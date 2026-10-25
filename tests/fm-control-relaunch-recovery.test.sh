@@ -273,25 +273,25 @@ test_relocation_rebinds_a_vanished_worktree_to_a_fresh_copy() {
   local dir out rc id=rl100
   dir=$(new_case relocate-valid "$id")
   make_relocation_case "$dir" "$id"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "the old copy vanished"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "the old copy vanished"); rc=$?
   expect_code 0 "$rc" "a vanished copy must relocate onto a fresh copy of its branch"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the record was not rebound to the fresh copy"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "the record was not rebound to the fresh copy"
   [ "$(meta_field "$dir" "$id" branch)" = "task-$id" ] || fail "relocation changed the recorded branch"
   [ "$(meta_field "$dir" "$id" endpoint_task_id)" = "$id" ] || fail "relocation changed the task identity"
   [ "$(meta_field "$dir" "$id" window)" = "fmses:fm-$id" ] || fail "relocation moved the endpoint"
-  [ "$(git -C "$dir/dest" rev-parse HEAD)" = "$(cat "$dir/committed-head")" ] || fail "the fresh copy lost committed work"
-  [ -z "$(git -C "$dir/dest" status --porcelain)" ] || fail "relocation left the fresh copy dirty"
-  assert_present "$dir/dest/.claude/settings.local.json" "the replacement was not wired in the fresh copy"
-  assert_grep "cd -- '$dir/dest'" "$dir/fake/keys" "the replacement launched outside the fresh copy"
+  [ "$(git -C "$dir/th/1/dest" rev-parse HEAD)" = "$(cat "$dir/committed-head")" ] || fail "the fresh copy lost committed work"
+  [ -z "$(git -C "$dir/th/1/dest" status --porcelain)" ] || fail "relocation left the fresh copy dirty"
+  assert_present "$dir/th/1/dest/.claude/settings.local.json" "the replacement was not wired in the fresh copy"
+  assert_grep "cd -- '$dir/th/1/dest'" "$dir/fake/keys" "the replacement launched outside the fresh copy"
   assert_contains "$(cat "$dir/home/state/$id.status")" "preserved history" "relocation truncated the status log"
   assert_grep "the old copy vanished" "$dir/home/data/$id/brief.md" "relocation dropped the progress note"
   assert_grep "proven absent" "$dir/home/data/$id/brief.md" "the note must tell the worker its copy was replaced"
   [ "$(journal_field "$dir" "$id" phase)" = complete ] || fail "relocation did not complete its journal"
   [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/wt" ] || fail "the journal lost the vanished path"
-  [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/dest" ] || fail "the journal lost the fresh copy"
+  [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/th/1/dest" ] || fail "the journal lost the fresh copy"
   [ "$(journal_field "$dir" "$id" relocation_head)" = "$(cat "$dir/committed-head")" ] || fail "the journal lost the recorded head"
   [ "$(journal_field "$dir" "$id" relocation_head_source)" = meta-pr_head ] || fail "the journal must name every recorded source it checked"
-  [ "$(cat "$dir/fake/cwd")" = "$dir/dest" ] || fail "the idle shell was not moved from the vanished path"
+  [ "$(cat "$dir/fake/cwd")" = "$dir/th/1/dest" ] || fail "the idle shell was not moved from the vanished path"
   pass "relocation: a vanished copy rebinds to a fresh copy of its branch, keeping identity, endpoint, status and note"
 }
 
@@ -317,7 +317,7 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
         source="registered-worktree,journal-worktree_head,meta-pr_head"
         ;;
     esac
-    out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+    out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
     expect_code 0 "$rc" "a copy containing the recorded head must relocate ($variant)"$'\n'"$out"
     [ "$(journal_field "$dir" "$id" relocation_head_source)" = "$source" ] \
       || fail "the journal named '$(journal_field "$dir" "$id" relocation_head_source)', not $source ($variant)"
@@ -348,7 +348,7 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
           "$id" "$dir/wt" "$(cat "$dir/first-head")" "$dir/wt" "$(cat "$dir/committed-head")" > "$dir/home/state/$id.control-relaunch"
         ;;
     esac
-    git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
+    git -C "$dir/th/1/dest" reset -q --hard "$(cat "$dir/first-head")"
     run_relocation_refusal "$dir" "$id" "does not contain" "branch reset behind the recorded head ($variant)"
   done
   id=rl102nohead
@@ -356,9 +356,10 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" pr_head ""
   run_relocation_refusal "$dir" "$id" "no recorded head exists" "no surviving recorded head"
-  run_relocation_refusal "$dir" "$id" "git worktree add -f <path> task-$id" "no-head refusal names the forced add"
+  run_relocation_refusal "$dir" "$id" "run 'treehouse get' (without -b) from" "no-head refusal names the lease allocation"
+  run_relocation_refusal "$dir" "$id" "git checkout --ignore-other-worktrees task-$id" "no-head refusal names the checkout past the kept registration"
   run_relocation_refusal "$dir" "$id" "do not run 'git worktree prune' first" "no-head refusal warns against pruning"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
   expect_code 1 "$rc" "relocation must refuse (no-head remedy)"$'\n'"$out"
   assert_contains "$out" "pr_head=<sha>, into the task record" "no-head refusal must name the pr_head= route"
   assert_not_contains "$out" "worktree_head=" "no-head refusal must not name the journal worktree_head= hint"
@@ -367,13 +368,13 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" pr_head ""
   set_case_meta_field "$dir" "$id" pr "https://github.com/example/repo/pull/7"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
   expect_code 1 "$rc" "relocation must refuse (no-head remedy with a recorded PR)"$'\n'"$out"
   assert_contains "$out" "task=$id, worktree=$dir/wt, worktree_head=<sha> into the control journal $dir/home/state/$id.control-relaunch" \
     "no-head refusal for a task with a PR must name the three journal lines"
   assert_not_contains "$out" "pr_head=" "no-head refusal must not tell a task with a PR to hand-write pr_head="
   printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/committed-head")" > "$dir/home/state/$id.control-relaunch"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
   expect_code 0 "$rc" "the named journal lines must let a task with a PR relocate"$'\n'"$out"
   [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-worktree_head ] \
     || fail "the journal remedy was not the checked source ($(journal_field "$dir" "$id" relocation_head_source))"
@@ -395,7 +396,7 @@ test_relocation_refuses_unreadable_head_evidence() {
     else
       make_relocation_case "$dir" "$id" keep-registration
       set_case_meta_field "$dir" "$id" pr_head "$(cat "$dir/first-head")"
-      git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
+      git -C "$dir/th/1/dest" reset -q --hard "$(cat "$dir/first-head")"
     fi
     case "$variant" in
       registration|reflog)
@@ -428,12 +429,12 @@ test_relocation_refuses_unreadable_head_evidence() {
     brief_before=$(cat "$dir/home/data/$id/brief.md")
     chmod 000 "$locked"
     args=("$id" relaunch --note "resume")
-    [ "$variant" = journal-ordinary ] || args+=(--worktree "$dir/dest")
+    [ "$variant" = journal-ordinary ] || args+=(--worktree "$dir/th/1/dest")
     out=$(run_control "$dir" "${args[@]}"); rc=$?
     expect_code 1 "$rc" "control must refuse unreadable historical evidence ($variant)"$'\n'"$out"
     assert_contains "$out" "$fragment" "control refused for the wrong reason ($variant)"
     if [ "$variant" != journal-ordinary ]; then
-      out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+      out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
       expect_code 1 "$rc" "direct spawn must refuse unreadable historical evidence ($variant)"$'\n'"$out"
       assert_contains "$out" "$fragment" "direct spawn refused for the wrong reason ($variant)"
     fi
@@ -469,8 +470,8 @@ test_relocation_refuses_every_unsafe_destination() {
         chmod 000 "$dir/locked"
         fragment="cannot be proven"
         ;;
-      branch) git -C "$dir/dest" checkout -q -b elsewhere; fragment="does not equal the recorded branch" ;;
-      detached) git -C "$dir/dest" checkout -q --detach; fragment="does not equal the recorded branch" ;;
+      branch) git -C "$dir/th/1/dest" checkout -q -b elsewhere; fragment="does not equal the recorded branch" ;;
+      detached) git -C "$dir/th/1/dest" checkout -q --detach; fragment="does not equal the recorded branch" ;;
       head-unrelated)
         foreign=$(printf 'unrelated\n' | git -C "$dir/proj" -c user.name=t -c user.email=t@example.com commit-tree "$(git -C "$dir/proj" rev-parse 'HEAD^{tree}')")
         set_case_meta_field "$dir" "$id" pr_head "$foreign"
@@ -481,9 +482,9 @@ test_relocation_refuses_every_unsafe_destination() {
         fragment="not in the repository"
         ;;
       head-malformed) set_case_meta_field "$dir" "$id" pr_head not-a-commit; fragment="full commit id" ;;
-      owned) printf 'worktree=%s\n' "$dir/dest" > "$dir/home/state/other.meta"; fragment="recorded by another task" ;;
+      owned) printf 'worktree=%s\n' "$dir/th/1/dest" > "$dir/home/state/other.meta"; fragment="recorded by another task" ;;
       owned-alias)
-        ln -s "$dir/dest" "$dir/alias"
+        ln -s "$dir/th/1/dest" "$dir/alias"
         printf 'worktree=%s\n' "$dir/alias" > "$dir/home/state/other.meta"
         fragment="recorded by another task"
         ;;
@@ -492,8 +493,8 @@ test_relocation_refuses_every_unsafe_destination() {
         fragment="same repository"
         ;;
       primary) fragment="isolated worktree" ;;
-      subdir) mkdir "$dir/dest/subdir"; fragment="not a worktree root" ;;
-      dirty) printf 'someone else\n' > "$dir/dest/stray.txt"; fragment="uncommitted changes" ;;
+      subdir) mkdir "$dir/th/1/dest/subdir"; fragment="not a worktree root" ;;
+      dirty) printf 'someone else\n' > "$dir/th/1/dest/stray.txt"; fragment="uncommitted changes" ;;
       scout) set_case_meta_field "$dir" "$id" kind scout; fragment="ships only" ;;
       secondmate)
         set_case_meta_field "$dir" "$id" kind secondmate
@@ -503,12 +504,14 @@ test_relocation_refuses_every_unsafe_destination() {
         ;;
       relative) fragment="absolute path" ;;
       missing-dest) fragment="not a readable directory" ;;
-      same-as-recorded) fragment="still exists" ;;
+      # Treehouse reuses a free slot, so `treehouse get` often enters the
+      # vanished copy's own path; the refusal must name plain relaunch.
+      same-as-recorded) fragment="run 'git checkout --ignore-other-worktrees task-$id' in it, then relaunch without --worktree" ;;
     esac
     case "$variant" in
       other-repo) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/foreign-wt" ;;
       primary) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/proj" ;;
-      subdir) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/dest/subdir" ;;
+      subdir) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/th/1/dest/subdir" ;;
       relative) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "dest" ;;
       missing-dest) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/nope" ;;
       same-as-recorded) mkdir "$dir/wt"; run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/wt" ;;
@@ -540,9 +543,9 @@ test_relocation_refuses_a_copy_another_local_home_records() {
     case "$variant" in
       worktree*|home*)
         field=${variant%%-*}
-        owned="$dir/dest"
+        owned="$dir/th/1/dest"
         if [[ "$variant" = *-alias ]]; then
-          ln -s "$dir/dest" "$dir/alias"
+          ln -s "$dir/th/1/dest" "$dir/alias"
           owned="$dir/alias"
         fi
         printf '%s=%s\n' "$field" "$owned" > "$dir/mate/state/$id.meta"
@@ -556,15 +559,15 @@ test_relocation_refuses_a_copy_another_local_home_records() {
         locked="$dir/mate/data/secondmates.md"
         printf -- '- hidden - a local mate (home: %s; scope: project work; projects: project; added 2026-09-01)\n' \
           "$dir/hidden" > "$locked"
-        printf '%s=%s\n' "${variant##*-}" "$dir/dest" > "$dir/hidden/state/$id.meta"
+        printf '%s=%s\n' "${variant##*-}" "$dir/th/1/dest" > "$dir/hidden/state/$id.meta"
         chmod 000 "$locked"
         fragment="local Firstmate registry cannot be read"
         ;;
       own-record)
-        set_case_meta_field "$dir" "$id" home "$dir/dest"
-        out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+        set_case_meta_field "$dir" "$id" home "$dir/th/1/dest"
+        out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
         expect_code 0 "$rc" "the exact own record must be excluded from the local-home scan"$'\n'"$out"
-        [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "own-record exclusion did not allow relocation"
+        [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "own-record exclusion did not allow relocation"
         continue
         ;;
     esac
@@ -572,7 +575,7 @@ test_relocation_refuses_a_copy_another_local_home_records() {
     brief_before=$(cat "$dir/home/data/$id/brief.md")
     journal_before=$(cat "$dir/home/state/$id.control-relaunch")
     run_relocation_refusal "$dir" "$id" "$fragment" "$variant"
-    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
     expect_code 1 "$rc" "direct spawn must refuse the local-home ownership hazard ($variant)"$'\n'"$out"
     assert_contains "$out" "$fragment" "direct spawn refused for the wrong reason ($variant)"
     [ "$(cat "$dir/home/state/$id.meta")" = "$before" ] || fail "direct refusal changed the record ($variant)"
@@ -591,22 +594,22 @@ test_relocation_never_overwrites_or_deletes_a_foreign_harness_file() {
     id="rl104$n"
     dir=$(new_case "relocate-wiring-$n" "$id")
     make_relocation_case "$dir" "$id"
-    mkdir -p "$(dirname "$dir/dest/$rel")"
-    printf 'the project owns this file: %s\n' "$rel" > "$dir/dest/$rel"
+    mkdir -p "$(dirname "$dir/th/1/dest/$rel")"
+    printf 'the project owns this file: %s\n' "$rel" > "$dir/th/1/dest/$rel"
     # A project commonly ignores these local files, which is exactly when the
     # clean-copy check cannot see them and the harness-file check must.
-    printf '%s\n' "$rel" >> "$(git -C "$dir/dest" rev-parse --path-format=absolute --git-path info/exclude)"
-    before=$(cat "$dir/dest/$rel")
+    printf '%s\n' "$rel" >> "$(git -C "$dir/th/1/dest" rev-parse --path-format=absolute --git-path info/exclude)"
+    before=$(cat "$dir/th/1/dest/$rel")
     run_relocation_refusal "$dir" "$id" "harness file" "foreign $rel"
-    [ "$(cat "$dir/dest/$rel")" = "$before" ] || fail "a refused relocation changed $rel"
-    rm "$dir/dest/$rel"
+    [ "$(cat "$dir/th/1/dest/$rel")" = "$before" ] || fail "a refused relocation changed $rel"
+    rm "$dir/th/1/dest/$rel"
     printf '%s\n' "$before" > "$dir/fake/foreign-wiring"
-    printf '%s\n' "$dir/dest/$rel" > "$dir/fake/foreign-wiring-path"
-    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+    printf '%s\n' "$dir/th/1/dest/$rel" > "$dir/fake/foreign-wiring-path"
+    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
     expect_code 1 "$rc" "the launch owner must refuse a foreign $rel"$'\n'"$out"
     assert_contains "$out" "harness file" "the launch owner refused for the wrong reason ($rel)"
     assert_present "$dir/fake/foreign-wiring-created" "the foreign file must arrive after admission ($rel)"
-    [ "$(cat "$dir/dest/$rel")" = "$before" ] || fail "the launch owner changed $rel"
+    [ "$(cat "$dir/th/1/dest/$rel")" = "$before" ] || fail "the launch owner changed $rel"
     [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused launch rebound the record ($rel)"
   done
   pass "relocation: a destination's own harness files are never overwritten or deleted"
@@ -623,26 +626,26 @@ test_relocation_proof_survives_every_failure_journal_rewrite() {
       launch-refused)
         printf '%s' "$dir/proj" > "$dir/fake/cwd"
         : > "$dir/fake/ignore-cd"
-        out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+        out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
         phase=failed:launching
         ;;
       stop-transport)
         printf claude > "$dir/fake/command"
         out=$(FM_FAKE_EXIT_TRANSPORT_FAIL_AFTER_STOP=1 \
-          run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+          run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
         phase=failed:stopping
         ;;
       publish-failed)
         make_mv_failure_stub "$dir"
         out=$(FM_REAL_MV="$(command -v mv)" FM_FAKE_META_PUBLISH_MV_FAIL="$dir/home/state/$id.meta" \
-          run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
+          run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "resume"); rc=$?
         phase=failed:launching
         ;;
       complete-journal)
         printf codex > "$dir/fake/becomes"
         make_mv_failure_stub "$dir"
         out=$(FM_REAL_MV="$(command -v mv)" FM_FAKE_COMPLETE_JOURNAL_MV_FAIL=1 \
-          run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/dest" --note "resume"); rc=$?
+          run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/th/1/dest" --note "resume"); rc=$?
         phase=failed:launching
         ;;
     esac
@@ -650,7 +653,7 @@ test_relocation_proof_survives_every_failure_journal_rewrite() {
     [ "$(journal_field "$dir" "$id" phase)" = "$phase" ] \
       || fail "the journal phase was '$(journal_field "$dir" "$id" phase)', not $phase ($variant)"
     [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/wt" ] || fail "the failure journal lost relocation_from ($variant)"
-    [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/dest" ] || fail "the failure journal lost relocation_to ($variant)"
+    [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/th/1/dest" ] || fail "the failure journal lost relocation_to ($variant)"
     [ "$(journal_field "$dir" "$id" relocation_head)" = "$(cat "$dir/committed-head")" ] \
       || fail "the failure journal lost relocation_head ($variant)"
     if [ "$variant" != complete-journal ]; then
@@ -665,17 +668,17 @@ test_relocation_proof_survives_every_failure_journal_rewrite() {
   make_relocation_case "$dir" "$id"
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
   : > "$dir/fake/ignore-cd"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "first attempt"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "first attempt"); rc=$?
   expect_code 1 "$rc" "the first attempt must fail after the stop"$'\n'"$out"
   set_case_meta_field "$dir" "$id" pr_head "$(cat "$dir/first-head")"
-  git -C "$dir/dest" reset -q --hard "$(cat "$dir/first-head")"
-  printf '%s' "$dir/dest" > "$dir/fake/cwd"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "second attempt"); rc=$?
+  git -C "$dir/th/1/dest" reset -q --hard "$(cat "$dir/first-head")"
+  printf '%s' "$dir/th/1/dest" > "$dir/fake/cwd"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "second attempt"); rc=$?
   expect_code 1 "$rc" "a copy that lost the journaled head must still be refused on retry"$'\n'"$out"
   assert_contains "$out" "does not contain" "the retry must be judged against the journaled head"
-  git -C "$dir/dest" reset -q --hard "$(cat "$dir/committed-head")"
+  git -C "$dir/th/1/dest" reset -q --hard "$(cat "$dir/committed-head")"
   rm "$dir/fake/ignore-cd"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "third attempt"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "third attempt"); rc=$?
   expect_code 0 "$rc" "the identical relocation must succeed once the copy is right"$'\n'"$out"
   [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head,journal-worktree_head,meta-pr_head ] \
     || fail "the retry must check both surviving journal heads and the PR head, got '$(journal_field "$dir" "$id" relocation_head_source)'"
@@ -688,12 +691,12 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
   make_relocation_case "$dir" "$id"
   printf codex > "$dir/fake/becomes"
   out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
-    run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/dest" --note "relocate"); rc=$?
+    run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/th/1/dest" --note "relocate"); rc=$?
   expect_code 1 "$rc" "relocation must report a post-publication launch failure"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "published relocation did not retain its destination"
-  [ "$(journal_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "failure journal still names the vanished worktree"
-  git_commit_file "$dir/dest" later.txt "committed after relocation"
-  newer=$(git -C "$dir/dest" rev-parse HEAD)
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "published relocation did not retain its destination"
+  [ "$(journal_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "failure journal still names the vanished worktree"
+  git_commit_file "$dir/th/1/dest" later.txt "committed after relocation"
+  newer=$(git -C "$dir/th/1/dest" rev-parse HEAD)
   out=$(FM_FAKE_LAUNCH_TRANSPORT_FAIL_AFTER_START=1 \
     run_control "$dir" "$id" relaunch --note "ordinary retry"); rc=$?
   expect_code 1 "$rc" "ordinary retry must report the staged launch failure"$'\n'"$out"
@@ -701,7 +704,7 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
   for field in from to head head_source; do
     case "$field" in
       from) expected="$dir/wt" ;;
-      to) expected="$dir/dest" ;;
+      to) expected="$dir/th/1/dest" ;;
       head) expected=$(cat "$dir/committed-head") ;;
       head_source) expected="meta-pr_head" ;;
     esac
@@ -710,20 +713,20 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
   done
   [ "$(journal_field "$dir" "$id" worktree_head)" = "$newer" ] || fail "ordinary launch failure lost the newer checkpoint"
   set_case_meta_field "$dir" "$id" pr_head ""
-  git -C "$dir/proj" worktree remove --force "$dir/dest"
+  git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
   git -C "$dir/proj" branch -f "task-$id" "$(cat "$dir/committed-head")"
-  git -C "$dir/proj" worktree add -q "$dir/next" "task-$id"
+  git -C "$dir/proj" worktree add -q "$dir/th/2/next" "task-$id"
   printf zsh > "$dir/fake/command"
   : > "$dir/fake/literal"
-  run_relocation_refusal "$dir" "$id" "journal-worktree_head" "newer checkpoint after ordinary launch failure" "$dir/next"
-  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/next"); rc=$?
+  run_relocation_refusal "$dir" "$id" "journal-worktree_head" "newer checkpoint after ordinary launch failure" "$dir/th/2/next"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/2/next"); rc=$?
   expect_code 1 "$rc" "direct spawn must preserve the failed ordinary relaunch checkpoint"$'\n'"$out"
   assert_contains "$out" "journal-worktree_head" "direct spawn missed the failed ordinary checkpoint"
-  git -C "$dir/next" reset -q --hard "$newer"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/next" --note "relocate again"); rc=$?
+  git -C "$dir/th/2/next" reset -q --hard "$newer"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/2/next" --note "relocate again"); rc=$?
   expect_code 0 "$rc" "a later relocation must recover proof through relocation_to"$'\n'"$out"
-  [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/dest" ] || fail "new relocation did not replace the prior proof"
-  [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/next" ] || fail "new relocation did not record its destination"
+  [ "$(journal_field "$dir" "$id" relocation_from)" = "$dir/th/1/dest" ] || fail "new relocation did not replace the prior proof"
+  [ "$(journal_field "$dir" "$id" relocation_to)" = "$dir/th/2/next" ] || fail "new relocation did not record its destination"
   [ "$(journal_field "$dir" "$id" relocation_head_source)" = journal-relocation_head,journal-worktree_head ] || fail "later relocation did not use both surviving journal heads"
   pass "relocation: proof survives ordinary launch failures and proves a later destination"
 }
@@ -733,30 +736,30 @@ test_relocation_requires_a_newer_ordinary_relaunch_checkpoint() {
   dir=$(new_case relocate-newer-checkpoint "$id")
   make_relocation_case "$dir" "$id"
   printf codex > "$dir/fake/becomes"
-  out=$(run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/dest" --note "relocate"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --harness codex --worktree "$dir/th/1/dest" --note "relocate"); rc=$?
   expect_code 0 "$rc" "the first relocation must complete"$'\n'"$out"
-  git_commit_file "$dir/dest" later.txt "committed after relocation"
-  newer=$(git -C "$dir/dest" rev-parse HEAD)
+  git_commit_file "$dir/th/1/dest" later.txt "committed after relocation"
+  newer=$(git -C "$dir/th/1/dest" rev-parse HEAD)
   printf zsh > "$dir/fake/command"
   out=$(run_control "$dir" "$id" relaunch --note "checkpoint newer work"); rc=$?
   expect_code 0 "$rc" "the ordinary relaunch must complete at the newer head"$'\n'"$out"
   [ "$(journal_field "$dir" "$id" worktree_head)" = "$newer" ] || fail "ordinary relaunch did not checkpoint newer work"
   [ "$(journal_field "$dir" "$id" relocation_head)" = "$(cat "$dir/committed-head")" ] || fail "ordinary relaunch lost the earlier relocation proof"
-  git -C "$dir/proj" worktree remove --force "$dir/dest"
+  git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
   git -C "$dir/proj" branch -f "task-$id" "$(cat "$dir/committed-head")"
-  git -C "$dir/proj" worktree add -q "$dir/next" "task-$id"
+  git -C "$dir/proj" worktree add -q "$dir/th/2/next" "task-$id"
   printf zsh > "$dir/fake/command"
   : > "$dir/fake/literal"
-  run_relocation_refusal "$dir" "$id" "journal-worktree_head" "newer ordinary checkpoint" "$dir/next"
-  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/next"); rc=$?
+  run_relocation_refusal "$dir" "$id" "journal-worktree_head" "newer ordinary checkpoint" "$dir/th/2/next"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/2/next"); rc=$?
   expect_code 1 "$rc" "direct spawn must also preserve the newer checkpoint"$'\n'"$out"
   assert_contains "$out" "journal-worktree_head" "direct spawn missed the newer checkpoint"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "checkpoint refusal rebound the task"
-  git -C "$dir/next" reset -q --hard "$newer"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/next" --note "resume all committed work"); rc=$?
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "checkpoint refusal rebound the task"
+  git -C "$dir/th/2/next" reset -q --hard "$newer"
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/2/next" --note "resume all committed work"); rc=$?
   expect_code 0 "$rc" "a copy containing both journal heads must relocate"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/next" ] || fail "the containing copy was not published"
-  [ "$(git -C "$dir/next" rev-parse HEAD)" = "$newer" ] || fail "relocation lost newer committed work"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/2/next" ] || fail "the containing copy was not published"
+  [ "$(git -C "$dir/th/2/next" rev-parse HEAD)" = "$newer" ] || fail "relocation lost newer committed work"
   pass "relocation: a newer ordinary relaunch checkpoint cannot be hidden by preserved relocation evidence"
 }
 
@@ -766,9 +769,9 @@ test_relocation_claims_and_respects_pool_slot_ownership() {
     dir=$(new_case "relocate-pool-$id" "$id")
     make_relocation_case "$dir" "$id"
     pool="$dir/pool"
-    git -C "$dir/proj" worktree remove --force "$dir/dest"
+    git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
     mkdir -p "$pool/1"
-    printf '{}\n' > "$pool/treehouse-state.json"
+    write_pool_state "$pool" "$pool/1/repo"
     git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
     printf '%s' "$pool/1/repo" > "$dir/fake/cwd"
     marker="$pool/1/.fm-slot-owner"
@@ -803,8 +806,8 @@ test_relocation_claims_and_respects_pool_slot_ownership() {
   pass "relocation: a pool slot claimed by another task refuses, and an unclaimed one is claimed for the task"
 }
 
-test_concurrent_non_pool_relocations_publish_only_one_owner() {
-  local dir second id=rl111race first_pid out rc first_rc i=0 before
+test_concurrent_pool_slot_claim_publishes_one_owner() {
+  local dir second id=rl111race first_pid out rc first_rc i=0 before first_before holder
   dir=$(new_case relocate-race-first "$id")
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" harness codex
@@ -822,8 +825,35 @@ test_concurrent_non_pool_relocations_publish_only_one_owner() {
   printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
     "$second/home" > "$dir/home/data/secondmates.md"
   before=$(cat "$second/home/state/$id.meta")
+  # Two homes can both pass the unlocked ownership proof before either claims
+  # the slot; the shared project lock alone then stops the second one.
+  first_before=$(cat "$dir/home/state/$id.meta")
+  # shellcheck disable=SC2016 # expanded by the holder's own shell
+  FM_HOME="$dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    lock=$(fm_treehouse_project_lock_path "$2") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    printf "%s\n" "$lock" > "$3.held"
+    while [ ! -f "$3.release" ]; do sleep 0.05; done
+    fm_lock_release "$lock"
+  ' _ "$ROOT" "$dir/proj" "$dir/lock-holder" &
+  holder=$!
+  while [ ! -s "$dir/lock-holder.held" ] && kill -0 "$holder" 2>/dev/null && [ "$i" -lt 1000 ]; do
+    sleep 0.01
+    i=$((i + 1))
+  done
+  [ -s "$dir/lock-holder.held" ] || fail "the lock holder never took the shared project lock"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
+  : > "$dir/lock-holder.release"
+  wait "$holder" || true
+  expect_code 1 "$rc" "a relocation published while another actor held the shared project lock: $out"
+  assert_contains "$out" "refusing to race relocation ownership" "a relocation did not refuse on the held shared project lock"
+  [ "$(cat "$dir/home/state/$id.meta")" = "$first_before" ] || fail "a relocation refused at the shared lock published a record"
+  assert_absent "$dir/th/1/.fm-slot-owner" "a relocation refused at the shared lock claimed the pool slot"
+  [ ! -s "$dir/fake/literal" ] || fail "a relocation refused at the shared lock launched an agent"
+  i=0
   : > "$dir/fake/hold-relocation-cd"
-  run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest" > "$dir/first.out" 2>&1 &
+  run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest" > "$dir/first.out" 2>&1 &
   # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
   first_pid=$!
   while [ ! -f "$dir/fake/relocation-cd-held" ] && kill -0 "$first_pid" 2>/dev/null && [ "$i" -lt 1000 ]; do
@@ -835,20 +865,86 @@ test_concurrent_non_pool_relocations_publish_only_one_owner() {
     wait "$first_pid" || true
     fail "the first relocation never reached cwd handoff: $(cat "$dir/first.out")"
   fi
-  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
   : > "$dir/fake/relocation-cd-release"
   first_rc=0
   wait "$first_pid" || first_rc=$?
   expect_code 0 "$first_rc" "the lock-holding relocation failed: $(cat "$dir/first.out")"
   expect_code 1 "$rc" "the second home published into an acquired copy: $out"
-  assert_contains "$out" "refusing to race relocation ownership" "concurrent relocation did not refuse under the shared lock"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the first home did not publish its destination"
+  assert_contains "$out" "is claimed by task" "concurrent relocation did not refuse on the lease claim"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "the first home did not publish its destination"
   [ "$(cat "$second/home/state/$id.meta")" = "$before" ] || fail "the second home published a competing owner"
   [ ! -s "$second/fake/literal" ] || fail "the second home launched into the first home's copy"
-  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
   expect_code 1 "$rc" "a retry ignored the published owner: $out"
-  assert_contains "$out" "recorded by another task" "the published owner was not visible after lock release"
-  pass "concurrent non-pool relocations from two homes publish and launch exactly one owner"
+  assert_contains "$out" "recorded by another task" "the published owner was not visible to the retry"
+  pass "concurrent relocations refuse while the shared project lock is held, and two homes publish and launch exactly one pool owner"
+}
+
+test_relocation_refuses_a_non_lease_copy() {
+  local dir id variant dest fragment remedy out rc bash_env state lease="run 'git checkout --ignore-other-worktrees"
+  for variant in plain unrecorded missing-jq escaped relative; do
+    id="rl113${variant//-/}"
+    dir=$(new_case "relocate-non-lease-$variant" "$id")
+    make_relocation_case "$dir" "$id"
+    dest="$dir/th/1/dest"
+    state="$dir/th/treehouse-state.json"
+    bash_env=
+    case "$variant" in
+      plain|unrecorded)
+        git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
+        if [ "$variant" = plain ]; then
+          dest="$dir/plain"; fragment="is not a Treehouse pool slot"
+        else
+          dest="$dir/th/9/dest"; fragment="has no entry in Treehouse state"
+        fi
+        remedy="$lease task-$id' in the slot it enters"
+        git -C "$dir/proj" worktree add -q "$dest" "task-$id"
+        ;;
+      missing-jq)
+        # jq lives in a system directory on many hosts, so mask it the way the
+        # bootstrap case does instead of trimming PATH.
+        bash_env="$dir/no-jq.bash"
+        cat > "$bash_env" <<'SH'
+command() {
+  if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+jq() {
+  return 127
+}
+SH
+        fragment="needs jq, which is not installed"
+        remedy="install jq and retry"
+        ;;
+      escaped|relative)
+        if [ "$variant" = escaped ]; then
+          jq '.worktrees += [{name: "3", path: "/elsewhere\\3/next", leased: true}]' "$state" > "$state.tmp"
+          fragment="contains an escaped entry path for entry '3'"
+        else
+          jq '.worktrees += [{name: "3", path: "3/next", leased: true}]' "$state" > "$state.tmp"
+          fragment="contains a relative entry path for entry '3'"
+        fi
+        mv "$state.tmp" "$state"
+        remedy="the pool's treehouse-state.json must be inspected, because another entry cannot be compared, then retry; a new lease slot does not clear this refusal"
+        ;;
+    esac
+    # fm-control reads its dispatch rules with jq before it reaches the proof,
+    # so only the launch owner meets the missing-jq refusal.
+    [ -n "$bash_env" ] || run_relocation_refusal "$dir" "$id" "$fragment" "$variant copy" "$dest"
+    out=$(BASH_ENV=$bash_env run_spawn "$dir" "$id" --relaunch --worktree "$dest"); rc=$?
+    expect_code 1 "$rc" "the launch owner must refuse a $variant copy"$'\n'"$out"
+    assert_contains "$out" "$fragment" "the launch owner refused the $variant copy for the wrong reason"
+    assert_contains "$out" "$remedy" "the $variant refusal did not name its own remedy"
+    case "$variant" in
+      plain|unrecorded) ;;
+      *) assert_not_contains "$out" "$lease" "the $variant refusal named the lease procedure, which cannot clear it" ;;
+    esac
+    [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused $variant relocation changed the record"
+  done
+  pass "relocation: a hand-made linked worktree refuses, in or out of the pool layout, unless the pool state records it, and an unreadable state names its own remedy"
 }
 
 test_unpublished_relocation_releases_only_its_new_pool_claim() {
@@ -859,9 +955,9 @@ test_unpublished_relocation_releases_only_its_new_pool_claim() {
     make_relocation_case "$dir" "$id"
     cp "$dir/home/data/$id/brief.md" "$dir/brief-before"
     pool="$dir/pool"
-    git -C "$dir/proj" worktree remove --force "$dir/dest"
+    git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
     mkdir -p "$pool/1" "$pool/2"
-    printf '{}\n' > "$pool/treehouse-state.json"
+    write_pool_state "$pool" "$pool/1/repo" "$pool/2/repo"
     git -C "$dir/proj" worktree add -q "$pool/1/repo" "task-$id"
     git -C "$dir/proj" worktree add -q -f "$pool/2/repo" "task-$id"
     marker="$pool/1/.fm-slot-owner"
@@ -926,18 +1022,18 @@ test_relocation_flag_is_scoped_to_relaunch() {
   local dir out rc id=rl107
   dir=$(new_case relocate-flags "$id")
   make_relocation_case "$dir" "$id"
-  out=$(run_control "$dir" "$id" exit --worktree "$dir/dest"); rc=$?
+  out=$(run_control "$dir" "$id" exit --worktree "$dir/th/1/dest"); rc=$?
   expect_code 1 "$rc" "--worktree must not apply to exit"$'\n'"$out"
   assert_contains "$out" "apply to 'relaunch' only" "the exit refusal must name the verb restriction"
   out=$(run_control "$dir" "$id" relaunch --worktree); rc=$?
   expect_code 1 "$rc" "--worktree needs a value"$'\n'"$out"
   assert_contains "$out" "--worktree requires a value" "the refusal must name the missing value"
-  out=$(run_spawn "$dir" "$id" --worktree "$dir/dest"); rc=$?
+  out=$(run_spawn "$dir" "$id" --worktree "$dir/th/1/dest"); rc=$?
   expect_code 1 "$rc" "a fresh spawn must refuse --worktree"$'\n'"$out"
   assert_contains "$out" "applies to --relaunch only" "the spawn refusal must name relaunch"
-  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest"); rc=$?
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
   expect_code 0 "$rc" "the launch owner must accept a validated relocation on its own"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the launch owner did not rebind the record"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "the launch owner did not rebind the record"
   pass "relocation: --worktree belongs to relaunch only, and the launch owner repeats the proof itself"
 }
 
@@ -1927,7 +2023,8 @@ control_relaunch_test_cases+=(
   test_relocation_proof_survives_later_ordinary_launch_failure
   test_relocation_requires_a_newer_ordinary_relaunch_checkpoint
   test_relocation_claims_and_respects_pool_slot_ownership
-  test_concurrent_non_pool_relocations_publish_only_one_owner
+  test_relocation_refuses_a_non_lease_copy
+  test_concurrent_pool_slot_claim_publishes_one_owner
   test_unpublished_relocation_releases_only_its_new_pool_claim
   test_relocation_flag_is_scoped_to_relaunch
   test_herdr_relaunch_resumes_only_the_registered_pi_session

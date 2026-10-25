@@ -52,7 +52,9 @@
 # Ship branch line), anchoring the copy it leaves, recording that copy as
 # prior_worktree= (or, when it is in a pool slot the task leaves entirely,
 # releasing the task's claim and recording it as released_worktree=), and
-# writing the note in the brief. It stops, starts,
+# writing the note in the brief. A ship whose recorded copy is gone refuses,
+# because relocation through relaunch --worktree is that copy's only recovery
+# route. It stops, starts,
 # deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
 # any pipeline run are untouched. A recorded GitHub PR is retained only when
 # the replacement's HEAD equals or descends from its recorded head and the
@@ -898,13 +900,17 @@ reassociate_check() {  # <record-index>
   fm_task_copy_same_repository "$new_wt" "$project" \
     || die "replacement copy $new_wt is not a checkout of task $ID's project repository ($project): it uses a different repository/ref store, even if it has the same origin; nothing was changed"
 
-  # The current copy. A path that no longer exists has no bytes or owner left
-  # to protect and is recorded as it was; anything else that exists but is not
-  # a directory cannot be proved preserved, so it refuses.
+  # The current copy. A scout's path that no longer exists has no bytes or
+  # owner left to protect and is recorded as it was; a ship's vanished copy is
+  # recovered only by relocation, whose lease proof this re-point does not run.
+  # Anything else that exists but is not a directory cannot be proved
+  # preserved, so it refuses.
   if [ -e "$old_wt" ] || [ -L "$old_wt" ]; then
     old_real=$(fm_task_copy_canonical_dir "$old_wt") \
       || die "task $ID's recorded copy $old_wt exists but is not a directory, so it cannot be proved preserved; nothing was changed"
   else
+    [ "$kind" != ship ] \
+      || die "task $ID's recorded copy $old_wt is gone; reassociation re-points a ship whose copy still exists, so recover a vanished copy by relocation instead: fm-control $ID relaunch --worktree <copy> --note <why>, which accepts only a pool slot the project's Treehouse lease allocated (docs/agent-control.md \"Relocating a task whose worktree is gone\"); nothing was changed"
     old_state=absent
   fi
   [ "$old_real" != "$new_wt" ] \
@@ -2507,7 +2513,7 @@ safe_checkpoint() {
   else
     check_wt=$WT
   fi
-  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)"
+  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (for a ship of a Treehouse project, pass --worktree with a pool slot that 'treehouse get' allocates and that is checked out on the task's branch; if 'treehouse get' enters the recorded path itself, check the branch out there and relaunch without --worktree; a ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch, and a detailed procedure for that is follow-up work)"
   wt_real=$(cd "$check_wt" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $check_wt cannot be resolved"
   wt_top=$(git -C "$check_wt" rev-parse --show-toplevel 2>/dev/null) \
     || die "task $ID's recorded worktree $check_wt is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"
