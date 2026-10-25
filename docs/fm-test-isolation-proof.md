@@ -61,6 +61,21 @@ All six captain-hold files and 21 other candidates exited 0 under four-way concu
 Two candidates did not exit 0 for reasons unrelated to concurrency: `tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on that host, and `tests/fm-pr-merge.test.sh` fails its `forgejo-merges` case on that host both alone and on an unmodified checkout.
 That run is therefore not a clean 29-path pass and does not replace the archived result; the six files share the former file's fixtures and temporary-root discipline, and a clean run on a host with the Pi prerequisite refreshes this record.
 
+## fm-pr-merge split re-check
+
+The fm-pr-merge split proposed `tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` for the portable set beside `tests/fm-pr-merge.test.sh`, so the 31-path proposal was run as a portable-pool proof.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --jobs 4 --json /tmp/fm-proof-r3/portable.json`, on macOS at a one-minute load average between 10 and 18 during the run
+- Result: failed. One run, 31 candidates, 2 failures, summary `FM_ISOLATION_SUMMARY total=31 failed=2 concurrency=4 duration_ms=1673911`, run `fm-isolation-1792891736623-61827`, artifact `fm_test_run_jobs_enabled=false`.
+
+The two failing candidates were not the new paths.
+`tests/fm-backend-herdr.test.sh` exited 1 in `fm_backend_herdr_container_ensure`: Herdr server startup refused with `socket absence is unknown: AF_UNIX path too long`, because the proof's worker root under this host's `TMPDIR` made the socket path longer than the Unix-socket limit.
+`tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on this host, which the harness counts as a failure.
+All three fm-pr-merge groups exited 0, at 302702 ms for `fm-pr-merge-checks`, 211479 ms for `fm-pr-merge-forges`, and 215970 ms for `fm-pr-merge`.
+Because the run is not a clean 31-path pass, the two new paths are not admitted: they are absent from the candidate set above, from `bin/fm-test-isolation-proof.sh --list`, and from the portable parallel lanes, and they run in the portable serial remainder while staying in the `pr-forge` family.
+A clean portable-pool run of the 31-path proposal on a host with `tsc` and a short enough `TMPDIR` is what admits them.
+
 ## Durations
 
 | duration_ms | exit | worker | script |
@@ -197,7 +212,15 @@ The fm-pr-merge split added `fm-pr-merge-forges` and `fm-pr-merge-checks` to the
 
 The failing candidate was `tests/fm-open-loops.test.sh` (exit 1, 333116 ms): its inactive-source probe timed out after two seconds, and the collector's `os.killpg` cleanup then raised `PermissionError: [Errno 1] Operation not permitted`.
 The three fm-pr-merge groups exited 0 in that run at 336995 ms for `fm-pr-merge-checks`, 229810 ms for `fm-pr-merge-forges`, and 236863 ms for `fm-pr-merge`, and the other eleven candidates also exited 0.
-This run is not a clean pass and does not admit the new membership; a clean run of the 15-member family refreshes this record.
+That run is not a clean pass, so the family was run again.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4 --json /tmp/fm-proof-r3/prforge.json`, on macOS at a one-minute load average between 9 and 23 during the run
+- Result: passed. One run, 15 candidates, 0 failures, summary `FM_ISOLATION_SUMMARY total=15 failed=0 concurrency=4 duration_ms=1394355`, run `fm-isolation-1792890341539-10212`, artifact `fm_test_run_jobs_enabled=true`.
+
+`tests/fm-open-loops.test.sh` exited 0 in that run (757127 ms), and the three fm-pr-merge groups exited 0 at 350116 ms for `fm-pr-merge-checks`, 246981 ms for `fm-pr-merge-forges`, and 265749 ms for `fm-pr-merge`.
+This clean run covers the 15-member family, so `fm-pr-merge-forges` and `fm-pr-merge-checks` keep the family's four-worker admission.
+It does not admit them to the proven-isolated portable set; the [fm-pr-merge split re-check](#fm-pr-merge-split-re-check) owns that decision.
 
 ### secondmate: admitted
 

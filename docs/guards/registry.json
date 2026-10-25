@@ -274,7 +274,7 @@
       "trigger": "any unwaived required check at the current head is not green",
       "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports",
       "budget": 1,
-      "test": "tests/fm-pr-merge.test.sh",
+      "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture"
@@ -298,7 +298,7 @@
       "trigger": "an away record exists and the merge asks for a waiver or an unattended merge",
       "remedy": "return from away so the away record is archived, then bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> (attended only)",
       "budget": 1,
-      "test": "tests/fm-pr-merge.test.sh",
+      "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture"
@@ -322,7 +322,7 @@
       "trigger": "the task still has an open captain hold",
       "remedy": "bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release",
       "budget": 1,
-      "test": "tests/fm-pr-merge.test.sh",
+      "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
       "harm": "reversible",
       "remedy_verified": "fixture"

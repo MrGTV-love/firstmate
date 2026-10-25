@@ -253,7 +253,7 @@ error: refusing to merge https://gitlab.com/KarotKris/gitlab-merge-watch-fixture
   - the head pipeline ran at "none", not at the current head 66b8a6777bea5e291d7fa2fc20c42ad7686f6bc8
 ```
 
-The remaining refusal conditions, and the merge itself, are covered by `tests/fm-pr-merge.test.sh` against fixtures.
+The remaining refusal conditions, and the merge itself, are covered by `tests/fm-pr-merge-forges.test.sh` against fixtures.
 The conflict, unresolved-discussion, and running-pipeline conditions were additionally exercised against real merge requests on a private instance; those runs cannot be reproduced here, so their identifiers stay out of this record.
 The merge itself is not exercised against any live merge request, in either direction: `glab mr merge` has no dry run, so a live success path would mean merging someone's work to produce evidence.
 

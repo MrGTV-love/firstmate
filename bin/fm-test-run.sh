@@ -304,9 +304,10 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # of quietly stretching the workflow. The lane 1 membership that ran modeled at
 # 1209767 ms, just above this budget, so two scripts moved to lane 2; that
 # rebalanced lane 1 modeled at 1117958 ms, set by fm-pr-merge alone. After the
-# fm-pr-merge split, lane 1 models at 1016757 ms from the apportioned hints,
-# set by the bin holding fm-pr-merge-checks, fm-pr-merge, and fm-crew-state.
-# Like the serial target this is packing arithmetic, not an execution timeout.
+# fm-pr-merge split, only tests/fm-pr-merge.test.sh stays parallel, on an
+# apportioned hint, and fm-captain-hold-cleanup moved to lane 1 to restore the
+# balance; lane 1 models at 941010 ms, set by fm-test-run alone. Like the
+# serial target this is packing arithmetic, not an execution timeout.
 # measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 then modeled at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
@@ -649,8 +650,6 @@ tests/fm-herdr-lab.test.sh
 tests/fm-lint.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh
-tests/fm-pr-merge-forges.test.sh
-tests/fm-pr-merge-checks.test.sh
 tests/fm-review-diff.test.sh
 tests/fm-send-popup-settle.test.sh
 tests/fm-send-settle.test.sh
@@ -688,8 +687,6 @@ tests/fm-herdr-lab.test.sh 29438
 tests/fm-lint.test.sh 713491
 tests/fm-pi-primary-types.test.sh 3677
 tests/fm-pr-merge.test.sh 370000
-tests/fm-pr-merge-forges.test.sh 370000
-tests/fm-pr-merge-checks.test.sh 378000
 tests/fm-review-diff.test.sh 12861
 tests/fm-send-popup-settle.test.sh 10405
 tests/fm-send-settle.test.sh 3052
@@ -724,9 +721,8 @@ list_portable_parallel_1() {
   cat <<'EOF'
 tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
-tests/fm-pr-merge-checks.test.sh
-tests/fm-pr-merge-forges.test.sh
 tests/fm-pr-merge.test.sh
+tests/fm-captain-hold-cleanup.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh
@@ -743,7 +739,6 @@ list_portable_parallel_2() {
   cat <<'EOF'
 tests/fm-lint.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
-tests/fm-captain-hold-cleanup.test.sh
 tests/fm-captain-hold-sweep.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
