@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # bin/fm-pr-merge.sh on the other forges and around the merge: GitLab and
 # Forgejo resolution and refusals, secondmate and local reporting, and the
-# backlog and backend-configuration reads.
-# The GitHub outcome and authority cases live in tests/fm-pr-merge.test.sh;
-# the check-run, rollup, and waiver cases live in
+# backlog and backend-configuration reads, plus the argument/URL cases at the
+# front and the GitHub red-check and multi-PR local-tip cases at the end that
+# landed in this slice.
+# The three groups are contiguous slices of the former suite's registration
+# order, not exact themes.
+# The authority and GitHub outcome cases live in tests/fm-pr-merge.test.sh;
+# the check-run, rollup, waiver, and away-authority cases live in
 # tests/fm-pr-merge-checks.test.sh.
 # Shared fixtures: tests/fm-pr-merge-helpers.sh.
 
@@ -800,6 +804,11 @@ test_gitlab_head_override_args_refuse_before_recording() {
   [ ! -s "$case_dir/glab.log" ] || fail "gitlab-head-override: glab was invoked despite the head override"
   pass "fm-pr-merge refuses a GitLab head override before recording state"
 }
+
+# --- durable merge outcome ---------------------------------------------------
+# A merge that lands must leave a record outside the merging agent's memory.
+# bin/fm-merge-outcome-lib.sh owns where that record goes; these cases pin the
+# behavior through the real merge entrypoint.
 
 test_secondmate_merge_reports_upward_once() {
   local case_dir replies url

@@ -2,10 +2,12 @@
 # bin/fm-pr-merge.sh: the record, the authority, and the GitHub merge outcome.
 #
 # Review and captain-word authority, pr= recording, the GitHub merge outcome
-# read, queue rules, and the argument and URL handling around them.
-# The GitLab, Forgejo, and reporting cases live in
-# tests/fm-pr-merge-forges.test.sh; the check-run, rollup, and waiver cases
-# live in tests/fm-pr-merge-checks.test.sh.
+# read, queue rules, and the first argument and URL refusals.
+# The three groups are contiguous slices of the former suite's registration
+# order, not exact themes, so a few cases sit with their neighbors.
+# The other forges, reporting, and the remaining argument/URL and multi-PR
+# edges live in tests/fm-pr-merge-forges.test.sh; the check-run, rollup,
+# waiver, and away-authority cases live in tests/fm-pr-merge-checks.test.sh.
 # Shared fixtures: tests/fm-pr-merge-helpers.sh.
 
 # shellcheck source=tests/fm-pr-merge-helpers.sh

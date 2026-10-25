@@ -968,6 +968,8 @@ fi
 TAB=$(printf '\t')
 # Slowest successful per-root duration_ms from three Ubuntu main runs.
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
+# Exception: the four tests/fm-pr-merge*.sh hints are apportioned estimates
+# sized from the former single-file 3825 ms hint, pending measurement.
 # Hints affect assignment only, never source analysis or canonical coverage.
 fm_lint_partition_weight_hints() {
   cat <<'EOF'

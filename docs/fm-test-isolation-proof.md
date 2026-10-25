@@ -189,6 +189,16 @@ The teardown split added `fm-teardown-pool` and `fm-teardown-cleanup` to the fam
 The three teardown groups ran in that proof at 426064 ms for `fm-teardown-cleanup`, 229022 ms for `fm-teardown-pool`, and 150181 ms for `fm-teardown`.
 Each worker got a private mode-0700 temporary root with ambient `FM_HOME` and `FM_*_OVERRIDE` cleared.
 
+The fm-pr-merge split added `fm-pr-merge-forges` and `fm-pr-merge-checks` to the family beside `fm-pr-merge`, so the family was re-run at its 15-member membership.
+
+- Date: 2026-10-24
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4 --json /tmp/fm-proof-prforge/proof.json`, on macOS at a one-minute load average near 22
+- Result: failed. One run, 15 candidates, 1 failure, summary `FM_ISOLATION_SUMMARY total=15 failed=1 concurrency=4 duration_ms=1357608`, run `fm-isolation-1792887876773-18918`, artifact `fm_test_run_jobs_enabled=false`.
+
+The failing candidate was `tests/fm-open-loops.test.sh` (exit 1, 333116 ms): its inactive-source probe timed out after two seconds, and the collector's `os.killpg` cleanup then raised `PermissionError: [Errno 1] Operation not permitted`.
+The three fm-pr-merge groups exited 0 in that run at 336995 ms for `fm-pr-merge-checks`, 229810 ms for `fm-pr-merge-forges`, and 236863 ms for `fm-pr-merge`, and the other eleven candidates also exited 0.
+This run is not a clean pass and does not admit the new membership; a clean run of the 15-member family refreshes this record.
+
 ### secondmate: admitted
 
 - Date: 2026-09-03

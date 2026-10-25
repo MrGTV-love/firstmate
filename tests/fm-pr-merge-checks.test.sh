@@ -2,9 +2,12 @@
 # bin/fm-pr-merge.sh's check evidence: check runs and status contexts, the
 # required set from branch protection and rulesets, rollup pagination and
 # supersession, the named waivers, and the away-posture authority that decides
-# whether a green head may merge.
+# whether a green head may merge, after the remaining multi-PR head cases.
+# The three groups are contiguous slices of the former suite's registration
+# order, not exact themes.
 # The authority and GitHub outcome cases live in tests/fm-pr-merge.test.sh;
-# the GitLab and Forgejo cases live in tests/fm-pr-merge-forges.test.sh.
+# the other forges, reporting, and the argument/URL and multi-PR edges that
+# landed there live in tests/fm-pr-merge-forges.test.sh.
 # Shared fixtures: tests/fm-pr-merge-helpers.sh.
 
 # shellcheck source=tests/fm-pr-merge-helpers.sh

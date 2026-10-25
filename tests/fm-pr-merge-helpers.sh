@@ -918,28 +918,6 @@ write_rollup_response() {  # <case-dir> <output>
   }}}}}}' "$1/github-view.json" > "$2"
 }
 
-set -u
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-fm_git_identity fmtest fmtest@example.invalid
-PR_MERGE="$ROOT/bin/fm-pr-merge.sh"
-TMP_ROOT=$(fm_test_tmproot fm-pr-merge-tests)
-BASE_PATH=$PATH
-MR_HOST=gitlab.example
-MR_PATH=group/subgroup/project
-MR_PROJECT_URL="https://$MR_HOST/$MR_PATH"
-MR_URL="$MR_PROJECT_URL/-/merge_requests/7"
-MR_HEAD=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-MR_STALE_HEAD=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-FJ_HOST=forgejo.example
-FJ_OWNER=fixture
-FJ_REPO=fixture-repo
-FJ_LOGIN=fm-fixture
-FJ_URL="https://$FJ_HOST/$FJ_OWNER/$FJ_REPO/pulls/9"
-FJ_HEAD=cccccccccccccccccccccccccccccccccccccccc
-FJ_STALE_HEAD=dddddddddddddddddddddddddddddddddddddddd
-JQ_BIN=$(command -v jq) || fail "these tests read glab's JSON with the real jq, which was not found"
-REAL_MV=$(command -v mv) || fail "these tests need mv to simulate a failed poll publish"
-
 # Validate one group's registered selection and run it in the order the group
 # registered. Each group assigns pr_merge_test_cases before calling this.
 pr_merge_run() {

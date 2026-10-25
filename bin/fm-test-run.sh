@@ -302,10 +302,12 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # 779131 ms, each about 1.7 percent under. So 1200000 ms bounds a real lane near
 # 20.4 minutes, and a new member or a slow path fails the coverage guard instead
 # of quietly stretching the workflow. The lane 1 membership that ran modeled at
-# 1209767 ms, just above this budget, so two scripts moved to lane 2; the
-# rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone. Like the
-# serial target this is packing arithmetic, not an execution timeout.
-# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 models at 1117958 ms, set by fm-pr-merge alone)
+# 1209767 ms, just above this budget, so two scripts moved to lane 2; that
+# rebalanced lane 1 modeled at 1117958 ms, set by fm-pr-merge alone. After the
+# fm-pr-merge split, lane 1 models at 1016757 ms from the apportioned hints,
+# set by the bin holding fm-pr-merge-checks, fm-pr-merge, and fm-crew-state.
+# Like the serial target this is packing arithmetic, not an execution timeout.
+# measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 then modeled at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
 # Conservative balance hint for a portable-serial script with no measurement.
@@ -720,11 +722,11 @@ portable_parallel_lane_weight() {
 # compiler it typechecks with; moving it needs that workflow step moved with it.
 list_portable_parallel_1() {
   cat <<'EOF'
-tests/fm-pr-merge.test.sh
-tests/fm-pr-merge-forges.test.sh
-tests/fm-pr-merge-checks.test.sh
 tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
+tests/fm-pr-merge-checks.test.sh
+tests/fm-pr-merge-forges.test.sh
+tests/fm-pr-merge.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-cd-pretool-check.test.sh
 tests/fm-tmux-submit-busy.test.sh

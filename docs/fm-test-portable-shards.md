@@ -245,9 +245,13 @@ That factor is a local estimate, not a CI measurement, and it predates the other
 ## Split the fm-pr-merge suite
 
 `tests/fm-pr-merge.test.sh` was the parallel lane's longest single script (1117958 ms in run 40121241146), so it set that lane's wall no matter how the rest packed.
-It is now a shared helpers module plus three groups: the review and captain-word authority with the GitHub outcome cases (49), the GitLab, Forgejo, reporting, and backlog cases (49), and the check-run, rollup, waiver, and away-authority cases (50).
+It is now a shared helpers module plus three groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
+The first group (49) is the review and captain-word authority with the GitHub outcome cases.
+The second group (49) is the GitLab, Forgejo, reporting, and backlog cases, plus the argument/URL and multi-PR edge cases that fell in that slice.
+The third group (50) is the check-run, rollup, waiver, and away-authority matrix.
 Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the 148-case cover.
 The three new files' parallel hints are apportioned from the former hint by case share (370000, 370000, and 378000 ms), pending the first measured artifacts for them; `--check-coverage` reports `parallel_makespan_ms` 1016757.
+The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 1250, 240, and 1250 ms) are estimates sized from the former 3825 ms lint hint, not measurements, pending the first measured lint runs; they affect lint shard assignment only.
 
 ## Portable serial remainder
 
