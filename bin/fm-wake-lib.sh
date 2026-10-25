@@ -112,8 +112,9 @@ fm_pid_identity() {
   # watcher (issue #799). This mirrors fm_pending_reply_pid_identity, which pins the
   # same width for the same reason.
   # A confined worker's sandbox refuses to run setuid ps (exit 126); there
-  # bin/fm-proc-info.py prints the same bytes from sysctl, so either source
-  # compares equal.
+  # bin/fm-proc-info.py prints the same bytes from sysctl for this user's
+  # processes, so their identities compare equal from either source. Another
+  # user's argv cannot be read without setuid, so those identities differ.
   out=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null)
   case $? in
     0) ;;

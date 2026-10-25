@@ -6,10 +6,14 @@ Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
-by spaces, as macOS `ps -o comm=` and `ps -o args=` do, and lstart its start
-time as `LC_ALL=C ps -o lstart=` with runs of spaces collapsed. identity prints
-the exact bytes `COLUMNS=10000 LC_ALL=C ps -p PID -o lstart= -o command=` prints,
-so an identity recorded through either source compares equal. table prints one
+by spaces, as macOS `LC_ALL=C ps -o comm=` and `LC_ALL=C ps -o args=` do, each
+argv word escaped by vis(3) the way ps escapes it, and lstart its start time as
+`LC_ALL=C ps -o lstart=` with runs of spaces collapsed. identity prints the
+exact bytes `COLUMNS=10000 LC_ALL=C ps -p PID -o lstart= -o command=` prints
+for a process of this user, so such an identity recorded through either source
+compares equal. Another user's argv cannot be read without setuid, so for such
+a process the command is the kernel's short name in parentheses where ps prints
+the full command, and the two identities differ. table prints one
 line per process with the comma-separated FIELDS among pid, ppid, pgid, stat,
 lstart and command, like `ps -axo <field>=,...`; stat carries the state letters
 macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
@@ -75,6 +79,18 @@ def kinfo(pid):
     return data[:KINFO_SIZE]
 
 
+# macOS ps escapes each argv word with vis(3) and VIS_NOSLASH, VIS_NL and
+# VIS_TAB; in the C locale every byte above 0x7f gets its own M- escape.
+VIS_FLAGS = 0x08 | 0x10 | 0x40
+libc.setlocale(0, b"C")
+
+
+def shown(word):
+    out = ctypes.create_string_buffer(len(word) * 4 + 1)
+    libc.strvis(out, word, VIS_FLAGS)
+    return out.value.decode("ascii")
+
+
 def argv(pid):
     data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
     argc = struct.unpack_from("i", data, 0)[0]
@@ -83,7 +99,7 @@ def argv(pid):
     words = rest.split(b"\0")[:argc]
     if argc < 1 or len(words) < argc:
         raise LookupError(pid)
-    return [word.decode("utf-8", "replace") for word in words]
+    return [shown(word) for word in words]
 
 
 def kinfos():
@@ -108,7 +124,7 @@ def command_of(record):
     try:
         return " ".join(argv(pid))
     except (OSError, LookupError, struct.error, IndexError):
-        return "(" + record[P_COMM:P_COMM + 17].split(b"\0", 1)[0].decode("utf-8", "replace") + ")"
+        return "(" + shown(record[P_COMM:P_COMM + 17].split(b"\0", 1)[0]) + ")"
 
 
 def state(record):
@@ -178,7 +194,7 @@ def main(argv_):
             try:
                 value = argv(number)[0]
             except (OSError, LookupError):
-                value = kinfo(number)[P_COMM:P_COMM + 17].split(b"\0", 1)[0].decode("utf-8", "replace")
+                value = shown(kinfo(number)[P_COMM:P_COMM + 17].split(b"\0", 1)[0])
         elif command == "args":
             value = " ".join(argv(number))
         elif command == "cpu-tree":

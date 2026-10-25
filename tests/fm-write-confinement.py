@@ -432,8 +432,15 @@ console.log(JSON.stringify({ foreignDenied }));
     # Renaming a protected folder, or a folder above one, would move it away.
     for name, path in manifest["renamed"].items():
         results["refused-rename-" + name] = rename_refused(path)
+    results["identity"] = pid_identity(manifest["repo"], manifest["identity_pid"], Path(os.environ["TMPDIR"]) / "identity-state")
     print(json.dumps(results, sort_keys=True))
     return results
+
+
+def pid_identity(repo, pid, state):
+    """The shared process identity, read through bin/fm-wake-lib.sh."""
+    return subprocess.run(["bash", "-c", '. "$0/bin/fm-wake-lib.sh"; fm_pid_identity "$1"', repo, str(pid)],
+                          env=dict(os.environ, FM_STATE_OVERRIDE=str(state)), capture_output=True, text=True).stdout
 
 
 def write(path, text="original"):
@@ -649,11 +656,18 @@ for harness in ("claude", "omp"):
             (base / "temp").mkdir()
             profile = base / "profile.sb"
             build_profile(repo, manifest, harness, profile, env)
+            # A process of this user whose arguments ps must escape: non-ASCII
+            # bytes, a newline, a tab and an empty word.
+            unusual = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)", "jos\u00e9", "a\nb", "t\tb", ""])
+            manifest["identity_pid"] = unusual.pid
             for path in manifest["late"]:
                 write(path, "window=fmtest:fm-late\nkind=ship\n")
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
             result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+            expected_identity = pid_identity(str(repo), unusual.pid, base / "identity-state")
+            unusual.kill()
+            unusual.wait()
         finally:
             for path in shared:
                 shutil.rmtree(path, ignore_errors=True)
@@ -661,6 +675,7 @@ for harness in ("claude", "omp"):
             raise AssertionError(f"{harness} {mode}: exit={result.returncode} stderr={result.stderr}")
         actual = json.loads(result.stdout)
         print(f"{harness} {mode}: " + json.dumps(actual, sort_keys=True))
+        assert expected_identity and actual.pop("identity") == expected_identity, (harness, mode, expected_identity)
         if harness == "claude":
             fresh = fresh_container(repo, manifest, base, mode, env)
             print(f"{harness} {mode} fresh container: " + json.dumps(fresh, sort_keys=True))
