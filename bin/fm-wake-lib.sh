@@ -3053,10 +3053,13 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 
 # Main's presented-row claim (state/.main-eligible-rows) outlives the turn that
 # presented it, because only an acknowledgement shrinks it and a branch grant
-# must keep excluding those rows. Whether an open main turn still holds them is
-# the separate held flag: bin/fm-wake-drain.sh sets it when main presents rows,
-# and the Claude Stop hook (bin/fm-claude-stop-autoarm.sh) clears it when a
-# main turn ends.
+# must keep excluding those rows. Whether the presenting main turn still holds
+# them is the separate held flag: bin/fm-wake-drain.sh sets it when main
+# presents rows, and the Claude Stop hook (bin/fm-claude-stop-autoarm.sh) clears
+# it when a main turn ends through that hook. A turn ended by an interrupt or an
+# API error fires no Stop hook, so its flag stays set until the next turn's Stop
+# (a known residual): a host close for its unacknowledged rows is refused, and
+# the next main drain presents those rows again.
 fm_wake_main_presentation_hold() { : > "$STATE/.main-eligible-rows.held"; }
 fm_wake_main_presentation_release() { rm -f -- "$STATE/.main-eligible-rows.held"; }
 
