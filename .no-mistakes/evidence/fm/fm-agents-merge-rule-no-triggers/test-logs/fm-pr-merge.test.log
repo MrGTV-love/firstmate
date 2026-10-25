@@ -1,0 +1,23 @@
+ok - yes-trigger review verification: independent
+ok - yes-trigger review verification: same-family
+ok - yes-trigger review verification: unknown-reader
+ok - yes-trigger review verification: unknown-author
+ok - yes-trigger review verification: wrong-head
+ok - yes-trigger review verification: fail
+ok - an independent loosens-deny-allow-list PASS clears a FAIL without renewed captain words
+ok - an independent widens-guard PASS clears a FAIL without renewed captain words
+ok - an independent customer-data-billing-spend PASS clears a FAIL without renewed captain words
+ok - review recording refuses missing report with exit 2 and appends nothing
+ok - review recording refuses symlink report with exit 2 and appends nothing
+ok - review recording refuses verdict report with exit 2 and appends nothing
+ok - review recording refuses head report with exit 2 and appends nothing
+ok - review recording refuses directory report with exit 2 and appends nothing
+ok - review recording refuses unreadable report with exit 2 and appends nothing
+ok - review recording refuses trailing-space report with exit 2 and appends nothing
+ok - matching local reports record whole-file sha256 and a matching FAIL blocks verification
+ok - github refuses a FAIL appended after earlier verify and before the merge hold
+ok - gitlab refuses a FAIL appended after earlier verify and before the merge hold
+ok - forgejo refuses a FAIL appended after earlier verify and before the merge hold
+ok - github attended override cannot merge without recorded review evidence
+ok - gitlab attended override cannot merge without recorded review evidence
+ok - forgejo attended override cannot merge without recorded review evidence

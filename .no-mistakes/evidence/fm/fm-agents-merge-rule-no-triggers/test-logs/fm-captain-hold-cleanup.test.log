@@ -1,0 +1,38 @@
+ok - cleanup leaves a captain-held work item open with its deliverable, and only an answer closes it
+ok - release and scout report retention distinguish deliveries from rejected merge answers
+ok - an interrupted cleanup keeps the captain call recoverable and session start retains it
+ok - cleanup replay closes answered work and preserves the report after direct or keyed answers
+warning: re-init: ignored --initial-branch=main
+ok - an answer before cleanup replay notes the retained Gerrit change
+ok - ledger on: an answer, a reconcile close, or a repair that closes retained work records one task.closed naming its report, and a repeat records none
+warning: re-init: ignored --initial-branch=main
+ok - ledger on: an answer before cleanup replay records one task.closed from the pending retention, and the replay adds none
+ok - ledger on: an interrupted answer, reconcile close, or repair leaves one task.closed and one task.answered, and a retry adds none
+ok - ledger on: a reused task id's close records its own cycle's evidence, and a replayed answer records nothing more
+ok - an unusable pending-close record names its reason instead of a bare refusal
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - cleanup retains captain calls in the configured backlog
+warning: re-init: ignored --initial-branch=main
+ok - cleanup keeps a captain-held Gerrit task open and records its change URL
+warning: re-init: ignored --initial-branch=main
+ok - merge approval releases before zero-retention cleanup records completion
+ok - the PR merge entrypoint refuses a captain-held task before merging
+ok - the local merge entrypoint refuses a captain-held task before merging
+ok - the PR merge entrypoint separates an unreadable authority record from an absent one
+ok - the local merge entrypoint separates an unreadable authority record from an absent one
+ok - merge entrypoints reject unsafe identities and absent state before locking
+ok - merge entrypoints refuse a replacement incarnation after waiting for cleanup
+ok - merge entrypoints own task state before forced cleanup can retire it
+ok - a released merge passes the guarded entrypoint and remains recently landed
+ok - cleanup refuses a ship row when its captain hold cannot be read
+ok - skipped on markdown-only tasks-axi: verify against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify against a prefix-migrated hold
+ok - skipped on markdown-only tasks-axi: prefer a marker-noted row over a prefix namesake
+ok - skipped on markdown-only tasks-axi: complete against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify an unresolvable beads legacy id
+ok - skipped on markdown-only tasks-axi: verify a derived pre-collapse key
+ok - captain-hold mutations address the beads backend without a markdown override
+ok - skipped on markdown-only tasks-axi: captain-hold create under due.required without types.custom
+ok - captain-hold lifecycle leaves no runner or watchdog processes

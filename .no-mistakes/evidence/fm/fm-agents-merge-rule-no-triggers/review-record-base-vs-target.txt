@@ -1,0 +1,36 @@
+##### base commit version of fm-review-record.py #####
+recorded: review
+-- independent PASS, all triggers yes, no captain word:
+error: loosens_deny_allow_list, widens_guard, customer_data_billing_spend is yes but captain-word is missing at live head 1111111111111111111111111111111111111111; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+recorded: captain-word
+recorded: review
+recorded: review
+-- captain-word, then FAIL, then same-family PASS (adversarial):
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792862257, report <tmp>/base-cw-fail-samefam/r-24063.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+recorded: captain-word
+recorded: review
+recorded: review
+-- captain-word, then FAIL, then independent yes-trigger PASS:
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792862258, report <tmp>/base-cw-fail-indep/r-11970.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+
+##### target commit version of fm-review-record.py #####
+recorded: review
+-- independent PASS, all triggers yes, no captain word:
+review: PASS
+exit=0
+recorded: captain-word
+recorded: review
+recorded: review
+-- captain-word, then FAIL, then same-family PASS (adversarial):
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader claude-opus-5-5, at 1792862259, report <tmp>/target-cw-fail-samefam/r-15963.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+recorded: captain-word
+recorded: review
+recorded: review
+-- captain-word, then FAIL, then independent yes-trigger PASS:
+review: captain-word
+exit=0
+

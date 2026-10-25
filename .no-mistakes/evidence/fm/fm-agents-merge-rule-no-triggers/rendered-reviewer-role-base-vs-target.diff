@@ -1,0 +1,22 @@
+--- <base-root>-role.txt	2026-10-24 12:17:53
++++ /Users/charlesabrooker/.no-mistakes/evidence/01M5QBW9KX2J6NZ7MW6D4SCEC3/rendered-reviewer-role-target.txt	2026-10-24 12:17:53
+@@ -6,8 +6,8 @@
+ Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.
+ When this task works on Firstmate itself, the repository root `AGENTS.md` (also imported by `CLAUDE.md`) is project content and the supervisor contract for the firstmate managing you: follow this brief instead of that supervisor contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including `CONTRIBUTING.md` and `firstmate-coding-guidelines` for Firstmate changes.
+-If the `firstmate-coding-guidelines` skill name does not resolve in this session, read `<base-root>/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.
+-When assigned an independent review, apply the shared review rubric below, rendered from `<base-root>/docs/review-rubric.md`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied.
++If the `firstmate-coding-guidelines` skill name does not resolve in this session, read `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QBW9KX2J6NZ7MW6D4SCEC3/.agents/skills/firstmate-coding-guidelines/SKILL.md` instead.
++When assigned an independent review, apply the shared review rubric below, rendered from `/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5QBW9KX2J6NZ7MW6D4SCEC3/docs/review-rubric.md`, against the reviewed task's DoD and exclusions; obtain that task's brief or verification plan from firstmate if it was not supplied.
+ 
+ # Shared review rubric
+ 
+@@ -26,6 +26,8 @@
+ - A failed DoD mandatory item: block.
+ - A real defect that breaks the stated intent, even when no DoD item names it: block.
+ - An improvement outside the DoD: a follow-up note, never a block.
++- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
++- Removing a guard rule that such a recorded reassessment recommends: not a block.
+ - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+ 
+ ## PR body claims
