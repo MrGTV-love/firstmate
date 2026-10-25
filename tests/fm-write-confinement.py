@@ -1,12 +1,15 @@
 """Synthetic cross-task operations through the production profile builder."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
+import time
 
 GIT_ENV = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
 # The confined Claude worker's own session, and another session in the same home.
@@ -234,6 +237,50 @@ def child(manifest):
     ledger = data / "command-durations.jsonl"
     results["duration"] = (record.returncode == 0 and ledger.exists()
                            and any(json.loads(line).get("key") == "fixture.write-confinement" for line in ledger.read_text().splitlines()))
+    # fm-duration's process reads: without the gate the sandbox refuses setuid
+    # ps, and with it bin/fm-proc-info.py answers instead.
+    spec = importlib.util.spec_from_file_location("fm_duration", Path(manifest["repo"]) / "bin/fm-duration.py")
+    duration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(duration)
+    os.environ.pop("FM_WRITE_CONFINEMENT", None)
+    results["refused-setuid-ps"] = duration.ps_table() is None
+    os.environ["FM_WRITE_CONFINEMENT"] = "seatbelt-v1"
+    try:
+        table = duration.ps_table() or {}
+        results["duration-ps-table"] = table.get(os.getpid(), (None,))[0] == os.getppid()
+        try:
+            idle = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-duration.py"), "keep-going", "1", "--", "sleep", "20"],
+                                  capture_output=True, text=True, timeout=15)
+            results["duration-keep-going"] = idle.returncode == 124 and "cpu_telemetry_unavailable" not in idle.stderr
+        except subprocess.TimeoutExpired:
+            results["duration-keep-going"] = False  # nothing stopped the inactive child
+        gone = subprocess.Popen(["true"])
+        gone.wait()
+        since = int(time.time())
+        results["duration-stale-holder"] = duration.holder_is_stale(gone.pid, since) and not duration.holder_is_stale(os.getpid(), since)
+        # A group whose only member is a zombie answers a group signal with
+        # EPERM on Darwin; the inventory must prove it complete, not re-raise.
+        zombie = subprocess.Popen(["true"], start_new_session=True)
+        for _ in range(100):
+            states = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-proc-info.py"), "table", "pid,stat"],
+                                    capture_output=True, text=True).stdout.splitlines()
+            if f"{zombie.pid} Z" in states:
+                break
+            time.sleep(0.05)
+        try:
+            os.killpg(zombie.pid, 0)
+            eperm = False
+        except PermissionError:
+            eperm = True
+        reaped = type("Reaped", (), {"pid": zombie.pid, "poll": lambda self: 0})()
+        try:
+            duration.signal_group(reaped, signal.SIGKILL)
+            results["duration-group-complete"] = eperm
+        except (OSError, ValueError):
+            results["duration-group-complete"] = False
+        zombie.wait()
+    finally:
+        os.environ.pop("FM_WRITE_CONFINEMENT")
     with (state / "task.status").open("a") as stream:
         stream.write("working\n")
     results["e-append"] = (state / "task.status").read_text() == "working\n"

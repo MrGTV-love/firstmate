@@ -10,8 +10,10 @@ by spaces, as macOS `ps -o comm=` and `ps -o args=` do, and lstart its start
 time as `LC_ALL=C ps -o lstart=` with runs of spaces collapsed. identity prints
 the exact bytes `COLUMNS=10000 LC_ALL=C ps -p PID -o lstart= -o command=` prints,
 so an identity recorded through either source compares equal. table prints one
-line per process with the comma-separated FIELDS among pid, ppid, pgid, lstart
-and command, like `ps -axo <field>=,...`. cpu-tree prints the
+line per process with the comma-separated FIELDS among pid, ppid, pgid, stat,
+lstart and command, like `ps -axo <field>=,...`; stat carries the state letters
+macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
+else S) and E for a process that is exiting. cpu-tree prints the
 whole centiseconds of CPU used by PID and its live descendants, including their
 reaped children, as macOS `ps -S` counts them. Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU from libproc's proc_pid_rusage. A process or fact
@@ -26,11 +28,15 @@ import time
 CTL_KERN, KERN_PROC, KERN_PROCARGS2 = 1, 14, 49
 KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_RUID = 0, 1, 6
 # struct kinfo_proc on 64-bit Darwin: kp_proc.p_pid, kp_proc.p_comm,
-# kp_eproc.e_ppid and kp_eproc.e_pgid.
-KINFO_SIZE, P_START, P_PID, P_COMM, E_PPID, E_PGID = 648, 0, 40, 243, 560, 564
+# kp_proc.p_flag, kp_proc.p_stat, kp_eproc.e_ppid and kp_eproc.e_pgid.
+KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40, 243, 32, 36, 560, 564
+# sys/proc.h P_WEXIT and the p_stat values SSTOP and SZOMB.
+P_WEXIT, SSTOP, SZOMB = 0x2000, 4, 5
+# proc_pidinfo PROC_PIDTASKINFO: struct proc_taskinfo and its pti_numrunning.
+PROC_PIDTASKINFO, TASKINFO_SIZE, PTI_NUMRUNNING = 4, 96, 88
 DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-TABLE_FIELDS = ("pid", "ppid", "pgid", "lstart", "command")
+TABLE_FIELDS = ("pid", "ppid", "pgid", "stat", "lstart", "command")
 RUSAGE_INFO_V2 = 2
 
 libc = ctypes.CDLL(None, use_errno=True)
@@ -105,9 +111,20 @@ def command_of(record):
         return "(" + record[P_COMM:P_COMM + 17].split(b"\0", 1)[0].decode("utf-8", "replace") + ")"
 
 
+def state(record):
+    if record[P_STAT] == SZOMB:
+        return "Z"
+    pid = struct.unpack_from("i", record, P_PID)[0]
+    info = ctypes.create_string_buffer(TASKINFO_SIZE)
+    running = (libc.proc_pidinfo(pid, PROC_PIDTASKINFO, ctypes.c_uint64(0), info, TASKINFO_SIZE) == TASKINFO_SIZE
+               and struct.unpack_from("i", info.raw, PTI_NUMRUNNING)[0] > 0)
+    letter = "T" if record[P_STAT] == SSTOP else "R" if running else "S"
+    return letter + ("E" if struct.unpack_from("i", record, P_FLAG)[0] & P_WEXIT else "")
+
+
 def table(fields):
     readers = {"pid": lambda r: struct.unpack_from("i", r, P_PID)[0], "ppid": lambda r: struct.unpack_from("i", r, E_PPID)[0],
-               "pgid": lambda r: struct.unpack_from("i", r, E_PGID)[0], "lstart": lstart, "command": command_of}
+               "pgid": lambda r: struct.unpack_from("i", r, E_PGID)[0], "stat": state, "lstart": lstart, "command": command_of}
     return "\n".join(" ".join(str(readers[field](record)) for field in fields) for record in kinfos())
 
 

@@ -20,7 +20,10 @@ Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
 (/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
-on Darwin, whose ps omits waited-child time). Without a complete sample,
+on Darwin, whose ps omits waited-child time). Under FM_WRITE_CONFINEMENT=seatbelt-v1
+the sandbox refuses setuid ps, so the process table, the process-group check
+behind a Darwin EPERM group signal and a slot holder's start time come from
+bin/fm-proc-info.py instead. Without a complete sample,
 including unavailable native imports, one cpu_telemetry_unavailable line names
 the platform and nothing is stopped for inactivity: a missing sample is neither
 progress nor a stall.
@@ -131,7 +134,8 @@ needs repair and a killed run frees its slot at once; the lock is held by this
 process alone and never inherited by COMMAND, so a test's own leftover daemon
 can never hold a slot for good. Each holder writes a record of its pid and
 the epoch at which it took the slot; taking a free slot runs no ps. A waiter's
-notice names the key it waits on and each holder, with one ps call per holder,
+notice names the key it waits on and each holder, with one ps call (or
+fm-proc-info.py call under confinement) per holder,
 and flags a record whose pid is gone or whose process started more than 2
 seconds after the recorded epoch (the pid was reused; ps start times have
 one-second resolution, hence the slack), so a reused pid is never taken for the
@@ -199,6 +203,7 @@ import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
+PROC_INFO = ROOT / 'bin' / 'fm-proc-info.py'
 HOST = platform.node()
 MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit applies
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
@@ -573,15 +578,26 @@ def proc_table(pid):
     return table
 
 
+def confined():
+    """True in a confined worker, whose sandbox refuses setuid ps."""
+    return os.environ.get('FM_WRITE_CONFINEMENT') == 'seatbelt-v1'
+
+
 def ps_table():
+    # The helper prints no CPU column; Darwin's libproc reader supplies the CPU
+    # (tree_cpu), and a zero here never exceeds a retained high-water value.
+    timed = not confined()
+    command = (['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='] if timed
+               else [sys.executable, str(PROC_INFO), 'table', 'pid,ppid,stat,lstart'])
     try:
-        result = subprocess.run(['ps', '-S', '-axo', 'pid=,ppid=,time=,stat=,lstart='], capture_output=True, text=True,
-                                env=dict(os.environ, LC_ALL='C'))
+        result = subprocess.run(command, capture_output=True, text=True, env=dict(os.environ, LC_ALL='C'))
         if result.returncode:
             return None
         table = {}
         for line in result.stdout.splitlines():
             fields = line.split()
+            if not timed:
+                fields[2:2] = ['0']
             if len(fields) < 5:
                 continue
             child, parent = map(int, fields[:2])
@@ -774,7 +790,8 @@ def signal_group(child, sig):
         # zombie or is exiting (flag E); neither can run again.
         if child.poll() is None:
             raise
-        inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
+        inventory = subprocess.run([sys.executable, str(PROC_INFO), 'table', 'pgid,stat'] if confined()
+                                   else ['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
         if inventory.returncode:
             raise
         for line in inventory.stdout.splitlines():
@@ -872,7 +889,8 @@ def slot_holders(directory, limit):
 def holder_is_stale(pid, since):
     """True when PID is gone, or started after the epoch SINCE and so cannot be the process that took the slot."""
     try:
-        result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
+        result = subprocess.run([sys.executable, str(PROC_INFO), 'lstart', str(pid)] if confined()
+                                else ['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
                                 env=dict(os.environ, LC_ALL='C'))
     except OSError:
         return False
