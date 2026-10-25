@@ -620,6 +620,7 @@ test_omp_device_effects() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
@@ -652,9 +653,62 @@ for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
   }
   assert.equal(sent().length, before, 'failed diagnostics scope proofs never send data');
 }
-// The Auto QA report and GitHub transport can egress. Their arguments pass the
-// existing privacy, credential, complete-screening and outage rules, not roots.
-for (const [path, content] of [['xd://report_issue', 'write: refused Auto QA grievance report'], ['xd://github', '{"op":"repo_view","repo":"fixture/repo"}']]) {
+// A clean report can flush an older unscreened grievance from another task.
+// clean push/fill arguments can release local objects or commit-message text.
+// Put a never-send value in real queued/repository state, not in the arguments.
+const forbidden = 'hidden-outbound-private-canary';
+writeFileSync(`${config}/dispatch-never-send`, forbidden + '\n');
+mkdirSync(`${home}/.omp`);
+const queue = `${home}/.omp/autoqa.db`;
+const queued = execFileSync('python3', ['-c', [
+  'import sqlite3, sys',
+  'c = sqlite3.connect(sys.argv[1])',
+  "c.execute('CREATE TABLE grievances (id INTEGER PRIMARY KEY, report TEXT, pushed INTEGER)')",
+  "c.execute('INSERT INTO grievances VALUES (1, ?, 0)', (sys.argv[2],))",
+  'c.commit()',
+  "print(c.execute('SELECT report FROM grievances WHERE pushed = 0').fetchone()[0])",
+].join('\n'), queue, forbidden], { encoding: 'utf8' });
+assert.equal(queued.trim(), forbidden, 'older pending report must contain the forbidden value');
+const derivedRepo = `${process.env.TASK_DATA}/derived-egress-repo`;
+mkdirSync(derivedRepo);
+const git = (...args) => execFileSync('git', ['-C', derivedRepo, ...args], { encoding: 'utf8' });
+git('init', '-q');
+writeFileSync(`${derivedRepo}/payload.txt`, forbidden + '\n');
+git('add', 'payload.txt');
+git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', forbidden);
+assert.equal(git('show', 'HEAD:payload.txt').trim(), forbidden, 'push fixture must contain an unscreened committed value');
+assert.equal(git('log', '-1', '--format=%B').trim(), forbidden, 'fill fixture must contain unscreened commit-message text');
+for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
+  const handler = install({ worktree: derivedRepo, ...scope });
+  for (const [path, content, reason] of [
+    ['xd://report_issue', 'write: refused Auto QA grievance report', /complete pending queue/],
+    ['xd://github', JSON.stringify({ op: 'pr_push', repo: 'fixture/repo', branch: 'main' }), /repository state/],
+    ['xd://github', JSON.stringify({ op: 'pr_create', repo: 'fixture/repo', fill: true }), /repository state/],
+    ['xd://github', JSON.stringify({ op: 'pr_create', repo: 'fixture/repo', title: 'clean title', body: 'clean body', head: 'main' }), /repository state/],
+  ]) {
+    const before = sent().length;
+    assert.equal(content.includes(forbidden), false, 'arguments must not themselves contain the hidden value');
+    const refused = await handler({ toolName: 'write', input: { path, content } }, { ...ctx, cwd: derivedRepo });
+    assert.equal(refused?.block, true, 'an unproved hidden outbound payload must never be released by a clean argument judgment');
+    assert.ok(refused.reason.includes(path));
+    assert.match(refused.reason, reason);
+    assert.match(refused.reason, /Firstmate/);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+    assert.equal(sent().length, before, 'unproved complete payloads stop before even argument-only screening');
+  }
+}
+unlinkSync(`${config}/dispatch-never-send`);
+for (const content of ['not-json', '{}', '{"op":"repo_view"}', '{"op":"pr_checkout","repo":"fixture/repo","pr":"1"}', '{"op":"future_op","repo":"fixture/repo"}']) {
+  const before = sent().length;
+  assert.equal((await call(active, 'xd://github', content))?.block, true);
+  assert.equal(sent().length, before);
+}
+// Only proved argument-only GitHub reads reach the existing privacy,
+// credential, complete-screening and outage rules rather than file roots.
+for (const args of [{ op: 'repo_view', repo: 'fixture/repo' }, { op: 'file_read', repo: 'fixture/repo', path: 'README.md' }]) {
+  const path = 'xd://github';
+  const payload = branch => JSON.stringify({ ...args, branch });
+  const content = JSON.stringify(args);
   let before = sent().length;
   assert.equal(await call(active, path, content), undefined);
   assert.equal(sent().length, before + 1);
@@ -667,22 +721,22 @@ for (const [path, content] of [['xd://report_issue', 'write: refused Auto QA gri
     assert.match(refused.reason, /egress review is inactive/);
     assert.equal(sent().length, before);
   }
-  const secret = await call(active, path, 'sk-live-fixture');
+  const secret = await call(active, path, payload('sk-live-fixture'));
   assert.equal(secret?.block, true);
   assert.match(secret.reason, /failed credential screening/);
-  const outage = await call(active, path, 'http402');
+  const outage = await call(active, path, payload('http402'));
   assert.equal(outage?.block, true);
   assert.match(outage.reason, /Review required/);
   assert.ok(outage.reason.includes(path));
   assert.doesNotMatch(outage.reason, /needs a plain absolute or worktree-relative path/);
   before = sent().length;
   writeFileSync(`${config}/dispatch-never-send`, 'device-private-canary\n');
-  assert.equal((await call(active, path, 'device-private-canary'))?.block, true);
+  assert.equal((await call(active, path, payload('device-private-canary')))?.block, true);
   unlinkSync(`${config}/dispatch-never-send`);
   assert.equal(sent().length, before, 'never-send must stop device egress before transport');
   // Oversized outbound devices must not inherit the local-file unscreened-tail
   // allowance, even when no credential-shaped value is present in that tail.
-  const oversize = await call(active, path, 'x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+  const oversize = await call(active, path, payload('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1)));
   assert.equal(oversize?.block, true);
   assert.match(oversize.reason, /complete-screening-budget/);
   assert.equal(sent().length, before);
@@ -708,7 +762,7 @@ console.log('device-effects-ok');
 JS
 ) || fail "OMP device effects: $out"
   [ "$out" = device-effects-ok ] || fail "unexpected device effects output: $out"
-  pass "measured local devices skip models; Auto QA and GitHub retain egress checks; unknown devices name their review remedy"
+  pass "local devices skip models; hidden queued/repository payloads fail closed; proved GitHub reads retain egress checks; unknown devices name their review remedy"
 }
 
 test_deadlines() {

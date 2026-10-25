@@ -2544,8 +2544,8 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | --- | --- |
 | `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
 | `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
-| `xd://report_issue` | Egress review required: after consent, native Auto QA writes the shared local grievance database and asynchronously uploads its pending queue to the configured endpoint. |
-| `xd://github` | Egress review required: the native GitHub transport sends queries, PR metadata or repository data to a forge, including for read operations. |
+| `xd://report_issue` | Refused: after consent, native Auto QA can upload every pending grievance, and the guard cannot prove or screen that complete queue from the current report argument. |
+| `xd://github` | Only `repo_view` and `file_read` with an explicit repository have a proved argument-only outbound payload and may reach egress review; other operations fail closed. PR creation can derive fill text or auto-push, while push/checkout depend on repository state. |
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
@@ -2561,9 +2561,10 @@ The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup
 Finished or missing jobs, named project services absent from the owner snapshot, stdin and mode changes do not supply the proc cancellation proof.
 
 Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
-Egress devices skip filesystem-root selection but retain the existing firstmate-only authorization, never-send preflight, credential judgment and fail-closed outage policy; an inactive project/helper configuration never admits them.
-Their entire argument payload must fit complete screening, with no local-file unscreened-tail allowance.
-This reviews supplied device arguments, not every implicit native downstream payload: Auto QA may flush other pending reports, and GitHub push/fill may derive repository content.
+An egress variant must first prove that its complete outbound task data comes from the supplied arguments; missing or opaque payload proofs fail closed before argument-only review.
+Proved egress variants skip filesystem-root selection but retain the existing firstmate-only authorization, never-send preflight, credential judgment and fail-closed outage policy; an inactive project/helper configuration never admits them.
+Their complete argument payload must fit screening, with no local-file unscreened-tail allowance.
+A clean current report cannot release older Auto QA grievances, and clean GitHub push/fill arguments cannot release repository-derived content: those variants remain refused until a complete outbound-data and target proof exists.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
 Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
