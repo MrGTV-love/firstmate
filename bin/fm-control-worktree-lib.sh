@@ -214,6 +214,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
     else
       echo "  If the registration was already pruned, give the PR head or a known commit of the branch: write the three lines task=$id, worktree=$old, worktree_head=<sha> into the control journal $journal." >&2
     fi
+    echo "  A ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch $branch, and a detailed procedure for that is follow-up work." >&2
     return 1
   }
   for i in "${!heads[@]}"; do
