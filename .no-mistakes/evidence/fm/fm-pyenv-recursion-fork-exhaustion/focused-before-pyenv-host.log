@@ -1,0 +1,2 @@
+# all fm-spawn-dispatch-profile tests passed
+not ok - the exclusion hook must preserve interpreter selection: recursive interpreter route: non-system version treated as system: expected exit 0, got 97

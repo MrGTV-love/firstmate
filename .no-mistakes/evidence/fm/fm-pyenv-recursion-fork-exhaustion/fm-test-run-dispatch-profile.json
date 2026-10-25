@@ -1,0 +1,18 @@
+{
+  "label": "fm-test-run-dispatch-profile",
+  "cmd": [
+    "bin/fm-test-run.sh",
+    "tests/fm-spawn-dispatch-profile.test.sh"
+  ],
+  "hard_nproc_cap": 2366,
+  "user_baseline": 866,
+  "budget_extra": 1500,
+  "returncode": 0,
+  "watchdog_fired": false,
+  "seconds": 584.0,
+  "sampled_peak_tree": 14,
+  "max_live_pyenv_prefix_or_which": 0,
+  "pyenv_commands_seen": [],
+  "python3_on_path": "/Users/charlesabrooker/.pyenv/shims/python3",
+  "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M5T1YK73J6BQ4QS4Z655C0YS/fm-test-run-dispatch-profile.log"
+}

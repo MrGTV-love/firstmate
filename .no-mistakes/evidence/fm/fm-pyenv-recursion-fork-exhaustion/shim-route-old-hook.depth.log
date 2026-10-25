@@ -1,0 +1,1198 @@
+depth=1 cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-proc-budget.sh 80 -- python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-dsh.py route deepseek/test-model
+depth=2 cmd=bash /Users/charlesabrooker/.pyenv/shims/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-dsh.py route deepseek/test-model
+depth=3 cmd=bash /opt/homebrew/opt/pyenv/bin/pyenv exec python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-dsh.py route deepseek/test-model
+depth=4 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-exec python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-dsh.py route deepseek/test-model
+depth=5 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-name -f
+depth=6 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-file
+depth=6 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-file-read /Users/charlesabrooker/.pyenv/version
+depth=6 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-name
+depth=5 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3
+depth=6 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-name -f
+depth=7 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-file
+depth=7 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-file-read /Users/charlesabrooker/.pyenv/version
+depth=7 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-name
+depth=6 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=7 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=8 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=9 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=10 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=11 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=12 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=13 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=14 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=15 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=15 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=14 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=13 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=14 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=15 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=15 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=14 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=12 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=11 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=12 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=13 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=14 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=15 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=16 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=17 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=18 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=19 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=20 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=21 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=22 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python2 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-version-origin
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks version-origin
+depth=23 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=24 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which
+depth=25 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=26 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-hooks which

@@ -1,0 +1,5 @@
+== /bin/bash 3.2.57(1)-release
+<3.13.6 = system> argc-slice
+<3.13.6><=><system><]> argc-full
+old-hook-says-TRUE
+new-hook-says-false

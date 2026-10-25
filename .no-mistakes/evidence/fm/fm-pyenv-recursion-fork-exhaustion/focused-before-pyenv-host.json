@@ -1,0 +1,18 @@
+{
+  "label": "focused-before-pyenv-host",
+  "cmd": [
+    "/bin/bash",
+    "/Users/charlesabrooker/.no-mistakes/evidence/01M5T1YK73J6BQ4QS4Z655C0YS/focused-before.test.sh"
+  ],
+  "hard_nproc_cap": 1279,
+  "user_baseline": 879,
+  "budget_extra": 400,
+  "returncode": 1,
+  "watchdog_fired": false,
+  "seconds": 4.3,
+  "sampled_peak_tree": 5,
+  "max_live_pyenv_prefix_or_which": 0,
+  "pyenv_commands_seen": [],
+  "python3_on_path": "/Users/charlesabrooker/.pyenv/shims/python3",
+  "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M5T1YK73J6BQ4QS4Z655C0YS/focused-before-pyenv-host.log"
+}

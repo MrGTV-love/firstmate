@@ -1,0 +1,4 @@
+depth=1 cmd=bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5T1YK73J6BQ4QS4Z655C0YS/bin/fm-proc-budget.sh 80 -- /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=2 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+depth=3 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-latest -f 3.13.6
+depth=4 cmd=bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-versions --bare --skip-envs
