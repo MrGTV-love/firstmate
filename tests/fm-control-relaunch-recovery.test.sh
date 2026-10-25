@@ -504,7 +504,9 @@ test_relocation_refuses_every_unsafe_destination() {
         ;;
       relative) fragment="absolute path" ;;
       missing-dest) fragment="not a readable directory" ;;
-      same-as-recorded) fragment="still exists" ;;
+      # Treehouse reuses a free slot, so `treehouse get` often enters the
+      # vanished copy's own path; the refusal must name plain relaunch.
+      same-as-recorded) fragment="run 'git checkout --ignore-other-worktrees task-$id' in it, then relaunch without --worktree" ;;
     esac
     case "$variant" in
       other-repo) run_relocation_refusal "$dir" "$id" "$fragment" "$variant" "$dir/foreign-wt" ;;

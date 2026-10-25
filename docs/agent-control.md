@@ -566,6 +566,7 @@ The launch owner repeats the proof before publication; a later refusal can there
 
 - **The recorded path is proven absent.**
   Absence is shown from a readable, searchable ancestor.
+  `treehouse get` often enters the vanished copy's own path again, because it reuses a free slot; the recorded copy then exists, so `--worktree` refuses and names the route: run `git checkout --ignore-other-worktrees <branch>` in that slot, then run plain `fm-control <id> relaunch --note ...`.
   A path that exists, a dangling symlink, or an unreadable ancestry is "cannot say", never "gone".
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
@@ -578,6 +579,7 @@ The launch owner repeats the proof before publication; a later refusal can there
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
   A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `treehouse get` (no `-b`) from the recorded project and `git checkout --ignore-other-worktrees <branch>` in the slot it enters, and do not run `git worktree prune` first; only the pool slot the lease enters is an accepted destination.
+  `treehouse get` can prune the vanished copy's registration itself when it builds a slot (Treehouse v3.1.4 does), and the reflog head goes with it.
   If the registration was already pruned, give a known commit of the branch as evidence, scoped by task:
   a task with no recorded `pr=` takes one line, `pr_head=<sha>`, in its task record (`state/<id>.meta`);
   a task with a recorded `pr=` takes the three lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` in its control journal (`state/<id>.control-relaunch`), never a hand-written `pr_head=`, because `bin/fm-dod-lib.sh` and `bin/fm-review-diff.sh` read `pr_head` as the head the forge reported.
@@ -606,7 +608,9 @@ It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse g
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy from the lease, never after `git worktree prune`: run `treehouse get` with no `-b` from the recorded project, then run `git checkout --ignore-other-worktrees <branch>` inside the slot it enters, and pass that slot.
 `treehouse get -b <branch>` fails because the branch already exists, and a plain `git checkout <branch>` refuses while the vanished copy's registration still names the branch.
-That registration must stay, because its reflog may be the task's only recorded head.
+Do not prune that registration yourself, because its reflog may be the task's only recorded head.
+`treehouse get` can prune it when it builds a slot, so it may already be gone after this step.
+If `treehouse get` enters the vanished copy's own path, that path is the recorded copy again: check the branch out there and run plain `relaunch`, not `relaunch --worktree`.
 If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.
 That evidence only gives the proof a head to check; the proof and the launch owner still make every change.
 Rebinding the task by hand-editing its `worktree=` has none of those checks, no journal, and no lock against a concurrent launch.

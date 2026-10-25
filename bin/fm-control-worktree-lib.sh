@@ -119,6 +119,11 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   done
   if [ -e "$probe" ] || [ -L "$probe" ]; then
     echo "error: task $id's recorded worktree $old still exists or its absence cannot be proven ($probe is present); --worktree replaces a copy that is gone, never one that is there" >&2
+    if [ "$probe" = "$old" ]; then
+      branch=$(fm_meta_get "$meta" branch)
+      [ -n "$branch" ] || branch="fm/$id"
+      echo "  If 'treehouse get' entered this recorded path again, the task's copy is back: run 'git checkout --ignore-other-worktrees $branch' in it, then relaunch without --worktree." >&2
+    fi
     return 1
   fi
 
@@ -208,7 +213,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   if [ -n "$head" ]; then heads+=("$head"); sources+=("meta-pr_head"); fi
   [ -n "${heads[*]-}" ] || {
     echo "error: no recorded head exists for branch '$branch', so the fresh copy cannot be shown to contain the task's work" >&2
-    echo "  Re-create the copy from the lease: run 'treehouse get' (without -b) from $project, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters, and do not run 'git worktree prune' first: the vanished copy's registration keeps its reflog head." >&2
+    echo "  Re-create the copy from the lease: run 'treehouse get' (without -b) from $project, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters, and do not run 'git worktree prune' first: the vanished copy's registration keeps its reflog head, although 'treehouse get' can prune that registration itself." >&2
     if [ -z "$(fm_meta_get "$meta" pr)" ]; then
       echo "  If the registration was already pruned, give a known commit of the branch: write one line, pr_head=<sha>, into the task record $meta." >&2
     else
