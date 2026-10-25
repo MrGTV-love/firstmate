@@ -811,7 +811,7 @@ test_late_successor_failure_reaches_the_wake_queue() {
 }
 
 # A successor that reports its own startup failure ends the wait at once, even
-# while that arm process lingers.
+# while that arm process lingers, and the host retries the start once.
 test_failed_successor_fails_fast() {
   local home host started elapsed
   home=$(make_home failed-successor attended)
@@ -824,9 +824,11 @@ test_failed_successor_fails_fast() {
   elapsed=$((SECONDS - started))
   [ "$elapsed" -lt 15 ] || fail "failed successor: the host took ${elapsed}s to see the reported failure"
   expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
-  assert_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a failed successor must be reported unverified"
+  assert_re 'pass-through	successor-retry' "$home/state/.supervision-host.log" "a failed successor must be reported and retried"
+  assert_no_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a retried start that succeeds is not unverified"
+  [ "$(cat "$home/arm-calls")" -eq 3 ] || fail "failed successor: the start was not retried exactly once"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must still reach main"
-  pass "host: a successor that reports failure ends the readiness wait at once"
+  pass "host: a successor that reports failure ends the readiness wait at once and is retried once"
 }
 
 # The live failure this guards: a main-only pass-through used to exit without

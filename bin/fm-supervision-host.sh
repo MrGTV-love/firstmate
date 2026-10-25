@@ -54,7 +54,10 @@
 #     that is unsafe or holds nothing for the branch) stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
-#     drops the handoff. It confirms no engine handling handoff, so the host
+#     drops the handoff. A failed start is retried once; a second failure
+#     republishes downtime before the close is printed, as every attended
+#     pass-through that leaves no successor does. It confirms no engine
+#     handling handoff, so the host
 #     leaves the recovery marker reading downtime; docs/watcher-continuity.md
 #     owns the re-arm owner's delivery eligibility when another drain changes
 #     that phase. The host records that successor's arm before relinquishing it
@@ -589,13 +592,28 @@ retire_successor() {
   "$SCRIPT_DIR/fm-watch-arm.sh" --stop >/dev/null 2>&1 || true
 }
 
+# A close handed to main with no live successor leaves the home unwatched, so
+# the true recovery state is downtime. The closed watcher's own cleanup
+# published downtime, but a drain that entered handling since then would leave
+# the re-arm owner refusing this close while no watcher runs. Republishing
+# keeps the generation, so main's acknowledgement still names it.
+restore_downtime_without_watcher() {
+  fm_recovery_marker_snapshot "$STATE/.watcher-down" 2>/dev/null || return 0
+  case "$FM_RECOVERY_MARKER_TOKEN" in
+    pending:handling:*|announced:handling:*) ;;
+    *) return 0 ;;
+  esac
+  fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null 2>&1
+}
+
 # Hand the close to main: stop the successor cycle, print the close, why, and
 # any further "supervision-host:" lines, and exit.
 exit_to_main() {  # <why> [further lines]
   local lines=${2:-} rc=0
   retire_successor
-  if [ -n "$SUCCESSOR_GENERATION" ] \
-    && ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null 2>&1; then
+  if { [ -n "$SUCCESSOR_GENERATION" ] \
+      && ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null 2>&1; } \
+    || { [ -z "$SUCCESSOR_GENERATION" ] && ! restore_downtime_without_watcher; }; then
     log_line "to-main	downtime-unrestored	$1"
     lines=${lines:+$lines$'\n'}"supervision-host: watcher downtime could not be restored for the main hand-back"
     rc=1
@@ -727,13 +745,22 @@ detach_successor() {
 # Start the same successor a handled wake starts and leave it running. It
 # confirms no handling handoff: main, not the engine, handles this close.
 # docs/watcher-continuity.md owns delivery eligibility if another drain changes
-# the shared recovery phase. A failed start returns 1; the caller still prints
-# the close unchanged. A successor still
+# the shared recovery phase. A failed start is retried once; a second failure
+# returns 1, and the caller restores downtime (restore_downtime_without_watcher)
+# before it prints the close unchanged. A successor still
 # starting is left running too, and SUCCESSOR_NOTE carries the line saying so.
 SUCCESSOR_NOTE=
 leave_successor_for_main() {
   local rc=0
   ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
+  if [ "$rc" -eq 1 ]; then
+    log_line "pass-through	successor-retry	$(printf '%s\n' "$REASON" | head -n 1)"
+    retire_arm "$SUCCESSOR_PID" "$SUCCESSOR_OUT"
+    SUCCESSOR_PID=
+    SUCCESSOR_OUT=
+    rc=0
+    ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
+  fi
   if [ "$rc" -eq 1 ]; then
     log_line "pass-through	successor-unverified	$(printf '%s\n' "$REASON" | head -n 1)"
     return 1
@@ -1121,8 +1148,11 @@ while :; do
   if ! fm_afk_contract_away_present "$STATE"; then
     if ! attended_acceptor "$(printf '%s\n' "$REASON" | head -n 1)"; then
       log_line "pass-through	attended	$ATTENDED_WHY	$(printf '%s\n' "$REASON" | head -n 1)"
-      if [ "$ATTENDED_WHY" = main-only ]; then
-        leave_successor_for_main || true
+      if { [ "$ATTENDED_WHY" != main-only ] || ! leave_successor_for_main; } \
+        && ! restore_downtime_without_watcher; then
+        log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"
+        emit "$SUCCESSOR_NOTE" "supervision-host: watcher downtime could not be restored for the main hand-back"
+        exit 1
       fi
       emit "$SUCCESSOR_NOTE"
       exit 0

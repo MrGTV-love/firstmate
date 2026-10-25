@@ -33,6 +33,7 @@ install_autoarm_scripts() {
   local dir=$1
   mkdir -p "$dir/bin"
   cp "$ROOT/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-stop-autoarm.sh"
+  cp "$ROOT/bin/fm-claude-hold-release.sh" "$dir/bin/fm-claude-hold-release.sh"
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
@@ -47,7 +48,7 @@ install_autoarm_scripts() {
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/fm-classify-lib.sh"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
-  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh" "$dir/bin/fm-afk-contract.sh"
+  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-hold-release.sh" "$dir/bin/fm-lock.sh" "$dir/bin/fm-afk-contract.sh"
 }
 
 # A Claude home runs the supervision host unless config/supervision-host-off
@@ -1802,12 +1803,18 @@ SH
 # without an ack, nothing holds the still-queued row and the close is delivered
 # exactly once. A late Stop firing whose start precedes the next turn's drain
 # (late-stop: the drain runs while the firing loads its libraries) must leave
-# that newer turn's hold in place, so the close is still refused.
+# that newer turn's hold in place, so the close is still refused. A turn that
+# ends with no Stop - the next prompt after an Escape (interrupted) or an API
+# error (api-error) - releases its hold through bin/fm-claude-hold-release.sh,
+# so the close is delivered exactly once. Every close leaves a live watcher or
+# wakes main, so the refusing modes run beside a live watcher.
 test_host_handback_after_main_presentation() {
-  local phase watcher mode dir out status pid identity drain generation cutoff queued lib
-  for mode in open acked ended late-stop; do
+  local phase watcher watchers mode dir out status pid identity drain generation cutoff queued lib
+  for mode in open acked ended late-stop interrupted api-error; do
+    watchers="absent live"
+    case "$mode" in open|acked|late-stop) watchers=live ;; esac
     for phase in pending announced; do
-      for watcher in absent live; do
+      for watcher in $watchers; do
         dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$mode-$phase-$watcher")
         rm -f "$dir/config/supervision-host-off"
         : > "$dir/state/task.meta"
@@ -1841,6 +1848,14 @@ if [ ! -e "$FM_HOME/state/host-prepared" ]; then
       # shellcheck disable=SC2046
       set -- $(sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p' "$STATE/main-drain")
       FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" "$@" > "$STATE/main-ack" 2>&1
+      ;;
+    interrupted|api-error)
+      event=UserPromptSubmit
+      [ "$FM_TEST_MAIN_TURN" = interrupted ] || event=StopFailure
+      rc=0
+      printf '{"hook_event_name":"%s","session_id":"sess-autoarm"}\n' "$event" \
+        | "$FM_HOME/bin/fm-claude-hold-release.sh" > "$STATE/turn-release" 2>&1 || rc=$?
+      printf '%s\n' "$rc" > "$STATE/turn-release-rc"
       ;;
     ended|late-stop)
       [ "$FM_TEST_MAIN_TURN" = ended ] || : > "$STATE/late-stop-drain"
@@ -1890,6 +1905,15 @@ SH
             [ "$(epoch_outcome "$dir")" = rewake ] || fail "ended/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
             [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "ended/$phase/$watcher: handback was not delivered exactly once: $out"
             [ "$queued" -eq 1 ] || fail "ended/$phase/$watcher: translation consumed a durable row"
+            ;;
+          interrupted|api-error)
+            [ "$(cat "$dir/state/turn-release-rc")" = 0 ] && [ ! -s "$dir/state/turn-release" ] \
+              || fail "$mode/$phase/$watcher: the hold release hook was not silent: $(cat "$dir/state/turn-release")"
+            assert_absent "$dir/state/.main-eligible-rows.held" "$mode/$phase/$watcher: the ended turn's hold survived"
+            expect_code 2 "$status" "$phase/$watcher: a close left unacknowledged by a turn that ended without Stop must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "$mode/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "$mode/$phase/$watcher: handback was not delivered exactly once: $out"
+            [ "$queued" -eq 1 ] || fail "$mode/$phase/$watcher: translation consumed a durable row"
             ;;
           late-stop)
             [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "late-stop/$phase/$watcher: the late Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"

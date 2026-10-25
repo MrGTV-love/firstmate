@@ -277,10 +277,10 @@ autoarm_commit() {  # <outcome> [marker-file]
       pending:handling:*|announced:handling:*)
         # A shared recovery phase is not a delivery receipt for this host's
         # close: a branch drain can enter handling with main's wake still
-        # queued. The close stays owed while main has a queued row whose
-        # presenting turn has not ended through the Stop hook
-        # (fm_wake_main_unpresented); while that turn still holds every row it
-        # presented, a rewake would duplicate the close.
+        # queued. The close stays owed while main has a queued row no
+        # presentation hold covers (fm_wake_main_unpresented); while the turn
+        # that presented every row still holds them, a rewake would duplicate
+        # the close.
         [ "$HOST_MODE" -eq 1 ] || return 2
         fm_wake_main_unpresented || return 2
         recovery=${FM_RECOVERY_MARKER_TOKEN##*:}

@@ -3054,14 +3054,14 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 # Main's presented-row claim (state/.main-eligible-rows) outlives the turn that
 # presented it, because only an acknowledgement shrinks it and a branch grant
 # must keep excluding those rows. Whether the presenting main turn still holds
-# them is the separate held flag: bin/fm-wake-drain.sh sets it when main
-# presents rows, writing a token unique to that presentation, and a Claude Stop
-# firing (bin/fm-claude-stop-autoarm.sh) that passes its AFK and need gates
-# clears it when a main turn ends through that hook. A turn ended by an
-# interrupt or an API error fires no Stop hook, so its flag stays set until the
-# next turn's gated Stop (a known residual): a host close for its
-# unacknowledged rows is refused, and the next main drain presents those rows
-# again.
+# them is the separate held flag, which lasts only for that turn:
+# bin/fm-wake-drain.sh sets it when main presents rows, writing a token unique to
+# that presentation, and the first proof that the turn ended releases it - a
+# Claude Stop firing that passes its AFK and need gates
+# (bin/fm-claude-stop-autoarm.sh), a StopFailure or the next UserPromptSubmit
+# (bin/fm-claude-hold-release.sh), or the next main drain, which replaces it
+# with its own. A row counts as delivered only once main acknowledges it with
+# --ack-through; a refused host close leaves it queued for the next drain.
 fm_wake_main_presentation_hold() {
   printf '%s %s %s\n' "$$" "$(date +%s)" "$RANDOM" > "$STATE/.main-eligible-rows.held"
 }
@@ -3082,8 +3082,7 @@ fm_wake_main_presentation_release() {  # <seen>
   return "$status"
 }
 
-# 0 when main owns a queued row whose presenting turn has not ended through the
-# Claude Stop hook: a structurally valid
+# 0 when main owns a queued row no presentation hold covers: a structurally valid
 # row no live branch grant reserves, unless main's presented-row claim names it
 # while the held flag above is set. Read without the queue lock, like the count
 # above; a queue that exists but cannot be read counts as unheld.
