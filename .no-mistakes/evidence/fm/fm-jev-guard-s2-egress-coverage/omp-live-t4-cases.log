@@ -1,0 +1,55 @@
+# Real omp omp/18.12.6 with Firstmate Jev guard extension + .omp/fm-worker-overlay.yml, private scripted provider (tests/fm-jev-guard-native-fixture.py), scrubbed env, dead proxy.
+# Driver: omp-cases.sh / omp-cases2.sh (copied below). First-pass find and extension cases had malformed test inputs; corrected reruns follow.
+
+=== case websearch-ungranted: tool=web_search grant=none omp_exit=0
+tool output seen by next model turn:
+["[jev-guard] Missing task egress grant: request Firstmate authorization for egress=[\"web\"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"allow","session":"t4omp:web_search","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"t4omp:web","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"web_search","decision":"block","branch":"egress","destination_class":"web","confinement_owner":null,"request_started":false}
+
+=== case eval-t5: tool=eval grant=none omp_exit=0
+tool output seen by next model turn:
+["2"]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"allow","session":"t4omp:eval","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"eval","decision":"allow","branch":"confinement","destination_class":null,"confinement_owner":"T5","request_started":false}
+
+=== case report-issue-write: tool=write grant=["semantic-search","web","browser","provider","subagent","dynamic-code","remote-storage"] omp_exit=0
+tool output seen by next model turn:
+["[jev-guard] jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block. Refused path: \"xd://report_issue\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"allow","session":"t4omp:write","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"write","decision":"block","branch":"deterministic","destination_class":null,"confinement_owner":null,"request_started":false}
+
+=== case find-ungranted: tool=find grant=none omp_exit=0
+tool output seen by next model turn:
+["[jev-guard] Missing task egress grant: request Firstmate authorization for egress=[\"semantic-search\"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"allow","session":"t4omp:find","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"t4omp:semantic-search","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"find","decision":"block","branch":"egress","destination_class":"semantic-search","confinement_owner":null,"request_started":false}
+
+=== case find-granted: tool=find grant=["semantic-search"] omp_exit=0
+tool output seen by next model turn:
+["no hits for \"t4 private query canary\" (τ 0.20)\n\nlisted 0 · judged 0 · read 0 files (0B) · 0 requests · 0 tokens · $0.0000 · 2ms wall / 0ms api"]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"allow","session":"t4omp:find","source_ok":true}
+{"guard":"jev-egress-grant","decision":"allow","session":"t4omp:semantic-search","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"find","decision":"allow","branch":"egress","destination_class":"semantic-search","confinement_owner":null,"request_started":false}
+
+=== case unlisted-extension-tool: tool=t4probe grant=["semantic-search","web","browser","provider","subagent","dynamic-code","remote-storage"] omp_exit=0
+tool output seen by next model turn:
+["[jev-guard] Unclassified host tool \"t4probe\": Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an au"]
+central guard events:
+{"guard":"jev-tool-coverage","decision":"deny","session":"t4omp:t4probe","source_ok":true}
+jev-guard tool_call audit rows:
+{"tool":"t4probe","decision":"block","branch":"coverage","destination_class":null,"confinement_owner":null,"request_started":false}
+probe tool body ran (must be no): no
+
