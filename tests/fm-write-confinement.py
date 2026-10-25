@@ -574,7 +574,7 @@ def fixture(repo, base, harness, user_home, other):
             "renamed": {name: str(path) for name, path in renamed.items()}}
 
 
-def build_profile(repo, manifest, harness, profile, env):
+def build_profile(repo, manifest, harness, profile, env, agent_dir=None):
     home = Path(manifest["home"])
     command = [sys.executable, str(repo / "bin/fm-write-confinement.py"), "--worktree", manifest["worktree"],
                "--home", str(home), "--config", str(home / "config"), "--projects", str(home / "projects"),
@@ -582,7 +582,51 @@ def build_profile(repo, manifest, harness, profile, env):
                "--harness", harness, "--protect", manifest["other_home"], "--profile", str(profile)]
     if harness == "claude":
         command += ["--claude-session", OWN_SESSION]
+    if agent_dir:
+        command += ["--agent-dir", str(agent_dir)]
     subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True)
+
+
+# A new task's worktree has a new slug, so its first Claude launch creates the
+# transcript container. Run under a profile for a fresh config root that holds
+# no container yet: create it, append this session's transcript, then try to
+# move it to a writable place and to delete it.
+CONTAINER_PROBE = r'''
+import json, os, shutil, sys
+container, own, moved = sys.argv[1:4]
+result = {}
+try:
+    os.mkdir(container)
+    with open(own, "a") as stream:
+        stream.write("transcript\n")
+    result["create-and-append"] = True
+except OSError:
+    result["create-and-append"] = False
+try:
+    os.rename(container, moved)
+    os.rename(moved, container)
+    result["renamed"] = True
+except OSError:
+    result["renamed"] = False
+try:
+    shutil.rmtree(container)
+except OSError:
+    pass
+result["deleted"] = not os.path.isdir(container)
+print(json.dumps(result))
+'''
+
+
+def fresh_container(repo, manifest, base, mode, env):
+    root = base / "fresh-claude"
+    (root / "projects").mkdir(parents=True)
+    profile = base / "fresh-profile.sb"
+    build_profile(repo, manifest, "claude", profile, env, agent_dir=root)
+    container = root / "projects" / re.sub(r"[^A-Za-z0-9]", "-", manifest["worktree"])
+    command = [sys.executable, "-c", CONTAINER_PROBE, str(container), str(container / f"{OWN_SESSION}.jsonl"), str(base / "temp/moved")]
+    invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
+    result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+    return json.loads(result.stdout)
 
 
 if sys.argv[1] == "--child":
@@ -617,6 +661,11 @@ for harness in ("claude", "omp"):
             raise AssertionError(f"{harness} {mode}: exit={result.returncode} stderr={result.stderr}")
         actual = json.loads(result.stdout)
         print(f"{harness} {mode}: " + json.dumps(actual, sort_keys=True))
+        if harness == "claude":
+            fresh = fresh_container(repo, manifest, base, mode, env)
+            print(f"{harness} {mode} fresh container: " + json.dumps(fresh, sort_keys=True))
+            confined = mode == "confined"
+            assert fresh == {"create-and-append": True, "renamed": not confined, "deleted": not confined}, (harness, mode, fresh)
         if mode == "baseline":
             for name in actual:
                 if name in CONTROL_KEYS or name.startswith("refused-"):
