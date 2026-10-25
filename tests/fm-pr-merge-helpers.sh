@@ -10,6 +10,9 @@
 # This file defines no test cases. It holds the sandbox, forge-mock, and
 # assertion helpers the groups share, and pr_merge_run, which runs a group's
 # registered cases.
+# The groups that source this file read globals it assigns, so they read as
+# "unused" here.
+# shellcheck disable=SC2034
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -927,6 +930,7 @@ pr_merge_run() {
   local requested_case test_case registered_case
   for requested_case in "$@"; do
     registered_case=false
+    # shellcheck disable=SC2154 # Each group assigns pr_merge_test_cases before calling this.
     for test_case in "${pr_merge_test_cases[@]}"; do
       if [ "$requested_case" = "$test_case" ]; then registered_case=true; break; fi
     done
