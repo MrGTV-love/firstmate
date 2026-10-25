@@ -141,8 +141,7 @@ function object(value: unknown): value is Record<string, unknown> {
 
 type DeviceInput = { path?: unknown; content?: unknown };
 type DeviceRule = { effect: "local"; prove: (input: DeviceInput, ctx: GuardRuntimeContext, worktree: string) => boolean; remedy: string }
-  | { effect: "egress"; prove: (input: DeviceInput) => boolean; remedy: string }
-  | { effect: "unproved-egress"; reason: string }
+  | { effect: "refused"; reason: string }
   | { effect: "unknown"; reason: string };
 
 function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: string): boolean {
@@ -153,6 +152,7 @@ function scopedLsp(input: DeviceInput, ctx: GuardRuntimeContext, worktree: strin
   const root = realpathSync(worktree);
   if (realpathSync(ctx.cwd) !== root || effect === "unbounded") return false;
   if (effect === "session-read") return true;
+  if (args.action === "symbols" && (args.file === undefined || args.file === "*")) return true;
   if (effect === "preview" && (args.action === "rename" ? args.apply !== false : args.apply === true)) return false;
   // omp replaces these Unicode spaces before resolving the file. Diagnostics
   // also accepts globs; only an existing regular file proves a single target.
@@ -170,28 +170,16 @@ function ownJob(input: DeviceInput, ctx: GuardRuntimeContext): boolean {
     && snapshot.running.some((entry: unknown) => object(entry) && entry.id === job[1]);
 }
 
-function explicitGithubRead(input: DeviceInput): boolean {
-  if (typeof input.content !== "string") return false;
-  const args: unknown = JSON.parse(input.content);
-  if (!object(args) || typeof args.repo !== "string"
-    || !/^(?:[A-Za-z0-9.-]+\/)?[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(args.repo)) return false;
-  // These native branches send only caller-supplied repo/ref/path arguments.
-  // PR creation can auto-push or derive fill text; push/checkout use git state.
-  // No clean argument string proves the content those operations can release.
-  return args.op === "repo_view" || (args.op === "file_read" && typeof args.path === "string" && args.path.length > 0);
-}
-
 // Effects established against native omp 18.12.6 (docs/configuration.md "Jev guard").
-// Device arguments are not file contents. In particular Auto QA records locally
-// AND flushes the pending queue to its configured endpoint after consent.
+// Device arguments are not file contents. Auto QA flushes its whole pending
+// queue off the machine, and xd://github results return as unscreened write results.
 const deviceEffects: Readonly<Record<string, DeviceRule>> = {
   "xd://lsp": { effect: "local", prove: scopedLsp,
-    remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply not true), or reload with a plain existing file inside this task worktree and the session cwd equal to that worktree. For workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
+    remedy: "Use a file-scoped read, a rename preview (apply: false), code-action listing (apply not true), or reload with a plain existing file inside this task worktree, or a workspace symbols search (file \"*\"), with the session cwd equal to that worktree. For other workspace scope, edits, commands or raw requests, report the intended action to Firstmate for effect/target review." },
   "proc://<job>/kill": { effect: "local", prove: ownJob,
     remedy: "Read proc:// to identify a running job owned by this session, then use its exact proc://<job>/kill path. Ask Firstmate to handle other tasks or shared services." },
-  "xd://report_issue": { effect: "unproved-egress", reason: "Auto QA can upload every older queued grievance, not just this report; this guard cannot prove or screen the complete pending queue. Ask Firstmate to arrange a complete outbound-queue proof or a native per-report transport before retrying" },
-  "xd://github": { effect: "egress", prove: explicitGithubRead,
-    remedy: "Only repo_view and file_read with an explicit repository have a proved argument-only outbound payload. Other operations, including pr_push, pr_checkout and pr_create (with or without fill), can derive repository state or have unproved effects. Ask Firstmate for complete outbound-data and target review before retrying." },
+  "xd://report_issue": { effect: "refused", reason: "Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead" },
+  "xd://github": { effect: "refused", reason: "its results return as write-tool output, which this guard never screens for injected instructions. Use gh through the shell instead, where the result is screened" },
   "xd://propose": { effect: "unknown", reason: "the plan handler's downstream effects are not available to this guard" },
   "xd://resolve": { effect: "unknown", reason: "the pending apply callback's targets and downstream effects are not available to this guard" },
   "xd://reject": { effect: "unknown", reason: "the pending discard callback's targets and downstream effects are not available to this guard" },
@@ -460,32 +448,21 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
           const deny = (reason: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`);
           if (tool !== "write" || service.host !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
           if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
-          if (device.effect === "unproved-egress") return deny(device.reason);
-          if (device.effect === "local") {
-            let admitted = false;
-            try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
-            return admitted ? finishCall(terminal) : deny(device.remedy);
-          }
-          let outboundProved = false;
-          try { outboundProved = device.prove(input); } catch { /* Invalid or opaque payloads cannot establish the effect. */ }
-          if (!outboundProved) return deny(device.remedy);
-          if (!service.active) return deny("this device can send data off the machine, but egress review is inactive for this project/session. Ask Firstmate to resolve the project egress authorization or helper configuration before retrying.");
-        } else {
-          if (!plainPath(path)) {
-            return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-              "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block.");
-          }
-          const repo = roots.find((root) => insideRepo(path, root));
-          if (!repo) return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" }, `outside the repo: ${path}`);
+          if (device.effect === "refused") return deny(`${device.reason}.`);
+          let admitted = false;
+          try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+          return admitted ? finishCall(terminal) : deny(device.remedy);
         }
+        if (!plainPath(path)) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+            "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block.");
+        }
+        const repo = roots.find((root) => insideRepo(path, root));
+        if (!repo) return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" }, `outside the repo: ${path}`);
         if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
         const content = tool === "edit" ? input.new_string : input.content;
         if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-        // Unlike a local file write, a device may send its payload away. Never
-        // admit an unscreened tail using the local-file large-write allowance.
-        const { pieces, ...coverage } = device
-          ? { pieces: service.plan({ path, content }, "content", WRITE_QUESTIONS), model_screened_bytes: Buffer.byteLength(content, "utf8"), local_only_bytes: 0 }
-          : service.planWrite({ path, content }, WRITE_QUESTIONS);
+        const { pieces, ...coverage } = service.planWrite({ path, content }, WRITE_QUESTIONS);
         if (coverage.local_only_bytes > 0 && credentialShaped(content)) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
             "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
@@ -499,8 +476,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if ("failure" in settled) throw settled.failure;
         return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
           ...(!settled.decision.block ? { write_coverage: coverage } : {}),
-          enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result },
-        whereBlocked(settled, device ? `Device ${JSON.stringify(path)} can send data off the machine; its payload failed credential screening. Remove credentials from the outbound device arguments or ask Firstmate for an authorized correction.` : settled.decision.reason));
+          enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
       } catch (error) {
         const error_type = failureType(error);
         const request_started = result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted);

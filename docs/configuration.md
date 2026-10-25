@@ -2544,8 +2544,8 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | --- | --- |
 | `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
 | `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
-| `xd://report_issue` | Refused: after consent, native Auto QA can upload every pending grievance, and the guard cannot prove or screen that complete queue from the current report argument. |
-| `xd://github` | Only `repo_view` and `file_read` with an explicit repository have a proved argument-only outbound payload and may reach egress review; other operations fail closed. PR creation can derive fill text or auto-push, while push/checkout depend on repository state. |
+| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. |
+| `xd://github` | Refused: its native results return as `write` tool output, which the result screen never inspects, so remote content would reach the worker unscreened. The refusal points to `gh` through the shell, whose result is screened. |
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
@@ -2553,18 +2553,16 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
 The same file proof admits rename preview only with `apply: false`, code-action listing only when `apply` is not true, and file-scoped reload of the local server.
 `status` reads local session/server configuration and requires no file.
+Workspace `symbols` search (`file: "*"`, or no `file`, which omp answers with its own missing-file error) runs `workspace/symbol` on the local language servers in the session workspace, no wider than `references`, and requires no file.
 All admitted LSP calls require the session's real working directory to equal the task worktree and a native session context.
 The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
-Workspace-wide `file: "*"`, glob expansion, directories, missing files and symlink escapes do not supply the file proof.
+For every other action, workspace-wide `file: "*"`, glob expansion, directories, missing files and symlink escapes do not supply the file proof.
 Raw requests, applying rename or code actions, rename_file (including its separate destination/expanded source set), and unrecognized actions remain refused because their complete effects cannot be proved before dispatch.
 The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
 Finished or missing jobs, named project services absent from the owner snapshot, stdin and mode changes do not supply the proc cancellation proof.
 
 Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
-An egress variant must first prove that its complete outbound task data comes from the supplied arguments; missing or opaque payload proofs fail closed before argument-only review.
-Proved egress variants skip filesystem-root selection but retain the existing firstmate-only authorization, never-send preflight, credential judgment and fail-closed outage policy; an inactive project/helper configuration never admits them.
-Their complete argument payload must fit screening, with no local-file unscreened-tail allowance.
-A clean current report cannot release older Auto QA grievances, and clean GitHub push/fill arguments cannot release repository-derived content: those variants remain refused until a complete outbound-data and target proof exists.
+No device that sends data off the machine is admitted.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
 Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
 The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.

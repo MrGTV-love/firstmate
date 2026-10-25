@@ -592,6 +592,7 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   for (const input of [
     ...['references', 'definition', 'implementation', 'type_definition', 'hover', 'symbols', 'diagnostics', 'capabilities', 'reload', 'code_actions'].map(action => lsp({ action, file: 'source.ts', line: 1, symbol: 'value' })),
     lsp({ action: 'status' }), lsp({ action: 'rename', file: 'source.ts', apply: false, new_name: 'renamed' }),
+    lsp({ action: 'symbols', file: '*', query: 'value' }), lsp({ action: 'symbols', query: 'value' }),
     ...['plain space.ts', 'unicode-λ.ts'].map(file => lsp({ action: 'references', file })), { path: 'proc://bg_1/kill' },
   ]) {
     const before = requests();
@@ -600,9 +601,10 @@ for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project
   }
   for (const action of ['request', 'rename', 'rename_file', 'code_actions', 'format', 'unknown', 'References', '__proto__', 'constructor', 'toString', '']) await deny(lsp({ action, file: 'source.ts', apply: true }));
   for (const file of [...rewritten, ...rewritten.map(file => `${process.env.WT}/${file}`), '/etc/hosts', `${process.env.TASK_DATA}/outside.ts`, 'escape.ts', '../outside.ts', 'missing.ts', '.', process.env.WT, '/', 'file:///etc/hosts', '~/.env', '@source.ts', ':./source.ts', '[source.ts]', 'src/**/*.ts', '*', '']) await deny(lsp({ action: 'references', file }));
-  await deny(lsp({ action: 'symbols' }));
+  for (const file of ['src/*.ts', '**', ' *', `*${String.fromCodePoint(0x00a0)}`]) await deny(lsp({ action: 'symbols', file, query: 'value' }));
   for (const content of ['', 'not json', 'null', '[]', '1', '{"action":"references","file":1}']) await deny({ path: 'xd://lsp', content });
   await deny(lsp({ action: 'references', file: 'source.ts' }), { ...ctx, cwd: process.env.TASK_DATA });
+  await deny(lsp({ action: 'symbols', file: '*', query: 'value' }), { ...ctx, cwd: process.env.TASK_DATA });
   await deny(lsp({ action: 'references', file: 'source.ts' }), { cwd: process.env.WT });
   await deny({ ...lsp({ action: 'references', file: 'source.ts' }), path: 'XD://lsp' });
   await deny({ ...lsp({ action: 'references', file: 'source.ts' }), new_string: 'x' }, ctx, 'edit');
@@ -620,11 +622,9 @@ test_omp_device_effects() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const { MAX_CHUNKS, MAX_REQUEST_BYTES } = await import(pathToFileURL(process.env.REPORT));
 const home = process.env.HOME_DIR;
 const config = `${home}/device-config`;
 mkdirSync(config);
@@ -653,98 +653,29 @@ for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
   }
   assert.equal(sent().length, before, 'failed diagnostics scope proofs never send data');
 }
-// A clean report can flush an older unscreened grievance from another task.
-// clean push/fill arguments can release local objects or commit-message text.
-// Put a never-send value in real queued/repository state, not in the arguments.
-const forbidden = 'hidden-outbound-private-canary';
-writeFileSync(`${config}/dispatch-never-send`, forbidden + '\n');
-mkdirSync(`${home}/.omp`);
-const queue = `${home}/.omp/autoqa.db`;
-const queued = execFileSync('python3', ['-c', [
-  'import sqlite3, sys',
-  'c = sqlite3.connect(sys.argv[1])',
-  "c.execute('CREATE TABLE grievances (id INTEGER PRIMARY KEY, report TEXT, pushed INTEGER)')",
-  "c.execute('INSERT INTO grievances VALUES (1, ?, 0)', (sys.argv[2],))",
-  'c.commit()',
-  "print(c.execute('SELECT report FROM grievances WHERE pushed = 0').fetchone()[0])",
-].join('\n'), queue, forbidden], { encoding: 'utf8' });
-assert.equal(queued.trim(), forbidden, 'older pending report must contain the forbidden value');
-const derivedRepo = `${process.env.TASK_DATA}/derived-egress-repo`;
-mkdirSync(derivedRepo);
-const git = (...args) => execFileSync('git', ['-C', derivedRepo, ...args], { encoding: 'utf8' });
-git('init', '-q');
-writeFileSync(`${derivedRepo}/payload.txt`, forbidden + '\n');
-git('add', 'payload.txt');
-git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', forbidden);
-assert.equal(git('show', 'HEAD:payload.txt').trim(), forbidden, 'push fixture must contain an unscreened committed value');
-assert.equal(git('log', '-1', '--format=%B').trim(), forbidden, 'fill fixture must contain unscreened commit-message text');
+// Auto QA uploads every pending grievance and GitHub results return as
+// unscreened write output, so both stay refused whatever the arguments say.
 for (const scope of [{}, { noHelpers: true }, { project: 'vernant' }]) {
-  const handler = install({ worktree: derivedRepo, ...scope });
+  const handler = install(scope);
   for (const [path, content, reason] of [
-    ['xd://report_issue', 'write: refused Auto QA grievance report', /complete pending queue/],
-    ['xd://github', JSON.stringify({ op: 'pr_push', repo: 'fixture/repo', branch: 'main' }), /repository state/],
-    ['xd://github', JSON.stringify({ op: 'pr_create', repo: 'fixture/repo', fill: true }), /repository state/],
-    ['xd://github', JSON.stringify({ op: 'pr_create', repo: 'fixture/repo', title: 'clean title', body: 'clean body', head: 'main' }), /repository state/],
+    ['xd://report_issue', 'write: refused Auto QA grievance report', /Auto QA is off for firstmate workers/],
+    ...['repo_view', 'file_read', 'pr_push', 'pr_create', 'pr_checkout', 'future_op'].map(op => ['xd://github', JSON.stringify({ op, repo: 'fixture/repo', path: 'README.md' }), /gh through the shell/]),
+    ...['not-json', '{}'].map(content => ['xd://github', content, /gh through the shell/]),
   ]) {
     const before = sent().length;
-    assert.equal(content.includes(forbidden), false, 'arguments must not themselves contain the hidden value');
-    const refused = await handler({ toolName: 'write', input: { path, content } }, { ...ctx, cwd: derivedRepo });
-    assert.equal(refused?.block, true, 'an unproved hidden outbound payload must never be released by a clean argument judgment');
-    assert.ok(refused.reason.includes(path));
-    assert.match(refused.reason, reason);
-    assert.match(refused.reason, /Firstmate/);
-    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
-    assert.equal(sent().length, before, 'unproved complete payloads stop before even argument-only screening');
-  }
-}
-unlinkSync(`${config}/dispatch-never-send`);
-for (const content of ['not-json', '{}', '{"op":"repo_view"}', '{"op":"pr_checkout","repo":"fixture/repo","pr":"1"}', '{"op":"future_op","repo":"fixture/repo"}']) {
-  const before = sent().length;
-  assert.equal((await call(active, 'xd://github', content))?.block, true);
-  assert.equal(sent().length, before);
-}
-// Only proved argument-only GitHub reads reach the existing privacy,
-// credential, complete-screening and outage rules rather than file roots.
-for (const args of [{ op: 'repo_view', repo: 'fixture/repo' }, { op: 'file_read', repo: 'fixture/repo', path: 'README.md' }]) {
-  const path = 'xd://github';
-  const payload = branch => JSON.stringify({ ...args, branch });
-  const content = JSON.stringify(args);
-  let before = sent().length;
-  assert.equal(await call(active, path, content), undefined);
-  assert.equal(sent().length, before + 1);
-  assert.deepEqual(sent().at(-1).body && JSON.parse(sent().at(-1).body).state, { path, content });
-  for (const scope of [{ noHelpers: true }, { project: 'vernant' }, { project: '' }]) {
-    before = sent().length;
-    const refused = await call(install(scope), path, content);
+    const refused = await call(handler, path, content);
     assert.equal(refused?.block, true);
     assert.ok(refused.reason.includes(path));
-    assert.match(refused.reason, /egress review is inactive/);
-    assert.equal(sent().length, before);
+    assert.match(refused.reason, reason);
+    assert.doesNotMatch(refused.reason, /needs a plain absolute or worktree-relative path/);
+    assert.equal(sent().length, before, 'refused devices stop before any screening request');
   }
-  const secret = await call(active, path, payload('sk-live-fixture'));
-  assert.equal(secret?.block, true);
-  assert.match(secret.reason, /failed credential screening/);
-  const outage = await call(active, path, payload('http402'));
-  assert.equal(outage?.block, true);
-  assert.match(outage.reason, /Review required/);
-  assert.ok(outage.reason.includes(path));
-  assert.doesNotMatch(outage.reason, /needs a plain absolute or worktree-relative path/);
-  before = sent().length;
-  writeFileSync(`${config}/dispatch-never-send`, 'device-private-canary\n');
-  assert.equal((await call(active, path, payload('device-private-canary')))?.block, true);
-  unlinkSync(`${config}/dispatch-never-send`);
-  assert.equal(sent().length, before, 'never-send must stop device egress before transport');
-  // Oversized outbound devices must not inherit the local-file unscreened-tail
-  // allowance, even when no credential-shaped value is present in that tail.
-  const oversize = await call(active, path, payload('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1)));
-  assert.equal(oversize?.block, true);
-  assert.match(oversize.reason, /complete-screening-budget/);
-  assert.equal(sent().length, before);
-  for (const handler of [install({ host: 'claude' }), active]) {
-    const tool = handler === active ? 'edit' : 'write';
-    assert.equal((await call(handler, path, content, tool))?.block, true);
-    assert.equal(sent().length, before, 'non-native invocation must not egress');
-  }
+}
+for (const handler of [install({ host: 'claude' }), active]) {
+  const before = sent().length;
+  const tool = handler === active ? 'edit' : 'write';
+  assert.equal((await call(handler, 'xd://lsp', JSON.stringify({ action: 'hover', file: 'source.ts' }), tool))?.block, true);
+  assert.equal(sent().length, before, 'non-native invocation must not reach a device');
 }
 // Neither a registered opaque callback nor an unrecognized device may be
 // guessed harmless from its URI spelling or from a benign-looking payload.
@@ -762,7 +693,11 @@ console.log('device-effects-ok');
 JS
 ) || fail "OMP device effects: $out"
   [ "$out" = device-effects-ok ] || fail "unexpected device effects output: $out"
-  pass "local devices skip models; hidden queued/repository payloads fail closed; proved GitHub reads retain egress checks; unknown devices name their review remedy"
+  command -v ruby >/dev/null 2>&1 || fail "ruby is required to parse .omp/fm-worker-overlay.yml as YAML"
+  out=$(ruby -ryaml -e 'print YAML.safe_load(File.read(ARGV[0])).fetch("dev").fetch("autoqa").inspect' "$ROOT/.omp/fm-worker-overlay.yml" 2>&1) \
+    || fail "worker overlay has no dev.autoqa setting: $out"
+  [ "$out" = false ] || fail "worker overlay must disable omp Auto QA, got dev.autoqa=$out"
+  pass "local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy"
 }
 
 test_deadlines() {
