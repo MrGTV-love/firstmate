@@ -1,0 +1,15 @@
+$ jq guards whose test is a pr-merge file
+merge-green-head	tests/fm-pr-merge-checks.test.sh
+merge-away-waiver	tests/fm-pr-merge-checks.test.sh
+merge-held-task	tests/fm-pr-merge-checks.test.sh
+
+$ bin/fm-guard-refcheck.sh
+REFCHECK_SUMMARY registrations=52 paths=109 missing=0 registry_missing=0 retired=9 resurrected=0
+rc=0
+
+$ bash tests/fm-pr-merge-checks.test.sh <the four guard-refusal cases>
+ok - fm-pr-merge prints one green-head refusal naming each check, its requirement, its next action, and the exact repair
+ok - fm-pr-merge names the away posture and the attended waiver command when it refuses a waiver while away
+ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge
+rc=0

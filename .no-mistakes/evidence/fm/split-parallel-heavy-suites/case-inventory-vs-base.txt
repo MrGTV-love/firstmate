@@ -1,0 +1,10 @@
+base dump rc=0
+fm-pr-merge registered=50 undefined=0
+fm-pr-merge-forges registered=49 undefined=0
+fm-pr-merge-checks registered=50 undefined=0
+base cases=149 union cases=149 duplicates=0
+ORDER: identical to base
+BODIES: identical to base
+/Users/charlesabrooker/tmp/fm-prmerge-inv.dEfLTb/base/tests/lib.sh: line 39: /Users/charlesabrooker/tmp/fm-prmerge-inv.dEfLTb/base/tests/git-config-helpers.sh: No such file or directory
+_: /Users/charlesabrooker/tmp/fm-prmerge-inv.dEfLTb/base/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found

@@ -1,0 +1,30 @@
+$ bash tests/fm-pr-merge-checks.test.sh test_github_review_required_refuses
+ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED
+rc=0
+
+$ bash tests/fm-pr-merge-forges.test.sh test_multi_pr_task_merges_named_pr_when_copy_head_is_a_local_tip test_extra_merge_args_forwarded  (second name belongs to another group)
+Unknown test case: test_extra_merge_args_forwarded
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+rc=2
+
+$ bash tests/fm-pr-merge.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge.test.sh [test_function_name ...]
+rc=2
+
+$ bash <tmp>/fake-group.test.sh   (throwaway group: case 2 calls fail; uses the real helpers module and pr_merge_run)
+ok - first_passes
+not ok - second_fails_on_purpose
+rc=1
+
+$ bin/fm-test-run.sh <tmp>/fake-group.test.sh  (same failing group through the real runner)
+ok - first_passes
+not ok - second_fails_on_purpose
+FM_TEST_END 2026-10-25T06:13:26Z /Users/charlesabrooker/tmp/fm-prmerge-adv.AXMDg6/fake-group.test.sh exit=1 duration_ms=13656 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5R6MC4PYH3RKTD4Q8EB6NWJ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=14045
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=13656 failed=1
+FM_TEST_SLOWEST rank=1 script=/Users/charlesabrooker/tmp/fm-prmerge-adv.AXMDg6/fake-group.test.sh duration_ms=13656
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5R6MC4PYH3RKTD4Q8EB6NWJ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+rc=
+runner exit for failing throwaway group: rc=1
