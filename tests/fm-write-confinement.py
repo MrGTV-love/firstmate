@@ -244,19 +244,44 @@ def child(manifest):
         except PermissionError:
             results["e-" + name] = (state / record).read_text() == "original"
     # Shared home state the worker's own procedures write stays writable.
+    # Process inspection runs through bin/fm-proc-info.py: the sandbox refuses
+    # setuid ps, and a confined worker has no ps fallback.
+    lavish_bin, lavish_state = data / "task/fake-bin", data / "task/lavish-state"
+    lavish_bin.mkdir()
+    lavish_state.mkdir()
+    (lavish_bin / "lavish-axi").write_text(
+        '#!/usr/bin/env bash\n[ "${1-}" = poll ] || exit 2\nprintf "polled\\n" >> "$2.polled"\n'
+        'printf "session:\\n  status: ended\\n  ended_by: user\\n"\n')
+    (lavish_bin / "lavish-axi").chmod(0o755)
     procedure_env = dict(os.environ, FM_ROOT_OVERRIDE=manifest["repo"], FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
-                         FM_DATA_OVERRIDE=str(data), FM_CONFIG_OVERRIDE=str(home / "config"))
+                         FM_DATA_OVERRIDE=str(data), FM_CONFIG_OVERRIDE=str(home / "config"), FM_WRITE_CONFINEMENT="seatbelt-v1",
+                         LAVISH_AXI_STATE_DIR=str(lavish_state), PATH=str(lavish_bin) + os.pathsep + os.environ["PATH"])
     board = data / "task/board.html"
     board.write_text("<h1>board</h1>\n")
+    key = hashlib.sha256(str(board.resolve()).encode()).hexdigest()[:16]
+    (lavish_state / "state.json").write_text(json.dumps({"sessions": {key: {"key": key, "file": str(board.resolve()), "status": "open",
+                                                                            "url": "http://127.0.0.1:14387/session/0123456789abcdef"}}}))
     lavish = str(Path(manifest["repo"]) / "bin/fm-procevent-lavish.sh")
     procevent = str(Path(manifest["repo"]) / "bin/fm-procevent.sh")
     source = subprocess.run([lavish, "source-id", str(board)], env=procedure_env, capture_output=True, text=True).stdout.strip()
     register = subprocess.run([procevent, "register-task", "lavish", source, "task", "--", lavish, "poll", str(board)],
                               env=procedure_env, capture_output=True, text=True)
     listed = subprocess.run([procevent, "list"], env=procedure_env, capture_output=True, text=True).stdout
+    poll = subprocess.run([procevent, "start", source], env=procedure_env, capture_output=True, text=True, timeout=120)
+    polled = Path(str(board) + ".polled")
+    results["procevent-poll"] = (poll.returncode == 0 and polled.exists() and polled.read_text() == "polled\n"
+                                 and (state / f"procevent-inbox/{source}.1.result").exists())
+    handled = subprocess.run([procevent, "handled", source, "1"], env=procedure_env, capture_output=True, text=True)
     retire = subprocess.run([procevent, "retire", source], env=procedure_env, capture_output=True, text=True)
-    results["procevent-board"] = (bool(source) and register.returncode == 0 and source in listed and retire.returncode == 0
+    results["procevent-board"] = (bool(source) and register.returncode == 0 and source in listed and handled.returncode == 0 and retire.returncode == 0
                                   and source not in subprocess.run([procevent, "list"], env=procedure_env, capture_output=True, text=True).stdout)
+    budget = subprocess.run(["bash", str(Path(manifest["repo"]) / "bin/fm-proc-budget.sh"), "--", "true"],
+                            env=procedure_env, capture_output=True, text=True)
+    results["proc-budget"] = budget.returncode == 0
+    ancestry = subprocess.run(["bash", "-c", 'exec -a claude bash -c \'. "$0"; fm_harness_ancestry_pids; echo "self=$$"\' "$1"', "probe",
+                               str(Path(manifest["repo"]) / "bin/fm-session-lock-lib.sh")], env=procedure_env, capture_output=True, text=True)
+    lines = ancestry.stdout.split()
+    results["session-lock-ancestry"] = len(lines) >= 2 and lines[-1] == "self=" + lines[0]
     ledger = subprocess.run([str(Path(manifest["repo"]) / "bin/fm-fleet-ledger.sh"), "appended", str(home / "config"), str(state / "task.status")],
                             env=procedure_env, capture_output=True, text=True)
     results["fleet-ledger"] = (ledger.returncode == 0 and (state / "fleet-ledger.jsonl").exists()

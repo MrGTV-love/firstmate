@@ -148,8 +148,15 @@ fm_project_lock_describe() {  # <lock> <head>
 
 # Cumulative centiseconds for a holder and its live descendants. macOS ps -S
 # includes reaped child CPU; Linux procps uses the portable live-tree fallback.
-# A sampling failure returns nonzero and establishes no progress.
+# A sampling failure returns nonzero and establishes no progress. Setuid ps
+# cannot run inside a confined worker's sandbox, so a confined worker reads the
+# same total through bin/fm-proc-info.py instead.
+_FM_PROJECT_LOCK_PROC_INFO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-proc-info.py
 fm_project_lock_cpu() {  # <holder-pid>
+  if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
+    python3 "$_FM_PROJECT_LOCK_PROC_INFO" cpu-tree "$1" 2>/dev/null
+    return
+  fi
   (
     set -o pipefail
     { LC_ALL=C ps -S -axo pid=,ppid=,time= 2>/dev/null || LC_ALL=C ps -axo pid=,ppid=,time=; } | LC_ALL=C awk -v root="$1" '

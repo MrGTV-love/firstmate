@@ -33,6 +33,7 @@
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it.
 set -u
+FM_PROC_BUDGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 fm_proc_budget_error() {
   echo "fm-proc-budget: $*" >&2
@@ -48,7 +49,15 @@ fm_proc_budget_count() {
   set -o pipefail
   case "$(uname -s)" in
     Linux) count=$(ps -L -U "$uid" -o lwp= | wc -l) || return 1 ;;
-    *) count=$(ps -U "$uid" -o pid= | wc -l) || return 1 ;;
+    # Setuid ps cannot run inside a confined worker's sandbox, so a confined
+    # worker reads the count through bin/fm-proc-info.py instead.
+    *)
+      if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
+        count=$(python3 "$FM_PROC_BUDGET_DIR/fm-proc-info.py" count-uid "$uid") || return 1
+      else
+        count=$(ps -U "$uid" -o pid= | wc -l) || return 1
+      fi
+      ;;
   esac
   count=$(printf '%s' "$count" | tr -d '[:space:]')
   case "$count" in

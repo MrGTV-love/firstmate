@@ -273,6 +273,11 @@ observe_launch() {
   cat > "$FAKEBIN_DIR/claude" <<'SH'
 #!/usr/bin/env bash
 observed="$FM_OBSERVED"
+session=none
+if [ "${1:-}" = --session-id ]; then
+  session=${2:-}
+  shift 2
+fi
 case "${1:-}:${2:-}:${3:-}" in
   --version:*) observed="$FM_OBSERVED.version" ;;
   --dangerously-skip-permissions:--print:compound-worker) observed="$FM_OBSERVED.worker" ;;
@@ -280,6 +285,7 @@ esac
 printf 'API_KEY=%s\nAUTH_TOKEN=%s\nCONFIG_DIR=%s\n' \
   "${ANTHROPIC_API_KEY-unset}" "${ANTHROPIC_AUTH_TOKEN-unset}" \
   "${CLAUDE_CONFIG_DIR-unset}" > "$observed"
+printf '%s\n' "$session" > "$observed.session"
 SH
   chmod +x "$FAKEBIN_DIR/claude"
   env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" \
@@ -372,6 +378,11 @@ test_compound_launch_credentials_and_account() {
       expected_key=sk-ant-pane-only
       expected_token=sk-ant-pane-token
     fi
+    # A confined launch clears a pane's stale CLAUDE_CONFIG_DIR so an unpinned
+    # Claude runs under the default root its write profile grants.
+    if [ "$pin" = none ] && grep -qx 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta"; then
+      root=unset
+    fi
     for probe in version worker; do
       [ -f "$CASE_DIR/observed.$probe" ] \
         || fail "$scenario compound launch did not execute the $probe invocation"
@@ -380,6 +391,12 @@ test_compound_launch_credentials_and_account() {
         "$expected_key" "$expected_token" "$root")
       [ "$actual" = "$expected" ] \
         || fail "$scenario $probe invocation must receive the expected credentials and account"$'\n'"expected: $expected"$'\n'"actual: $actual"
+      expected=none
+      if grep -qx 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta"; then
+        expected=$(grep '^claude_session_id=' "$HOME_DIR/state/$id.meta" | tail -1 | cut -d= -f2-)
+      fi
+      [ -n "$expected" ] && [ "$(cat "$CASE_DIR/observed.$probe.session")" = "$expected" ] \
+        || fail "$scenario $probe invocation must lead with the recorded session id, then its own arguments"
     done
     pass "$scenario compound Claude launch enforces credentials and account on both invocations"
   done
@@ -429,7 +446,9 @@ test_teamclaude_launcher_keeps_the_api_key_guard() {
     run_case_spawn teamclaude-api-key-a2 "$PROJ_DIR" --mode no-mistakes --yolo off --allow-api-key 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "a TeamClaude claude spawn should honor --allow-api-key"$'\n'"$out"
-  assert_contains "$(cat "$LAUNCH_LOG")" "$ROOT/bin/fm-teamclaude-launch.sh' " \
+  # The closing quote ends the program word at any quoting level; a confined
+  # launch nests the command in one more single-quoted level.
+  assert_contains "$(cat "$LAUNCH_LOG")" "$ROOT/bin/fm-teamclaude-launch.sh'" \
     "an allowed API-key launch should still start through TeamClaude"
   pass "config/claude-launcher=teamclaude keeps the API-key refusal and the --allow-api-key opt-in"
 }

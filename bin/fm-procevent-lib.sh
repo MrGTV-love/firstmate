@@ -35,6 +35,23 @@ fm_procevent_claim_root() {
   printf '%s\n' "${FM_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
 }
 
+# One process fact: ppid, pgid or lstart for <pid>, or a process table with the
+# comma-separated fields among pid, ppid, pgid, lstart and command. Setuid ps
+# cannot run inside a confined worker's sandbox, so a confined worker reads them
+# through bin/fm-proc-info.py instead. lstart is the C-locale start time with
+# runs of spaces collapsed, from either source.
+fm_procevent_proc() {  # <ppid|pgid|lstart> <pid> | table <fields>
+  if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
+    python3 "${SCRIPT_DIR:-${BASH_SOURCE[0]%/*}}/fm-proc-info.py" "$1" "$2" 2>/dev/null
+    return
+  fi
+  case "$1" in
+    table) LC_ALL=C ps -axo "${2//,/=,}=" 2>/dev/null ;;
+    lstart) LC_ALL=C ps -o lstart= -p "$2" 2>/dev/null | awk '{ $1 = $1; print }' ;;
+    *) ps -o "$1=" -p "$2" 2>/dev/null ;;
+  esac
+}
+
 # Functions only: a runner started with exported functions does not inherit
 # shell variables, so a path built from a library variable would come out empty.
 fm_procevent_registry_dir_to() { printf -v "$1" '%s/procevent' "$2"; }

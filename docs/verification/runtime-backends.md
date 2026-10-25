@@ -23,7 +23,7 @@ Every confined check was true for both profiles:
 - cases a-e, with B3's glob deletion against another task's directory in the shared `/private/tmp/claude-<uid>` root and B15's aged sweep against another task's `~/tmp` entry;
 - own Git commit, inbox handling, the real busy writer, native session proof and task audit;
 - a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
-- a duration record appended through `bin/fm-duration.py`, a procevent board registered and retired through `bin/fm-procevent.sh`, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
+- a duration record appended through `bin/fm-duration.py`, a procevent board registered, polled once by its runner and retired through `bin/fm-procevent.sh`, a process budget through `bin/fm-proc-budget.sh`, a session-lock ancestry walk, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
 - one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state, data and temp roots, the shared legacy audit, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
 - refused writes to every Claude and omp file that loads code or instructions, `~/.codex` and `~/.dsh`, while the running harness's measured runtime state stayed writable;
 - refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/`, the shared Git `refs/` and `worktrees/` folders and another session's Claude temp directory;
@@ -43,8 +43,8 @@ A second Claude session launched with `--session-id` under the session-scoped pr
 Its transcript and temp directories used the builder's derived slug.
 Neither Claude session had a to-do tool in print mode or wrote `todos/`, so `todos/` carries no grant.
 A third Claude session ran interactively, as `fm-spawn.sh` launches workers, under a profile that also granted its own `tasks/<session-id>/` and kept `sessions/` protected: all four `SessionStart` hooks finished with status 0 and Bash, Read and Edit completed, with Edit writing its own `file-history/<session-id>/`.
-TaskCreate was not available in that session, so `tasks/<session-id>/` was not exercised.
-Claude's debug log showed the `sessions/` registry write refused without failing any tool, prompt history unsaved because `history.jsonl.lock` is not granted, and `ps` refused because macOS runs no setuid program inside a sandbox.
+TaskCreate was not available in that session, so `tasks/<session-id>/` was not exercised by a real session; its model-free write is proven by `tests/fm-write-confinement.test.sh`.
+Claude's debug log showed the `sessions/` registry write refused without failing any tool, prompt history unsaved because `history.jsonl.lock` is not granted, and `ps` refused because macOS runs no setuid program inside a sandbox; Firstmate's own worker tools read process facts through `bin/fm-proc-info.py` instead, and the direct fixture proves a process budget, a procevent poll and a session-lock ancestry walk under each profile.
 The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings; a denial a harness swallows silently would not be seen.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
 

@@ -1739,9 +1739,9 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
         IFS= read -r model_flag
         IFS= read -r model
         IFS= read -r brief
-      } < "$env_out.args"
+      } < <(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")
       [ "$flag" = --settings ] && [ "$model_flag" = --model ] && [ "$model" = opus ] \
-        || fail "raw launch lost its model arguments: $(cat "$env_out.args")"
+        || fail "raw launch lost its model arguments or its recorded session id: $(cat "$env_out.args")"
       [ "$(printf '%s' "$brief" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
         || fail "raw launch lost its brief doorbell"
       if [ "$source" != none ]; then
@@ -2556,8 +2556,8 @@ test_teamclaude_launcher_proxies_a_raw_claude_launch() {
   env_out="$CASE_DIR/claude-env"
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
-  [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
-    || fail "the raw claude command must keep its own arguments: $(cat "$env_out.args" 2>/dev/null)"
+  [ "$(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the raw claude command must keep its own arguments after its recorded session id: $(cat "$env_out.args" 2>/dev/null)"
   pass "config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments"
 }
 
@@ -2706,8 +2706,8 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
     ! grep -q '^FM_TC_' "$env_out" \
       || fail "$scenario: private snapshot variables must not reach Claude"
     if [ "$launch_kind" = raw ]; then
-      [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
-        || fail "$scenario: the raw command must retain its Claude arguments"
+      [ "$(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")" = "$(printf '%s\n' --model opus)" ] \
+        || fail "$scenario: the raw command must retain its Claude arguments after its recorded session id"
     fi
   done
   pass "TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration"
