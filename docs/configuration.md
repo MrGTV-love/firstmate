@@ -2506,7 +2506,7 @@ The task's own gate repository is the one no-mistakes names from the first 12 he
 Native temp selectors point at the task temporary root.
 A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
 The measured harness contracts are omp and Claude.
-`codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy` and `devin` launch unchanged and unconfined, with no guessed state-root grants.
+`codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy`, `devin` and `dsh` launch unchanged and unconfined, with no guessed state-root grants.
 Each launch audit prints the actual harness identifier and confinement mode; macOS metadata records `write_confinement=unconfined-macos-<harness>` for these unmeasured harnesses.
 Their root contracts are follow-up work, not coverage supplied by this boundary.
 Secondmates are persistent homes and are not subject to this task-worker boundary.
