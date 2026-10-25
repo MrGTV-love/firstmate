@@ -3,7 +3,7 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "subagent" | "dynamic-code" | "remote-storage";
+export type DestinationClass = "semantic-search" | "web" | "browser" | "provider" | "subagent" | "remote-storage";
 type ToolPolicy = { result: "screen" | "unjudged" } & (
   { call: "confinement"; confinement_owner: "T5" }
   | { call: "shell" | "write" | "edit" | "local" | "paths" | DestinationClass; confinement_owner?: never }
@@ -63,9 +63,9 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   exitworktree: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   listagents: { call: "local", result: "unjudged" },
   listmcpresourcestool: { call: "remote-storage", result: "unjudged" },
-  monitor: { call: "dynamic-code", result: "unjudged" },
+  monitor: { call: "shell", result: "unjudged" },
   notebookedit: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
-  powershell: { call: "dynamic-code", result: "unjudged" },
+  powershell: { call: "shell", result: "unjudged" },
   pushnotification: { call: "provider", result: "unjudged" },
   readmcpresourcetool: { call: "remote-storage", result: "unjudged" },
   remotetrigger: { call: "provider", result: "unjudged" },
@@ -98,7 +98,7 @@ export function uncoveredTools(names: readonly string[]): string[] {
 }
 
 const classes: Readonly<Record<string, true>> = {
-  "semantic-search": true, web: true, browser: true, provider: true, subagent: true, "dynamic-code": true, "remote-storage": true,
+  "semantic-search": true, web: true, browser: true, provider: true, subagent: true, "remote-storage": true,
 };
 function destinationClass(value: string): value is DestinationClass {
   return Object.hasOwn(classes, value);

@@ -2507,7 +2507,7 @@ Tool coverage and egress-grant refusals apply whether or not the project scope i
 A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
 
 Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
-The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent`, `dynamic-code` and `remote-storage`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider`, `subagent` and `remote-storage`.
 An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
 Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
 The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
@@ -2527,7 +2527,8 @@ A legacy host tool absent from the current host references, such as Claude `Mult
 A coverage refusal names the refused host tool, states the remedy of a `TOOL_POLICY` row classified by its real effect, notes that `report_issue` and `SendFeedback` never get one, and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop`, `SubagentHandback` and `StructuredOutput` (which only returns the final structured answer to its caller), are classified `local`.
 Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
-Claude `Monitor` and `PowerShell` run commands outside the `bash` tool and require a `dynamic-code` grant; granting that class authorizes that execution capability, not a confinement guarantee.
+Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
+Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
 The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the existing plain-path guard.
 Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name or destination class, so an allow of another tool or class never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
 The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.

@@ -170,7 +170,7 @@ assert.equal(blocked.attempts, 6);
 assert.equal(blocked.cost.incomplete, true);
 });
 await test('T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body', async () => {
-  const all = '["semantic-search","web","browser","provider","subagent","dynamic-code","remote-storage"]';
+  const all = '["semantic-search","web","browser","provider","subagent","remote-storage"]';
   for (const meta of [undefined, `egress=${all}\n`]) {
     if (meta) writeFileSync(`${state}/audit.meta`, meta);
     try {
@@ -376,6 +376,31 @@ await test('M4: an unrelated allow never clears a later deny in the real metrics
     assert.equal(metric(id).verdict, 'keep', id);
   }
   rmSync(log);
+});
+await test('Claude Monitor and PowerShell share Bash shell-command treatment without a grant', async () => {
+  const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
+  const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION];
+  for (const tool_name of ['Bash', 'Monitor', 'PowerShell']) {
+    const before = rowCount();
+    const output = execFileSync(process.execPath, args, {
+      input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: { command: 'echo synthetic-shell-effect' }, cwd: state }),
+      encoding: 'utf8',
+    });
+    assert.equal(output, '', `${tool_name}: a shell command needs no pre-call grant`);
+    assert.equal(rowCount(), before, `${tool_name}: no egress or model decision row`);
+  }
+});
+await test('a removed execution class cannot authorize an otherwise valid web grant', async () => {
+  writeFileSync(`${state}/audit.meta`, 'egress=["web","dynamic-code"]\n');
+  try {
+    const r = await fresh(async () => {
+      const patch = await handlers.tool_call({ toolName: 'webfetch', input: { url: 'https://synthetic.invalid' } }, { cwd: state });
+      assert.equal(patch?.block, true, 'the removed class invalidates the entire grant');
+    });
+    assert.equal(r.branch, 'egress');
+    assert.equal(r.destination_class, 'web');
+    assert.equal(r.request_started, false);
+  } finally { rmSync(`${state}/audit.meta`); }
 });
 await test('worker brief shell commands are never refused for a missing egress grant', async () => {
   const commands = ['gh-axi pr create --title synthetic --body synthetic', 'gh pr checks 1 --watch',
