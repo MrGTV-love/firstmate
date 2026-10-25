@@ -1800,15 +1800,30 @@ SH
 # in-turn, that turn holds the close, so the host's copy is refused in silence.
 # Once that turn's Stop fires (deferring to the parked host's open claim)
 # without an ack, nothing holds the still-queued row and the close is delivered
-# exactly once.
+# exactly once. A late Stop firing whose start precedes the next turn's drain
+# (late-stop: the drain runs while the firing loads its libraries) must leave
+# that newer turn's hold in place, so the close is still refused.
 test_host_handback_after_main_presentation() {
-  local phase watcher mode dir out status pid identity drain generation cutoff queued
-  for mode in open acked ended; do
+  local phase watcher mode dir out status pid identity drain generation cutoff queued lib
+  for mode in open acked ended late-stop; do
     for phase in pending announced; do
       for watcher in absent live; do
         dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$mode-$phase-$watcher")
         rm -f "$dir/config/supervision-host-off"
         : > "$dir/state/task.meta"
+        if [ "$mode" = late-stop ]; then
+          lib=$(cat "$dir/bin/fm-supervision-lib.sh")
+          {
+            cat <<'SH'
+if [ -e "$FM_HOME/state/late-stop-drain" ]; then
+  rm -f "$FM_HOME/state/late-stop-drain"
+  cp "$FM_HOME/state/.main-eligible-rows.held" "$FM_HOME/state/hold-before-next-turn"
+  FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$FM_HOME/state/next-turn-drain" 2>&1 || true
+fi
+SH
+            printf '%s\n' "$lib"
+          } > "$dir/bin/fm-supervision-lib.sh"
+        fi
         cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu
@@ -1827,7 +1842,8 @@ if [ ! -e "$FM_HOME/state/host-prepared" ]; then
       set -- $(sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p' "$STATE/main-drain")
       FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" "$@" > "$STATE/main-ack" 2>&1
       ;;
-    ended)
+    ended|late-stop)
+      [ "$FM_TEST_MAIN_TURN" = ended ] || : > "$STATE/late-stop-drain"
       rc=0
       printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
         | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$STATE/turn-stop" 2>&1 || rc=$?
@@ -1874,6 +1890,16 @@ SH
             [ "$(epoch_outcome "$dir")" = rewake ] || fail "ended/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
             [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "ended/$phase/$watcher: handback was not delivered exactly once: $out"
             [ "$queued" -eq 1 ] || fail "ended/$phase/$watcher: translation consumed a durable row"
+            ;;
+          late-stop)
+            [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "late-stop/$phase/$watcher: the late Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
+            assert_contains "$(cat "$dir/state/next-turn-drain")" 'check: newer main-only host handback' "the next turn's drain must present the row again"
+            assert_present "$dir/state/.main-eligible-rows.held" "late-stop/$phase/$watcher: an older Stop firing cleared the newer turn's hold"
+            [ "$(cat "$dir/state/.main-eligible-rows.held")" != "$(cat "$dir/state/hold-before-next-turn")" ] \
+              || fail "late-stop/$phase/$watcher: the next turn's drain did not write its own hold"
+            expect_code 0 "$status" "$phase/$watcher: a close the newer open main turn holds must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "late-stop/$phase/$watcher: held handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 1 ] || fail "late-stop/$phase/$watcher: refusal consumed a durable row"
             ;;
         esac
         if [ "$mode" != acked ]; then

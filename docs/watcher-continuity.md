@@ -356,11 +356,13 @@ An acknowledged episode does not freeze the generation, because the next downtim
 
 While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
 A supervision-host close commits against a valid unacknowledged downtime episode.
-It also commits against a handling episode, but only while main owns a queued row that no open main turn holds (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
-A main presentation drain sets that held flag, and every Claude Stop firing of the session-lock owner clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
+It also commits against a handling episode, but only while main owns a queued row whose presenting turn has not ended through the Claude Stop hook (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
+A main presentation drain sets that held flag with a token unique to that presentation.
+Every Claude Stop firing of the session-lock owner that passes the AFK and need gates clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
+The firing reads the token before any gate or library load and clears the flag under the queue lock only while it still carries that token, so a late asynchronous firing never clears a hold that a newer turn's drain wrote.
 Only a turn that ends through the Claude Stop hook clears it.
 The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
-When main's own drain entered handling and the turn that presented every row is still open, that turn holds the close, so the rewake is refused in silence rather than delivered twice.
+When main's own drain entered handling and the turn that presented every row has not ended through the Stop hook, that turn holds the close, so the rewake is refused in silence rather than delivered twice.
 When that turn ended through the Stop hook without acknowledging, the claim no longer counts as held, so the still-queued close is delivered once.
 Known residual: a turn ended by an interrupt (such as Escape) or an API error fires no Stop hook, so the flag stays set and that host close is refused in silence; the unacknowledged row stays queued, and the next main drain presents it again.
 Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.

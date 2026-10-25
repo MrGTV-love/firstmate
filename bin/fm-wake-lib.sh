@@ -3055,15 +3055,35 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 # presented it, because only an acknowledgement shrinks it and a branch grant
 # must keep excluding those rows. Whether the presenting main turn still holds
 # them is the separate held flag: bin/fm-wake-drain.sh sets it when main
-# presents rows, and the Claude Stop hook (bin/fm-claude-stop-autoarm.sh) clears
-# it when a main turn ends through that hook. A turn ended by an interrupt or an
-# API error fires no Stop hook, so its flag stays set until the next turn's Stop
-# (a known residual): a host close for its unacknowledged rows is refused, and
-# the next main drain presents those rows again.
-fm_wake_main_presentation_hold() { : > "$STATE/.main-eligible-rows.held"; }
-fm_wake_main_presentation_release() { rm -f -- "$STATE/.main-eligible-rows.held"; }
+# presents rows, writing a token unique to that presentation, and a Claude Stop
+# firing (bin/fm-claude-stop-autoarm.sh) that passes its AFK and need gates
+# clears it when a main turn ends through that hook. A turn ended by an
+# interrupt or an API error fires no Stop hook, so its flag stays set until the
+# next turn's gated Stop (a known residual): a host close for its
+# unacknowledged rows is refused, and the next main drain presents those rows
+# again.
+fm_wake_main_presentation_hold() {
+  printf '%s %s %s\n' "$$" "$(date +%s)" "$RANDOM" > "$STATE/.main-eligible-rows.held"
+}
 
-# 0 when main owns a queued row no open main turn holds: a structurally valid
+# Clear the hold only while it still carries the token <seen> the Stop firing
+# read when it started, under the queue lock the drain sets it under, so an
+# older asynchronous firing never clears a newer turn's hold. An empty <seen>
+# means no hold existed when the Stop fired, so there is nothing to clear.
+fm_wake_main_presentation_release() {  # <seen>
+  local seen=${1:-} current status=0
+  [ -n "$seen" ] || return 0
+  fm_lock_acquire_wait_max "$FM_WAKE_QUEUE_LOCK" 10 || return 1
+  current=$(cat "$STATE/.main-eligible-rows.held" 2>/dev/null || true)
+  if [ "$current" = "$seen" ]; then
+    rm -f -- "$STATE/.main-eligible-rows.held" || status=1
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$status"
+}
+
+# 0 when main owns a queued row whose presenting turn has not ended through the
+# Claude Stop hook: a structurally valid
 # row no live branch grant reserves, unless main's presented-row claim names it
 # while the held flag above is set. Read without the queue lock, like the count
 # above; a queue that exists but cannot be read counts as unheld.
