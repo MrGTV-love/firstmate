@@ -3245,8 +3245,8 @@ test_control_relaunch_groups_partition_one_inventory() {
   [ -z "$dup" ] || fail "a control-relaunch case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
   [ "$total" = 158 ] \
-    || fail "the control-relaunch groups register $total cases, not the 158-case inventory they partition"
-  pass "the control-relaunch groups are a duplicate-free 158-case cover, each case registered by the file that defines it"
+    || fail "the control-relaunch groups register $total cases, not the 159-case inventory they partition"
+  pass "the control-relaunch groups are a duplicate-free 159-case cover, each case registered by the file that defines it"
 }
 
 # The fm-watch-triage-waits selector called 67 shared-helper cases as one list.
