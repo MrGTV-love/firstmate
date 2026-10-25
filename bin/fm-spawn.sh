@@ -2511,7 +2511,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     RELAUNCH_RELOCATING=1
   fi
   [ -n "$RELAUNCH_WT" ] && [ -d "$RELAUNCH_WT" ] || {
-    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in (a fresh copy of the same branch can replace it: pass --worktree <path>)" >&2
+    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in (for a ship of a Treehouse project, pass --worktree with a pool slot that 'treehouse get' allocates and that is checked out on the task's branch; otherwise start a new task that brings in the surviving branch, as docs/agent-control.md \"Relocating a task whose worktree is gone\" describes)" >&2
     exit 1
   }
   if [ "$KIND" = secondmate ]; then

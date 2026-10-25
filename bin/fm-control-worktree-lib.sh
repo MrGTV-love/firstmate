@@ -272,7 +272,7 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   # one. A hand-made copy, an Orca-allocated worktree, and a project with no
   # Treehouse pool carry no lease proof and refuse here rather than being
   # accepted on the caller's word.
-  remedy="Run 'treehouse get' (without -b, which fails for the existing branch) from $project in a scratch pane, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters and pass that slot. A hand-made 'git worktree add' copy, an Orca-allocated worktree, and a project without a Treehouse pool carry no lease proof, so start the task fresh instead"
+  remedy="For a Treehouse project, run 'treehouse get' (without -b, which fails for the existing branch) from $project in a scratch pane, then run 'git checkout --ignore-other-worktrees $branch' in the slot it enters and pass that slot. An Orca-backed project or a project without a Treehouse pool cannot relocate in place: start a new task that brings in the surviving branch $branch, as docs/agent-control.md \"Relocating a task whose worktree is gone\" describes"
   if ! fm_treehouse_pool_slot "$project" "$real"; then
     echo "error: the fresh copy $dest is not a Treehouse pool slot, so no lease allocated it; relocation accepts only a slot the project's lease allocated. $remedy" >&2
     return 1
@@ -284,6 +284,14 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   fm_task_copy_pool_slot_held "$real" || true
   case "$FM_TASK_COPY_SLOT_STATE" in
     held|unleased|conflicting|recovered) ;;
+    missing-jq)
+      echo "error: the fresh copy $dest $FM_TASK_COPY_SLOT_REASON; install jq and retry" >&2
+      return 1
+      ;;
+    escaped|relative)
+      echo "error: the fresh copy $dest $FM_TASK_COPY_SLOT_REASON; the pool's treehouse-state.json must be inspected, because another entry cannot be compared, then retry; a new lease slot does not clear this refusal" >&2
+      return 1
+      ;;
     *)
       echo "error: the fresh copy $dest $FM_TASK_COPY_SLOT_REASON; relocation accepts only a slot the project's lease allocated. $remedy" >&2
       return 1

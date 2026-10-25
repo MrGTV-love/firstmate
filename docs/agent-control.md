@@ -556,6 +556,20 @@ A scout has no branch to match and a secondmate's home is not a task copy, so bo
 The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
 The `<pool>/<slot>/<repo>` layout is not that proof, since a hand-made copy can reproduce it; the copy must also have an entry, in any lease state, in its pool's Treehouse state file, which only Treehouse writes.
 
+**A task whose project has no Treehouse lease.**
+For a ship of an Orca-backed project, or of a project with no Treehouse pool, in-place relocation is unavailable, because no copy made for it carries lease proof.
+Its branch and commits still survive in the shared repository, so recover the work as a new task on top of that branch, never by recreating it:
+
+1. Read the recorded branch from `branch=` in `state/<id>.meta` (`fm/<id>` when the line is absent), and confirm that `git -C <project> log <branch>` shows the task's commits.
+   Do not delete that branch or run `git worktree prune`, because the branch and the vanished copy's registration are the only record of the work.
+2. Scaffold and spawn a new ship task for the same project the ordinary way, with `bin/fm-brief.sh` and `bin/fm-spawn.sh`, under a new task id.
+   Its `## Firstmate spec` names the surviving branch and its head, and tells the worker to bring that work in first.
+3. Inside its own copy, the new worker runs `git merge <surviving branch>`.
+   The commits are already in the shared repository, so the merge brings them in from the recorded branch and no work is rewritten.
+4. Keep the old task's record and branch until `git -C <project> merge-base --is-ancestor <surviving head> <new branch>` succeeds, so the surviving head is proven to be in the new task's history.
+
+A Treehouse project's hand-made copy does not take this route: it takes the lease procedure below.
+
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
 The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
 The launch owner repeats the proof before publication; a later refusal can therefore occur after the control plane has journaled the attempt and stopped the old agent, following [Failure and rollback](#failure-and-rollback).
@@ -565,7 +579,11 @@ The launch owner repeats the proof before publication; a later refusal can there
   A path that exists, a dangling symlink, or an unreadable ancestry is "cannot say", never "gone".
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
-- **It is a Treehouse pool slot of the recorded project that its pool's state file records**; an entry in any lease state counts, and an unreadable state file or one with no entry for the slot refuses.
+- **It is a Treehouse pool slot of the recorded project that its pool's state file records**; an entry in any lease state counts.
+  Four causes refuse, and each refusal names its own remedy:
+  a state file with no entry for the slot, or one that cannot be read, names the lease procedure in **Why the caller prepares the copy** below;
+  a host without `jq` to read the state file says to install `jq` and retry;
+  an entry with a TSV-escaped path, or one with a relative path, even another slot's entry, says that the pool's `treehouse-state.json` must be inspected, because that entry cannot be compared, and that a new lease slot does not clear the refusal.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.

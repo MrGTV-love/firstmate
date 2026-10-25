@@ -805,7 +805,7 @@ test_relocation_claims_and_respects_pool_slot_ownership() {
 }
 
 test_concurrent_pool_slot_claim_publishes_one_owner() {
-  local dir second id=rl111race first_pid out rc first_rc i=0 before
+  local dir second id=rl111race first_pid out rc first_rc i=0 before first_before holder
   dir=$(new_case relocate-race-first "$id")
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" harness codex
@@ -823,6 +823,33 @@ test_concurrent_pool_slot_claim_publishes_one_owner() {
   printf -- '- mate - fixture (home: %s; scope: test; projects: project; added 2026-01-01)\n' \
     "$second/home" > "$dir/home/data/secondmates.md"
   before=$(cat "$second/home/state/$id.meta")
+  # Two homes can both pass the unlocked ownership proof before either claims
+  # the slot; the shared project lock alone then stops the second one.
+  first_before=$(cat "$dir/home/state/$id.meta")
+  # shellcheck disable=SC2016 # expanded by the holder's own shell
+  FM_HOME="$dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    lock=$(fm_treehouse_project_lock_path "$2") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    printf "%s\n" "$lock" > "$3.held"
+    while [ ! -f "$3.release" ]; do sleep 0.05; done
+    fm_lock_release "$lock"
+  ' _ "$ROOT" "$dir/proj" "$dir/lock-holder" &
+  holder=$!
+  while [ ! -s "$dir/lock-holder.held" ] && kill -0 "$holder" 2>/dev/null && [ "$i" -lt 1000 ]; do
+    sleep 0.01
+    i=$((i + 1))
+  done
+  [ -s "$dir/lock-holder.held" ] || fail "the lock holder never took the shared project lock"
+  out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
+  : > "$dir/lock-holder.release"
+  wait "$holder" || true
+  expect_code 1 "$rc" "a relocation published while another actor held the shared project lock: $out"
+  assert_contains "$out" "refusing to race relocation ownership" "a relocation did not refuse on the held shared project lock"
+  [ "$(cat "$dir/home/state/$id.meta")" = "$first_before" ] || fail "a relocation refused at the shared lock published a record"
+  assert_absent "$dir/th/1/.fm-slot-owner" "a relocation refused at the shared lock claimed the pool slot"
+  [ ! -s "$dir/fake/literal" ] || fail "a relocation refused at the shared lock launched an agent"
+  i=0
   : > "$dir/fake/hold-relocation-cd"
   run_spawn "$dir" "$id" --relaunch --worktree "$dir/th/1/dest" > "$dir/first.out" 2>&1 &
   # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
@@ -849,30 +876,73 @@ test_concurrent_pool_slot_claim_publishes_one_owner() {
   out=$(run_spawn "$second" "$id" --relaunch --worktree "$dir/th/1/dest"); rc=$?
   expect_code 1 "$rc" "a retry ignored the published owner: $out"
   assert_contains "$out" "recorded by another task" "the published owner was not visible to the retry"
-  pass "concurrent relocations from two homes publish and launch exactly one pool owner"
+  pass "concurrent relocations refuse while the shared project lock is held, and two homes publish and launch exactly one pool owner"
 }
 
 test_relocation_refuses_a_non_lease_copy() {
-  local dir id variant dest fragment out rc
-  for variant in plain unrecorded; do
-    id="rl113$variant"
+  local dir id variant dest fragment remedy out rc bash_env state lease="run 'git checkout --ignore-other-worktrees"
+  for variant in plain unrecorded missing-jq escaped relative; do
+    id="rl113${variant//-/}"
     dir=$(new_case "relocate-non-lease-$variant" "$id")
     make_relocation_case "$dir" "$id"
-    git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
+    dest="$dir/th/1/dest"
+    state="$dir/th/treehouse-state.json"
+    bash_env=
     case "$variant" in
-      plain) dest="$dir/plain"; fragment="is not a Treehouse pool slot" ;;
-      unrecorded) dest="$dir/th/9/dest"; fragment="has no entry in Treehouse state" ;;
+      plain|unrecorded)
+        git -C "$dir/proj" worktree remove --force "$dir/th/1/dest"
+        if [ "$variant" = plain ]; then
+          dest="$dir/plain"; fragment="is not a Treehouse pool slot"
+        else
+          dest="$dir/th/9/dest"; fragment="has no entry in Treehouse state"
+        fi
+        remedy="$lease task-$id' in the slot it enters"
+        git -C "$dir/proj" worktree add -q "$dest" "task-$id"
+        ;;
+      missing-jq)
+        # jq lives in a system directory on many hosts, so mask it the way the
+        # bootstrap case does instead of trimming PATH.
+        bash_env="$dir/no-jq.bash"
+        cat > "$bash_env" <<'SH'
+command() {
+  if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+jq() {
+  return 127
+}
+SH
+        fragment="needs jq, which is not installed"
+        remedy="install jq and retry"
+        ;;
+      escaped|relative)
+        if [ "$variant" = escaped ]; then
+          jq '.worktrees += [{name: "3", path: "/elsewhere\\3/next", leased: true}]' "$state" > "$state.tmp"
+          fragment="contains an escaped entry path for entry '3'"
+        else
+          jq '.worktrees += [{name: "3", path: "3/next", leased: true}]' "$state" > "$state.tmp"
+          fragment="contains a relative entry path for entry '3'"
+        fi
+        mv "$state.tmp" "$state"
+        remedy="the pool's treehouse-state.json must be inspected, because another entry cannot be compared, then retry; a new lease slot does not clear this refusal"
+        ;;
     esac
-    git -C "$dir/proj" worktree add -q "$dest" "task-$id"
-    run_relocation_refusal "$dir" "$id" "$fragment" "hand-made $variant copy" "$dest"
-    out=$(run_spawn "$dir" "$id" --relaunch --worktree "$dest"); rc=$?
-    expect_code 1 "$rc" "the launch owner must refuse a hand-made $variant copy"$'\n'"$out"
+    # fm-control reads its dispatch rules with jq before it reaches the proof,
+    # so only the launch owner meets the missing-jq refusal.
+    [ -n "$bash_env" ] || run_relocation_refusal "$dir" "$id" "$fragment" "$variant copy" "$dest"
+    out=$(BASH_ENV=$bash_env run_spawn "$dir" "$id" --relaunch --worktree "$dest"); rc=$?
+    expect_code 1 "$rc" "the launch owner must refuse a $variant copy"$'\n'"$out"
     assert_contains "$out" "$fragment" "the launch owner refused the $variant copy for the wrong reason"
-    assert_contains "$out" "run 'git checkout --ignore-other-worktrees task-$id' in the slot it enters" \
-      "the $variant refusal did not name the lease procedure"
+    assert_contains "$out" "$remedy" "the $variant refusal did not name its own remedy"
+    case "$variant" in
+      plain|unrecorded) ;;
+      *) assert_not_contains "$out" "$lease" "the $variant refusal named the lease procedure, which cannot clear it" ;;
+    esac
     [ "$(meta_field "$dir" "$id" worktree)" = "$dir/wt" ] || fail "a refused $variant relocation changed the record"
   done
-  pass "relocation: a hand-made linked worktree refuses, in or out of the pool layout, unless the pool state records it"
+  pass "relocation: a hand-made linked worktree refuses, in or out of the pool layout, unless the pool state records it, and an unreadable state names its own remedy"
 }
 
 test_unpublished_relocation_releases_only_its_new_pool_claim() {

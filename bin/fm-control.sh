@@ -2507,7 +2507,7 @@ safe_checkpoint() {
   else
     check_wt=$WT
   fi
-  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)"
+  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (for a ship of a Treehouse project, pass --worktree with a pool slot that 'treehouse get' allocates and that is checked out on the task's branch; otherwise start a new task that brings in the surviving branch, as docs/agent-control.md \"Relocating a task whose worktree is gone\" describes)"
   wt_real=$(cd "$check_wt" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $check_wt cannot be resolved"
   wt_top=$(git -C "$check_wt" rev-parse --show-toplevel 2>/dev/null) \
     || die "task $ID's recorded worktree $check_wt is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"
