@@ -43,11 +43,12 @@ State all five of these elements in one concise, evidence-first escalation:
 
 1. The original requirement or accepted task criterion.
 2. The proposed product or engineering contract expansion.
-3. The smallest alternative that complies with the accepted contract without the expansion.
+3. The smallest alternative that complies with the accepted contract without the expansion, if one is established; otherwise state why none is established rather than inventing one.
 4. The concrete consequences of accepting and declining the expansion.
 5. A recommendation with the reason it best serves the accepted intent.
 
 Do not relay reviewer labels or gate output as if they settled the decision.
+Apply `AGENTS.md` section 9's recommendation-quality standard when selecting what to present.
 
 ## Classification examples
 
