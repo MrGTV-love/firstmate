@@ -724,7 +724,7 @@ ROWS
   pass "bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement"
 }
 
-test_python3_is_required_only_for_herdr() {
+test_python3_is_required_for_every_backend() {
   local backend case_dir fakebin bash_env out expected
   expected="MISSING: python3 (install: brew install python3  # or the platform's package manager)"
   for backend in herdr tmux zellij cmux orca; do
@@ -748,13 +748,11 @@ python3() {
 SH
     out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
       FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
-    if [ "$backend" = herdr ]; then
-      [ "$out" = "$expected" ] || fail "Herdr without python3 must report supported install guidance, got: $out"
-    else
-      [ -z "$out" ] || fail "backend=$backend must not require Herdr's python3 dependency, got: $out"
-    fi
+    # Brief scaffolding needs python3 on every backend; Herdr also lists it in
+    # its own delta, and the shared tool must still be reported exactly once.
+    [ "$out" = "$expected" ] || fail "backend=$backend without python3 must report one install line, got: $out"
   done
-  pass "bootstrap: python3 is required for Herdr, never for an inactive backend"
+  pass "bootstrap: python3 is required once on every backend"
 }
 
 test_herdr_install_requires_manual_action() {
@@ -1283,7 +1281,8 @@ test_crew_dispatch_validation() {
     [ -n "$label" ] || continue
     n=$((n + 1))
     case_dir="$TMP_ROOT/dispatch-$n"
-    mkdir -p "$case_dir/home/config"
+    mkdir -p "$case_dir/home/config" "$case_dir/home/data"
+    printf "%s\n" "- firstmate - Supervisor" "- vernant - Vernant" > "$case_dir/home/data/projects.md"
     printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
     printf '%s\n' "$body" > "$case_dir/home/config/crew-dispatch.json"
     fakebin=$(make_fake_toolchain "$case_dir")
@@ -1301,43 +1300,43 @@ test_crew_dispatch_validation() {
   done <<'ROWS'
 malformed dispatch config is flagged^{"rules":[^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON
 unverified dispatch harness is flagged^{"rules":[{"when":"anything","use":{"harness":"spaceship"}}],"default":{"harness":"codex"}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: spaceship
-codex Luna max effort is accepted^{"rules":[{"when":"big feature","use":{"harness":"codex","model":"gpt-5.6-luna","effort":"max"}}]}^empty^
+codex Luna max effort is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"big feature","use":{"harness":"codex","model":"gpt-5.6-luna","effort":"max"}}]}^empty^
 codex unsupported model max effort is flagged^{"rules":[{"when":"big feature","use":{"harness":"codex","model":"gpt-5","effort":"max"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: codex:max
 unsupported grok max effort is flagged^{"rules":[{"when":"deep current work","use":{"harness":"grok","model":"grok-4","effort":"max"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: grok:max
 unsupported grok xhigh effort is flagged^{"rules":[{"when":"deep current work","use":{"harness":"grok","model":"grok-4","effort":"xhigh"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: grok:xhigh
 native pi ultra is accepted^{"rules":[],"default":{"harness":"pi","model":"codex-native/gpt-6-astra","effort":"ultra","provider":"codex"}}^empty^
-native signed pi ultra is accepted^{"rules":[{"when":"native reasoning","use":{"harness":"pi-signed","model":"codex-native/gpt-6-astra","effort":"ultra","provider":"codex"}}]}^empty^
+native signed pi ultra is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"native reasoning","use":{"harness":"pi-signed","model":"codex-native/gpt-6-astra","effort":"ultra","provider":"codex"}}]}^empty^
 ordinary pi ultra is refused^{"default":{"harness":"pi","model":"openai-codex/gpt-6-astra","effort":"ultra","provider":"codex"}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: pi:ultra
 missing native model ultra is refused^{"default":{"harness":"pi","effort":"ultra","provider":"codex"}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: pi:ultra
 empty native model ultra is refused^{"default":{"harness":"pi","model":"codex-native/","effort":"ultra","provider":"codex"}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: pi:ultra
 codex harness ultra is refused^{"default":{"harness":"codex","model":"codex-native/gpt-6-astra","effort":"ultra"}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: codex:ultra
-pi max effort is accepted^{"rules":[{"when":"deep coding","use":{"harness":"pi","model":"openai-codex/gpt-5.6-sol","effort":"max","provider":"codex"}}]}^empty^
-pi-signed max effort is accepted^{"rules":[{"when":"signed coding","use":{"harness":"pi-signed","model":"openai-codex/gpt-5.6-sol","effort":"max","provider":"codex"}}]}^empty^
-muse shared efforts are accepted^{"rules":[{"when":"muse low","use":{"harness":"muse","effort":"low"}},{"when":"muse medium","use":{"harness":"muse","effort":"medium"}},{"when":"muse high","use":{"harness":"muse","effort":"high"}},{"when":"muse xhigh","use":{"harness":"muse","effort":"xhigh"}},{"when":"muse max","use":{"harness":"muse","effort":"max"}}]}^empty^
+pi max effort is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"deep coding","use":{"harness":"pi","model":"openai-codex/gpt-5.6-sol","effort":"max","provider":"codex"}}]}^empty^
+pi-signed max effort is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"signed coding","use":{"harness":"pi-signed","model":"openai-codex/gpt-5.6-sol","effort":"max","provider":"codex"}}]}^empty^
+muse shared efforts are accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"muse low","use":{"harness":"muse","effort":"low"}},{"match":{"projects":["firstmate"]},"when":"muse medium","use":{"harness":"muse","effort":"medium"}},{"match":{"projects":["firstmate"]},"when":"muse high","use":{"harness":"muse","effort":"high"}},{"match":{"projects":["firstmate"]},"when":"muse xhigh","use":{"harness":"muse","effort":"xhigh"}},{"match":{"projects":["firstmate"]},"when":"muse max","use":{"harness":"muse","effort":"max"}}]}^empty^
 unsupported muse ultra effort is flagged^{"rules":[{"when":"muse ultra","use":{"harness":"muse","effort":"ultra"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: muse:ultra
-agy model profile is accepted^{"rules":[{"when":"agy work","use":{"harness":"agy","model":"gemini-3.8-flash-high"}}]}^empty^
-gemini profile with explicit provider is accepted^{"rules":[{"when":"gemini work","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google"}}]}^empty^
-agy low medium high efforts are accepted^{"rules":[{"when":"agy low","use":{"harness":"agy","effort":"low"}},{"when":"agy medium","use":{"harness":"agy","effort":"medium"}},{"when":"agy high","use":{"harness":"agy","effort":"high"}}]}^empty^
+agy model profile is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"agy work","use":{"harness":"agy","model":"gemini-3.8-flash-high"}}]}^empty^
+gemini profile with explicit provider is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"gemini work","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google"}}]}^empty^
+agy low medium high efforts are accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"agy low","use":{"harness":"agy","effort":"low"}},{"match":{"projects":["firstmate"]},"when":"agy medium","use":{"harness":"agy","effort":"medium"}},{"match":{"projects":["firstmate"]},"when":"agy high","use":{"harness":"agy","effort":"high"}}]}^empty^
 unsupported agy xhigh effort is flagged^{"rules":[{"when":"agy xhigh","use":{"harness":"agy","effort":"xhigh"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: agy:xhigh
 unsupported agy max effort is flagged^{"rules":[{"when":"agy max","use":{"harness":"agy","effort":"max"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: agy:max
 unsupported opencode effort is flagged^{"rules":[{"when":"opencode work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5","effort":"high","provider":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: opencode:high
-kimi model profile is accepted^{"rules":[{"when":"kimi work","use":{"harness":"kimi","model":"kimi-code/k3"}}]}^empty^
+kimi model profile is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"kimi work","use":{"harness":"kimi","model":"kimi-code/k3"}}]}^empty^
 unsupported kimi effort is flagged^{"rules":[{"when":"kimi work","use":{"harness":"kimi","model":"kimi-code/k3","effort":"high"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: kimi:high
-cursor model profile is accepted^{"rules":[{"when":"cursor work","use":{"harness":"cursor","model":"cursor-grok-4.5-high"}}]}^empty^
+cursor model profile is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"cursor work","use":{"harness":"cursor","model":"cursor-grok-4.5-high"}}]}^empty^
 unsupported cursor effort is flagged^{"rules":[{"when":"cursor work","use":{"harness":"cursor","model":"cursor-grok-4.5-high","effort":"high"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: cursor:high
-array use with quota-balanced is accepted^{"rules":[{"when":"big feature","use":[{"harness":"claude","model":"claude-sonnet-5","effort":"high"},{"harness":"codex","model":"gpt-5.5","effort":"high"}],"select":"quota-balanced"}]}^empty^
-array use without select is accepted^{"rules":[{"when":"big feature","use":[{"harness":"claude"},{"harness":"codex"}]}]}^empty^
-one-element array use is accepted^{"rules":[{"when":"focused feature","use":[{"harness":"claude"}]}]}^empty^
+array use with quota-balanced is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"big feature","use":[{"harness":"claude","model":"claude-sonnet-5","effort":"high"},{"harness":"codex","model":"gpt-5.5","effort":"high"}],"select":"quota-balanced"}]}^empty^
+array use without select is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"big feature","use":[{"harness":"claude"},{"harness":"codex"}]}]}^empty^
+one-element array use is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"focused feature","use":[{"harness":"claude"}]}]}^empty^
 default array is accepted^{"default":[{"harness":"pi","model":"anthropic/claude-sonnet-5"},{"harness":"grok"}]}^empty^
-provider-less multi-provider profile remains accepted without opt-in^{"rules":[{"when":"cross-provider work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}^empty^
+provider-less multi-provider profile remains accepted without opt-in^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"cross-provider work","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}^empty^
 one-element default array is accepted^{"default":[{"harness":"codex"}]}^empty^
 empty array use is flagged^{"rules":[{"when":"big feature","use":[]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs at least one use profile
 array profile without harness is flagged^{"rules":[{"when":"big feature","use":[{"model":"gpt-5.5"}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each use profile needs harness
 array profile with malformed model is flagged^{"rules":[{"when":"big feature","use":[{"harness":"codex","model":5}]}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - use profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present
-resolve fields are accepted^{"rules":[{"when":"hard design","approval":"captain","floor":{"scope":"model:fable","min_percent":20,"provider":"claude"},"use":[{"harness":"pi","model":"openai-codex/gpt-5.6-sol","provider":"codex"},{"harness":"codex","model":"gpt-5.6-sol","floor":{"scope":"all_models","min_percent":50}}]}],"default":[{"harness":"pi","model":"kimi-code/k3","provider":"kimi","floor":{"scope":"all_models","min_percent":10}}]}^empty^
-rule min_confidence is accepted^{"rules":[{"when":"hard design","min_confidence":0.9,"use":{"harness":"claude"}}]}^empty^
+resolve fields are accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"hard design","approval":"captain","floor":{"scope":"model:fable","min_percent":20,"provider":"claude"},"use":[{"harness":"pi","model":"openai-codex/gpt-5.6-sol","provider":"codex"},{"harness":"codex","model":"gpt-5.6-sol","floor":{"scope":"all_models","min_percent":50}}]}],"default":[{"harness":"pi","model":"kimi-code/k3","provider":"kimi","floor":{"scope":"all_models","min_percent":10}}]}^empty^
+rule min_confidence is accepted^{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"hard design","min_confidence":0.9,"use":{"harness":"claude"}}]}^empty^
 rule min_confidence out of range is flagged^{"rules":[{"when":"hard design","min_confidence":1.2,"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - min_confidence must be a number from 0 through 1 when present
-task horizon is accepted^{"task_horizon_minutes":90,"rules":[{"when":"hard design","use":{"harness":"claude"}}]}^empty^
+task horizon is accepted^{"judgments":{},"task_horizon_minutes":90,"rules":[{"match":{"projects":["firstmate"]},"when":"hard design","use":{"harness":"claude"}}]}^empty^
 nonpositive task horizon is flagged^{"task_horizon_minutes":0,"rules":[{"when":"hard design","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - task_horizon_minutes must be a positive number when present
 non-captain approval is flagged^{"rules":[{"when":"hard design","approval":"firstmate","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - approval must be "captain" when present
 rule floor without provider is flagged^{"rules":[{"when":"hard design","floor":{"scope":"model:fable","min_percent":20},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - rule floor needs scope, min_percent 0..100, and provider matching ^[a-z0-9]+(-[a-z0-9]+)*\z
@@ -1356,10 +1355,19 @@ default array profile without harness is flagged^{"default":[{"model":"gpt-5.5"}
 default array malformed effort is flagged^{"default":[{"harness":"codex","effort":3}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - default profile model and effort must be non-empty strings, and provider must match ^[a-z0-9]+(-[a-z0-9]+)*\z when present
 default profile floor without min_percent is flagged^{"default":[{"harness":"codex","floor":{"scope":"all_models"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - default profile floor needs scope and min_percent 0..100
 default profile floor provider override is flagged^{"default":{"harness":"codex","floor":{"scope":"all_models","min_percent":50,"provider":"claude"}}}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - default profile floor needs scope and min_percent 0..100
+typed rule without structured match is flagged^{"rules":[{"when":"legacy prose rule","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - judgments must be an object of single-judgment Nouls
+typed match naming an unknown judgment is flagged^{"judgments":{},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match all, any, and none must be non-empty arrays of declared judgment ids
+typed judgment without criteria is flagged^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?"}},"rules":[{"when":"fresh work","match":{"projects":["firstmate"],"all":["fresh"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false
+typed unknown match selector is flagged^{"judgments":{},"rules":[{"when":"vernant work","match":{"project":"vernant"},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout
+typed unknown project is flagged^{"judgments":{},"rules":[{"when":"unknown project","match":{"projects":["unregistered"]},"use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - match.projects contains an unregistered project id
+typed rule without a match object is flagged^{"judgments":{},"rules":[{"when":"w","use":{"harness":"claude"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - each rule needs a match object
+typed unsupported gemini effort is flagged^{"judgments":{},"rules":[{"when":"gemini work","match":{"projects":["firstmate"]},"use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google","effort":"minimal"}}]}^exact^CREW_DISPATCH: invalid config/crew-dispatch.json - invalid effort: gemini:minimal
+typed structured facts and judgments are accepted^{"judgments":{"fresh":{"type":"noul","instructions":"Does task need fresh facts?","criteria":{"true":"Fresh facts are needed.","false":"Supplied facts suffice."}}},"rules":[{"when":"vernant fresh ship","match":{"projects":["vernant"],"kind":"ship","all":["fresh"]},"use":{"harness":"claude"}},{"when":"other scout","match":{"projects":["firstmate"],"kind":"scout","none":["fresh"]},"use":{"harness":"codex"}}]}^empty^
 ROWS
 
   case_dir="$TMP_ROOT/dispatch-opt-in-gate"
-  mkdir -p "$case_dir/home/config"
+  mkdir -p "$case_dir/home/config" "$case_dir/home/data"
+  printf "%s\n" "- firstmate - Supervisor" > "$case_dir/home/data/projects.md"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   fakebin=$(make_fake_toolchain "$case_dir")
   add_real_jq "$fakebin"
@@ -1397,9 +1405,16 @@ ROWS
   [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - unverified harness: gemini' ] \
     || fail "no-key bootstrap must preserve its former verified-harness baseline, got: $out"
   printf '%s\n' 'TYPESAFE_API_KEY=test-key' > "$case_dir/home/.env"
+  printf '%s\n' '{"judgments":{},"rules":[{"match":{"projects":["firstmate"]},"when":"gemini work","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google"}}]}' > "$case_dir/home/config/crew-dispatch.json"
   out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
   [ -z "$out" ] || fail "typed resolution should add verified Gemini crewmate routing, got: $out"
+  mv "$case_dir/home/data/projects.md" "$case_dir/projects.md.saved"
+  out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 "$ROOT/bin/fm-bootstrap.sh")
+  [ "$out" = 'CREW_DISPATCH: invalid config/crew-dispatch.json - project registry data/projects.md is missing or unreadable' ] \
+    || fail "typed bootstrap must name an unreadable project registry, got: $out"
+  mv "$case_dir/projects.md.saved" "$case_dir/home/data/projects.md"
 
   rm -f "$case_dir/home/.env"
   : > "$case_dir/child-env.log"
@@ -1800,7 +1815,7 @@ test_git_is_required_with_supported_install_instruction
 test_orca_backend_gates_orca_tool_only_when_selected
 test_session_provider_backends_do_not_require_tmux
 test_session_provider_backends_gate_own_cli_not_tmux
-test_python3_is_required_only_for_herdr
+test_python3_is_required_for_every_backend
 test_herdr_install_requires_manual_action
 test_cmux_bundled_cli_satisfies_dependency
 test_unknown_backend_reports_invalid_configuration

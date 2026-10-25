@@ -9,7 +9,8 @@ server='' denied=''
 trap '[ -z "$denied" ] || chmod 700 "$denied"; [ -z "$server" ] || kill "$server" 2>/dev/null; fm_test_cleanup' EXIT
 HOME_DIR="$TMP_ROOT/home"
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
-mkdir -p "$HOME_DIR/config"
+mkdir -p "$HOME_DIR/config" "$HOME_DIR/data"
+printf '%s\n' '# Projects' '- firstmate [no-mistakes] - Supervisor' '- vernant [no-mistakes] - Vernant' '- pager - Pager' '- orion-private - Synthetic privacy case' > "$HOME_DIR/data/projects.md"
 RULES="$HOME_DIR/config/crew-dispatch.json"
 BRIEF="$TMP_ROOT/brief.md"
 SETTINGS="$TMP_ROOT/settings.json"
@@ -81,7 +82,7 @@ const server = http.createServer(async (req, res) => {
   const answers = {};
   for (const [id, q] of Object.entries(request.questions)) {
     if (q.type === 'choice') {
-      const selected = settings[id] ?? (id === 'rule' ? 'rule_3' : id === 'profile' ? 'fast_agent' : 'fast');
+      const selected = settings[id] ?? 'fast';
       answers[id] = { type: 'choice', choice: selected, confidence: settings[`${id}_confidence`] ?? settings.confidence ?? 0.95,
         probabilities: settings[`${id}_probabilities`] ?? Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === selected ? 1 : 0])) };
     } else if (q.type === 'score') {
@@ -89,7 +90,13 @@ const server = http.createServer(async (req, res) => {
       answers[id] = { type: 'score', score, confidence: 0.95,
         probabilities: Object.fromEntries(q.criteria.map((_, i) => [i, i === Math.round(score) ? 1 : 0])),
         legend: Object.fromEntries(q.criteria.map((s, i) => [i, s])) };
-    } else answers[id] = { type: 'noul', noul: settings[id] ?? 0 };
+    } else {
+      const rule = /^judgment_r([0-9]+)$/.exec(id);
+      const selected = settings.rule ?? 'rule_3';
+      answers[id] = { type: 'noul', noul: rule
+        ? (settings.rule_probabilities?.[`rule_${rule[1]}`] ?? (`rule_${rule[1]}` === selected ? settings.rule_confidence ?? settings.confidence ?? 1 : 0))
+        : settings[id] ?? 0 };
+    }
   }
   const response = { model: 'jev-1.13.0', answers, usage: { input_tokens: 100, output_tokens: 20 } };
   if (settings.patch) merge(response, settings.patch);
@@ -105,10 +112,105 @@ for _ in {1..100}; do [ ! -f "$TMP_ROOT/port" ] || break; sleep .05; done
 [ -f "$TMP_ROOT/port" ] || fail 'local provider did not start'
 FM_TYPESAFE_TEST_ENDPOINT="http://127.0.0.1:$(cat "$TMP_ROOT/port")"
 export FM_TEST_SEAM=1 FM_TYPESAFE_TEST_ENDPOINT
+# Build synthetic independent predicates for quota/privacy scenarios; the
+# fact-scoped production schema and historical replay run below as CLI tests.
+structure_rules() {
+  local file=$1
+  [ -f "$file" ] || return 0
+  jq 'if type == "object" and (.rules | type) == "array" and (.judgments | type) != "object" then
+    .judgments = (reduce range(0; (.rules | length)) as $i ({};
+      .["r\($i+1)"] = {type:"noul", instructions:"Does task exhibit property \($i+1)?",
+        criteria:{"true":"The named property is present.","false":"The named property is absent."}})) |
+    .rules |= to_entries | .rules |= map(.value + {match: ({projects:["firstmate","vernant","pager","orion-private"]} + (.value.match // {}) + {all:["r\(.key+1)"]})})
+    else . end' "$file" > "$TMP_ROOT/structured.json" 2>/dev/null && cp "$TMP_ROOT/structured.json" "$file"
+}
+# Attach the scaffold's typed location to a copy, leaving fixture prose intact.
+bind_brief() {
+  node -e 'const fs=require("fs"); const [source,target,location]=process.argv.slice(1); const text=fs.readFileSync(source,"utf8").split("\n").filter(s=>!s.startsWith("FIRSTMATE_DISPATCH: ")).join("\n"); fs.writeFileSync(target,"FIRSTMATE_DISPATCH: "+JSON.stringify({project_path:location})+"\n"+text)' "$1" "$TMP_ROOT/bound-brief.md" "$2"
+}
+mkdir -p "$HOME_DIR/projects/vernant" "$HOME_DIR/projects/pager" "$HOME_DIR/projects/orion-private"
 run() {
-  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project "${1:-firstmate}" 2> "$TMP_ROOT/error") || fail "resolver failed: $(cat "$TMP_ROOT/error")"
+  structure_rules "$RULES"
+  local location="$HOME_DIR/projects/${1:-firstmate}"
+  [ "${1:-firstmate}" != firstmate ] || location="$HOME_DIR"
+  bind_brief "$BRIEF" "$location"
+  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$TMP_ROOT/bound-brief.md" 2> "$TMP_ROOT/error") || fail "resolver failed: $(cat "$TMP_ROOT/error")"
 }
 count() { if [ -f "$CALLS" ]; then wc -l < "$CALLS" | tr -d ' '; else echo 0; fi; }
+
+# B1 / reviewer D and E: there is no caller-typed project input to misspell.
+# A recorded location must identify exactly one registered clone.
+binding_resolve() {
+  OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$1" "${@:2}" 2> "$TMP_ROOT/error")
+  CODE=$?
+}
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+structure_rules "$RULES"
+for spelling in Vernant ' vernant'; do
+  before=$(count)
+  binding_resolve "$BRIEF" --project "$spelling"
+  expect_code 2 "$CODE" 'the removed free-text project flag is rejected'
+  assert_contains "$(cat "$TMP_ROOT/error")" 'unknown flag --project' 'the old input cannot reach routing'
+  assert_equals "$before" "$(count)" 'a removed input sends nothing'
+done
+before=$(count)
+binding_resolve "$BRIEF"
+assert_contains "$OUT" 'reason: brief is missing FIRSTMATE_DISPATCH project_path' 'a missing typed field fails closed'
+assert_equals "$before" "$(count)" 'a missing field sends nothing'
+for fence in '```json' ''; do
+  { cat "$BRIEF"; printf '\n%s\n' "$fence"; python3 "$ROOT/bin/fm-dispatch-project.py" scaffold "$HOME_DIR" "$HOME_DIR/projects" vernant; printf '%s\n' "$fence"; } > "$TMP_ROOT/quoted-binding.md"
+  binding_resolve "$TMP_ROOT/quoted-binding.md"
+  assert_contains "$OUT" 'reason: brief is missing FIRSTMATE_DISPATCH project_path' 'a task example cannot substitute for the metadata header'
+  assert_not_contains "$OUT" '  profile:' 'task prose cannot establish project identity'
+  assert_equals "$before" "$(count)" 'a missing header with a quoted record sends nothing'
+done
+mkdir -p "$TMP_ROOT/outside-clone"
+ln -s "$TMP_ROOT/outside-clone" "$TMP_ROOT/vernant-alias"
+for location in "$TMP_ROOT/outside-clone" "$TMP_ROOT/vernant-alias"; do
+  bind_brief "$BRIEF" "$location"
+  binding_resolve "$TMP_ROOT/bound-brief.md"
+  assert_contains "$OUT" 'reason: brief project_path must resolve to exactly one registered project clone' 'an unrelated or redirected alias is not project identity'
+  assert_not_contains "$OUT" '  profile:' 'an invalid location never clears a profile'
+  assert_equals "$before" "$(count)" 'an invalid location sends nothing'
+done
+printf '%s\n' '- missing-clone - Registered but absent' >> "$HOME_DIR/data/projects.md"
+bind_brief "$BRIEF" "$HOME_DIR/projects/missing-clone"
+binding_resolve "$TMP_ROOT/bound-brief.md"
+assert_contains "$OUT" 'reason: brief project_path has no existing project clone' 'registration cannot substitute for an existing clone'
+assert_equals "$before" "$(count)" 'a missing clone sends nothing'
+jq '.rules[0].match.projects=["unregistered"]' "$RULES" > "$TMP_ROOT/bad-project.json"
+cp "$RULES" "$TMP_ROOT/good-project.json"
+cp "$TMP_ROOT/bad-project.json" "$RULES"
+bind_brief "$BRIEF" "$HOME_DIR/projects/vernant"
+binding_resolve "$TMP_ROOT/bound-brief.md"
+expect_code 2 "$CODE" 'config cannot name an unregistered project'
+assert_contains "$(cat "$TMP_ROOT/error")" 'match.projects contains an unregistered project id' 'config load names the invalid positive selection'
+assert_equals "$before" "$(count)" 'invalid project configuration sends nothing'
+cp "$TMP_ROOT/good-project.json" "$RULES"
+jq '.rules[1].match.projects=["vernant"] | .rules[2].match.projects=["firstmate","pager","orion-private"]' "$RULES" > "$TMP_ROOT/positive-projects.json"
+cp "$TMP_ROOT/positive-projects.json" "$RULES"
+printf '%s\n' '{"rule_probabilities":{"rule_2":1,"rule_3":1}}' > "$SETTINGS"
+FM_HOME="$HOME_DIR" bash "$ROOT/bin/fm-brief.sh" clone-bound vernant --mode direct-PR > "$TMP_ROOT/scaffold.out" \
+  || fail 'Vernant scaffold did not record its clone location'
+binding_resolve "$HOME_DIR/data/clone-bound/brief.md"
+assert_contains "$OUT" 'rule: rule_2' 'a scaffolded Vernant clone reaches only positively applicable rules'
+assert_not_contains "$OUT" 'rule_3=' 'a Vernant clone cannot reach the non-Vernant runner-up'
+assert_not_contains "$(cat "$CALLS")" 'project_path' 'the clone binding never reaches the provider'
+assert_not_contains "$(cat "$CALLS")" "$HOME_DIR" 'the absolute clone path never reaches the provider'
+mkdir -p "$TMP_ROOT/override-projects/vernant"
+FM_HOME="$HOME_DIR" FM_PROJECTS_OVERRIDE="$TMP_ROOT/override-projects" bash "$ROOT/bin/fm-brief.sh" override-bound vernant --mode direct-PR > "$TMP_ROOT/scaffold.out" \
+  || fail 'Vernant scaffold did not record its overridden clone location'
+assert_equals "FIRSTMATE_DISPATCH: {\"project_path\": \"$TMP_ROOT/override-projects/vernant\"}" "$(head -n 1 "$HOME_DIR/data/override-bound/brief.md")" 'the scaffold records the overridden projects directory'
+OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_PROJECTS_OVERRIDE="$TMP_ROOT/override-projects" TYPESAFE_API_KEY=synthetic-key \
+  bash "$ROOT/bin/fm-dispatch-resolve.sh" "$HOME_DIR/data/override-bound/brief.md" 2> "$TMP_ROOT/error") || fail "resolver failed: $(cat "$TMP_ROOT/error")"
+assert_contains "$OUT" 'rule: rule_2' 'an overridden Vernant clone binds to its registered project'
+before=$(count)
+binding_resolve "$HOME_DIR/data/override-bound/brief.md"
+assert_contains "$OUT" 'reason: brief project_path must resolve to exactly one registered project clone' 'a clone outside the active projects directory is not registered'
+assert_equals "$before" "$(count)" 'a clone outside the active projects directory sends nothing'
+pass 'B1 removes free-text project input and rejects missing, unrelated, redirected and absent clone bindings'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+printf '%s\n' '{}' > "$SETTINGS"
 
 # Reproduce the former default preference: a positive pooled sibling cannot be
 # discarded just because Claude exposes a scalar and the pool does not.
@@ -186,40 +288,54 @@ nobun_path() {
   printf '%s' "$out"
 }
 NOBUN_PATH=$(nobun_path)
-OUT=$(PATH="$FAKEBIN:$NOBUN_PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash -c 'command -v bun >/dev/null && exit 3; exec bash "$0" "$@"' "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project firstmate 2> "$TMP_ROOT/error") \
+structure_rules "$RULES"
+OUT=$(PATH="$FAKEBIN:$NOBUN_PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash -c 'command -v bun >/dev/null && exit 3; exec bash "$0" "$@"' "$ROOT/bin/fm-dispatch-resolve.sh" "$TMP_ROOT/bound-brief.md" 2> "$TMP_ROOT/error") \
   || fail "resolver without bun failed: $(cat "$TMP_ROOT/error")"
 assert_contains "$OUT" 'status: clear' 'node resolves when bun is absent'
 assert_contains "$OUT" "--model 'claude-sonnet-5-5[1m]' --effort 'high'" 'node applies the same policy'
 pass 'the resolver runs its adapter with node when bun is absent'
+
+# Executable T6 acceptance, including the 136-record offline structural replay.
+node --experimental-strip-types --no-warnings --test "$ROOT/tests/fm-dispatch-level5.test.ts" > "$TMP_ROOT/dispatch-level5.out" 2>&1 \
+  || fail "dispatch facts/replay failed: $(cat "$TMP_ROOT/dispatch-level5.out")"
+pass 'T6 repository/kind facts, Q7 structural replay and Q9 capability boundaries'
 
 # The vendored upstream Level 5 tests run unchanged.
 JEV_BACKEND=mock node --experimental-strip-types --no-warnings --test "$ROOT/bin/ten-levels/tests/level05.test.ts" > "$TMP_ROOT/level05.out" 2>&1 \
   || fail "vendored upstream Level 5 tests failed: $(tail -20 "$TMP_ROOT/level05.out")"
 pass 'vendored upstream Level 5 tests pass unchanged'
 
-# The rule Choice alone decides project-scoped and Claude-only rules: every
-# rule's `when` reaches the one request, whatever the project or brief says.
+# The CLI regressions below cover deterministic repository/kind eligibility.
 last_request() { node -e 'const fs=require("fs");console.log(fs.readFileSync(process.argv[1],"utf8").trim().split("\n").at(-1))' "$CALLS"; }
-printf '%s\n' '# Task' "## Captain's intent" 'Use Claude Code for this repair.' > "$BRIEF"
-printf '%s\n' '{"rule":"rule_1"}' > "$SETTINGS"
-before=$(count); run
-assert_equals "$((before + 1))" "$(count)" 'an explicit Claude requirement is judged by the rule Choice'
-assert_contains "$OUT" 'rule: rule_1' 'the rule Choice selects the Claude-only rule'
-assert_contains "$OUT" "--harness 'claude' --model 'claude-sonnet-5-5[1m]'" 'the selected Claude-only rule resolves its own profile'
-for project in firstmate vernant; do
-  run "$project"
-  for id in rule_1 rule_2 rule_3 rule_4 default; do
-    assert_contains "$(last_request)" "\"$id\"" "$id is offered for project $project"
-  done
+# T6(a): contradictory semantic answers cannot override repository facts.
+jq '.rules[1].match={projects:["vernant"],kind:"ship"} | .rules[2].match={projects:["firstmate","pager","orion-private"],kind:"ship"}' "$TMP_ROOT/base-rules.json" > "$RULES"
+printf '%s\n' '{"rule":"rule_3","rule_probabilities":{"rule_2":1,"rule_3":1}}' > "$SETTINGS"
+run vernant
+assert_contains "$OUT" 'rule: rule_2' 'Vernant ship resolves its eligible rule despite a contradictory non-Vernant answer'
+assert_not_contains "$(last_request)" 'judgment_r3' 'ineligible semantic predicates never reach the provider'
+assert_not_contains "$OUT" 'rule_3=' 'ineligible rules cannot enter runner-up selection'
+before=$(count)
+OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" 2> "$TMP_ROOT/error") \
+  || fail "resolver without project metadata failed: $(cat "$TMP_ROOT/error")"
+assert_contains "$OUT" 'status: escalate' 'a Vernant ship brief without project metadata escalates'
+assert_contains "$OUT" 'reason: brief is missing FIRSTMATE_DISPATCH project_path' 'the escalation names the missing project'
+assert_not_contains "$OUT" '  profile:' 'a missing project never clears an unscoped rule or the default'
+assert_equals "$before" "$(count)" 'a missing project sends nothing'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+for removed in human browser_agent deterministic_script; do
+  printf '{"profile":"%s"}\n' "$removed" > "$SETTINGS"
+  run
+  assert_contains "$OUT" 'status: clear' 'removed workflow labels cannot force escalation'
 done
-pass 'the rule Choice decides project-scoped and Claude-only rules without local text pre-checks'
+printf '%s\n' '{}' > "$SETTINGS"
+pass 'repository facts and removal of the workflow decision hold through the public resolver'
 
 # The session launch policy filters the selected rule after the answer; it
 # never removes the rule before judgment, so a weaker rule cannot replace it.
 printf '%s\n' omp-or-tc > "$HOME_DIR/config/session-launch-policy"
 printf '%s\n' '{"rule":"rule_2"}' > "$SETTINGS"
 run
-assert_contains "$(last_request)" '"rule_2"' 'a rule whose harness is prohibited is still offered to judgment'
+assert_contains "$(last_request)" '"judgment_r2"' 'a prohibited harness does not suppress the rule predicate judgment'
 assert_contains "$OUT" 'rule: rule_2' 'the prohibited rule remains the selected rule'
 assert_contains "$OUT" 'status: escalate' 'a prohibited selected rule escalates'
 assert_contains "$OUT" 'reason: every rule_2 profile was filtered out: session launch policy prohibits this harness' 'the escalation names the session policy filter'
@@ -292,13 +408,13 @@ pass 'Level 5 tier and effort map to the approved model matrix'
 
 printf '%s\n' '{"ambiguity":1,"needs_desktop":0.5}' > "$SETTINGS"; run
 assert_contains "$OUT" 'status: clear' 'the exact ambiguity and desktop thresholds do not escalate'
-for settings in '{"ambiguity":1.004}' '{"ambiguity":2}' '{"profile":"human"}' '{"needs_desktop":1}' '{"profile":"browser_agent"}' '{"profile":"deterministic_script"}'; do
+for settings in '{"ambiguity":1.004}' '{"ambiguity":2}' '{"needs_desktop":1}'; do
   printf '%s\n' "$settings" > "$SETTINGS"; run
   assert_contains "$OUT" 'status: escalate' 'uncertain or capability-dependent handler escalates'
   assert_not_contains "$OUT" '  profile:' 'no permission or handler is invented'
 done
 printf '%s\n' '{"confidence":0.4}' > "$SETTINGS"; run
-assert_not_contains "$OUT" '  profile:' 'low-confidence upstream agent routes to human'
+assert_contains "$OUT" 'status: clear' 'a removed upstream workflow confidence cannot force a human handler'
 pass 'ambiguity and unsupported handler/capability decisions escalate'
 
 # Privacy refusal happens before either inference or quota selection.
@@ -372,28 +488,39 @@ assert_contains "$OUT" "--harness 'claude' --model 'claude-haiku-5-5' --effort '
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 pass 'rule floor: a known shortfall falls through to default'
 
-# A picked rule below its own probability floor falls to the most probable
-# runner-up that clears its own floor.
+# Independent predicate support uses each rule's own floor, not Choice confidence.
 jq '.rules[2].min_confidence=0.99 | .rules[3].min_confidence=0.1' "$TMP_ROOT/base-rules.json" > "$RULES"
-printf '%s\n' '{"rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":0.8,"rule_4":0.2,"default":0}}' > "$SETTINGS"
+printf '%s\n' '{"rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":0.8,"rule_4":0.2}}' > "$SETTINGS"
 run
-assert_contains "$OUT" 'status: clear' 'a qualifying runner-up resolves'
-assert_contains "$OUT" 'rule: rule_3' 'the picked rule stays reported'
-assert_contains "$OUT" 'fallback: rule_4 (Trivial mechanical edit.) probability 0.2 clears its floor 0.1; rule_3 probability 0.8 is below its floor 0.99' 'the runner-up fallback names both floors'
-assert_contains "$OUT" "--model 'claude-haiku-5-5'" 'the runner-up rule profiles are resolved'
+assert_contains "$OUT" 'status: clear' 'a qualifying predicate runner-up resolves'
+assert_contains "$OUT" 'fallback: rule_4' 'the selected rule floor is enforced'
+assert_contains "$OUT" "--model 'claude-haiku-5-5'" 'the approved runner-up class resolves'
 jq '.rules[2].min_confidence=0.99' "$TMP_ROOT/base-rules.json" > "$RULES"
 run
-assert_contains "$OUT" 'status: ambiguous' 'no runner-up clearing its own floor is ambiguous'
-assert_contains "$OUT" 'no other option clears its own floor' 'the ambiguous reason names the missing runner-up'
-assert_not_contains "$OUT" '  profile:' 'an unqualified runner-up is not taken'
-jq '.rules[2].min_confidence=0.99 | .rules[3].min_confidence=0.1 | .rules[1].min_confidence=0.1' "$TMP_ROOT/base-rules.json" > "$RULES"
-printf '%s\n' '{"rule_probabilities":{"rule_1":0,"rule_2":0.1,"rule_3":0.8,"rule_4":0.1,"default":0}}' > "$SETTINGS"
-run
-assert_contains "$OUT" 'status: ambiguous' 'two equally probable runner-ups are ambiguous'
-assert_contains "$OUT" 'runner-up tie' 'the tie is named'
-printf '%s\n' '{}' > "$SETTINGS"
+assert_contains "$OUT" 'status: ambiguous' 'no qualified predicate means no dispatch'
+assert_not_contains "$OUT" '  profile:' 'a missed floor cannot pick a weaker profile'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
-pass 'per-rule confidence floors fall to the most probable runner-up that clears its own floor'
+jq '.rules[2].min_confidence=0.99 | .rules[0].min_confidence=0.3 | .rules[1].min_confidence=0.3 | .rules[3].min_confidence=0.3 | .rules[1].use=.rules[0].use' "$TMP_ROOT/base-rules.json" > "$RULES"
+printf '%s\n' '{"rule_probabilities":{"rule_1":0.4,"rule_2":0.4,"rule_3":0.7,"rule_4":0.4}}' > "$SETTINGS"
+run
+assert_contains "$OUT" 'status: ambiguous' 'a third conflicting runner-up cannot hide behind two equivalent ties'
+assert_contains "$OUT" 'runner-up tie' 'all tied outcomes are checked before dispatch'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+printf '%s\n' '{"rule_probabilities":{"rule_1":0,"rule_2":0.9,"rule_3":0,"rule_4":0.9}}' > "$SETTINGS"
+run
+assert_contains "$OUT" 'conflicting rule support tie' 'distinct equally supported outcomes remain ambiguous'
+printf '%s\n' '{"rule_probabilities":{"rule_1":0.7,"rule_2":0.7,"rule_3":0,"rule_4":0}}' > "$SETTINGS"
+for order in '.' '.rules=[.rules[1],.rules[0],.rules[2],.rules[3]]'; do
+  jq ".rules[0].min_confidence=0.8 | $order" "$TMP_ROOT/base-rules.json" > "$RULES"
+  run
+  assert_contains "$OUT" 'status: ambiguous' "a conflicting top-support tie stays ambiguous whatever the rule order: $order"
+  assert_contains "$OUT" 'conflicting rule support tie' "a missed floor cannot hand a conflicting tie to the runner-up: $order"
+  assert_not_contains "$OUT" 'fallback:' "no runner-up is taken around a conflicting tie: $order"
+  assert_not_contains "$OUT" '  profile:' "a conflicting tie emits no profile: $order"
+done
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+pass 'predicate support floors retain explicit runner-up policy'
+printf '%s\n' '{}' > "$SETTINGS"
 
 # Proven exhaustion of every candidate activates the selected rule's declared
 # model-matrix stand-in.
@@ -454,8 +581,18 @@ RESOLVER_BASH=bash
 # resolve [NAME=value...] -- [args...]: CODE, OUT, ERR; no ambient key leaks in.
 resolve() {
   local -a envs=()
+  local config_file="$RULES" fixture_home="$HOME_DIR" value
+  for value in "$@"; do case "$value" in FM_CONFIG_OVERRIDE=*) config_file="${value#*=}/crew-dispatch.json" ;; FM_HOME=*) fixture_home=${value#*=} ;; esac; done
+  structure_rules "$config_file"
   while [ $# -gt 0 ] && [ "$1" != -- ]; do envs+=("$1"); shift; done
   [ $# -eq 0 ] || shift
+  if [ $# -gt 0 ] && [ -f "$1" ]; then
+    local location="$fixture_home/projects/${FIXTURE_PROJECT:-pager}"
+    [ "${FIXTURE_PROJECT:-pager}" != firstmate ] || location="$fixture_home"
+    bind_brief "$1" "$location"
+    shift
+    set -- "$TMP_ROOT/bound-brief.md" "$@"
+  fi
   OUT=$(env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" \
     ${envs[@]+"${envs[@]}"} "$RESOLVER_BASH" "$ROOT/bin/fm-dispatch-resolve.sh" "$@" 2> "$TMP_ROOT/error")
   CODE=$?
@@ -502,7 +639,7 @@ spy "$SPYNODE" node "$(command -v node)"
 
 # Absent key: off, silent on stdout, no helper, no network, no quota read.
 reset_spies; before=$(count)
-resolve PATH="$SPYBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF" --project pager
+resolve PATH="$SPYBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF"
 expect_code 0 "$CODE" 'absent key exits 0'
 assert_equals '' "$OUT" 'absent key prints nothing on stdout'
 assert_contains "$ERR" 'dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and' 'absent key explains itself on stderr'
@@ -530,20 +667,43 @@ pass 'help and bare-filename startup isolate environment credentials'
 
 # A .env key activates the tool, the environment wins, and config overrides apply.
 printf '%s\n' '# local secrets' 'FMX_PAIRING_TOKEN=abc' "export TYPESAFE_API_KEY=\"$KEY\"" > "$HOME_DIR/.env"
-resolve -- "$BRIEF" --project pager
+resolve -- "$BRIEF"
 expect_code 0 "$CODE" '.env key resolves'
 assert_contains "$OUT" '  status: clear' '.env key produces a clear result'
 assert_equals "Bearer $KEY" "$(last_auth)" '.env key reaches the provider as the bearer header'
-resolve TYPESAFE_API_KEY=env-wins -- "$BRIEF" --project pager
+resolve TYPESAFE_API_KEY=env-wins -- "$BRIEF"
 assert_equals 'Bearer env-wins' "$(last_auth)" 'environment key wins over .env'
 rm -f "$HOME_DIR/.env"
 OVERRIDE_CONFIG="$TMP_ROOT/override-config"
 mkdir -p "$OVERRIDE_CONFIG"
-jq '.rules[0].when = "Override-only rule criterion."' "$TMP_ROOT/base-rules.json" > "$OVERRIDE_CONFIG/crew-dispatch.json"
-keyed FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" -- "$BRIEF" --project pager
+cp "$TMP_ROOT/base-rules.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
+structure_rules "$OVERRIDE_CONFIG/crew-dispatch.json"
+jq '.judgments.r1.instructions = "Override-only judgment instruction?"' "$OVERRIDE_CONFIG/crew-dispatch.json" > "$TMP_ROOT/override.json"
+cp "$TMP_ROOT/override.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
+keyed FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" -- "$BRIEF"
 assert_contains "$OUT" '  status: clear' 'FM_CONFIG_OVERRIDE resolves'
-assert_contains "$(last_request)" 'Override-only rule criterion.' 'FM_CONFIG_OVERRIDE selects the rules directory'
-pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work'
+assert_contains "$(last_request)" 'Override-only judgment instruction?' 'FM_CONFIG_OVERRIDE uses its own structured rules'
+cp "$TMP_ROOT/base-rules.json" "$OVERRIDE_CONFIG/crew-dispatch.json"
+before=$(count)
+OUT=$(env -u TYPESAFE_API_KEY_PRIVATE PATH="$FAKEBIN:$BASE_PATH" FM_HOME="$HOME_DIR" FM_CONFIG_OVERRIDE="$OVERRIDE_CONFIG" \
+  TYPESAFE_API_KEY="$KEY" bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" 2> "$TMP_ROOT/error")
+CODE=$?
+expect_code 2 "$CODE" 'a legacy rules file without judgments is a configuration error'
+assert_contains "$(cat "$TMP_ROOT/error")" 'malformed rules file:' 'the legacy rules file is named as malformed'
+assert_contains "$(cat "$TMP_ROOT/error")" 'judgments must be an object of single-judgment Nouls' 'the diagnostic names the missing judgments object'
+assert_equals '' "$OUT" 'a legacy rules file prints no status'
+assert_equals "$before" "$(count)" 'a legacy rules file sends nothing'
+mkdir -p "$TMP_ROOT/brokenbun"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$TMP_ROOT/brokenbun/bun"
+chmod +x "$TMP_ROOT/brokenbun/bun"
+before=$(count)
+keyed PATH="$TMP_ROOT/brokenbun:$FAKEBIN:$BASE_PATH" -- "$BRIEF"
+expect_code 0 "$CODE" 'an adapter runtime failure is a structured result, not a configuration error'
+assert_contains "$OUT" '  status: error' 'an adapter that cannot run reports status error'
+assert_contains "$OUT" 'reason: Level 5 rules validation could not run' 'the error names the failed validation run'
+assert_not_contains "$ERR" 'malformed rules file' 'a valid rules file is never blamed for an adapter runtime failure'
+assert_equals "$before" "$(count)" 'an adapter runtime failure sends nothing'
+pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work; legacy rules and adapter failures fail closed'
 
 # The key reaches only the provider's bearer header: never argv, never a child
 # environment, never the request. The request carries the project and task
@@ -554,9 +714,9 @@ jq '.rules[2].why = "SECRET-WHY-TEXT strongest model" | .rules[1].approval = "ca
 for runtime in "${RUNTIMES[@]}"; do
   reset_spies
   if [ "$runtime" = bun ]; then
-    keyed PATH="$SPYBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF" --project pager
+    keyed PATH="$SPYBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF"
   else
-    keyed PATH="$SPYNODE:$FAKEBIN:$NOBUN_PATH" -- "$BRIEF" --project pager
+    keyed PATH="$SPYNODE:$FAKEBIN:$NOBUN_PATH" -- "$BRIEF"
   fi
   expect_code 0 "$CODE" "$runtime keyed resolution exits 0"
   assert_contains "$OUT" '  status: clear' "$runtime keyed resolution clears"
@@ -571,13 +731,11 @@ for runtime in "${RUNTIMES[@]}"; do
   assert_not_contains "$(last_request)" "$KEY" "$runtime: the key never rides in the request body"
 done
 body=$(last_request)
-assert_equals jev-latest "$(jq -r .model <<<"$body")" 'the request names jev-latest'
-assert_equals pager "$(jq -r .state.repository <<<"$body")" 'the project rides in the state'
-assert_contains "$(jq -r .state.task <<<"$body")" 'off-by-one in the pager' 'the task text rides in the state'
-assert_equals '["ambiguity","effort","model","needs_desktop","profile","rule"]' "$(jq -c '.questions | keys' <<<"$body")" 'Level 5 questions share the rule Choice request'
-assert_equals '["default","rule_1","rule_2","rule_3","rule_4"]' "$(jq -c '.questions.rule.criteria | keys' <<<"$body")" 'one option per rule plus default'
-assert_equals 'No listed rule applies to this task.' "$(jq -r .questions.rule.criteria.default <<<"$body")" 'the fixed neutral criterion is the default option'
-assert_equals 'Trivial mechanical edit.' "$(jq -r .questions.rule.criteria.rule_4 <<<"$body")" 'rule when text is the option verbatim'
+assert_equals pager "$(jq -r .state.repository <<<"$body")" 'the authoritative project is explicit'
+assert_contains "$(jq -r .state.task <<<"$body")" 'off-by-one in the pager' 'the task-specific state is retained'
+assert_equals false "$(jq -r '.state | has("kind")' <<<"$body")" 'the request state holds no kind field'
+assert_equals null "$(jq -r '.questions.profile // null' <<<"$body")" 'upstream workflow selection is removed'
+assert_equals noul "$(jq -r '.questions.judgment_r4.type' <<<"$body")" 'each open property is an independent Noul'
 for private in SECRET-WHY-TEXT spendPriority openai-codex/gpt-6.1-sol claude-haiku-5-5 '"approval"' min_confidence; do
   assert_not_contains "$body" "$private" "the request never carries $private"
 done
@@ -606,47 +764,57 @@ expect_withheld() {  # <label> <stderr fragment> [<value that must not print>...
 }
 
 printf '%s\n' '# private values' '' '   ' 'Unlisted-Value' > "$NEVER_SEND"
-keyed -- "$PRIVATE_BRIEF" --project pager
+keyed -- "$PRIVATE_BRIEF"
 assert_contains "$OUT" '  status: clear' 'a list with no match leaves resolution unchanged'
 assert_contains "$(jq -r .state.task <<<"$(last_request)")" 'Acme-Ledger' 'a list with no match sends the task text'
 
 printf '%s\n' '# private values' '' '  acme-ledger  ' > "$NEVER_SEND"
-withheld_run -- "$PRIVATE_BRIEF" --project pager
+withheld_run -- "$PRIVATE_BRIEF"
 expect_withheld 'a case-insensitive literal match' "brief text matches $NEVER_SEND line 3" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 
 WRAPPED_BRIEF="$TMP_ROOT/wrapped-brief.md"
 printf '# Task\n## Captain'"'"'s intent\nFix the pager for Example Client\nLtd before\tthe\xc2\xa0release.\n' > "$WRAPPED_BRIEF"
 printf '%s\n' 'example  client ltd' > "$NEVER_SEND"
-withheld_run -- "$WRAPPED_BRIEF" --project pager
+withheld_run -- "$WRAPPED_BRIEF"
 expect_withheld 'a literal the brief wraps across lines' "brief text matches $NEVER_SEND line 1" 'example' 'Example'
 printf '%s\n' 'before the release' > "$NEVER_SEND"
-withheld_run -- "$WRAPPED_BRIEF" --project pager
+withheld_run -- "$WRAPPED_BRIEF"
 expect_withheld 'a literal the brief spaces with a tab and a no-break space' "brief text matches $NEVER_SEND line 1" 'release'
 
 printf '%s\n' 'orion-private' > "$NEVER_SEND"
-withheld_run -- "$BRIEF" --project orion-private
+FIXTURE_PROJECT=orion-private withheld_run -- "$BRIEF"
 expect_withheld 'a project-name match' "brief text matches $NEVER_SEND line 1" 'orion-private'
-printf '%s\n' 'well understood' > "$NEVER_SEND"
-withheld_run -- "$BRIEF" --project pager
-expect_withheld 'a rule-criterion match' "brief text matches $NEVER_SEND line 1" 'well understood'
+printf '%s\n' 'Does task exhibit property' > "$NEVER_SEND"
+withheld_run -- "$BRIEF"
+expect_withheld 'a judgment-criterion match' "brief text matches $NEVER_SEND line 1" 'Does task exhibit property'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+structure_rules "$RULES"
+jq '.judgments.acme_migration = .judgments.r1 | del(.judgments.r1) | .rules[0].match.all = ["acme_migration"]' "$RULES" > "$TMP_ROOT/judgment-id.json"
+cp "$TMP_ROOT/judgment-id.json" "$RULES"
+printf '%s\n' 'acme' > "$NEVER_SEND"
+withheld_run -- "$BRIEF"
+expect_withheld 'a match only in a judgment id' "brief text matches $NEVER_SEND line 1" 'acme'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+structure_rules "$RULES"
 
 SECOND_HOME="$TMP_ROOT/secondmate-home"
-mkdir -p "$SECOND_HOME/config"
+mkdir -p "$SECOND_HOME/config" "$SECOND_HOME/data" "$SECOND_HOME/projects/pager"
+cp "$HOME_DIR/data/projects.md" "$SECOND_HOME/data/projects.md"
 printf '%s\n' 'acme-ledger' > "$NEVER_SEND"
 # shellcheck disable=SC2016 # Expanded by the child shell
 bash -c '. "$1" && propagate_inheritable_config "$2" "$3"' _ \
   "$ROOT/bin/fm-config-inherit-lib.sh" "$HOME_DIR/config" "$SECOND_HOME/config" >/dev/null 2>&1 \
   || fail 'inheritance into the secondmate home failed'
-withheld_run FM_HOME="$SECOND_HOME" -- "$PRIVATE_BRIEF" --project pager
+withheld_run FM_HOME="$SECOND_HOME" -- "$PRIVATE_BRIEF"
 expect_withheld 'an inherited list in a secondmate home' "brief text matches $SECOND_HOME/config/dispatch-never-send line 1" 'acme-ledger' 'Acme-Ledger' '4417-2290'
 
 rm -f "$NEVER_SEND"
 mkdir "$NEVER_SEND"
-withheld_run -- "$PRIVATE_BRIEF" --project pager
+withheld_run -- "$PRIVATE_BRIEF"
 expect_withheld 'a directory at the list path' "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rmdir "$NEVER_SEND"
 ln -s "$TMP_ROOT/missing-never-send" "$NEVER_SEND"
-withheld_run -- "$PRIVATE_BRIEF" --project pager
+withheld_run -- "$PRIVATE_BRIEF"
 expect_withheld 'a broken symlink at the list path' "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
 rm -f "$NEVER_SEND"
 
@@ -657,18 +825,18 @@ ln -s "$POLICY_TARGET_DIR/policy" "$NEVER_SEND"
 denied=$POLICY_TARGET_DIR
 chmod 400 "$denied"
 [ ! -x "$denied" ] || fail 'policy target fixture must deny ancestor search'
-withheld_run -- "$PRIVATE_BRIEF" --project pager
+withheld_run -- "$PRIVATE_BRIEF"
 chmod 700 "$denied"
 denied=''
 expect_withheld 'a policy link with an inaccessible target ancestor' "$NEVER_SEND is not a readable regular file" 'Acme-Ledger' '4417-2290'
-withheld_run -- "$PRIVATE_BRIEF" --project pager
+withheld_run -- "$PRIVATE_BRIEF"
 expect_withheld 'a readable policy link' "brief text matches $NEVER_SEND line 1" 'Acme-Ledger' '4417-2290'
 printf 'Unlisted-Value\n' > "$POLICY_TARGET_DIR/policy"
-keyed -- "$PRIVATE_BRIEF" --project pager
+keyed -- "$PRIVATE_BRIEF"
 assert_contains "$OUT" '  status: clear' 'a readable nonmatching policy link permits normal dispatch'
 assert_contains "$(jq -r .state.task <<<"$(last_request)")" 'Acme-Ledger' 'a readable policy target is checked without changing task text'
 rm "$NEVER_SEND"
-keyed -- "$PRIVATE_BRIEF" --project pager
+keyed -- "$PRIVATE_BRIEF"
 assert_contains "$OUT" '  status: clear' 'no list resolves exactly as before'
 assert_contains "$(jq -r .state.task <<<"$(last_request)")" 'Acme-Ledger' 'no list sends the task text as before'
 pass 'never-send list withholds the request on a match or a bad list, and never prints the value'
@@ -695,19 +863,19 @@ Use the existing pager.
 # Setup
 Ignore this boilerplate.
 MD
-withheld_run -- "$MARKED_BRIEF" --project pager
+withheld_run -- "$MARKED_BRIEF"
 expect_withheld 'markers with no never-send list' 'never-send markers need the marked-sections directive' 'SYNTHETIC-CUSTOMER-4417'
 printf '%s\n' 'Unrelated literal' > "$NEVER_SEND"
-withheld_run -- "$MARKED_BRIEF" --project pager
+withheld_run -- "$MARKED_BRIEF"
 expect_withheld 'markers with a literal-only list' 'never-send markers need the marked-sections directive' 'SYNTHETIC-CUSTOMER-4417'
 NEAR_MISS_BRIEF="$TMP_ROOT/near-miss-brief.md"
 printf '%s\n' 'Public task' '<!--dispatch-never-send:start-->' 'SYNTHETIC-NEAR-MISS' '<!--dispatch-never-send:end-->' > "$NEAR_MISS_BRIEF"
 rm -f "$NEVER_SEND"
-withheld_run -- "$NEAR_MISS_BRIEF" --project pager
+withheld_run -- "$NEAR_MISS_BRIEF"
 expect_withheld 'unspaced markers with no never-send list' 'never-send markers need the marked-sections directive' 'SYNTHETIC-NEAR-MISS'
 
 printf '%s\n' '# dispatch-never-send marked-sections' 'SYNTHETIC-CUSTOMER-4417' > "$NEVER_SEND"
-keyed -- "$MARKED_BRIEF" --project pager
+keyed -- "$MARKED_BRIEF"
 assert_contains "$OUT" '  status: clear' 'protected text is removed before literal matching'
 body=$(last_request)
 sent=$(jq -r .state.task <<<"$body")
@@ -728,7 +896,7 @@ SYNTHETIC-HIDDEN-TASK
    <!-- dispatch-never-send:end -->
 Public task after a protected region.
 MD
-keyed -- "$WHOLE_MARKED_BRIEF" --project pager
+keyed -- "$WHOLE_MARKED_BRIEF"
 sent=$(jq -r .state.task <<<"$(last_request)")
 assert_contains "$sent" 'Public task before' 'whole-brief fallback uses sanitized text before the region'
 assert_contains "$sent" 'Public task after' 'whole-brief fallback uses sanitized text after the region'
@@ -736,13 +904,13 @@ assert_not_contains "$(last_request)" 'SYNTHETIC-HIDDEN-TASK' 'whole-brief fallb
 
 FENCED_MARKED_BRIEF="$TMP_ROOT/fenced-marked-brief.md"
 printf '%s\n' 'Public fenced example:' '```' '<!-- dispatch-never-send:start -->' 'SYNTHETIC-FENCED-SECRET' '<!-- dispatch-never-send:end -->' 'public code' '```' > "$FENCED_MARKED_BRIEF"
-keyed -- "$FENCED_MARKED_BRIEF" --project pager
+keyed -- "$FENCED_MARKED_BRIEF"
 assert_contains "$(jq -r .state.task <<<"$(last_request)")" 'public code' 'public fenced code survives'
 assert_not_contains "$(last_request)" 'SYNTHETIC-FENCED-SECRET' 'markers protect text inside code fences'
 
 # A literal outside a removed region still stops the entire request.
 printf '%s\n' '# dispatch-never-send marked-sections' 'public pagination' > "$NEVER_SEND"
-withheld_run -- "$MARKED_BRIEF" --project pager
+withheld_run -- "$MARKED_BRIEF"
 expect_withheld 'literal protection after section stripping' "brief text matches $NEVER_SEND line 2" 'public pagination'
 
 printf '%s\n' '# dispatch-never-send marked-sections' > "$NEVER_SEND"
@@ -757,14 +925,14 @@ for malformed in unclosed orphan nested inline typo unspaced recased; do
     unspaced) printf '%s\n' 'Public task' '<!--dispatch-never-send:start-->' 'SYNTHETIC-BAD-SECRET' '<!--dispatch-never-send:end-->' > "$BAD_MARKED_BRIEF" ;;
     recased) printf '%s\n' 'Public task' '<!-- Dispatch-Never-Send:start -->' 'SYNTHETIC-BAD-SECRET' '<!-- Dispatch-Never-Send:end -->' > "$BAD_MARKED_BRIEF" ;;
   esac
-  withheld_run -- "$BAD_MARKED_BRIEF" --project pager
+  withheld_run -- "$BAD_MARKED_BRIEF"
   expect_withheld "$malformed markers" 'invalid never-send markers or unreadable brief' 'SYNTHETIC-BAD-SECRET'
 done
 
 for directive in '# dispatch-never-send project: pager' '# dispatch-never-send marked-section' '#dispatch-never-send marked-sections' '# Dispatch-Never-Send marked-sections'; do
   printf '%s\n' 'Ordinary comment' "$directive" > "$NEVER_SEND"
   for directive_brief in "$BRIEF" "$MARKED_BRIEF"; do
-    withheld_run -- "$directive_brief" --project pager
+    withheld_run -- "$directive_brief"
     expect_withheld 'an invalid privacy directive' "invalid privacy directive in $NEVER_SEND line 2" 'SYNTHETIC-CUSTOMER-4417'
   done
 done
@@ -775,7 +943,7 @@ pass 'opt-in marked sections protect outgoing bodies and markers never send with
 # They are never diagnostics, even when the resolver keeps intake moving.
 jq -n --arg body "$KEY private-brief-marker-4417" '{http: 401, body: $body}' > "$SETTINGS"
 rm -f "$QUOTA_AXI_CALLS"
-keyed -- "$BRIEF" --project pager
+keyed -- "$BRIEF"
 expect_code 0 "$CODE" 'sensitive API error exits 0'
 assert_contains "$OUT" '  status: error' 'an HTTP rejection is an error outcome'
 assert_contains "$OUT" '  reason: Level 5 API request failed' 'the API failure is named'
@@ -803,7 +971,7 @@ jq '.rules = [.rules[0]]' "$TMP_ROOT/base-rules.json" > "$RULES"
 settings '{"rule":"rule_1","delay":120}'
 rm -f "$QUOTA_AXI_CALLS"
 RESOLVER_BASH=/bin/bash
-keyed PATH="$CLOCKBIN:$FAKEBIN:$BASE_PATH" FAKE_QUOTA_DELAY=0.24 -- "$BRIEF" --project pager
+keyed PATH="$CLOCKBIN:$FAKEBIN:$BASE_PATH" FAKE_QUOTA_DELAY=0.24 -- "$BRIEF"
 RESOLVER_BASH=bash
 expect_code 0 "$CODE" 'timed resolver exits 0 under /bin/bash'
 assert_contains "$OUT" '  status: clear' 'timed resolver clears'
@@ -845,7 +1013,7 @@ SH
   chmod +x "$PERLBIN/perl"
   settings '{"rule":"rule_1"}'
   RESOLVER_BASH=$FAST_BASH
-  keyed PATH="$PERLBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF" --project pager
+  keyed PATH="$PERLBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF"
   RESOLVER_BASH=bash
   assert_contains "$OUT" '  status: clear' 'EPOCHREALTIME resolver clears'
   case "$(field "$OUT" total_ms)" in ''|*[!0-9]*) fail "EPOCHREALTIME total must be integer milliseconds: $OUT" ;; esac
@@ -858,7 +1026,7 @@ cp "$TMP_ROOT/base-rules.json" "$RULES"
 
 # Missing usage is an invalid response: unknown, never fabricated as zero.
 settings '{"patch":{"usage":null}}'
-keyed -- "$BRIEF" --project pager
+keyed -- "$BRIEF"
 expect_code 0 "$CODE" 'missing usage exits 0'
 assert_contains "$OUT" '  reason: Level 5 API request failed' 'missing usage fails response validation'
 assert_contains "$ERR" 'invalid provider answer contract' 'missing usage is named as a contract failure'
@@ -867,7 +1035,7 @@ for name in api_ms input_tokens output_tokens jev_cost_usd returned_model; do
 done
 # A quota failure still reports the paid call while marking only the snapshot failed.
 settings '{}'
-keyed FAKE_QUOTA_FAIL=1 FAKE_QUOTA_DELAY=0.12 -- "$BRIEF" --project pager
+keyed FAKE_QUOTA_FAIL=1 FAKE_QUOTA_DELAY=0.12 -- "$BRIEF"
 expect_code 0 "$CODE" 'quota failure with telemetry exits 0'
 assert_contains "$OUT" '  reason: quota-axi --json failed' 'quota failure preserves its reason'
 assert_equals "$cost" "$(field "$OUT" jev_cost_usd)" 'quota failure retains API cost'
@@ -877,7 +1045,7 @@ case "$(field "$OUT" api_ms)" in ''|null|*[!0-9]*) fail "quota failure lost the 
 pass 'unavailable usage is unknown and a failed quota snapshot retains API cost'
 
 jq -n --arg model "jev-1.13.0"$'\n'"$KEY private-brief-marker-4417" '{patch: {model: $model}}' > "$SETTINGS"
-keyed FAKE_QUOTA_FAIL=1 -- "$BRIEF" --project pager
+keyed FAKE_QUOTA_FAIL=1 -- "$BRIEF"
 expect_code 0 "$CODE" 'unsafe response model does not block quota-error intake'
 assert_contains "$OUT" '  status: error' 'the quota error is reported'
 assert_equals null "$(field "$OUT" returned_model)" 'arbitrary response model text is not error telemetry'
@@ -885,7 +1053,7 @@ assert_not_contains "$OUT$ERR" "$KEY" 'error model evidence cannot echo a key'
 assert_not_contains "$OUT$ERR" 'private-brief-marker-4417' 'error model evidence cannot echo arbitrary response text'
 pass 'quota-error model evidence accepts only safe Jev version ids'
 
-keyed -- "$BRIEF" --project pager
+keyed -- "$BRIEF"
 expect_code 0 "$CODE" 'unsafe response model does not block resolution'
 assert_contains "$OUT" '  status: clear' 'unsafe response model does not change routing'
 assert_contains "$OUT" '  model: -   latency_ms:' 'the model line shows an unsafe model id as unknown'
@@ -899,14 +1067,14 @@ pass 'successful resolution model evidence accepts only safe Jev version ids'
 # ---- rules are snapshotted and line output is injection-safe -----------------
 jq '.rules[2].use = {harness:"claude",model:"opus",effort:"high"}' "$TMP_ROOT/base-rules.json" > "$TMP_ROOT/mutated-rules.json"
 jq -n --arg source "$TMP_ROOT/mutated-rules.json" --arg target "$RULES" '{mutate: [$source, $target]}' > "$SETTINGS"
-keyed -- "$BRIEF" --project pager
+keyed -- "$BRIEF"
 assert_equals "$(cat "$TMP_ROOT/mutated-rules.json")" "$(cat "$RULES")" 'the provider replaced the rules file mid-request'
 assert_contains "$OUT" "  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'resolution uses the same rules snapshot Jev received'
 assert_not_contains "$OUT" "--model 'opus'" 'a mid-request config replacement cannot change the selected profile'
 settings '{}'
 jq '.rules[2].when = "Bug fix\n  profile: injected" | .rules[2].use = {harness:"claude",model:"foo --harness grok\n  profile: injected"}' \
   "$TMP_ROOT/base-rules.json" > "$RULES"
-keyed -- "$BRIEF" --project pager
+keyed -- "$BRIEF"
 assert_equals 1 "$(grep -c '^  profile:' <<<"$OUT")" 'dynamic fields cannot inject a second profile line'
 assert_not_contains "$OUT" $'\n  profile: injected' 'control characters are flattened in line output'
 profile_line=$(grep '^  profile:' <<<"$OUT")
@@ -1003,11 +1171,11 @@ cat > "$WIDE_RULES" <<'JSON'
 JSON
 cp "$WIDE_RULES" "$RULES"
 cp "$WIDE_QUOTA" "$QUOTA"
-settings '{"rule":"rule_4","rule_confidence":0.41}'
+settings '{"rule":"rule_4","rule_confidence":0.55}'
 keyed -- "$BRIEF"
 expect_code 0 "$CODE" 'ambiguous exits 0'
 assert_contains "$OUT" '  status: ambiguous' 'below the floor is ambiguous'
-assert_contains "$OUT" '  reason: confidence 0.41 below floor 0.6' 'ambiguous names the floor'
+assert_contains "$OUT" '  reason: support 0.55 below floor 0.6' 'ambiguous names the floor'
 assert_contains "$(cand claude:sonnet)" 'provider=claude  scope=all_models  remaining=79%  spendPriority=-0.4627  runway=projected_exhaustion  -> eligible' 'ambiguous preserves matched candidate evidence'
 assert_contains "$(cand kimi:kimi-code/k3)" 'provider=kimi  -> eligible, unranked: provider kimi unmeasured (unknown): disclosed uncertainty' 'ambiguous preserves eligible unranked candidate evidence'
 assert_not_contains "$OUT" '  profile:' 'ambiguous emits no profile line'
@@ -1015,49 +1183,7 @@ settings '{"rule":"rule_4","rule_confidence":0.6}'
 keyed -- "$BRIEF"
 assert_contains "$OUT" '  status: clear' 'confidence exactly at the fixed floor clears'
 pass 'ambiguous: confidence below the fixed floor hands the decision back'
-
-# ---- per-rule confidence floors: boundaries and runner-up probabilities ------
-FLOOR_RULES="$TMP_ROOT/floor-rules.json"
-jq '.rules[2].min_confidence = 0.9 | .rules[3].min_confidence = 0.1' "$TMP_ROOT/base-rules.json" > "$FLOOR_RULES"
-cp "$FLOOR_RULES" "$RULES"
-cp "$TMP_ROOT/base-quota.json" "$QUOTA"
-floor_answer() {  # <choice> <confidence> <rule_1> <rule_2> <rule_3> <rule_4> <default>
-  jq -n --arg c "$1" --argjson conf "$2" --argjson r1 "$3" --argjson r2 "$4" --argjson r3 "$5" --argjson r4 "$6" --argjson d "$7" \
-    '{rule: $c, rule_confidence: $conf, rule_probabilities: {rule_1: $r1, rule_2: $r2, rule_3: $r3, rule_4: $r4, default: $d}}' > "$SETTINGS"
-}
-floor_answer rule_3 0.76 0.02 0.02 0.76 0.08 0.12
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'no runner-up clearing its own floor is ambiguous'
-assert_contains "$OUT" '  reason: rule_3 probability 0.76 below its floor 0.9; no other option clears its own floor' 'the undeclared default keeps the global floor as a runner-up'
-assert_not_contains "$OUT" '  fallback:' 'no fallback is reported when none is taken'
-assert_not_contains "$OUT" '  profile:' 'ambiguous per-rule floor emits no profile'
-assert_not_contains "$(last_request)" 'min_confidence' 'the model never sees confidence floors'
-floor_answer rule_4 0.45 0.02 0.01 0.01 0.45 0.51
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a declared floor below the global floor lets the picked rule resolve'
-assert_contains "$OUT" "  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'" 'the low-confidence pick resolves its own rule'
-# A declared floor needs the same support from a rule as the pick or as a runner-up.
-jq '.rules[3].min_confidence = 0.3' "$FLOOR_RULES" > "$RULES"
-floor_answer rule_4 0.25 0.25 0.05 0.05 0.35 0.30
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a picked rule clears its declared floor on its own probability, not the answer confidence'
-assert_not_contains "$OUT" '  fallback:' 'a picked rule that clears its own floor takes no fallback'
-floor_answer rule_3 0.95 0.05 0.05 0.55 0.30 0.05
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a high answer confidence does not lift a picked rule over its own floor'
-assert_contains "$OUT" '  fallback: rule_4 (Trivial mechanical edit.) probability 0.3 clears its floor 0.3; rule_3 probability 0.55 is below its floor 0.9' 'a runner-up exactly at its floor clears the same floor it would need as the pick'
-floor_answer rule_3 0.55 0.05 0.05 0.55 0.25 0.10
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a runner-up below its own floor is not taken'
-assert_contains "$OUT" '  reason: rule_3 probability 0.55 below its floor 0.9; no other option clears its own floor' 'the missed runner-up floor is named'
-cp "$TMP_ROOT/base-rules.json" "$RULES"
-floor_answer rule_3 0.55 0.01 0.01 0.55 0.42 0.01
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'without declared floors a low pick stays ambiguous'
-assert_contains "$OUT" '  reason: confidence 0.55 below floor 0.6' 'without declared floors the global floor reason is unchanged'
-assert_not_contains "$OUT" '  fallback:' 'without declared floors no runner-up is taken'
 settings '{}'
-pass 'per-rule confidence floor boundaries check each runner-up on its own probability; no declared floors keeps the global floor'
 
 # ---- the model sees only the task-specific brief sections --------------------
 SCAFFOLD_BRIEF="$TMP_ROOT/scaffold-brief.md"
@@ -1107,11 +1233,30 @@ sent=$(sent_task)
 assert_contains "$sent" $'## Captain\'s intent\nAdd a flag to the pager.' 'a ship brief still sends its task sections'
 assert_not_contains "$sent" 'Brief kind:' 'a ship brief gets no kind line'
 assert_not_contains "$sent" 'mode=' "a ship brief's delivery mode is not sent"
-{ cat "$SCAFFOLD_BRIEF"; printf '%s\n' 'This is a SCOUT task: the deliverable is a written report, not a PR.'; } > "$KIND_BRIEF"
+awk '{ print } /^BOILERPLATE-SETUP/ { print "This is a SCOUT task: the deliverable is a written report, not a PR." }' "$SCAFFOLD_BRIEF" > "$KIND_BRIEF"
 keyed -- "$KIND_BRIEF"
 sent=$(sent_task)
 assert_contains "$sent" $'Brief kind: scout (report only)\n\n## Captain\'s intent' "a scout brief's contract line names its kind"
 assert_not_contains "$sent" 'This is a SCOUT task' 'the scout contract line itself is not sent'
+# Promotion retains the scout body and appends the authoritative ship spec.
+PROMOTED_BRIEF="$TMP_ROOT/promoted-brief.md"
+{ cat "$KIND_BRIEF"; printf '\n%s\n%s\n' '# Current ship Firstmate spec' 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.'; } > "$PROMOTED_BRIEF"
+jq '.rules=[.rules[0],.rules[1]] | .rules[0].match={projects:["vernant"],kind:"ship"} | .rules[1].match={projects:["vernant"],kind:"scout"}' "$TMP_ROOT/base-rules.json" > "$RULES"
+settings '{"rule_probabilities":{"rule_1":1,"rule_2":1}}'
+FIXTURE_PROJECT=vernant keyed -- "$PROMOTED_BRIEF"
+assert_contains "$OUT" 'rule: rule_1' 'a promoted Vernant ship cannot select the retained scout rule'
+assert_contains "$(sent_task)" 'PROMOTED-SHIP-SPEC implement the accepted Vernant repair.' 'the active ship specification reaches judgment'
+assert_not_contains "$(sent_task)" 'Touch pager.sh only.' 'the obsolete scout specification is not sent'
+assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a promoted ship is not labeled as a scout'
+awk '{ print } /^Touch pager.sh only./ { print "```md"; print "This is a SCOUT task: the deliverable is a written report, not a PR."; print "```" }' "$SCAFFOLD_BRIEF" > "$PROMOTED_BRIEF"
+FIXTURE_PROJECT=vernant keyed -- "$PROMOTED_BRIEF"
+assert_contains "$OUT" 'rule: rule_1' 'a quoted scout declaration does not demote a ship'
+assert_not_contains "$(sent_task)" 'Brief kind: scout' 'a ship quoting the scout declaration is not labeled as a scout'
+{ cat "$KIND_BRIEF"; printf '\n%s\n%s\n%s\n%s\n' '```md' '# Current ship Firstmate spec' 'QUOTED-SHIP-SPEC' '```'; } > "$PROMOTED_BRIEF"
+FIXTURE_PROJECT=vernant keyed -- "$PROMOTED_BRIEF"
+assert_contains "$OUT" 'rule: rule_2' 'a quoted ship heading does not promote a scout'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+settings '{}'
 WHOLE_BRIEF="$TMP_ROOT/whole-brief.md"
 printf '%s\n' '# Task' 'Fix the off-by-one in the pager: root cause is the <= on line 40.' > "$WHOLE_BRIEF"
 keyed -- "$WHOLE_BRIEF"
@@ -1533,16 +1678,12 @@ settings '{"raw":"{not json"}'
 keyed -- "$BRIEF"
 api_error 'a malformed response body' 'invalid provider answer contract'
 for bad in \
-  'a missing probability|{"patch":{"answers":{"rule":{"probabilities":{"default":null}}}}}' \
-  'a nonnumeric probability|{"patch":{"answers":{"rule":{"probabilities":{"rule_3":"high"}}}}}' \
-  'a zero-mass distribution|{"rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":0,"rule_4":0,"default":0}}' \
-  'an out-of-range confidence|{"rule_confidence":2}' \
-  'an undeclared rule id|{"rule":"rule_9","rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":1,"rule_4":0,"default":0}}' \
-  'rule zero|{"rule":"rule_0","rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":1,"rule_4":0,"default":0}}' \
+  'an out-of-range predicate|{"patch":{"answers":{"judgment_r3":{"noul":2}}}}' \
+  'a nonnumeric predicate|{"patch":{"answers":{"judgment_r3":{"noul":"high"}}}}' \
   'a mismatched score legend|{"patch":{"answers":{"effort":{"legend":{"0":"tampered"}}}}}' \
   'an out-of-range score|{"patch":{"answers":{"effort":{"score":5}}}}' \
   'an out-of-range noul|{"needs_desktop":1.5}' \
-  'a missing answer|{"patch":{"answers":{"profile":null}}}' \
+  'a missing answer|{"patch":{"answers":{"judgment_r3":null}}}' \
   'malformed usage|{"patch":{"usage":"bad"}}' \
   'a fractional token count|{"patch":{"usage":{"input_tokens":1.5}}}' \
   'a blank model|{"patch":{"model":" "}}'; do
@@ -1632,6 +1773,10 @@ for bad in \
   '{"rules":[{"when":"x","use":{"harness":"codex"}}],"default":[{"harness":"claude","model":"opus"},{"harness":"claude","model":"opus"}]}|default must not contain duplicate harness, model, and effort profiles' \
   '{"rules":[{"when":"x","use":{"harness":"spaceship"}}]}|each use profile must name a verified harness' \
   '{"rules":[{"when":"x","use":{"harness":"grok","effort":"max"}}]}|each use profile effort must be supported by its harness and model' \
+  '{"rules":[{"when":"x","use":{"harness":"gemini","model":"gemini-3.8-flash-high","provider":"google","effort":"minimal"}}]}|each use profile effort must be supported by its harness and model' \
+  '{"judgments":{"q":{"type":"noul","instructions":"Q?"}},"rules":[{"when":"x","match":{"all":["q"]},"use":{"harness":"claude"}}]}|each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false' \
+  '{"judgments":{},"rules":[{"when":"x","match":{"kind":"review"},"use":{"harness":"claude"}}]}|match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout' \
+  '{"judgments":{},"rules":[{"when":"x","match":{"projects":["pager"],"any":["q"]},"use":{"harness":"claude"}}]}|match all, any, and none must be non-empty arrays of declared judgment ids' \
   '{"rules":[{"when":"x","use":{"harness":"opencode","model":"anthropic/claude-sonnet-4-5"}}]}|use profiles whose harness lacks one authoritative provider family require provider: opencode' \
   '{"rules":[{"when":"x","use":{"harness":"rovo"}}]}|use profiles whose harness lacks one authoritative provider family require provider: rovo' \
   '{"rules":[{"when":"x","use":{"harness":"codex"}}],"default":{"harness":"pi","model":"anthropic/claude-sonnet-5"}}|default profiles whose harness lacks one authoritative provider family require provider: pi'; do
@@ -1669,9 +1814,9 @@ printf '%s\n' '{"models":[{"id":"cursor-grok-4.6-medium"}]}' > "$TMP_ROOT/model-
 printf '%s\n' '{"version":1,"roles":{"routine":{"cursor":{"model":"cursor-grok-4.6-medium"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
 jq '.rules[3].use[1] |= (del(.model) | .role = "routine")' "$WIDE_RULES" > "$RULES"
 # Withheld intakes must not even try to read live catalog exports.
-printf '%s\n' 'New feature work on the app.' > "$NEVER_SEND"
+printf '%s\n' 'Does task exhibit property 1?' > "$NEVER_SEND"
 withheld_run FM_MODEL_CATALOG_DIR="$TMP_ROOT/absent-catalogs" -- "$BRIEF"
-expect_withheld 'a withheld indexed intake' "brief text matches $NEVER_SEND line 1" 'New feature work'
+expect_withheld 'a withheld indexed intake' "brief text matches $NEVER_SEND line 1" 'Does task exhibit'
 rm "$NEVER_SEND"
 keyed FM_MODEL_CATALOG_DIR="$TMP_ROOT/model-catalogs" -- "$BRIEF"
 expect_code 0 "$CODE" 'role-based typed intake resolves'
@@ -1772,157 +1917,36 @@ cp "$TMP_ROOT/base-quota.json" "$QUOTA"
 settings '{}'
 pass 'chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks'
 
-# ---- equivalent options pool their probability; every result is logged ------
-# Rules that select identical profiles are one dispatch decision, so a split
-# between them is not a low-confidence pick. Options that differ stay split.
+# ---- independent rule support and result logging ----------------------------
+# Independent predicates cannot pool their support just because profiles match.
 LOG="$HOME_DIR/data/dispatch-resolve.jsonl"
-SENTINEL='PRIVATE-BRIEF-SENTINEL-7731'
-printf '%s\n' '# Task' "## Captain's intent" "Repair the pager. $SENTINEL" > "$BRIEF"
-cp "$TMP_ROOT/base-quota.json" "$QUOTA"
-POOL_RULES="$TMP_ROOT/pool-rules.json"
-jq '.rules[3].use = .rules[2].use' "$TMP_ROOT/base-rules.json" > "$POOL_RULES"
 rm -f "$LOG"
-cp "$POOL_RULES" "$RULES"
-floor_answer rule_3 0.51 0 0 0.51 0.49 0
+jq '.rules[3].use = .rules[2].use' "$TMP_ROOT/base-rules.json" > "$RULES"
+settings '{"rule_probabilities":{"rule_1":0,"rule_2":0,"rule_3":0.51,"rule_4":0.49}}'
 keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a 0.51/0.49 split between rules with identical profiles resolves'
-assert_contains "$OUT" '  pooled: rule_3 rule_4 select the same profiles, approval and floors; combined probability 1 clears floor 0.6' 'pooling is reported with the options and floor'
-assert_contains "$OUT" '  rule: rule_3 ' 'the picked rule is still the one reported'
-assert_not_contains "$OUT" '  replaced:' 'a pick that is the answer choice reports no replacement'
-floor_answer rule_4 0.51 0 0 0.49 0.51 0
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'the pool does not depend on which equivalent rule is picked'
-assert_contains "$OUT" '  pooled: rule_4 rule_3 ' 'the pick leads the pooled options'
-# The neutral option pools with a rule that selects the same default profiles.
-cp "$TMP_ROOT/base-rules.json" "$RULES"
-floor_answer default 0.51 0.49 0 0 0 0.51
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'the neutral option pools with a rule that selects the default profiles'
-assert_contains "$OUT" '  pooled: default rule_1 ' 'the neutral option is named in the pool'
-# Different profiles, differing approval, and a pool still below the floor stay ambiguous.
-floor_answer rule_3 0.51 0 0 0.51 0.49 0
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a 0.51/0.49 split between different profiles stays ambiguous'
-assert_not_contains "$OUT" '  pooled:' 'different profiles are never pooled'
-jq '.rules[3].approval = "captain"' "$POOL_RULES" > "$RULES"
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'identical profiles with different approval are different decisions'
-jq '.rules[3].floor = {scope:"all_models",min_percent:10,provider:"claude"}' "$POOL_RULES" > "$RULES"
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'identical profiles with a different quota floor are different decisions'
-cp "$POOL_RULES" "$RULES"
-floor_answer rule_3 0.3 0.1 0.15 0.3 0.25 0.2
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a pool whose combined probability is below the floor stays ambiguous'
-assert_contains "$OUT" '  reason: rule_3 pooled probability 0.55 below floor 0.6' 'the ambiguous reason names the pooled probability'
-# A declared floor is checked against the pooled probability of the pick.
-jq '.rules[2].min_confidence = 0.9' "$POOL_RULES" > "$RULES"
-floor_answer rule_3 0.51 0 0 0.51 0.49 0
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a declared floor is met by the pooled probability'
-floor_answer rule_3 0.4 0 0.2 0.4 0.39 0.01
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a declared floor above the pooled probability still hands the decision back'
-# One record per finished resolve, one for each status, and nothing private.
+assert_contains "$OUT" 'status: ambiguous' 'overlapping independent judgments never sum to confidence'
+assert_not_contains "$OUT" '  profile:' 'duplicating a rule cannot authorize dispatch'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 settings '{"rule":"rule_3"}'
 keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a confident pick is clear'
-jq '.rules[2].approval = "captain"' "$TMP_ROOT/base-rules.json" > "$RULES"
+assert_contains "$OUT" 'status: clear' 'a supported rule clears'
+jq '.rules[2].approval="captain"' "$TMP_ROOT/base-rules.json" > "$RULES"
 keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: escalate' 'an approval-gated rule escalates'
+assert_contains "$OUT" 'status: escalate' 'approval remains independent of semantic support'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 keyed FAKE_QUOTA_FAIL=1 -- "$BRIEF"
-assert_contains "$OUT" '  status: error' 'a quota failure is an error'
+assert_contains "$OUT" 'status: error' 'quota failures remain errors'
 rm "$RULES"
 keyed -- "$BRIEF"
-assert_contains "$OUT" '  reason: no rules to match' 'an absent rules file reports no rules'
-cp "$TMP_ROOT/base-rules.json" "$RULES"
-assert_present "$LOG" 'the result log is created'
-jq -e -s 'all(.[]; (.ts | test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z\\z")) and (keys == ["choice","confidence","floor","pooled","profile","reason","rule","selected","status","ts"]))' "$LOG" >/dev/null \
-  || fail "log records are not well formed: $(cat "$LOG")"
-assert_equals 'clear clear clear ambiguous ambiguous ambiguous ambiguous clear ambiguous clear escalate error escalate' \
-  "$(jq -r '.status' "$LOG" | paste -sd' ' -)" 'every resolve appends exactly one record, in order, with its status'
-first=$(sed -n 1p "$LOG")
-assert_equals 'rule_3' "$(jq -r .choice <<<"$first")" 'the record names the answer choice'
-assert_equals 'rule_3' "$(jq -r .rule <<<"$first")" 'the record names the picked rule'
-assert_equals 'rule_3' "$(jq -r .selected <<<"$first")" 'the record names the selected rule'
-assert_equals '0.6' "$(jq -r .floor <<<"$first")" 'the record carries the floor applied'
-assert_equals '0.51' "$(jq -r .confidence <<<"$first")" 'the record carries the answer confidence'
-assert_equals '1' "$(jq -r .pooled <<<"$first")" 'the record carries the pooled probability when pooling decided'
-assert_equals 'claude' "$(jq -r .profile.harness <<<"$first")" 'a clear record names the chosen profile'
-assert_equals 'null' "$(jq -c .profile <<<"$(sed -n 4p "$LOG")")" 'a non-clear record has no chosen profile'
-assert_equals 'confidence 0.51 below floor 0.6' "$(jq -r .reason <<<"$(sed -n 4p "$LOG")")" 'an ambiguous record carries the coarse reason'
-assert_equals 'error' "$(jq -r .status <<<"$(sed -n 12p "$LOG")")" 'an error record carries its status'
-assert_equals 'no rules to match' "$(jq -r .reason <<<"$(sed -n 13p "$LOG")")" 'a no-rules record carries its reason'
-for private in "$SENTINEL" 'Repair the pager' "$KEY" 'Trivial mechanical edit' 'Non-Vernant ship task'; do
-  assert_no_grep "$private" "$LOG" "the result log never holds $private"
+assert_contains "$OUT" 'reason: no rules to match' 'absent configuration stays non-clear'
+assert_equals 'ambiguous clear escalate error escalate' "$(jq -r '.status' "$LOG" | paste -sd' ' -)" 'each finished resolve appends exactly one result'
+jq -e -s 'all(.[]; has("ts") and has("choice") and has("profile") and (has("pooled") | not))' "$LOG" >/dev/null || fail 'malformed result records'
+for private in "$KEY" 'Fix the off-by-one' 'Does task exhibit'; do
+  assert_no_grep "$private" "$LOG" 'result records exclude key, task and questions'
 done
-printf '%s\n' '{}' > "$SETTINGS"
 cp "$TMP_ROOT/base-rules.json" "$RULES"
-printf '%s\n' '# Task' "## Captain's intent" 'Fix the off-by-one in the pager.' > "$BRIEF"
-pass 'equivalent options pool behind the pick, and each resolve appends one private result record'
-
-# ---- a larger pooled group replaces a choice that falls below its floor ------
-# Rules 2 to 4 and the neutral option dispatch identically; rule_1 is distinct.
-GROUP_RULES="$TMP_ROOT/group-rules.json"
-jq '.rules[1].use = .rules[2].use | .rules[3].use = .rules[2].use | .default = .rules[2].use' "$TMP_ROOT/base-rules.json" > "$GROUP_RULES"
-cp "$GROUP_RULES" "$RULES"
-floor_answer rule_1 0.3 0.3 0.2 0.2 0.15 0.15
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'four options sharing 0.7 outrank a distinct rule at 0.3 that is the single argmax'
-assert_contains "$OUT" '  rule: rule_2 ' 'the pooled group is stood for by its most probable member'
-assert_contains "$OUT" '  pooled: rule_2 rule_3 rule_4 default select the same profiles, approval and floors; combined probability 0.7 clears floor 0.6' 'the pooled report names the group and its combined probability'
-assert_contains "$OUT" "  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'the pooled group profiles are resolved'
-assert_contains "$OUT" '  replaced: answer choice rule_1 (probability 0.3, floor 0.6) did not clear; pooled group rule_2 rule_3 rule_4 default (probability 0.7) stands in' 'a pooled group replacing the answer choice is reported'
-last=$(tail -n 1 "$LOG")
-assert_equals 'clear rule_1 rule_2 rule_2 0.7 0.6' "$(jq -r '[.status, .choice, .rule, .selected, .pooled, .floor] | join(" ")' <<<"$last")" 'the record carries the answer choice, the pooled pick and its pooled probability'
-floor_answer rule_1 0.45 0.45 0.2 0.15 0.1 0.1
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a pooled group of 0.55 against a distinct 0.45 is still below the floor'
-assert_contains "$OUT" '  reason: confidence 0.45 below floor 0.6' 'a close split keeps the answer confidence reason'
-assert_not_contains "$OUT" '  pooled:' 'a pooled group below the floor reports no pooling'
-assert_not_contains "$OUT" '  profile:' 'a close split emits no profile'
-floor_answer rule_1 0.55 0.55 0.15 0.1 0.1 0.1
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'a distinct 0.55 against a pooled 0.45 is below the floor'
-assert_contains "$OUT" '  reason: confidence 0.55 below floor 0.6' 'a distinct pick above the group keeps the confidence reason'
-floor_answer rule_1 0.5 0.5 0.2 0.1 0.1 0.1
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  reason: confidence 0.5 below floor 0.6' 'an equal split goes to the group holding the answer choice'
-# The floor of the member that stands for the pooled group applies to its pooled probability.
-jq '.rules[2].min_confidence = 0.5' "$GROUP_RULES" > "$RULES"
-floor_answer rule_1 0.45 0.45 0.1 0.25 0.1 0.1
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a declared floor on the leading member is met by the pooled group'
-assert_contains "$OUT" '  rule: rule_3 ' 'the declaring member stands for the group when it leads'
-assert_contains "$OUT" '  pooled: rule_3 rule_2 rule_4 default select the same profiles, approval and floors; combined probability 0.55 clears floor 0.5' 'the pooled floor is the declared floor'
-cp "$GROUP_RULES" "$RULES"
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: ambiguous' 'without the declared floor the same pooled group stays ambiguous'
-assert_contains "$OUT" '  reason: confidence 0.45 below floor 0.6' 'the undeclared group keeps the global floor'
-# A choice that clears its own declared floor stays the pick over a larger pooled group.
-jq '.rules[0].min_confidence = 0.25' "$GROUP_RULES" > "$RULES"
-floor_answer rule_1 0.3 0.3 0.2 0.2 0.15 0.15
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a choice clearing its declared floor resolves'
-assert_contains "$OUT" '  rule: rule_1 ' 'the choice stays the pick'
-assert_not_contains "$OUT" '  pooled:' 'a choice that clears alone reports no pooling'
-assert_not_contains "$OUT" '  replaced:' 'a choice that stays the pick reports no replacement'
-# A stand-in that clears its own lower declared floor alone still leaves the replaced choice on record.
-jq '.rules[1].use = .rules[2].use | .rules[0].min_confidence = 0.9 | .rules[1].min_confidence = 0.3' "$TMP_ROOT/base-rules.json" > "$RULES"
-floor_answer rule_1 0.4 0.4 0.3 0.25 0.05 0
-keyed -- "$BRIEF"
-assert_contains "$OUT" '  status: clear' 'a pooled group clearing a lower declared floor replaces a choice below its own'
-assert_contains "$OUT" '  rule: rule_2 ' 'the most probable pooled member stands in'
-assert_contains "$OUT" '  replaced: answer choice rule_1 (probability 0.4, floor 0.9) did not clear; pooled group rule_2 rule_3 (probability 0.55) stands in' 'the replaced choice is shown with its probability and floor'
-assert_not_contains "$OUT" '  fallback:' 'a replacement is not a runner-up fallback'
-last=$(tail -n 1 "$LOG")
-assert_equals 'clear rule_1 rule_2 rule_2' "$(jq -r '[.status, .choice, .rule, .selected] | join(" ")' <<<"$last")" 'the record keeps the answer choice beside the replacing rule'
-printf '%s\n' '{}' > "$SETTINGS"
-cp "$TMP_ROOT/base-rules.json" "$RULES"
-pass 'a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not'
-
+settings '{}'
+pass 'independent support cannot pool, and private result logging retains every outcome'
 
 # ---- shadow model picker: observe only -----------------------------------------
 # With the flag off the resolver is byte-identical and touches no picker data. With it on
@@ -1938,9 +1962,11 @@ printf '%s\n' '{"verdict":"TRUSTED"}' > "$SHADOW_DATA/verdict.json"
 printf '%s\n' '{"work_type":"feature","worker":"candidate_3","validator":"candidate_5"}' > "$SETTINGS"
 node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({reports:[{provider:"openai-codex",fetchedAt:Date.now(),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},limits:[{scope:{tier:"chat"},amount:{remainingFraction:.9}}]}]}))' "$POOL"
 run_shadow() {  # <flag-value>
+  structure_rules "$RULES"
+  bind_brief "$BRIEF" "$HOME_DIR"
   OUT=$(PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key \
     FM_MODEL_PICKER_SHADOW="$1" FM_MODEL_PICKER_DATA="$SHADOW_DATA" \
-    bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project firstmate 2> "$TMP_ROOT/error") \
+    bash "$ROOT/bin/fm-dispatch-resolve.sh" "$TMP_ROOT/bound-brief.md" 2> "$TMP_ROOT/error") \
     || fail "resolver failed with shadow flag '$1': $(cat "$TMP_ROOT/error")"
 }
 strip_diag() { printf '%s\n' "$1" | grep -v -e '^  timings:' -e '^  usage:' -e '^  model:'; }

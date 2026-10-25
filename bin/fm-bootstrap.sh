@@ -862,7 +862,7 @@ missing_tool_diagnostic() {
 # fm_backend_required_tools (bin/fm-backend.sh). So a herdr/zellij/cmux home is
 # never told tmux is missing, and only orca drops treehouse. A backend value with
 # no verified dependency set is reported before the universal checks continue.
-COMMON_TOOLS="node git gh no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi"
+COMMON_TOOLS="node git gh python3 no-mistakes gh-axi chrome-devtools-axi tasks-axi quota-axi"
 BACKEND=$(fm_backend_name)
 BACKEND_VALID=1
 if ! BACKEND_TOOLS=$(fm_backend_required_tools "$BACKEND"); then
@@ -1096,7 +1096,7 @@ model_freshness_sweep() {
 }
 
 crew_dispatch_validate() {
-  local file err verified_harnesses resolved index_notes typed_active=false
+  local file err verified_harnesses resolved index_notes projects='{}' typed_active=false
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
@@ -1121,7 +1121,13 @@ crew_dispatch_validate() {
   else
     verified_harnesses='["claude","codex","opencode","pi","pi-signed","grok","kimi","cursor","agy","muse","rovo","omp","dsh","devin"]'
   fi
-  err=$(jq -r --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
+  if $typed_active && jq -e '(.rules // []) | length > 0' <<<"$resolved" >/dev/null; then
+    if ! projects=$(python3 "$SCRIPT_DIR/fm-dispatch-project.py" snapshot "$FM_HOME" "$PROJECTS" "${FM_DATA_OVERRIDE:-$FM_HOME/data}/projects.md" 2>&1); then
+      echo "CREW_DISPATCH: invalid config/crew-dispatch.json - $projects"
+      return 0
+    fi
+  fi
+  err=$(jq -r --argjson projects "$projects" --argjson typed "$typed_active" --argjson verified_harnesses "$verified_harnesses" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" '
     def verified($h): $verified_harnesses | index($h);
     def provider_id($p): ($p | type) == "string" and ($p | test($provider_re));
     def effort_ok($h; $m; $e):
@@ -1136,6 +1142,7 @@ crew_dispatch_validate() {
       elif $h == "muse" then (["low","medium","high","xhigh","max"] | index($e))
       elif $h == "rovo" then (["low","medium","high","max"] | index($e))
       elif $h == "opencode" or $h == "kimi" or $h == "cursor" then false
+      elif $typed then (["low","medium","high","xhigh","max"] | index($e))
       else true
       end;
     def profiles($value):
@@ -1163,6 +1170,30 @@ crew_dispatch_validate() {
           end);
     def malformed_profile_floors($items):
       ($items | any(has("floor") and floor_bad(.floor; false)));
+    def text: type == "string" and test("\\S");
+    def structured_err:
+      .judgments as $j
+      | if ((.rules // []) | length) == 0 then null
+        elif ($j | type) != "object" then "judgments must be an object of single-judgment Nouls"
+        elif any($j | to_entries[];
+          (.key | test("\\A[a-z][a-z0-9_]*\\z") | not)
+          or (.value | type) != "object" or .value.type != "noul" or (.value.instructions | text | not)
+          or (.value.criteria | type) != "object"
+          or (.value.criteria["true"] | text | not) or (.value.criteria["false"] | text | not))
+        then "each judgment needs a lowercase id, type noul, non-empty instructions, and non-empty criteria.true and criteria.false"
+        else first((.rules[] | .match |
+          if type != "object" then "each rule needs a match object"
+          elif ((keys - ["projects", "kind", "all", "any", "none"]) | length) > 0
+            or (.projects | type != "array" or length == 0 or any(.[]; type != "string"))
+            or (has("kind") and .kind != "ship" and .kind != "scout")
+          then "match requires a non-empty projects array and accepts only projects, kind, all, any, and none; kind must be ship or scout"
+          elif any(.projects[]; . as $id | $projects | has($id) | not)
+          then "match.projects contains an unregistered project id"
+          elif any(("all", "any", "none") as $k | select(has($k)) | .[$k];
+            type != "array" or length == 0 or any(.[]; . as $id | type != "string" or ($j | has($id) | not)))
+          then "match all, any, and none must be non-empty arrays of declared judgment ids"
+          else empty end), null)
+        end;
     def bad_efforts:
       configured_profiles
       | map({h: .harness, m: .model, e: .effort})
@@ -1208,6 +1239,7 @@ crew_dispatch_validate() {
         | unique) as $bad_harnesses
       | if ($bad_harnesses | length) > 0 then "unverified harness: " + ($bad_harnesses | join(", "))
         elif (bad_efforts | length) > 0 then "invalid effort: " + (bad_efforts | join(", "))
+        elif $typed and structured_err != null then structured_err
         else empty
         end
     end
@@ -1506,6 +1538,8 @@ detect_local_tools() {
       || missing_tool_diagnostic "$t"
   done
   for t in $COMMON_TOOLS; do
+    # A tool the backend delta also lists (Herdr's python3) was checked above.
+    fm_backend_list_contains "$BACKEND_TOOLS" "$t" && continue
     command -v "$t" >/dev/null || missing_tool_diagnostic "$t"
   done
   # The treehouse lease-support upgrade check is only relevant when the resolved
