@@ -2,7 +2,6 @@
 import json
 import pathlib
 import sys
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 lab = pathlib.Path(sys.argv[1])
@@ -34,8 +33,6 @@ class Handler(BaseHTTPRequestHandler):
             scenario = json.loads((lab / 'scenario.json').read_text())
             if scenario['phase'] == 'provider':
                 return send_json(self, {'error': 'synthetic outage'}, 402)
-            if scenario.get('judge_delay') and 'path' in body['state']:
-                time.sleep(scenario['judge_delay'])
             answers = {}
             for key, question in body['questions'].items():
                 if question['type'] == 'noul':
