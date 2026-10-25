@@ -647,15 +647,44 @@ SH
   "$REAL_TMUX" set-environment -g FM_TEST_SLOT_REFUSE "$SLOT_CASE/refuse"
   RETRY_ID="get-slot-recovery-$$"
   fm_test_spawn_brief "$FM_HOME" "$RETRY_ID" 'Recover the same retained copy and exact declared scope.'
+  printf 'uncommitted prior work must survive\n' >> "$SLOT_COPY/README.md"
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
     bash "$ROOT/bin/fm-spawn.sh" "$RETRY_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
       --mode local-only --yolo off --owned-path scripts --owned-path README.md 2>&1)
   rc=$?
-  [ "$rc" -ne 0 ] || fail 'transient provisioning refusal admitted the task'
-  assert_contains "$out" manifest_live_owner 'transient refusal lost its cause'
+  [ "$rc" -ne 0 ] || fail 'dirty pre-preparation refusal admitted the task'
+  assert_contains "$out" dirty_worktree 'initial refusal did not stop before preparation'
   assert_absent "$SLOT_CASE/admitted" 'refused task entered the harness'
   cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'refusal overwrote the prior declaration'
-  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'refusal did not restore the prior ahead checkout'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior ahead checkout'
+  # Preserve the dirty work by committing it on its original branch, then let
+  # the public retry finish first-admission preparation but refuse provision.
+  git -C "$SLOT_COPY" add README.md
+  git -C "$SLOT_COPY" commit -qm 'fixture preserve initially dirty prior work'
+  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'Prior dirty work is committed; finish the original preparation without replacing its owner.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'first prepared retry bypassed the transient provisioner refusal'
+  assert_contains "$out" manifest_live_owner 'first prepared retry lost the actual provisioner refusal'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'prepared refusal did not restore the prior checkout'
+  # Upstream advances between refused relaunches. The already prepared task
+  # branch must remain at A rather than being freshened to this new B.
+  printf 'later upstream work\n' > "$SLOT_PROJECT/upstream-change"
+  git -C "$SLOT_PROJECT" add upstream-change
+  git -C "$SLOT_PROJECT" commit -qm 'fixture upstream advances after prepared refusal'
+  git -C "$SLOT_PROJECT" push -q origin main
+  [ "$(git -C "$SLOT_COPY" rev-parse origin/main)" != "$slot_base" ] || fail 'upstream advancement setup was vacuous'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The provisioner still refuses; do not replace the prepared commit when upstream advances.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'repeat retry bypassed the provisioner refusal'
+  assert_contains "$out" manifest_live_owner "repeat retry stranded or replaced its prepared identity: $out"
+  [ "$(git -C "$SLOT_COPY" rev-parse "fm/$RETRY_ID")" = "$slot_base" ] || fail 'repeat retry moved the prepared branch'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'repeat refusal changed the restored prior checkout'
+  cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'repeat refusal overwrote the prior declaration'
+  assert_absent "$SLOT_CASE/admitted" 'repeated refusal entered the harness'
   # Removing the fixture's refusal is not provisioner proof; the separate real
   # provisioner smoke must establish holder-exit adoption against its own guard.
   rm "$SLOT_CASE/refuse"

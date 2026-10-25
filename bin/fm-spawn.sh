@@ -534,6 +534,9 @@
 #   branch; a changed/missing prepared branch refuses instead of being reset.
 #   A refused launch whose base preparation never completed finishes that same
 #   first-admission preparation, never the reset path for an admitted worker.
+#   If provisioning still refuses after preparation finishes, that commit is
+#   saved once in the retained record; later retries never replace an existing
+#   prepared identity with newer upstream history.
 #   Existing-slot adoption is entirely the installed provisioner's decision: a
 #   create-only manifest_exists or incompatible declaration is never forced.
 #   Projects without the provisioner keep the ordinary spawn path unchanged.
@@ -5973,7 +5976,7 @@ fi
 # A governed provisioner refusal retains this assigned copy and its endpoint:
 # ordinary acquisition-abort cleanup must not release its lease or remove it.
 spawn_slot_refused() {
-  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path
+  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0
   [ "$BACKEND" != orca ] || window=$W
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
@@ -6018,6 +6021,21 @@ spawn_slot_refused() {
       [ "$BACKEND" != cmux ] || printf 'cmux_workspace_id=%s\ncmux_surface_id=%s\n' "$CMUX_WORKSPACE_ID" "$CMUX_SURFACE_ID"
       :
     } >"$recovery"
+    update_recovery=1
+  elif [ -n "$FM_SLOT_PREPARED_HEAD" ] &&
+    [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = slot-provision-refused ] &&
+    ! grep -q '^slot_prepared_head=' "$RELAUNCH_META"; then
+    # Relaunch already holds the metadata lock. Preparation may first finish
+    # on this refused attempt; save that identity once, preserving the entire
+    # existing contract so newer upstream cannot change subsequent retries.
+    if awk -v head="$FM_SLOT_PREPARED_HEAD" '1; END { print "slot_prepared_head=" head }' "$RELAUNCH_META" >"$recovery"; then
+      update_recovery=1
+    else
+      echo "error: could not record prepared task commit $FM_SLOT_PREPARED_HEAD for retained copy $WT" >&2
+      rm -f -- "$recovery"
+    fi
+  fi
+  if [ "$update_recovery" = 1 ]; then
     fm_backlog_atomic_transition publish "$recovery" "$STATE/$ID.meta" "task record" "$STATE" || {
       echo "error: could not record retained copy $WT: $FM_BACKLOG_TRANSITION_ERROR" >&2
       rm -f -- "$recovery"
