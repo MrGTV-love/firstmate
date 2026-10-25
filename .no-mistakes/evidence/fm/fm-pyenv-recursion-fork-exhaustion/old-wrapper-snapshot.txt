@@ -1,0 +1,189 @@
+67522 67517 67522 timeout -s KILL 8 env BASH_ENV=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/fixture-wrapper-old.sh python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+67572 67522 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-exec python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+67625 67572 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3
+67660 67625 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3
+67663 67660 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67667 67663 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67669 67667 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67673 67669 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67675 67673 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67684 67675 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67686 67684 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67692 67686 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67694 67692 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67699 67694 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67701 67699 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67710 67701 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67713 67710 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67722 67713 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67723 67722 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67729 67723 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67731 67729 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67738 67731 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67741 67738 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67749 67741 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67752 67749 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67759 67752 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67760 67759 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67768 67760 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67769 67768 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67775 67769 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67779 67775 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67786 67779 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67788 67786 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67799 67788 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67800 67799 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67803 67800 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67807 67803 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67815 67807 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67816 67815 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67819 67816 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67821 67819 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67825 67821 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67828 67825 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67835 67828 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67838 67835 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67842 67838 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67845 67842 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67853 67845 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67855 67853 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67861 67855 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67862 67861 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67864 67862 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67867 67864 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67876 67867 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67877 67876 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67887 67877 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67889 67887 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67897 67889 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67898 67897 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67903 67898 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67904 67903 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67912 67904 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67915 67912 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67920 67915 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67922 67920 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67924 67922 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67925 67924 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67926 67925 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67928 67926 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67937 67928 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67938 67937 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67945 67938 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67946 67945 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67952 67946 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67954 67952 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67962 67954 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67964 67962 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67970 67964 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67971 67970 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67976 67971 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67978 67976 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67983 67978 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67984 67983 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67988 67984 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+67989 67988 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+67998 67989 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68000 67998 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68005 68000 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68006 68005 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68012 68006 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68013 68012 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68016 68013 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68020 68016 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68030 68020 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68031 68030 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68036 68031 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68037 68036 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68042 68037 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68044 68042 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68047 68044 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68049 68047 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68053 68049 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68055 68053 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68060 68055 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68061 68060 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68069 68061 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68071 68069 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68074 68071 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68081 68074 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68085 68081 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68086 68085 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68093 68086 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68095 68093 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68104 68095 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68107 68104 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68112 68107 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68113 68112 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68121 68113 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68123 68121 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68134 68123 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68135 68134 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68140 68135 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68142 68140 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68154 68142 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68158 68154 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68166 68158 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68168 68166 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68184 68168 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68185 68184 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68191 68185 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68193 68191 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68201 68193 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68203 68201 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68211 68203 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68212 68211 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68224 68212 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68225 68224 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68235 68225 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68238 68235 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68250 68238 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68252 68250 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68268 68252 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68269 68268 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68273 68269 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68276 68273 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68287 68276 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68288 68287 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68297 68288 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68299 68297 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68300 68299 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68302 68300 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68307 68302 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68309 68307 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68313 68309 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68315 68313 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68322 68315 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68323 68322 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68325 68323 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68327 68325 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68331 68327 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68332 68331 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68335 68332 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68338 68335 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68344 68338 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68345 68344 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68354 68345 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68357 68354 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68362 68357 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68365 68362 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68371 68365 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+68374 68371 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68376 68374 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+68377 68376 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74056 68377 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74060 74056 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+74064 74060 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python3 --skip-advice
+74066 74064 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74071 74066 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74074 74071 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+74080 74074 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+74081 74080 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74085 74081 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-prefix 3.13.6
+74087 74085 67522 bash /opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which python --skip-advice
+74093 74087 67522 (bash)
+74095 74093 67522 (bash)
+74182 74095 67522 (bash)
+74185 74182 67522 (bash)
+74192 74185 67522 (bash)
+74195 74192 67522 (bash)

@@ -1,0 +1,11 @@
+== fixture-after-fix
+command: bash /Users/charlesabrooker/tmp/fm-pyenv-scratch.3Z7u3z/after/tests/fm-spawn-dispatch-profile.test.sh
+user procs before=998 cap(ulimit -u)=1398 timeout=300s
+exit=0 elapsed=10.35s
+peak pyenv-prefix/pyenv-which procs in group=0 peak group size=7
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=907
+stdout (first 3 lines):
+  ok - Pi and pi-signed ship and scout launches refuse when the exclusion file disappears after its checks
+  # all fm-spawn-dispatch-profile tests passed
+stderr (first 3 lines, 0 total):

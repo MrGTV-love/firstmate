@@ -1,0 +1,57 @@
+== route-wrapper-none
+command: env BASH_ENV=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-env.sh FM_TALLY_LOG=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-route-none.log FM_TALLY_WRAP= python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+user procs before=1013 cap(ulimit -u)=1313 timeout=15s
+exit=0 elapsed=.27s
+peak pyenv-prefix/pyenv-which procs in group=0 peak group size=1
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=1005
+stdout (first 3 lines):
+  dsh
+stderr (first 3 lines, 0 total):
+bash starts=17 pyenv-prefix=0 pyenv-which=0 deepest bash ancestry chain=4
+first 6 starts:
+  18917 18911 bash 
+  18917 18911 bash 
+  18917 18911 bash 
+  18940 18917 bash 
+  18943 18940 bash 
+  18951 18950 bash 
+
+== route-wrapper-new
+command: env BASH_ENV=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-env.sh FM_TALLY_LOG=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-route-new.log FM_TALLY_WRAP=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/fixture-wrapper-new.sh python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+user procs before=1002 cap(ulimit -u)=1302 timeout=15s
+exit=0 elapsed=.21s
+peak pyenv-prefix/pyenv-which procs in group=0 peak group size=1
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=980
+stdout (first 3 lines):
+  dsh
+stderr (first 3 lines, 0 total):
+bash starts=17 pyenv-prefix=0 pyenv-which=0 deepest bash ancestry chain=4
+first 6 starts:
+  20751 20734 bash 
+  20751 20734 bash 
+  20751 20734 bash 
+  20775 20751 bash 
+  20785 20775 bash 
+  20791 20790 bash 
+
+./capped-run.sh: line 23: 22740 Killed: 9               perl -e 'setpgrp(0,0); exec @ARGV or die' -- /bin/bash -c 'ulimit -u "$1"; shift; exec timeout -s KILL "$@"' _ "$cap" "$secs" "$@" > "$out" 2> "$err"
+== route-wrapper-old
+command: env BASH_ENV=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-env.sh FM_TALLY_LOG=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/tally-route-old.log FM_TALLY_WRAP=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/fixture-wrapper-old.sh python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+user procs before=994 cap(ulimit -u)=1294 timeout=15s
+exit=137 elapsed=15.37s
+peak pyenv-prefix/pyenv-which procs in group=365 peak group size=375
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=925
+stdout (first 3 lines):
+stderr (first 3 lines, 0 total):
+bash starts=2138 pyenv-prefix=0 pyenv-which=0 deepest bash ancestry chain=4
+first 6 starts:
+  22761 22740 bash 
+  22761 22740 bash 
+  22761 22740 bash 
+  22791 22761 bash 
+  22802 22791 bash 
+  22812 22810 bash 
+

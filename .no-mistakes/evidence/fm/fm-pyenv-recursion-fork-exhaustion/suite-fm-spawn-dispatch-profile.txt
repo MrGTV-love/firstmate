@@ -1,0 +1,12 @@
+== /Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/suite-fm-spawn-dispatch-profile
+command: bin/fm-test-run.sh tests/fm-spawn-dispatch-profile.test.sh
+user procs before=871 cap(ulimit -u)=1371 timeout=560s
+exit=137 elapsed=560.27s
+peak pyenv-prefix/pyenv-which procs in group=0 peak group size=15
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=899
+stdout (first 3 lines):
+  FM_TEST_BEGIN 2026-10-25T05:41:40Z tests/fm-spawn-dispatch-profile.test.sh family=backend-dispatch expected_gate_skip=none
+  ok - allowlist=absent preserves the operational floor and filters only when opted in
+  ok - allowlist=missing-config preserves the operational floor and filters only when opted in
+stderr (first 3 lines, 0 total):

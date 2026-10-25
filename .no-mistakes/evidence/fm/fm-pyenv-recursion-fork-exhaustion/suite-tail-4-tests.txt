@@ -1,0 +1,12 @@
+== /Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/suite-tail-4-tests
+command: bash tests/zz-tmp-tail4.test.sh
+user procs before=904 cap(ulimit -u)=1304 timeout=500s
+exit=0 elapsed=54.52s
+peak pyenv-prefix/pyenv-which procs in group=1 peak group size=10
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=895
+stdout (first 3 lines):
+  ok - TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration
+  ok - config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments
+  ok - config/claude-launcher is inherited by secondmate homes
+stderr (first 3 lines, 0 total):

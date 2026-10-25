@@ -1,0 +1,5 @@
+wrapper-old.sh IFS=default: [ 3.13.6 = system ] -> false (right)
+wrapper-old.sh IFS=colon: [ 3.13.6 = system ] -> TRUE (wrong)
+wrapper-new.sh IFS=default: [ 3.13.6 = system ] -> false (right)
+wrapper-new.sh IFS=colon: [ 3.13.6 = system ] -> false (right)
+bash: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)

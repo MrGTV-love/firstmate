@@ -1,0 +1,9 @@
+== fixture-base-before-fix
+command: bash /Users/charlesabrooker/tmp/fm-pyenv-scratch.3Z7u3z/base/tests/fm-spawn-dispatch-profile.test.sh
+user procs before=916 cap(ulimit -u)=1216 timeout=30s
+exit=137 elapsed=30.33s
+peak pyenv-prefix/pyenv-which procs in group=331 peak group size=348
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=880
+stdout (first 3 lines):
+stderr (first 3 lines, 0 total):

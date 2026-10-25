@@ -1,0 +1,10 @@
+== fixture-old-wrapper-new-detector
+command: bash /Users/charlesabrooker/tmp/fm-pyenv-scratch.3Z7u3z/hybrid/tests/fm-spawn-dispatch-profile.test.sh
+user procs before=907 cap(ulimit -u)=1307 timeout=120s
+exit=1 elapsed=5.64s
+peak pyenv-prefix/pyenv-which procs in group=0 peak group size=6
+fork-failure lines in stderr=0
+group procs left after teardown=0 user procs after=895
+stdout (first 3 lines):
+stderr (first 3 lines, 1 total):
+  not ok - the exclusion hook must preserve interpreter selection: recursive interpreter route: non-system version treated as system: expected exit 0, got 97

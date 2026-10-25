@@ -1,0 +1,5 @@
+ok - TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration
+ok - config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments
+ok - config/claude-launcher is inherited by secondmate homes
+ok - fresh default-model secondmates retain warning-only routing inheritance
+# all fm-spawn-dispatch-profile tests passed

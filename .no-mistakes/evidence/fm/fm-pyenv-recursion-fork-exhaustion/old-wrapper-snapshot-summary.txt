@@ -1,0 +1,9 @@
+group procs at t=4s:      189
+  90 bash pyenv-prefix 3.13.6
+  87 bash pyenv-which python --skip-advice
+   6 (bash)
+   2 bash pyenv-which python3 --skip-advice
+   2 bash pyenv-which python3
+   1 timeout -s KILL 8 env BASH_ENV=/Users/charlesabrooker/.no-mistakes/evidence/01M5RRRJX9BQ93FVASDBMAM3M4/fixture-wrapper-old.sh python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+   1 bash pyenv-exec python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5RRRJX9BQ93FVASDBMAM3M4/bin/fm-dsh.py route deepseek/test-model
+deepest parent chain inside group: 189
