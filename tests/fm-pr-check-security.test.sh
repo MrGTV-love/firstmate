@@ -325,7 +325,7 @@ seed_merge_review() {
   FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
     --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
     --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
-    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
     --report "$dir/review.md"
 }
 

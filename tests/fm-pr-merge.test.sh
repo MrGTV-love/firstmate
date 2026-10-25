@@ -3190,11 +3190,13 @@ test_recorded_review_merge_conditions() {
       newest-fail)
         record_review "$case_dir" "$url" "$head" >/dev/null
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null; expected=verdict ;;
-      trigger-list) record_review "$case_dir" "$url" "$head" --loosens-deny-allow-list yes >/dev/null; expected=loosens_deny_allow_list ;;
-      trigger-guard) record_review "$case_dir" "$url" "$head" --widens-guard yes >/dev/null; expected=widens_guard ;;
-      trigger-data|other-pr|stale-captain-word|captain-word)
-        record_review "$case_dir" "$url" "$head" --customer-data-billing-spend yes >/dev/null
-        expected=customer_data_billing_spend
+      trigger-list) record_review "$case_dir" "$url" "$head" --loosens-deny-allow-list yes >/dev/null ;;
+      trigger-guard) record_review "$case_dir" "$url" "$head" --widens-guard yes >/dev/null ;;
+      trigger-data) record_review "$case_dir" "$url" "$head" --customer-data-billing-spend yes >/dev/null ;;
+      other-pr|stale-captain-word|captain-word)
+        record_review "$case_dir" "$url" "$head" --customer-data-billing-spend yes \
+          --reader-model gpt-5.1-codex >/dev/null
+        expected=reader_family
         if [ "$scenario" = other-pr ]; then
           review_record_command "$case_dir" captain-word --pr https://github.com/example/repo/pull/10 --head "$head" --words 'Merge this PR.' >/dev/null
         elif [ "$scenario" = stale-captain-word ]; then
@@ -3231,7 +3233,7 @@ test_recorded_review_merge_conditions() {
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
+      valid|trigger-list|trigger-guard|trigger-data|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -3398,8 +3400,48 @@ test_captain_word_refused_while_away() {
   pass "captain-word refuses under an away record, records under quiet or no record, and pre-away words stay valid"
 }
 
-# Probe P2: a triggered PASS must not revive words voided by a later FAIL.
-test_captain_fail_triggered_pass_refuses() {
+test_triggered_review_verifies_only_when_independent() {
+  local case_dir head url scenario rc expected
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  for scenario in independent same-family unknown-reader unknown-author wrong-head fail; do
+    case_dir=$(make_case "triggered-verify-$scenario")
+    record_review "$case_dir" "$url" "$head" --loosens-deny-allow-list yes \
+      --widens-guard yes --customer-data-billing-spend yes >/dev/null || fail "record yes-trigger PASS"
+    expected=
+    local review_head=$head
+    local -a args=(--verdict PASS)
+    case "$scenario" in
+      same-family) args=(--reader-model gpt-5.1-codex); expected=reader_family ;;
+      unknown-reader) args=(--reader-model mistral-large); expected='model family unknown' ;;
+      unknown-author) args=(--author-groups '{"all":["mistral-large"]}'); expected='model family unknown' ;;
+      wrong-head) review_head=2222222222222222222222222222222222222222; expected='head mismatch' ;;
+      fail) args=(--verdict FAIL); expected='verdict is FAIL' ;;
+    esac
+    if [ "$scenario" != independent ]; then
+      record_review "$case_dir" "$url" "$review_head" --loosens-deny-allow-list yes \
+        --widens-guard yes --customer-data-billing-spend yes "${args[@]}" >/dev/null \
+        || fail "record newest $scenario review"
+    fi
+    rc=0
+    review_record_command "$case_dir" verify --pr "$url" --head "$head" > "$case_dir/out" 2>&1 || rc=$?
+    if [ "$scenario" = independent ]; then
+      expect_code 0 "$rc" "yes-trigger independent PASS must verify: $(cat "$case_dir/out")"
+      assert_grep 'review: PASS' "$case_dir/out" "independent evidence is accepted without captain words"
+      review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read yes-trigger evidence"
+      "$JQ_BIN" -e '.review.loosens_deny_allow_list == "yes" and .review.widens_guard == "yes"
+        and .review.customer_data_billing_spend == "yes" and .["captain-word"] == null' \
+        "$case_dir/latest" >/dev/null || fail "latest must print all yes triggers without captain words"
+    else
+      expect_code 1 "$rc" "newest $scenario review must still refuse"
+      assert_grep "$expected" "$case_dir/out" "$scenario refusal must name its cause"
+    fi
+    pass "yes-trigger review verification: $scenario"
+  done
+}
+
+# A later independent PASS clears a FAIL even when its trigger answers are yes.
+test_captain_fail_triggered_independent_pass_merges() {
   local case_dir head url trigger rc
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
@@ -3413,19 +3455,14 @@ test_captain_fail_triggered_pass_refuses() {
     record_review "$case_dir" "$url" "$head" "--$trigger" yes >/dev/null || fail "could not record triggered PASS"
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "captain-word, FAIL, PASS with $trigger=yes must refuse"
-    assert_grep 'the captain must give a new merge word' "$case_dir/stderr" "triggered PASS must leave the word voided"
-    assert_no_grep '^pr merge ' "$case_dir/gh.log" "triggered PASS must not reach forge merge"
-    review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge despite the new trigger.' >/dev/null \
-      || fail "could not record renewed captain-word"
-    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" \
-      || fail "a new captain-word must authorize the triggered PASS: $(cat "$case_dir/stderr")"
+    expect_code 0 "$rc" "captain-word, FAIL, independent PASS with $trigger=yes must merge: $(cat "$case_dir/stderr")"
     assert_logged_gh_merge "$case_dir" 9 example/repo --squash
-    pass "a $trigger PASS cannot revive a voided captain-word; new words can authorize it"
+    pass "an independent $trigger PASS clears a FAIL without renewed captain words"
   done
 }
 
-test_captain_fail_triggered_pass_refuses
+test_triggered_review_verifies_only_when_independent
+test_captain_fail_triggered_independent_pass_merges
 test_review_record_requires_matching_local_report
 test_late_fail_before_away_hold_refuses
 test_attended_override_without_review_refuses

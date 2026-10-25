@@ -188,12 +188,12 @@ SH
 run_pr_merge() {  # <home> <id> <url>
   local home=$1
   shift
-  # Each fixture merge carries an independent PASS for the live head.
+  # Yes-trigger independent PASS evidence must not bypass the separate hold guards.
   printf 'VERDICT: PASS head=%s\n' 1111111111111111111111111111111111111111 > "$home/review.md"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-review-record.py" review \
     --pr "$2" --head 1111111111111111111111111111111111111111 \
     --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
-    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
     --report "$home/review.md" >/dev/null || return
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
