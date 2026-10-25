@@ -240,7 +240,7 @@ The refresh now stores each parallel script's measured three-abreast wall from [
 That run also showed the lanes carried 3453612 ms and 2311994 ms of concurrent work - 33 percent apart on the larger lane despite a one percent hint balance - and the lane 1 membership modeled at 1209767 ms, just above the 1200000 ms budget, so `tests/fm-captain-hold-lifecycle.test.sh` and `tests/fm-arm-pretool-check.test.sh` moved from lane 1 to lane 2.
 The measured lane sums are now 2871001 ms and 2894605 ms, a 0.8 percent imbalance, and `--check-coverage` reports `parallel_makespan_ms` 1117958 against the unchanged 1200000 ms parallel budget.
 The backends group's main samples predate `test_omp_adoption`, so its hint is its slowest main sample (514105 ms, run 40121241146) scaled for that case: a local macOS run of the whole group took 639 s and 576 s without the case, and the case's 63 s there scales to 67.5 s for the later reused-PID test by a local macOS run of the case alone (54.4 s with it, 50.8 s without it), giving 514105 x 643.46 / 576 = 574316 ms.
-That factor is a local estimate, not a CI measurement; replace the hint from the group's own artifacts once main runs the adoption case.
+That factor is a local estimate, not a CI measurement, and it predates the other-harness foreground shape of the non-omp process case; replace the hint from the group's own artifacts once main runs the adoption case.
 
 ## Portable serial remainder
 
