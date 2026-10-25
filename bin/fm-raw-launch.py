@@ -3,7 +3,6 @@
 
 Usage: fm-raw-launch.py mark-claude COMMAND
        fm-raw-launch.py root NAME COMMAND CWD
-       fm-raw-launch.py profile COMMAND
 
 mark-claude prints COMMAND with __CLAUDERAWSESSION__ inserted right after each
 claude program word: the first word, after leading NAME=value assignments, of
@@ -17,11 +16,6 @@ first command sets, with its quotes removed and a relative value resolved
 against CWD. It exits 1 when NAME is not assigned that way and 3, naming NAME on
 stderr, when the value needs shell expansion ($, a backquote or a leading ~),
 is empty, or NAME is assigned again by a later command.
-profile prints the omp profile the first command selects literally, through a
-leading OMP_PROFILE= or PI_PROFILE= assignment or a --profile NAME or
---profile=NAME argument. It exits 1 when no profile is selected and 3 when the
-selection needs shell expansion, is empty, disagrees, or comes from a later
-command.
 Malformed quoting exits 2.
 """
 import os
@@ -122,30 +116,6 @@ def root(name, text, cwd):
     return 0, os.path.abspath(os.path.join(cwd, value))
 
 
-def profile(text):
-    found = []
-    for index, command in enumerate(commands(text)):
-        position = 0
-        while position < len(command) and ASSIGNMENT.match(text[command[position][1]:command[position][2]]):
-            raw = text[command[position][1]:command[position][2]]
-            name = raw.split("=", 1)[0]
-            if name in ("OMP_PROFILE", "PI_PROFILE"):
-                found.append((index, command[position][3][len(name) + 1:], command[position][4]))
-            position += 1
-        rest = command[position + 1:]
-        for offset, (kind, start, end, value, expands) in enumerate(rest):
-            if value == "--profile" and offset + 1 < len(rest):
-                found.append((index, rest[offset + 1][3], rest[offset + 1][4]))
-            elif value.startswith("--profile="):
-                found.append((index, value[len("--profile="):], expands))
-    if not found:
-        return 1, None
-    values = {value for _, value, _ in found}
-    if len(values) > 1 or any(index != 0 or expands or value == "" for index, value, expands in found):
-        return 3, None
-    return 0, values.pop()
-
-
 def main(argv):
     try:
         if len(argv) == 3 and argv[1] == "mark-claude":
@@ -157,13 +127,6 @@ def main(argv):
                 print(f"{argv[2]} needs shell expansion or is not one leading literal assignment", file=sys.stderr)
             if path:
                 print(path)
-            return status
-        if len(argv) == 3 and argv[1] == "profile":
-            status, name = profile(argv[2])
-            if status == 3:
-                print("the omp profile needs shell expansion or is not one literal selection", file=sys.stderr)
-            if name:
-                print(name)
             return status
     except ValueError as error:
         print(f"malformed raw launch command: {error}", file=sys.stderr)

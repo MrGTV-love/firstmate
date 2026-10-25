@@ -111,10 +111,14 @@ fm_pid_identity() {
   # narrow-COLUMNS hook, where a truncated command would likewise reject a live
   # watcher (issue #799). This mirrors fm_pending_reply_pid_identity, which pins the
   # same width for the same reason.
-  # Setuid ps cannot run inside a confined worker's sandbox; bin/fm-proc-info.py
-  # then prints the same bytes from sysctl, so either source compares equal.
-  out=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null) \
-    || out=$(python3 "$FM_WAKE_LIB_DIR/fm-proc-info.py" identity "$pid" 2>/dev/null) || return 1
+  # Setuid ps cannot run inside a confined worker's sandbox; there
+  # bin/fm-proc-info.py prints the same bytes from sysctl, so either source
+  # compares equal.
+  if [ "${FM_WRITE_CONFINEMENT:-}" = seatbelt-v1 ]; then
+    out=$(python3 "$FM_WAKE_LIB_DIR/fm-proc-info.py" identity "$pid" 2>/dev/null) || return 1
+  else
+    out=$(COLUMNS=10000 LC_ALL=C ps -p "$pid" -o lstart= -o command= 2>/dev/null) || return 1
+  fi
   [ -n "$out" ] || return 1
   # Strip each line's leading blanks in the shell instead of through a sed
   # process: this runs on every liveness probe. The loop covers a command that

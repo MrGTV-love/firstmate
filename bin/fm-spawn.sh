@@ -6131,13 +6131,10 @@ if [ "$KIND" != secondmate ]; then
   case "$confinement_os:$HARNESS" in
     Darwin:omp | Darwin:claude)
       [ -x /usr/bin/sandbox-exec ] || { confinement_refuse false "sandbox-exec is required for macOS workers"; exit 1; }
-      # A raw command's own root selectors run after the confinement exports
-      # and win, so the profile could not follow the root the harness uses.
       # A raw command's own root assignment runs after the confinement exports
       # and wins, so the profile follows one leading literal assignment, read as
       # shell words and never expanded; any other root selector refuses.
       confinement_raw_root=
-      confinement_raw_profile=
       if [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = omp ]; then
         case "$RAW_COMMAND" in
           *PI_CONFIG_DIR*)
@@ -6145,12 +6142,8 @@ if [ "$KIND" != secondmate ]; then
             exit 1
             ;;
           *OMP_PROFILE* | *PI_PROFILE* | *--profile*)
-            confinement_raw_status=0
-            confinement_raw_profile=$(python3 "$SCRIPT_DIR/fm-raw-launch.py" profile "$RAW_COMMAND" 2>/dev/null) || confinement_raw_status=$?
-            if [ "$confinement_raw_status" -gt 1 ]; then
-              confinement_refuse false "this raw omp launch command selects an omp profile that needs shell expansion or is not one literal selection, so its write profile cannot follow it; pass the profile name literally instead"
-              exit 1
-            fi
+            confinement_refuse false "this raw omp launch command selects its own omp profile, so its write profile cannot follow it; launch the profile through --harness omp with OMP_PROFILE set in the environment instead"
+            exit 1
             ;;
         esac
       fi
@@ -6190,7 +6183,7 @@ if [ "$KIND" != secondmate ]; then
       for confinement_home_state in "${FM_LOCAL_FIRSTMATE_STATES[@]:1}"; do
         confinement_args+=(--protect "${confinement_home_state%/state}")
       done
-      ${confinement_raw_profile:+env OMP_PROFILE="$confinement_raw_profile"} python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
+      python3 "$SCRIPT_DIR/fm-write-confinement.py" --worktree "$WT" --home "$FM_HOME" \
         --config "$CONFIG" --projects "$PROJECTS" \
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
         --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \

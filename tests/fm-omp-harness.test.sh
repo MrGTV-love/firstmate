@@ -1230,6 +1230,19 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
         FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "${spawn_args[@]}")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector and points to the supported --harness omp route.
+      case "$mode" in
+        flag | flag-equals | assignment-omp | assignment-pi)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse its own profile selector ($mode): $out"
+            assert_contains "$out" "selects its own omp profile" "the refusal must name the profile selector ($mode)"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused profile-selecting launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
@@ -1311,6 +1324,20 @@ EOF" ;;
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector, including one inside a substitution, and never
+      # evaluates it.
+      case "$mode" in
+        substitution | backticks)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse a profile selector in an expansion ($mode): $out"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$CASE_DIR/expanded" "the refusal must not evaluate the command substitution ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused expanded launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       assert_absent "$CASE_DIR/node-timeout" "a long literal prefix ending in a glob must classify within three seconds"
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
