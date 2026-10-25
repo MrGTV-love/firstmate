@@ -1,0 +1,26 @@
+# real worktree
+ok - the fm-pr-merge groups are a duplicate-free 148-case cover, each case registered by the file that defines it
+exit=0
+
+# mutation: same case registered in two groups
+/Users/charlesabrooker/tmp/fmguard.CZPFKd/dup/tests/lib.sh: line 39: /Users/charlesabrooker/tmp/fmguard.CZPFKd/dup/tests/git-config-helpers.sh: No such file or directory
+_: /Users/charlesabrooker/tmp/fmguard.CZPFKd/dup/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found
+not ok - an fm-pr-merge case is registered in more than one group: test_held_task_refusal_prints_the_exact_release_command
+exit=1
+
+# mutation: one case dropped from the checks group registration
+/Users/charlesabrooker/tmp/fmguard.CZPFKd/drop/tests/lib.sh: line 39: /Users/charlesabrooker/tmp/fmguard.CZPFKd/drop/tests/git-config-helpers.sh: No such file or directory
+_: /Users/charlesabrooker/tmp/fmguard.CZPFKd/drop/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found
+not ok - the fm-pr-merge groups register 147 cases, not the 148-case inventory they partition
+exit=1
+
+# mutation: forges registers a name it does not define
+/Users/charlesabrooker/tmp/fmguard.CZPFKd/undef/tests/lib.sh: line 39: /Users/charlesabrooker/tmp/fmguard.CZPFKd/undef/tests/git-config-helpers.sh: No such file or directory
+_: /Users/charlesabrooker/tmp/fmguard.CZPFKd/undef/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found
+not ok - tests/fm-pr-merge-forges.test.sh registers test_not_defined_anywhere but does not define it
+exit=1
+
+# Note: the "No such file" lines above come from copying only tests/lib.sh and the pr-merge files into the scratch copies; the guard itself does not use those helpers.

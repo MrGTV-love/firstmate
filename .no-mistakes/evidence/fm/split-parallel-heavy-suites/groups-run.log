@@ -1,0 +1,8 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5R6MC4PYH3RKTD4Q8EB6NWJ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-25T04:11:06Z tests/fm-pr-merge.test.sh family=pr-forge expected_gate_skip=none
+rm: /Users/charlesabrooker/tmp/fm-test-run.HG0jfQ/w1/tmp/fm-pr-merge-tests.umlGRM/extra-args-attended: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-test-run.HG0jfQ/w1/tmp/fm-pr-merge-tests.umlGRM: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-test-run.HG0jfQ/w1/tmp: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-test-run.HG0jfQ/w1: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-test-run.HG0jfQ: Directory not empty
+# run stopped by the test agent before completion (phase deadline)

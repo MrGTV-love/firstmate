@@ -1,0 +1,7 @@
+# Former registration order (866e454a:tests/fm-pr-merge.test.sh) vs concatenated pr_merge_test_cases of fm-pr-merge, fm-pr-merge-forges, fm-pr-merge-checks
+fm-pr-merge registers 49
+fm-pr-merge-forges registers 49
+fm-pr-merge-checks registers 50
+base=148 split=148
+ORDER IDENTICAL
+case bodies: base 148 split 148 byte-differing 0

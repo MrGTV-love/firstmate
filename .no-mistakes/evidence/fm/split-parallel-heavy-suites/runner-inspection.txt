@@ -1,0 +1,39 @@
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=361 parallel=29 parallel_max_ms=2528379 parallel_imbalance_ms=39110 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=941010 parallel_budget_ms=1200000 serial=314 serial_shards=21 serial_unhinted=0 serial_max_ms=1134150 serial_budget_ms=1200000 serial_indivisible_ms=916930 herdr=18
+exit=0
+
+$ bin/fm-test-run.sh --list --family pr-forge | grep pr-merge
+tests/fm-pr-merge-checks.test.sh
+tests/fm-pr-merge-forges.test.sh
+tests/fm-pr-merge.test.sh
+
+$ bin/fm-test-run.sh --list-scheduled --lane portable-parallel-1
+tests/fm-test-run.test.sh
+tests/fm-captain-hold-reconcile.test.sh
+tests/fm-pr-merge.test.sh
+tests/fm-captain-hold-cleanup.test.sh
+tests/fm-crew-state.test.sh
+tests/fm-cd-pretool-check.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-review-diff.test.sh
+tests/fm-send-strict.test.sh
+tests/fm-composer-ghost.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-supervision-instructions.test.sh
+
+$ bin/fm-test-run.sh --list --lane portable-parallel-2 | grep -c pr-merge
+0
+
+$ bin/fm-test-isolation-proof.sh --list | grep pr-merge
+tests/fm-pr-merge.test.sh
+
+$ bin/fm-test-run.sh --list --lane portable-serial | grep pr-merge
+tests/fm-pr-merge-checks.test.sh
+tests/fm-pr-merge-forges.test.sh
+
+$ for k in 1..21: which serial shard holds each pr-merge group
+portable-serial-7of21: tests/fm-pr-merge-checks.test.sh
+portable-serial-18of21: tests/fm-pr-merge-forges.test.sh
+
+$ bin/fm-test-run.sh --list --all | grep -c pr-merge-helpers
+0

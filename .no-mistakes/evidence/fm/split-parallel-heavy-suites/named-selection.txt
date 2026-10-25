@@ -1,0 +1,27 @@
+$ bash tests/fm-pr-merge-checks.test.sh test_held_task_refusal_prints_the_exact_release_command test_github_review_required_refuses
+ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED
+exit=0
+
+$ bash tests/fm-pr-merge.test.sh test_no_such_case
+Unknown test case: test_no_such_case
+Usage: bash fm-pr-merge.test.sh [test_function_name ...]
+exit=2
+
+# adversarial: a real case that belongs to a different group
+$ bash tests/fm-pr-merge.test.sh test_github_review_required_refuses
+Unknown test case: test_github_review_required_refuses
+Usage: bash fm-pr-merge.test.sh [test_function_name ...]
+exit=2
+
+# adversarial: a helper function name, not a registered case
+$ bash tests/fm-pr-merge-forges.test.sh write_rollup_response
+Unknown test case: write_rollup_response
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+exit=2
+
+# adversarial: one valid name plus one unknown name must run nothing
+$ bash tests/fm-pr-merge-forges.test.sh test_multi_pr_task_merges_named_pr_when_copy_head_is_a_local_tip bogus
+Unknown test case: bogus
+Usage: bash fm-pr-merge-forges.test.sh [test_function_name ...]
+exit=2
