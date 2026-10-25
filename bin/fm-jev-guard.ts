@@ -4,7 +4,7 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
-import { confinementOwner, egressClass, egressGranted, memoryEgress, toolPolicy } from "./fm-jev-egress.ts";
+import { confinementOwner, egressClass, egressGranted, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
 import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -255,6 +255,14 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       const egressStarted = performance.now();
       const memory = policy.call === "memory" ? memoryEgress(tool, c.ompSetting) : undefined;
       const destination = memory ? "provider" : egressClass(tool);
+      const githubOp = refusedGithubOp(tool, event.input);
+      if (destination && githubOp) {
+        terminal.destination_class = destination;
+        await guardEvent("jev-egress-grant", "github-write", "deny", egressStarted, remainingMs);
+        return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
+          `GitHub op ${githubOp} refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made.`,
+          "Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read.");
+      }
       if (destination) {
         terminal.destination_class = destination;
         const { granted, sourceOk } = egressGranted(c.state, c.task, destination);

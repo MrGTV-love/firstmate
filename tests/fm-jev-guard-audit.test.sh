@@ -222,6 +222,36 @@ await test('T4(b): paid find requires a task grant and records exactly one conte
     assert.ok(!JSON.stringify(r).includes('paid-provider.invalid'));
   } finally { rmSync(`${state}/audit.meta`); }
 });
+await test('omp github read ops need a remote-storage grant while write ops refuse under every grant', async () => {
+  const read = { toolName: 'github', input: { op: 'repo_view', repo: 'synthetic/repo' } };
+  let patch;
+  let r = await fresh(async () => { patch = await handlers.tool_call(read, { cwd: state }); });
+  assert.equal(patch?.block, true, 'an ungranted GitHub read must not execute');
+  assert.equal(r.branch, 'egress');
+  assert.equal(r.destination_class, 'remote-storage');
+  for (const meta of [undefined, 'egress=["remote-storage"]\n']) {
+    if (meta) writeFileSync(`${state}/audit.meta`, meta);
+    try {
+      for (const op of ['pr_checkout', 'pr_create', 'pr_push', 'synthetic_op', undefined]) {
+        r = await fresh(async () => { patch = await handlers.tool_call({ toolName: 'github', input: { op, pr: '12', force: true } }, { cwd: state }); });
+        assert.equal(patch?.block, true, `${op}: a GitHub write op must not execute (grant: ${meta ?? 'none'})`);
+        assert.ok(patch.reason.includes(`GitHub op ${JSON.stringify(op ?? null)} refused under every grant`), patch.reason);
+        assert.ok(patch.reason.includes('no-mistakes pipeline') && patch.reason.includes('gh-axi'), patch.reason);
+        assert.equal(r.decision, 'block');
+        assert.equal(r.branch, 'egress');
+        assert.equal(r.destination_class, 'remote-storage');
+        assert.equal(r.request_started, false);
+      }
+    } finally { if (meta) rmSync(`${state}/audit.meta`); }
+  }
+  writeFileSync(`${state}/audit.meta`, 'egress=["remote-storage"]\n');
+  try {
+    r = await fresh(async () => { patch = await handlers.tool_call(read, { cwd: state }); });
+    assert.equal(patch, undefined, 'the same GitHub read is admitted under its task grant');
+    assert.equal(r.decision, 'allow');
+    assert.equal(r.destination_class, 'remote-storage');
+  } finally { rmSync(`${state}/audit.meta`); }
+});
 await test('T4(d): an installed tool absent from the policy table is rejected, not silently ignored', async () => {
   const { uncoveredTools } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-egress.ts`));
   assert.deepEqual(uncoveredTools(['read', 'bash', 'write', 'edit', 'find']), []);

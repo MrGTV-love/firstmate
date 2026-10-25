@@ -728,18 +728,18 @@
       "version": "1",
       "id": "jev-egress-grant",
       "owner": "bin/fm-jev-guard.ts",
-      "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class",
+      "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class, and an omp github op other than a read op never runs under any grant",
       "layer": "runtime-block",
       "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta",
-      "trigger": "egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked",
-      "remedy": "Firstmate, never the worker, records exactly one grant line in state/<task>.meta, for example `printf 'egress=[\"<class>\"]\\n' >> state/<task>.meta` when none exists; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove",
+      "trigger": "egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked; or refusedGithubOp(<tool>, <input>) finds a github op outside the omp 18.12.6 read ops (repo_view, file_read, search_issues, search_prs, search_code, search_commits, search_repos, run_watch), such as pr_checkout, pr_create, pr_push, an unknown op or a missing op",
+      "remedy": "Firstmate, never the worker, records exactly one grant line in state/<task>.meta, for example `printf 'egress=[\"<class>\"]\\n' >> state/<task>.meta` when none exists; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove; a github write-op refusal has no grant remedy, names the op and points to git and the no-mistakes pipeline, or gh-axi through the shell for reads",
       "budget": 1,
       "test": "tests/fm-jev-guard-audit.test.sh",
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "fail_direction_note": "an unreadable, malformed or symlinked grant record grants nothing; unreadable live memory settings, an unrecognized backend or llmMode, or embeddings left on prove nothing local, so the memory operation requires provider; the table is compiled into the guard module; a runtime that cannot load it is denied in an active project scope and, per docs/configuration.md Jev guard, does not block in an inactive project scope",
-      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class> so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
+      "telemetry_note": "each allow and deny decision emits one event through bin/fm-guard-event.sh into state/guard-events.jsonl with the guard id, decision, source_ok (task record readable) and elapsed time only, keyed to session <task>:<destination-class>, or <task>:github-write for a github write-op deny, so only a later allow of the same subject clears a deny; the content-free terminal row in state/jev-guard.jsonl remains the task audit"
     },
     {
       "decision": "deny",

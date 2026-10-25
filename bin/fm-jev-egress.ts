@@ -136,6 +136,18 @@ export function confinementOwner(tool: string, input: unknown): "T5" | undefined
   return policy?.call === "confinement" ? policy.confinement_owner : undefined;
 }
 
+// omp 18.12.6 github ops whose approval is "read"; every other op writes worktrees, branches, git config, refs or the remote.
+const githubReadOps: Readonly<Record<string, true>> = {
+  repo_view: true, file_read: true, search_issues: true, search_prs: true, search_code: true, search_commits: true, search_repos: true, run_watch: true,
+};
+
+/** A github call naming any op but a read op is refused under every grant; returns that op, JSON-encoded. */
+export function refusedGithubOp(tool: string, input: unknown): string | undefined {
+  if (tool !== "github") return undefined;
+  const op = input !== null && typeof input === "object" ? (input as { op?: unknown }).op : undefined;
+  return typeof op === "string" && Object.hasOwn(githubReadOps, op) ? undefined : JSON.stringify(op ?? null);
+}
+
 export function egressClass(tool: string): DestinationClass | undefined {
   const policy = toolPolicy(tool);
   return policy && destinationClass(policy.call) ? policy.call : undefined;
