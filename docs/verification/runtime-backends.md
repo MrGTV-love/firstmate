@@ -42,6 +42,9 @@ A first Claude session without a fixed session id completed Bash, Read and Edit,
 A second Claude session launched with `--session-id` under the session-scoped profile ran all four `SessionStart` hooks successfully and completed Bash, Read and Edit, with `shell-snapshots/` and every other session's entries protected.
 Its transcript and temp directories used the builder's derived slug.
 Neither Claude session had a to-do tool in print mode or wrote `todos/`, so `todos/` carries no grant.
+A third Claude session ran interactively, as `fm-spawn.sh` launches workers, under a profile that also granted its own `tasks/<session-id>/` and kept `sessions/` protected: all four `SessionStart` hooks finished with status 0 and Bash, Read and Edit completed, with Edit writing its own `file-history/<session-id>/`.
+TaskCreate was not available in that session, so `tasks/<session-id>/` was not exercised.
+Claude's debug log showed the `sessions/` registry write refused without failing any tool, prompt history unsaved because `history.jsonl.lock` is not granted, and `ps` refused because macOS runs no setuid program inside a sandbox.
 The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings; a denial a harness swallows silently would not be seen.
 Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
 

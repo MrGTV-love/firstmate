@@ -308,7 +308,7 @@ SH
 # The launch fm-spawn delivers for a measured harness runs inside the generated
 # profile: a model-free stand-in for the harness records what it could do.
 test_measured_harness_launch_runs_confined() {
-  local harness rec id out source_line probe before version
+  local harness rec id out source_line probe before version session_probe session other
   local FM_COMPAT_LAUNCH_LOG
   if [ "$(uname -s)" != Darwin ]; then
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
@@ -335,6 +335,20 @@ case "\${1:-}" in --version) printf '%s\\n' '$version'; exit 0 ;; esac
   echo "confinement=\$FM_WRITE_CONFINEMENT"
 } > '$probe'
 SH
+    session_probe="$HOME_DIR/data/$id/claude-session-probe"
+    other=99999999-8888-4777-8666-555555555555
+    if [ "$harness" = claude ]; then
+      mkdir -p "$HOME_DIR/user-home/.claude/session-env"
+      cat >> "$FAKEBIN_DIR/claude" <<SH
+session=
+while [ \$# -gt 0 ]; do [ "\$1" != --session-id ] || session=\$2; shift; done
+{
+  echo "session-id=\$session"
+  if { mkdir -p '$HOME_DIR/user-home/.claude/session-env/'"\$session" && : > '$HOME_DIR/user-home/.claude/session-env/'"\$session/probe"; } 2>/dev/null; then echo own=created; else echo own=refused; fi
+  if { mkdir -p '$HOME_DIR/user-home/.claude/session-env/$other' && : > '$HOME_DIR/user-home/.claude/session-env/$other/probe'; } 2>/dev/null; then echo other=created; else echo other=refused; fi
+} > '$session_probe'
+SH
+    fi
     chmod +x "$FAKEBIN_DIR/$harness"
     before=$(cat "$PROJ_DIR/README.md")
     out=$(run_settle_spawn "$id")
@@ -348,6 +362,13 @@ SH
       "delivered $harness launch ran outside its write profile"
     assert_equals "$before" "$(cat "$PROJ_DIR/README.md")" "confined $harness changed the primary checkout"
     assert_grep 'probe-status-append' "$HOME_DIR/state/$id.status" "confined $harness could not append its own status"
+    if [ "$harness" = claude ]; then
+      session=$(grep '^claude_session_id=' "$HOME_DIR/state/$id.meta" | cut -d= -f2-)
+      [ -n "$session" ] && [ "$(grep -c '^claude_session_id=' "$HOME_DIR/state/$id.meta")" = 1 ] \
+        || fail "confined claude metadata must record exactly one session id"
+      assert_equals "session-id=$session"$'\nown=created\nother=refused' "$(cat "$session_probe")" \
+        "delivered claude launch must run under the recorded session id its profile grants, and only that one"
+    fi
   done
   pass "measured harness launches run inside their generated write profile"
 }

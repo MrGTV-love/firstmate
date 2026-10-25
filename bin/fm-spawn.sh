@@ -3147,7 +3147,31 @@ launch_template() {
   esac
 }
 
+# Marks every claude program word of a raw launch, the first word of each
+# command in the line, so a confined launch can splice the session id its write
+# profile grants after each one; a non-session call ignores the flag.
+raw_claude_session_marks() (  # <launch>
+  local rest=$1 out='' word command=1
+  set -f
+  for word in $1; do
+    out+=${rest%%"$word"*}
+    rest=${rest#*"$word"}
+    out+=$word
+    if [ "$command" = 1 ]; then
+      case "$word" in
+      [A-Za-z_]*=*) continue ;;
+      esac
+      [ "$(basename -- "${word#__CLAUDERAWPREFIX__}")" != claude ] || out+=__CLAUDERAWSESSION__
+      command=0
+    fi
+    case "$word" in *';' | *'&&' | *'||' | *'|') command=1 ;; esac
+  done
+  printf '%s' "$out$rest"
+)
+
 RAW_FUNCTION_HOOKS_SET=0
+RAW_CLAUDE_CONFIG_DIR=
+RAW_PI_CODING_AGENT_DIR=
 case "$ARG3" in
 *' '*) # raw launch command (unverified-adapter escape hatch)
   RAW_LAUNCH=1
@@ -3158,12 +3182,15 @@ case "$ARG3" in
     RAW_LAUNCH_TAIL=${RAW_LAUNCH_TAIL#*"$word"}
     case "$word" in
     CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=*) RAW_FUNCTION_HOOKS_SET=1 ;;
+    CLAUDE_CONFIG_DIR=*) RAW_CLAUDE_CONFIG_DIR=${word#*=} ;;
+    PI_CODING_AGENT_DIR=*) RAW_PI_CODING_AGENT_DIR=${word#*=} ;;
     [A-Za-z_]*=*) continue ;;
     *)
       HARNESS=$(basename "$word")
       if [ "$HARNESS" = claude ]; then
         RAW_PROGRAM_PREFIX=${LAUNCH:0:${#LAUNCH}-${#RAW_LAUNCH_TAIL}-${#word}}
         LAUNCH="$RAW_PROGRAM_PREFIX"'__CLAUDERAWPREFIX__'"${LAUNCH:${#RAW_PROGRAM_PREFIX}}"
+        LAUNCH=$(raw_claude_session_marks "$LAUNCH")
       fi
       break
       ;;
@@ -6129,15 +6156,26 @@ if [ "$KIND" != secondmate ]; then
       [ -x /usr/bin/sandbox-exec ] || { confinement_refuse false "sandbox-exec is required for macOS workers"; exit 1; }
       # A raw command's own root selectors run after the confinement exports
       # and win, so the profile could not follow the root the harness uses.
+      # A leading literal absolute root assignment is followed; any other
+      # spelling leaves the root uncertain and refuses the launch.
+      confinement_raw_root=
+      confinement_raw_uncertain=0
       if [ "$RAW_LAUNCH" = 1 ]; then
-        case "$RAW_COMMAND" in
-          *PI_CODING_AGENT_DIR* | *PI_CONFIG_DIR* | *OMP_PROFILE* | *PI_PROFILE* | *--profile* | *CLAUDE_CONFIG_DIR*)
-            confinement_refuse false "this raw $HARNESS launch command selects its own harness state root, so its write profile cannot be derived; launch with --harness $HARNESS and set the root in the environment instead"
-            exit 1
+        case "$HARNESS:$RAW_COMMAND" in
+          claude:*CLAUDE_CONFIG_DIR*) confinement_raw_root=$RAW_CLAUDE_CONFIG_DIR ;;
+          omp:*PI_CODING_AGENT_DIR*) confinement_raw_root=$RAW_PI_CODING_AGENT_DIR ;;
+        esac
+        case "$HARNESS:$RAW_COMMAND" in
+          claude:*CLAUDE_CONFIG_DIR* | omp:*PI_CODING_AGENT_DIR*)
+            case "$confinement_raw_root" in /*) ;; *) confinement_raw_uncertain=1 ;; esac
+            case "$confinement_raw_root" in *[!A-Za-z0-9/._+-]*) confinement_raw_uncertain=1 ;; esac
             ;;
         esac
-        if [ "$HARNESS" = claude ]; then
-          confinement_refuse false "a raw claude launch command cannot carry the session id its write profile grants; launch with --harness claude instead"
+        case "$RAW_COMMAND" in
+          *PI_CONFIG_DIR* | *OMP_PROFILE* | *PI_PROFILE* | *--profile*) confinement_raw_uncertain=1 ;;
+        esac
+        if [ "$confinement_raw_uncertain" = 1 ]; then
+          confinement_refuse false "this raw $HARNESS launch command selects its own harness state root in a form its write profile cannot follow; use a leading literal absolute root assignment, or launch with --harness $HARNESS and set the root in the environment instead"
           exit 1
         fi
       fi
@@ -6145,8 +6183,8 @@ if [ "$KIND" != secondmate ]; then
       WRITE_CONFINEMENT_PROFILE="$STATE_REAL/$ID.write-confinement.sb"
       confinement_agent=
       case "$HARNESS" in
-        omp) confinement_agent=${OMP_AGENT_DIR:-} ;;
-        claude) confinement_agent=${WORKER_ACCOUNT_ROOT:-${CLAUDE_CONFIG_DIR:-}} ;;
+        omp) confinement_agent=${confinement_raw_root:-${OMP_AGENT_DIR:-}} ;;
+        claude) confinement_agent=${confinement_raw_root:-${WORKER_ACCOUNT_ROOT:-${CLAUDE_CONFIG_DIR:-}}} ;;
       esac
       confinement_args=()
       [ -z "$confinement_agent" ] || confinement_args=(--agent-dir "$confinement_agent")
@@ -7105,6 +7143,7 @@ if [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then
     CLAUDE_RAW_PREFIX="bash $(shell_quote "$SCRIPT_DIR/fm-claude-memory-lib.sh") '{${CLAUDE_MD_EXCLUDES#,}}' "
   fi
   LAUNCH=${LAUNCH//__CLAUDERAWPREFIX__/"$CLAUDE_RAW_PREFIX"}
+  LAUNCH=${LAUNCH//__CLAUDERAWSESSION__/${CLAUDE_SESSION_ID:+ --session-id $CLAUDE_SESSION_ID}}
 fi
 if [ "$HARNESS" = rovo ]; then
   ROVOCONFIGOVERRIDE=$(rovo_config_override_flag "$EFFORT" "$DATA" "$STATE" "$ID") || {

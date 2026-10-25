@@ -153,14 +153,14 @@ def build(args):
         claude = canonical(args.agent_dir or os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude")
         deny.append(claude)
         # Session-owned runtime state is granted for this worker's own session
-        # id only, so other sessions' transcripts, edit backups and hook
-        # environments stay protected.
+        # id only, so other sessions' transcripts, edit backups, task lists and
+        # hook environments stay protected.
         session = args.claude_session or ""
         if not re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", session):
             raise ValueError("a confined Claude worker needs its lowercase --claude-session UUID")
         runtime += [under(claude, r"\.claude\.json(\..+)?"), under(claude, r"history\.jsonl")]
         runtime += [f"(subpath {quoted(claude + '/' + name)})"
-                    for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session)]
+                    for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session, "tasks/" + session)]
         for slug in slugs(worktree, args.worktree):
             project = claude + "/projects/" + slug
             runtime += [f"(literal {quoted(project)})", f"(literal {quoted(project + '/' + session + '.jsonl')})",

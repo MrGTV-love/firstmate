@@ -414,6 +414,7 @@ def fixture(repo, base, harness, user_home, other):
                    ".claude/settings.local.json", ".claude/.credentials.json", ".claude/projects/p/memory/MEMORY.md", ".claude/statusline.sh",
                    ".claude/shell-snapshots/snapshot-zsh.sh", ".claude/session-env/session/hook.sh",
                    f".claude/session-env/{OTHER_SESSION}/hook.sh", f".claude/file-history/{OTHER_SESSION}/backup",
+                   f".claude/tasks/{OTHER_SESSION}/1.json", ".claude/sessions/1234.json",
                    f".claude/todos/{OWN_SESSION}-agent-{OWN_SESSION}.json", f".claude/projects/{slug}/{OTHER_SESSION}.jsonl",
                    ".claude/projects/p/session.jsonl")
     omp_code = (".omp/agent/config.yml", ".omp/agent/models.yml", ".omp/agent/auth.json", ".omp/agent/.env",
@@ -430,6 +431,7 @@ def fixture(repo, base, harness, user_home, other):
                                "claude-session-env": user_home / f".claude/session-env/{OWN_SESSION}/hook.sh",
                                "claude-json": user_home / ".claude.json", "claude-json-backup": user_home / ".claude/backups/.claude.json.backup.1",
                                "claude-file-history": user_home / f".claude/file-history/{OWN_SESSION}/backup",
+                               "claude-tasks": user_home / f".claude/tasks/{OWN_SESSION}/1.json",
                                "claude-history": user_home / ".claude/history.jsonl",
                                "claude-statsig": user_home / ".claude/statsig/cache", "claude-debug": user_home / ".claude/debug/session.txt"})
     else:

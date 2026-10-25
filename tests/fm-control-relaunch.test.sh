@@ -14,11 +14,11 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-helpers.sh"
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
-  local dir out rc gen_before gen_after
+  local dir out rc gen_before gen_after session old_session=00000000-0000-4000-8000-000000000000
   dir=$(new_case same rl1)
   add_ship_task "$dir" rl1 claude
   gen_before=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" rl1)
-  printf 'busy_gen=%s\n' "$gen_before" >> "$dir/home/state/rl1.meta"
+  printf 'busy_gen=%s\nclaude_session_id=%s\n' "$gen_before" "$old_session" >> "$dir/home/state/rl1.meta"
   out=$(run_control "$dir" rl1 relaunch --note "stopped mid-refactor"); rc=$?
   expect_code 0 "$rc" "a same-harness relaunch should succeed"$'\n'"$out"
   assert_contains "$out" "relaunched rl1 harness=claude from=claude" "the outcome should name the transition"
@@ -36,6 +36,14 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   assert_grep "/exit" "$dir/fake/literal" "the previous agent should have been exited"
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
   assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
+  if [ "$(meta_field "$dir" rl1 write_confinement)" = seatbelt-v1 ]; then
+    session=$(meta_field "$dir" rl1 claude_session_id)
+    [ "$(grep -c '^claude_session_id=' "$dir/home/state/rl1.meta")" = 1 ] && [ -n "$session" ] && [ "$session" != "$old_session" ] \
+      || fail "a confined relaunch must replace the recorded Claude session id with one fresh id"
+    assert_grep "--session-id $session" "$dir/fake/literal" "the replacement must launch under the recorded session id"
+  else
+    assert_no_grep claude_session_id= "$dir/home/state/rl1.meta" "an unconfined relaunch must drop the Claude session id"
+  fi
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
 }
 
