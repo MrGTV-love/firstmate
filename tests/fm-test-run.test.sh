@@ -3344,3 +3344,43 @@ test_pr_merge_groups_partition_one_inventory() {
 }
 
 test_pr_merge_groups_partition_one_inventory
+
+# The four fm-lint groups partition one former suite. The union of their
+# registered lists must be the same 73 cases, each registered by the file that
+# also defines it, with no case twice.
+test_fm_lint_groups_partition_one_inventory() {
+  local group file registered defined union total dup name
+  local -a groups=(fm-lint fm-lint-policy fm-lint-slots fm-lint-report)
+  union=''
+  for group in "${groups[@]}"; do
+    file="$ROOT/tests/$group.test.sh"
+    [ -f "$file" ] || fail "missing fm-lint group file: tests/$group.test.sh"
+    registered=$(awk '
+      /^fm_lint_test_cases=\(\)/ { next }
+      /^fm_lint_test_cases=\(/ { inarr = 1; next }
+      inarr && /^[[:space:]]*\)[[:space:]]*$/ { inarr = 0; next }
+      inarr {
+        line = $0
+        sub(/^[[:space:]]+/, "", line)
+        sub(/[[:space:]]+$/, "", line)
+        if (line ~ /^test_[A-Za-z0-9_]+$/) print line
+      }
+    ' "$file" | LC_ALL=C sort)
+    [ -n "$registered" ] || fail "tests/$group.test.sh registers no cases"
+    defined=$(grep -oE '^test_[A-Za-z0-9_]+\(\)' "$file" | sed 's/()$//' | LC_ALL=C sort)
+    for name in $registered; do
+      printf '%s\n' "$defined" | grep -qx "$name" \
+        || fail "tests/$group.test.sh registers $name but does not define it"
+    done
+    union=$(printf '%s\n%s\n' "$union" "$registered")
+  done
+  union=$(printf '%s\n' "$union" | grep '^test_' | LC_ALL=C sort)
+  dup=$(printf '%s\n' "$union" | uniq -d)
+  [ -z "$dup" ] || fail "an fm-lint case is registered in more than one group: $dup"
+  total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
+  [ "$total" = 73 ] \
+    || fail "the fm-lint groups register $total cases, not the 73-case inventory they partition"
+  pass "the fm-lint groups are a duplicate-free 73-case cover, each case registered by the file that defines it"
+}
+
+test_fm_lint_groups_partition_one_inventory

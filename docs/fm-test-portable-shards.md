@@ -260,6 +260,14 @@ With the two groups out of the parallel set, the lanes summed 2123043 ms and 289
 The lanes now sum 2489269 ms and 2528379 ms, a 1.5 percent imbalance, and `--check-coverage` reports `parallel_makespan_ms` 941010, set by `tests/fm-test-run.test.sh` alone in lane 1.
 The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 1250, 240, and 1250 ms) are estimates sized from the former 3825 ms lint hint, not measurements, pending the first measured lint runs; they affect lint shard assignment only.
 
+## Split the fm-lint suite
+
+The 2026-10-25 main run measured `tests/fm-lint.test.sh` at 1241630 ms, the parallel lane's longest script and above the 1200000 ms budget on its own, so no packing could bring that lane under the target while it stayed whole.
+It is now a shared helpers module plus four groups: changed-file and cache selection (21 cases), modes and installer and policy refusals (16), host slots and memory (19), and the sidecar and CI inputs (17).
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` pins the 73-case cover.
+The four parallel hints are apportioned from that measured 1241630 ms by case share (357000, 272000, 323000, and 289000 ms); they are estimates pending the first artifacts for the groups.
+The same change rebalances the two parallel lanes to their measured sums, which the 2026-10-25 run showed 2.1 times apart, and re-sorts both lanes longest-hint-first.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.

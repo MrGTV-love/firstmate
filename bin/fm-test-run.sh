@@ -414,7 +414,7 @@ family_for_basename() {
     fm-documentation-audiences.test.sh|fm-ensure-agents-md.test.sh|fm-forge-detect.test.sh|fm-grok-harness.test.sh|\
     fm-fork-free-helpers.test.sh|fm-friction-ledger.test.sh|\
     fm-harness-precedence.test.sh|\
-    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|\
+    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|fm-lint-policy.test.sh|fm-lint-slots.test.sh|fm-lint-report.test.sh|\
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
     fm-calm-claude-mod.test.sh|\
@@ -650,6 +650,9 @@ tests/fm-ensure-agents-md.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-herdr-lab.test.sh
 tests/fm-lint.test.sh
+tests/fm-lint-policy.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-report.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh
 tests/fm-review-diff.test.sh
@@ -686,7 +689,10 @@ tests/fm-crew-state.test.sh 268757
 tests/fm-ensure-agents-md.test.sh 2078
 tests/fm-grok-harness.test.sh 10027
 tests/fm-herdr-lab.test.sh 29438
-tests/fm-lint.test.sh 713491
+tests/fm-lint.test.sh 357000
+tests/fm-lint-policy.test.sh 272000
+tests/fm-lint-slots.test.sh 323000
+tests/fm-lint-report.test.sh 289000
 tests/fm-pi-primary-types.test.sh 3677
 tests/fm-pr-merge.test.sh 370000
 tests/fm-review-diff.test.sh 12861
@@ -725,12 +731,8 @@ tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-pr-merge.test.sh
 tests/fm-captain-hold-cleanup.test.sh
+tests/fm-lint.test.sh
 tests/fm-crew-state.test.sh
-tests/fm-cd-pretool-check.test.sh
-tests/fm-tmux-submit-busy.test.sh
-tests/fm-review-diff.test.sh
-tests/fm-send-strict.test.sh
-tests/fm-composer-ghost.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-supervision-instructions.test.sh
 EOF
@@ -739,9 +741,11 @@ EOF
 # Portable parallel shard 2: the complementary LPT half of the proven set.
 list_portable_parallel_2() {
   cat <<'EOF'
-tests/fm-lint.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-sweep.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-policy.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
@@ -749,9 +753,14 @@ tests/fm-arm-pretool-check.test.sh
 tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
+tests/fm-cd-pretool-check.test.sh
 tests/fm-brief.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-review-diff.test.sh
 tests/fm-send-popup-settle.test.sh
+tests/fm-send-strict.test.sh
 tests/fm-grok-harness.test.sh
+tests/fm-composer-ghost.test.sh
 tests/fm-spawn-batch.test.sh
 tests/fm-send-settle.test.sh
 tests/fm-ensure-agents-md.test.sh
@@ -2104,6 +2113,9 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-duration.test.sh
       printf '%s\n' __script__:fm-timeout-lib.test.sh
       printf '%s\n' __script__:fm-lint.test.sh
+      printf '%s\n' __script__:fm-lint-policy.test.sh
+      printf '%s\n' __script__:fm-lint-slots.test.sh
+      printf '%s\n' __script__:fm-lint-report.test.sh
       printf '%s\n' __script__:fm-test-run.test.sh
       ;;
     bin/fm-timeout-lib.sh)
