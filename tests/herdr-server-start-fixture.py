@@ -17,6 +17,12 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(sys.argv.pop(1)).resolve()
+# Bound one adapter call from .invoke(). The adapter waits for a competing
+# starter's lock and then for its readiness poll, so this must exceed
+# bin/backends/herdr-server-start.py's own STARTUP_SECONDS.
+# measured: value=8.115 date=2026-10-25 host=Mac-Studio.local margin=3.7
+# (slowest of 4 concurrent runs of this fixture against the intercepted CLI)
+CALL_SECONDS = 30
 
 STUB = r'''
 import json, os, pathlib, sys, time
@@ -168,7 +174,7 @@ class StartupSafety(unittest.TestCase):
                                  text=True)
         self.children.append(child)
         try:
-            out, err = child.communicate(timeout=4)
+            out, err = child.communicate(timeout=CALL_SECONDS)
         except subprocess.TimeoutExpired:
             self.fail("server retained a starter descriptor or the call did not return")
         return child.returncode, out
