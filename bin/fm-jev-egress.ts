@@ -18,6 +18,7 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   edit: { call: "edit", result: "unjudged" },
   grep: { call: "paths", result: "unjudged" },
   glob: { call: "paths", result: "unjudged" },
+  ast_grep: { call: "paths", result: "unjudged" },
   find: { call: "semantic-search", result: "unjudged" },
   web_search: { call: "web", result: "unjudged" },
   webfetch: { call: "web", result: "unjudged" },
@@ -26,9 +27,11 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   // T4 records ownership; T5 enforces writes at process launch, not by parsing code here.
   eval: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   python: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
+  ida: { call: "confinement", confinement_owner: "T5", result: "unjudged" },
   task: { call: "local", result: "unjudged" },
   generate_image: { call: "provider", result: "unjudged" },
   security_scan: { call: "provider", result: "unjudged" },
+  github: { call: "remote-storage", result: "unjudged" },
   learn: { call: "memory", result: "unjudged" },
   recall: { call: "memory", result: "unjudged" },
   reflect: { call: "memory", result: "unjudged" },
@@ -47,6 +50,12 @@ export const TOOL_POLICY: Readonly<Record<string, ToolPolicy>> = Object.freeze({
   ask: { call: "local", result: "unjudged" },
   todo: { call: "local", result: "unjudged" },
   wait: { call: "local", result: "unjudged" },
+  think: { call: "local", result: "unjudged" },
+  yield: { call: "local", result: "unjudged" },
+  checkpoint: { call: "local", result: "unjudged" },
+  rewind: { call: "local", result: "unjudged" },
+  context_notes: { call: "local", result: "unjudged" },
+  new_context: { call: "local", result: "unjudged" },
   // Claude built-ins, lower-cased at the adapter boundary. Unknown extensions/MCP
   // names still fail coverage; these rows classify capabilities, not trusted tools.
   agent: { call: "local", result: "unjudged" },

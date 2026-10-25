@@ -5,11 +5,12 @@
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
 import { confinementOwner, egressClass, egressGranted, memoryEgress, toolPolicy } from "./fm-jev-egress.ts";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, withDecisionBudget,
@@ -192,6 +193,7 @@ function credentialShaped(content: string): boolean {
 
 // Central guard decisions go through the shared state/guard-events.jsonl writer.
 const GUARD_EVENT_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "fm-guard-event.sh");
+const runWriter = promisify(execFile);
 
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
@@ -224,12 +226,12 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
   }
 
-  const guardEvent = (guard: string, subject: string, decision: "allow" | "deny", started: number, remainingMs: () => number, sourceOk = true): void => {
+  const guardEvent = async (guard: string, subject: string, decision: "allow" | "deny", started: number, remainingMs: () => number, sourceOk = true): Promise<void> => {
     try {
-      execFileSync("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", `${c.task}:${subject}`, "--source-ok", String(sourceOk), "--elapsed-ms", String(Math.round(performance.now() - started))], {
+      await runWriter("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", `${c.task}:${subject}`, "--source-ok", String(sourceOk), "--elapsed-ms", String(Math.round(performance.now() - started))], {
         env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FM_HOME: c.home,
           ...(process.env.FM_GUARD_EVENT_LOG ? { FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG } : {}) },
-        stdio: "ignore", timeout: remainingMs(),
+        timeout: remainingMs(),
       });
     } catch {}
   };
@@ -244,7 +246,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       branch: "policy", error_type: null, request_started: false,
       ...((tool === "write" || tool === "edit") && object(event.input) && typeof event.input.path === "string"
         ? { refused_path: event.input.path } : {}) };
-    guardEvent("jev-tool-coverage", tool, policy ? "allow" : "deny", started, remainingMs);
+    await guardEvent("jev-tool-coverage", tool, policy ? "allow" : "deny", started, remainingMs);
     if (!policy) {
       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
@@ -256,7 +258,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
       if (destination) {
         terminal.destination_class = destination;
         const { granted, sourceOk } = egressGranted(c.state, c.task, destination);
-        guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
+        await guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
         if (!granted) {
           return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
             `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);

@@ -280,12 +280,13 @@ await test('coverage and egress refusals hold in an inactive project scope', asy
   assert.equal(call('TaskStop', { task_id: 'synthetic' }), '');
 });
 await test('tools that move no data or run no worker code are local; unscreened writers name T5', async () => {
-  for (const toolName of ['skill', 'listagents', 'waitformcpservers', 'subagenthandback', 'taskstop', 'structuredoutput']) {
+  for (const toolName of ['skill', 'listagents', 'waitformcpservers', 'subagenthandback', 'taskstop', 'structuredoutput',
+    'think', 'yield', 'checkpoint', 'rewind', 'context_notes', 'new_context']) {
     const before = rowCount();
     assert.equal(await handlers.tool_call({ toolName, input: {} }, { cwd: state }), undefined, toolName);
     assert.equal(rowCount(), before, `${toolName}: local tools add no egress or confinement row`);
   }
-  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'notebook', 'lsp', 'manage_skill', 'notebookedit', 'python', 'debug', 'run_experiment']) {
+  for (const toolName of ['ast_edit', 'init_experiment', 'log_experiment', 'notebook', 'lsp', 'manage_skill', 'notebookedit', 'python', 'debug', 'run_experiment', 'ida']) {
     let patch;
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName, input: {} }, { cwd: state }); });
     assert.equal(patch, undefined, toolName);
@@ -373,6 +374,7 @@ await test('S2 egress classes are permissions, never a bypass of existing write 
     ['browser', { url: 'https://synthetic.invalid' }, 'browser'],
     ['generate_image', { prompt: 'synthetic' }, 'provider'],
     ['designsync', { method: 'list_projects' }, 'remote-storage'],
+    ['github', { op: 'repo_view' }, 'remote-storage'],
   ];
   for (const [toolName, input, destination] of cases) {
     let patch;
@@ -518,10 +520,12 @@ const lab = `${process.env.AUDIT_TMP}/inventory`;
 mkdirSync(`${lab}/agent`, { recursive: true });
 writeFileSync(`${lab}/agent/config.yml`, 'setupVersion: 2\nfind:\n  enabled: on\n');
 const extension = `${lab}/inventory.ts`;
+// Settings-gated and subagent-only built-ins are absent from a default registry, so omp's own built-in name lists join it.
 writeFileSync(extension, `import { writeFileSync } from 'node:fs';
+import { BUILTIN_TOOL_NAMES, HIDDEN_TOOL_NAMES } from "@oh-my-pi/pi-coding-agent/tools/builtin-names";
 export default function(pi: { on(name: string, fn: () => void): void; getAllTools(): {name: string}[] }) {
   pi.on('session_start', () => {
-    writeFileSync(${JSON.stringify(`${lab}/tools.json`)}, JSON.stringify(pi.getAllTools().map(t => t.name).sort()));
+    writeFileSync(${JSON.stringify(`${lab}/tools.json`)}, JSON.stringify({ registry: pi.getAllTools().map(t => t.name).sort(), builtin: BUILTIN_TOOL_NAMES, hidden: HIDDEN_TOOL_NAMES }));
     process.exit(0);
   });
 }`);
@@ -531,8 +535,10 @@ execFileSync(`${process.env.AUDIT_ROOT}/bin/fm-proc-budget.sh`, ['--', 'omp', '-
   { cwd: lab, input: '', env: { PATH: process.env.PATH, HOME: lab, PI_CODING_AGENT_DIR: `${lab}/agent`, OMP_SKIP_SETUP: '1',
     TYPESAFE_API_KEY: 'synthetic-inventory-only', OPENAI_API_KEY: 'synthetic-inventory-only',
     HTTP_PROXY: dead, HTTPS_PROXY: dead, ALL_PROXY: dead }, stdio: ['pipe', 'pipe', 'pipe'] });
-const installed = JSON.parse(readFileSync(`${lab}/tools.json`, 'utf8'));
-assert.ok(installed.includes('find'), 'the real host inventory must include the missed paid tool');
+const { registry, builtin, hidden } = JSON.parse(readFileSync(`${lab}/tools.json`, 'utf8'));
+assert.ok(registry.includes('find'), 'the real host inventory must include the missed paid tool');
+assert.ok(builtin.includes('ida') && hidden.includes('yield'), 'omp must expose its gated and hidden built-in names');
+const installed = [...new Set([...registry, ...builtin, ...hidden])].sort();
 assert.deepEqual(uncoveredTools(installed), [], 'every installed host tool needs an explicit classification');
 assert.deepEqual(uncoveredTools([...installed, 'new-paid-host-tool']), ['new-paid-host-tool'], 'S2(c): an added installed tool fails coverage');
 console.log(`installed omp: ${installed.length} tools classified; injected unknown tool rejected; no model turn`);

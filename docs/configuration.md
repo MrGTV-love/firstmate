@@ -2491,7 +2491,7 @@ Activation is selected per task at its initial launch and retained across relaun
 
 [`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls.
 An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
-The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry and with the tool list in the installed Claude Code init event, reached through a dead local proxy, without submitting a model turn, and proves that adding an unclassified tool fails coverage.
+The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry joined with omp's own built-in and hidden tool name lists, so settings-gated tools such as `github` and `ida` and the subagent-only `yield` are checked even when the default registry omits them, and with the tool list in the installed Claude Code init event, reached through a dead local proxy, without submitting a model turn, and proves that adding an unclassified tool fails coverage.
 The Claude init list depends on the binary's feature gates, so a gated tool absent from that run is checked only when it appears.
 Optional host tools need not be installed for the offline regression; each installed-host portion explicitly skips when its host is absent.
 Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
@@ -2527,13 +2527,15 @@ Local file `read` remains pre-tool unjudged, `bash` receives no model screening,
 This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
 The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
 That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
-omp's `python`, `debug` and `run_experiment` code runners have the same effect as `eval` and use the same confinement-owned classification.
+omp's `python`, `debug` and `run_experiment` code runners, and `ida`, which runs Python against IDA databases and saves them, have the same effect as `eval` and use the same confinement-owned classification.
 Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), `manage_skill` and `learn`-with-`skill` writes to the managed-skills directory, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
 A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
 `report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
 A coverage refusal names the refused host tool, states the remedy of a `TOOL_POLICY` row classified by its real effect, notes that `report_issue` and `SendFeedback` never get one, and states that no call was made.
 Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop`, `SubagentHandback` and `StructuredOutput` (which only returns the final structured answer to its caller), are classified `local`.
+omp `think`, `yield`, `checkpoint`, `rewind`, `context_notes` and `new_context` change only the session's own conversation state, so they are also `local`, and omp `ast_grep` shares the `grep` path-search classification.
 Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
+omp `github` reads and changes GitHub repositories, so a top-level `github` call requires a `remote-storage` grant; its `xd://github` device write stays refused by the native-device rule under every grant.
 Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
 Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
 The unclassified-tool and missing-grant refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage` and `jev-egress-grant`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the native-device rule of the existing `jev-write-path-gate`.
