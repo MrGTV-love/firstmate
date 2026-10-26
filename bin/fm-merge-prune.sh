@@ -24,8 +24,9 @@
 # returns the slot with its nested copies in it, or closes the task and holds
 # the slot, so a nested copy with work of its own keeps the whole slot with one
 # wake and teardown does not run. Teardown ends a job working at the copy root,
-# so a job in the task's terminal pane (not the worker's agent or what it
-# started) keeps the copy with one wake before teardown runs, too.
+# so a job in the task's terminal pane (not a shell, the worker's agent, what it
+# started, or what it runs under) keeps the copy with one wake before teardown
+# runs, too.
 #
 # Transient refusals retry on later sweeps with backoff (60s, doubling to 3600s)
 # and stay silent: the task lease or project lock is held by another actor

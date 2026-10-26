@@ -702,7 +702,7 @@ Before teardown runs, each copy nested in the task's copy must pass the fallback
 A teardown that succeeds returns the slot with its nested copies still in it, or closes the task and holds the slot.
 So a nested copy with an unpushed commit, a stash or a changed file keeps the whole slot with one wake, and teardown does not run.
 Teardown also ends a job working at the copy root.
-So a job in the task's terminal pane (tmux or herdr) whose working directory is inside the copy keeps it with one wake before teardown runs, too; the worker's agent, what it started and the shells it runs under are teardown's to stop and do not count.
+So a job in the task's terminal pane (tmux or herdr) whose working directory is inside the copy keeps it with one wake before teardown runs, too; a shell, the worker's agent, what the agent started, and the processes it runs under do not count here.
 
 A refusal that only means "not now" is retried on later ticks and says nothing.
 That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
