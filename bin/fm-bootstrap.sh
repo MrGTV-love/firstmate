@@ -11,7 +11,11 @@
 #          bin/fm-api-key-guard-lib.sh owns the active-global-config YAML check;
 #          it never calls models, emits credentials or changes omp configuration.
 #          docs/configuration.md "OMP fallback approvals" owns the approval record.
+#          PATH_MISSING means lookup failed but an executable regular file exists
+#          at $HOME/.local/bin/<tool>. Discovery never executes that candidate or
+#          changes PATH, and does not establish tool compatibility or readiness.
 #          Lines: "MISSING: <tool> (install: <command>)",
+#                 "PATH_MISSING: <tool> (found: <path>); add <directory> to PATH, then rerun bootstrap to verify compatibility",
 #                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
@@ -849,7 +853,17 @@ manual_install_url() {
 }
 
 missing_tool_diagnostic() {
-  local tool=$1 instructions
+  local tool=$1 instructions candidate
+  # Presence on disk is evidence for PATH repair, not permission to execute an
+  # unselected binary or bypass the normal version and backend capability gates.
+  if ! command -v "$tool" >/dev/null 2>&1 && [ -n "${HOME:-}" ]; then
+    candidate="$HOME/.local/bin/$tool"
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf 'PATH_MISSING: %s (found: %s); add %s to PATH, then rerun bootstrap to verify compatibility\n' \
+        "$tool" "$candidate" "${candidate%/*}"
+      return 0
+    fi
+  fi
   if instructions=$(manual_install_url "$tool"); then
     echo "MISSING_MANUAL: $tool (instructions: $instructions)"
     return 0
@@ -1027,14 +1041,14 @@ x_mode_setup() {
   missing=0
   for tool in curl jq; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-      echo "MISSING: $tool (install: $(install_cmd "$tool"))"
+      missing_tool_diagnostic "$tool"
       missing=1
     fi
   done
   if [ "$missing" -ne 0 ]; then
     if x_mode_artifact_present "$shim" || x_mode_artifact_present "$cadence"; then
       if x_mode_remove_artifacts; then
-        echo "FMX: X mode off - missing relay poll dependencies; install them and rerun bootstrap"
+        echo "FMX: X mode off - missing relay poll dependencies; resolve the dependency lines above and rerun bootstrap"
       else
         echo "FMX: X mode off - failed to remove relay poll shim or 30s cadence after missing relay poll dependencies"
       fi
@@ -1100,7 +1114,7 @@ crew_dispatch_validate() {
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
-    echo "MISSING: jq (install: $(install_cmd jq))"
+    missing_tool_diagnostic jq
     return 0
   fi
   if ! jq -e . "$file" >/dev/null 2>&1; then

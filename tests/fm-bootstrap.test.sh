@@ -24,10 +24,13 @@
 set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh" || exit 1
 
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
-TMP_ROOT=$(fm_test_tmproot fm-bootstrap-tests)
+TMP_ROOT=$(fm_test_tmproot fm-bootstrap-tests) || exit 1
+# Missing-tool cases must not discover the operator's real user-local installs.
+export HOME="$TMP_ROOT/operator-home"
+mkdir -p "$HOME"
 export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
 export PI_CODING_AGENT_DIR="$TMP_ROOT/no-ambient-omp-config" OMP_PROFILE='' PI_PROFILE=''
 
@@ -421,6 +424,71 @@ manual backlog backend still requires missing tasks-axi^1^-^1^manual^exact^MISSI
 manual backlog backend suppresses tasks-axi availability^1^0.2.6^1^manual^empty^^
 ROWS
   pass "bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts"
+}
+
+test_off_path_tools_get_actionable_path_diagnostics() {
+  local case_dir="$TMP_ROOT/off-path-tools" fakebin user out tool label candidate
+  user="$case_dir/operator with spaces"
+  mkdir -p "$case_dir/home" "$user/.local/bin"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  mv "$fakebin/treehouse" "$case_dir/treehouse-installed"
+  ln -s "$case_dir/treehouse-installed" "$user/.local/bin/treehouse"
+  mv "$fakebin/no-mistakes" "$user/.local/bin/no-mistakes"
+  # Record execution independently of the expected diagnostic. Discovery must
+  # inspect candidates only, not execute an unselected binary outside PATH.
+  for tool in treehouse no-mistakes; do
+    cp "$user/.local/bin/$tool" "$case_dir/$tool-body"
+    # shellcheck disable=SC2016 # The generated child owns these expansions.
+    printf '#!/usr/bin/env bash\nprintf executed >> "$FM_TEST_OFF_PATH_EXEC_LOG"\nexec bash "%s" "$@"\n' \
+      "$case_dir/$tool-body" > "$user/.local/bin/$tool"
+  done
+  out=$(PATH="$fakebin:$BASE_PATH" HOME="$user" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh") \
+    || fail "off-PATH discovery must retain bootstrap's diagnostic-only exit"
+  for tool in treehouse no-mistakes; do
+    assert_contains "$out" "PATH_MISSING: $tool (found: $user/.local/bin/$tool)" "installed tool needs PATH guidance"
+    assert_not_contains "$out" "MISSING: $tool (install:" "installed tool must not receive reinstall advice"
+  done
+  assert_contains "$out" 'rerun bootstrap to verify compatibility' "discovery must not establish readiness"
+  assert_absent "$case_dir/executed" "bootstrap executed an off-PATH candidate"
+  assert_absent "$case_dir/home/state" "detect-only discovery changed runtime state"
+  out=$(PATH="$fakebin:$BASE_PATH:$user/.local/bin" HOME="$user" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  [ -z "$out" ] || fail "corrected PATH must pass normal version and lease checks, got: $out"
+  assert_present "$case_dir/executed" "corrected PATH did not exercise compatibility checks"
+  # An older selected binary still needs an upgrade; a hidden copy must never
+  # replace the operator's selected executable or weaken the version floor.
+  cp "$case_dir/no-mistakes-body" "$fakebin/no-mistakes"
+  out=$(PATH="$fakebin:$BASE_PATH:$user/.local/bin" HOME="$user" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+    FM_FAKE_NO_MISTAKES_VERSION='no-mistakes version v1.45.0' \
+    FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" 'MISSING: no-mistakes (install:' "selected incompatible version must still be refused"
+  assert_not_contains "$out" 'PATH_MISSING:' "selected version is not a PATH problem"
+  pass "bootstrap distinguishes installed off-PATH tools without executing them or weakening compatibility"
+
+  for label in absent nonexecutable directory broken-symlink; do
+    case_dir="$TMP_ROOT/off-path-$label"
+    user="$case_dir/operator"
+    mkdir -p "$case_dir/home" "$user/.local/bin"
+    fakebin=$(make_fake_toolchain "$case_dir")
+    mv "$fakebin/no-mistakes" "$case_dir/no-mistakes-installed"
+    candidate="$user/.local/bin/no-mistakes"
+    case "$label" in
+      absent) ;;
+      nonexecutable) cp "$case_dir/no-mistakes-installed" "$candidate"; chmod -x "$candidate" ;;
+      directory) mkdir "$candidate" ;;
+      broken-symlink) ln -s "$case_dir/no-such-tool" "$candidate" ;;
+    esac
+    out=$(PATH="$fakebin:$BASE_PATH" HOME="$user" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+      FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+      "$ROOT/bin/fm-bootstrap.sh")
+    assert_contains "$out" 'MISSING: no-mistakes (install:' "$label candidate must still be missing"
+    assert_not_contains "$out" 'PATH_MISSING:' "$label candidate must not be advertised as executable"
+  done
+  pass "bootstrap preserves missing-tool advice for absent and unusable user-local candidates"
 }
 
 test_no_mistakes_min_version() {
@@ -833,6 +901,59 @@ zellij
 cmux
 ROWS
   pass "bootstrap: JSON-emitting backends require jq (their genuine dep), never tmux"
+}
+
+test_crew_dispatch_reports_off_path_jq() {
+  local case_dir fakebin user user_bin bash_env real_jq out
+  case_dir="$TMP_ROOT/crew-dispatch-off-path-jq"
+  user="$case_dir/operator with spaces"
+  user_bin="$user/.local/bin"
+  mkdir -p "$case_dir/home/config" "$user_bin"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' '{"rules":[' > "$case_dir/home/config/crew-dispatch.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  real_jq=$(command -v jq) || fail "test host must provide jq"
+  cat > "$user_bin/jq" <<SH
+#!/usr/bin/env bash
+printf 'executed\\n' >> "\$FM_TEST_OFF_PATH_EXEC_LOG"
+exec '$real_jq' "\$@"
+SH
+  chmod +x "$user_bin/jq"
+  # Mask any system jq unless the user-local directory is on PATH, so only that
+  # copy can satisfy the crew-dispatch lookup.
+  bash_env="$case_dir/no-system-jq.bash"
+  cat > "$bash_env" <<'SH'
+case ":$PATH:" in
+  *":$FM_TEST_USER_BIN:"*) ;;
+  *)
+    command() {
+      if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+        return 1
+      fi
+      builtin command "$@"
+    }
+    jq() {
+      return 127
+    }
+    ;;
+esac
+SH
+  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" HOME="$user" FM_TEST_USER_BIN="$user_bin" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "PATH_MISSING: jq (found: $user_bin/jq); add $user_bin to PATH" \
+    "crew dispatch needs PATH guidance for an off-PATH jq"
+  assert_not_contains "$out" "MISSING: jq (install:" "crew dispatch must not recommend reinstalling an off-PATH jq"
+  assert_not_contains "$out" "CREW_DISPATCH:" "crew dispatch must not validate through an off-PATH jq"
+  assert_absent "$case_dir/executed" "bootstrap executed an off-PATH jq"
+  out=$(PATH="$user_bin:$fakebin:$BASE_PATH" BASH_ENV="$bash_env" HOME="$user" FM_TEST_USER_BIN="$user_bin" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON" \
+    "corrected PATH must restore normal crew-dispatch validation"
+  assert_not_contains "$out" "PATH_MISSING:" "corrected PATH is not a PATH problem"
+  assert_present "$case_dir/executed" "corrected PATH did not validate through normal jq lookup"
+  pass "crew dispatch reports an off-PATH jq without executing it until PATH lookup succeeds"
 }
 
 test_treehouse_lease_check_follows_resolved_backend() {
@@ -1799,6 +1920,8 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
   pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
 }
 
+test_off_path_tools_get_actionable_path_diagnostics
+test_crew_dispatch_reports_off_path_jq
 test_omp_api_billing_config_diagnostics
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
