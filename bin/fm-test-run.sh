@@ -990,7 +990,6 @@ tests/fm-inbox.test.sh 8769
 tests/fm-jev-guard-audit.test.sh 8143
 tests/fm-jev-guard-claude-live-e2e.test.sh 1075
 tests/fm-jev-guard-omp-live-e2e.test.sh 876
-tests/fm-jev-guard-producer.test.sh 866
 tests/fm-jev-guard.test.sh 401320
 tests/fm-keep-ai-trailers-home-local.test.sh 46294
 tests/fm-kimi-harness.test.sh 65265
