@@ -720,7 +720,7 @@ record_review() {
   printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
-    "$ROOT/bin/fm-review-record.py" review --task task-x1 --base main --pr "$url" --head "$head" \
+    "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
       --report "$case_dir/review.md" "$@"
@@ -857,11 +857,17 @@ parent_reply_lines() {  # <file> <url>
 }
 
 review_record_command() {
-  local case_dir=$1
+  local case_dir=$1 command
   shift
+  command=$1
+  shift
+  local -a identity=()
+  if [ "$command" = verify ]; then
+    identity=(--task task-x1 --base "$(cat "$case_dir/github-base")")
+  fi
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
   FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
-    "$ROOT/bin/fm-review-record.py" "$@"
+    "$ROOT/bin/fm-review-record.py" "$command" ${identity[@]+"${identity[@]}"} "$@"
 }
 
 # A direct-PR task's worker copy whose HEAD is a commit no remote ref holds: the

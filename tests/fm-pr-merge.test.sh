@@ -17,17 +17,18 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback missing-object malformed-config duplicate-config tagged-config extra-document parser-unavailable quoted-config; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default typed-unknown; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
     base=$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main)
-    if [ "$scenario" != ship-only ]; then
-      git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): repair consumer behavior'
-    fi
+    case "$scenario" in
+      ship-*) ;;
+      *) git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): repair consumer behavior' ;;
+    esac
     head=$(git -C "$case_dir/wt" rev-parse HEAD)
     mkdir -p "$case_dir/user-home/.no-mistakes"
-    python3 - "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt" "$base" "$head" "$url" <<'PY'
+    python3 - "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt" "$base" "$head" "$url" "$scenario" <<'PY'
 import sqlite3
 import sys
 with sqlite3.connect(sys.argv[1]) as db:
@@ -36,30 +37,30 @@ CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, base_sha TEXT, head_sha T
 CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);''')
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
-    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'claude-sonnet-5-5', 'anthropic'))
+    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] == 'typed-unknown' else 'claude-sonnet-5-5', 'anthropic'))
 PY
     case "$scenario" in
-      unreadable|config-fallback|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable|quoted-config)
+      unreadable|config-fallback|changed-config)
         printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
     esac
-    if [ "$scenario" = config-fallback ]; then
-      printf 'agent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml"
-    fi
     case "$scenario" in
-      malformed-config) printf 'agent: "codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
-      duplicate-config) printf 'agent: claude\nagent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
-      tagged-config) printf 'agent: claude\n!!binary YWdlbnQ=: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
-      extra-document) printf 'agent: codex\n---\nagent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
-      parser-unavailable)
-        printf 'agent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml"
-        printf '#!/bin/sh\nexit 127\n' > "$case_dir/fakebin/ruby"
-        chmod +x "$case_dir/fakebin/ruby" ;;
-      quoted-config) printf 'agent: "codex"\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      config-fallback) printf 'agent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      changed-config) printf 'agent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      ship-history|ship-multi-read)
+        printf 'claude-opus-5-5\ngpt-5.1-codex\n' > "$case_dir/state/task-x1.launch-models" ;;
+      ship-prior)
+        printf 'model=claude-opus-5-5\n' > "$case_dir/state/task-x1.control-relaunch.meta-prior" ;;
+      ship-default) printf 'default\n' > "$case_dir/state/task-x1.launch-models" ;;
     esac
     before=$(shasum -a 256 "$case_dir/user-home/.no-mistakes/state.sqlite")
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
-      ship-only|omitted-pipeline|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable|quoted-config) record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
+      ship-only|omitted-pipeline|ship-history|ship-prior|ship-default)
+        record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
+      ship-multi-read)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gemini-3-pro >/dev/null || fail 'record independent read of both ship families' ;;
+      typed-unknown)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","opus"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown typed constraint' ;;
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
@@ -75,7 +76,7 @@ PY
       record_review "$case_dir" "$url" "$head" --verdict FAIL --author-groups "$groups" --reader-model gemini-3-pro >/dev/null || fail 'record blocking reader'
       record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gemini-3-pro >/dev/null || fail 'record later PASS'
     fi
-    if [ "$scenario" = missing-object ]; then
+    if [ "$scenario" = head-mismatch ]; then
       head=9999999999999999999999999999999999999999
       add_gh_mocks "$case_dir" "$head"
       # Existing report evidence cannot authorize a different, unavailable head.
@@ -83,7 +84,7 @@ PY
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      two-readers|ship-only|config-fallback|quoted-config)
+      two-readers|ship-only|ship-multi-read)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -91,8 +92,11 @@ PY
         assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario must not reach forge mutation"
         case "$scenario" in
           exact-head-fail) expected='verdict is FAIL' ;;
-          missing-object) expected='head mismatch' ;;
-          unreadable|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          head-mismatch) expected='head mismatch' ;;
+          unreadable|config-fallback|changed-config) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          ship-history|ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
+          ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
+          typed-unknown) expected='family unknown' ;;
           *) expected='uncovered commit group no-mistakes:anthropic, family anthropic' ;;
         esac
         assert_grep "$expected" "$case_dir/stderr" "$scenario identifies missing independent read"
@@ -112,13 +116,36 @@ test_author_evidence_accepts_path_safe_legacy_task_ids() {
   for id in _noncanonical aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa Task_A.1; do
     case_dir=$(make_case "review-task-id-$id")
     mv "$case_dir/state/task-x1.meta" "$case_dir/state/$id.meta"
-    record_review "$case_dir" "$url" "$head" --task "$id" >/dev/null || fail 'path-safe task review must record'
+    record_review "$case_dir" "$url" "$head" >/dev/null || fail 'path-safe task review must record'
     rc=0
-    review_record_command "$case_dir" verify --pr "$url" --head "$head" --task "$id" --base main > "$case_dir/out" 2>&1 || rc=$?
+    review_record_command "$case_dir" verify --pr "$url" --head "$head" --task "$id" --base "$(cat "$case_dir/github-base")" > "$case_dir/out" 2>&1 || rc=$?
     expect_code 0 "$rc" "supported task id $id must verify author coverage: $(cat "$case_dir/out")"
     assert_grep 'review: PASS' "$case_dir/out" 'known independent coverage must verify for the supported id'
     pass "author evidence accepts path-safe task id: $id"
   done
+}
+
+test_author_verification_requires_exact_identity() {
+  local case_dir scenario rc
+  case_dir=$(make_case exact-evidence-identity)
+  for scenario in missing-task missing-base branch-base; do
+    local -a args=(--pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111)
+    case "$scenario" in
+      missing-task) args+=(--base "$(cat "$case_dir/github-base")") ;;
+      missing-base) args+=(--task task-x1) ;;
+      branch-base) args+=(--task task-x1 --base main) ;;
+    esac
+    rc=0
+    FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+      "$ROOT/bin/fm-review-record.py" verify "${args[@]}" > "$case_dir/out" 2>&1 || rc=$?
+    expect_code 2 "$rc" "$scenario must refuse without deriving from mutable refs or guessing a task"
+    case "$scenario" in
+      missing-task) assert_grep 'arguments are required: --task' "$case_dir/out" 'missing task diagnosis' ;;
+      missing-base) assert_grep 'arguments are required: --base' "$case_dir/out" 'missing base diagnosis' ;;
+      branch-base) assert_grep 'exact 40-hex base SHA' "$case_dir/out" 'branch name is not base evidence' ;;
+    esac
+  done
+  pass 'author verification requires explicit task and exact base commit'
 }
 
 test_identical_captain_words_follow_append_order() {
@@ -277,7 +304,7 @@ test_late_fail_before_away_hold_refuses() {
 for target in "$@"; do
   if [ "$target" = "$FM_STATE_OVERRIDE/.afk-contract.lock" ] && [ -e "$FM_TEST_REVIEW_RACE_DIR/late-fail-pending" ]; then
     rm "$FM_TEST_REVIEW_RACE_DIR/late-fail-pending" || exit 10
-    "$FM_TEST_ROOT/bin/fm-review-record.py" review --task task-x1 --base main --pr "$FM_TEST_REVIEW_RACE_URL" --head "$FM_TEST_REVIEW_RACE_HEAD" \
+    "$FM_TEST_ROOT/bin/fm-review-record.py" review --pr "$FM_TEST_REVIEW_RACE_URL" --head "$FM_TEST_REVIEW_RACE_HEAD" \
       --verdict FAIL --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
       --report "$FM_TEST_REVIEW_RACE_DIR/late-fail.md" > "$FM_TEST_REVIEW_RACE_DIR/late-fail-out" || exit 11
@@ -1722,6 +1749,7 @@ test_repo_override_args_refuse_before_recording() {
 pr_merge_test_cases=(
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
+test_author_verification_requires_exact_identity
 test_identical_captain_words_follow_append_order
 test_triggered_review_verifies_only_when_independent
 test_captain_fail_triggered_pass_requires_fresh_word

@@ -632,7 +632,29 @@ test_spawn_fixed_family_scope() {
   pass "fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op"
 }
 
+test_spawn_launch_model_history() {
+  local rec id out history prefix
+  id=omp-author-history
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  expect_code 0 $? "initial author-history launch: $out"
+  history="$HOME_DIR/state/$id.launch-models"
+  assert_equals 'openai-codex/gpt-6.1-sol' "$(cat "$history")" "initial launch records its author"
+  prefix=$(cat "$history")
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
+    --model anthropic/claude-opus-5-5 --effort high)
+  expect_code 0 $? "cross-family author-history relaunch: $out"
+  assert_equals "$prefix
+openai-codex/gpt-6.1-sol
+anthropic/claude-opus-5-5" "$(cat "$history")" "relaunch appends without erasing the old author"
+  assert_grep 'model=anthropic/claude-opus-5-5' "$HOME_DIR/state/$id.meta" "current model changes while history retains both authors"
+  pass "launch-model history preserves both families across relaunch"
+}
+
 test_spawn_fixed_family() {
+  test_spawn_launch_model_history
   test_spawn_fixed_family_contract
   test_spawn_fixed_family_scope
 }

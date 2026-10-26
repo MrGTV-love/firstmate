@@ -100,6 +100,11 @@
 #   kind and project or home come from the task's validated state/<id>.meta,
 #   so --backend, --scout, --secondmate, a project positional, and batch pairs
 #   are refused. Harness, model, and effort may change explicitly.
+#   Every launch appends its exact model (or default) as a newline-delimited
+#   entry to state/<id>.launch-models under the task metadata lock, before
+#   publishing replacement metadata. Relaunch also appends the prior meta model
+#   for legacy tasks. History is never truncated or unwound on launch failure:
+#   conservative extra authors fail closed in fm-review-record.py verification.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
@@ -6984,6 +6989,23 @@ preserve_relaunch_meta() {
   fi
 } >"$SPAWN_META_PATH" || {
   echo "error: task record for $ID could not be prepared at $SPAWN_META_PATH" >&2
+  exit 1
+}
+# Append-only author evidence shares the per-task metadata lock. Preserve the
+# prior launch before replacing legacy metadata, including failed relaunches:
+# over-attribution fails closed, while losing a prior author would widen merges.
+SPAWN_MODEL_HISTORY="$STATE/$ID.launch-models"
+if [ -L "$SPAWN_MODEL_HISTORY" ] || { [ -e "$SPAWN_MODEL_HISTORY" ] && [ ! -f "$SPAWN_MODEL_HISTORY" ]; }; then
+  echo "error: launch-model history is not an ordinary file: $SPAWN_MODEL_HISTORY" >&2
+  exit 1
+fi
+{
+  if [ "$RELAUNCH" -eq 1 ]; then
+    awk -F= '$1 == "model" { print substr($0, 7); found=1 } END { if (!found) print "unknown" }' "$RELAUNCH_META"
+  fi
+  printf '%s\n' "${MODEL:-default}"
+} >> "$SPAWN_MODEL_HISTORY" || {
+  echo "error: could not append launch-model history: $SPAWN_MODEL_HISTORY" >&2
   exit 1
 }
 if [ "$RELAUNCH" -eq 0 ]; then

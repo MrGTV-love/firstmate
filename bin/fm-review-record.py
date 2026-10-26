@@ -6,7 +6,7 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
     --reader-model MODEL --author-groups '{"commit-group":["model",...]}'
     --loosens-deny-allow-list yes|no --widens-guard yes|no
     --customer-data-billing-spend yes|no --report PATH
-    [--task TASK --base SHA_OR_BRANCH] [--covered-groups '["ship"]']
+    [--covered-groups '["ship"]']
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py latest --pr URL
   fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA
@@ -19,27 +19,25 @@ records are never replaced; append order, not wall-clock time, selects the newes
 review and captain-word for each canonical PR URL. Reads share the same lock.
 verify derives authors anew from the exact head's commits outside the merge base,
 with replacement objects disabled. fm-pr-merge.sh supplies --base as the live
-forge's exact base SHA, never a stale local target ref. A manual review snapshot
-also accepts a target branch name resolved under refs/remotes/origin/; fetch the
-base and full head locally first. --task selects state/<task>.meta; without it the PR
-must match exactly one meta pr= record. Non-pipeline commits form group ship,
-using that task's recorded model. Subjects starting exactly no-mistakes( form
+forge's exact 40-hex base SHA, never a stale local target ref. verify requires
+--task selecting state/<task>.meta and --base; fetch the exact base and full head
+locally first. Non-pipeline commits form group ship, using every model from the
+append-only state/<task>.launch-models history, current meta, and any
+state/<task>.control-relaunch.meta-prior. fm-spawn.sh owns history publication.
+Legacy tasks without history use the available meta evidence; default stays
+unknown. Subjects starting exactly no-mistakes( form
 no-mistakes:<family> groups. Their models come from matching runs and
 agent_invocations in <NM_HOME>/state.sqlite (default ~/.no-mistakes), opened with
 SQLite mode=ro. A matching run must contain the pipeline commit in its recorded
 base-to-head/pushed range and name this PR or this task's repository and branch.
 All its invocation models are conservative author evidence. A recorded provider
 can resolve an otherwise unknown model alias; conflicting provider/model families
-are unknown. Unattributed commits fall back to the configured agent, never to the
-ship model. The fallback safely parses agent strings/lists in config.yaml and the worktree's
-.no-mistakes.yaml with Ruby/Psych, with no object classes or aliases permitted.
-Malformed YAML, duplicate keys, extra documents, parser/dependency failures and
-unreadable files remain unknown; quote stripping never supplies author evidence.
-Only native claude/codex/grok identities without model/argument/custom-route
-overrides resolve; other agents remain unknown. Ruby/Psych is needed only for
-this fallback, not for readable run evidence. It never creates a database.
-review optionally accepts --task TASK --base BRANCH to record an author snapshot;
+are unknown. Unattributed commits remain unknown: today's agent configuration
+cannot prove who authored an earlier commit. It never creates a database.
+review records only the reader's declaration, not an attribution snapshot;
 verify always rereads authoritative evidence, including for historical records.
+Typed unknown-family models stay unknown even when a run provider resolves a
+similarly named recorded model.
 --author-groups remains a required declaration of exact author models, not an
 authority to remove or relabel derived groups. Named declarations must include the
 derived family; an all declaration must include every derived family. Additional
@@ -277,83 +275,16 @@ def git(worktree, *args):
 
 def task_metadata(home, pr, task):
     state = state_dir(home)
-    if task:
-        valid = subprocess.run(["bash", "-c", '. "$1/fm-pr-lib.sh"; fm_pr_task_id_valid "$2"',
-                                "fm-review-record", str(BIN), task], capture_output=True, check=False)
-        if valid.returncode:
-            raise RecordError("task must be a supported path-safe task id, not a path")
-    candidates = [state / f"{task}.meta"] if task else sorted(state.glob("*.meta"))
-    matches = []
-    for path in candidates:
-        try:
-            fields = dict(line.split("=", 1) for line in path.read_text().splitlines() if "=" in line)
-            if not task and fields.get("pr") != pr:
-                continue
-            matches.append((path.stem, fields))
-        except OSError as exc:
-            raise RecordError(f"cannot read task metadata {path}") from exc
-    if len(matches) != 1:
-        raise RecordError("author evidence needs exactly one PR task; supply --task TASK with its recorded worktree and model")
-    return matches[0]
-
-
-def configured_pipeline_models(root, worktree):
-    unknown = [modelled("unknown", "pipeline agent")]
-    documents = []
-    for path in (root / "config.yaml", worktree / ".no-mistakes.yaml"):
-        try:
-            documents.append(path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            continue
-        except (OSError, UnicodeError):
-            return unknown
-    if not documents:
-        return unknown
-    # Psych is a safe, real YAML parser, not a quote-stripping approximation.
-    # A missing Ruby/Psych dependency is unavailable evidence, never permission
-    # to guess a family. Reject duplicate keys and extra documents as ambiguous.
+    valid = subprocess.run(["bash", "-c", '. "$1/fm-pr-lib.sh"; fm_pr_task_id_valid "$2"',
+                            "fm-review-record", str(BIN), task], capture_output=True, check=False)
+    if valid.returncode:
+        raise RecordError("task must be a supported path-safe task id, not a path")
+    path = state / f"{task}.meta"
     try:
-        parsed = subprocess.run(["ruby", "-rjson", "-ryaml", "-e", '''
-def check_keys(node)
-  if node.is_a?(Psych::Nodes::Mapping)
-    keys = node.children.each_slice(2).map do |key, _|
-      unless key.is_a?(Psych::Nodes::Scalar) && (key.tag.nil? || key.tag == "tag:yaml.org,2002:str")
-        raise "complex or type-tagged config key"
-      end
-      key.value
-    end
-    raise "duplicate config key" unless keys.uniq.length == keys.length
-  end
-  node.children.to_a.each { |child| check_keys(child) }
-end
-configs = JSON.parse(STDIN.read).map do |text|
-  stream = Psych.parse_stream(text)
-  raise "multiple config documents" if stream.children.length > 1
-  check_keys(stream)
-  config = YAML.safe_load(text, permitted_classes: [], permitted_symbols: [], aliases: false, fallback: nil)
-  raise "config must be a mapping" unless config.nil? || config.is_a?(Hash)
-  config || {}
-end
-STDOUT.write(JSON.generate(configs))
-'''], input=json.dumps(documents), capture_output=True, text=True, check=False)
-        if parsed.returncode:
-            return unknown
-        configs = json.loads(parsed.stdout)
-    except (OSError, UnicodeError, ValueError):
-        return unknown
-    if not isinstance(configs, list) or len(configs) != len(documents):
-        return unknown
-    value = None
-    for config in configs:
-        if not isinstance(config, dict) or any(key in config for key in ("agent_config", "agent_args_override", "acp_registry_overrides")):
-            return unknown
-        if "agent" in config:
-            value = config["agent"]
-    agents = value if isinstance(value, list) else [value]
-    if not agents or any(not isinstance(agent, str) for agent in agents):
-        return unknown
-    native = {"claude": "claude", "codex": "codex", "grok": "grok"}
-    return [modelled(native.get(agent, "unknown"), "pipeline agent") for agent in agents]
+        fields = dict(line.split("=", 1) for line in path.read_text().splitlines() if "=" in line)
+    except (OSError, UnicodeError) as exc:
+        raise RecordError(f"cannot read task metadata {path}") from exc
+    return task, fields
 
 
 def derived_authors(home, pr, head, task, base):
@@ -362,17 +293,28 @@ def derived_authors(home, pr, head, task, base):
     # The merge helper already binds the forge head; independently require the
     # actual objects and base locally, rather than trusting a typed commit list.
     git(worktree, "cat-file", "-e", f"{head}^{{commit}}")
-    if not base:
-        raise RecordError("author evidence requires --base with the forge's current target branch")
-    base_ref = base if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", base) else f"refs/remotes/origin/{base}"
-    base_ref = git(worktree, "rev-parse", "--verify", f"{base_ref}^{{commit}}")
+    if not base or not re.fullmatch(r"[0-9a-f]{40}", base):
+        raise RecordError("author evidence requires --base with the forge's exact 40-hex base SHA")
+    base_ref = git(worktree, "rev-parse", "--verify", f"{base}^{{commit}}")
     base_sha = git(worktree, "merge-base", head, base_ref)
     commits = [line.split("\x00", 1) for line in git(worktree, "log", "--format=%H%x00%s", f"{base_sha}..{head}").splitlines()]
     if not commits:
         raise RecordError("author commit group is empty; fetch the PR base and exact head before recording a read")
     groups = {}
     if any(not subject.startswith("no-mistakes(") for _, subject in commits):
-        groups["ship"] = [modelled(meta.get("model") or "unknown", "ship model")]
+        models = [meta.get("model") or "unknown"]
+        state = state_dir(home)
+        history = state / f"{task}.launch-models"
+        prior = state / f"{task}.control-relaunch.meta-prior"
+        try:
+            if history.exists():
+                models.extend(history.read_text(encoding="utf-8").splitlines() or ["unknown"])
+            if prior.exists():
+                fields = dict(line.split("=", 1) for line in prior.read_text(encoding="utf-8").splitlines() if "=" in line)
+                models.append(fields.get("model") or "unknown")
+        except (OSError, UnicodeError) as exc:
+            raise RecordError(f"cannot read ship launch-model evidence for {task}") from exc
+        groups["ship"] = [modelled(value or "unknown", "ship model") for value in sorted(set(models))]
     pipeline = [sha for sha, subject in commits if subject.startswith("no-mistakes(")]
     if pipeline:
         root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
@@ -416,7 +358,7 @@ def derived_authors(home, pr, head, task, base):
             covered.clear()
             models.clear()
         if set(pipeline) - covered:
-            models.extend(configured_pipeline_models(root, worktree))
+            models.append(modelled("unknown", "pipeline model"))
         for item in {(item["model"], item["family"]): item for item in models}.values():
             groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
     return task, groups
@@ -440,26 +382,15 @@ def verify(records, rows, head, home, pr, task, base):
         raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
     if review["head"] != head:
         raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    task, groups = derived_authors(home, pr, head, task or review.get("task"), base)
+    task, groups = derived_authors(home, pr, head, task, base)
     derived_families = {a["family"] for authors in groups.values() for a in authors}
-    identities = {}
-    for authors in groups.values():
-        for author in authors:
-            identities.setdefault(author["model"], set()).add(author["family"])
-
-    def identified(author):
-        result = modelled(author["model"], "author_groups model")
-        known = identities.get(author["model"], set())
-        if result["family"] == "unknown" and len(known) == 1:
-            result["family"] = next(iter(known))
-        return result
 
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
     passes = [row for row in rows if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
     # Typed groups can only add author constraints, never erase the derived ones.
     for row in passes:
         for group, authors in row["author_groups"].items():
-            authors = [identified(a) for a in authors]
+            authors = [modelled(a["model"], "author_groups model") for a in authors]
             if group == "all":
                 extras = [a for a in authors if a["family"] not in derived_families]
                 if extras:
@@ -473,11 +404,11 @@ def verify(records, rows, head, home, pr, task, base):
         for row in passes:
             named = row.get("covered_groups", list(row["author_groups"]))
             declared = row["author_groups"].get(group, row["author_groups"].get("all", []))
-            declared_families = {identified(a)["family"] for a in declared}
+            declared_families = {modelled(a["model"], "author_groups model")["family"] for a in declared}
             reader = model(row["reader_model"], "reader_model")
             # An 'all' read is usable only when its typed evidence includes every
             # derived family; the old OpenAI-only declaration cannot hide Claude.
-            all_declared = {identified(a)["family"] for a in row["author_groups"].get("all", [])}
+            all_declared = {modelled(a["model"], "author_groups model")["family"] for a in row["author_groups"].get("all", [])}
             required = derived_families if "all" in row["author_groups"] else families
             constraints = families | (all_declared - derived_families)
             if (group in named or "all" in named) and required <= declared_families:
@@ -486,8 +417,8 @@ def verify(records, rows, head, home, pr, task, base):
         if not covered or unknown_reader:
             reason = f"model family unknown for {review['reader_model']}; " if unknown_reader else ""
             models = {key: sorted({a["model"] for a in values}) for key, values in groups.items()}
-            command = shlex.join([str(BIN / "fm-review-record.py"), "review", "--task", task,
-                                  "--pr", pr, "--head", head, "--base", base,
+            command = shlex.join([str(BIN / "fm-review-record.py"), "review",
+                                  "--pr", pr, "--head", head,
                                   "--verdict", "PASS", "--reader-model", "OUTSIDE_FAMILY_MODEL",
                                   "--author-groups", json.dumps(models, separators=(",", ":")),
                                   "--covered-groups", json.dumps([group]),
@@ -505,9 +436,9 @@ def main():
         command.add_argument("--pr", required=True)
         if name != "latest":
             command.add_argument("--head", required=True)
-        if name in ("review", "verify"):
-            command.add_argument("--task")
-            command.add_argument("--base")
+        if name == "verify":
+            command.add_argument("--task", required=True)
+            command.add_argument("--base", required=True)
         if name == "review":
             command.add_argument("--covered-groups", help='JSON list of groups read, or ["all"]; defaults to author-groups keys')
             for flag in ("verdict", "reader-model", "author-groups", "report", *(t.replace("_", "-") for t in TRIGGERS)):
@@ -517,6 +448,8 @@ def main():
     args = parser.parse_args()
     try:
         home = task_home()
+        if args.command == "verify" and not re.fullmatch(r"[0-9a-f]{40}", args.base):
+            raise RecordError("author evidence requires --base with the forge's exact 40-hex base SHA")
         pr = canonical_pr(args.pr)
         row = {"schema": "fm-review-record.v1", "kind": args.command, "pr": pr, "at": int(time.time())}
         if args.command == "review":
@@ -536,18 +469,13 @@ def main():
             validate(row)
         if args.command == "review":
             row["report_sha256"] = report_digest(args.report, args.verdict, args.head)
-            if args.base:
-                row["task"], row["derived_author_groups"] = derived_authors(home, pr, args.head, args.task, args.base)
-                row["base"] = args.base
-            elif args.task:
-                row["task"] = args.task
             try:
                 row["covered_groups"] = json.loads(args.covered_groups) if args.covered_groups else list(groups)
             except ValueError as exc:
                 raise RecordError("covered_groups must be a JSON list of commit groups read") from exc
             if (not isinstance(row["covered_groups"], list) or not row["covered_groups"]
                     or any(not isinstance(g, str) or not g for g in row["covered_groups"])
-                    or any(g != "all" and g not in groups and g not in row.get("derived_author_groups", {}) for g in row["covered_groups"])):
+                    or any(g != "all" and g not in groups for g in row["covered_groups"])):
                 raise RecordError("covered_groups must name author groups or all")
         if args.command == "captain-word":
             refuse_away(state_dir(home))
@@ -566,7 +494,7 @@ def main():
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
             else:
-                print(f"review: {verify(records, rows, args.head, home, pr, args.task, args.base or (records['review'] or {}).get('base'))}")
+                print(f"review: {verify(records, rows, args.head, home, pr, args.task, args.base)}")
     except (RecordError, OSError) as exc:
         print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
         return 1
