@@ -4366,11 +4366,19 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-      # One event per decision: this refusal is the decision the brief gate took.
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+      # One event per decision: this refusal is the decision each brief gate took.
+      case "$DISPATCH_PROBLEMS" in
+      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --source-ok true 2>/dev/null || true ;;
+      esac
+      if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vqF '### Out of scope is empty'; then
+        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+      fi
       exit 1
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
+    if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
+    fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi

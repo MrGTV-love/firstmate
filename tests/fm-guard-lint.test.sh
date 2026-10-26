@@ -166,6 +166,16 @@ assert_clean "a retired guard with a live retirement test is clean" "$RETIRED"
 mutate "$RETIRED" '.guards += [(.guards[0] | .id = "gone-guard" | .invariant = "a retired invariant")]'
 assert_fails_with "a retired guard that is still registered fails" "$RETIRED" R1
 
+# --- post-audit inventory ---------------------------------------------------
+LATER=$(fixture later)
+mutate "$LATER" '.guards += [(.guards[0] | .id = "later-guard" | .invariant = "a later invariant")]'
+out=$(run_lint "$LATER" --counts) && fail "an unaccounted post-audit guard balanced the inventory: $out"
+mutate "$LATER" '.beyond_audit_active = ["missing-guard"]'
+out=$(run_lint "$LATER" --counts) && fail "an unregistered post-audit id balanced the inventory: $out"
+mutate "$LATER" '.beyond_audit_active = ["later-guard"]'
+out=$(run_lint "$LATER" --counts) || fail "a registered post-audit guard did not balance the inventory: $out"
+pass "a guard registered after the audit balances the inventory only when it is named"
+
 # --- ratchet ----------------------------------------------------------------
 ALLOW=$(fixture allowlist)
 mutate "$ALLOW" '.guards[0].remedy = "a pointer with no command"'
