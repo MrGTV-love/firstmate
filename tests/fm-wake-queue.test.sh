@@ -3345,7 +3345,7 @@ test_bounded_lock_malformed_steal_reports_acquire_failure() {
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
 test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   local dir state status queue_out queue_err first_out first_err second_out second_err replay_out replay_err
-  local queue_holder presentation_holder ack_holder i start elapsed rc advisory_count ack_count
+  local queue_holder presentation_holder ack_holder i elapsed rc advisory_count ack_count
   dir=$(make_case presentation-lock-deadline)
   state="$dir/state"
   status="$state/task.status"
@@ -3377,13 +3377,11 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/queue.ready" ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue holder never acquired its lock"; }
 
-  start=$(date +%s)
   FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
     "$DRAIN" > "$queue_out" 2> "$queue_err" \
     || { kill "$queue_holder" 2>/dev/null || true; fail "bounded queue presentation drain failed"; }
-  elapsed=$(( $(date +%s) - start ))
-  [ "$elapsed" -le 4 ] \
-    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain for ${elapsed}s"; }
+  kill -0 "$queue_holder" 2>/dev/null \
+    || fail "queue presentation returned only after its live holder exited"
   advisory_count=$(grep -Fc \
     "WAKE DRAIN SKIPPED: queue lock remains held by live pid $queue_holder" \
     "$queue_out" || true)
@@ -3417,26 +3415,33 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/presentation.ready" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation holder never acquired its lock"; }
 
-  # Assert helper silence at its own boundary, not against the drain's valid
-  # supervision alarms for the still-unacknowledged wake.
+  # Instruction 003 decision: five interleaved base/branch trials both broke
+  # the old whole-drain ceiling. Time the bounded acquire, not startup/guard
+  # work; preserve the same four-second bound and all lock/ack assertions.
+  # Assert helper silence separately from the drain's valid supervision alarms.
   rc=0
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
+    wait_started=$SECONDS
     fm_lock_acquire_wait_bounded "$2" 1
-  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.status-presentation-lock" \
+    rc=$?
+    printf "%s\n" "$((SECONDS - wait_started))" > "$3"
+    exit "$rc"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.status-presentation-lock" "$dir/wait.elapsed" \
     > "$dir/presentation-helper.out" 2> "$dir/presentation-helper.err" || rc=$?
+  elapsed=$(cat "$dir/wait.elapsed")
+  [ "$elapsed" -le 4 ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded lock acquire delayed for ${elapsed}s"; }
   [ "$rc" -eq 124 ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation helper did not report its deadline (rc=$rc)"; }
   [ ! -s "$dir/presentation-helper.err" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline leaked helper-process diagnostics"; }
 
-  start=$(date +%s)
   FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
     "$DRAIN" > "$first_out" 2> "$first_err" \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation drain failed"; }
-  elapsed=$(( $(date +%s) - start ))
-  [ "$elapsed" -le 4 ] \
-    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain for ${elapsed}s"; }
+  kill -0 "$presentation_holder" 2>/dev/null \
+    || fail "status presentation returned only after its live holder exited"
   advisory_count=$(grep -Fc \
     "STATUS PRESENTATION SKIPPED: lock remains held by live pid $presentation_holder" \
     "$first_out" || true)

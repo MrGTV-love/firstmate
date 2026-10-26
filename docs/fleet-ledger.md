@@ -95,7 +95,8 @@ Example:
 
 - A worker using the current status command in its instructions records its line immediately after appending it, while the ledger is enabled.
   The supervision monitor's regular poll is the backstop: it records any line the immediate write missed, and does not record again a line that write already recorded.
-  These lines still trail the status log by up to one poll interval, or until the monitor next runs when none is running:
+  These lines still trail the status log by up to one poll interval when the ledger lock is available, or until the monitor next runs when none is running.
+  A busy ledger lock defers the monitor's capture without consuming pending status offsets, leaving lock alarms runnable; the next available poll retries these lines:
   - lines firstmate itself writes to a task's status log, such as a recorded answer, a failed launch, a relayed pending reply, or a second mate's report line;
   - lines from workers whose instructions predate this, or that append without running the instruction's full command;
   - lines a remote second mate reports, which reach this home through firstmate's relay;
