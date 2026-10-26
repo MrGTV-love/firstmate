@@ -125,13 +125,27 @@ wait_for_capture_text "$TARGET" "shell-ready" \
   || fail "the tmux task shell did not become ready"
 pass "real tmux: passive readiness survives slow pre-interactive startup"
 
-# Control: Ctrl-C is safe once the interactive rc file has acknowledged startup.
+# Control: Ctrl-C must not disturb an interactive shell. The rc file prints its
+# readiness marker while it is still running, and CI proved that marker can be
+# observed before the terminal is in the interactive state: the captured pane
+# then showed "^Cprintf ..." followed by the shell running "rintf ...", so the
+# control key was taken by the terminal instead of the prompt and swallowed the
+# first byte of the command behind it. The message that used to fail here blamed
+# the shell dying, which that capture disproves. Submit a probe command, then
+# wait for its output followed by the redrawn prompt line. The probe output alone
+# only proves the command ran; bash prints it before it returns to readline.
+# readline draws the prompt only after it owns the terminal, so the prompt line
+# after the probe output proves readline owns the terminal before Ctrl-C is sent.
+fm_backend_tmux_send_text_line "$TARGET" "printf 'interactive-%s\\n' ready" \
+  || fail "could not submit a probe command once the rc file acknowledged startup"
+wait_for_capture_text "$TARGET" "interactive-ready"$'\n'"smoke\$" \
+  || fail "the tmux task shell did not dispatch a submitted command after startup"
 tmux send-keys -t "$TARGET" C-c
 fm_backend_tmux_send_text_line "$TARGET" "printf 'after-interactive-%s\\n' interrupt" \
   || fail "the interactive shell did not accept input after Ctrl-C"
 wait_for_capture_text "$TARGET" "after-interactive-interrupt" \
-  || fail "Ctrl-C after the interactive rc file killed the shell"
-pass "real tmux: Ctrl-C after the interactive rc file preserves command execution"
+  || fail "the shell did not run the command sent after Ctrl-C"
+pass "real tmux: Ctrl-C after the prompt is live preserves command execution"
 
 tmux send-keys -t "$TARGET" "cd /tmp && PS1='smoke\$ ' && clear && printf 'setup-%s\\n' ready" Enter
 wait_for_capture_text "$TARGET" "setup-ready" || fail "the tmux task shell did not complete setup"
