@@ -1,0 +1,7 @@
+## lab primary pane env (pane_pid of 'claude' started per .no-mistakes.yaml recipe)
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ZX7z5Y
+TMUX=/private/tmp/fml.rtG1JD/tmux-501/fm-lab,65794,0
+NO_MISTAKES_GATE absent in pane env: yes
+
+## claude agent-view probe result
+ ✻ fm-control-probe                       The probe ran once. `FM_HOME` and `TMUX` were both empty. `bin/fm-control.sh` refused to run inside the gate worktree and exited with code 3.              12s

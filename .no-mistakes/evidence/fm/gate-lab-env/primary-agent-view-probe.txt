@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  New sessions: Opus 5.5 · high effort · ~/.no-mistakes/worktrees/e2f2c2589455/01M5VCYYNYRDAEVK6FJ8YYY100
+ ▝▝   ▝▝   0 awaiting input · 2 working · 19 completed
+
+Pinned
+ ∙ we may now increase the cycle time on  Done · cron job 1e978b73 set to 3hr interval; log check clean, no action needed                                                                            16m
+ ∙ yes Let s close the gap                Idle · The fork is now the only proxy that can serve port 13456. The `teamclaude` command runs the fork, `tc server` refuses to start a second pro…        31d
+
+~/.no-mistakes/repos/e2f2c2589455.git
+ ✻ fm-control-probe                       Done · The probe ran once. `FM_HOME` and `TMUX` were both empty. `bin/fm-control.sh` refused to run inside the gate worktree and exited with code …        12s
+
+~/.no-mistakes/repos/0cc02b51527d.git
+ ∙ telemetry-ok-handshake                 Done · telemetry-ok                                                                                                                                        20s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M48Y55XHVMYKTXPFGKFKDR35
+ ∙ isolated test validation               Done · Captain, the third lab scout `model-next-local` started inside the lab on omp, and `role:strong` now gave `openai-codex/gpt-6-luna` instead…         3m
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M49BNC0Y814WKMNYSGKQPCT8
+ ∙ fm-lock acquire isolated               Done · The lab lock-race test passed for both relaunch paths: authorization was refused while each relaunch held the locks, the restricted scope c…        23s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4CVJREG2ZWYYTNDVWK2DHWT
+ ∙ upgrade-gate open decision             Done · Upgrade-gate decision not in context. Its final next-step section was not delivered, because only a 2KB preview of the 17.7KB session-start…         9s
+ ∙ isolated-fm-session-start-validation   Done · The startup digest at `.live-validation-j9hf4ix3/primary/state/startup-digest.txt` has a NEXT STEP section, but no key upgrade-gate, no STA…        20s
+ ∙ isolated validation output-check       Done · The isolated startup digest exited 0. It shows the upgrade-gate decision (line 17) and NEXT STEP (line 174). It has no real STARTUP TRUNCAT…        27s
+ ∙ session-start-digest-test              Done · The cold lab startup took 10.494 s and the warm re-emit took 8.281 s; both digests show decision key `buried-live` and end with the `NEXT S…        56s
+ ∙ live gate validation run               Done · Lab session start finished and printed NEXT STEP. Total time was 8.563s (zsh timing line, because zsh ignores TIMEFORMAT).                          35s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4D1H184R6TQSQ9R3SMA5QQ4
+ ∙ reply-only isolated validation         Done · isolated validation                                                                                                                                  3s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4DC7R9X49RYPVX8VEVR5045
+ ∙ watchdog-live-validation-lab           Failed · working directory no longer exists or is not accessible: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4DC7R9X49RYPVX8VEV…         4h
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4EY67GK5YXQS7CVZEW2QSJQ
+ ∙ watchdog live-validation lab           Done · LAB_READY sent; disposable FM_HOME ready for watchdog validation, no other action taken                                                             36s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V
+ ∙ isolated fm-session live validation    Done · The timed session start in the disposable lab home took 64.61 s (user 5.38 s, sys 15.59 s), got the lock (`lock acquired: harness pid 65894…         3m
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG
+ ∙ live validation lab_report             Done · LAB_REPORT 63                                                                                                                                        9s
+
+~/.no-mistakes/worktrees/32d18ed9638d/01M4FMK7GT1AYZYG9RNY8ND34P
+ ∙ pause-watcher validation lab           Done · LAB_READY acknowledged; agent holding per instruction                                                                                                5s
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ describe a task for a new session
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  enter to open · space to reply · hold space to speak · ctrl+x to delete · ? for shortcuts

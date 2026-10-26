@@ -1,0 +1,20 @@
+## TMPDIR=/tmp (realpath /private/tmp)
+$ eval "$(TMPDIR=/tmp bin/fm-lab-home.sh env)"
+FM_HOME=/private/tmp/fm-lab.rmKxjD
+canonical=/private/tmp/fm-lab.rmKxjD
+$ bin/fm-control.sh nosuch-task stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.rmKxjD
+error: no task 'nosuch-task' in /private/tmp/fm-lab.rmKxjD/state (fm-control resolves an exact task id only)
+rc=1
+torn down
+
+## TMPDIR=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/ (realpath /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T)
+$ eval "$(TMPDIR=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/ bin/fm-lab-home.sh env)"
+FM_HOME=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-lab.P5vedn
+canonical=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-lab.P5vedn
+$ bin/fm-control.sh nosuch-task stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-lab.P5vedn
+error: no task 'nosuch-task' in /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-lab.P5vedn/state (fm-control resolves an exact task id only)
+rc=1
+torn down
+

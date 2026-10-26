@@ -1,0 +1,55 @@
+## context: NO_MISTAKES_GATE=1 TMPDIR=/Users/charlesabrooker/tmp git-common-dir=/Users/charlesabrooker/.no-mistakes/repos/e2f2c2589455.git
+
+## S1 adversarial: real (unmarked) FM_HOME from gate worktree is refused, refusal names the env command
+$ FM_HOME=/Users/charlesabrooker/tmp/fake-real-home.yhembu bin/fm-control.sh nosuch-task stay
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+rc=3
+$ (no FM_HOME) bin/fm-send.sh nosuch-task hello
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+rc=3
+
+## S2: one command provisions the lab; eval exports FM_HOME + TMUX_TMPDIR; stderr repeats exports + teardown
+$ eval "$(bin/fm-lab-home.sh env)"
+rc=0
+--- stderr of env:
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XJrB7j
+export TMUX_TMPDIR=/tmp/fml.0aYcWr
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5VCYYNYRDAEVK6FJ8YYY100/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.XJrB7j && rm -rf /Users/charlesabrooker/tmp/fm-lab.XJrB7j
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XJrB7j
+TMUX_TMPDIR=/tmp/fml.0aYcWr
+canonical: /Users/charlesabrooker/tmp/fm-lab.XJrB7j
+total 8
+drwx------      7 charlesabrooker  staff      224 Oct 26 01:09 .
+drwxr-xr-x  65535 charlesabrooker  staff  2398688 Oct 26 01:09 ..
+-rw-r--r--      1 charlesabrooker  staff      103 Oct 26 01:09 .fm-lab-home
+drwxr-xr-x      2 charlesabrooker  staff       64 Oct 26 01:09 config
+drwxr-xr-x      2 charlesabrooker  staff       64 Oct 26 01:09 data
+drwxr-xr-x      2 charlesabrooker  staff       64 Oct 26 01:09 projects
+drwxr-xr-x      3 charlesabrooker  staff       96 Oct 26 01:09 state
+fm-lab-home v1
+owner_pid=14199
+owner_identity=Mon Oct 26 01:09:10 2026     bash bin/fm-lab-home.sh env
+drwx------  2 charlesabrooker  wheel  64 Oct 26 01:09 /tmp/fml.0aYcWr
+
+## S3: lifecycle call with the env-minted lab home passes the gate refusal (fails later on unknown task, not exit 3)
+$ bin/fm-control.sh nosuch-task stay   (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XJrB7j)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XJrB7j
+error: no task 'nosuch-task' in /Users/charlesabrooker/tmp/fm-lab.XJrB7j/state (fm-control resolves an exact task id only)
+rc=1
+
+## S4 adversarial: a symlinked path to the same lab home is still refused (only canonical marked home admitted)
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab-link.13816 bin/fm-control.sh nosuch-task stay
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+rc=3
+
+## S5: teardown line printed on stderr removes the socket dir and the lab, from a fresh shell in another cwd
+$ (cd / && /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5VCYYNYRDAEVK6FJ8YYY100/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.XJrB7j && rm -rf /Users/charlesabrooker/tmp/fm-lab.XJrB7j)
+rc=0
+lab removed: /Users/charlesabrooker/tmp/fm-lab.XJrB7j
+socket dir removed: /tmp/fml.0aYcWr
