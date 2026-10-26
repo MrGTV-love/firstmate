@@ -508,14 +508,31 @@ for label, source in bodies:
     assert args == ["--session-id", session] + old_args, label
     assert stdin == old_stdin, label
     print("ok - raw Claude shell data byte fidelity:", label)
-for arguments in (["--resume", "old-session"], ["-r", "old-session"], ["--continue"], ["-c"]):
-    source = "claude " + " ".join(arguments)
-    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
-    result = subprocess.run(["bash", "-c", rendered], input="resume prompt", check=True, capture_output=True, text=True, env=env)
-    args, stdin = json.loads(result.stdout)
-    assert args == ["--session-id", session, "--fork-session"] + arguments, args
-    assert stdin == "resume prompt", stdin
-    print("ok - raw Claude forks resumed session:", arguments[0])
+forks = [
+    ["--resume", "old-session"], ["-r", "old-session"], ["--continue"], ["-c"],
+    ["--resume=old-session"], ["-rold-session"], ["-pc"], ["-p", "-cr"],
+    ["--append-system-prompt", "--", "--resume", "old-id"],
+    ["--model", "--", "--continue"],
+    ["--append-system-prompt", "--fork-session", "--resume", "old-id"],
+    ["-n", "--print", "-c"],
+]
+unforked = [
+    ["--append-system-prompt", "--continue", "--print", "hello"],
+    ["--append-system-prompt=--continue", "--print", "hello"],
+    ["-n", "--resume", "--print", "hello"],
+    ["-n--continue", "--print", "hello"],
+    ["--print", "--", "--resume"],
+    ["--resume", "old-session", "--fork-session"],
+]
+for fork, cases in ((["--fork-session"], forks), ([], unforked)):
+    for arguments in cases:
+        source = "claude " + " ".join("'" + argument + "'" for argument in arguments)
+        rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+        result = subprocess.run(["bash", "-c", rendered], input="resume prompt", check=True, capture_output=True, text=True, env=env)
+        args, stdin = json.loads(result.stdout)
+        assert args == ["--session-id", session] + fork + arguments, (arguments, args)
+        assert stdin == "resume prompt", stdin
+        print("ok - raw Claude", "forks" if fork else "does not fork", "for:", " ".join(arguments))
 refusals = [
     ("command substitution", "claude --print $(claude --help)"),
     ("command substitution", "claude --print $(cat <<END\nclaude --help\nEND\n)"),

@@ -26,6 +26,40 @@ import sys
 
 OPERATORS = "\n;&|()"
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+# Claude Code 2.1.310 options whose value is required: its parser takes the next
+# word as that value even when it starts with "-".
+CLAUDE_VALUE_OPTIONS = frozenset("""
+    --ablation --accept-command --add-dir --advisor --agent --agent-color
+    --agent-id --agent-name --agent-type --agents --allow-tools --allowedTools
+    --allowed-tools --append-subagent-system-prompt
+    --append-subagent-system-prompt-file --append-system-prompt
+    --append-system-prompt-file --attach-serve --author --author-email
+    --autocompact --betas --callback-port --case --channels --client-data-url
+    --client-id --concurrency --config --correlation-id --cwd
+    --dangerously-load-development-channels --debug-file --deep-link-cwd-b64
+    --deep-link-last-fetch --deep-link-repo --description --disallow-tools
+    --disallowedTools --disallowed-tools --effort --email --env --environment
+    --eval-dir --fallback-model --fast-mode --file --forward-home-settings
+    --header --id-token --inherit-permission-mode --input-format --issuer
+    --json-schema --judge-model --label --managed-settings --marketplace
+    --max-budget-usd --max-cost-usd --max-thinking-tokens --max-turns
+    --mcp-config --message --messaging-socket-path --mocks --model --name
+    --on-branch --output-dir --output-format --parent-session-id
+    --permission-mode --permission-prompt-tool --permission-prompts
+    --plan-mode-instructions --plugin-dir --plugin-dir-no-mcp --plugin-url
+    --pool --port --prefill --prefill-b64 --proactivity --profile
+    --project-config-root --ref --registry
+    --remote-control-session-name-prefix --report --result-format
+    --resume-drops-turn --resume-session-at --rewind-files --runner-declares
+    --runs --scope --sdk-url --session-id --setting-sources --settings --sparse
+    --system-prompt --system-prompt-file --system-prompt-snapshot --tag
+    --task-budget --team-name --teammate-mode --thinking --thinking-display
+    --threshold --timeout --tools --transport --watch-artifact
+    --watch-artifact-no-autoreact --with --workload
+""".split())
+CLAUDE_SHORT_VALUES = "Hejmnst"
+CLAUDE_SHORT_OPTIONAL_VALUES = "drw"
+RESUME_OPTIONS = {"--resume", "-r", "--continue", "-c"}
 
 
 def refuse(construct):
@@ -172,6 +206,29 @@ def commands(text):
     yield current
 
 
+def claude_options(arguments):
+    """Return the option names Claude's parser reads, skipping option values."""
+    names, operand = set(), False
+    for argument in arguments:
+        if operand:
+            operand = False
+        elif argument == "--":
+            break
+        elif argument.startswith("--"):
+            name, attached, _ = argument.partition("=")
+            names.add(name)
+            operand = not attached and name in CLAUDE_VALUE_OPTIONS
+        elif argument.startswith("-") and argument != "-":
+            for index, flag in enumerate(argument[1:], 1):
+                names.add("-" + flag)
+                if flag in CLAUDE_SHORT_VALUES:
+                    operand = index == len(argument) - 1
+                    break
+                if flag in CLAUDE_SHORT_OPTIONAL_VALUES:
+                    break
+    return names
+
+
 def render_claude(text, session, prefix):
     marks = []
     for command in commands(text):
@@ -183,14 +240,9 @@ def render_claude(text, session, prefix):
             if expands:
                 refuse("expanded program word")
             if os.path.basename(value) == "claude":
-                options = []
-                for argument in command[position + 1:]:
-                    if argument[3] == "--":
-                        break
-                    options.append(argument[3])
-                resumes = any(option in ("--resume", "-r", "--continue", "-c") for option in options)
+                options = claude_options(argument[3] for argument in command[position + 1:])
                 suffix = session
-                if session and resumes and "--fork-session" not in options:
+                if session and options & RESUME_OPTIONS and "--fork-session" not in options:
                     suffix += " --fork-session"
                 marks.append((start, end, suffix))
             break
