@@ -305,11 +305,14 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # 1209767 ms, just above this budget, so two scripts moved to lane 2; that
 # rebalanced lane 1 modeled at 1117958 ms, set by fm-pr-merge alone. After the
 # fm-pr-merge split, only tests/fm-pr-merge.test.sh stays parallel, on an
-# apportioned hint (one of the 29 parallel hints; the other 28 are measured),
-# and fm-captain-hold-cleanup moved to lane 1 to restore the balance; lane 1
-# models at 941010 ms, set by fm-test-run alone, and that is the reported
-# parallel_makespan_ms. Like the serial target this is packing arithmetic, not
-# an execution timeout.
+# apportioned hint, and fm-captain-hold-cleanup moved to lane 1 to restore the
+# balance. After the fm-lint split, 5 of the 32 parallel hints are apportioned
+# (tests/fm-pr-merge.test.sh and the four fm-lint groups) and the other 27 are
+# measured. Lane 1 is fm-test-run, fm-captain-hold-reconcile, fm-pr-merge,
+# fm-captain-hold-cleanup, fm-lint, fm-crew-state, fm-pi-primary-types, and
+# fm-supervision-instructions; its three-bin packing models at 1004983 ms, not
+# fm-test-run alone, and that is the reported parallel_makespan_ms. Like the
+# serial target this is packing arithmetic, not an execution timeout.
 # measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 then modeled at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
