@@ -1,0 +1,26 @@
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5-live-a/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5-live-a
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5-live-a+66cf929ab8f147916319cd62bfbc0084b32103556d77e870bf4be8e0c729c1f7/launch.s1793041703.25423.21531.sh'
+2.1.310 (Claude Code)
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/other-z.status: Operation not permitted
+rm: /private/tmp/fm-other-z/fixture.txt: Operation not permitted
+rm: /private/tmp/fm-other-z: Operation not permitted
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import pathlib; pathlib.Path('/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/README.md').unlink()
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_local.py", line 746, in unlink
+    os.unlink(self)
+    ~~~~~~~~~^^^^^^
+PermissionError: [Errno 1] Operation not permitted: '/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/README.md'
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-a.meta: Operation not permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/config/probe: Operation not permitted
+charlesabrooker@Mac-Studio demo % 

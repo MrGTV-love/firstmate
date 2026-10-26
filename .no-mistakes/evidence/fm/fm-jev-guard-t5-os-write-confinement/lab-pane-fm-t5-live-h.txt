@@ -1,0 +1,13 @@
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/3/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/3/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5-live-h/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5-live-h
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5-live-h+66cf929ab8f147916319cd62bfbc0084b32103556d77e870bf4be8e0c729c1f7/launch.s1793041827.61142.6579.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio demo % 

@@ -1,0 +1,481 @@
+# Lab home: /Users/charlesabrooker/tmp/fm-lab.FZOGft (removed at the end of this run)
+
+## t5r3-a
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: claude --version; echo w > probe-worktree.txt && echo P1-own-worktree-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P1-own-worktree-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo d > /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probe-data.txt && echo P2-own-data-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P2-own-data-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo appended >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.status && echo P3-own-status-append=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P3-own-status-append=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo clobber > /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-other.status && echo P4e-other-status-whole-rewrite=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P4e-other-status-whole-rewrite=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; rm -rf /private/tmp/claude-501/base.t5r3-other* && echo P5a-B3-rm-other-claude-tmp=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P5a-B3-rm-other-claude-tmp=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; find /Users/charlesabrooker/tmp -mindepth 1 -maxdepth 1 -name fm-teardown.t5r3-other -mtime +1 -exec rm -rf {} +; [ ! -e /Users/charlesabrooker/tmp/fm-teardown.t5r3-other/old ] && echo P6b-B15-age-sweep-other-home-tmp=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P6b-B15-age-sweep-other-home-tmp=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; python3 -c 'eval("__import__(\"pathlib\").Path(\"/Users/charlesabrooker/tmp/fm-lab.FZOGft/projects/demo/README.md\").unlink()")' && echo P7c-H3-eval-unlink-primary-checkout=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P7c-H3-eval-unlink-primary-checkout=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; rm -rf /private/tmp/fm-t5r3-other && echo P8-rm-other-fm-tmp=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P8-rm-other-fm-tmp=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; git -c user.name=lab -c user.email=lab@lab.invalid commit -q --allow-empty -m probe && echo P9-own-git-commit=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P9-own-git-commit=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo x >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.meta && echo P10-own-meta-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P10-own-meta-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo x > /Users/charlesabrooker/tmp/fm-lab.FZOGft/config/probe && echo P11-home-config-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P11-home-config-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; mkdir -p .claude/worktrees/fm-nested && echo n > .claude/worktrees/fm-nested/f.txt && echo P13d-own-nested-claude-worktree-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P13d-own-nested-claude-worktree-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; mkdir -p /tmp/fm-t5r3-a/p && echo t > /tmp/fm-t5r3-a/p/t && echo P12-own-tmp-write=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log || echo P12-own-tmp-write=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log; echo DONE >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/probes.log
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-a: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-a
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-a ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-a: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-a harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-a worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/1/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/1/demo
+harness=claude
+write_confinement=seatbelt-v1
+--- probes.log (written by the confined worker)
+P1-own-worktree-write=ok
+P2-own-data-write=ok
+P3-own-status-append=ok
+P4e-other-status-whole-rewrite=refused
+P5a-B3-rm-other-claude-tmp=refused
+P6b-B15-age-sweep-other-home-tmp=refused
+P7c-H3-eval-unlink-primary-checkout=refused
+P8-rm-other-fm-tmp=refused
+P9-own-git-commit=ok
+P10-own-meta-write=refused
+P11-home-config-write=refused
+P13d-own-nested-claude-worktree-write=ok
+P12-own-tmp-write=ok
+DONE
+--- missing config root modes after spawn (expect all 700)
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing/session-env
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing/file-history
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing/tasks
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing/projects
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing/projects/-Users-charlesabrooker--treehouse-demo-9f39b3-1-demo
+
+## pre-existing root before t5r3-b
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/unrelated
+
+## t5r3-b
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755
+raw launch: claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-b: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-b/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-b/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-b
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-b/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-b ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-b: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-b harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-b worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/2/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/2/demo
+harness=claude
+write_confinement=seatbelt-v1
+--- pre-existing 0755 root after spawn (root and unrelated stay 755; created folders 700)
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/unrelated
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/session-env
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/file-history
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/tasks
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/projects
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-755/projects/-Users-charlesabrooker--treehouse-demo-9f39b3-2-demo
+
+## existing ancestor before t5r3-n
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep
+missing /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest
+
+## t5r3-n
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root
+raw launch: claude --version; sh /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-n/probe.sh
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-n: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-n/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-n/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-n
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-n/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-n ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-n: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-n harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-n worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/3/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/3/demo
+harness=claude
+write_confinement=seatbelt-v1
+--- probes.log (written by the confined worker)
+sid-present=yes
+S1-own-session-env-write=ok
+S2-own-file-history-write=ok
+S3-own-tasks-write=ok
+S4-foreign-session-env-write=refused
+S5-root-file-write=refused
+S6-chain-parent-file-write=refused
+DONE
+--- nested missing root chain after spawn (expect keep 755; nest, deeper, root and session folders 700)
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root/session-env
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root/file-history
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root/tasks
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root/projects
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/keep/nest/deeper/claude-root/projects/-Users-charlesabrooker--treehouse-demo-9f39b3-3-demo
+claude_session_id recorded: 1
+
+## t5r3-p
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/mid/tail/claude-root
+raw launch: claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-p: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-p/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-p/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-p
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-p/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-p ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-p: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-p harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-p worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/4/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/4/demo
+harness=claude
+write_confinement=seatbelt-v1
+--- partial chain after spawn (expect mid 755; tail, root 700)
+755 /Users/charlesabrooker/tmp/fm-lab.FZOGft/mid
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/mid/tail
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/mid/tail/claude-root
+700 /Users/charlesabrooker/tmp/fm-lab.FZOGft/mid/tail/claude-root/session-env
+
+## t5r3-f
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: claude --version; echo clobber > /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.status && echo Q1e-rewrite-task-a-status=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log || echo Q1e-rewrite-task-a-status=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log; echo w > /Users/charlesabrooker/.treehouse/demo-9f39b3/1/demo/intrude.txt && echo Q2-write-task-a-worktree=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log || echo Q2-write-task-a-worktree=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log; echo w > /tmp/fm-t5r3-a/intrude.txt && echo Q3-write-task-a-temp=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log || echo Q3-write-task-a-temp=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log; echo w > /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/intrude.txt && echo Q4-write-task-a-data=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log || echo Q4-write-task-a-data=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log; echo probe-f >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.status && echo Q5e-own-status-append=ok >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log || echo Q5e-own-status-append=refused >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log; echo DONE >> /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/probes.log
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-f: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-f
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-f/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-f ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-f: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-f harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-f worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/5/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/5/demo
+harness=claude
+write_confinement=seatbelt-v1
+--- probes.log (written by the confined worker)
+Q1e-rewrite-task-a-status=refused
+Q2-write-task-a-worktree=refused
+Q3-write-task-a-temp=refused
+Q4-write-task-a-data=refused
+Q5e-own-status-append=ok
+DONE
+
+## t5r3-r1
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: [ -d src ] && cd src; claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+error: malformed raw launch command: cd before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+grep: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r1.meta: No such file or directory
+
+## t5r3-r2
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: bash -c 'cd src && claude -p hi'
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+error: malformed raw launch command: cd before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+grep: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r2.meta: No such file or directory
+
+## t5r3-r3
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: claude --session-id=11111111-2222-4333-8444-555555555555 --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+error: malformed raw launch command: --session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+grep: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r3.meta: No such file or directory
+
+## t5r3-r4
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: claude $FLAGS --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+error: malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+grep: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r4.meta: No such file or directory
+
+## t5r3-r5
+CLAUDE_CONFIG_DIR=/Users/charlesabrooker/tmp/fm-lab.FZOGft/claude-root-missing
+raw launch: [ -d src ] && claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FZOGft
+warning: task t5r3-r5: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-r5/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-r5/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5r3-r5
+warning: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-r5/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5r3-r5 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5r3-r5: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5r3-r5 harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5r3-r5 worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/6/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/.treehouse/demo-9f39b3/6/demo
+harness=claude
+write_confinement=seatbelt-v1
+
+## after probes
+other status: other-original
+task A status: appended
+B3 fixture: payload
+B15 fixture: old
+other fm tmp: fixture.txt
+primary README: /Users/charlesabrooker/tmp/fm-lab.FZOGft/projects/demo/README.md
+intrusions into A: ls: /Users/charlesabrooker/.treehouse/demo-9f39b3/1/demo/intrude.txt: No such file or directory ls: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/intrude.txt: No such file or directory ls: /tmp/fm-t5r3-a/intrude.txt: No such file or directory 
+--- spawn-write-confinement guard events
+{"ts":"2026-10-26T19:33:18Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-a","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:33:47Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-b","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:34:19Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-n","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:34:48Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-p","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:20Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-f","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:46Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-r1","decision":"deny","source_ok":true,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:47Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-r2","decision":"deny","source_ok":true,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:47Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-r3","decision":"deny","source_ok":true,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:48Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-r4","decision":"deny","source_ok":true,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:35:52Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5r3-r5","decision":"allow","source_ok":true,"cleared_by":"proceed","repeat":1,"override":false}
+--- worker panes
+### pane fm-t5r3-a
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    eval("__import__(\"pathlib\").Path(\"/Users/charlesabrooker/tmp/fm-lab.FZOGf
+t/projects/demo/README.md\").unlink()")
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 1, in <module>
+    eval("__import__(\"pathlib\").Path(\"/Users/charlesabrooker/tmp/fm-lab.FZOGf
+t/projects/demo/README.md\").unlink()")
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/pathlib/_lo
+cal.py", line 746, in unlink
+    os.unlink(self)
+    ~~~~~~~~~^^^^^^
+PermissionError: [Errno 1] Operation not permitted: '/Users/charlesabrooker/tmp/
+fm-lab.FZOGft/projects/demo/README.md'
+rm: /private/tmp/fm-t5r3-other/fixture.txt: Operation not permitted
+rm: /private/tmp/fm-t5r3-other: Operation not permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.meta: Operation n
+ot permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.FZOGft/config/probe: Operation not pe
+rmitted
+charlesabrooker@Mac-Studio demo %
+### pane fm-t5r3-f
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-9f39b3/5/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/.treehouse/demo-
+9f39b3/5/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5r3-f/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5r3-f
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5r3-f+72fd36bd86581835f6e65e19ead2
+e51d04800c8c5b79b8d8103d3eac0bf12c2a/launch.s1793043321.10913.1268.sh'
+2.1.310 (Claude Code)
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.status: Operation
+ not permitted
+/bin/sh: /Users/charlesabrooker/.treehouse/demo-9f39b3/1/demo/intrude.txt: Opera
+tion not permitted
+/bin/sh: /tmp/fm-t5r3-a/intrude.txt: Operation not permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.FZOGft/data/t5r3-a/intrude.txt: Opera
+tion not permitted
+charlesabrooker@Mac-Studio demo %
+### pane fm-t5r3-b
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-9f39b3/2/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/.treehouse/demo-
+9f39b3/2/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5r3-b/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5r3-b
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5r3-b+72fd36bd86581835f6e65e19ead2
+e51d04800c8c5b79b8d8103d3eac0bf12c2a/launch.s1793043228.62035.2025.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio demo %
+### pane fm-t5r3-n
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-9f39b3/3/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/.treehouse/demo-
+9f39b3/3/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5r3-n/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5r3-n
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5r3-n+72fd36bd86581835f6e65e19ead2
+e51d04800c8c5b79b8d8103d3eac0bf12c2a/launch.s1793043260.76825.21514.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio demo %
+### pane fm-t5r3-p
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-9f39b3/4/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/.treehouse/demo-
+9f39b3/4/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5r3-p/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5r3-p
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5r3-p+72fd36bd86581835f6e65e19ead2
+e51d04800c8c5b79b8d8103d3eac0bf12c2a/launch.s1793043289.92969.22125.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio demo %
+### pane fm-t5r3-r5
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-9f39b3/6/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/.treehouse/demo-
+9f39b3/6/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5r3-r5/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5r3-r5
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5r3-r5+72fd36bd86581835f6e65e19ead
+2e51d04800c8c5b79b8d8103d3eac0bf12c2a/launch.s1793043353.30216.29083.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio demo %
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-n.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-p.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-b.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-a.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-f.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state/t5r3-r5.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-lab.FZOGft: Directory not empty
+# teardown done: lab removed=no
+
+# Post-run cleanup (manual): the driver teardown hit read-only state/<task>.git-hooks folders; chmod -R u+w then rm -rf removed both lab homes and the two treehouse fixture pools. Verified absent.

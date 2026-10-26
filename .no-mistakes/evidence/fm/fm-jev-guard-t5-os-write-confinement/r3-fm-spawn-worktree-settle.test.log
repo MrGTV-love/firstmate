@@ -10,8 +10,38 @@ ok - raw Claude shell data byte fidelity: comment
 ok - raw Claude shell data byte fidelity: option-terminator
 ok - raw Claude shell data byte fidelity: quoted-expansion-data
 ok - raw Claude shell data byte fidelity: value-session-id
-ok - raw Claude accepts a test bracket command: [ -d src ] && cd src; claude --print hi
+ok - raw Claude accepts a test bracket command: [ -d src ] && claude --print hi
 ok - raw Claude accepts a test bracket command: [[ -f x ]] && claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -u FM_UNSET_PROBE claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -- FOO=1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: command claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: exec claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: exec -a worker claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nohup claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: time claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: time -p claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nice claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nice -n 5 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: true && nohup env -u X nice -n 1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -i FOO=1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: command -p claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout 3600 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout -k 5 -s TERM 10 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate -i claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate -t 60 -di claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -arm64 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -x86_64 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -arch arm64 -e A=b claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: stdbuf -o0 -e L claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: stdbuf -i 0 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout "$T" claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -u "$V" A="$X" claude --print hi
+ok - raw Claude renders a claude in shell -c text: bash -c 'claude --print hi'
+ok - raw Claude renders a claude in shell -c text: sh -e -c 'true && claude --print hi' name
+ok - raw Claude renders a claude in shell -c text: bash -lc "nohup claude --print hi"
+ok - raw Claude renders a claude in shell -c text: zsh -c 'claude --print hi'
 ok - raw Claude forks for: --resume old-session
 ok - raw Claude forks for: -r old-session
 ok - raw Claude forks for: --continue
@@ -51,10 +81,85 @@ ok - raw Claude refuses: shell expansion
 ok - raw Claude refuses: shell expansion
 ok - raw Claude refuses: shell expansion
 ok - raw Claude refuses: shell expansion
+ok - raw Claude refuses: shell expansion
+ok - raw Claude refuses: --session-id
+ok - raw Claude refuses: expanded program word
+ok - raw Claude refuses: expanded program word
+ok - raw Claude refuses: expanded program word
+ok - raw Claude refuses: shell control structure
+ok - raw Claude refuses: cd before claude
+ok - raw Claude refuses: cd before claude
+ok - raw Claude refuses: cd before claude
+ok - raw Claude refuses: pushd before claude
+ok - raw launch scanner reads a quoted argument expansion: codex --config "${HOME}/worker.yml"
+ok - raw launch scanner reads a quoted unbraced argument expansion: codex --config "$HOME/worker.yml"
+ok - raw launch scanner reads a leading assignment expansion: FOO=$X codex --config "$Y"
+ok - raw launch scanner reads an unquoted parameter expansion: codex --config $HOME/worker.yml
+ok - raw launch scanner refuses a forced pattern: codex --config ${~P}
+ok - raw launch scanner refuses a forced pattern: codex --config $~P
+ok - raw launch scanner refuses a forced splitting form: codex --config ${=P}
+ok - raw launch scanner refuses a forced pattern in a quote: codex --config "$~P"
+ok - raw launch scanner still finds a later claude command: codex --config "${HOME}/x.yml" && claude --print hi
+ok - raw launch scanner reads a claude argument expansion: claude --settings "${HOME}/s.json"
+ok - raw launch scanner does not see a program an expanded command word names: "$CMD" --x
+ok - raw launch scanner does not see a program a braced command word names: ${CMD} --x
+ok - raw launch scanner refuses a command substitution in an argument: codex --config "$(claude -p hi)"
+ok - raw launch scanner refuses zsh parameter expansion flags: codex --config "${(e)PAYLOAD}"
+ok - raw launch scanner refuses a backtick in an argument: codex --config `claude -p hi`
+ok - raw launch scanner finds a claude before text it cannot read: true && claude --print "$(date)"
+ok - raw launch scanner cannot read a grouped claude: true && (claude --print hi)
+ok - raw launch scanner does not see a program expanded shell -c text names: sh -c "${X}"
+ok - raw launch scanner does not see a program assignment-shaped shell -c text names: sh -c code="$CMD"
+ok - raw launch scanner does not see a program expanded shell -c text names: bash -lc "$X"
+ok - raw launch scanner does not see a program an expanded env argument names: env "$X" --print hi
+ok - raw launch scanner does not see a program an expanded nohup argument names: nohup "$X" --print hi
+ok - raw launch scanner does not see a program an expanded time argument names: time "$CMD" --x
+ok - raw launch scanner does not see a program an expanded command argument names: command "$X" --print hi
+ok - raw launch scanner reads an expansion in a test command: if [ -n "$LOCK" ]; then omp --resume=bare-session; fi
+ok - raw launch scanner finds claude behind env: env claude --print hi
+ok - raw launch scanner finds claude behind env -u: env -u X claude --print hi
+ok - raw launch scanner finds claude behind env assignments: env -i FOO=1 claude --print hi
+ok - raw launch scanner finds claude behind env assignments after --: env -- FOO=1 claude --print hi
+ok - raw launch scanner finds claude behind command: command claude --print hi
+ok - raw launch scanner finds claude behind exec: exec claude --settings "$HOME/s.json"
+ok - raw launch scanner finds claude behind nohup: nohup claude --print hi
+ok - raw launch scanner finds claude behind time: time claude --print hi
+ok - raw launch scanner finds claude behind timeout and its duration: timeout 3600 claude --print hi
+ok - raw launch scanner finds claude behind nice: nice -n 5 claude --print hi
+ok - raw launch scanner finds claude behind caffeinate: caffeinate claude --print hi
+ok - raw launch scanner finds claude behind caffeinate -i: caffeinate -i claude --print hi
+ok - raw launch scanner finds claude behind arch: arch -arm64 claude --print hi
+ok - raw launch scanner finds claude behind stdbuf: stdbuf -o0 claude --print hi
+ok - raw launch scanner finds claude behind nested wrappers: true && nohup env -u X caffeinate -i claude --print hi
+ok - raw launch scanner finds claude in bash -c text: bash -c 'claude --print hi'
+ok - raw launch scanner finds claude in sh -c text: sh -e -c 'cd src && claude --print hi'
+ok - raw launch scanner finds claude behind a wrapper in zsh -c text: zsh -c 'nohup claude --print hi'
+ok - raw launch scanner does not find claude behind a wrapper outside the named list: flock /tmp/lock claude --print hi
+ok - raw launch scanner does not find claude behind sudo: sudo claude --print hi
+ok - raw launch scanner does not find claude behind an env option outside the named list: env -S 'claude --print hi'
+ok - raw launch scanner does not take command -v for a claude run: command -v claude
+ok - raw launch scanner does not read a shell script: bash script.sh
+ok - raw launch scanner finds claude behind a quoted timeout duration: timeout "$T" claude --print hi
+ok - raw launch scanner finds claude behind a quoted env assignment: env A="$X" claude -p hi
+ok - raw launch scanner finds claude behind a quoted env -u name: env -u "$V" claude -p hi
+ok - raw launch scanner finds claude behind a quoted nice value: nice -n "$N" claude -p hi
+ok - raw launch scanner finds claude in quoted shell -c text: bash -c "claude -p $X"
+ok - raw launch scanner finds claude behind a quoted timeout duration after a command: true && timeout "$T" claude --print hi
+ok - raw launch scanner finds claude past bash --login: bash --login -c 'claude -p hi'
+ok - raw launch scanner finds claude past bash --norc: bash --norc -c 'claude -p hi'
+ok - raw launch scanner finds claude past bash --noprofile: bash --noprofile -c 'claude -p hi'
+ok - raw launch scanner finds claude past bash -O and its shopt name: bash -O extglob -c 'claude -p hi'
+ok - raw launch scanner does not decide claude behind an unquoted expansion that can split: timeout $T claude --print hi
+ok - raw launch scanner does not decide claude behind an unquoted env expansion: env $OPTS claude --print hi
 ok - non-measured harness launches unchanged and explicitly reports unconfined coverage
 ok - measured harness launches run inside their generated write profile
+ok - a confined Claude spawn creates a missing config root owner-only
+ok - a confined Claude spawn creates a missing config root chain owner-only
 ok - a confined raw claude launch runs through TeamClaude with its session id and literal config root granted
+ok - a raw launch that runs claude after another command, behind a named wrapper or in shell -c text runs confined under its session id
 ok - an unconfined raw claude launch keeps shell constructs and gets no session id
+ok - an unconfined raw claude launch keeps the caller's shell and never gains a host /bin/sh
+ok - a confined raw launch keeps the pane shell, with /bin/bash as the fallback
 ok - a single transient stale pane_current_path read is not accepted as the worktree
 ok - an already-settled pane confirms on the next read, not a whole extra cycle
 ok - a transient primary-checkout pane read is not accepted as the worktree
@@ -62,5 +167,3 @@ ok - a pane stuck on the primary checkout fails loudly at the deadline
 ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
 ok - output activity cannot keep an acquisition alive beyond the absolute extreme
 # all fm-spawn-worktree-settle tests passed
-bash tests/fm-spawn-worktree-settle.test.sh  10.39s user 14.12s system 49% cpu 49.883 total
-settle rc=0

@@ -1,0 +1,153 @@
+# Live lab transcript: real bin/fm-spawn.sh, real treehouse, real tmux (fm-lab socket), real claude 2.1.310 binary, real sandbox-exec
+# Lab home: /Users/charlesabrooker/tmp/fm-lab.VRYheQ (torn down after capture)
+
+## t5-live-a
+raw launch: [ -d src ] && claude --version; echo w > probe-worktree.txt && echo P1-own-worktree-write=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P1-own-worktree-write=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo d > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probe-data.txt && echo P2-own-data-write=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P2-own-data-write=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo probe-status-append >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-a.status && echo P3-own-status-append=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P3-own-status-append=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo clobber > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/other-z.status && echo P4-other-task-status-rewrite=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P4-other-task-status-rewrite=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; rm -rf /private/tmp/fm-other-z && echo P5-other-task-temp-delete=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P5-other-task-temp-delete=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; python3 -c "import pathlib; pathlib.Path('/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/README.md').unlink()" && echo P6-eval-unlink-primary-checkout=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P6-eval-unlink-primary-checkout=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; git -c user.name=lab -c user.email=lab@lab commit -q --allow-empty -m probe && echo P7-own-git-commit=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P7-own-git-commit=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo x >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-a.meta && echo P8-own-meta-write=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P8-own-meta-write=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo x > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/config/probe && echo P9-home-config-write=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log || echo P9-home-config-write=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log; echo PROBES-DONE >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/probes.log
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+warning: task t5-live-a: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5-live-a
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5-live-a ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5-live-a: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5-live-a harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5-live-a worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=390555e7-2b29-4bc5-9b5c-1d19ba59ed6a
+--- probes.log (written by the confined worker)
+P1-own-worktree-write=ok
+P2-own-data-write=ok
+P3-own-status-append=ok
+P4-other-task-status-rewrite=refused
+P5-other-task-temp-delete=refused
+P6-eval-unlink-primary-checkout=refused
+P7-own-git-commit=ok
+P8-own-meta-write=refused
+P9-home-config-write=refused
+PROBES-DONE
+
+## t5-live-b
+raw launch: [ -d src ] && cd src; claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+error: malformed raw launch command: cd before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-b.meta: No such file or directory
+
+## t5-live-c
+raw launch: bash -c 'cd sub && claude -p hi'
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+error: malformed raw launch command: cd before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-c.meta: No such file or directory
+
+## t5-live-d
+raw launch: claude --session-id=11111111-2222-4333-8444-555555555555 --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+error: malformed raw launch command: --session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-d.meta: No such file or directory
+
+## t5-live-e
+raw launch: claude $FLAGS --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+error: malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-e.meta: No such file or directory
+
+## t5-live-g
+raw launch: pushd src; claude --version
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+error: malformed raw launch command: pushd before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root; use a named harness or simplify the raw launch to literal shell commands
+repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments
+rc=1
+--- metadata (selected)
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-g.meta: No such file or directory
+
+## t5-live-f
+raw launch: claude --version; echo clobber > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-a.status && echo Q1-rewrite-task-a-status=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log || echo Q1-rewrite-task-a-status=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log; echo w > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo/intrude.txt && echo Q2-write-task-a-worktree=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log || echo Q2-write-task-a-worktree=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log; echo w > /tmp/fm-t5-live-a/intrude.txt && echo Q3-write-task-a-temp=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log || echo Q3-write-task-a-temp=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log; echo w > /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/intrude.txt && echo Q4-write-task-a-data=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log || echo Q4-write-task-a-data=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log; echo probe-f >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-f.status && echo Q5-own-status-append=ok >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log || echo Q5-own-status-append=refused >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log; echo DONE >> /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/probes.log
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+warning: task t5-live-f: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5-live-f
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-f/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5-live-f ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5-live-f: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5-live-f harness=claude kind=ship mode=local-only yolo=off window=primary:fm-t5-live-f worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/2/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/2/demo
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=c499efe1-4b33-422f-a786-7f35eff1da59
+--- probes.log (written by the confined worker)
+Q1-rewrite-task-a-status=refused
+Q2-write-task-a-worktree=refused
+Q3-write-task-a-temp=refused
+Q4-write-task-a-data=refused
+Q5-own-status-append=ok
+DONE
+
+## t5-live-h
+raw launch: true && (claude --version)
+--- fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.VRYheQ
+warning: task t5-live-h: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-h/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-h/launch-brief.md records no ship branch; defaulting to legacy branch fm/t5-live-h
+warning: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-h/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: t5-live-h ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5-live-h: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5-live-h harness=true kind=ship mode=local-only yolo=off window=primary:fm-t5-live-h worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/3/demo
+rc=0
+--- metadata (selected)
+worktree=/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/3/demo
+harness=true
+write_confinement=unconfined-macos-true
+
+## after probes
+other-z.status: other-original
+other task temp fixture: fixture.txt
+primary README present: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/README.md
+t5-live-a.status: probe-status-append
+--- spawn-write-confinement deny events
+{"ts":"2026-10-26T19:08:22Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-a","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:29Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-b","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:31Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-c","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:33Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-d","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:35Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-e","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:37Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-g","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T19:09:56Z","guard":"spawn-write-confinement","version":"1","system":"firstmate","session":"t5-live-f","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+--- lab Claude config root modes
+755 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/tasks
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/projects
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/session-env
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/file-history
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/projects/-Users-charlesabrooker-tmp-fm-lab-VRYheQ-projects-demo--treehouse-demo-f15ed2-1-demo
+700 /Users/charlesabrooker/tmp/fm-lab.VRYheQ/claude-root/projects/-Users-charlesabrooker-tmp-fm-lab-VRYheQ-projects-demo--treehouse-demo-f15ed2-2-demo

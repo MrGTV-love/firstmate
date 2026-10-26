@@ -1,0 +1,17 @@
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/2/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '/Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/2/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-t5-live-f/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=t5-live-f
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-t5-live-f+66cf929ab8f147916319cd62bfbc0084b32103556d77e870bf4be8e0c729c1f7/launch.s1793041797.51550.17280.sh'
+2.1.310 (Claude Code)
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/state/t5-live-a.status: Operation not permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/projects/demo/.treehouse/demo-f15ed2/1/demo/intrude.txt: Operation not permitted
+/bin/sh: /tmp/fm-t5-live-a/intrude.txt: Operation not permitted
+/bin/sh: /Users/charlesabrooker/tmp/fm-lab.VRYheQ/data/t5-live-a/intrude.txt: Operation not permitted
+charlesabrooker@Mac-Studio demo % 
