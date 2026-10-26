@@ -1,0 +1,7 @@
+case                     pid      ps comm / argv0                                  base     target  
+omp-dir-exec-path        78937    $TMP/opt/omp/bin/python3 / $TMP/opt/omp/bin/python3 accept   refuse  
+omp-dir-argv0-only       79865    $TMP/opt/omp/bin/python3 / $TMP/opt/omp/bin/python3 accept   refuse  
+bun-installed-omp-copy   80855    $TMP/.bun/bin/omp / $TMP/.bun/bin/omp            accept   accept  
+ompd-near-miss           81788    $TMP/bin/ompd / $TMP/bin/ompd                    refuse   refuse  
+real-omp-cli             83354    omp / omp                                        accept   accept  
+teardown: fm-lab-omp-ident-78803-29266 removed, default session tripwire matched

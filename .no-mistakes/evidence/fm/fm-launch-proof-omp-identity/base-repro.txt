@@ -1,0 +1,10 @@
+# base commit 8c6bb40a7 bin/fm-launch-proof-lib.sh with target tests
+$ bash tests/fm-launch-proof.test.sh
+not ok - omp directory in executable path is refused (expected 'refuse', got 'accept')
+exit=
+$ bash tests/fm-control-relaunch-backends.test.sh test_omp_adoption
+ok - omp adoption: record generation mismatch refused
+ok - omp adoption: same-PID personal current session overrides stale task registration and remains refused
+ok - omp adoption: the extension's unproven mark for the live PID is not overwritten
+not ok - unsafe adoption succeeded: adopted: rcv-83576-f7POyZ-adoption-non-omp-omp-directory-comm
+exit=
