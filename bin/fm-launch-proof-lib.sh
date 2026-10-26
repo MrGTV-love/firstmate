@@ -56,14 +56,14 @@ fm_launch_proof_pid_unpinned() { # <pid>
   ! printf '%s\n' "$environment" | grep -Eq '^FM_SPAWN_GEN=.+$'
 }
 
-# Succeeds only for a live process whose readable name or argv[0] is omp, the
-# anchored name the agent classifier gives it. Prints nothing.
+# Succeeds only for a live process whose readable executable name or argv[0]
+# has basename omp. Installation directory names are not identity. Prints nothing.
 fm_launch_proof_pid_is_omp() { # <pid>
   local pid=$1 comm args name
   comm=$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null) \
     && args=$(LC_ALL=C ps -p "$pid" -o args= 2>/dev/null) || return 1
   for name in "$comm" "${args%% *}"; do
-    [ "$(fm_harness_path_name "$name")" != omp ] || return 0
+    [ "${name##*/}" != omp ] || return 0
   done
   return 1
 }
