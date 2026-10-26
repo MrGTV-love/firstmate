@@ -1,0 +1,6 @@
+Run 40341624397 (PR #267, head d760c4ce, conclusion success)
+  portable-parallel-1: wall=682320 failed=0 total=12
+  portable-parallel-2: wall=830886 failed=0 total=20
+  serial shards: count=21 min=954050 max=1278930 over_1200000=2
+  summary: {'critical_path_duration_ms': 1278930, 'failed': 0, 'lanes': 23, 'skipped_gate': 55, 'total': 355}
+{"duration_ms": 2357, "exit": 0, "expected_gate_skip": "none", "family": "pure-contract-unit", "gate_skip": false, "gate_skip_reason": "", "lane_run_id": "fm-test-run-1793025581461-2337", "lane_selection": "lane=portable-parallel-1;fail-on-gate-skip=Pi extension typecheck prerequisite not found;jobs=3", "path": "tests/fm-pi-primary-types.test.sh"}

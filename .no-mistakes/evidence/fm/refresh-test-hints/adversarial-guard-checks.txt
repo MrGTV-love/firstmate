@@ -1,0 +1,22 @@
+### A1: PORTABLE_SERIAL_SHARDS=20
+269:PORTABLE_SERIAL_SHARDS=20
+fm-test-run: coverage guard: portable serial shard 1 of 20 packs 1241943ms above the 1200000ms target and beyond its own largest script (1036787ms), so the excess is packing
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+rc=
+
+### A2: drop the ten new serial hints (back to 45000 ms default)
+fm-test-run: coverage guard: portable serial shard 1 of 21 packs 1203272ms above the 1200000ms target and beyond its own largest script (1036787ms), so the excess is packing
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+rc=
+
+### A3: inflate tests/fm-test-run.test.sh parallel hint 925194 -> 1250000
+718:tests/fm-test-run.test.sh 1250000
+fm-test-run: coverage guard: portable parallel shard models a 1250000ms makespan packed into 3 bins, above the 1200000ms budget
+fm-test-run: move the heaviest member to the lighter lane, split the lane, or refresh the hints from CI measurements; a higher --jobs does not change the model: docs/fm-test-portable-shards.md
+rc=
+
+### A4: inflate one serial hint (fm-teardown-cleanup 944450 -> 1300000)
+1157:tests/fm-teardown-cleanup.test.sh 1036787
+1157:tests/fm-teardown-cleanup.test.sh 1036787
+FM_TEST_COVERAGE ok total=373 parallel=32 parallel_max_ms=3089104 parallel_imbalance_ms=316 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030749 parallel_budget_ms=1200000 serial=323 serial_shards=21 serial_unhinted=0 serial_max_ms=1183250 serial_budget_ms=1200000 serial_indivisible_ms=1036787 herdr=18
+rc=

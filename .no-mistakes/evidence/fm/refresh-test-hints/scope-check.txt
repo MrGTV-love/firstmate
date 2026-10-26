@@ -1,0 +1,12 @@
+Changed bin/fm-test-run.sh lines that are NOT a comment or a 'tests/<x>.test.sh [ms]' data line:
+(end)
+
+Budget constants at head:
+269:PORTABLE_SERIAL_SHARDS=21
+280:PORTABLE_PARALLEL_JOBS=3
+323:PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
+327:PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
+344:PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
+Files changed:
+bin/fm-test-run.sh
+docs/fm-test-portable-shards.md

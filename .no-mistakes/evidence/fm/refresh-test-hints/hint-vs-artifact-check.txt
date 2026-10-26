@@ -1,0 +1,72 @@
+Runs: ['40285405366', '40288417075', '40308410676']
+hinted=356 measured_match=300 measured_mismatch=0 unsampled_kept_previous=56 unsampled_changed=0
+green_measured_scripts_without_hint=0 []
+newly_hinted (absent from base table):
+   tests/fm-git-secrets.test.sh 12328 measured_max= 12328
+   tests/fm-retired-jev-channel-consistency.test.sh 1101 measured_max= 1101
+   tests/fm-retired-jev-omp-result-screen.test.sh 751 measured_max= 751
+   tests/fm-retired-jev-producer-field-exclusion.test.sh 970 measured_max= 970
+   tests/fm-retired-jev-result-size-refusal.test.sh 961 measured_max= 961
+   tests/fm-retired-jev-trusted-read.test.sh 801 measured_max= 801
+   tests/fm-retired-jev-write-credential-noul.test.sh 1343 measured_max= 1343
+   tests/fm-retired-jev-write-judgment-unavailable.test.sh 1234 measured_max= 1234
+   tests/fm-retired-jev-write-remainder-shapes.test.sh 1568 measured_max= 1568
+   tests/fm-retired-jev-write-secrets-kind.test.sh 1611 measured_max= 1611
+removed_hints: []
+unsampled members (56): all records gate-skipped? True
+   tests/fm-afk-pi-herdr-return-e2e.test.sh ['live: opt-in; set FM_AFK_PI_HERDR_E2E=1 to run']
+   tests/fm-agy-composer-live-e2e.test.sh ['live: opt-in; set FM_AGY_COMPOSER_LIVE=1 to run']
+   tests/fm-agy-signals-live-e2e.test.sh ['live: opt-in; set FM_AGY_SIGNALS_LIVE=1 to run']
+   tests/fm-backend-cmux-smoke.test.sh ['cmux CLI not found on PATH or at the bundle path']
+   tests/fm-backend-zellij-smoke.test.sh ['zellij not found']
+   tests/fm-bearings-board-lavish-live-e2e.test.sh ['live: lavish-axi absent']
+   tests/fm-calm-claude-mod-live-e2e.test.sh ['live: opt-in; set FM_CLAUDE_CALM_LIVE_E2E=1 to run']
+   tests/fm-calm-claude-mod-plugin.test.sh ['live: claude absent']
+   tests/fm-claude-nested-home-live-e2e.test.sh ['live: claude absent']
+   tests/fm-claude-stop-autoarm-live-e2e.test.sh ['live: opt-in; set FM_CLAUDE_LIVE_E2E=1 to run']
+   tests/fm-claude-titled-composer-live-e2e.test.sh ['live: herdr absent']
+   tests/fm-cmux-claude-composer-live-e2e.test.sh ['live: opt-in; set FM_CMUX_CLAUDE_COMPOSER_LIVE=1 to run']
+   tests/fm-codex-continuity-live-e2e.test.sh ['live: opt-in; set FM_CODEX_LIVE_E2E=1 to run']
+   tests/fm-codex-hook-layer-live-e2e.test.sh ['live: codex absent']
+   tests/fm-composer-codex-idle-live-e2e.test.sh ['live: codex absent']
+   tests/fm-composer-matrix-live-e2e.test.sh ['live: opt-in; set FM_COMPOSER_MATRIX_LIVE=1 to run']
+   tests/fm-cursor-primary-live-e2e.test.sh ['live: opt-in; set FM_CURSOR_PRIMARY_LIVE_E2E=1 to run']
+   tests/fm-devin-signals-live-e2e.test.sh ['live: opt-in; set FM_DEVIN_SIGNALS_LIVE=1 to run']
+   tests/fm-dsh-live-e2e.test.sh ['live: opt-in; set FM_DSH_LIVE=1 to run']
+   tests/fm-dsh-primary-live-e2e.test.sh ['live: opt-in; set FM_DSH_PRIMARY_LIVE=1 to run']
+   tests/fm-grok-continuity-live-e2e.test.sh ['live: opt-in; set FM_GROK_LIVE_E2E=1 to run']
+   tests/fm-grok-stop-live-e2e.test.sh ['live: opt-in; set FM_GROK_STOP_LIVE_E2E=1 to run']
+   tests/fm-harness-adapter-instructions-live-e2e.test.sh ['live: opt-in; set FM_HARNESS_ADAPTER_INSTRUCTION_EVAL=1 to r']
+   tests/fm-herdr-pi-stale-registration-live-e2e.test.sh ['live: herdr absent']
+   tests/fm-herdr-submit-confirm-live-e2e.test.sh ['live: opt-in; set FM_HERDR_SUBMIT_CONFIRM_LIVE=1 to run']
+   tests/fm-herdr-version-floor-live-e2e.test.sh ['live: herdr absent']
+   tests/fm-host-mirror-live-e2e.test.sh ['live: opt-in; set FM_HOST_MIRROR_LIVE_E2E=1 to run']
+   tests/fm-jev-guard-claude-live-e2e.test.sh ['live: opt-in; set FM_JEV_GUARD_CLAUDE_LIVE=1 to run']
+   tests/fm-jev-guard-omp-live-e2e.test.sh ['live: omp absent']
+   tests/fm-jev-guard-producer.test.sh []
+   tests/fm-launch-prompt-signals-live-e2e.test.sh ['live: opt-in; set FM_LAUNCH_PROMPT_SIGNALS_LIVE=1 to run']
+   tests/fm-model-index-live-e2e.test.sh ['live: no installed native adapter has an available catalog']
+   tests/fm-muse-signals-live-e2e.test.sh ['live: opt-in; set FM_MUSE_SIGNALS_LIVE=1 to run']
+   tests/fm-omp-composer-box-live-e2e.test.sh ['live: herdr absent']
+   tests/fm-omp-fallback-chain-live-e2e.test.sh ['live: omp absent']
+   tests/fm-omp-primary-live-e2e.test.sh ['live: opt-in; set FM_OMP_LIVE_E2E=1 to run']
+   tests/fm-omp-reboot-live-e2e.test.sh ['live: opt-in; set FM_OMP_REBOOT_LIVE=1 to run']
+   tests/fm-omp-stale-wake-live-e2e.test.sh ['live: omp absent']
+   tests/fm-omp-task-session-live-e2e.test.sh ['live: opt-in; set FM_OMP_TASK_SESSION_LIVE=1 to run']
+   tests/fm-omp-wake-restore-live-e2e.test.sh ['live: opt-in; set FM_OMP_WAKE_RESTORE_LIVE=1 to run']
+   tests/fm-opencode-primary-live-e2e.test.sh ['live: opt-in; set FM_OPENCODE_LIVE_E2E=1 to run']
+   tests/fm-pi-branch-live-e2e.test.sh ['live: opt-in; set FM_PI_BRANCH_LIVE_E2E=1 to run']
+   tests/fm-pi-codex-native.test.sh ['native Pi adapter not installed (PI_CODEX_NATIVE_PACKAGE to ']
+   tests/fm-pi-primary-live-e2e.test.sh ['live: opt-in; set FM_PI_LIVE_E2E=1 to run']
+   tests/fm-pi-watch-loader-live.test.sh ['live: opt-in; set FM_PI_WATCH_LOADER_LIVE_E2E=1 to run']
+   tests/fm-pi-windows-shell-invocation.test.sh ['native Windows Node required']
+   tests/fm-pr-state-live-e2e.test.sh ['live: opt-in; set FM_PR_STATE_LIVE_E2E=1 to run']
+   tests/fm-quota-array-dispatch-live-e2e.test.sh ['live: opt-in; set FM_QUOTA_ARRAY_DISPATCH_LIVE_E2E=1 to run']
+   tests/fm-rovo-signals-live-e2e.test.sh ['live: opt-in; set FM_ROVO_SIGNALS_LIVE=1 to run']
+   tests/fm-send-inbox-doorbell-live-e2e.test.sh ['live: opt-in; set FM_SEND_INBOX_LIVE_E2E=1 to run']
+   tests/fm-send-secondmate-marker-herdr-e2e.test.sh ['live: opt-in; set FM_SEND_MARKER_HERDR_E2E=1 to run']
+   tests/fm-sessionstart-hook-live-e2e.test.sh ['live: opt-in; set FM_SESSIONSTART_HOOK_LIVE_E2E=1 to run']
+   tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh ['live: opt-in; set FM_SESSIONSTART_INSTRUCTION_REFRESH_LIVE_E']
+   tests/fm-supervision-host-attended-live-e2e.test.sh ['live: opt-in; set FM_SUPERVISION_HOST_ATTENDED_LIVE_E2E=1 to']
+   tests/fm-supervision-host-live-e2e.test.sh ['live: opt-in; set FM_SUPERVISION_HOST_LIVE_E2E=1 to run']
+   tests/fm-teamclaude-launch-live-e2e.test.sh ['live: teamclaude absent']

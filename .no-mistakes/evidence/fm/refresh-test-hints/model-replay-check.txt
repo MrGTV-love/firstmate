@@ -1,0 +1,16 @@
+Three-bin LPT model from head hints:
+  portable-parallel-1: 1030514 ms (12 scripts)
+  portable-parallel-2: 1030749 ms (20 scripts)
+Run 40285405366: recorded parallel walls p1=1149828 p2=786535; recorded slowest serial shard=1329974
+    replay portable-parallel-1 new membership with this run durations: 958965 ms
+    replay portable-parallel-2 new membership with this run durations: 896980 ms
+    replay slowest new serial shard (measured scripts only): 1179209 ms
+Run 40288417075: recorded parallel walls p1=1138429 p2=995436; recorded slowest serial shard=1370090
+    replay portable-parallel-1 new membership with this run durations: 1024957 ms
+    replay portable-parallel-2 new membership with this run durations: 1027567 ms
+    replay slowest new serial shard (measured scripts only): 1170381 ms
+Run 40308410676: recorded parallel walls p1=1141598 p2=836218; recorded slowest serial shard=1370959
+    replay portable-parallel-1 new membership with this run durations: 991414 ms
+    replay portable-parallel-2 new membership with this run durations: 933208 ms
+    replay slowest new serial shard (measured scripts only): 1168860 ms
+New serial shards modeled from hints: max 1183250 min 1182565

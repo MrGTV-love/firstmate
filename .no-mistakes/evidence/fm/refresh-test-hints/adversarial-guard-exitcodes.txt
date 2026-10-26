@@ -1,0 +1,17 @@
+### shards=20 exit code
+rc=1
+### shards=21 exit code
+rc=0
+
+### A2 exit code (ten new hints dropped)
+rc=1
+
+### A3 exit code (parallel hint inflated)
+rc=1
+
+### A4: serial hint fm-teardown-cleanup 1036787 -> 1300000
+1157:tests/fm-teardown-cleanup.test.sh 1300000
+FM_TEST_COVERAGE ok total=373 parallel=32 parallel_max_ms=3089104 parallel_imbalance_ms=316 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030749 parallel_budget_ms=1200000 serial=323 serial_shards=21 serial_unhinted=0 serial_max_ms=1300000 serial_budget_ms=1200000 serial_indivisible_ms=1300000 herdr=18
+rc=0
+
+### A4b: two mid-size serial hints doubled (fm-lint-workflows? pick 2nd/3rd largest) 

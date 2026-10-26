@@ -1,0 +1,32 @@
+== lane sizes (base -> head)
+portable-parallel-1:        8 ->       12
+portable-parallel-2:       24 ->       20
+portable-serial:      323 ->      323
+proven:       32 ->       32
+== parallel union identical?
+yes
+== serial set identical?
+yes
+== proven-isolated set identical?
+yes
+== fm-pi-primary-types lane at head:
+/tmp/fmart.7dFD/head/portable-parallel-1
+== portable-parallel-1 at head:
+tests/fm-test-run.test.sh
+tests/fm-lint.test.sh
+tests/fm-captain-hold-lifecycle.test.sh
+tests/fm-pr-merge.test.sh
+tests/fm-captain-hold-archive.test.sh
+tests/fm-backend-herdr.test.sh
+tests/fm-arm-pretool-check.test.sh
+tests/fm-brief.test.sh
+tests/fm-grok-harness.test.sh
+tests/fm-send-strict.test.sh
+tests/fm-pi-primary-types.test.sh
+tests/fm-supervision-instructions.test.sh
+== 21 shards cover serial set exactly once?
+yes
+== any shard empty?
+s1=      12 s2=      15 s3=      14 s4=      15 s5=      14 s6=      15 s7=      16 s8=      16 s9=      16 s10=      16 s11=      16 s12=      16 s13=      16 s14=      16 s15=      15 s16=      16 s17=      16 s18=      15 s19=      16 s20=      16 s21=      16 
+== list-lanes diff
+identical
