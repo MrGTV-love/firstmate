@@ -66,7 +66,7 @@ ok - exclusions stay in the home that configured them and skip secondmate agents
 ok - batch dispatch forwards shared --harness, --model, and --effort to every pair
 ok - claude forwards firstmate's CLAUDE_CONFIG_DIR so the crewmate uses the same credential store
 ok - the primary-owned Lavish server address reaches every worker launch
-cat: /Users/charlesabrooker/tmp/fm-spawn-dispatch-profile.C2xpVE/profile-lavish-ambient/pane.log: No such file or directory
+cat: /Users/charlesabrooker/tmp/fm-spawn-dispatch-profile.J0fHs1/profile-lavish-ambient/pane.log: No such file or directory
 ok - absent Lavish configuration preserves the destination environment
 ok - config/claude-permission-mode=auto replaces --dangerously-skip-permissions with --permission-mode auto
 ok - config/claude-permission-mode=auto reaches scout launches too
@@ -94,4 +94,5 @@ ok - config/claude-launcher=teamclaude: a raw claude launch reaches claude with 
 ok - config/claude-launcher is inherited by secondmate homes
 ok - fresh default-model secondmates retain warning-only routing inheritance
 # all fm-spawn-dispatch-profile tests passed
-EXIT=0
+bash tests/fm-spawn-dispatch-profile.test.sh  105.95s user 151.78s system 44% cpu 9:37.73 total
+rc=0

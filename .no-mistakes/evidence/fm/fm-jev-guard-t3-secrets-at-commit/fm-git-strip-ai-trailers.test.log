@@ -17,4 +17,3 @@ ok - commit-msg file mode strips the trailer and keeps the subject
 ok - supported same-task bash tmux relaunch reconciles generated hooks and preserves operator configuration
 ok - supported same-task ksh tmux relaunch reconciles generated hooks and preserves operator configuration
 # all fm-git-strip-ai-trailers tests passed
-EXIT=0

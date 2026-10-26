@@ -1,0 +1,107 @@
+
+### keep-ai-trailers=0: setup repo, bare remote, install task hooks via bin/fm-git-strip-ai-trailers.sh
+install rc=0
+applypatch-msg commit-msg post-applypatch post-checkout post-commit post-merge post-rewrite pre-applypatch pre-auto-gc pre-commit pre-merge-commit pre-push pre-rebase prepare-commit-msg sendemail-validate 
+
+### T3(a) commit a file holding a 36-char ghp_ token
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "config.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+commit rc=1
+token not printed: ok
+HEAD subject: base
+
+### T3(c) replace the token with placeholder replace-me and commit + push
+commit rc=0
+push rc=0 remote main=placeholder
+
+### T3(b) write the token to ignored .env, git add -A, try to commit
+.env written: yes
+staged after add -A: []
+commit rc=1 (nonzero = nothing to commit)
+HEAD unchanged: ok
+
+### Adversarial: force-add ignored .env
+commit rc=1
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: ".env"
+
+### Adversarial: bypass pre-commit with --no-verify, then remove token at tip, push
+no-verify commit rc=0
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "leak.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+push rc=1
+remote main unchanged: ok
+
+### Adversarial: second identical refusal escalates
+push rc=1
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate f
+
+### commit-msg trailer behaviour (keep=0)
+trailer present after commit: 0
+
+### keep-ai-trailers=1: setup repo, bare remote, install task hooks via bin/fm-git-strip-ai-trailers.sh
+install rc=0
+applypatch-msg commit-msg post-applypatch post-checkout post-commit post-merge post-rewrite pre-applypatch pre-auto-gc pre-commit pre-merge-commit pre-push pre-rebase prepare-commit-msg sendemail-validate 
+
+### T3(a) commit a file holding a 36-char ghp_ token
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "config.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+commit rc=1
+token not printed: ok
+HEAD subject: base
+
+### T3(c) replace the token with placeholder replace-me and commit + push
+commit rc=0
+push rc=0 remote main=placeholder
+
+### T3(b) write the token to ignored .env, git add -A, try to commit
+.env written: yes
+staged after add -A: []
+commit rc=1 (nonzero = nothing to commit)
+HEAD unchanged: ok
+
+### Adversarial: force-add ignored .env
+commit rc=1
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: ".env"
+
+### Adversarial: bypass pre-commit with --no-verify, then remove token at tip, push
+no-verify commit rc=0
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "leak.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+push rc=1
+remote main unchanged: ok
+
+### Adversarial: second identical refusal escalates
+push rc=1
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate f
+
+### commit-msg trailer behaviour (keep=1)
+trailer present after commit: 1
+
+### Other credential shapes refused; look-alikes admitted (keep=0 hooks)
+shape AKIA...: commit rc=1 no-leak
+shape ----...: commit rc=1 no-leak
+shape post...: commit rc=1 no-leak
+shape xoxb...: commit rc=1 no-leak
+look-alike 'prefix-ghp_00000000000...': commit rc=0
+look-alike 'http://localhost:3000?...': commit rc=0
+look-alike 'password=replace-me...': commit rc=0
+
+### guard events recorded
+('git-commit-credential-shapes', 'allow') 13
+('git-commit-credential-shapes', 'deny') 8
+('git-push-credential-shapes', 'allow') 2
+('git-push-credential-shapes', 'deny') 4

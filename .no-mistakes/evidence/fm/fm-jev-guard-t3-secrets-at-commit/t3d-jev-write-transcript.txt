@@ -1,0 +1,20 @@
+
+### host=omp
+T3(b) write token to ignored .env: admitted (30 ms)
+T3(b) staged after add -A: []
+T3(d) write 396924-byte report.md: admitted (28 ms)
+T3(d) edit with 396924-byte new_string: admitted (27 ms)
+write token into tracked file (no write-time judgment now): admitted
+T3(d) committed report.md bytes in HEAD: 396924; on disk: 396924
+commit of tracked token: rc=1; names file: true; token printed: false
+
+### host=claude
+T3(b) write token to ignored .env: admitted (53 ms)
+T3(b) staged after add -A: []
+T3(d) write 396924-byte report.md: admitted (55 ms)
+T3(d) edit with 396924-byte new_string: admitted (55 ms)
+write token into tracked file (no write-time judgment now): admitted
+T3(d) committed report.md bytes in HEAD: 396924; on disk: 396924
+commit of tracked token: rc=1; names file: true; token printed: false
+
+provider/fetch requests made: 0

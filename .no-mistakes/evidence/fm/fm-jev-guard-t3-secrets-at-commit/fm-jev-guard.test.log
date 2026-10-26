@@ -1,25 +1,27 @@
 ok - pure write boundaries
-✔ omp T2(a), B68: remove own smoke.py (6.81825ms)
-✔ omp T2(b), B69: four-file probe cleanup (5.7805ms)
-✔ omp T2(c), B57: six tracked cd-guard deletions (44.214125ms)
-✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (52.674584ms)
-✔ omp T2(e), O13: acknowledge inbox with provider unreachable (5.213667ms)
-✔ omp T2(f): shell admission does not depend on audit availability or payload size (77.57475ms)
-✔ claude T2(a), B68: remove own smoke.py (5.806333ms)
-✔ claude T2(b), B69: four-file probe cleanup (5.6085ms)
-✔ claude T2(c), B57: six tracked cd-guard deletions (40.633417ms)
-✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (50.743958ms)
-✔ claude T2(e), O13: acknowledge inbox with provider unreachable (5.466833ms)
-✔ claude T2(f): shell admission does not depend on audit availability or payload size (77.554583ms)
-✔ claude: Write and Edit still reach the generated jev-guard hook (150.222667ms)
-ℹ tests 13
+✔ omp T2(a), B68: remove own smoke.py (35.761334ms)
+✔ omp T2(b), B69: four-file probe cleanup (33.668375ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (61.826042ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (78.552542ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (34.751583ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (101.419667ms)
+✔ claude T2(a), B68: remove own smoke.py (5.194791ms)
+✔ claude T2(b), B69: four-file probe cleanup (5.59475ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (33.349333ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (49.344375ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (4.67325ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (74.443333ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.099041ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (271.533125ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (115.924333ms)
+ℹ tests 15
 ℹ suites 0
-ℹ pass 13
+ℹ pass 15
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 533.170875
+ℹ duration_ms 910.62175
 ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
 ok - Claude pre-tool allowed write roots, credential insertion deferred to commit time, removals and deterministic device refusal
 ok - active writes need no provider, never-send check or model key and send nothing; inactive scopes send nothing and keep path checks
