@@ -7,7 +7,7 @@
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --digest lists unchanged overdue rows, their current ages, status and last actions for the
-# existing periodic open-loop-ledger wake; an escalation the captain has not answered is
+# periodic open-loop-ledger-resurface wake; an escalation the captain has not answered is
 # listed as "escalated, waiting on the captain". Printing the list delivers nothing.
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.

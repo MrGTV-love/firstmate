@@ -3010,9 +3010,11 @@ lavish_auto_retire_tick() {
   LAVISH_AUTO_RETIRE_PID=$!
 }
 
-# Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
-# wakes firstmate at once; an unchanged overdue set repeats only every
-# OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
+# Surface the ledger so overdue work cannot be dropped silently. A new or changed
+# overdue row wakes firstmate at once as open-loop-ledger; the periodic waiting list
+# is its own open-loop-ledger-resurface wake every OPEN_LOOPS_RESURFACE seconds,
+# whose marker only that wake restamps; a ledger the helper stopped publishing is
+# its own wake.
 # The durable row is appended before wake() exits, and firstmate's acknowledgement clears it.
 open_loops_stale_wake() {  # <ledger-path>
   local marker="$STATE/.open-loops-stale-surfaced" reason
@@ -3024,6 +3026,7 @@ open_loops_stale_wake() {  # <ledger-path>
 }
 open_loops_surface() {
   local ledger="$STATE/open-loops.json" marker="$STATE/.open-loops-surfaced" ids digest previous overdue reason
+  local resurfaced="$STATE/.open-loops-resurfaced"
   if [ -f "$ledger" ] && [ ! -L "$ledger" ]; then
     [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ] || open_loops_stale_wake "$ledger"
   else
@@ -3049,17 +3052,22 @@ open_loops_surface() {
     && [ "$(age_of "$ledger")" -lt $((OPEN_LOOPS_INTERVAL * 3)) ]; then
     rm -f "$STATE/.open-loops-stale-surfaced"
   fi
-  [ -n "$ids" ] || { rm -f "$marker"; return 0; }
+  [ -n "$ids" ] || { rm -f "$marker" "$resurfaced"; return 0; }
   digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
   previous=$(cat "$marker" 2>/dev/null || true)
-  if [ "$previous" = "$digest" ] && [ "$(age_of "$marker")" -lt "$OPEN_LOOPS_RESURFACE" ]; then
-    return 0
-  fi
   overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
-  reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
-  fm_wake_append check open-loop-ledger "$reason" || exit 1
-  printf '%s\n' "$digest" > "$marker"
-  wake "$reason"
+  if [ "$previous" != "$digest" ]; then
+    reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
+    fm_wake_append check open-loop-ledger "$reason" || exit 1
+    printf '%s\n' "$digest" > "$marker"
+    [ -e "$resurfaced" ] || date '+%s' > "$resurfaced"
+    wake "$reason"
+  elif [ ! -e "$resurfaced" ] || [ "$(age_of "$resurfaced")" -ge "$OPEN_LOOPS_RESURFACE" ]; then
+    reason="check: open-loop-ledger-resurface ($overdue overdue assigned obligations; periodic waiting list)"
+    fm_wake_append check open-loop-ledger-resurface "$reason" || exit 1
+    date '+%s' > "$resurfaced"
+    wake "$reason"
+  fi
 }
 
 # One reconcile pass can wait on a single shared launch-confirmation window of up

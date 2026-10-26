@@ -897,9 +897,10 @@ if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
   else
     OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
-    # Reuse the ledger's existing fixed resurfacing cadence, not every handling turn.
+    # Only the periodic resurface wake carries the full waiting list; a change wake
+    # presents just the new or changed rows above.
     if [ -f "$FM_WAKE_QUEUE" ] && awk -F '\t' '
-      $3 == "check" && $4 == "open-loop-ledger" { found=1 }
+      $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
       END { exit !found }
     ' "$FM_WAKE_QUEUE"; then
       "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1

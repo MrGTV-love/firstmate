@@ -262,6 +262,41 @@ test_unchanged_overdue_set_stays_quiet_then_new_row_wakes() {
   pass "unchanged evidence stays quiet; new rows and changed evidence wake immediately"
 }
 
+test_resurface_wake_is_periodic_and_separate_from_changes() {
+  local dir state fakebin out pid resurfaced before
+  dir=$(make_case ledger-resurface-split); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  resurfaced="$state/.open-loops-resurfaced"
+  publish_ledger "$state" lost-launcher
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "first overdue ledger did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  [ -e "$resurfaced" ] || fail "the first surfaced row did not start the resurface period"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the first wake"
+  set_mtime "$(( $(date +%s) - 1800 ))" "$resurfaced"
+  before=$(file_mtime "$resurfaced")
+  publish_ledger "$state" lost-launcher forgotten-guard
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a new row did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  ! grep -q 'open-loop-ledger-resurface' "$state/.wake-queue" || fail "a single new row queued the periodic list"
+  [ "$(file_mtime "$resurfaced")" = "$before" ] || fail "a change wake restamped the resurface cooldown"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the change wake"
+  set_mtime "$(( $(date +%s) - 3700 ))" "$resurfaced"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "the resurface interval passed without the periodic wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
+  ack_stopped_cycle "$state" || fail "could not acknowledge the resurface wake"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the periodic list repeated within its interval"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "the periodic list was queued twice in one interval"; }
+  reap "$pid"
+  pass "row changes wake without the periodic list; the resurface wake carries it once per interval"
+}
+
 test_ledger_without_overdue_rows_is_silent() {
   local dir state fakebin out pid
   dir=$(make_case ledger-clean); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -595,7 +630,7 @@ test_decimal_resurface_and_zero_defaults() (
       if [ "$kind" = overdue ]; then
         publish_ledger "$state" unchanged-obligation
         set_mtime "$now" "$state/open-loops.json"
-        marker="$state/.open-loops-surfaced"
+        marker="$state/.open-loops-resurfaced"
       else
         publish_ledger "$state"
         set_mtime "$((now - 600))" "$state/open-loops.json"
@@ -862,6 +897,7 @@ test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery() {
 tests=(
   test_overdue_row_wakes_with_a_durable_row
   test_unchanged_overdue_set_stays_quiet_then_new_row_wakes
+  test_resurface_wake_is_periodic_and_separate_from_changes
   test_ledger_without_overdue_rows_is_silent
   test_detached_helper_runs_and_a_blind_ledger_wakes
   test_missing_ledger_collects_with_large_interval_and_then_throttles

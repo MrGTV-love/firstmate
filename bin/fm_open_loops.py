@@ -1448,7 +1448,8 @@ def receipt_covers(action, row, now, waits=None):
     An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
     """
     if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
-            and action.get("digest") == row_digest(row) and not action.get("invalidated"):
+            and action.get("digest") == row_digest(row) and not action.get("invalidated") \
+            and not action.get("unverified"):
         return not action.get("hold") or (waits is not None and waits.hold_stands(action, row))
     return receipt_stands(action, row, now, waits)
 
@@ -1574,7 +1575,8 @@ def ledger_action(args, state, now):
         return 0
     if args.check_actions:
         def presentation_answered(ident):
-            # A reviewed green PR's action answers only the presentation it followed.
+            # A reviewed green PR's action, or an escalation whose captain hold could not be verified,
+            # answers only the presentation it followed.
             action = actions.get(ident, {})
             if action.get("kind") == "waiting":
                 return False
@@ -1582,7 +1584,8 @@ def ledger_action(args, state, now):
                 action.get("kind") == "deferred" and action.get("recheck_epoch", 0) <= now))
         missing = [row for ident, row in by_id.items()
                    if not receipt_covers(actions.get(ident, {}), row, now, waits)
-                   and not (row.get("category") == "review_pass_not_merged" and presentation_answered(ident))]
+                   and not ((row.get("category") == "review_pass_not_merged"
+                             or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused")
             print(render_overdue(missing))
@@ -1689,6 +1692,8 @@ def ledger_action(args, state, now):
         actions[ident]["binding"] = binding
     if hold:
         actions[ident]["hold"] = hold
+    elif unverified:
+        actions[ident]["unverified"] = True
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     write_ledger(state, report, receipt=True)
@@ -1698,8 +1703,8 @@ def ledger_action(args, state, now):
             print("standing: captain hold " + hold["task"] + "; covers this row until it changes"
                   " or that hold is answered, released, blocked or held again")
         elif unverified:
-            print(f"standing: no; the captain hold could not be verified ({unverified}), so this escalation"
-                  " waits on the captain without a hold binding and covers this row only until it changes")
+            print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
+                  " the turn it followed (record it again once the backlog is readable)")
         else:
             print("standing: no; no task held for the captain was named, so this escalation waits on the captain"
                   " without a hold binding and covers this row only until it changes (name the hold with --hold TASK_ID)")

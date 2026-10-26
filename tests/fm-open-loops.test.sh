@@ -2005,7 +2005,12 @@ _, boundary = drain()
 assert ack(boundary).returncode == 1
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
 assert ack(boundary).returncode == 0
-ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger "check: open-loop-ledger periodic digest"',
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger "check: open-loop-ledger (1 overdue)"',
+   '_', code / 'bin/fm-wake-lib.sh')
+change_wake, boundary = drain()
+assert ack(boundary).returncode == 0, 'a pending escalation never blocks an acknowledgement'
+assert 'WAITING OPEN WORK' not in change_wake.stdout, 'a change wake printed the full waiting list'
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"',
    '_', code / 'bin/fm-wake-lib.sh')
 unchanged, boundary = drain()
 assert ack(boundary).returncode == 0, 'a pending escalation never blocks an acknowledgement'
@@ -3085,9 +3090,9 @@ assert 'could not be verified' in recorded.stdout and 'no task held for the capt
 assert 'hold' not in stored()['handling']['actions'][row['id']]
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
-assert ack(boundary).returncode == 0
+assert ack(boundary).returncode == 0, 'an unverified escalation answers the turn it followed'
 result, boundary = drain('unverified-after')
-assert ack(boundary).returncode == 0, 'an escalation covers unchanged evidence without an unverified hold'
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverified escalation never covers the next presentation'
 
 # (f) Only firstmate-owned rows may bind a captain hold.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('marker')
@@ -3137,10 +3142,26 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in covered) and 'STANDING' not in broken.stdout, broken
 assert snapshot_runs() == 1, ('an unreadable backlog was read again for each covered row', snapshot_runs())
+# With fm-fleet-snapshot timing out, an escalation of a parkable row answers only the turn it followed.
+counting.write_text('#!/usr/bin/env bash\n[ ! -e "$FM_HOME/hang-snapshot" ] || exec sleep 30\n'
+                    'exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('snapshot-timeout')
+(home / 'config/open-loops.json').write_text(json.dumps(dict(command_timeout_seconds=1)))
+_, boundary = drain()
+(home / 'hang-snapshot').touch()
+recorded = act('escalated', 'asked the captain')
+assert recorded.returncode == 0 and 'could not be verified' in recorded.stdout, recorded
+assert 'answers only the turn it followed' in recorded.stdout, recorded
+assert 'hold' not in stored()['handling']['actions'][row['id']]
+assert ack(boundary).returncode == 0, 'the timed-out escalation is accepted for the turn it followed'
+(home / 'hang-snapshot').unlink()
+result, boundary = drain('after-timeout')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the row needs an action at its next presentation'
 print('PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain,'
       ' also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold'
       ' needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and'
-      ' other categories cannot bind holds; the deferral limit remains enforced; one presentation reads the backlog once')
+      ' other categories cannot bind holds; the deferral limit remains enforced; one presentation reads the backlog once;'
+      ' an unverifiable escalation answers only the turn it followed')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 # A real status append and collector refresh reactivate an unchanged paused obligation.
