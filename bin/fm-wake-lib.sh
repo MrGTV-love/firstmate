@@ -25,10 +25,12 @@
 # registered waiters; crashed waiter receipts are excluded by PID liveness.
 # FM_LOCK_WAIT_TICK, when set, names a function each waiting iteration calls
 # with <lock> <wait-start-SECONDS> <waiter-pid>; the watcher uses it to keep
-# observing long-held locks while its own wake-queue append keeps waiting. An
-# alarm that ends such a wait first settles the pending row: appended if the
-# queue lock is free, else spilled to STATE/.wake-spill.<seq>. Every locked
-# append replays spilled rows first, in order, so none is dropped or reordered.
+# observing long-held locks during every lock wait it makes. An alarm that ends
+# such a wait first settles any in-flight fm_wake_append row: appended if the
+# queue lock is free, else (or while this process holds it) spilled to
+# STATE/.wake-spill.<seq>. Every locked append replays spilled rows first, in
+# order, and an append whose row was spilled mid-write replays it instead of
+# writing it again, so none is dropped, duplicated or reordered.
 
 FM_WAKE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 FM_WAKE_DEFAULT_ROOT="$(cd "$FM_WAKE_LIB_DIR/.." && pwd)"
@@ -2667,30 +2669,35 @@ FM_WAKE_PENDING_KIND=
 FM_WAKE_PENDING_KEY=
 FM_WAKE_PENDING_PAYLOAD=
 fm_wake_append() {
-  local status=0 pending
+  local status=0
   FM_WAKE_PENDING_KIND=$1 FM_WAKE_PENDING_KEY=${2-} FM_WAKE_PENDING_PAYLOAD=${3-}
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || status=1
-  pending=$FM_WAKE_PENDING_KIND
-  FM_WAKE_PENDING_KIND=
-  [ "$status" -eq 0 ] || return 1
-  if [ -n "$pending" ]; then
-    fm_wake_append_locked "$@" || status=$?
-  else
-    _fm_wake_spill_replay_locked || status=$?
+  if ! fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"; then
+    FM_WAKE_PENDING_KIND=
+    return 1
   fi
+  _fm_wake_spill_replay_locked || status=$?
+  if [ "$status" -eq 0 ] && [ -n "$FM_WAKE_PENDING_KIND" ]; then
+    _fm_wake_append_row_locked "$@" pending || status=$?
+  fi
+  FM_WAKE_PENDING_KIND=
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$status"
 }
 
-# fm_wake_pending_settle: make the waiting fm_wake_append row durable without
-# waiting. It is appended when the queue lock is free now; otherwise it is
-# spilled to STATE/.wake-spill.<seq> (temp file plus rename, sequence order).
-# Returns 1 only when the row is neither appended nor spilled.
+# fm_wake_pending_settle: make the in-flight fm_wake_append row durable without
+# waiting. It is appended when the queue lock is free now; otherwise, or while
+# this process already holds that lock, it is spilled to STATE/.wake-spill.<seq>
+# (temp file plus rename, sequence order). Returns 1 only when the row is
+# neither appended nor spilled.
 fm_wake_pending_settle() {
-  local status=0 f n seq=0 tmp
+  local status=1 f n seq=0 tmp current held=''
+  local _fm_lock_observation_only=1
   [ -n "$FM_WAKE_PENDING_KIND" ] || return 0
   set -- "$FM_WAKE_PENDING_KIND" "$FM_WAKE_PENDING_KEY" "$FM_WAKE_PENDING_PAYLOAD"
-  if fm_lock_try_acquire "$FM_WAKE_QUEUE_LOCK"; then
+  fm_current_pid current || return 1
+  IFS= read -r held 2>/dev/null < "$FM_WAKE_QUEUE_LOCK/pid" || true
+  if [ "$held" != "$current" ] && fm_lock_try_acquire "$FM_WAKE_QUEUE_LOCK"; then
+    status=0
     fm_wake_append_locked "$@" || status=$?
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
     if [ "$status" -eq 0 ]; then
@@ -2765,6 +2772,12 @@ _fm_wake_append_row_locked() {
   status=0
 
   _fm_recovery_marker_publish "$recovery_marker" downtime "" append || status=$?
+  if [ "$status" -eq 0 ] && [ "${4:-}" = pending ] && [ -z "$FM_WAKE_PENDING_KIND" ]; then
+    FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
+    FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+    _fm_wake_spill_replay_locked
+    return
+  fi
   if [ "$status" -eq 0 ]; then
     seq=$(cat "$seq_file" 2>/dev/null || echo 0)
     case "$seq" in

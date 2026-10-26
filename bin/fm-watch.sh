@@ -2633,17 +2633,22 @@ lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures kee
   fi
 }
 
-# FM_LOCK_WAIT_TICK hook: while this watcher process waits on its own
-# wake-queue lock, run the long-held lock alarm once per poll interval and keep
-# waiting. Before any alarm row is published, the pending append is made
-# durable (appended now, or spilled for the next locked append to replay first);
-# if neither succeeds, or observation fails, the append keeps waiting.
-WATCH_QUEUE_WAIT_TICKED=0
-watch_queue_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
-  [ "$1" = "$FM_WAKE_QUEUE_LOCK" ] && [ "$3" = "$$" ] || return 0
-  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_QUEUE_WAIT_TICKED)) -ge "$POLL" ] || return 0
-  WATCH_QUEUE_WAIT_TICKED=$SECONDS
+# FM_LOCK_WAIT_TICK hook: while this watcher process waits on any lock (the
+# wake queue, the recovery marker, or any other), run the long-held lock alarm
+# once per poll interval and keep waiting; it never re-enters itself. Before any
+# alarm row is published, a pending append is made durable (appended now, or
+# spilled for the next locked append to replay first, never reclaiming a queue
+# lock this watcher already holds); if neither succeeds, or observation fails,
+# the wait goes on.
+WATCH_LOCK_WAIT_TICKED=0
+WATCH_LOCK_WAIT_TICKING=0
+watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+  [ "$3" = "$$" ] && [ "$WATCH_LOCK_WAIT_TICKING" = 0 ] || return 0
+  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_LOCK_WAIT_TICKED)) -ge "$POLL" ] || return 0
+  WATCH_LOCK_WAIT_TICKED=$SECONDS
+  WATCH_LOCK_WAIT_TICKING=1
   lock_alarm_tick fm_wake_pending_settle
+  WATCH_LOCK_WAIT_TICKING=0
   return 0
 }
 
@@ -2742,7 +2747,7 @@ done
 # watcher; startup failures retain the lock as stale evidence for the next arm.
 trap '[ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
 lock_alarm_tick
-FM_LOCK_WAIT_TICK=watch_queue_wait_tick
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
 if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
 fi
