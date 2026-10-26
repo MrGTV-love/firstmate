@@ -23,7 +23,7 @@ These skills are not captain-invocable; load them only at their precise triggers
 - `firstmate-orca` - load before switching to Orca, spawning or supervising Orca-backed work, smoke-testing Orca backend behavior, debugging Orca task state, or reconciling Orca-backed task metadata.
 - `project-management` - load before adding, creating, removing, or initializing a project.
   Cloning or registering a project is add intake and uses the same trigger.
-- `stuck-crewmate-recovery` - load before any stale-wake verdict, including repeated alerts for finished or intentionally idle workers and `demand-deep-inspection`; for dead or missing endpoints, looping or unresponsive workers, repeated confusion, answered-by-brief questions, failed steering, moved-copy reconciliation, or a live worker's pipeline-dead or timeout claim.
+- `stuck-crewmate-recovery` - load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims.
 - `secondmate-provisioning` - load before creating, seeding, validating, launching, handing backlog to, recovering, pushing inherited local material into, or retiring a secondmate home, and before editing `data/secondmates.md`.
 - `captain-hold-lifecycle` - load before treating an investigation or visual review as complete, before ending a visual review that exposed a captain decision, when recording or routing the captain's answer, and on any `RECORD DIVERGENCE` line from the wake drain.
 - `away-quiet-supervision` - load whenever /afk or /quiet is invoked, an away or quiet record exists, or a marked away-supervisor message arrives.
@@ -32,7 +32,7 @@ These skills are not captain-invocable; load them only at their precise triggers
 - `fmx-respond` - load on an `x-mention <request_id>` `check:` wake to handle the mention, on an `x-mode-error ...` `check:` wake to report the Relay configuration blocker, on a `public-followup ...` `check:` wake or a startup-surfaced public commitment, and on any milestone or terminal wake for a Relay-linked task before posting its completion follow-up; relevant only when Relay is on.
 - `firstmate-codexapp` - load before coordinating a visible Codex Desktop thread, evaluating a Codex App backend request, or reconciling Codex Desktop host-tool smoke evidence for Firstmate work.
 - `firstmate-coding-guidelines` - load before changing firstmate's shared, tracked material, as defined by section 1's list, whether editing directly or briefing a crewmate for a firstmate-repo task.
-- `backlog-maintenance` - load before filing, holding, updating, archiving, or handing off backlog items or task notes.
+- `backlog-maintenance` - load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named.
 - `captain-facing-wording` - load before translating worker or supervision evidence into captain-facing chat, including PR review or merge replies.
 - `check-result-handling` - load on any `check:` wake before acting on its named result.
 - `crew-brief-authoring` - load before creating or changing a ship, scout, or secondmate brief, and before spawning or promoting work from one.
