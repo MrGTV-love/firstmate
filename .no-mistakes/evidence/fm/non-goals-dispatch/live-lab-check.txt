@@ -1,0 +1,8 @@
+ok primary: claude pid 6351 in /Users/charlesabrooker/tmp/fmlivelab.iR8tP0/home
+fail probe: no LABREADY-5e1afba5c908 reply in window main (model refused, turn still running, or a dialog is open)
+ok trust: /Users/charlesabrooker/tmp/fmlivelab.iR8tP0/home is trusted in the Claude store
+fail mirror: the dialog mirror has no captain and main entry yet (captain=1 main=0)
+fail host: no live supervision host (expected one)
+fail watcher: no live watcher with a fresh beacon holds the lab home
+fail worker: the worker is not currently parked on /Users/charlesabrooker/tmp/fmlivelab.iR8tP0/home/data/lab5e1afba5c908-worker/gate (state: unknown · source: none · no current-state source available)
+ok treehouse: ~/.treehouse unchanged

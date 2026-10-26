@@ -1,0 +1,17 @@
+window=firstmate:fm-oos-blank
+endpoint_task_id=oos-blank
+worktree=/Users/charlesabrooker/.treehouse/proj-e9a795/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.rCHSkh/projects/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/oos-blank
+tasktmp=/tmp/fm-oos-blank
+model=default
+effort=default
+jev_guard_policy=FIRSTMATE_JEV_GUARD_V1
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1792995133.36771.6929
+spawn_gen=s1792995134.30190.25427

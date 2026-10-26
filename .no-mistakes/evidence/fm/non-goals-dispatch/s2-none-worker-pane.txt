@@ -1,0 +1,24 @@
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use
+  Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use
+  Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use
+  Bash(*>*/.tac/governance/*)
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.rCHSkh/state/operational-inbox/1792995134-b1dab9c160bb8c44.msg' and handle
+  its contents as Firstmate operational input.
+
+⏺ Creating branch and listing tracked files
+  ⎿  $ git checkout -b fm/oos-blank -- && git ls-files && git log --all
+     --oneline && find .claude -type f && git -C
+     /Users/charlesabrooker/tmp/fm-lab.rCHSkh/projects/proj ls-tree -r main
+     --name-only
+
+✽ Osmosing… (16s · ↓ 1.4k tokens · thought for 5s)
+  tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 39k/1.0M fm/oos-blank proj:d4935828
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

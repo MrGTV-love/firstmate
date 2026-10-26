@@ -1,0 +1,24 @@
+
+  What I checked:
+  1. I am in my own copy of the project, not the main one.
+  2. I am on branch fm/oos-blank. The last commit is 1d39be3.
+  3. greet.sh prints hello. I ran it to see.
+  4. The branch adds to main with no conflicts.
+  5. There are no unsaved changes.
+  6. The inbox was empty, so there were no new orders.
+  7. The out-of-scope list was blank, so nothing was forbidden.
+
+  What I did:
+  - I added one done line to the status file:
+    /Users/charlesabrooker/tmp/fm-lab.rCHSkh/state/oos-blank.status.
+  - I did not push. I did not open a PR. I started no services.
+
+  What you do now: Nothing. Firstmate merges the branch into main.
+
+✻ Brewed for 27s · done 1:13 AM
+
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 4% 40k/1.0M fm/oos-blank proj:73133c62
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

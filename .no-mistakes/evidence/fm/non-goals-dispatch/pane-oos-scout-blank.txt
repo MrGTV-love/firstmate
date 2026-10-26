@@ -1,0 +1,24 @@
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use
+  Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use
+  Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use
+  Bash(*>*/.tac/governance/*)
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.rCHSkh/state/operational-inbox/1792995258-42bd1293bfc3a56c.msg' and handle
+  its contents as Firstmate operational input.
+
+⏺ Checking brief files and completion-gate skill
+  ⎿  $ cd /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-scout-blank && grep
+     -n -i -E "greet|hello|intent|spec|scope|DoD file" brief.md launch-brief.md
+     | head -40; echo ---; cat /Users/charlesabrooker/.no-mistakes/worktrees/e2f
+     2c2589455/01M5VCZS6YBNJ3YRMZCQT59KKT/.agents/skills/captain-hold-lifecycle…
+
+✳ Moseying… (31s · ↓ 1.8k tokens · thinking with high effort)
+  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and re…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 4% 42k/1.0M oos-scout-blank:ec670b7f
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

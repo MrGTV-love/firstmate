@@ -1,0 +1,76 @@
+=== S3b: fresh SCOUT spawn with ### Out of scope answered None. ===
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Find out why the greeting is wrong.
+    
+    ## Firstmate spec
+    Read greet.sh and report the cause.
+    
+    ### Out of scope
+    None.
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-scout-blank: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned oos-scout-blank harness=claude kind=scout window=firstmate:fm-oos-scout-blank worktree=/Users/charlesabrooker/.treehouse/proj-e9a795/2/proj
+exit=0
+guard events written:
+{"ts":"2026-10-26T06:14:14Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-93602","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T06:14:14Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-93669","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+
+=== S4: fresh ship spawn of a brief that never had a ### Out of scope heading (heading removed from the scaffold) ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-noheading/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Make the farewell say goodbye.
+    
+    ## Firstmate spec
+    Edit bye.sh so it prints goodbye.
+    
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: oos-noheading ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for oos-noheading: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned oos-noheading harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-oos-noheading worktree=/Users/charlesabrooker/.treehouse/proj-e9a795/3/proj
+exit=0
+guard events written:
+{"ts":"2026-10-26T06:14:23Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-6043","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+
+=== S8: fresh ship spawn whose spec puts the build steps in a ### Approach subsection AFTER '### Out of scope / None.' ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-approach/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Make the greeting say hi.
+    
+    ## Firstmate spec
+    ### Out of scope
+    None.
+    
+    ### Approach
+    Edit hi.sh so it prints hi.
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+notice: oos-approach ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for oos-approach: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned oos-approach harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-oos-approach worktree=/Users/charlesabrooker/.treehouse/proj-e9a795/4/proj
+exit=0

@@ -1,0 +1,24 @@
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Sonnet 5.5 with low effort · Claude Max
+ ▝▝   ▝▝   ~/tmp/fmlivelab.iR8tP0/treehouse/.treehouse/notes-20321e/1/notes
+⚠ Deny rule Bash(rm -rf /*:*) reads its * literally · use Bash(rm -rf /*)
+⚠ Deny rule Bash(rm -rf ~/*:*) reads its * literally · use Bash(rm -rf ~/*)
+⚠ Deny rule Bash(dd if=* of=/dev/*:*) reads its * literally · use Bash(dd if=* of=/dev/*)
+⚠ Ask rule Bash(rm*/.claude/hooks/*:*) reads its * literally · use Bash(rm*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.claude/settings*:*) reads its * literally · use Bash(rm*/.claude/settings*)
+⚠ Ask rule Bash(mv*/.claude/hooks/*:*) reads its * literally · use Bash(mv*/.claude/hooks/*)
+⚠ Ask rule Bash(mv*/.claude/settings*:*) reads its * literally · use Bash(mv*/.claude/settings*)
+⚠ Ask rule Bash(*>*/.claude/settings*:*) reads its * literally · use Bash(*>*/.claude/settings*)
+⚠ Ask rule Bash(*>*/.claude/hooks/*:*) reads its * literally · use Bash(*>*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use Bash(*>*/.tac/governance/*)
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fmlivelab.iR8tP0/home/state/operational-inbox/1792995335-101c007394945cb9.msg' and handle its contents as Firstmate operational input.            
+  ⎿  You've hit your weekly limit · resets Oct 27 at 6am (America/Chicago)
+✻ Cooked for 1s · done 1:15 AM
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   What do you want to do?                           
+   ❯ 1. Stop and wait for limit to reset                                                                                                                                                                                    
+     2. Wait here, then continue automatically at Oct 27 at 6am
+     3. Add funds to continue with usage credits                                                                                                                                                                            
+   Enter to confirm · Esc to cancel                  

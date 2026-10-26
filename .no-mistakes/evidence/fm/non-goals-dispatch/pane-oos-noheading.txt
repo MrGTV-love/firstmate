@@ -1,0 +1,24 @@
+⚠ Ask rule Bash(*>*/.claude/hooks/*:*) reads its * literally · use
+  Bash(*>*/.claude/hooks/*)
+⚠ Ask rule Bash(rm*/.tac/governance/*:*) reads its * literally · use
+  Bash(rm*/.tac/governance/*)
+⚠ Ask rule Bash(mv*/.tac/governance/*:*) reads its * literally · use
+  Bash(mv*/.tac/governance/*)
+⚠ Ask rule Bash(*>*/.tac/governance/*:*) reads its * literally · use
+  Bash(*>*/.tac/governance/*)
+
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.rCHSkh/state/operational-inbox/1792995267-18c90cb0b271d365.msg' and handle
+  its contents as Firstmate operational input.
+
+  Verifying isolation and view the repo
+  ⎿  $ git ls-files && git log --stat -1 && find .claude -type f && git checkout
+     -b fm/oos-noheading --
+
+✽ Cooking… (22s · ↓ 773 tokens · thinking with high effort)
+  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and re…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 39k/1.0M fm/oos-noheading proj:be4650b0
+  ⏵⏵ bypass permissions on (shift+tab to cycle)

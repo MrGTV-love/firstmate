@@ -1,0 +1,10 @@
+lab: /Users/charlesabrooker/tmp/fmlivelab.iR8tP0 (tear down with: bin/fm-live-lab.sh down /Users/charlesabrooker/tmp/fmlivelab.iR8tP0)
+tree: 5860aabe00032d170fabd2915b4251f287d4cded from /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5VCZS6YBNJ3YRMZCQT59KKT
+skill selection for lab5e1afba5c908-worker: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned lab5e1afba5c908-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-lab5e1afba5c908-worker worktree=/Users/charlesabrooker/tmp/fmlivelab.iR8tP0/treehouse/.treehouse/notes-20321e/1/notes
+gate: /Users/charlesabrooker/tmp/fmlivelab.iR8tP0/home/data/lab5e1afba5c908-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto

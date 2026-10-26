@@ -1,0 +1,107 @@
+=== S3a: fresh SCOUT spawn, scaffold filled, ### Out of scope left blank ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-scout-blank/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Find out why the greeting is wrong.
+    
+    ## Firstmate spec
+    Read greet.sh and report the cause.
+    
+    ### Out of scope
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+$ fm-spawn.sh oos-scout-blank <proj> --scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-scout-blank/brief.md cannot be dispatched; every input problem is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-scout-blank/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+guard events since: {"ts":"2026-10-26T06:13:49Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-57009","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+
+=== S5: fresh ship spawn whose Firstmate spec holds ONLY '### Out of scope / None.' ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-spec-empty/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Make the greeting say hello.
+    
+    ## Firstmate spec
+    
+    
+    ### Out of scope
+    None.
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-spec-empty/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn; write the requested change or investigation and the substance of any referenced report, then rerun fm-spawn.sh to complete dispatch
+exit=1
+
+=== S6: adversarial - exclusion list holding only spaces and blank lines ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-ws/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Make the greeting say hello.
+    
+    ## Firstmate spec
+    Edit greet.sh so it prints hello.
+    
+    ### Out of scope
+       
+    	
+      
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-ws/brief.md cannot be dispatched; every input problem is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-ws/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+
+=== S7: blank list plus unfilled DoD tokens -> one refusal listing both, both guard ids logged ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-both/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-both/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-both/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+guard events written by this refusal:
+{"ts":"2026-10-26T06:13:55Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-66637","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T06:13:55Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-66725","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+
+=== S9: adversarial - '### Out of scope' only inside a fenced example in the spec, list never a real heading; DoD left unfilled so the spawn stops before launch ===
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-fenced/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+$ brief excerpt:
+    # Task
+    ## Captain's intent
+    Make the greeting say hello.
+    
+    ## Firstmate spec
+    Edit greet.sh so it prints hello. Example brief shape:
+    ```
+    ### Out of scope
+    ```
+    
+    # Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.rCHSkh
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-fenced/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ## Definition Of Done (task) still holds {DOD_CAPABILITY}
+  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}
+  ### Supporting items still holds {DOD_SUPPORTING_ITEMS}
+  ### Hard gates still holds {DOD_HARD_GATES}
+  ### Honesty rule still holds {DOD_HONESTY_RULE}
+error: repair: edit /Users/charlesabrooker/tmp/fm-lab.rCHSkh/data/oos-fenced/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+guard events written by this refusal:
+{"ts":"2026-10-26T06:13:57Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-69658","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

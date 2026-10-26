@@ -1,0 +1,15 @@
+=== S2 -> S10: task oos-blank was fresh-spawned with '### Out of scope / None.' (real Claude worker started, see s2-none-worker-pane.txt).
+Then the list was blanked again in the source brief and the task was relaunched through the real control plane.
+Brief excerpt at relaunch time:
+    ## Firstmate spec
+    Edit greet.sh so it prints hello.
+
+    ### Out of scope
+
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.rCHSkh bin/fm-control.sh oos-blank relaunch --note "lab check: relaunch with a blank exclusion list"
+(watcher-down supervision banner trimmed; it is unrelated lab supervision noise)
+notice: oos-blank ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for oos-blank: unavailable - no TypeSafe or OpenRouter key
+relaunched oos-blank harness=claude from=claude model=default effort=default backend=tmux endpoint=firstmate:fm-oos-blank worktree=/Users/charlesabrooker/.treehouse/proj-e9a795/1/proj
+exit=0
+No spawn-brief-out-of-scope deny event was written by the relaunch (guard-events.jsonl unchanged after the relaunch).
