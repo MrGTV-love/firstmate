@@ -29,9 +29,10 @@
 # env is the one-command form of the supported setup: it mints a fresh lab home
 # plus its private socket directory and prints `export FM_HOME=...` and
 # `export TMUX_TMPDIR=...`, so a caller evals it once per scenario shell instead
-# of composing mktemp, create, and a mkdir for tmux. It prints the teardown line,
-# with literal paths, to stderr so it stays visible past the eval, and it is the
-# recipe the gate-context refusal names; never re-express it
+# of composing mktemp, create, and a mkdir for tmux. It repeats both exports and
+# prints the teardown line, with literal paths, on stderr so they stay visible
+# past the eval for a caller whose next command runs in a fresh shell, and it is
+# the recipe the gate-context refusal names; never re-express it
 # in prose somewhere else.
 # A refused teardown reports the tmux probe's exit status and stderr while
 # retaining the socket directory and its durable ownership record.
@@ -60,8 +61,9 @@ case "${1:-}" in
     dir=$(mktemp -d "$base/fm-lab.XXXXXX") || exit 1
     lab=$("$SCRIPT_DIR/fm-lab-home.sh" create "$dir") || { rmdir "$dir" 2>/dev/null || true; exit 1; }
     socket=$("$SCRIPT_DIR/fm-lab-home.sh" tmux-dir "$lab") || { rm -rf "$lab"; exit 1; }
-    printf 'export FM_HOME=%q\n' "$lab"
-    printf 'export TMUX_TMPDIR=%q\n' "$socket"
+    exports=$(printf 'export FM_HOME=%q\nexport TMUX_TMPDIR=%q' "$lab" "$socket")
+    printf '%s\n' "$exports"
+    printf '%s\n' "$exports" >&2
     printf 'fm-lab-home: teardown: %q teardown %q && rm -rf %q\n' "$SCRIPT_DIR/fm-lab-home.sh" "$lab" "$lab" >&2
     ;;
   create)

@@ -336,6 +336,7 @@ lab_home_env_provisions() {  # <tmpdir> <expected-real-parent> <label>
   assert_contains "$out" 'export FM_HOME=' "lab-home $label: env must export FM_HOME"
   assert_contains "$out" 'export TMUX_TMPDIR=' "lab-home $label: env must export TMUX_TMPDIR"
   assert_contains "$err" 'teardown' "lab-home $label: env must print the teardown line on stderr"
+  grep '^export ' "$TMP/env.err" > "$TMP/env.stderr-exports"
   printf '%s\n' "$out" > "$TMP/env.exports"
   # shellcheck source=/dev/null
   ( . "$TMP/env.exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.paths" )
@@ -345,9 +346,13 @@ lab_home_env_provisions() {  # <tmpdir> <expected-real-parent> <label>
   [ "$lab" = "$(cd -P -- "$lab" && pwd -P)" ] || fail "lab-home $label: env must export a canonical FM_HOME, got $lab"
   case "$lab" in "$parent"/*) ;; *) fail "lab-home $label: env must mint under $parent, got $lab" ;; esac
   [ -d "$socket" ] || fail "lab-home $label: env did not create the private tmux socket directory"
+  # shellcheck source=/dev/null
+  ( unset FM_HOME TMUX_TMPDIR; . "$TMP/env.stderr-exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.stderr-paths" )
+  [ "$(cat "$TMP/env.stderr-paths")" = "$(printf '%s\n%s' "$lab" "$socket")" ] \
+    || fail "lab-home $label: the stderr exports must restore the same FM_HOME and TMUX_TMPDIR in a fresh shell"
   out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1); rc=$?
   expect_code 0 "$rc" "lab-home $label: the home env mints must be permitted by the gate boundary"
-  teardown=${err#fm-lab-home: teardown: }
+  teardown=$(sed -n 's/^fm-lab-home: teardown: //p' "$TMP/env.err")
   (cd / && eval "$teardown") || fail "lab-home $label: the printed teardown line failed: $teardown"
   [ ! -e "$socket" ] || fail "lab-home $label: teardown left the env socket directory behind"
   [ ! -e "$lab" ] || fail "lab-home $label: teardown left the env lab home behind"
