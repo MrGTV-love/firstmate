@@ -127,7 +127,7 @@ run_settle_spawn() {
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
     FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" BASH_ENV="$TMP_ROOT/clock.sh" \
-    CLAUDE_CONFIG_DIR='' PI_CODING_AGENT_DIR='' OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
+    CLAUDE_CONFIG_DIR=${SETTLE_CLAUDE_CONFIG_DIR:-} PI_CODING_AGENT_DIR='' OMP_PROFILE='' PI_PROFILE='' PI_CONFIG_DIR=.omp \
     FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
     FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
     PATH="$FAKEBIN_DIR:$PATH" \
@@ -330,6 +330,32 @@ echo "own=$own"
 echo "other=$foreign"
 SH
   chmod +x "$1/claude-session-probe"
+}
+
+# A missing CLAUDE_CONFIG_DIR root that a confined Claude spawn creates is
+# owner-only, although the trust step reaches the root before the session folders.
+test_confined_claude_creates_a_missing_config_root_owner_only() {
+  local rec id out root
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
+    return 0
+  fi
+  id=settle-confined-new-root-z8
+  rec=$(make_settle_case confined-new-root "$id" 0)
+  read_settle_record "$rec"
+  printf 'claude\n' > "$HOME_DIR/config/crew-harness"
+  cat > "$FAKEBIN_DIR/claude" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --version ] || printf '2.1.310 (Claude Code)\n'
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  root="$HOME_DIR/claude-root"
+  out=$(SETTLE_CLAUDE_CONFIG_DIR=$root run_settle_spawn "$id")
+  expect_code 0 "$?" "confined claude spawn on a missing config root was refused: $out"
+  assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "confined claude coverage absent from metadata"
+  assert_equals '700 700' "$(stat -f %Lp "$root" "$root/session-env" | tr '\n' ' ' | sed 's/ $//')" \
+    "a missing Claude config root the confined spawn creates must be owner-only"
+  pass "a confined Claude spawn creates a missing config root owner-only"
 }
 
 # The launch fm-spawn delivers for a measured harness runs inside the generated
@@ -1004,6 +1030,7 @@ PY
 test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
+test_confined_claude_creates_a_missing_config_root_owner_only
 test_confined_raw_claude_launch_runs_through_teamclaude
 test_compound_raw_claude_launch_runs_confined
 test_unconfined_raw_claude_launch_keeps_shell_constructs
