@@ -1,0 +1,4 @@
+portable_parallel_weight_hints: entries=32 base_entries=32 new_entries=[]
+portable_serial_weight_hints: entries=324 base_entries=314 new_entries=['tests/fm-git-secrets.test.sh', 'tests/fm-retired-jev-channel-consistency.test.sh', 'tests/fm-retired-jev-omp-result-screen.test.sh', 'tests/fm-retired-jev-producer-field-exclusion.test.sh', 'tests/fm-retired-jev-result-size-refusal.test.sh', 'tests/fm-retired-jev-trusted-read.test.sh', 'tests/fm-retired-jev-write-credential-noul.test.sh', 'tests/fm-retired-jev-write-judgment-unavailable.test.sh', 'tests/fm-retired-jev-write-remainder-shapes.test.sh', 'tests/fm-retired-jev-write-secrets-kind.test.sh']
+measured_hints_matching_slowest_success=300 mismatched=0 no_sample_kept_previous=56 no_sample_changed=0
+

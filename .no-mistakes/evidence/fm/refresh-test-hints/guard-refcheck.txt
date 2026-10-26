@@ -1,0 +1,3 @@
+$ bin/fm-guard-refcheck.sh
+REFCHECK_SUMMARY registrations=52 paths=109 missing=0 registry_missing=0 retired=13 resurrected=0
+rc=0

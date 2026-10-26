@@ -1,0 +1,97 @@
+FM_TEST_BEGIN 2026-10-26T14:31:02Z tests/fm-retired-jev-channel-consistency.test.sh family=unclassified expected_gate_skip=none
+ok - T1(c): launch and steering publisher records reach the worker verbatim, with no receipt, audit row or model call
+FM_TEST_END 2026-10-26T14:31:14Z tests/fm-retired-jev-channel-consistency.test.sh exit=0 duration_ms=11601 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:31:14Z tests/fm-retired-jev-omp-result-screen.test.sh family=unclassified expected_gate_skip=none
+✔ T1(a): the recorded omp background-job notice reaches the worker verbatim (0.466208ms)
+✔ T1(d): a worker session records only pre-tool work and sends no result to TypeSafe (0.429084ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2.782458
+ok - T1(a, d): flagged omp output reaches the worker unchanged; the session audits only pre-tool work, with no omp_replace row and no result provider call
+FM_TEST_END 2026-10-26T14:31:24Z tests/fm-retired-jev-omp-result-screen.test.sh exit=0 duration_ms=9979 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:31:24Z tests/fm-retired-jev-producer-field-exclusion.test.sh family=unclassified expected_gate_skip=none
+ok - T1(b): the recorded bounded wait keeps help[3] and its error state, with no audit row or model call
+FM_TEST_END 2026-10-26T14:31:34Z tests/fm-retired-jev-producer-field-exclusion.test.sh exit=0 duration_ms=9797 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:31:34Z tests/fm-retired-jev-result-size-refusal.test.sh family=unclassified expected_gate_skip=none
+ok - results beyond one request and beyond the whole screening budget reach the worker unchanged
+FM_TEST_END 2026-10-26T14:31:44Z tests/fm-retired-jev-result-size-refusal.test.sh exit=0 duration_ms=9605 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:31:44Z tests/fm-retired-jev-trusted-read.test.sh family=unclassified expected_gate_skip=none
+ok - task-owned data and state reads reach the worker unchanged with no audit row or model call
+FM_TEST_END 2026-10-26T14:31:54Z tests/fm-retired-jev-trusted-read.test.sh exit=0 duration_ms=9742 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:31:54Z tests/fm-retired-jev-write-credential-noul.test.sh family=unclassified expected_gate_skip=none
+ok - a credential write the Noul would score 0.99 is admitted with no judgment and stages nothing
+ok - a force-added credential still refuses at commit, and the admitting guard was active
+FM_TEST_END 2026-10-26T14:32:05Z tests/fm-retired-jev-write-credential-noul.test.sh exit=0 duration_ms=10698 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:32:05Z tests/fm-retired-jev-write-judgment-unavailable.test.sh family=unclassified expected_gate_skip=none
+ok - report writes are admitted with no judgment during an outage and under never-send text
+ok - the guard that admitted those writes during the outage was active and still refuses a write outside its roots
+FM_TEST_END 2026-10-26T14:32:15Z tests/fm-retired-jev-write-judgment-unavailable.test.sh exit=0 duration_ms=10015 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:32:15Z tests/fm-retired-jev-write-remainder-shapes.test.sh family=unclassified expected_gate_skip=none
+ok - a long write whose remainder holds a credential shape is admitted with no judgment
+ok - the same shapes refuse the added lines at commit, and the admitting guard was active
+FM_TEST_END 2026-10-26T14:32:26Z tests/fm-retired-jev-write-remainder-shapes.test.sh exit=0 duration_ms=10378 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:32:26Z tests/fm-retired-jev-write-secrets-kind.test.sh family=unclassified expected_gate_skip=none
+ok - a write the kind judge would label secrets is admitted with no judgment and its placeholders commit
+ok - the commit check still refuses a credential shape, and the admitting guard was active
+FM_TEST_END 2026-10-26T14:32:37Z tests/fm-retired-jev-write-secrets-kind.test.sh exit=0 duration_ms=10747 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T14:32:37Z tests/fm-git-secrets.test.sh family=unclassified expected_gate_skip=none
+ok - pre-commit keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals
+ok - pre-push keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals
+ok - project pre-commit staging is scanned before commit, and project-hook failure propagates
+ok - T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked
+ok - T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked
+ok - an unrelated edit beside an existing fixture commits; a newly added AKIA-shaped line refuses
+ok - a conflicted merge bringing main's fixtures commits and pushes; a new line in its resolution refuses
+ok - pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential
+ok - squash and cherry-pick replays of remote content stay refused and name the likely cause and escalation
+ok - renamed and split files with existing fixtures commit and push; a new AKIA line inside a moved file refuses
+ok - refusals past the budget escalate to a human decision, stay refused, and an allow resets the count
+ok - pre-commit escalates repeated inspection failures and keeps the refused line's count across them
+ok - pre-push escalates repeated inspection failures and keeps the refused line's count across them
+ok - commit and push decisions each record guard events, including a fail-closed unreadable source
+ok - fixture repositories in a task pane are still checked but record no event; the task worktree records its event
+omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit
+ok - T3(b,d): both native write adapters admit ignored credentials and the 396924-byte report without a provider
+FM_TEST_END 2026-10-26T14:33:04Z tests/fm-git-secrets.test.sh exit=0 duration_ms=27474 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=10 failed=0 skipped_gate=0 duration_ms=122691
+FM_TEST_SUMMARY_FAMILY family=unclassified count=10 duration_ms=120036 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-git-secrets.test.sh duration_ms=27474
+FM_TEST_SLOWEST rank=2 script=tests/fm-retired-jev-channel-consistency.test.sh duration_ms=11601
+FM_TEST_SLOWEST rank=3 script=tests/fm-retired-jev-write-secrets-kind.test.sh duration_ms=10747
+FM_TEST_SLOWEST rank=4 script=tests/fm-retired-jev-write-credential-noul.test.sh duration_ms=10698
+FM_TEST_SLOWEST rank=5 script=tests/fm-retired-jev-write-remainder-shapes.test.sh duration_ms=10378
+FM_TEST_SLOWEST rank=6 script=tests/fm-retired-jev-write-judgment-unavailable.test.sh duration_ms=10015
+FM_TEST_SLOWEST rank=7 script=tests/fm-retired-jev-omp-result-screen.test.sh duration_ms=9979
+FM_TEST_SLOWEST rank=8 script=tests/fm-retired-jev-producer-field-exclusion.test.sh duration_ms=9797
+FM_TEST_SLOWEST rank=9 script=tests/fm-retired-jev-trusted-read.test.sh duration_ms=9742
+FM_TEST_SLOWEST rank=10 script=tests/fm-retired-jev-result-size-refusal.test.sh duration_ms=9605
+fm-test-run: wrote timing artifact: /tmp/fmhint.WunpRp/retiree.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5W9DRQAD3YHXMNM6J6GVY48/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+tests/fm-retired-jev-channel-consistency.test.sh exit=0 duration_ms=11601 gate_skip=False
+tests/fm-retired-jev-omp-result-screen.test.sh exit=0 duration_ms=9979 gate_skip=False
+tests/fm-retired-jev-producer-field-exclusion.test.sh exit=0 duration_ms=9797 gate_skip=False
+tests/fm-retired-jev-result-size-refusal.test.sh exit=0 duration_ms=9605 gate_skip=False
+tests/fm-retired-jev-trusted-read.test.sh exit=0 duration_ms=9742 gate_skip=False
+tests/fm-retired-jev-write-credential-noul.test.sh exit=0 duration_ms=10698 gate_skip=False
+tests/fm-retired-jev-write-judgment-unavailable.test.sh exit=0 duration_ms=10015 gate_skip=False
+tests/fm-retired-jev-write-remainder-shapes.test.sh exit=0 duration_ms=10378 gate_skip=False
+tests/fm-retired-jev-write-secrets-kind.test.sh exit=0 duration_ms=10747 gate_skip=False
+tests/fm-git-secrets.test.sh exit=0 duration_ms=27474 gate_skip=False
+nine_retirees_total_ms 92562
