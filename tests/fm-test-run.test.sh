@@ -1502,6 +1502,8 @@ assert doc["summary"]["total"] == 1
 assert doc["summary"]["failed"] == 0
 assert "duration_ms" in doc["scripts"][0]
 assert "family" in doc["scripts"][0]
+assert "cpu_ms" in doc["scripts"][0], "the artifact must carry the CPU field even when it is unmeasured"
+assert doc["scripts"][0]["cpu_ms"] is None or doc["scripts"][0]["cpu_ms"] > 0
 ' "$json" || { rm -rf "$tmp"; fail "JSON timing artifact missing required fields"; }
   rm -rf "$tmp"
   pass "timing markers and JSON artifact are valid"

@@ -2483,12 +2483,15 @@ with open(records_file, encoding="utf-8") as fh:
         line = line.rstrip("\n")
         if not line:
             continue
-        path, family, expected, exit_s, dur_s, gate, reason = line.split("\t")
+        fields = line.split("\t")
+        path, family, expected, exit_s, dur_s, gate, reason = fields[:7]
+        cpu_s = fields[7] if len(fields) > 7 else ""
         scripts.append({
             "path": path,
             "family": family,
             "expected_gate_skip": expected,
             "duration_ms": int(dur_s),
+            "cpu_ms": int(cpu_s) if cpu_s else None,
             "exit": int(exit_s),
             "gate_skip": gate == "true",
             "gate_skip_reason": reason,
@@ -3058,7 +3061,15 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
-  local base family expected gate_skip gate_reason fail_delta token timed_out=0
+  local base family expected gate_skip gate_reason fail_delta token timed_out=0 cpu_ms=
+  # CPU comes from the slot gate's single process-tree sample, so it is present
+  # exactly when that wrapper ran and empty otherwise. See docs
+  # "Timing artifacts": this is measurement evidence, not a verdict on why a
+  # suite took as long as it did.
+  if [ -f "$out.cpu" ]; then
+    cpu_ms=$(head -n 1 "$out.cpu" 2>/dev/null || true)
+    case "$cpu_ms" in ''|*[!0-9]*) cpu_ms= ;; esac
+  fi
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
@@ -3091,8 +3102,8 @@ record_script_result() {
     AGG_RC=1
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" "$cpu_ms" >>"$RECORDS"
   if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1 && [ ! -e "$out.guarded" ]; then
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
@@ -3207,7 +3218,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
     # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
     cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
-      --wait-file "$out.slotwait" "test.$script" -- "${cmd[@]}")
+      --wait-file "$out.slotwait" --cpu-file "$out.cpu" "test.$script" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then
