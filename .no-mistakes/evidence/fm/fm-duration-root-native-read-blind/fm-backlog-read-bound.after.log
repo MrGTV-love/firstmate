@@ -1,0 +1,13 @@
+ok - productive slow backlog rows and captain-held calls finish without latching later reads
+ok - a hanging tasks-axi show returns within the per-item bound instead of running unbounded
+ok - a timed-out row read reports one error naming the item that timed out
+ok - after the first bound hit the sweep continues and names every remaining item without paying the bound again
+ok - under an outer progress owner the per-item bound fires and the latch spares later items
+ok - a bound hit stops a captain hold without creating a task
+ok - the teardown verify gate stops at a bound hit without attesting the inventory
+ok - the reconcile-requests intake stops at a bound hit without classifying or recording the row
+ok - a bound hit in the migrated-prefix scan stops verify without attesting the inventory
+ok - a wedged backlog backend still leaves a complete digest: wake queue, supervision instructions, fleet state, and context all print
+ok - a full-body restart timeout latches the recovery sweep, naming every worker without another backend read
+# fm-backlog-read-bound.test.sh: all assertions passed
+exit=0 secs=93

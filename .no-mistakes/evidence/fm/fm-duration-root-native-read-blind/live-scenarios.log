@@ -1,0 +1,57 @@
+host: Darwin 27.0.0 arm64; python: Python 3.13.6; load: { 34.04 28.82 27.72 }
+  PID  PPID USER RUSER                TIME COMMAND
+60925 60642 root charlesabrooker   0:00.93 top -l 0 -s 3600
+== S1 root-blind: unreadable native ROOT, idle tree (pid 60925) ==
+  NEW  exit=0   record=no  cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+  NEW  exit=0   record=no  cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+  NEW  exit=0   record=no  cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+  NEW  exit=0   record=no  cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+  OLD  exit=0   record=yes 
+  OLD  exit=124 record=yes no_progress: "pid=60925 no CPU or watched-file progress for 1.0s"
+  OLD  exit=124 record=yes no_progress: "pid=60925 no CPU or watched-file progress for 2.1s"
+  OLD  exit=124 record=yes no_progress: "pid=60925 no CPU or watched-file progress for 3.0s"
+  PID  PPID USER                 TIME COMMAND
+78639 60642 charlesabrooker   0:00.00 bash -c top -l 0 -s 1 >/dev/null 2>&1 & wait
+== S2 non-root ps fallback: busy unreadable CHILD (pid 78639) ==
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+bash: line 1: 78645 Terminated: 15          top -l 0 -s 1 > /dev/null 2>&1
+== S3 non-root ps fallback: idle unreadable CHILD (pid 90741) ==
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=124 record=yes no_progress: "pid=90741 no CPU or watched-file progress for 1.8s"
+  NEW  exit=124 record=yes no_progress: "pid=90741 no CPU or watched-file progress for 2.8s"
+  OLD  exit=0   record=yes 
+  OLD  exit=124 record=yes no_progress: "pid=90741 no CPU or watched-file progress for 1.0s"
+  OLD  exit=124 record=yes no_progress: "pid=90741 no CPU or watched-file progress for 2.0s"
+  OLD  exit=124 record=yes no_progress: "pid=90741 no CPU or watched-file progress for 2.9s"
+bash: line 1: 90747 Terminated: 15          top -l 0 -s 3600 > /dev/null 2>&1
+== S4 own idle tree (pid 99981) ==
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=124 record=yes no_progress: "pid=99981 no CPU or watched-file progress for 1.8s"
+  NEW  exit=124 record=yes no_progress: "pid=99981 no CPU or watched-file progress for 2.8s"
+  OLD  exit=0   record=yes 
+  OLD  exit=124 record=yes no_progress: "pid=99981 no CPU or watched-file progress for 1.0s"
+  OLD  exit=124 record=yes no_progress: "pid=99981 no CPU or watched-file progress for 2.0s"
+  OLD  exit=124 record=yes no_progress: "pid=99981 no CPU or watched-file progress for 2.9s"
+bash: line 1: 99987 Terminated: 15          sleep 600
+== S5 own tree, work only in reaped children (pid 7985) ==
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  NEW  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+  OLD  exit=0   record=yes 
+== S6 keep-going 2 -- setuid top (idle) [NEW]: still running after 8s (not stopped); stderr: cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" 
+== S6 keep-going 2 -- setuid top (idle) [OLD]: exited code=124 after 8s; stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping" 
+== S7a keep-going 2 -- 12 reaped CPU children [NEW]: exit=0 after 10s; stderr: 
+== S7b keep-going 2 -- sleep 60 [NEW]: exit=124 after 3s; stderr: no_progress: "operational-read made no output or CPU progress for 2s; stopping" 
