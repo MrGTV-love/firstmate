@@ -1,0 +1,87 @@
+########## g8: live-run-8.sh (target d74151fb2)
+===== S5k: a job in the task's pane working in a SUBDIRECTORY of the copy keeps it with one wake; teardown never runs
+pane tree before: 4474(-zsh) 4537(treehouse) 8385(sleep) 5269(/bin/zsh) 
+--- data/t5k/merge-prune.log
+2026-10-26T07:58:49Z armed for https://github.com/acme/widget/pull/71
+2026-10-26T07:58:50Z retained $LAB/th/.treehouse/widget-defcae/1/widget: process(es) inside $LAB/th/.treehouse/widget-defcae/1/widget running in the task's terminal pane: 8385
+--- state/t5k.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/71
+attempts=2
+next_at=1793023130
+state=retained
+reason=process(es) inside $LAB/th/.treehouse/widget-defcae/1/widget running in the task's terminal pane: 8385
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-defcae/1/widget
+armed_at=1793001529
+--- merge-prune wakes for t5k: 1
+1793001530	2	check	merge-prune:t5k	check: merge-prune kept $LAB/th/.treehouse/widget-defcae/1/widget for t5k: process(es) inside $LAB/th/.treehouse/widget-defcae/1/widget running in the task's terminal pane: 8385
+--- state/t5k.meta present: yes
+teardown calls for t5k: 0
+job alive: yes; copy on: fm/t5k; slot: 1     in-use       $LAB/th/.treehouse/widget-defcae/1/widget  [fm/t5k]
+===== S5o: a job in the task's pane whose working directory is OUTSIDE the copy does not keep it: the prune reaps
+pane tree before: 27066(sleep) 23577(/bin/zsh) 22538(-zsh) 22608(treehouse) 
+--- data/t5o/merge-prune.log
+2026-10-26T07:58:54Z armed for https://github.com/acme/widget/pull/72
+2026-10-26T07:59:02Z reaped: teardown completed
+--- state/t5o.merge-prune
+(absent)
+--- merge-prune wakes for t5o: 0
+--- state/t5o.meta present: no
+teardown calls for t5o: 1
+slot: 2     available    $LAB/th/.treehouse/widget-defcae/2/widget  (detached)
+===== S5a: the worker's agent (a process named claude) and a child it started in the copy do not keep it: the prune reaps
+pane tree before: 69176(claude) 65164(-zsh) 69189(sleep) 65241(treehouse) 66839(/bin/zsh) 
+--- data/t5a/merge-prune.log
+2026-10-26T07:59:06Z armed for https://github.com/acme/widget/pull/73
+2026-10-26T07:59:16Z reaped: teardown completed
+--- state/t5a.merge-prune
+(absent)
+--- merge-prune wakes for t5a: 0
+--- state/t5a.meta present: no
+teardown calls for t5a: 1
+slot: 2     available    $LAB/th/.treehouse/widget-defcae/2/widget  (detached)
+agent stand-in or its child still alive: no
+===== S5b2: a background job (sleep &) left by the pane shell at the copy root keeps it with one wake
+pane tree before: 18166(treehouse) 24229(sleep) 20675(/bin/zsh) 18049(-zsh) 
+--- data/t5g/merge-prune.log
+2026-10-26T07:59:20Z armed for https://github.com/acme/widget/pull/74
+2026-10-26T07:59:20Z retained $LAB/th/.treehouse/widget-defcae/2/widget: process(es) inside $LAB/th/.treehouse/widget-defcae/2/widget running in the task's terminal pane: 24229
+--- state/t5g.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/74
+attempts=2
+next_at=1793023160
+state=retained
+reason=process(es) inside $LAB/th/.treehouse/widget-defcae/2/widget running in the task's terminal pane: 24229
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-defcae/2/widget
+armed_at=1793001559
+--- merge-prune wakes for t5g: 1
+1793001560	6	check	merge-prune:t5g	check: merge-prune kept $LAB/th/.treehouse/widget-defcae/2/widget for t5g: process(es) inside $LAB/th/.treehouse/widget-defcae/2/widget running in the task's terminal pane: 24229
+--- state/t5g.meta present: yes
+teardown calls for t5g: 0
+0
+job alive: yes; slot: 2     in-use       $LAB/th/.treehouse/widget-defcae/2/widget  [fm/t5g]
+===== S5e: the same task after its job ended and the record is re-armed: the prune now reaps
+--- data/t5k/merge-prune.log
+2026-10-26T07:58:49Z armed for https://github.com/acme/widget/pull/71
+2026-10-26T07:58:50Z retained $LAB/th/.treehouse/widget-defcae/1/widget: process(es) inside $LAB/th/.treehouse/widget-defcae/1/widget running in the task's terminal pane: 8385
+2026-10-26T07:59:23Z armed for https://github.com/acme/widget/pull/71
+2026-10-26T07:59:28Z retained $LAB/th/.treehouse/widget-defcae/1/widget: REFUSED: process 5269 (lstart=Mon Oct 26 02:58:46 2026) matched path $LAB/th/.treehouse/widget-defcae/1/widget/src beneath scan root $LAB/th...
+--- state/t5k.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/71
+attempts=1
+next_at=1793023163
+state=retained
+reason=REFUSED: process 5269 (lstart=Mon Oct 26 02:58:46 2026) matched path $LAB/th/.treehouse/widget-defcae/1/widget/src beneath scan root $LAB/th/.treehouse/widget-defcae/1/widget, whose ownership by t5k is not proven; preserving it ...
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-defcae/1/widget
+armed_at=1793001563
+--- merge-prune wakes for t5k: 2
+1793001530	2	check	merge-prune:t5k	check: merge-prune kept $LAB/th/.treehouse/widget-defcae/1/widget for t5k: process(es) inside $LAB/th/.treehouse/widget-defcae/1/widget running in the task's terminal pane: 8385
+1793001568	7	check	merge-prune:t5k	check: merge-prune kept $LAB/th/.treehouse/widget-defcae/1/widget for t5k: REFUSED: process 5269 (lstart=Mon Oct 26 02:58:46 2026) matched path $LAB/th/.treehouse/widget-defcae/1/widget/src beneath scan root $LAB/th/.treehouse/widget-defcae/1/widget, whose ownership by t5k is not proven; preserving it ...
+--- state/t5k.meta present: yes
+teardown calls for t5k: 1
+########## g8: lab removed: yes

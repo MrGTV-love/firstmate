@@ -1,0 +1,91 @@
+########## g1: live-run-1.sh (target ad8bd7984)
+===== S1: a verified merge prunes the copy with no human step
+copy: $LAB/th/.treehouse/widget-35915c/1/widget (branch fm/t1)
+1     in-use       $LAB/th/.treehouse/widget-35915c/1/widget  [fm/t1]
+--- data/t1/merge-prune.log
+2026-10-26T07:32:09Z armed for https://github.com/acme/widget/pull/7
+2026-10-26T07:32:17Z reaped: teardown completed
+--- state/t1.merge-prune
+(absent)
+--- merge-prune wakes for t1: 0
+--- state/t1.meta present: no
+slot after: 1     available    $LAB/th/.treehouse/widget-35915c/1/widget  (detached)
+copy status after: 0 dirty lines, HEAD detached
+tmux windows: lab 
+===== S2: a transient refusal (co-tenant lifecycle lock) retries, then reaps
+after attempt 1 (lock held):
+--- data/t2/merge-prune.log
+2026-10-26T07:32:18Z armed for https://github.com/acme/widget/pull/8
+2026-10-26T07:32:19Z retry in 60s (attempt 1): error: another lifecycle action is already running for task t2; nothing was changed
+--- state/t2.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/8
+attempts=1
+next_at=1792999998
+state=pending
+reason=error: another lifecycle action is already running for task t2; nothing was changed
+wake_sent=0
+copy=
+armed_at=1792999938
+--- merge-prune wakes for t2: 0
+--- state/t2.meta present: yes
+copy exists: yes; slot: 1     in-use       $LAB/th/.treehouse/widget-35915c/1/widget  [fm/t2]
+after the lock cleared and the backoff elapsed:
+--- data/t2/merge-prune.log
+2026-10-26T07:32:18Z armed for https://github.com/acme/widget/pull/8
+2026-10-26T07:32:19Z retry in 60s (attempt 1): error: another lifecycle action is already running for task t2; nothing was changed
+2026-10-26T07:32:27Z reaped: teardown completed
+--- state/t2.merge-prune
+(absent)
+--- merge-prune wakes for t2: 0
+--- state/t2.meta present: no
+slot: 1     available    $LAB/th/.treehouse/widget-35915c/1/widget  (detached)
+===== S3: a copy with a changed file is kept with exactly one wake
+--- data/t3/merge-prune.log
+2026-10-26T07:32:28Z armed for https://github.com/acme/widget/pull/9
+2026-10-26T07:32:31Z retained $LAB/th/.treehouse/widget-35915c/1/widget: REFUSED: worktree $LAB/th/.treehouse/widget-35915c/1/widget has uncommitted changes.
+--- state/t3.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/9
+attempts=3
+next_at=1793021554
+state=retained
+reason=REFUSED: worktree $LAB/th/.treehouse/widget-35915c/1/widget has uncommitted changes.
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-35915c/1/widget
+armed_at=1792999948
+--- merge-prune wakes for t3: 1
+1792999951	4	check	merge-prune:t3	check: merge-prune kept $LAB/th/.treehouse/widget-35915c/1/widget for t3: REFUSED: worktree $LAB/th/.treehouse/widget-35915c/1/widget has uncommitted changes.
+--- state/t3.meta present: yes
+copy:  M README.md on fm/t3; slot: 1     in-use       $LAB/th/.treehouse/widget-35915c/1/widget  [fm/t3]
+===== S4: a copy with an unpushed commit is kept with exactly one wake
+--- data/t4/merge-prune.log
+2026-10-26T07:32:38Z armed for https://github.com/acme/widget/pull/10
+2026-10-26T07:32:43Z retained $LAB/th/.treehouse/widget-35915c/2/widget: $LAB/th/.treehouse/widget-35915c/2/widget has 1 commit(s) on no remote
+--- state/t4.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/10
+attempts=3
+next_at=1793021567
+state=retained
+reason=$LAB/th/.treehouse/widget-35915c/2/widget has 1 commit(s) on no remote
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-35915c/2/widget
+armed_at=1792999958
+--- merge-prune wakes for t4: 1
+1792999963	6	check	merge-prune:t4	check: merge-prune kept $LAB/th/.treehouse/widget-35915c/2/widget for t4: $LAB/th/.treehouse/widget-35915c/2/widget has 1 commit(s) on no remote
+--- state/t4.meta present: yes
+unpushed: 87953f4 unpushed work; slot: 2     in-use       $LAB/th/.treehouse/widget-35915c/2/widget  [fm/t4]
+===== S5: a copy with a live process (a job in the pane) is kept with exactly one wake
+--- data/t5/merge-prune.log
+2026-10-26T07:32:55Z armed for https://github.com/acme/widget/pull/11
+2026-10-26T07:33:03Z reaped: teardown completed
+--- state/t5.merge-prune
+(absent)
+--- merge-prune wakes for t5: 0
+--- state/t5.meta present: no
+copy exists: yes; slot: 3     available    $LAB/th/.treehouse/widget-35915c/3/widget  (detached)
+pane still running sleep: no
+can't find window: fm-t5
+===== forbidden flags in treehouse calls? (none expected)
+########## g1: lab removed: yes

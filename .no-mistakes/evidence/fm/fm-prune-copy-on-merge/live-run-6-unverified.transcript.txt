@@ -1,0 +1,4 @@
+arm (no verified merge) rc=0
+record: absent; log: none
+arm (merge record names a different PR #99) rc=0
+record: absent; copy still on fm/tu; meta present: yes

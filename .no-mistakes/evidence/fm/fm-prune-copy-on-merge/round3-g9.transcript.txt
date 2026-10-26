@@ -1,0 +1,36 @@
+########## g9: live-run-9-herdr.sh (target d74151fb2)
+herdr lab session: fm-lab-prune-11516-20873
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+workspace create: Error: Custom { kind: InvalidInput, error: "local socket name length exceeds capacity of sun_path of sockaddr_un" }
+
+herdr pane: 
+process-info: Error: Custom { kind: InvalidInput, error: "local socket name length exceeds capacity of sun_path of sockaddr_un" }
+
+jq: parse error: Invalid numeric literal at line 1, column 6
+usage: pgrep [-Lfilnoqvx] [-d delim] [-F pidfile] [-G gid]
+             [-P ppid] [-U uid] [-g pgrp] [-t tty] [-u euid]
+             pattern ...
+herdr pane shell pid  children: 
+window=fm-lab-prune-11516-20873:
+backend=herdr
+--- data/th1/merge-prune.log
+2026-10-26T08:14:59Z armed for https://github.com/acme/widget/pull/81
+2026-10-26T08:15:00Z retained $LAB/th/.treehouse/widget-7c7bc8/1/widget: REFUSED: lab stub (the pane check should have kept this copy)
+--- state/th1.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/81
+attempts=2
+next_at=1793024100
+state=retained
+reason=REFUSED: lab stub (the pane check should have kept this copy)
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-7c7bc8/1/widget
+armed_at=1793002499
+--- merge-prune wakes for th1: 1
+1793002500	2	check	merge-prune:th1	check: merge-prune kept $LAB/th/.treehouse/widget-7c7bc8/1/widget for th1: REFUSED: lab stub (the pane check should have kept this copy)
+--- state/th1.meta present: yes
+teardown calls for th1: 2
+job alive: no
+fm-herdr-lab: missing fleet-state tripwire for 'fm-lab-prune-11516-20873'; refusing destructive calls
+herdr lab teardown rc=0
+########## g9: lab removed: yes

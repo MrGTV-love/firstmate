@@ -1,0 +1,161 @@
+########## g4: live-run-4.sh (target ad8bd7984)
+===== S8a: an unpushed commit in a NESTED linked worktree (.claude/worktrees/n1) keeps the whole slot with one wake
+--- data/t8a/merge-prune.log
+2026-10-26T07:33:05Z armed for https://github.com/acme/widget/pull/31
+2026-10-26T07:33:05Z retained $LAB/th/.treehouse/widget-98b1a4/1/widget: $LAB/th/.treehouse/widget-98b1a4/1/widget/.claude/worktrees/n1 has 1 commit(s) on no remote
+--- state/t8a.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/31
+attempts=2
+next_at=1793021585
+state=retained
+reason=$LAB/th/.treehouse/widget-98b1a4/1/widget/.claude/worktrees/n1 has 1 commit(s) on no remote
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-98b1a4/1/widget
+armed_at=1792999985
+--- merge-prune wakes for t8a: 1
+1792999985	2	check	merge-prune:t8a	check: merge-prune kept $LAB/th/.treehouse/widget-98b1a4/1/widget for t8a: $LAB/th/.treehouse/widget-98b1a4/1/widget/.claude/worktrees/n1 has 1 commit(s) on no remote
+--- state/t8a.meta present: yes
+real teardown said:
+awk: can't open file $LAB/teardown-calls.log
+ source line number 1
+nested unpushed still: 96b9760 unpushed in nested; slot: 1     in-use       $LAB/th/.treehouse/widget-98b1a4/1/widget  [fm/t8a]
+===== S6n: natural squash false positive: the pipeline rebased the branch (copy HEAD only on the gate remote)
+usage: git cherry-pick [--edit] [-n] [-m <parent-number>] [-s] [-x] [--ff]
+                       [-S[<keyid>]] <commit>...
+   or: git cherry-pick (--continue | --skip | --abort | --quit)
+
+    --quit                end revert or cherry-pick sequence
+    --continue            resume revert or cherry-pick sequence
+    --abort               cancel revert or cherry-pick sequence
+    --skip                skip current commit and continue
+    --[no-]cleanup <mode> how to strip spaces and #comments from message
+    -n, --no-commit       don't automatically commit
+    --commit              opposite of --no-commit
+    -e, --[no-]edit       edit the commit message
+    -s, --[no-]signoff    add a Signed-off-by trailer
+    -m, --[no-]mainline <parent-number>
+                          select mainline parent
+    --[no-]rerere-autoupdate
+                          update the index with reused conflict resolution if possible
+    --[no-]strategy <strategy>
+                          merge strategy
+    -X, --[no-]strategy-option <option>
+                          option for merge strategy
+    -S, --[no-]gpg-sign[=<key-id>]
+                          GPG sign commit
+    -x                    append commit name
+    --[no-]ff             allow fast-forward
+    --[no-]allow-empty    preserve initially empty commits
+    --[no-]allow-empty-message
+                          allow commits with empty messages
+    --[no-]keep-redundant-commits
+                          deprecated: use --empty=keep instead
+    --empty (stop|drop|keep)
+                          how to handle commits that become empty
+
+--- data/t6n/merge-prune.log
+2026-10-26T07:33:07Z armed for https://github.com/acme/widget/pull/32
+2026-10-26T07:33:12Z retained $LAB/th/.treehouse/widget-98b1a4/2/widget: $LAB/th/.treehouse/widget-98b1a4/2/widget has commits that are not in the merged pull request: its HEAD 0599d283ea35 is not in the pull request's head and the default branch do...
+--- state/t6n.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/32
+attempts=1
+next_at=1793021588
+state=retained
+reason=$LAB/th/.treehouse/widget-98b1a4/2/widget has commits that are not in the merged pull request: its HEAD 0599d283ea35 is not in the pull request's head and the default branch does not carry its content
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-98b1a4/2/widget
+armed_at=1792999987
+--- merge-prune wakes for t6n: 1
+1792999992	4	check	merge-prune:t6n	check: merge-prune kept $LAB/th/.treehouse/widget-98b1a4/2/widget for t6n: $LAB/th/.treehouse/widget-98b1a4/2/widget has commits that are not in the merged pull request: its HEAD 0599d283ea35 is not in the pull request's head and the default branch does not carry its content
+--- state/t6n.meta present: yes
+real teardown said:
+=== teardown t6n rc=1
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+copy dir exists: yes; slot: 2     in-use       $LAB/th/.treehouse/widget-98b1a4/2/widget  [fm/t6n]
+===== S6w: teardown refuses (closeout driver 'exact tree not covered'); the fallback proves the squash-merged copy scratch, preserves the bug-evidence record with SHA-256, ends the pane's idle treehouse subshell, and the REAL treehouse destroy removes it
+before: slot 3     in-use       $LAB/th/.treehouse/widget-98b1a4/3/widget  [fm/t6w]; pane processes: 12825 
+--- data/t6w/merge-prune.log
+2026-10-26T07:33:13Z armed for https://github.com/acme/widget/pull/33
+2026-10-26T07:33:19Z fallback destroyed $LAB/th/.treehouse/widget-98b1a4/3/widget (head 3b93c7a); preserved records, if any, are in $LAB/data/t6w/merge-prune-preserved/1792999994
+2026-10-26T07:33:22Z reaped: removed by fallback, teardown completed
+--- state/t6w.merge-prune
+(absent)
+--- merge-prune wakes for t6w: 0
+--- state/t6w.meta present: no
+real teardown said:
+=== teardown t6w rc=1
+REFUSED: Vernant's closeout driver did not release foreign copy $LAB/th/.treehouse/widget-98b1a4/3/widget/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR
+=== teardown t6w rc=0
+teardown t6w complete (window firstmate:fm-t6w, worktree $LAB/th/.treehouse/widget-98b1a4/3/widget)
+copy dir exists after: no; slot: (slot not listed)
+treehouse destroy calls:
+destroy $LAB/th/.treehouse/widget-98b1a4/3/widget --include-leased --yes
+preserved files:
+$DATA/t6w/merge-prune-preserved/1792999994/root/.claude/bug-evidence/slot.json
+$DATA/t6w/merge-prune-preserved/1792999994/root/SHA256SUMS
+checksum file SHA256SUMS:
+9add6edd6b5a123b224bd0e62bb1a1c409bd148717a21a598783fbedc3cd68c3  .claude/bug-evidence/slot.json
+tmux windows: lab fm-t8a fm-t6n 
+===== S7w: same refusal, but the copy holds a unique ignored file (notes.local) outside the preserve list and scratch: kept, one wake, nothing destroyed
+--- data/t7w/merge-prune.log
+2026-10-26T07:33:23Z armed for https://github.com/acme/widget/pull/34
+2026-10-26T07:33:25Z retained $LAB/th/.treehouse/widget-98b1a4/3/widget: $LAB/th/.treehouse/widget-98b1a4/3/widget holds an ignored file that is neither scratch nor on the preserve list: notes.local
+--- state/t7w.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/34
+attempts=2
+next_at=1793021605
+state=retained
+reason=$LAB/th/.treehouse/widget-98b1a4/3/widget holds an ignored file that is neither scratch nor on the preserve list: notes.local
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-98b1a4/3/widget
+armed_at=1793000003
+--- merge-prune wakes for t7w: 1
+1793000005	7	check	merge-prune:t7w	check: merge-prune kept $LAB/th/.treehouse/widget-98b1a4/3/widget for t7w: $LAB/th/.treehouse/widget-98b1a4/3/widget holds an ignored file that is neither scratch nor on the preserve list: notes.local
+--- state/t7w.meta present: yes
+notes.local still there: yes; copy on fm/t7w; new destroy calls: 0; slot: 3     in-use       $LAB/th/.treehouse/widget-98b1a4/3/widget  [fm/t7w]
+pane subshell still alive: yes
+===== no forbidden treehouse flags in any call:
+all treehouse destroy/return calls:
+destroy $LAB/th/.treehouse/widget-98b1a4/3/widget --include-leased --yes
+########## g4: live-run-5.sh (target ad8bd7984)
+===== S6n: natural squash false positive: the pipeline rebased the branch onto a moved main (copy HEAD only on the gate remote)
+error: remote no-mistakes already exists.
+copy HEAD 70f9a7e is ancestor of PR head 8c495c3: no; main carries t6r.txt: yes
+--- data/t6r/merge-prune.log
+2026-10-26T07:33:28Z armed for https://github.com/acme/widget/pull/41
+2026-10-26T07:33:36Z reaped: teardown completed
+--- state/t6r.merge-prune
+(absent)
+--- merge-prune wakes for t6r: 0
+--- state/t6r.meta present: no
+real teardown said:
+=== teardown t6r rc=0
+teardown t6r complete (window firstmate:fm-t6r, worktree $LAB/th/.treehouse/widget-98b1a4/4/widget)
+copy dir exists: yes; slot: 4     available    $LAB/th/.treehouse/widget-98b1a4/4/widget  (detached)
+===== S8b: an unpushed commit in a NESTED independent clone (.claude/worktrees/n2, its own .git) under a squash-merged copy
+--- data/t8b/merge-prune.log
+2026-10-26T07:33:38Z armed for https://github.com/acme/widget/pull/42
+2026-10-26T07:33:38Z retained $LAB/th/.treehouse/widget-98b1a4/4/widget: $LAB/th/.treehouse/widget-98b1a4/4/widget/.claude/worktrees/n2 has 1 commit(s) on no remote
+--- state/t8b.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/42
+attempts=2
+next_at=1793021618
+state=retained
+reason=$LAB/th/.treehouse/widget-98b1a4/4/widget/.claude/worktrees/n2 has 1 commit(s) on no remote
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-98b1a4/4/widget
+armed_at=1793000017
+--- merge-prune wakes for t8b: 1
+1793000018	10	check	merge-prune:t8b	check: merge-prune kept $LAB/th/.treehouse/widget-98b1a4/4/widget for t8b: $LAB/th/.treehouse/widget-98b1a4/4/widget/.claude/worktrees/n2 has 1 commit(s) on no remote
+--- state/t8b.meta present: yes
+real teardown said:
+slot: 4     in-use       $LAB/th/.treehouse/widget-98b1a4/4/widget  [fm/t8b]
+nested unpushed commit still on disk: 5ae698e unpushed in nested clone
+--- a new task's 'treehouse get' now:
+t8next got: $LAB/th/.treehouse/widget-98b1a4/5/widget
+t8next's copy holds t8b's nested clone with the unpushed commit: no
+########## g4: lab removed: yes

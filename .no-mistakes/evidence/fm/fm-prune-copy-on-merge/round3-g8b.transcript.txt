@@ -1,0 +1,81 @@
+########## g8: live-run-8.sh (target d74151fb2)
+===== S5k: a job in the task's pane working in a SUBDIRECTORY of the copy keeps it with one wake; teardown never runs
+pane tree before: 39717(treehouse) 43786(sleep) 40744(/bin/zsh) 39635(-zsh) 
+--- data/t5k/merge-prune.log
+2026-10-26T08:01:45Z armed for https://github.com/acme/widget/pull/71
+2026-10-26T08:01:45Z retained $LAB/th/.treehouse/widget-584341/1/widget: process(es) inside $LAB/th/.treehouse/widget-584341/1/widget running in the task's terminal pane: 43786
+--- state/t5k.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/71
+attempts=2
+next_at=1793023306
+state=retained
+reason=process(es) inside $LAB/th/.treehouse/widget-584341/1/widget running in the task's terminal pane: 43786
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-584341/1/widget
+armed_at=1793001705
+--- merge-prune wakes for t5k: 1
+1793001705	2	check	merge-prune:t5k	check: merge-prune kept $LAB/th/.treehouse/widget-584341/1/widget for t5k: process(es) inside $LAB/th/.treehouse/widget-584341/1/widget running in the task's terminal pane: 43786
+--- state/t5k.meta present: yes
+teardown calls for t5k: 0
+job alive: yes; copy on: fm/t5k; slot: 1     in-use       $LAB/th/.treehouse/widget-584341/1/widget  [fm/t5k]
+===== S5o: a job in the task's pane whose working directory is OUTSIDE the copy does not keep it: the prune reaps
+pane tree before: 61109(sleep) 57736(/bin/zsh) 56868(-zsh) 56922(treehouse) 
+--- data/t5o/merge-prune.log
+2026-10-26T08:01:50Z armed for https://github.com/acme/widget/pull/72
+2026-10-26T08:01:57Z reaped: teardown completed
+--- state/t5o.merge-prune
+(absent)
+--- merge-prune wakes for t5o: 0
+--- state/t5o.meta present: no
+teardown calls for t5o: 1
+slot: 2     available    $LAB/th/.treehouse/widget-584341/2/widget  (detached)
+===== S5a: the worker's agent (a process named claude) and a child it started in the copy do not keep it: the prune reaps
+pane tree before: 3567(sleep) 98823(-zsh) 98916(treehouse) 1244(/bin/zsh) 3552(claude) 
+--- data/t5a/merge-prune.log
+2026-10-26T08:02:01Z armed for https://github.com/acme/widget/pull/73
+2026-10-26T08:02:11Z reaped: teardown completed
+--- state/t5a.merge-prune
+(absent)
+--- merge-prune wakes for t5a: 0
+--- state/t5a.meta present: no
+teardown calls for t5a: 1
+slot: 2     available    $LAB/th/.treehouse/widget-584341/2/widget  (detached)
+agent stand-in or its child still alive: no
+===== S5b2: a background job (sleep &) left by the pane shell at the copy root keeps it with one wake
+pane tree before: 48720(sleep) 46504(/bin/zsh) 44821(-zsh) 44898(treehouse) 
+--- data/t5g/merge-prune.log
+2026-10-26T08:02:15Z armed for https://github.com/acme/widget/pull/74
+2026-10-26T08:02:16Z retained $LAB/th/.treehouse/widget-584341/2/widget: process(es) inside $LAB/th/.treehouse/widget-584341/2/widget running in the task's terminal pane: 48720
+--- state/t5g.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/74
+attempts=2
+next_at=1793023336
+state=retained
+reason=process(es) inside $LAB/th/.treehouse/widget-584341/2/widget running in the task's terminal pane: 48720
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-584341/2/widget
+armed_at=1793001735
+--- merge-prune wakes for t5g: 1
+1793001736	6	check	merge-prune:t5g	check: merge-prune kept $LAB/th/.treehouse/widget-584341/2/widget for t5g: process(es) inside $LAB/th/.treehouse/widget-584341/2/widget running in the task's terminal pane: 48720
+--- state/t5g.meta present: yes
+teardown calls for t5g: 0
+0
+job alive: yes; slot: 2     in-use       $LAB/th/.treehouse/widget-584341/2/widget  [fm/t5g]
+===== S5e: a pane job at the copy root keeps the copy; after the job ends and the record is re-armed, the prune reaps
+while the job runs: state=retained wakes=1 teardown calls=0
+0
+--- data/t5e/merge-prune.log
+2026-10-26T08:02:21Z armed for https://github.com/acme/widget/pull/75
+2026-10-26T08:02:22Z retained $LAB/th/.treehouse/widget-584341/3/widget: process(es) inside $LAB/th/.treehouse/widget-584341/3/widget running in the task's terminal pane: 65559
+2026-10-26T08:02:24Z armed for https://github.com/acme/widget/pull/75
+2026-10-26T08:02:33Z reaped: teardown completed
+--- state/t5e.merge-prune
+(absent)
+--- merge-prune wakes for t5e: 1
+1793001741	8	check	merge-prune:t5e	check: merge-prune kept $LAB/th/.treehouse/widget-584341/3/widget for t5e: process(es) inside $LAB/th/.treehouse/widget-584341/3/widget running in the task's terminal pane: 65559
+--- state/t5e.meta present: no
+teardown calls for t5e: 1
+slot: 3     available    $LAB/th/.treehouse/widget-584341/3/widget  (detached)
+########## g8: lab removed: yes

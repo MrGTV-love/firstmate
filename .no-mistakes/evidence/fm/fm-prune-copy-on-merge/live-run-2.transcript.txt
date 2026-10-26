@@ -1,0 +1,69 @@
+===== S5b: a process working in a subdirectory of the copy (not provably the task's) keeps the copy with one wake
+--- data/t5b/merge-prune.log
+2026-10-26T06:59:43Z armed for https://github.com/acme/widget/pull/21
+2026-10-26T06:59:47Z retained $LAB/th/.treehouse/widget-84ac83/1/widget: REFUSED: process 11917 (lstart=Mon Oct 26 01:59:42 2026) matched path $LAB/th/.treehouse/widget-84ac83/1/widget/src beneath scan root $LAB/t...
+--- state/t5b.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/21
+attempts=2
+next_at=1793019587
+state=retained
+reason=REFUSED: process 11917 (lstart=Mon Oct 26 01:59:42 2026) matched path $LAB/th/.treehouse/widget-84ac83/1/widget/src beneath scan root $LAB/th/.treehouse/widget-84ac83/1/widget, whose ownership by t5b is not proven; preserving it...
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-84ac83/1/widget
+armed_at=1792997983
+--- merge-prune wakes for t5b: 1
+1792997987	2	check	merge-prune:t5b	check: merge-prune kept $LAB/th/.treehouse/widget-84ac83/1/widget for t5b: REFUSED: process 11917 (lstart=Mon Oct 26 01:59:42 2026) matched path $LAB/th/.treehouse/widget-84ac83/1/widget/src beneath scan root $LAB/th/.treehouse/widget-84ac83/1/widget, whose ownership by t5b is not proven; preserving it...
+--- state/t5b.meta present: yes
+copy on: fm/t5b; process 11917 alive: yes; slot: 1     leased       $LAB/th/.treehouse/widget-84ac83/1/widget  [fm/t5b]  (held by t5b)
+===== S6: a squash-merged copy (pipeline commit on top) with ignored scratch and a bug-evidence record: teardown refuses, the fallback proves it scratch, preserves the record with a checksum, and real treehouse destroy removes it
+copy before: $LAB/th/.treehouse/widget-84ac83/2/widget on fm/t6; ignored: .claude/ node_modules/ 
+--- data/t6/merge-prune.log
+2026-10-26T06:59:52Z armed for https://github.com/acme/widget/pull/22
+2026-10-26T07:00:00Z reaped: teardown completed
+--- state/t6.merge-prune
+(absent)
+--- merge-prune wakes for t6: 0
+--- state/t6.meta present: no
+real teardown said:
+=== teardown t6 rc=0
+copy dir exists after: yes; slot: 2     available    $LAB/th/.treehouse/widget-84ac83/2/widget  (detached)
+preserved:
+tmux windows: lab fm-t5b 
+===== S7: same squash-merged shape but with a unique ignored file outside the preserve list and scratch: kept with one wake
+--- data/t7/merge-prune.log
+2026-10-26T07:00:01Z armed for https://github.com/acme/widget/pull/23
+2026-10-26T07:00:09Z reaped: teardown completed
+--- state/t7.merge-prune
+(absent)
+--- merge-prune wakes for t7: 0
+--- state/t7.meta present: no
+notes.local still there: yes; slot: 2     available    $LAB/th/.treehouse/widget-84ac83/2/widget  (detached)
+===== S8: an unpushed commit in a NESTED copy keeps the whole slot with one wake
+--- data/t8/merge-prune.log
+2026-10-26T07:00:11Z armed for https://github.com/acme/widget/pull/24
+2026-10-26T07:00:19Z reaped: teardown completed
+--- state/t8.merge-prune
+(absent)
+--- merge-prune wakes for t8: 0
+--- state/t8.meta present: no
+nested unpushed: bb60abc unpushed in nested; slot: 2     available    $LAB/th/.treehouse/widget-84ac83/2/widget  (detached)
+===== S9: a merge armed by the poll (arm only) is pruned by the real watcher's tick
+record before watcher: pending
+S9: record still present after 90s
+--- data/t9/merge-prune.log
+2026-10-26T07:00:21Z armed for https://github.com/acme/widget/pull/25
+--- state/t9.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/25
+attempts=0
+next_at=1792998021
+state=pending
+reason=
+wake_sent=0
+copy=
+armed_at=1792998021
+--- merge-prune wakes for t9: 0
+--- state/t9.meta present: yes
+slot: 2     in-use       $LAB/th/.treehouse/widget-84ac83/2/widget  [fm/t9]
+watcher stderr tail:

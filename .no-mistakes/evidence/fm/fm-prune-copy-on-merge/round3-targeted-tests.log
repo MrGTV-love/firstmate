@@ -1,0 +1,95 @@
+ok - only a verified merge of the recorded PR arms the prune, and arming is idempotent
+ok - remote tasks, secondmates and a disabled setting are never armed
+ok - a record that is not due waits, and --now overrides
+ok - a vanished task or a different PR drops the record without calling teardown
+ok - a verified merge asks teardown once, never forced, and logs reaped
+ok - co-tenant, lease, timeout, not-ready and lifecycle refusals retry on later ticks and then succeed, silently
+ok - the sweep retries a contended task on a later tick and finishes it
+ok - backoff doubles from 60s to a 3600s cap and one wake follows the 24th attempt
+ok - a sweep runs only due records, at most 3 per pass
+ok - a copy refused by a false positive but clean, pushed and unused is removed, preserve-list files copied with checksums first
+ok - a changed tracked file keeps the copy with exactly one wake naming it
+ok - an untracked file keeps the copy with exactly one wake
+ok - an untracked file that status.showUntrackedFiles=no hides from a plain git status still keeps the copy with exactly one wake
+ok - an untracked file in a nested copy that status.showUntrackedFiles=no hides still keeps the copy with exactly one wake
+ok - a changed submodule that diff.ignoreSubmodules=all hides from a plain git status still keeps the copy with exactly one wake
+ok - an unpushed commit keeps the copy with exactly one wake naming it
+ok - a stash entry keeps the copy
+ok - a live process inside keeps the copy with exactly one wake
+ok - an unpushed commit in a NESTED copy keeps the whole slot
+ok - an unpushed commit in a nested clone keeps the whole slot with one wake before a teardown that would return it
+ok - an unpushed commit in a nested linked worktree keeps the whole slot with one wake before a teardown that would close the task
+ok - a job in the task's terminal pane keeps the copy with one wake before a teardown that would end it
+ok - the finished worker's agent in its pane does not keep the copy: teardown runs
+ok - a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved
+ok - a clean pushed nested clone that the project's .gitignore does not cover, and a clone inside it, go with the slot: the clones are not untracked files of the copy that holds them, and their own proofs ran
+ok - a clean linked worktree of the project nested in the copy, which the project's .gitignore does not cover, is removed before the destroy so treehouse does not refuse the slot as dirty
+ok - an untracked file beside a nested clone still keeps the copy with one wake naming that file
+ok - a nested clone that the project's .gitignore does not cover, with an unpushed commit, keeps the slot with one wake naming the clone
+ok - the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal
+ok - the one named difference from teardown: a wholly ignored .tac/ holding .venv and node_modules passes the prune and blocks teardown, and state.json beside them still blocks both
+ok - a unique ignored file outside the preserve list and the scratch patterns keeps the copy
+ok - a copy outside the pool is never destroyed
+ok - a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed
+ok - a worker steered between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off
+ok - a worker that turns busy between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off
+ok - a failing git ls-files for ignored files keeps the copy and is never read as no ignored files
+ok - a failing git ls-files for tracked files keeps the copy and is never read as no submodules
+ok - a failing git stash list keeps the copy and retries later and is never read as no stash
+ok - a subtree the nested-copy search cannot read keeps the copy and is never read as no nested copy
+ok - a .claude directory that cannot be listed keeps the copy and is never read as empty
+ok - a commit proved landed by the merged PR head does not keep the copy
+ok - a commit that only the merged PR head carries does not keep the copy
+ok - a squash-merged copy is removed although the default branch moved on after the merge
+ok - a system search indexer (Spotlight) reading the copy does not keep it; any other process does
+ok - a refusal about a live pipeline is retained, never overridden
+ok - the ship-deliverable-not-landed refusal is settled by the fallback
+ok - an orphan nested copy refused for a HEAD that is not proved landed, with the registered-copy refusal teardown always prints with it, is not settled: the copy stays with one wake
+ok - a nested independent clone that is clean and pushed on main but has an unpushed commit on a side branch keeps the copy with one wake
+ok - a nested independent clone with a stash made on a side branch keeps the copy with one wake
+ok - a nested independent clone with an unpushed side branch and a stash made on it keeps the copy with one wake
+ok - a closeout driver's exact-tree refusal for an own nested copy is settled by the fallback
+ok - a leaked worktree process refusal keeps the copy with one wake and no fallback
+ok - a leaked task tmp process refusal keeps the copy with one wake and no fallback
+ok - a launch agent that is still loaded after launchctl bootout keeps the copy with one wake and no fallback
+ok - a process whose ownership is not proven keeps the copy with one wake and no fallback
+ok - an unknown new refusal text keeps the copy with one wake and no fallback
+ok - a landing refusal printed together with a non-landing refusal keeps the copy
+ok - a copy with a pushed follow-up commit that the merged PR does not carry stays with one wake before the pane shell is ended, nothing stopped and nothing destroyed
+ok - in a linked worktree slot, another task's local-only commit and stash do not keep the copy
+ok - in a linked worktree slot, the copy's own unpushed commit keeps it
+ok - in a linked worktree slot, a stash made on the copy's branch keeps it
+ok - a detached linked worktree slot keeps the copy while any stash exists
+ok - a GitHub Enterprise PR keeps the copy with one wake and no fallback
+ok - a Forgejo PR keeps the copy with one wake and no fallback
+ok - a destroy the tool refuses keeps the copy with one wake
+ok - a retained copy is reaped on the quiet retry once its cause clears
+ok - a retained reason longer than the saved 300 characters is logged and woken once, not at every retry
+ok - the idle shell the task's tmux pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open
+ok - the idle shell the task's herdr pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open
+ok - a build, editor or test started in the pane keeps the copy with exactly one wake
+ok - an agent still running in the pane after the exit verb keeps the copy with one wake and is never signalled
+ok - a pane shell with a child process keeps the copy with exactly one wake
+ok - an idle shell that is not the task's pane shell keeps the copy with exactly one wake
+ok - a pane shell with a file of the copy open but its working directory elsewhere keeps the copy and is left alone
+ok - a shell that is the pane's own shell keeps the copy with one wake and is left alone, so the pane stays open
+ok - a remote that never answers is never waited on while the project lock is held, and the attempt still finishes
+ok - a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced
+ok - an exit verb that does not confirm the agent stopped leaves the pane shell alone and keeps the copy
+ok - a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done
+ok - a pane that cannot be read exempts no shell
+ok - a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed
+ok - an independent clone under .venv or node_modules with a commit on no remote keeps the whole slot with one wake
+ok - ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake
+ok - a process probe that exits with an error, or prints a message, keeps the copy and retries; a silent exit 1 with nothing open does not
+ok - a slot claim that names this task id under another home, or no home, is never destroyed
+ok - a wake that could not be appended is not recorded as sent, and the repaired queue gets exactly one
+ok - a project lock held by another actor stops nothing, backs off silently, and the retry finishes
+ok - an empty preserve-list path, in the copy or a nested copy, has nothing to checksum and does not keep the copy
+ok - end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, and the log says reaped
+ok - end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps
+ok - end to end: a squash-merged copy with ignored files that teardown refuses is removed by the fallback, preserved records first, and teardown then closes the task
+ok - end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake
+ok - end to end: a changed file, an unpushed commit and an unpushed NESTED commit each keep the copy, force nothing, and raise exactly one wake
+ok - mutation proof (unsafe direction): breaking any safety proof makes its keep case fail
+ok - mutation proof (over-strict direction): tightening any permission makes its removal case fail

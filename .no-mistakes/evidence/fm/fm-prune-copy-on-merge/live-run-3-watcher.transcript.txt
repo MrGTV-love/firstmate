@@ -1,0 +1,11 @@
+record before: pending attempts=0; slot: 2     in-use       $LAB/th/.treehouse/widget-84ac83/2/widget  [fm/t9]
+watcher run 1 exited 0: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json) 
+watcher run 2 exited 0: check: rearm-resurface 
+--- data/t9/merge-prune.log
+2026-10-26T07:00:21Z armed for https://github.com/acme/widget/pull/25
+2026-10-26T07:03:43Z reaped: teardown completed
+--- state/t9.merge-prune
+(absent)
+--- merge-prune wakes for t9: 0
+--- state/t9.meta present: no
+slot after: 2     available    $LAB/th/.treehouse/widget-84ac83/2/widget  (detached)

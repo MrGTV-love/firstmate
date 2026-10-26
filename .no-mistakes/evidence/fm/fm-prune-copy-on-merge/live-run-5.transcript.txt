@@ -1,0 +1,30 @@
+===== S6n: natural squash false positive: the pipeline rebased the branch onto a moved main (copy HEAD only on the gate remote)
+error: remote no-mistakes already exists.
+copy HEAD 5529b88 is ancestor of PR head 883e371: no; main carries t6r.txt: yes
+--- data/t6r/merge-prune.log
+2026-10-26T07:05:45Z armed for https://github.com/acme/widget/pull/41
+2026-10-26T07:05:54Z reaped: teardown completed
+--- state/t6r.merge-prune
+(absent)
+--- merge-prune wakes for t6r: 0
+--- state/t6r.meta present: no
+real teardown said:
+=== teardown t6r rc=0
+teardown t6r complete (window firstmate:fm-t6r, worktree $LAB/th/.treehouse/widget-32d8b1/4/widget)
+copy dir exists: yes; slot: 4     available    $LAB/th/.treehouse/widget-32d8b1/4/widget  (detached)
+===== S8b: an unpushed commit in a NESTED independent clone (.claude/worktrees/n2, its own .git) under a squash-merged copy
+--- data/t8b/merge-prune.log
+2026-10-26T07:05:56Z armed for https://github.com/acme/widget/pull/42
+2026-10-26T07:06:07Z reaped: teardown completed
+--- state/t8b.merge-prune
+(absent)
+--- merge-prune wakes for t8b: 0
+--- state/t8b.meta present: no
+real teardown said:
+=== teardown t8b rc=0
+teardown t8b complete (window firstmate:fm-t8b, worktree $LAB/th/.treehouse/widget-32d8b1/4/widget)
+slot: 4     available    $LAB/th/.treehouse/widget-32d8b1/4/widget  (detached)
+nested unpushed commit still on disk: ba11a5f unpushed in nested clone
+--- a new task's 'treehouse get' now:
+t8next got: $LAB/th/.treehouse/widget-32d8b1/4/widget
+t8next's copy holds t8b's nested clone with the unpushed commit: ba11a5f unpushed in nested clone
