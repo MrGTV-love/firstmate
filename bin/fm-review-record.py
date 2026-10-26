@@ -278,7 +278,7 @@ def git(worktree, *args):
     return result.stdout.strip()
 
 
-def task_metadata(home, pr, task):
+def task_metadata(home, task):
     state = state_dir(home)
     valid = subprocess.run(["bash", "-c", '. "$1/fm-pr-lib.sh"; fm_pr_task_id_valid "$2"',
                             "fm-review-record", str(BIN), task], capture_output=True, check=False)
@@ -293,14 +293,16 @@ def task_metadata(home, pr, task):
 
 
 def derived_authors(home, pr, head, task, base):
-    task, meta = task_metadata(home, pr, task)
+    task, meta = task_metadata(home, task)
     worktree = Path(nonempty(meta.get("worktree"), "task worktree"))
     # The merge helper already binds the forge head; independently require the
     # actual objects and base locally, rather than trusting a typed commit list.
-    git(worktree, "cat-file", "-e", f"{head}^{{commit}}")
-    if not base or not re.fullmatch(r"[0-9a-f]{40}", base):
-        raise RecordError("author evidence requires --base with the forge's exact 40-hex base SHA")
-    base_ref = git(worktree, "rev-parse", "--verify", f"{base}^{{commit}}")
+    try:
+        git(worktree, "cat-file", "-e", f"{head}^{{commit}}")
+        base_ref = git(worktree, "rev-parse", "--verify", f"{base}^{{commit}}")
+    except RecordError as exc:
+        fetch = shlex.join(["git", "-C", str(worktree), "fetch", "origin", base, head])
+        raise RecordError(f"{exc}; fetch the exact forge base and head with: {fetch}, then retry the merge") from exc
     base_sha = git(worktree, "merge-base", head, base_ref)
     commits = [line.split("\x00", 1) for line in git(worktree, "log", "--format=%H%x00%s", f"{base_sha}..{head}").splitlines()]
     if not commits:
@@ -486,21 +488,21 @@ def main():
                           for group, authors in groups.items()}
             row.update(head=args.head, verdict=args.verdict, reader_model=args.reader_model,
                        reader_family=model(args.reader_model, "reader_model"), author_groups=groups, report=args.report, **{t: getattr(args, t) for t in TRIGGERS})
+            if args.covered_groups:
+                try:
+                    row["covered_groups"] = json.loads(args.covered_groups)
+                except ValueError as exc:
+                    raise RecordError("covered_groups must be a JSON list of commit groups read") from exc
         elif args.command == "captain-word":
             row.update(head=args.head, words=args.words)
         write = args.command in ("review", "captain-word")
         if write:
             validate(row)
         if args.command == "review":
-            row["report_sha256"] = report_digest(args.report, args.verdict, args.head)
-            try:
-                row["covered_groups"] = json.loads(args.covered_groups) if args.covered_groups else list(groups)
-            except ValueError as exc:
-                raise RecordError("covered_groups must be a JSON list of commit groups read") from exc
-            if (not isinstance(row["covered_groups"], list) or not row["covered_groups"]
-                    or any(not isinstance(g, str) or not g for g in row["covered_groups"])
-                    or any(g != "all" and g not in groups for g in row["covered_groups"])):
+            row.setdefault("covered_groups", list(groups))
+            if any(g != "all" and g not in groups for g in row["covered_groups"]):
                 raise RecordError("covered_groups must name author groups or all")
+            row["report_sha256"] = report_digest(args.report, args.verdict, args.head)
         if args.command == "captain-word":
             refuse_away(state_dir(home))
     except RecordError as exc:

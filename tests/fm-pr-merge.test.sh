@@ -161,6 +161,40 @@ test_author_evidence_accepts_path_safe_legacy_task_ids() {
   done
 }
 
+test_author_verification_names_fetch_for_missing_objects() {
+  local case_dir head base url rc
+  case_dir=$(make_case missing-author-objects)
+  rm "$case_dir/fakebin/git"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  base=abababababababababababababababababababab
+  url=https://github.com/example/repo/pull/9
+  record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record review before stale-base verification'
+  rc=0
+  PATH="$case_dir/fakebin:$PATH" HOME="$case_dir/user-home" \
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" --task task-x1 --base "$base" > "$case_dir/out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "an unfetched forge base must refuse: $(cat "$case_dir/out")"
+  assert_grep "fetch the exact forge base and head with: git -C $case_dir/wt fetch origin $base $head" "$case_dir/out" \
+    'missing-object refusal names the exact recovery fetch'
+  pass 'author verification names the exact fetch for an unfetched base'
+}
+
+test_github_unreadable_base_names_the_refusal() {
+  local case_dir head url rc
+  case_dir=$(make_case github-unreadable-base)
+  head=1111111111111111111111111111111111111111
+  url=https://github.com/example/repo/pull/9
+  add_gh_mocks "$case_dir" "$head"
+  "$JQ_BIN" -c 'del(.baseRefOid)' "$case_dir/github-view.json" > "$case_dir/view.json"
+  mv "$case_dir/view.json" "$case_dir/github-view.json"
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "an unreadable GitHub base must refuse: $(cat "$case_dir/stderr")"
+  assert_grep 'could not read the GitHub PR base commit for author evidence' "$case_dir/stderr" 'base read refusal names its reason'
+  assert_no_grep '^pr merge ' "$case_dir/gh.log" 'unreadable base must not reach forge mutation'
+  pass 'an unreadable GitHub base commit refuses with its reason'
+}
+
 test_author_verification_requires_exact_identity() {
   local case_dir scenario rc
   case_dir=$(make_case exact-evidence-identity)
@@ -1786,6 +1820,8 @@ pr_merge_test_cases=(
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
 test_author_verification_requires_exact_identity
+test_author_verification_names_fetch_for_missing_objects
+test_github_unreadable_base_names_the_refusal
 test_identical_captain_words_follow_append_order
 test_triggered_review_verifies_only_when_independent
 test_captain_fail_triggered_pass_requires_fresh_word

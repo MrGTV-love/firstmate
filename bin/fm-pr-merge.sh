@@ -650,7 +650,7 @@ FIELDS
   printf 'verified: %s is open and mergeable, with a successful pipeline at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
-  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er 'select(.diff_refs.head_sha == .sha) | .diff_refs.base_sha') || return 1
+  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er 'select(.diff_refs.head_sha == .sha) | .diff_refs.base_sha') || FM_PR_MERGE_BASE=
   fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitLab PR base commit for author evidence' >&2; return 1; }
   FM_PR_GITLAB_ASYNC_CONFIGURED=$async_configured
 }
@@ -782,7 +782,7 @@ FIELDS
   printf 'verified: %s is open and mergeable, with a successful combined status at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
-  FM_PR_MERGE_BASE=$(printf '%s' "$pr_json" | jq -er '.base.sha') || return 1
+  FM_PR_MERGE_BASE=$(printf '%s' "$pr_json" | jq -er '.base.sha') || FM_PR_MERGE_BASE=
   fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the Forgejo PR base commit for author evidence' >&2; return 1; }
 }
 
@@ -1277,7 +1277,7 @@ EOF
   printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
-  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || return 4
+  FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || FM_PR_MERGE_BASE=
   fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitHub PR base commit for author evidence' >&2; return 4; }
   FM_PR_GITHUB_BASE=$base
 }
