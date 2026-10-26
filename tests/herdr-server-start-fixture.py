@@ -17,6 +17,19 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(sys.argv.pop(1)).resolve()
+# Bound every adapter call or start-lock wait. The adapter waits for a competing
+# starter's lock and then for its readiness poll, so this must exceed
+# bin/backends/herdr-server-start.py's own STARTUP_SECONDS.
+# measured: value=8.115 date=2026-10-25 host=Mac-Studio.local margin=3.7
+# (slowest of 4 concurrent runs of this fixture against the intercepted CLI)
+CALL_SECONDS = 30
+# Serialize every StartupSafety test across all copies of this fixture on the host.
+# bin/backends/herdr-server-start.py proves absence by scanning the whole host
+# process table, so a fake server one copy starts (unscoped, or with an unreadable
+# session) makes another copy's absence proof refuse. The interference is
+# host-wide, so the lock path is fixed and outlives any one run. Each test holds
+# it from setUp until its fake servers are killed after tearDown.
+HOST_LOCK = "/tmp/firstmate-herdr-server-start-fixture.lock"
 
 STUB = r'''
 import json, os, pathlib, sys, time
@@ -29,17 +42,19 @@ if "--session" not in args or args[args.index("--session") + 1] != root.name:
 cmd = args[0]
 if cmd == "status":
     mode = os.environ.get("START_STATUS", "false")
-    if not (root / "pid").exists():
+    # Read the launch marker once so a server starting mid-call cannot skip a failure.
+    launched = (root / "pid").exists()
+    if not launched:
         if mode == "error": sys.exit(1)
         if mode == "timeout": sys.exit(124)
         if mode == "empty": sys.exit(0)
     failures = root / "post-launch-failures"
-    if (root / "pid").exists() and os.environ.get("START_STATUS_FAILS_AFTER_LAUNCH"):
+    if launched and os.environ.get("START_STATUS_FAILS_AFTER_LAUNCH"):
         failed = int(failures.read_text()) if failures.exists() else 0
         if failed < int(os.environ["START_STATUS_FAILS_AFTER_LAUNCH"]):
             failures.write_text(str(failed + 1))
             sys.exit(1)
-    server = {"running": (root / "pid").exists(), "session": root.name}
+    server = {"running": launched, "session": root.name}
     if not os.environ.get("START_NO_STATUS_SOCKET"):
         server["socket"] = os.environ.get("START_SOCKET", str(root / "herdr.sock"))
     print(json.dumps({"server": server}))
@@ -113,6 +128,10 @@ class EnvironmentOwnership(unittest.TestCase):
 
 class StartupSafety(unittest.TestCase):
     def setUp(self):
+        # Read-only open so a lock file another user created still works.
+        host_lock = os.open(HOST_LOCK, os.O_RDONLY | os.O_CREAT, 0o666)
+        self.addCleanup(os.close, host_lock)
+        fcntl.flock(host_lock, fcntl.LOCK_EX)
         # Keep Unix socket paths below Darwin's 104-byte sockaddr_un limit.
         self.tmp = tempfile.TemporaryDirectory(prefix="fm-lab-start-", dir="/tmp")
         self.dir = Path(self.tmp.name)
@@ -168,7 +187,7 @@ class StartupSafety(unittest.TestCase):
                                  text=True)
         self.children.append(child)
         try:
-            out, err = child.communicate(timeout=4)
+            out, err = child.communicate(timeout=CALL_SECONDS)
         except subprocess.TimeoutExpired:
             self.fail("server retained a starter descriptor or the call did not return")
         return child.returncode, out
@@ -287,7 +306,7 @@ class StartupSafety(unittest.TestCase):
             self.children.append(subprocess.Popen(
                 ["bash", "-c", script, "fixture", str(ROOT), self.dir.name], env=self.env,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True))
-        results = [child.communicate(timeout=8) for child in self.children]
+        results = [child.communicate(timeout=CALL_SECONDS) for child in self.children]
         self.assertEqual([child.returncode for child in self.children], [0, 0], results)
         self.assertEqual(len(self.starts()), 1)
 
@@ -348,7 +367,7 @@ class StartupSafety(unittest.TestCase):
         return child
 
     def wait_for(self, predicate):
-        for _ in range(200):
+        for _ in range(round(CALL_SECONDS / .05)):
             if predicate():
                 return
             time.sleep(.05)
@@ -365,7 +384,7 @@ class StartupSafety(unittest.TestCase):
             self.children.append(ensure)
             time.sleep(2)
             self.assertEqual(self.servers(), [], "a starter launched while another held the start lock")
-        out, err = ensure.communicate(timeout=20)
+        out, err = ensure.communicate(timeout=CALL_SECONDS)
         self.assertEqual(ensure.returncode, 0, err)
         self.wait_for(lambda: (self.dir / "pid").exists())
         time.sleep(2)
@@ -380,7 +399,7 @@ class StartupSafety(unittest.TestCase):
         self.wait_for(self.lock_is_free)
 
     def test_guard_releases_the_start_lock_when_its_server_fails(self):
-        out, _ = self.guard(START_SERVER_FAILS="1").communicate(timeout=20)
+        out, _ = self.guard(START_SERVER_FAILS="1").communicate(timeout=CALL_SECONDS)
         self.assertIn("exited before reporting running; releasing the start lock", out)
         self.assertEqual(self.servers(), [])
         self.assertTrue(self.lock_is_free())
