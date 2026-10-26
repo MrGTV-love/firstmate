@@ -6,10 +6,10 @@
 # successful release retires them. The watcher checks those receipts and adopts
 # pre-upgrade locks in this home's state tree, without following directory links.
 # FM_LOCK_ALARM_SECS (positive seconds, default 300; an invalid or zero value
-# warns once and uses 300) reports each ownership episode once through a check
-# wake; project and merge control locks have their own limits and also report
-# a dead or zombie owner (fm_lock_monitor_check). The observing watcher's own
-# locks and the
+# warns once and uses 300) is the age limit for the measured fleet-ledger,
+# watcher-down and wake-queue locks; every other lock reports only a dead or
+# zombie owner (fm_lock_monitor_check). Each ownership episode reports once
+# through a check wake. The observing watcher's own locks and the
 # process-lifetime singletons state/.watch.lock and state/.supervise-daemon.lock
 # are not reported; a dead or zombie owner of those is still reclaimed.
 # It is an observation threshold, not permission to kill or reclaim anything.
@@ -1707,28 +1707,27 @@ _fm_lock_monitor_adopt() {  # <lock>
 # register receipts, including locks outside state/. A startup scan also finds
 # pre-upgrade lock directories and symlinks in this home's state tree, without
 # following directory symlinks into another home. The check only reports.
-# Each lock's limit has its own basis:
-# - fleet-ledger, watcher-down, wake-queue (FM_LOCK_ALARM_SECS, default 300s):
-#   measured: 25 releases per lock on 2026-10-26 gave p99/max 222.593ms for
-#   fleet-ledger, 137.998ms for watcher-down, and 447.383ms for wake-queue. The
-#   300s threshold leaves over 600x the largest measured hold, not a claim that
-#   all callers finish that fast.
-# - treehouse project locks (1347600s): measured: the largest of 3895 holds in
-#   the primary home's state/.treehouse-project-*.lock.holds records
-#   (2026-10-13..26, successful releases only) was 2246s (a teardown); the same
-#   600x margin gives 1347600s.
-# - merge control locks (state/.control-<id>.lock): no limit. bin/fm-pr-merge.sh
-#   bounds only its mergeable retries (5 attempts, sleeps of at most 10s); its
-#   gh/glab/tea reads and merge calls under the lock have no time bound, so no
-#   maximum normal hold can be computed.
-# Project and control locks also report a dead or zombie owner at any age.
-# Every other lock still uses FM_LOCK_ALARM_SECS without a measured basis.
+# Each lock class has its own basis:
+# - fleet-ledger, watcher-down, wake-queue: hold age past FM_LOCK_ALARM_SECS
+#   (default 300s). measured: 25 releases per lock on 2026-10-26 gave p99/max
+#   222.593ms for fleet-ledger, 137.998ms for watcher-down, and 447.383ms for
+#   wake-queue. The 300s threshold leaves over 600x the largest measured hold,
+#   not a claim that all callers finish that fast.
+# - every other lock: owner liveness only, a dead or zombie owner at any age,
+#   never hold age. No measured or computable bound covers them: the primary
+#   home's state/.treehouse-project-*.lock.holds records (2026-10-13..26) reach
+#   2246s; control locks (state/.control-<id>.lock, taken by fm-pr-merge,
+#   fm-teardown, fm-spawn, fm-promote, fm-tasks-axi, fm-captain-hold,
+#   fm-control, fm-bootstrap, fm-secondmate-reconcile and session-end relaunch)
+#   and lease command locks are held across unbounded network, teardown and
+#   spawn work. Gap: a live but stuck owner of these locks is not reported by
+#   age; only its waiters' 60s breadcrumbs name it.
 # Age is evidence to inspect, not a verdict that the owner is stuck; healthy
 # process-lifetime singletons and the observer's own holds are skipped.
 fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
   local settle=${1:-} record lock owner pid mtime now age state parent command reason key old identity
   local waiter waiter_pid waiter_lock waiters first='' limit=${FM_LOCK_ALARM_SECS:-300}
-  local episodes=$'\n' episodes_loaded=0 marker state_abs='' lock_limit owner_check below
+  local episodes=$'\n' episodes_loaded=0 marker state_abs='' dead_pid
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
   FM_LOCK_MONITOR_UNQUEUED=0
   FM_LOCK_MONITOR_PENDING=''
@@ -1772,9 +1771,9 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
       rm -f "$record" "$record.alerted" "$record.pending"
       continue
     fi
-    # One stat is the normal fresh-hold path. Resolve the owner and inspect
-    # processes only after the age threshold, rather than adding several
-    # subprocesses to every watcher poll and startup confirmation.
+    # A measured lock costs one stat until its age threshold; any other lock
+    # adds one pid read and liveness probe. Owners are resolved only after
+    # that verdict, rather than adding several subprocesses to every poll.
     if [ "$_FM_UNAME" = Darwin ]; then
       identity=$(/usr/bin/stat -f '%m:%d:%i' "$owner/pid" 2>/dev/null) || continue
     else
@@ -1783,16 +1782,17 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     IFS=: read -r mtime identity <<< "$identity"
     case "$mtime" in ''|*[!0-9]*) continue ;; esac
     age=$((now - mtime))
-    lock_limit=$limit owner_check=0
+    dead_pid=''
     case "${lock##*/}" in
-      .treehouse-project-*.lock) lock_limit=1347600 owner_check=1 ;;
-      .control-*.lock) lock_limit='' owner_check=1 ;;
+      .fleet-ledger.lock|.watcher-down.lock|.wake-queue.lock)
+        [ "$age" -ge "$limit" ] || continue
+        ;;
+      *)
+        IFS= read -r dead_pid 2>/dev/null < "$owner/pid" || [ -n "$dead_pid" ] || continue
+        case "$dead_pid" in ''|*[!0-9]*) continue ;; esac
+        ! fm_pid_alive "$dead_pid" || continue
+        ;;
     esac
-    below=0
-    if [ -z "$lock_limit" ] || [ "$age" -lt "$lock_limit" ]; then
-      [ "$owner_check" -eq 1 ] || continue
-      below=1
-    fi
     if [ "$owner" != "$lock" ] && ! fm_lock_points_to_owner "$lock" "$owner"; then
       rm -f "$record" "$record.alerted" "$record.pending"
       continue
@@ -1800,10 +1800,10 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     pid=''
     IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
     case "$pid" in ''|*[!0-9]*) continue ;; esac
+    [ -z "$dead_pid" ] || [ "$pid" = "$dead_pid" ] || continue
     [ "$pid" != "$$" ] || continue
     [ -n "$state_abs" ] || state_abs=$(cd "$STATE" && pwd -P) || state_abs=$STATE
     case "$lock" in "$state_abs/.watch.lock"|"$state_abs/.supervise-daemon.lock") continue ;; esac
-    [ "$below" -eq 0 ] || ! fm_pid_alive "$pid" || continue
     key="$owner:$pid:$mtime:$identity"
     # Adoption can race the holder's own receipt publication. Deduplicate the
     # ownership episode across all references, including within this poll and

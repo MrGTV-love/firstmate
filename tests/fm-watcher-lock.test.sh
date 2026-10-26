@@ -1971,7 +1971,7 @@ try:
     beats(4)
     assert "long-held" not in out.read_text(), out.read_text()
     # A control lock past the same limit still alarms on that very watcher.
-    control = state / ".fixture.lock"; control.mkdir()
+    control = state / ".fleet-ledger.lock"; control.mkdir()
     (control / "pid").write_text(f"{daemon.pid}\n")
     os.utime(control / "pid", (old, old))
     assert watcher.wait(timeout=60) == 0, err.read_text()
@@ -2122,7 +2122,7 @@ lib = root / "bin/fm-wake-lib.sh"
 env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
            FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
            PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
-fixture = state / ".fixture.lock"; fixture.mkdir()
+fixture = state / ".fleet-ledger.lock"; fixture.mkdir()
 (fixture / "pid").write_text(f"{os.getpid()}\n")
 old = time.time() - 301
 os.utime(fixture / "pid", (old, old))
@@ -2213,7 +2213,7 @@ lib = sys.argv[1]
 check = '. "$1"; fm_lock_monitor_check || exit $?; fm_lock_monitor_check || exit $?'
 for value, age, alarms in (("5m", 301, True), ("5m", 200, False), ("0", 200, False), ("00", 200, False), ("010", 20, True), ("", 200, False)):
     with tempfile.TemporaryDirectory(prefix="fm-lock-threshold-") as d:
-        lock = pathlib.Path(d, ".fixture.lock"); lock.mkdir()
+        lock = pathlib.Path(d, ".fleet-ledger.lock"); lock.mkdir()
         (lock / "pid").write_text(f"{os.getpid()}\n")
         old = time.time() - age
         os.utime(lock / "pid", (old, old))
@@ -2241,7 +2241,7 @@ lib = root / "bin/fm-wake-lib.sh"
 env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
            FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
            PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
-fixture = state / ".fixture.lock"; fixture.mkdir()
+fixture = state / ".fleet-ledger.lock"; fixture.mkdir()
 (fixture / "pid").write_text(f"{os.getpid()}\n")
 old = time.time() - 301
 os.utime(fixture / "pid", (old, old))
@@ -2280,7 +2280,7 @@ test_alarm_observation_failure_keeps_waiting_append() {
   local dir
   dir=$(make_case lock-alarm-observation-failure)
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an observation failure inside a queue wait lost the pending append"
-import os, pathlib, select, subprocess, sys
+import os, pathlib, select, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
 lock = state / ".wake-queue.lock"
@@ -2290,17 +2290,30 @@ env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
            PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
 # A file where the diagnostic index directory belongs makes every check fail.
 (state / ".lock-monitor").write_text("not a directory\n")
-holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; sleep 3; fm_lock_release "$2"', "_", str(lib), str(lock)], env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+release = home / "release"
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; until [ -e "$3" ]; do sleep 0.05; done; fm_lock_release "$2"', "_", str(lib), str(lock), str(release)], env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 try:
     assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
     assert holder.stdout.readline().strip() == "ready"
     source = '. "$1"; FM_LOCK_WAIT_TICK=watch_queue_wait_tick; : > "$STATE/offered"; fm_wake_append check x-mention-3 "check: x mention 3" || exit 1; wake "check: x mention 3"'
-    run = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh")], env=env, capture_output=True, text=True, timeout=60)
+    out, err = home / "source.out", home / "source.err"
+    with out.open("w") as stdout, err.open("w") as stderr:
+        source_run = subprocess.Popen(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, text=True)
+    # Release only after the injected observation failure ran inside the wait.
+    for _ in range(600):
+        if "long-held lock observation failed" in err.read_text(): break
+        assert source_run.poll() is None, err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("queue wait never ran the failing observation")
+    release.touch()
+    source_run.wait(timeout=60)
+    run = subprocess.CompletedProcess(source_run.args, source_run.returncode, out.read_text(), err.read_text())
     assert run.returncode == 0 and "check: x mention 3" in run.stdout, run
     assert "long-held lock observation failed" in run.stderr, run
     keys = [line.split("\t")[3] for line in (state / ".wake-queue").read_text().splitlines()]
     assert keys == ["x-mention-3"], keys
 finally:
+    release.touch()
     holder.wait(timeout=30)
 PY
   pass "a failed lock observation inside a queue wait keeps waiting and lands the pending append"
@@ -2371,7 +2384,9 @@ for _ in range(200):
 else: raise AssertionError("killed child did not stay a zombie")
 cases = [
     (".treehouse-project-abc.lock", os.getpid(), 2246, False),
-    (".treehouse-project-abc.lock", os.getpid(), 1347601, True),
+    (".treehouse-project-abc.lock", os.getpid(), 301, False),
+    (".fm-lease-command-task-1.lock", os.getpid(), 301, False),
+    (".fm-lease-command-task-1.lock", zombie.pid, 5, True),
     (".treehouse-project-abc.lock", dead.pid, 5, True),
     (".treehouse-project-abc.lock", zombie.pid, 5, True),
     (".control-task-1.lock", os.getpid(), 5, False),
@@ -2396,10 +2411,19 @@ try:
                 assert f"owner={pid}" in rows[0], rows
                 assert pid != zombie.pid or "state=Z" in rows[0], rows
             assert (lock / "pid").read_text().strip() == str(pid), "alarm changed the owner"
+    # A holder that releases between the pid read and the dead verdict is not
+    # reported: the owner record is revalidated before the alarm.
+    with tempfile.TemporaryDirectory(prefix="fm-lock-limits-") as d:
+        lock = pathlib.Path(d, ".control-task-2.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{dead.pid}\n")
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        released = '. "$1"; lockdir=$2; fm_pid_alive() { rm -rf "$lockdir"; return 1; }; fm_lock_monitor_check'
+        subprocess.run(["bash", "-c", released, "_", lib, str(lock)], env=env, check=True, timeout=30)
+        assert not pathlib.Path(d, ".wake-queue").exists(), "a released lock was reported dead"
 finally:
     zombie.wait()
 PY
-  pass "project and control locks alarm on their own limits and on a dead or zombie owner at any age"
+  pass "only measured locks alarm on age; other locks alarm on a dead or zombie owner at any age"
 }
 
 test_pid_alive_reads_proc_state_without_ps() {
@@ -2428,7 +2452,7 @@ import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
 with tempfile.TemporaryDirectory(prefix="fm-lock-alarm-") as d:
     lib = sys.argv[1]
     state = pathlib.Path(d, "state"); state.mkdir()
-    lock = state / ".fixture.lock"; lock.mkdir()
+    lock = state / ".fleet-ledger.lock"; lock.mkdir()
     (lock / "pid").write_text(str(os.getpid()) + "\n")
     env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=str(state))
     check = ["bash", "-c", '. "$1"; fm_lock_monitor_check', "_", lib]
@@ -2494,7 +2518,7 @@ for scenario in ("foreign-index", "external-waiter"):
         base = pathlib.Path(d)
         a, b = base / "a", base / "b"
         a.mkdir(); b.mkdir()
-        lock = (b if scenario == "foreign-index" else base) / ".shared.lock"
+        lock = (b if scenario == "foreign-index" else base) / ".fleet-ledger.lock"
         env_a = dict(os.environ, FM_HOME=str(a), FM_STATE_OVERRIDE=str(a))
         env_b = dict(os.environ, FM_HOME=str(b), FM_STATE_OVERRIDE=str(b))
         owner = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "owner-a", lib, str(lock)], env=env_a, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
@@ -2643,7 +2667,7 @@ test_unreadable_ps_never_reclaims_live_owner() {
   dir=$(make_case lock-unreadable-ps)
   mkdir "$dir/state/.fixture.lock"
   printf '%s\n' "$$" > "$dir/state/.fixture.lock/pid"
-  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/missing-proc" bash -c '
     . "$1"
     for mode in failure empty; do
       ps() { if [ "$mode" = failure ]; then printf "Z\\n"; return 1; fi; return 0; }
