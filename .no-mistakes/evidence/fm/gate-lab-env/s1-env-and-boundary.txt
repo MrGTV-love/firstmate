@@ -1,0 +1,43 @@
+### TMPDIR=/Users/charlesabrooker/tmp (default, symlinked: /tmp->/private/tmp)
+$ eval "$(bin/fm-lab-home.sh env)"   # stderr shown below
+[stderr] export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+[stderr] export TMUX_TMPDIR=/tmp/fml.Nct4pO
+[stderr] fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5V67F71R43THE1MJNPXPAD2/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.8eQ9JU && rm -rf /Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+TMUX_TMPDIR=/tmp/fml.Nct4pO
+canonical(FM_HOME)=/Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+.fm-lab-home
+config
+data
+projects
+state
+marker line1: fm-lab-home v1
+socket dir mode=700 owner=501
+my uid=501
+
+### Gate agent (NO_MISTAKES_GATE=1) runs lifecycle script bin/fm-send.sh against the lab home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+error: target 'no-such-task' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.8eQ9JU/state/no-such-task.meta; metadata window/terminal lookup; backend=none). Use fm-no-such-task for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+exit=1  (3 would mean gate refusal)
+
+### Same gate agent against an unmarked home (stand-in for a real home)
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+
+### Adversarial: lab home + FM_DATA_OVERRIDE relocation
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+
+### Adversarial: lab home via a symlinked (non-canonical) path
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+
+### Adversarial: env cannot re-mark the populated fake real home
+fm-lab-home: refusing '/private/tmp/fm-real.E92j3J': a lab marker is only ever stamped on a fresh empty dir
+create on populated dir exit=1

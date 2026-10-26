@@ -1,0 +1,7 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.n9jxzN
+TMUX=/private/tmp/fml.atI43w/tmux-501/fm-lab,50743,0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.n9jxzN
+error: target 'probe-target' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.n9jxzN/state/probe-target.meta; metadata window/terminal lookup; ba
+ckend=none). Use fm-probe-target for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+send_exit=1
+teardown exit=0; lab removed: yes

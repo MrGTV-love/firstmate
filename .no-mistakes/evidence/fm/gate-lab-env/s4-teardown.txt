@@ -1,0 +1,12 @@
+### Fresh shell: re-run the two export lines printed on stderr, then teardown while the lab primary still runs
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5V67F71R43THE1MJNPXPAD2/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.8eQ9JU && rm -rf /Users/charlesabrooker/tmp/fm-lab.8eQ9JU
+fm-lab-home: refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=0)
+exit=1  lab still exists: yes  socket dir exists: yes
+
+### Stop the primary through the lab socket, then the same teardown line
+kill-server exit=0
+exit=0  lab still exists: no  socket dir exists: no
+
+### Adversarial: teardown line on a non-lab dir is refused, so rm -rf never runs
+fm-lab-home: refusing '/tmp/fm-notlab.yu4taO': not a marked lab home
+exit=1  dir still exists: yes

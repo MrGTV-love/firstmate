@@ -1,0 +1,75 @@
+== git-common-dir: /Users/charlesabrooker/.no-mistakes/repos/e2f2c2589455.git
+== TMPDIR=/Users/charlesabrooker/tmp
+
+### S1: refusal names the env command (unmarked scratch home, gate context)
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+-- path signal only (NO_MISTAKES_GATE unset):
+error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/e2f2c2589455.git)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+
+### S2: eval "$(bin/fm-lab-home.sh env)" from default TMPDIR, then follow refusal's advice
+env exit=0
+-- stderr shown to caller:
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.IOjEnC
+export TMUX_TMPDIR=/tmp/fml.Do7okB
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5V67F71R43THE1MJNPXPAD2/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.IOjEnC && rm -rf /Users/charlesabrooker/tmp/fm-lab.IOjEnC
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.IOjEnC
+TMUX_TMPDIR=/tmp/fml.Do7okB
+canonical? yes
+marker line1: fm-lab-home v1
+.fm-lab-home
+config
+data
+projects
+state
+drwx------  2 charlesabrooker  wheel  64 Oct 25 23:35 /tmp/fml.Do7okB
+-- re-run lifecycle call with that FM_HOME:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.IOjEnC
+error: target 'some-target' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.IOjEnC/state/some-target.meta; metadata window/terminal lookup; backend=none). Use fm-some-target for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+exit=1 (3 would mean refused)
+
+### S3: symlinked TMPDIR=/tmp gives canonical /private/tmp home that is admitted
+export FM_HOME=/private/tmp/fm-lab.DPY4qP
+export TMUX_TMPDIR=/tmp/fml.qBklyD
+canonical? yes
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.DPY4qP
+error: target 'some-target' is not resolvable (tried meta=/private/tmp/fm-lab.DPY4qP/state/some-target.meta; metadata window/terminal lookup; backend=none). Use fm-some-target for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+exit=1 (3 would mean refused)
+lab2 removed: yes
+
+### S4 (adversarial): containment unchanged
+-- non-canonical alias (symlink) to a real marked lab:
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+-- populated dir cannot be marked by create:
+fm-lab-home: refusing '/Users/charlesabrooker/tmp/pop.CFP2Ne': a lab marker is only ever stamped on a fresh empty dir
+create exit=1
+backlog.md
+-- lab home with a stray FM_DATA_OVERRIDE:
+error: no-mistakes gate agent must not drive the fleet (NO_MISTAKES_GATE set)
+error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME
+error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.
+exit=3
+-- env inside the repo is impossible: TMPDIR pointed inside worktree:
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5V67F71R43THE1MJNPXPAD2/fm-lab.lMTljd': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+env exit=1
+no leftover fm-lab.* in worktree
+
+### S5: fresh-shell flow - re-export from stderr lines, private tmux server, guarded teardown
+socket in private dir:
+fm-lab
+primary: 1 windows (created Sun Oct 25 23:35:51 2026)
+-- default tmux dir has no fm-lab socket: none
+-- teardown line while server alive (expected refusal, lab kept):
+fm-lab-home: refusing teardown: cannot confirm the lab tmux server has stopped (tmux probe exit=0)
+exit=1  lab exists: yes
+-- kill server via same socket, then teardown line from / in a fresh shell:
+exit=0
+lab removed: yes; socket dir removed: yes

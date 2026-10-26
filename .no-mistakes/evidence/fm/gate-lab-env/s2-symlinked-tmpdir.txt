@@ -1,0 +1,11 @@
+### Symlinked TMPDIR: TMPDIR=/tmp (/tmp -> private/tmp) and TMPDIR=/var/folders-style
+$ TMPDIR=/tmp eval "$(bin/fm-lab-home.sh env)"
+FM_HOME=/private/tmp/fm-lab.fdV8e2  canonical=/private/tmp/fm-lab.fdV8e2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.fdV8e2
+lifecycle exit=141 (3 = refused)
+teardown ok; lab gone: yes
+$ TMPDIR=/tmp/ eval "$(bin/fm-lab-home.sh env)"
+FM_HOME=/private/tmp/fm-lab.lOgO5u  canonical=/private/tmp/fm-lab.lOgO5u
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.lOgO5u
+lifecycle exit=141 (3 = refused)
+teardown ok; lab gone: yes
