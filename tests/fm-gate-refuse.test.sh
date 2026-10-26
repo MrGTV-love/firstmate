@@ -342,6 +342,7 @@ lab_home_env_provisions() {  # <tmpdir> <expected-real-parent> <label>
   lab=$(sed -n '1p' "$TMP/env.paths")
   socket=$(sed -n '2p' "$TMP/env.paths")
   [ -f "$lab/.fm-lab-home" ] || fail "lab-home $label: env did not mint a marked lab home"
+  [ "$lab" = "$(cd -P -- "$lab" && pwd -P)" ] || fail "lab-home $label: env must export a canonical FM_HOME, got $lab"
   case "$lab" in "$parent"/*) ;; *) fail "lab-home $label: env must mint under $parent, got $lab" ;; esac
   [ -d "$socket" ] || fail "lab-home $label: env did not create the private tmux socket directory"
   out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1); rc=$?
