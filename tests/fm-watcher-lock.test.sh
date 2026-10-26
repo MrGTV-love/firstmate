@@ -2704,6 +2704,70 @@ PY
   pass "every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row"
 }
 
+test_exit_cleanup_wait_never_delivers_second_wake() {
+  local dir
+  dir=$(make_case lock-alarm-exit-cleanup)
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an exit-cleanup lock wait delivered a second wake"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+marker = state / ".watcher-down.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="1", FM_HEARTBEAT_MAX="1",
+           FM_WATCHER_CLEANUP_LOCK_BOUND="5",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+def hold(lock):
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; IFS= read -r _; fm_lock_release "$2"', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0] and holder.stdout.readline().strip() == "ready", f"{lock.name} holder did not acquire"
+    return holder
+def release(holder):
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+# After its output, wake retries the delivery lock for 0.4s; holding it keeps
+# the delivered watcher there long enough to stop it before EXIT cleanup.
+delivery = hold(state / ".watch-deliveries.lock")
+aged = state / ".fleet-ledger.lock"; aged.mkdir()
+(aged / "pid").write_text(f"{os.getpid()}\n")
+(state / ".afk").write_text("away\n")
+watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=subprocess.PIPE, stderr=open(home / "watch.err", "w"), start_new_session=True)
+marker_holder = None
+try:
+    assert select.select([watcher.stdout], [], [], 60)[0], (home / "watch.err").read_text()
+    first = watcher.stdout.readline().decode().strip()
+    os.killpg(watcher.pid, signal.SIGSTOP)
+    assert first == "heartbeat", first
+    assert (state / ".watch.lock").exists() or (state / ".watch.lock").is_symlink(), "cleanup ran before the watcher was stopped"
+    marker_holder = hold(marker)
+    old = time.time() - 301
+    os.utime(aged / "pid", (old, old))
+    os.killpg(watcher.pid, signal.SIGCONT)
+    target = str(state.resolve() / marker.name)
+    for _ in range(600):
+        if any(p.read_text().splitlines()[:2] == [str(watcher.pid), target] for p in (state / ".lock-monitor").glob("wait.*") if p.exists()): break
+        assert watcher.poll() is None, (home / "watch.err").read_text()
+        time.sleep(.05)
+    else: raise AssertionError("exit cleanup never waited on the recovery marker")
+    # Past the 1s poll tick and inside the 5s cleanup bound.
+    time.sleep(2.5)
+    release(marker_holder)
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    rest = watcher.stdout.read().decode().splitlines()
+    assert rest == [], f"exit cleanup delivered another reason: {rest}"
+    assert not (state / ".watch.lock").exists() and not (state / ".watch.lock").is_symlink(), "cleanup did not release the watcher lock"
+    assert (state / ".watcher-down").exists(), "cleanup did not publish downtime"
+finally:
+    release(marker_holder); release(delivery)
+    if watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGCONT)
+        os.killpg(watcher.pid, signal.SIGTERM); watcher.wait(timeout=30)
+PY
+  pass "exit cleanup's bounded recovery-marker wait never delivers a second wake"
+}
+
 test_long_held_lock_alarm() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
@@ -2988,6 +3052,7 @@ test_lock_alarm_threshold_normalizes
 test_alarm_freed_queue_keeps_producer_order
 test_alarm_observation_failure_keeps_waiting_append
 test_alarm_runs_during_watcher_down_waits
+test_exit_cleanup_wait_never_delivers_second_wake
 test_startup_queue_wait_alarm_releases_with_downtime
 test_lock_alarm_project_and_control_limits
 test_pid_alive_reads_proc_state_without_ps

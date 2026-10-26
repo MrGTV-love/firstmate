@@ -2639,7 +2639,8 @@ lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures kee
 # alarm row is published, a pending append is made durable (appended now, or
 # spilled for the next locked append to replay first, never reclaiming a queue
 # lock this watcher already holds); if neither succeeds, or observation fails,
-# the wait goes on.
+# the wait goes on. Both EXIT cleanups clear the hook first, so their bounded
+# waits never deliver a second wake.
 WATCH_LOCK_WAIT_TICKED=0
 WATCH_LOCK_WAIT_TICKING=0
 watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
@@ -2745,7 +2746,7 @@ done
 # owner can be reported without first waiting behind that same owner. Until
 # watcher_cleanup is installed, only a delivered wake closes like an ordinary
 # watcher; startup failures retain the lock as stale evidence for the next arm.
-trap '[ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
+trap 'FM_LOCK_WAIT_TICK=; [ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
 lock_alarm_tick
 FM_LOCK_WAIT_TICK=watch_lock_wait_tick
 if [ -n "$EVICTED_PID" ]; then
@@ -3063,6 +3064,7 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
