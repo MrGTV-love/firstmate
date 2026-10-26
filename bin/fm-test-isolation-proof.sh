@@ -179,6 +179,9 @@ tests/fm-crew-state.test.sh
 tests/fm-ensure-agents-md.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-herdr-lab.test.sh
+tests/fm-lint-policy.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-slots.test.sh
 tests/fm-lint.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh

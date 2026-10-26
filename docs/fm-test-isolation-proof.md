@@ -38,6 +38,9 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-ensure-agents-md.test.sh`
 - `tests/fm-grok-harness.test.sh`
 - `tests/fm-herdr-lab.test.sh`
+- `tests/fm-lint-policy.test.sh`
+- `tests/fm-lint-report.test.sh`
+- `tests/fm-lint-slots.test.sh`
 - `tests/fm-lint.test.sh`
 - `tests/fm-pi-primary-types.test.sh`
 - `tests/fm-pr-merge.test.sh`
@@ -75,6 +78,21 @@ The two failing candidates were not the new paths.
 All three fm-pr-merge groups exited 0, at 302702 ms for `fm-pr-merge-checks`, 211479 ms for `fm-pr-merge-forges`, and 215970 ms for `fm-pr-merge`.
 Because the run is not a clean 31-path pass, the two new paths are not admitted: they are absent from the candidate set above, from `bin/fm-test-isolation-proof.sh --list`, and from the portable parallel lanes, and they run in the portable serial remainder while staying in the `pr-forge` family.
 A clean portable-pool run of the 31-path proposal on a host with `tsc` and a short enough `TMPDIR` is what admits them.
+
+## fm-lint split re-check
+
+The fm-lint split replaced `tests/fm-lint.test.sh` with four groups that share `tests/fm-lint-helpers.sh`: `tests/fm-lint.test.sh`, `tests/fm-lint-policy.test.sh`, `tests/fm-lint-slots.test.sh`, and `tests/fm-lint-report.test.sh`.
+The three new paths joined the candidate set above, `bin/fm-test-isolation-proof.sh --list`, the portable parallel lanes, and the `pure-contract-unit` family, which makes 32 candidates.
+
+- Date: 2026-10-25
+- Command: `bin/fm-test-isolation-proof.sh --jobs 4`, on macOS
+- Result: did not complete. Four-way candidate contention ran `tests/fm-captain-hold-archive.test.sh` to 4855 s before the harness timeout.
+
+The evidence gathered instead is one concurrent run of seven groups: the four fm-lint groups and the three fm-pr-merge groups, `tests/fm-pr-merge.test.sh`, `tests/fm-pr-merge-forges.test.sh`, and `tests/fm-pr-merge-checks.test.sh`.
+In that run every completed group exited 0 with no failing case, with the host prerequisites ShellCheck 0.11.0 and actionlint 1.7.12 installed.
+The earlier failures in that same run came from those prerequisites being missing, not from interference between groups.
+That run is not a portable-pool proof and does not replace the archived result.
+The portable parallel lanes are the confirmation for the three new paths, and a full portable-pool proof of the 32-path set on an equipped host remains outstanding.
 
 ## Durations
 

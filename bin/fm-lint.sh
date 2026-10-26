@@ -970,6 +970,11 @@ TAB=$(printf '\t')
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
 # Exception: the four tests/fm-pr-merge*.sh hints are apportioned estimates
 # sized from the former single-file 3825 ms hint, pending measurement.
+# Exception: the tests/fm-lint.test.sh, tests/fm-lint-policy.test.sh,
+# tests/fm-lint-slots.test.sh, tests/fm-lint-report.test.sh, and
+# tests/fm-lint-helpers.sh hints are approximate sizing estimates from each
+# file's line count at the split (tests/fm-lint-report.test.sh is rounded from
+# 617 lines), pending measurement; they are not Ubuntu durations.
 # Hints affect assignment only, never source analysis or canonical coverage.
 fm_lint_partition_weight_hints() {
   cat <<'EOF'
@@ -1360,7 +1365,11 @@ tests/fm-kimi-harness.test.sh	1819
 tests/fm-launch-prompt-signals-live-e2e.test.sh	56051
 tests/fm-launch-proof.test.sh	15948
 tests/fm-lint-workflows.test.sh	1069
-tests/fm-lint.test.sh	3523
+tests/fm-lint-report.test.sh	600
+tests/fm-lint-policy.test.sh	452
+tests/fm-lint-slots.test.sh	1437
+tests/fm-lint.test.sh	1083
+tests/fm-lint-helpers.sh	552
 tests/fm-live-gate.test.sh	1119
 tests/fm-live-lab-up-mate.test.sh	967
 tests/fm-live-lab.test.sh	2070

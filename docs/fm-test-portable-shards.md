@@ -45,7 +45,10 @@ Run 40121241146 shows why the change was needed: lane 1's measured three-abreast
 The guard compares the modeled makespan with the 1200000 ms budget, and the model now reads about 1.7 percent below measured wall time.
 So 1200000 ms bounds a real lane near 20.4 minutes.
 The lane 1 membership that ran modeled at 1209767 ms, just above that budget, which is why two scripts moved to lane 2; that rebalanced lane 1 then modeled at 1117958 ms, set by `tests/fm-pr-merge.test.sh` alone.
-Since the [fm-pr-merge split](#split-the-fm-pr-merge-suite), lane 1 models at 941010 ms, set by `tests/fm-test-run.test.sh` alone, which is the `parallel_makespan_ms` that `--check-coverage` reports.
+After the [fm-pr-merge split](#split-the-fm-pr-merge-suite), lane 1 modeled at 941010 ms, set by `tests/fm-test-run.test.sh` alone.
+Since the [fm-lint split](#split-the-fm-lint-suite), 5 of the 32 parallel hints are apportioned (`tests/fm-pr-merge.test.sh` and the four fm-lint groups) and the other 27 are measured.
+Lane 1 is `tests/fm-test-run.test.sh`, `tests/fm-captain-hold-reconcile.test.sh`, `tests/fm-pr-merge.test.sh`, `tests/fm-captain-hold-cleanup.test.sh`, `tests/fm-lint.test.sh`, `tests/fm-crew-state.test.sh`, `tests/fm-pi-primary-types.test.sh`, and `tests/fm-supervision-instructions.test.sh`.
+Its three-bin packing models at 1004983 ms, which `tests/fm-test-run.test.sh` does not set alone, and that is the `parallel_makespan_ms` that `--check-coverage` reports.
 A concurrent run starts its scripts in the `--list-scheduled` order, which is the order the makespan model packs.
 
 The earlier shared hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
@@ -126,6 +129,7 @@ The earlier serial-era samples with two effective bins were retired because they
 
 All 29 parallel hints were last refreshed on 2026-10-24 from the concurrent `--jobs 3` artifacts of [run 40121241146](https://github.com/MrGTV-love/firstmate/actions/runs/40121241146): 28 are that run's measured three-abreast wall `duration_ms` for the script, and the `tests/fm-pr-merge.test.sh` hint is apportioned from its measured wall by case share after the [split](#split-the-fm-pr-merge-suite).
 In that run the two lanes took 1231 s and 793 s, and the measured hints modeled those memberships at 1209767 ms and 779131 ms; the rebalanced lane 1 then modeled at 1117958 ms.
+The [fm-lint split](#split-the-fm-lint-suite) then replaced the `tests/fm-lint.test.sh` hint with four group hints apportioned from the 2026-10-25 main run, so 32 parallel hints remain: 27 measured in run 40121241146 and 5 apportioned.
 This is one sample per script, not the slowest of several green runs that the procedure above asks for, so it under-covers run-to-run variance and a script that ran fast in that run is under-hinted until the next refresh.
 
 History: three parallel hints were refreshed earlier on 2026-10-24 from the concurrent `--jobs 3` artifacts of [run 40063531528](https://github.com/MrGTV-love/firstmate/actions/runs/40063531528): `tests/fm-pr-merge.test.sh`, `tests/fm-test-run.test.sh`, and `tests/fm-lint.test.sh` each carried that run's `duration_ms` divided by the observed 1.728 inflation, and the lane membership moved one script each way to restore the five percent balance, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) records.
@@ -260,6 +264,18 @@ With the two groups out of the parallel set, the lanes summed 2123043 ms and 289
 The lanes now sum 2489269 ms and 2528379 ms, a 1.5 percent imbalance, and `--check-coverage` reports `parallel_makespan_ms` 941010, set by `tests/fm-test-run.test.sh` alone in lane 1.
 The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 1250, 240, and 1250 ms) are estimates sized from the former 3825 ms lint hint, not measurements, pending the first measured lint runs; they affect lint shard assignment only.
 
+## Split the fm-lint suite
+
+The 2026-10-25 main run measured `tests/fm-lint.test.sh` at 1241630 ms, the parallel lane's longest script and above the 1200000 ms budget on its own, so no packing could bring that lane under the target while it stayed whole.
+It is now a shared helpers module plus four groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
+The groups are changed-file and cache selection (21 cases), modes and installer and policy refusals (16), host slots and scheduling with memory-limit retry (19), and memory fallback and evidence, required bounds, the sidecar, seeded parity, and CI inputs (17).
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` pins the 73-case cover.
+The four parallel hints are apportioned from that measured 1241630 ms by case share (357000, 272000, 323000, and 289000 ms); they are estimates pending the first artifacts for the groups.
+The same change rebalances the two parallel lanes on their hint sums, 2772520 ms and 2772637 ms, after replacing only the former fm-lint hint, and re-sorts both lanes longest-hint-first; `--check-coverage` then reports `parallel_makespan_ms` 1004983 from lane 1's three-bin packing.
+Every other parallel hint remains from the previous refresh, and the 2026-10-25 run measured the lanes 2.1 times apart, a larger runtime gap than those hints describe, so the hint balance does not claim a runtime balance.
+The five lint partition hints in `bin/fm-lint.sh` for the split files (1083, 452, 1437, and 600 ms for the four groups and 552 ms for the helpers) are approximate sizing estimates from each file's line count at the split, with `tests/fm-lint-report.test.sh` rounded from 617 lines to 600, not measurements, and wait for the first measured lint runs; they affect lint shard assignment only.
+The admission of the three new groups to the proven-isolated set rests on the evidence in the [fm-lint split re-check](fm-test-isolation-proof.md#fm-lint-split-re-check), and a full portable-pool proof remains outstanding.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
@@ -374,10 +390,11 @@ The script header owns missing-root fallback and partition syntax; local worker 
 Refresh the duration table from successful `end` records' `duration_ms`, retaining complete canonical root coverage independently of hints.
 `tests/fm-lint.test.sh` proves the measured-cost selection with equal-byte roots whose independently seeded durations require a different split.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
-Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, shared-cache invalidation, initial analysis flags, fallback reporting, and seeded finding parity.
+Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, and shared-cache invalidation.
+`tests/fm-lint-report.test.sh` verifies initial analysis flags, fallback reporting, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
-The [lint script header](../bin/fm-lint.sh) owns host-wide slot controls and queue-time accounting; `tests/fm-lint.test.sh` covers the CPU-derived cap, concurrent admission, per-run fair share between unequal runs, FIFO progress without barging past older or stopped waiters, cache-hit slot bypass, ungated fallback, inherited-slot lifetime, and queued-root timing.
+The [lint script header](../bin/fm-lint.sh) owns host-wide slot controls and queue-time accounting; `tests/fm-lint-slots.test.sh` covers the CPU-derived cap, concurrent admission, per-run fair share between unequal runs, FIFO progress without barging past older or stopped waiters, cache-hit slot bypass, ungated fallback, inherited-slot lifetime, and queued-root timing.
 
 The [lint script header](../bin/fm-lint.sh) owns local dependency discovery, conservative unresolved-import selection, and successful-result cache controls; these do not replace full joint source analysis.
 Regression fixtures exercise cross-file missing-argument findings through direct and private source routines, deleted sources, concurrent reuse, changed binaries, and the separation between fast and full analysis.

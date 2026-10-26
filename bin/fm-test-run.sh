@@ -305,11 +305,14 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # 1209767 ms, just above this budget, so two scripts moved to lane 2; that
 # rebalanced lane 1 modeled at 1117958 ms, set by fm-pr-merge alone. After the
 # fm-pr-merge split, only tests/fm-pr-merge.test.sh stays parallel, on an
-# apportioned hint (one of the 29 parallel hints; the other 28 are measured),
-# and fm-captain-hold-cleanup moved to lane 1 to restore the balance; lane 1
-# models at 941010 ms, set by fm-test-run alone, and that is the reported
-# parallel_makespan_ms. Like the serial target this is packing arithmetic, not
-# an execution timeout.
+# apportioned hint, and fm-captain-hold-cleanup moved to lane 1 to restore the
+# balance. After the fm-lint split, 5 of the 32 parallel hints are apportioned
+# (tests/fm-pr-merge.test.sh and the four fm-lint groups) and the other 27 are
+# measured. Lane 1 is fm-test-run, fm-captain-hold-reconcile, fm-pr-merge,
+# fm-captain-hold-cleanup, fm-lint, fm-crew-state, fm-pi-primary-types, and
+# fm-supervision-instructions; its three-bin packing models at 1004983 ms, not
+# fm-test-run alone, and that is the reported parallel_makespan_ms. Like the
+# serial target this is packing arithmetic, not an execution timeout.
 # measured: value=1200000 date=2026-10-24 host=github-ubuntu-26.04 margin=1.07 (run 40121241146's 1231 s lane models at 1209767 ms; the rebalanced lane 1 then modeled at 1117958 ms, set by fm-pr-merge alone)
 PORTABLE_PARALLEL_MAX_MSPAN_MS=1200000
 
@@ -414,7 +417,7 @@ family_for_basename() {
     fm-documentation-audiences.test.sh|fm-ensure-agents-md.test.sh|fm-forge-detect.test.sh|fm-grok-harness.test.sh|\
     fm-fork-free-helpers.test.sh|fm-friction-ledger.test.sh|\
     fm-harness-precedence.test.sh|\
-    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|\
+    fm-kimi-harness.test.sh|fm-devin-harness.test.sh|fm-muse-harness.test.sh|fm-rovo-harness.test.sh|fm-agy-harness.test.sh|fm-omp-harness.test.sh|fm-herdr-lab.test.sh|fm-lint.test.sh|fm-lint-policy.test.sh|fm-lint-slots.test.sh|fm-lint-report.test.sh|\
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
     fm-calm-claude-mod.test.sh|\
@@ -649,6 +652,9 @@ tests/fm-crew-state.test.sh
 tests/fm-ensure-agents-md.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-herdr-lab.test.sh
+tests/fm-lint-policy.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-slots.test.sh
 tests/fm-lint.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh
@@ -686,7 +692,10 @@ tests/fm-crew-state.test.sh 268757
 tests/fm-ensure-agents-md.test.sh 2078
 tests/fm-grok-harness.test.sh 10027
 tests/fm-herdr-lab.test.sh 29438
-tests/fm-lint.test.sh 713491
+tests/fm-lint.test.sh 357000
+tests/fm-lint-policy.test.sh 272000
+tests/fm-lint-slots.test.sh 323000
+tests/fm-lint-report.test.sh 289000
 tests/fm-pi-primary-types.test.sh 3677
 tests/fm-pr-merge.test.sh 370000
 tests/fm-review-diff.test.sh 12861
@@ -725,12 +734,8 @@ tests/fm-test-run.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-pr-merge.test.sh
 tests/fm-captain-hold-cleanup.test.sh
+tests/fm-lint.test.sh
 tests/fm-crew-state.test.sh
-tests/fm-cd-pretool-check.test.sh
-tests/fm-tmux-submit-busy.test.sh
-tests/fm-review-diff.test.sh
-tests/fm-send-strict.test.sh
-tests/fm-composer-ghost.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-supervision-instructions.test.sh
 EOF
@@ -739,9 +744,11 @@ EOF
 # Portable parallel shard 2: the complementary LPT half of the proven set.
 list_portable_parallel_2() {
   cat <<'EOF'
-tests/fm-lint.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-sweep.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-policy.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-archive.test.sh
@@ -749,9 +756,14 @@ tests/fm-arm-pretool-check.test.sh
 tests/fm-backend-herdr.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
+tests/fm-cd-pretool-check.test.sh
 tests/fm-brief.test.sh
+tests/fm-tmux-submit-busy.test.sh
+tests/fm-review-diff.test.sh
 tests/fm-send-popup-settle.test.sh
+tests/fm-send-strict.test.sh
 tests/fm-grok-harness.test.sh
+tests/fm-composer-ghost.test.sh
 tests/fm-spawn-batch.test.sh
 tests/fm-send-settle.test.sh
 tests/fm-ensure-agents-md.test.sh
@@ -2104,6 +2116,9 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-duration.test.sh
       printf '%s\n' __script__:fm-timeout-lib.test.sh
       printf '%s\n' __script__:fm-lint.test.sh
+      printf '%s\n' __script__:fm-lint-policy.test.sh
+      printf '%s\n' __script__:fm-lint-slots.test.sh
+      printf '%s\n' __script__:fm-lint-report.test.sh
       printf '%s\n' __script__:fm-test-run.test.sh
       ;;
     bin/fm-timeout-lib.sh)
