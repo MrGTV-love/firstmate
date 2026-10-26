@@ -1442,6 +1442,13 @@ def receipt_stands(action, row, now, waits=None):
     return kind in ("steered", "merged")
 
 
+def same_work(action, row, now):
+    """The action was recorded against this row's current evidence and age clock."""
+    age = row.get("age_seconds")
+    return action.get("digest") == row_digest(row) and not (
+        age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)))
+
+
 def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
@@ -1449,12 +1456,10 @@ def receipt_covers(action, row, now, waits=None):
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
     including between that ledger's generation and the record time, is changed work too.
     """
-    age = row.get("age_seconds")
-    if age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)):
+    if not same_work(action, row, now):
         return False
     if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
-            and action.get("digest") == row_digest(row) and not action.get("invalidated") \
-            and not action.get("unverified"):
+            and not action.get("invalidated") and not action.get("unverified"):
         return not action.get("hold") or (waits is not None and waits.hold_stands(action, row))
     return receipt_stands(action, row, now, waits)
 
@@ -1588,8 +1593,10 @@ def ledger_action(args, state, now):
                 return False
             return ident not in pending or (action.get("sequence", 0) > pending[ident] and not (
                 action.get("kind") == "deferred" and action.get("recheck_epoch", 0) <= now))
+        presented = {ident for marked in controls["presentations"].values() for ident in marked}
         missing = [row for ident, row in by_id.items()
-                   if not receipt_covers(actions.get(ident, {}), row, now, waits)
+                   if (ident in presented or ident in actions)
+                   and not receipt_covers(actions.get(ident, {}), row, now, waits)
                    and not ((row.get("category") == "review_pass_not_merged"
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
@@ -1644,8 +1651,9 @@ def ledger_action(args, state, now):
         wait_history = wait_history + [proof]
     elif args.prerequisite or args.prerequisite_task:
         raise ValueError("prerequisite options are only valid for waiting actions")
+    prior_deferrals = old.get("deferrals", 0) if same_work(old, by_id[ident], now) else 0
     if args.kind == "deferred":
-        if old.get("deferrals", 0):
+        if prior_deferrals:
             old["captain_visible"] = True
             old["invalidated"] = True
             actions[ident] = old
@@ -1689,7 +1697,7 @@ def ledger_action(args, state, now):
         raise ValueError("only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold")
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
-                         sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
+                         sequence=controls["sequence"], deferrals=prior_deferrals
                          + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
                          digest=row_digest(by_id[ident]), cited=cited, ledger_epoch=report["generated_epoch"])
     if by_id[ident].get("age_seconds") is not None:

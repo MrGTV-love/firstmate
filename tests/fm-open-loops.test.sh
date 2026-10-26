@@ -2034,6 +2034,8 @@ assert ack(boundary).returncode == 0
 record = json.loads(ledger.read_text())
 record['rows'].append(dict(row, id='new-row', subject='new-worker'))
 ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'an unpresented new row gated the ack'
+ok(code / 'bin/fm-open-loops.sh', '--present-overdue')
 missing = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 digest = ok(code / 'bin/fm-open-loops.sh', '--digest')
 assert missing.returncode == 1 and 'new-row' in missing.stdout
@@ -2380,13 +2382,34 @@ refreshed = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json'
 kept = next(r for r in refreshed['rows'] if r['id'] == row['id'])
 assert not refreshed['complete'] and kept['stale'] and not kept['overdue'], refreshed
 assert refreshed['handling']['actions'][row['id']]['sequence'] == sequence, 'publication must retain action receipts'
-# Newly discovered coverage degradation still needs its own action, even though the old row is informational.
-assert ack(boundary).returncode == 1
-ok(code / 'bin/fm-open-loops.sh', '--present-overdue')
+# Coverage degradation first published after the drain does not block that drain's acknowledgement;
+# the next drain presents it and gates it like any new row.
+assert ack(boundary).returncode == 0, 'a row first published after the drain blocked its acknowledgement'
+_, boundary = drain()
+assert ack(boundary).returncode == 1, 'the next drain did not gate the newly published row'
 for degraded in refreshed['rows']:
     if degraded['overdue']:
         ok(code / 'bin/fm-open-loops.sh', 'action', degraded['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
+
+# A changed row is new work with a fresh deferral allowance; an unchanged row still allows one deferral.
+home, ledger, row, call, ok, drain, ack = case('deferral-per-change')
+_, boundary = drain()
+recheck = dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+_, boundary = drain()
+fresh = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run',
+             '--recheck', recheck)
+assert fresh.returncode == 0, ('a changed row inherited the old deferral', fresh.stdout)
+assert ack(boundary).returncode == 0
+second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
+              '--recheck', recheck)
+assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
 
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
