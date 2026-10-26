@@ -5,24 +5,33 @@ Usage: fm-raw-launch.py render-claude COMMAND SESSION_ID PREFIX
        fm-raw-launch.py runs-claude COMMAND
        fm-raw-launch.py root NAME COMMAND CWD
 
+A command's program is its first word after leading assignments, or, behind
+a named wrapper (env, command, exec, nohup, time, timeout, nice, caffeinate,
+arch, stdbuf), the word after that wrapper's own options and operands; the -c
+text of sh, bash or zsh is read again by the same rules.
+
 render-claude inserts the session argument after each literal claude program
 word, forks resumed or continued sessions into that id and prefixes only the
 first claude invocation; empty SESSION_ID and PREFIX only validate the command.
 It splices original source spans, preserving
-quoted data, comments and here-document bodies. Here-documents support literal,
-single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
+quoted data, comments and here-document bodies; a shell -c text that runs
+claude is replaced by the same text, rendered and quoted again. Here-documents
+support literal, single/double-quoted delimiters and <<- tab stripping,
+including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
 A plain parameter expansion ($NAME, ${NAME}) is read as ordinary argument text;
-in a command word, or in text a shell or exec wrapper runs as a program, it
-refuses because it can name a program this check cannot see. Expansion flags,
+an expanded program word, wrapper argument or shell -c text refuses, because it
+can name a program this check cannot see. Expansion flags,
 a forced pattern and the forced `$~`, `$=` or `$^` forms refuse everywhere,
 because zsh globs such a value and a glob qualifier in it runs a command.
 A claude argument that needs shell expansion ($, unquoted *, ?, a closed
 [...] bracket pattern or brace characters) or that sets its own --session-id refuses too.
 
 runs-claude exits 0 when any command, not only the first, runs claude as its
-program word (past assignments and shell keywords) and 1 when none does.
+program (past assignments, shell keywords and named wrappers), even when text
+after that program word cannot be read, 1 when no command it reads does, and 2
+when it cannot read the text before finding one.
 
 root prints the absolute path a single leading NAME=value assignment of the
 first command sets, with its quotes removed and a relative value resolved
@@ -33,40 +42,33 @@ Malformed or unsupported shell text exits 2 without emitting a rewritten command
 """
 import os
 import re
+import shlex
 import sys
 
 OPERATORS = "\n;&|()"
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
-# Words that run the rest of the command as a program instead of passing those
-# words as arguments, so the scanner cannot see what an expansion there names.
-EXECUTING_WRAPPERS = frozenset("""
-    sh bash zsh dash ksh ksh93 mksh ash fish env exec command builtin nohup
-    sudo doas xargs timeout time eval source .
-""".split())
-# Keywords that introduce another command rather than being one: the word after
-# them is still a program word.
-INTRODUCING_KEYWORDS = frozenset("if then else elif fi for while until do done case esac function { } !".split())
-PARAMETER_EXPANSION_REFUSAL = (
-    "parameter expansion where a command word or a shell or exec wrapper runs the text as a program, "
-    "which can name a program this check cannot see"
-)
+# Programs that run the rest of their command as another program: the short
+# flags each takes, its short options that take a value, and the operands it
+# reads before that program. arch's own options are read in wrapped().
+WRAPPERS = {
+    "env": ("i", "u", 0),
+    "command": ("p", "", 0),
+    "exec": ("cl", "a", 0),
+    "nohup": ("", "", 0),
+    "time": ("p", "", 0),
+    "timeout": ("fpv", "ks", 1),
+    "nice": ("", "n", 0),
+    "caffeinate": ("dimsu", "tw", 0),
+    "arch": ("", "", 0),
+    "stdbuf": ("", "ioe", 0),
+}
+ARCH_VALUE_OPTIONS = ("-arch", "-d", "-e")
+SHELLS = ("sh", "bash", "zsh")
 PARAMETER_FLAGS_REFUSAL = (
     "a forced pattern or splitting form, which makes zsh glob the value, so a glob qualifier in it runs a command"
 )
 # A forced-glob, forced-splitting or forced-quoting `$` form.
 FORCED_EXPANSION_START = frozenset("~=^")
-# A `$` starts an expansion only when a name, a positional or special parameter,
-# or a forced form follows it; a bare `$` in an argument stays literal text.
-DOLLAR_EXPANSION_NAMES = frozenset("_@*#?$!-")
-DOLLAR_EXPANSION_START = DOLLAR_EXPANSION_NAMES | FORCED_EXPANSION_START
-
-
-def starts_expansion(text, i):
-    """True when text[i] is a `$` that starts a parameter expansion."""
-    if i + 1 >= len(text):
-        return False
-    follower = text[i + 1]
-    return follower.isalnum() or follower in DOLLAR_EXPANSION_START
 # Claude Code 2.1.310 options whose value is required: its parser takes the next
 # word as that value even when it starts with "-".
 CLAUDE_VALUE_OPTIONS = frozenset("""
@@ -101,21 +103,18 @@ CLAUDE_VALUE_OPTIONS = frozenset("""
 CLAUDE_SHORT_VALUES = "Hejmnst"
 CLAUDE_SHORT_OPTIONAL_VALUES = "drw"
 RESUME_OPTIONS = {"--resume", "-r", "--continue", "-c"}
-KEYWORDS = ("if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}", "!", "time", "eval", "exec", "command", "builtin", "source", ".")
+KEYWORDS = ("if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}", "!", "eval", "builtin", "source", ".")
 
 
 def refuse(construct):
     raise ValueError(f"{construct}; use a named harness or simplify the raw launch to literal shell commands")
 
 
-def word(text, i, run_as_command=False):
+def word(text, i):
     """Read one literal/expanded word, without executing shell text.
 
-    run_as_command marks a word whose expansion a shell would run as a program:
-    the command word itself, or any word of a command a wrapper executes.
-    A plain parameter expansion stays readable only where it merely fills an
-    argument, and a forced pattern or splitting form refuses even there, because
-    zsh turns such a value into a glob whose qualifiers run commands.
+    A forced pattern or splitting form refuses, because zsh turns such a value
+    into a glob whose qualifiers run commands.
     """
     start, value, expands, pattern, bracket = i, [], False, False, False
     n = len(text)
@@ -124,8 +123,6 @@ def word(text, i, run_as_command=False):
         if text.startswith("$(", i):
             refuse("command substitution")
         if text.startswith("${", i):
-            if run_as_command:
-                refuse(PARAMETER_EXPANSION_REFUSAL)
             if text[i + 2:i + 3] in ("(", "~", "=", "^"):
                 refuse(PARAMETER_FLAGS_REFUSAL)
             expands = True
@@ -137,8 +134,6 @@ def word(text, i, run_as_command=False):
         if char == "$" and i + 1 < n and text[i + 1] in "'\"":
             refuse("dollar-quoted string")
         if char == "$" and i + 1 < n and text[i + 1] in FORCED_EXPANSION_START:
-            if run_as_command:
-                refuse(PARAMETER_EXPANSION_REFUSAL)
             refuse(PARAMETER_FLAGS_REFUSAL)
         if char == "'":
             end = text.find("'", i + 1)
@@ -157,8 +152,6 @@ def word(text, i, run_as_command=False):
                 if text.startswith("$(", i):
                     refuse("command substitution in double quote")
                 if text.startswith("${", i):
-                    if run_as_command:
-                        refuse(PARAMETER_EXPANSION_REFUSAL)
                     if text[i + 2:i + 3] in ("(", "~", "=", "^"):
                         refuse(PARAMETER_FLAGS_REFUSAL)
                     expands = True
@@ -168,11 +161,7 @@ def word(text, i, run_as_command=False):
                 if text[i] == "`":
                     refuse("backtick command substitution in double quote")
                 if text[i] == "$" and i + 1 < n and text[i + 1] in FORCED_EXPANSION_START:
-                    if run_as_command:
-                        refuse(PARAMETER_EXPANSION_REFUSAL)
                     refuse(PARAMETER_FLAGS_REFUSAL)
-                if text[i] == "$" and run_as_command and starts_expansion(text, i):
-                    refuse(PARAMETER_EXPANSION_REFUSAL)
                 expands = expands or text[i] == "$"
                 value.append(text[i])
                 i += 1
@@ -186,8 +175,6 @@ def word(text, i, run_as_command=False):
                 value.append(text[i + 1])
             i += 2
         else:
-            if char == "$" and run_as_command and starts_expansion(text, i):
-                refuse(PARAMETER_EXPANSION_REFUSAL)
             expands = expands or char == "$"
             # A bracket is a pattern only when a later unquoted ] closes it.
             pattern = pattern or char in "*?{" or (bracket and char == "]")
@@ -200,14 +187,8 @@ def word(text, i, run_as_command=False):
 
 
 def words(text):
-    """Yield executable words/operators, skipping redirections and here-doc data.
-
-    The command word and the words of a command an executing wrapper runs are
-    parsed as text a shell could run as a program, so an expansion there refuses.
-    """
+    """Yield executable words/operators, skipping redirections and here-doc data."""
     i, n, documents = 0, len(text), []
-    program = None
-    executes_text = False
     while i < n:
         if text[i] in " \t":
             i += 1
@@ -222,7 +203,6 @@ def words(text):
         if text[i] == "\n":
             yield "op", i, i + 1, "\n", False
             i += 1
-            program, executes_text = None, False
             for delimiter, strip_tabs, quoted in documents:
                 while True:
                     if i >= n:
@@ -274,20 +254,12 @@ def words(text):
             if text[start:i] in (";;", ";&"):
                 refuse("case control operator")
             yield "op", start, i, text[start:i], False
-            program, executes_text = None, False
             continue
-        # Only a leading NAME=value is a shell assignment whose expansion cannot
-        # run anything; after the program word the same shape is an argument, and
-        # an executing wrapper runs it, so the wrapper refusal wins there.
-        assignment_word = program is None and ASSIGNMENT.match(text, i) is not None
-        token = word(text, i, not assignment_word and (program is None or executes_text))
+        token = word(text, i)
         i = token[2]
         # A numeric fd immediately preceding a redirection is not a program.
         if token[3].isdigit() and i < n and text[i] in "<>":
             continue
-        if not assignment_word and program is None and token[3] not in INTRODUCING_KEYWORDS:
-            program = token[3]
-            executes_text = os.path.basename(program) in EXECUTING_WRAPPERS
         yield token
     if documents:
         refuse("unterminated here-document")
@@ -328,57 +300,153 @@ def claude_options(arguments):
     return names
 
 
-def render_claude(text, session, prefix):
-    marks = []
-    for command in commands(text):
-        for position, (kind, start, end, value, expands) in enumerate(command):
-            if ASSIGNMENT.match(text[start:end]):
-                continue
-            if value in KEYWORDS:
-                refuse("shell control structure")
-            if expands:
-                refuse("expanded program word")
-            if os.path.basename(value) == "claude":
-                arguments = command[position + 1:]
-                if any(argument[4] for argument in arguments):
-                    refuse("shell expansion in a claude argument, which can produce options such as --resume that this check cannot see")
-                options = claude_options(argument[3] for argument in arguments)
-                if "--session-id" in options:
-                    refuse("--session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects")
-                suffix = session
-                if session and options & RESUME_OPTIONS and "--fork-session" not in options:
-                    suffix += " --fork-session"
-                marks.append((start, end, suffix))
+def wrapped(name, command, position):
+    """Return the position after a named wrapper's own options and operands,
+    or None when it takes an option this check does not know."""
+    flags, values, operands = WRAPPERS[name]
+    while position < len(command) and not command[position][4]:
+        argument = command[position][3]
+        if argument == "--":
+            position += 1
             break
-    for index in range(len(marks) - 1, -1, -1):
-        start, end, suffix = marks[index]
-        text = text[:end] + suffix + text[end:]
-        if index == 0:
-            text = text[:start] + prefix + text[start:]
-    return text
+        if name == "env" and (argument == "-" or ASSIGNMENT.match(argument)):
+            position += 1
+            continue
+        if not argument.startswith("-") or argument == "-":
+            break
+        if name == "arch":
+            position += 2 if argument in ARCH_VALUE_OPTIONS else 1
+            continue
+        for index, flag in enumerate(argument[1:], 2):
+            if flag in values:
+                position += index == len(argument)
+                break
+            if flag not in flags:
+                return None
+        position += 1
+    if name == "env":
+        while position < len(command) and not command[position][4] and ASSIGNMENT.match(command[position][3]):
+            position += 1
+    return position + operands
+
+
+def shell_text(command, position):
+    """Return the position of the text a named shell runs with -c, or None."""
+    reads_text = False
+    while position < len(command) and not command[position][4]:
+        argument = command[position][3]
+        if argument == "--":
+            position += 1
+            break
+        if argument[:1] not in ("-", "+") or argument in ("-", "+"):
+            break
+        if argument.startswith("--"):
+            return None
+        reads_text = reads_text or (argument[0] == "-" and "c" in argument)
+        position += 2 if "o" in argument else 1
+    return position if reads_text and position < len(command) else None
+
+
+def program(text, command):
+    """Return (position, shell) for the word a command runs as its program, past
+    leading assignments, shell keywords and named wrappers; shell is true when
+    that word is a named shell's -c text. An expanded word on the way is that
+    program, because it can name one; (None, False) when none is known."""
+    position = 0
+    while position < len(command) and (ASSIGNMENT.match(text, command[position][1]) or command[position][3] in KEYWORDS):
+        position += 1
+    while position < len(command):
+        name = os.path.basename(command[position][3])
+        if command[position][4] or name not in WRAPPERS and name not in SHELLS:
+            return position, False
+        start = position + 1
+        position = shell_text(command, start) if name in SHELLS else wrapped(name, command, start)
+        if position is None:
+            return None, False
+        for skipped in range(start, min(position, len(command))):
+            if command[skipped][4]:
+                return skipped, False
+        if name in SHELLS:
+            return position, True
+    return None, False
+
+
+def render_claude(text, session, prefix):
+    """Return text with the session after each claude program word and prefix
+    before the first one, and whether any command runs claude."""
+    edits, found = [], False
+    for command in commands(text):
+        first = next((token for token in command if not ASSIGNMENT.match(text, token[1])), None)
+        if first is None:
+            continue
+        if first[3] in KEYWORDS:
+            refuse("shell control structure")
+        position, shell = program(text, command)
+        if position is None:
+            continue
+        kind, start, end, value, expands = command[position]
+        if expands:
+            refuse("expanded program word, wrapper argument or shell -c text")
+        if shell:
+            rendered, inner = render_claude(value, session, "" if found else prefix)
+            found = found or inner
+            if rendered != value:
+                edits.append((start, end, shlex.quote(rendered)))
+            continue
+        if os.path.basename(value) != "claude":
+            continue
+        arguments = command[position + 1:]
+        if any(argument[4] for argument in arguments):
+            refuse("shell expansion in a claude argument, which can produce options such as --resume that this check cannot see")
+        options = claude_options(argument[3] for argument in arguments)
+        if "--session-id" in options:
+            refuse("--session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects")
+        suffix = session
+        if session and options & RESUME_OPTIONS and "--fork-session" not in options:
+            suffix += " --fork-session"
+        if not found:
+            edits.append((start, start, prefix))
+        edits.append((end, end, suffix))
+        found = True
+    for start, end, replacement in reversed(edits):
+        text = text[:start] + replacement + text[end:]
+    return text, found
 
 
 def runs_claude(text):
-    """Return whether any command's program word, past assignments and shell keywords, is claude."""
-    for command in commands(text):
-        for kind, start, end, value, expands in command:
-            if ASSIGNMENT.match(text[start:end]) or value in KEYWORDS:
+    """Return whether a command runs claude as its program, judged as each word
+    is read, so a claude before text this check cannot read still counts."""
+    command = []
+    for token in words(text):
+        if token[0] == "op":
+            command = []
+        elif token[0] == "word":
+            command.append(token)
+            position, shell = program(text, command)
+            if position is None or command[position][4]:
                 continue
-            if os.path.basename(value) == "claude":
+            value = command[position][3]
+            if runs_claude(value) if shell else os.path.basename(value) == "claude":
                 return True
-            break
     return False
 
 
 def root(name, text, cwd):
-    found = []
-    for index, command in enumerate(commands(text)):
-        for kind, start, end, value, expands in command:
-            raw = text[start:end]
-            if not ASSIGNMENT.match(raw):
-                break
-            if raw.startswith(name + "="):
-                found.append((index, raw[len(name) + 1:], value[len(name) + 1:], expands))
+    found, index, leading = [], 0, True
+    try:
+        for kind, start, end, value, expands in words(text):
+            if kind == "op":
+                index, leading = index + 1, True
+            elif kind == "word" and leading:
+                raw = text[start:end]
+                leading = ASSIGNMENT.match(raw) is not None
+                if leading and raw.startswith(name + "="):
+                    found.append((index, raw[len(name) + 1:], value[len(name) + 1:], expands))
+    except ValueError:
+        # Text after the first command's assignments that this check cannot
+        # read cannot change the root they set, unless it names NAME again.
+        if not found or (index == 0 and leading) or text.count(name + "=") > 1:
+            raise
     if not found:
         return 1, None
     index, raw_value, value, expands = found[0]
@@ -392,7 +460,7 @@ def main(argv):
         if len(argv) == 5 and argv[1] == "render-claude":
             if argv[3] and not re.fullmatch(r"[0-9a-fA-F-]{36}", argv[3]):
                 refuse("invalid session id")
-            print(render_claude(argv[2], " --session-id " + argv[3] if argv[3] else "", argv[4]), end="")
+            print(render_claude(argv[2], " --session-id " + argv[3] if argv[3] else "", argv[4])[0], end="")
             return 0
         if len(argv) == 3 and argv[1] == "runs-claude":
             return 0 if runs_claude(argv[2]) else 1

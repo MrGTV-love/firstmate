@@ -3161,27 +3161,25 @@ case "$ARG3" in
     [A-Za-z_]*=*) continue ;;
     *)
       HARNESS=$(basename "$word")
-      # A confined launch takes the Claude profile when any command runs claude,
-      # so `true && claude ...` cannot start Claude outside it. Text the scanner
-      # cannot read (exit 2) refuses; only a proven claude-free command (exit 1)
-      # keeps its first program word. The scanner reads a plain parameter
-      # expansion that only fills an argument and refuses one a command word or
-      # a shell or exec wrapper runs as a program, so an ordinary
-      # `codex --config "${HOME}/x"` launch reaches its own harness.
-      if [ "$HARNESS" != claude ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
-        raw_runs_claude=0
-        python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" || raw_runs_claude=$?
-        case "$raw_runs_claude" in
-        0) HARNESS=claude ;;
-        1) ;;
-        *) exit 1 ;;
-        esac
+      # A confined launch takes the Claude profile when a command it can read
+      # runs claude, directly, after another command, behind a named wrapper or
+      # in a named shell's -c text. omp keeps its own profile, which already
+      # denies Claude's config, and any other first program, including text the
+      # scanner cannot read, launches unchanged and unconfined as before.
+      if [ "$HARNESS" != claude ] && [ "$HARNESS" != omp ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ] \
+        && python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" 2>/dev/null; then
+        HARNESS=claude
       fi
       if [ "$HARNESS" = claude ]; then
         if [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
           # Validate before launch; a confined raw Claude command must never
           # fall back to one without its granted session id.
-          python3 "$SCRIPT_DIR/fm-raw-launch.py" render-claude "$LAUNCH" "" "" >/dev/null || exit 1
+          if ! raw_claude_refusal=$(python3 "$SCRIPT_DIR/fm-raw-launch.py" render-claude "$LAUNCH" "" "" 2>&1 >/dev/null); then
+            echo "error: $raw_claude_refusal" >&2
+            echo "repair: launch the worker through a named harness, or simplify this raw command so every claude it runs is a literal command with literal arguments" >&2
+            "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement deny --source-ok true --session "$ID" 2>/dev/null || true
+            exit 1
+          fi
         else
           RAW_PROGRAM_PREFIX=${LAUNCH:0:${#LAUNCH}-${#RAW_LAUNCH_TAIL}-${#word}}
           LAUNCH="$RAW_PROGRAM_PREFIX"'__CLAUDERAWPREFIX__'"${LAUNCH:${#RAW_PROGRAM_PREFIX}}"

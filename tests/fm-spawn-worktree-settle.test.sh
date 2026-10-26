@@ -462,8 +462,8 @@ SH
   pass "a confined raw claude launch runs through TeamClaude with its session id and literal config root granted"
 }
 
-# A raw launch that runs claude after another command takes the Claude profile
-# too, so a leading test or command cannot start Claude outside it.
+# A raw launch that runs claude after another command, behind a named wrapper or
+# in a shell's -c text takes the Claude profile too.
 test_compound_raw_claude_launch_runs_confined() {
   local rec id out source_line probe session raw index=0
   local FM_COMPAT_LAUNCH_LOG
@@ -471,7 +471,8 @@ test_compound_raw_claude_launch_runs_confined() {
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi' '[[ -f README.md ]] && claude --print hi'; do
+  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi' '[[ -f README.md ]] && claude --print hi' \
+    'env -u FM_UNSET_PROBE claude --print hi' "bash -c 'claude --print hi'"; do
     index=$((index + 1))
     id=settle-raw-compound-$index-z9
     rec=$(make_settle_case "raw-compound-$index" "$id" 0)
@@ -505,10 +506,10 @@ SH
     assert_equals "session-id=$session"$'\nargs=--print hi\nconfinement=seatbelt-v1\nforeign=refused' "$(cat "$probe")" \
       "compound raw claude launch must run inside its profile under its recorded session id: $raw"
   done
-  # A construct the scanner cannot prove after a leading command refuses rather
-  # than launching claude unconfined.
+  # A claude found after a leading command, followed by a construct the Claude
+  # route cannot rewrite, refuses rather than launching claude unconfined.
   # shellcheck disable=SC2016 # the literal constructs are the refused raw launch text
-  for raw in 'true && claude --print "$(date)"' 'true && claude --print `date`' 'true && (claude --print hi)'; do
+  for raw in 'true && claude --print "$(date)"' 'true && claude --print `date`' 'true && env "$PROGRAM" --print hi; claude --print hi'; do
     index=$((index + 1))
     id=settle-raw-compound-$index-z9
     rec=$(make_settle_case "raw-compound-$index" "$id" 0)
@@ -516,11 +517,37 @@ SH
     FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
     export FM_COMPAT_LAUNCH_LOG
     if out=$(run_settle_spawn "$id" --harness "$raw"); then fail "compound raw claude spawn with an unprovable construct was accepted: $raw: $out"; fi
-    case "$out" in *'malformed raw launch command'*) ;; *) fail "compound raw claude refusal omitted the construct: $raw: $out" ;; esac
+    case "$out" in *'error: malformed raw launch command'*'repair: '*) ;; *) fail "compound raw claude refusal omitted the construct or repair: $raw: $out" ;; esac
+    grep -F '"guard":"spawn-write-confinement"' "$HOME_DIR/state/guard-events.jsonl" 2>/dev/null | grep -qF '"decision":"deny"' \
+      || fail "a refused compound raw claude spawn must record its write-confinement deny: $raw"
     assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused compound raw claude command must not reach the worker: $raw"
     assert_absent "$HOME_DIR/state/$id.meta" "a refused compound raw claude spawn published task metadata: $raw"
   done
-  pass "a raw launch that runs claude after another command runs confined under its session id"
+  # Text the scanner cannot read before it finds a claude launches unchanged and
+  # unconfined under its first program, recorded as such.
+  index=$((index + 1))
+  id=settle-raw-compound-$index-z9
+  rec=$(make_settle_case "raw-compound-$index" "$id" 0)
+  read_settle_record "$rec"
+  FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+  export FM_COMPAT_LAUNCH_LOG
+  probe="$HOME_DIR/data/$id/probe"
+  cat > "$FAKEBIN_DIR/claude" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
+printf 'args=%s\\nconfinement=%s\\n' "\$*" "\$FM_WRITE_CONFINEMENT" > '$probe'
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  out=$(run_settle_spawn "$id" --harness 'true && (claude --print hi)')
+  expect_code 0 "$?" "an unreadable raw launch must launch unchanged: $out"
+  assert_equals true "$(grep '^harness=' "$HOME_DIR/state/$id.meta" | cut -d= -f2-)" "an unreadable raw launch must keep its first program"
+  assert_grep 'write_confinement=unconfined-macos-true' "$HOME_DIR/state/$id.meta" "an unreadable raw launch must record that it runs unconfined"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  (cd "$WT_DIR" && PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line")
+  assert_equals $'args=--print hi\nconfinement=unconfined-macos-true' "$(cat "$probe")" \
+    "an unreadable raw launch must run its command unchanged, with no session id, as recorded"
+  pass "a raw launch that runs claude after another command, behind a named wrapper or in shell -c text runs confined under its session id"
 }
 
 # make_unconfined_claude_case <name> <id> builds a Linux-simulated settle home
@@ -786,6 +813,44 @@ for source in ("[ -d src ] && cd src; claude --print hi", "[[ -f x ]] && claude 
     rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
     assert rendered == source.replace("claude", "claude" + marker, 1), source
     print("ok - raw Claude accepts a test bracket command:", source)
+# A claude behind a named wrapper gets the session id after its own word; these
+# wrappers run here, so the real argv proves it.
+for source in (
+    "env claude --print hi", "env -u FM_UNSET_PROBE claude --print hi", "env -- FOO=1 claude --print hi",
+    "command claude --print hi", "exec claude --print hi", "exec -a worker claude --print hi",
+    "nohup claude --print hi", "time claude --print hi", "time -p claude --print hi", "nice claude --print hi",
+    "nice -n 5 claude --print hi", "true && nohup env -u X nice -n 1 claude --print hi",
+):
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    assert rendered == source.replace("claude", "claude" + marker, 1), (source, rendered)
+    args, _ = json.loads(subprocess.run(["bash", "-c", rendered], check=True, capture_output=True, text=True, env=env).stdout)
+    assert args == ["--session-id", session, "--print", "hi"], (source, args)
+    print("ok - raw Claude renders a claude behind a named wrapper:", source)
+# Wrappers that may be absent on this host, or that clear the search path for
+# the fake claude: the rendered command is the contract.
+for source in (
+    "env -i FOO=1 claude --print hi", "command -p claude --print hi", "timeout 3600 claude --print hi", "timeout -k 5 -s TERM 10 claude --print hi", "caffeinate claude --print hi",
+    "caffeinate -i claude --print hi", "caffeinate -t 60 -di claude --print hi", "arch -arm64 claude --print hi",
+    "arch -x86_64 claude --print hi", "arch -arch arm64 -e A=b claude --print hi", "stdbuf -o0 -e L claude --print hi",
+    "stdbuf -i 0 claude --print hi",
+):
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    assert rendered == source.replace("claude", "claude" + marker, 1), (source, rendered)
+    print("ok - raw Claude renders a claude behind a named wrapper:", source)
+# A shell's -c text is read by the same rules; the id and the prefix go inside
+# that text, which runs with the same meaning.
+for source, prefix in (
+    ("bash -c 'claude --print hi'", ""), ("sh -e -c 'cd . && claude --print hi' name", ""),
+    ("bash -lc \"nohup claude --print hi\"", "env "), ("zsh -c 'claude --print hi'", "command "),
+):
+    if source.startswith("zsh") and not any(Path(d, "zsh").exists() for d in os.environ["PATH"].split(os.pathsep)):
+        print("skip: zsh is absent, so the zsh -c render case is not run")
+        continue
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, prefix], check=True, capture_output=True, text=True).stdout
+    assert marker in rendered and rendered != source, (source, rendered)
+    args, _ = json.loads(subprocess.run(["bash", "-c", rendered], check=True, capture_output=True, text=True, env=env).stdout)
+    assert args == ["--session-id", session, "--print", "hi"], (source, rendered, args)
+    print("ok - raw Claude renders a claude in shell -c text:", source)
 forks = [
     ["--resume", "old-session"], ["-r", "old-session"], ["--continue"], ["-c"],
     ["--resume=old-session"], ["-rold-session"], ["-pc"], ["-p", "-cr"],
@@ -833,6 +898,12 @@ refusals = [
     ("shell expansion", "claude --print *.md"),
     ("shell expansion", "claude {--resume,old-id}"),
     ("shell expansion", "claude --x=[ab]"),
+    ("shell expansion", "bash -c 'claude $FLAGS'"),
+    ("--session-id", "env -u X claude --session-id=other --print hi"),
+    ("expanded program word", "env \"$X\" claude --print hi"),
+    ("expanded program word", "nice -n $N claude --print hi"),
+    ("expanded program word", "bash -c \"$CMD\""),
+    ("shell control structure", "eval claude --print hi"),
 ]
 for construct, source in refusals:
     for extra in ([session, ""], ["", ""]):
@@ -840,8 +911,9 @@ for construct, source in refusals:
         assert result.returncode != 0 and result.stdout == "", (construct, extra)
         assert construct in result.stderr and "named harness" in result.stderr, (construct, result.stderr)
     print("ok - raw Claude refuses:", construct)
-# A plain parameter expansion is data when it only fills an argument, and a
-# program the scanner cannot see when a command word or a wrapper runs it.
+# A plain parameter expansion is data when it only fills an argument; a claude
+# behind a named wrapper or in shell -c text is found, and any other program in
+# front of claude, or an expansion that names the program, is not.
 scanned = [
     ("codex --config \"${HOME}/worker.yml\"", 1, "reads a quoted argument expansion"),
     ("codex --config \"$HOME/worker.yml\"", 1, "reads a quoted unbraced argument expansion"),
@@ -853,20 +925,44 @@ scanned = [
     ("codex --config \"$~P\"", 2, "refuses a forced pattern in a quote"),
     ("codex --config \"${HOME}/x.yml\" && claude --print hi", 0, "still finds a later claude command"),
     ("claude --settings \"${HOME}/s.json\"", 0, "reads a claude argument expansion"),
-    ("\"$CMD\" --x", 2, "refuses an expanded command word"),
-    ("${CMD} --x", 2, "refuses a braced command word"),
+    ("\"$CMD\" --x", 1, "does not see a program an expanded command word names"),
+    ("${CMD} --x", 1, "does not see a program a braced command word names"),
     ("codex --config \"$(claude -p hi)\"", 2, "refuses a command substitution in an argument"),
     ("codex --config \"${(e)PAYLOAD}\"", 2, "refuses zsh parameter expansion flags"),
     ("codex --config `claude -p hi`", 2, "refuses a backtick in an argument"),
-    ("sh -c \"${X}\"", 2, "refuses an expansion a shell wrapper runs"),
-    ("sh -c code=\"$CMD\"", 2, "refuses an assignment-shaped wrapper argument expansion"),
-    ("bash -lc \"$X\"", 2, "refuses an expansion a shell wrapper runs"),
-    ("env \"$X\" --print hi", 2, "refuses an expansion env runs as a program"),
-    ("exec claude --settings \"$HOME/s.json\"", 2, "refuses an expansion exec runs as a program"),
-    ("nohup \"$X\" --print hi", 2, "refuses an expansion nohup runs as a program"),
-    ("time \"$CMD\" --x", 2, "refuses an expansion time runs as a program"),
-    ("command \"$X\" --print hi", 2, "refuses an expansion command runs as a program"),
+    ("true && claude --print \"$(date)\"", 0, "finds a claude before text it cannot read"),
+    ("true && (claude --print hi)", 2, "cannot read a grouped claude"),
+    ("sh -c \"${X}\"", 1, "does not see a program expanded shell -c text names"),
+    ("sh -c code=\"$CMD\"", 1, "does not see a program assignment-shaped shell -c text names"),
+    ("bash -lc \"$X\"", 1, "does not see a program expanded shell -c text names"),
+    ("env \"$X\" --print hi", 1, "does not see a program an expanded env argument names"),
+    ("nohup \"$X\" --print hi", 1, "does not see a program an expanded nohup argument names"),
+    ("time \"$CMD\" --x", 1, "does not see a program an expanded time argument names"),
+    ("command \"$X\" --print hi", 1, "does not see a program an expanded command argument names"),
     ("if [ -n \"$LOCK\" ]; then omp --resume=bare-session; fi", 1, "reads an expansion in a test command"),
+    ("env claude --print hi", 0, "finds claude behind env"),
+    ("env -u X claude --print hi", 0, "finds claude behind env -u"),
+    ("env -i FOO=1 claude --print hi", 0, "finds claude behind env assignments"),
+    ("env -- FOO=1 claude --print hi", 0, "finds claude behind env assignments after --"),
+    ("command claude --print hi", 0, "finds claude behind command"),
+    ("exec claude --settings \"$HOME/s.json\"", 0, "finds claude behind exec"),
+    ("nohup claude --print hi", 0, "finds claude behind nohup"),
+    ("time claude --print hi", 0, "finds claude behind time"),
+    ("timeout 3600 claude --print hi", 0, "finds claude behind timeout and its duration"),
+    ("nice -n 5 claude --print hi", 0, "finds claude behind nice"),
+    ("caffeinate claude --print hi", 0, "finds claude behind caffeinate"),
+    ("caffeinate -i claude --print hi", 0, "finds claude behind caffeinate -i"),
+    ("arch -arm64 claude --print hi", 0, "finds claude behind arch"),
+    ("stdbuf -o0 claude --print hi", 0, "finds claude behind stdbuf"),
+    ("true && nohup env -u X caffeinate -i claude --print hi", 0, "finds claude behind nested wrappers"),
+    ("bash -c 'claude --print hi'", 0, "finds claude in bash -c text"),
+    ("sh -e -c 'cd src && claude --print hi'", 0, "finds claude in sh -c text"),
+    ("zsh -c 'nohup claude --print hi'", 0, "finds claude behind a wrapper in zsh -c text"),
+    ("flock /tmp/lock claude --print hi", 1, "does not find claude behind a wrapper outside the named list"),
+    ("sudo claude --print hi", 1, "does not find claude behind sudo"),
+    ("env -S 'claude --print hi'", 1, "does not find claude behind an env option outside the named list"),
+    ("command -v claude", 1, "does not take command -v for a claude run"),
+    ("bash script.sh", 1, "does not read a shell script"),
 ]
 for source, expected, label in scanned:
     result = subprocess.run([sys.executable, helper, "runs-claude", source], capture_output=True, text=True)
