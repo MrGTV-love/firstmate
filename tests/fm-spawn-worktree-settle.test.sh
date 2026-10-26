@@ -463,21 +463,25 @@ SH
 }
 
 # A raw launch that runs claude after another command, behind a named wrapper or
-# in a shell's -c text takes the Claude profile too.
+# in a shell's -c text takes the Claude profile too; one that changes directory
+# before claude refuses, because the profile grants only the worktree's folders.
 test_compound_raw_claude_launch_runs_confined() {
-  local rec id out source_line probe session raw index=0
+  local rec id out source_line probe session_probe session raw index=0 other=99999999-8888-4777-8666-555555555555
   local FM_COMPAT_LAUNCH_LOG
   if [ "$(uname -s)" != Darwin ]; then
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi' '[[ -f README.md ]] && claude --print hi' \
+  for raw in '[ -d src ] && claude --print hi' 'true && claude --print hi' '[[ -f README.md ]] && claude --print hi' \
     'env -u FM_UNSET_PROBE claude --print hi' "bash -c 'claude --print hi'"; do
     index=$((index + 1))
     id=settle-raw-compound-$index-z9
     rec=$(make_settle_case "raw-compound-$index" "$id" 0)
     read_settle_record "$rec"
+    mkdir -p "$WT_DIR/src" "$WT_DIR/sub"
     probe="$HOME_DIR/data/$id/probe"
+    session_probe="$HOME_DIR/data/$id/claude-session-probe"
+    write_claude_session_probe "$FAKEBIN_DIR"
     cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
@@ -490,6 +494,7 @@ session=
   echo "confinement=\$FM_WRITE_CONFINEMENT"
   if { printf 'replaced' >> '$PROJ_DIR/README.md'; } 2>/dev/null; then echo foreign=written; else echo foreign=refused; fi
 } > '$probe'
+claude-session-probe '$HOME_DIR/user-home/.claude' "\$session" '$other' "\$PWD" > '$session_probe'
 SH
     chmod +x "$FAKEBIN_DIR/claude"
     FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
@@ -505,19 +510,27 @@ SH
     (cd "$WT_DIR" && PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line")
     assert_equals "session-id=$session"$'\nargs=--print hi\nconfinement=seatbelt-v1\nforeign=refused' "$(cat "$probe")" \
       "compound raw claude launch must run inside its profile under its recorded session id: $raw"
+    assert_equals $'own=created\nother=refused' "$(cat "$session_probe")" \
+      "compound raw claude launch must write only its own session entries from its real working directory: $raw"
   done
   # A claude found after a leading command, followed by a construct the Claude
   # route cannot rewrite, refuses rather than launching claude unconfined.
   # shellcheck disable=SC2016 # the literal constructs are the refused raw launch text
-  for raw in 'true && claude --print "$(date)"' 'true && claude --print `date`' 'true && env "$PROGRAM" --print hi; claude --print hi'; do
+  for raw in 'true && claude --print "$(date)"' 'true && claude --print `date`' 'true && env "$PROGRAM" --print hi; claude --print hi' \
+    '[ -d src ] && cd src; claude --print hi' "bash -c 'cd sub && claude -p hi'"; do
     index=$((index + 1))
     id=settle-raw-compound-$index-z9
     rec=$(make_settle_case "raw-compound-$index" "$id" 0)
     read_settle_record "$rec"
+    mkdir -p "$WT_DIR/src" "$WT_DIR/sub"
     FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
     export FM_COMPAT_LAUNCH_LOG
     if out=$(run_settle_spawn "$id" --harness "$raw"); then fail "compound raw claude spawn with an unprovable construct was accepted: $raw: $out"; fi
     case "$out" in *'error: malformed raw launch command'*'repair: '*) ;; *) fail "compound raw claude refusal omitted the construct or repair: $raw: $out" ;; esac
+    case "$raw:$out" in
+      *cd*:*'cd before claude'*'start Claude from the worktree root'*) ;;
+      *cd*) fail "a raw claude launch that changes directory must name the construct and the worktree root: $raw: $out" ;;
+    esac
     grep -F '"guard":"spawn-write-confinement"' "$HOME_DIR/state/guard-events.jsonl" 2>/dev/null | grep -qF '"decision":"deny"' \
       || fail "a refused compound raw claude spawn must record its write-confinement deny: $raw"
     assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused compound raw claude command must not reach the worker: $raw"
@@ -809,7 +822,7 @@ for label, source in bodies:
     assert args == ["--session-id", session] + old_args, label
     assert stdin == old_stdin, label
     print("ok - raw Claude shell data byte fidelity:", label)
-for source in ("[ -d src ] && cd src; claude --print hi", "[[ -f x ]] && claude --print hi"):
+for source in ("[ -d src ] && claude --print hi", "[[ -f x ]] && claude --print hi"):
     rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
     assert rendered == source.replace("claude", "claude" + marker, 1), source
     print("ok - raw Claude accepts a test bracket command:", source)
@@ -840,7 +853,7 @@ for source in (
 # A shell's -c text is read by the same rules; the id and the prefix go inside
 # that text, which runs with the same meaning.
 for source, prefix in (
-    ("bash -c 'claude --print hi'", ""), ("sh -e -c 'cd . && claude --print hi' name", ""),
+    ("bash -c 'claude --print hi'", ""), ("sh -e -c 'true && claude --print hi' name", ""),
     ("bash -lc \"nohup claude --print hi\"", "env "), ("zsh -c 'claude --print hi'", "command "),
 ):
     if source.startswith("zsh") and not any(Path(d, "zsh").exists() for d in os.environ["PATH"].split(os.pathsep)):
@@ -904,6 +917,10 @@ refusals = [
     ("expanded program word", "nice -n $N claude --print hi"),
     ("expanded program word", "bash -c \"$CMD\""),
     ("shell control structure", "eval claude --print hi"),
+    ("cd before claude", "[ -d src ] && cd src; claude --print hi"),
+    ("cd before claude", "bash -c 'cd sub && claude -p hi'"),
+    ("cd before claude", "cd src; bash -c 'claude -p hi'"),
+    ("pushd before claude", "pushd src; claude -p hi"),
 ]
 for construct, source in refusals:
     for extra in ([session, ""], ["", ""]):

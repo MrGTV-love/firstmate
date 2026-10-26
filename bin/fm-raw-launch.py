@@ -25,13 +25,15 @@ Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
 A plain parameter expansion ($NAME, ${NAME}) is read as ordinary argument text,
 and a leading NAME=value assignment does not split; an expanded program word,
-including a quoted expansion where a named wrapper reads its options, a skipped
-wrapper word that can split, or expanded shell -c text refuses, because it can
-name a program this check cannot see. Expansion flags,
+including a quoted expansion where a named wrapper other than timeout reads its
+options, a skipped wrapper word that can split, or expanded shell -c text
+refuses, because it can name a program this check cannot see. Expansion flags,
 a forced pattern and the forced `$~`, `$=` or `$^` forms refuse everywhere,
 because zsh globs such a value and a glob qualifier in it runs a command.
 A claude argument that needs shell expansion ($, unquoted *, ?, a closed
-[...] bracket pattern or brace characters) or that sets its own --session-id refuses too.
+[...] bracket pattern or brace characters) or that sets its own --session-id refuses too,
+and so does a claude after a cd or pushd, including one in shell -c text, because
+Claude names its write-granted folders after the worktree it starts in.
 
 runs-claude exits 0 when any command, not only the first, runs claude as its
 program (past assignments, shell keywords and named wrappers), even when text
@@ -387,9 +389,10 @@ def program(text, command):
     return None, False
 
 
-def render_claude(text, session, prefix):
+def render_claude(text, session, prefix, moved=""):
     """Return text with the session after each claude program word and prefix
-    before the first one, and whether any command runs claude."""
+    before the first one, whether any command runs claude, and the directory
+    change (cd or pushd) read so far, which refuses a later claude."""
     edits, found = [], False
     for command in commands(text):
         first = next((token for token in command if not ASSIGNMENT.match(text, token[1])), None)
@@ -404,13 +407,18 @@ def render_claude(text, session, prefix):
         if expands:
             refuse("expanded program word, wrapper argument or shell -c text")
         if shell:
-            rendered, inner = render_claude(value, session, "" if found else prefix)
+            rendered, inner, moved = render_claude(value, session, "" if found else prefix, moved)
             found = found or inner
             if rendered != value:
                 edits.append((start, end, shlex.quote(rendered)))
             continue
+        if os.path.basename(value) in ("cd", "pushd"):
+            moved = moved or os.path.basename(value)
+            continue
         if os.path.basename(value) != "claude":
             continue
+        if moved:
+            refuse(f"{moved} before claude, which starts Claude outside the worktree its write profile grants; start Claude from the worktree root")
         arguments = command[position + 1:]
         if any(argument[4] for argument in arguments):
             refuse("shell expansion in a claude argument, which can produce options such as --resume that this check cannot see")
@@ -426,7 +434,7 @@ def render_claude(text, session, prefix):
         found = True
     for start, end, replacement in reversed(edits):
         text = text[:start] + replacement + text[end:]
-    return text, found
+    return text, found, moved
 
 
 def runs_claude(text):
