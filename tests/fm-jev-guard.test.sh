@@ -1195,7 +1195,7 @@ for (const [host, call] of [['omp', omp]]) {
 }
 assert.deepEqual(workerBriefResults, [['omp', 'unjudged']], 'worker-edited brief must not supply live authorization');
 assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['listed.txt', 'nested/listed.txt']);
-// Only Firstmate naming that extra path admits it, on both hosts.
+// Only Firstmate naming that extra path admits it.
 publish(['listed.txt', 'unlisted.txt']);
 for (const [host, call] of [['omp', omp]]) {
   restore();

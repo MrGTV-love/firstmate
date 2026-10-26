@@ -55,7 +55,7 @@ function trackedFiles(root: string, paths: string[]): boolean {
 
 // Deliberately not a shell interpreter. Only one literal rm with literal file
 // operands is provable here. Expansions, globs, directories and compound shell
-// commands retain ordinary Jev screening, even when some operands are listed.
+// commands keep the unjudged bash path, even when some operands are listed.
 function operands(command: string): string[] | undefined {
   if (command.length > 16_384 || /[\\$`;&|<>(){}\[\]*?!~#'"\n\r\0]/.test(command)) return;
   const [executable, ...words] = command.split(/[ \t]+/).filter(Boolean);
@@ -72,7 +72,7 @@ function operands(command: string): string[] | undefined {
   return paths.length > 0 ? paths : undefined;
 }
 
-/** Invalid declared authorization denies locally; non-applicable calls retain Jev screening. */
+/** Invalid declared authorization denies locally; non-applicable calls keep the unjudged bash path. */
 export function authorizedDeletion(command: string, cwd: string, c: Context): Admission | { invalid: true } | undefined {
   const targets = operands(command);
   if (!targets) return;
