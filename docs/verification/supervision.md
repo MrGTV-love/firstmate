@@ -331,8 +331,11 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 ### Claude presentation-hold release, 2026-10-25
 
 `bin/fm-claude-hold-release.sh` (registered for `UserPromptSubmit` and `StopFailure`) is not yet validated against the real harness.
-The scratch probe was blocked before Claude started: a task-scoped `CLAUDE_CONFIG_DIR` is signed out (`claude auth status` exited 1 on Claude Code installed on 2026-10-25), copying a credential into it is refused by the [worker account contract](../configuration.md), and the default store would have Claude itself write the real `~/.claude.json`.
+The scratch probe ran through `bin/fm-teamclaude-launch.sh`, under `fm-proc-budget.sh`, with a fresh task-scoped `CLAUDE_CONFIG_DIR` on Claude Code 2.1.310.
+The launcher's own proxy check passed, so it did not refuse, but Claude did: through the launcher, `claude auth status` exited 1 reporting `"loggedIn": false`, and a one-line `claude -p --model haiku` exited 1 with `Not logged in · Please run /login` before sending any request.
+The TeamClaude proxy does not stand in for Claude's own sign-in, so a scratch config needs a credential, which the [worker account contract](../configuration.md) forbids copying, and the default store would have Claude itself write the real `~/.claude.json`.
 So three cases stay unreproduced live: a message typed while a turn is still running, Escape followed by a new prompt, and an API-error turn end (`StopFailure`).
+A mid-turn `UserPromptSubmit`, if Claude fires one, costs at most a duplicate wake.
 The behavior is covered model-free by `tests/fm-claude-stop-autoarm.test.sh` and `tests/fm-supervision-host-hook.test.sh`, which run the real hook scripts against a fake harness.
 
 ### DSH native message identity, 2026-10-22
