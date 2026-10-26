@@ -8,7 +8,7 @@
 #
 # Usage:
 #   fm-guard-metrics.sh [--log <path>] [--registry <path>] [--min-opportunities <n>]
-#                       [--json] [--guards <id,id,...>] [-h|--help]
+#                       [--json] [--undecided] [--guards <id,id,...>] [-h|--help]
 #
 # Numbers per guard:
 #   opportunities         every decision recorded for this guard (deny, warn,
@@ -34,6 +34,10 @@
 #          median_clear_attempts=<f> recurrences=<n> verdict=<v>
 # followed by METRICS_SUMMARY guards=<n> measured=<n> cut=<n> unmeasured=<n>.
 # With --json, one object carries the same fields.
+# With --undecided, print only the ids whose verdict is `cut` and whose registry
+# entry carries no `retirement_decision`, one per line: a nomination nobody has
+# judged yet. It is the question a session start asks, so the pass cannot sit
+# unread in a log forever.
 #
 # Exit: 0 on success, 2 on usage error or an unreadable log path. A missing log
 # is not an error: every guard is simply unmeasured, because no evidence is not
@@ -46,6 +50,7 @@ LOG=''
 REGISTRY="$ROOT/docs/guards/registry.json"
 MIN_OPPS=30
 JSON=0
+UNDECIDED=0
 ONLY=''
 
 usage() { sed -n '3,44p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -58,6 +63,7 @@ while [ $# -gt 0 ]; do
     --min-opportunities) [ $# -ge 2 ] || die "--min-opportunities needs a value"; MIN_OPPS=$2; shift 2 ;;
     --guards) [ $# -ge 2 ] || die "--guards needs a value"; ONLY=$2; shift 2 ;;
     --json) JSON=1; shift ;;
+    --undecided) UNDECIDED=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument '$1'" ;;
   esac
@@ -106,26 +112,35 @@ if [ ! -f "$LOG" ]; then
   exit 0
 fi
 
-IDS=$(jq -r '.guard // empty' "$LOG" 2>/dev/null | sort -u || true)
-if [ -n "$ONLY" ]; then
-  filtered=''
-  for id in $(printf '%s' "$ONLY" | tr ',' ' '); do
-    if printf '%s\n' "$IDS" | grep -qxF -- "$id"; then filtered="$filtered$id
-"; fi
-  done
-  IDS=$filtered
-fi
+# One pass over the log, grouped by guard. The retirement rule needs every
+# guard's rows, and the previous shape rescanned the file once per guard, which
+# made a live 700 KB log cost seconds on the session-start path. `fromjson?`
+# drops a torn final line instead of failing the whole read.
+groups=$(jq -c -R 'fromjson? | objects | select((.guard // "") != "")' "$LOG" 2>/dev/null \
+  | jq -c -s --arg only "$ONLY" '
+      group_by(.guard)[]
+      | {id: .[0].guard, rows: .}
+      | . as $group
+      | select($only == "" or ($only | split(",") | index($group.id)))
+    ' 2>/dev/null || true)
 
-guards_n=0; measured=0; cut=0; unmeasured=0
+# The registry's recorded retirement decision, when the pass already judged this
+# guard. A nomination without one is what a session start must surface.
+decision_of() {  # <id>
+  jq -r --arg id "$1" '.guards[]? | select(.id == $id) | (.retirement_decision // "")' "$REGISTRY" 2>/dev/null
+}
+
+guards_n=0; measured=0; cut=0; unmeasured=0; undecided=''
 if [ "$JSON" -eq 1 ]; then : >"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl" || die "cannot write temp"; fi
-for id in $IDS; do
+while IFS= read -r group; do
+  [ -n "$group" ] || continue
+  id=$(printf '%s' "$group" | jq -r '.id')
+  rows=$(printf '%s' "$group" | jq -c '.rows')
   guards_n=$((guards_n + 1))
-  rows=$(jq -c --arg id "$id" 'select(.guard == $id)' "$LOG" 2>/dev/null || true)
-  [ -n "$rows" ] || { id=''; continue; }
-  opps=$(printf '%s\n' "$rows" | jq -s 'length')
-  denies=$(printf '%s\n' "$rows" | jq -s '[.[] | select(.decision == "deny")] | length')
-  warns=$(printf '%s\n' "$rows" | jq -s '[.[] | select(.decision == "warn")] | length')
-  overrides=$(printf '%s\n' "$rows" | jq -s '[.[] | select(.override == true)] | length')
+  opps=$(printf '%s' "$rows" | jq 'length')
+  denies=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "deny")] | length')
+  warns=$(printf '%s' "$rows" | jq '[.[] | select(.decision == "warn")] | length')
+  overrides=$(printf '%s' "$rows" | jq '[.[] | select(.override == true)] | length')
   fires=$((denies + warns))
   if [ "$fires" -gt 0 ]; then
     rate=$(jq -n --argjson o "$overrides" --argjson f "$fires" '$o / $f | . * 1000 | round | . / 1000')
@@ -133,7 +148,7 @@ for id in $IDS; do
     rate=0
   fi
   # Median clear attempts: consecutive denies in one session before an allow.
-  attempts=$(printf '%s\n' "$rows" | jq -s -r '
+  attempts=$(printf '%s' "$rows" | jq -r '
     sort_by(.ts) | group_by(.session)[]
     | reduce .[] as $e ({runs: [], cur: 0};
         if $e.decision == "deny" then .cur += 1
@@ -145,7 +160,7 @@ for id in $IDS; do
   else
     median=0
   fi
-  recur=$(printf '%s\n' "$rows" | jq -s -r '
+  recur=$(printf '%s' "$rows" | jq -r '
     sort_by(.ts) | group_by(.session)
     | map(reduce .[] as $e ({cleared: false, n: 0};
         if $e.decision == "deny" and .cleared then .n += 1
@@ -169,14 +184,24 @@ for id in $IDS; do
     esac
     if awk -v m="$median" 'BEGIN {exit !(m > 3)}'; then verdict="cut"; fi
     if [ "$recur" -gt 0 ]; then verdict="cut"; fi
-    [ "$verdict" = cut ] && cut=$((cut + 1))
+    if [ "$verdict" = cut ]; then
+      cut=$((cut + 1))
+      [ -n "$(decision_of "$id")" ] || undecided="$undecided$id
+"
+    fi
   fi
+  [ "$UNDECIDED" -eq 1 ] && continue
   if [ "$JSON" -eq 1 ]; then
     emit "$id" "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict" "$harm" >>"${TMPDIR:-/tmp}/fm-guard-metrics.$$.jsonl"
   else
     emit "$id" "$opps" "$denies" "$warns" "$rate" "$median" "$recur" "$verdict" "$harm"
   fi
-done
+done < <(printf '%s\n' "$groups")
+
+if [ "$UNDECIDED" -eq 1 ]; then
+  printf '%s' "$undecided"
+  exit 0
+fi
 
 if [ "$JSON" -eq 1 ]; then
   jq -s --argjson g "$guards_n" --argjson m "$measured" --argjson c "$cut" --argjson u "$unmeasured" --arg log "$LOG" \

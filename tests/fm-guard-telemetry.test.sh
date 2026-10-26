@@ -100,6 +100,21 @@ registry_with_harm "$TMP/irr.json" gquiet irreversible
   || fail "an irreversible guard with no fire must be kept"
 pass "an irreversible guard that never fires is kept"
 
+# --- undecided nominations --------------------------------------------------
+# A cut nomination with no recorded decision is the one thing a session start
+# must surface; recording the decision is what retires it.
+registry_with_harm "$TMP/undecided.json" gquiet reversible
+got=$("$METRICS" --log "$ZERO" --registry "$TMP/undecided.json" --min-opportunities 30 --undecided)
+[ "$got" = gquiet ] || fail "an undecided cut nomination must be reported, got '$got'"
+jq '.guards[0].retirement_decision = "keep 2026-10-26: recorded by the test"' \
+  "$TMP/undecided.json" > "$TMP/decided.json"
+got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunities 30 --undecided)
+[ -z "$got" ] || fail "a recorded decision must retire the nomination, got '$got'"
+got=$("$METRICS" --log "$ZERO" --registry "$TMP/decided.json" --min-opportunities 30)
+printf '%s\n' "$got" | grep -q '^METRIC gquiet .*verdict=cut' \
+  || fail "--undecided must not change the measured verdict: $got"
+pass "an undecided nomination is reported and a recorded decision retires it"
+
 # --- override rate ----------------------------------------------------------
 OVER="$TMP/override.jsonl"
 : >"$OVER"

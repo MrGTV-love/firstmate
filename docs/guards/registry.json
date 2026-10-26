@@ -201,6 +201,7 @@
       "telemetry": "state/guard-events.jsonl",
       "version": "1",
       "id": "spawn-brief-dod-placeholders",
+      "retirement_decision": "keep 2026-10-26: 0 denies and 0 warns across 104 opportunities is the designed state for a fail-closed refusal, not evidence it is dead weight; every spawn in the window carried a complete brief, and cutting it would widen what a fresh spawn accepts without a reassessment of that guard's harm model",
       "owner": "bin/fm-dod-lib.sh",
       "invariant": "a dispatch refuses a brief whose Definition of Done still holds scaffold tokens",
       "layer": "runtime-block",

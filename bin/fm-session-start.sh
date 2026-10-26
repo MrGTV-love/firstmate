@@ -780,6 +780,35 @@ else
   printf '(silent - all good)\n'
 fi
 
+# --- 2b. guard retirement pass --------------------------------------------
+# The guard audit's data-driven pass is the one open item that closes on real
+# traffic rather than on work, so no ordinary turn ever asks for it: a guard
+# reaches the cut threshold weeks after anyone last looked, and the nomination
+# then sits unread in a log. Ask once a day, cache the answer, and print only
+# while a nomination carries no recorded decision in the tracked registry.
+# The recorded decision is what silences this line, so it retires itself.
+stage guard-pass
+GUARD_STAMP="$STATE/.guard-pass-checked"
+guard_line=''
+if [ -f "$GUARD_STAMP" ]; then
+  case "$(uname -s)" in
+    Darwin) guard_mtime=$(/usr/bin/stat -f %m "$GUARD_STAMP" 2>/dev/null || echo 0) ;;
+    *) guard_mtime=$(stat -c %Y "$GUARD_STAMP" 2>/dev/null || echo 0) ;;
+  esac
+else
+  guard_mtime=0
+fi
+if [ $(( $(date +%s) - guard_mtime )) -ge 86400 ]; then
+  guard_ids=$("$SCRIPT_DIR/fm-guard-metrics.sh" --undecided 2>/dev/null) || guard_ids=''
+  if [ -n "$guard_ids" ]; then
+    guard_line="GUARD PASS: $(printf '%s' "$guard_ids" | tr '\n' ' ' | sed 's/ $//') nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json"
+  fi
+  [ "$READ_ONLY" -eq 1 ] || printf '%s\n' "$guard_line" > "$GUARD_STAMP" 2>/dev/null || true
+else
+  guard_line=$(cat "$GUARD_STAMP" 2>/dev/null || true)
+fi
+[ -n "$guard_line" ] && printf '%s\n' "$guard_line"
+
 # --- 3. wake-drain ---------------------------------------------------------
 # The inactive-outcome startup scan runs in the deferred worker launched above,
 # where its potentially slow current-state reads cannot block this digest. It
