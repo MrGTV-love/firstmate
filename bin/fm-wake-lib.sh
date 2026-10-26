@@ -1812,6 +1812,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     pid=''
     IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
     case "$pid" in ''|*[!0-9]*) continue ;; esac
+    [ -z "$dead_pid" ] || [ "$pid" = "$dead_pid" ] || continue
     [ "$pid" != "$$" ] || continue
     [ -n "$state_abs" ] || state_abs=$(cd "$STATE" && pwd -P) || state_abs=$STATE
     case "$lock" in "$state_abs/.watch.lock"|"$state_abs/.supervise-daemon.lock") continue ;; esac

@@ -2584,6 +2584,38 @@ fm_lock_monitor_check"""
         with blocked_waiter(lock, lib, env) as waiter:
             subprocess.run(["bash", "-c", replaced, "_", lib, str(lock), str(waiter.pid), str(os.getpid())], env=env, check=True, timeout=30)
         assert rows(d) == [], f"a replaced owner published the old dead verdict: {rows(d)}"
+    # (d) An in-place handoff from dead owner A to live owner B keeps the pid
+    # file's inode and mtime. The dead verdict for A must not admit B, so B,
+    # dying later, still needs two dead observations of its own.
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-d.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{dead.pid}\n")
+        successor = subprocess.Popen(["sleep", "300"])
+        handoff = """. "$1"; fixture_lock=$2 fixture_old=$3 fixture_new=$4 fixture_ref=$5
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
+fm_pid_alive() {
+  if [ "$1" = "$fixture_old" ]; then
+    touch -r "$fixture_lock/pid" "$fixture_ref"
+    printf '%s\\n' "$fixture_new" > "$fixture_lock/pid"
+    touch -r "$fixture_ref" "$fixture_lock/pid"
+    return 1
+  fi
+  observed_fm_pid_alive "$1"
+}
+fm_lock_monitor_check"""
+        try:
+            with blocked_waiter(lock, lib, env):
+                inode = (lock / "pid").stat().st_ino
+                subprocess.run(["bash", "-c", handoff, "_", lib, str(lock), str(dead.pid), str(successor.pid), os.path.join(d, "mtime-ref")], env=env, check=True, timeout=30)
+                assert (lock / "pid").read_text().strip() == str(successor.pid) and (lock / "pid").stat().st_ino == inode, "handoff was not in place"
+                successor.kill(); successor.wait()
+                subprocess.run(check, env=env, check=True, timeout=30)
+                assert rows(d) == [], f"one dead observation of the successor woke Main: {rows(d)}"
+                subprocess.run(check, env=env, check=True, timeout=30)
+                assert len(rows(d)) == 1 and f"owner={successor.pid} " in rows(d)[0], rows(d)
+        finally:
+            if successor.poll() is None: successor.kill(); successor.wait()
 finally:
     zombie.wait()
 PY
