@@ -1,0 +1,35 @@
+### Scenario: another firstmate user (no user-level git ignore) clones base vs head
+### isolation: HOME=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.N8hbO1JSDy/home GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 XDG_CONFIG_HOME=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.N8hbO1JSDy/xdg
+
+===== rev 3520ea104 (test: drop the hint row for a deleted suite (#272))
+-- tracked .ignore? : 1 file(s)
+-- .gitignore lines mentioning graft:
+17:graft/.cache/
+22:# graft's local graph cache — regenerable, not committed (run `graft build`).
+23:/graft/
+-- core.excludesFile seen by git: ''
+-- git check-ignore -v on graft paths (no output line = NOT ignored):
+   graft/cards/a.md => .gitignore:23:/graft/	graft/cards/a.md
+   graft/.cache/c => .gitignore:23:/graft/	graft/.cache/c
+   graft/.graph/g => .gitignore:23:/graft/	graft/.graph/g
+-- git status --porcelain -uall:
+?? .ignore.probe
+
+===== rev 1509664e6 (fix: remove leaked machine-local graft ignores)
+-- tracked .ignore? : 0 file(s)
+-- .gitignore lines mentioning graft:
+17:graft/.cache/
+-- core.excludesFile seen by git: ''
+-- git check-ignore -v on graft paths (no output line = NOT ignored):
+   graft/cards/a.md => NOT ignored
+   graft/.cache/c => .gitignore:17:graft/.cache/	graft/.cache/c
+   graft/.graph/g => NOT ignored
+-- git status --porcelain -uall:
+?? .ignore.probe
+?? graft/.graph/g
+?? graft/cards/a.md
+
+### Scenario: this Mac's root-cause fix still hides graft output (real user-level ignore, read-only)
+/Users/charlesabrooker/.config/git/ignore:3:/graft/	graft/cards/a.md
+/Users/charlesabrooker/.config/git/ignore:4:/.ignore	.ignore
+(empty status above = nothing graft-made would be committed)

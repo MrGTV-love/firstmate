@@ -1,0 +1,7 @@
+### commits base..target
+1509664e6 fix: remove leaked machine-local graft ignores
+### name-status base..target
+M	.gitignore
+D	.ignore
+### is this an exact revert of PR 272's ignore hunks? (empty = yes)
+### PR 272 non-ignore files untouched by this change (empty = untouched)
