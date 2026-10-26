@@ -381,6 +381,17 @@ start_pane() {  # <dir> <command...>
   wait_inside "$dir"
 }
 
+# The worker's agent still running in the pane: a process named claude inside
+# the copy. It runs tests/lib.sh fm_agent_standin, not the host sleep, which a
+# multicall coreutils (Ubuntu 26.04) refuses to run under a foreign name.
+start_pane_agent() {
+  local standin
+  standin=$(fm_agent_standin "$W/standin") || return 1
+  mkdir -p "$W/agent"
+  ln -s "$standin" "$W/agent/claude"
+  start_pane "$COPY" "$W/agent/claude"
+}
+
 # An idle shell inside <dir> that no pane started (STRAY_SHELL).
 STRAY_SHELL=
 start_stray_shell() {  # <dir>
@@ -646,9 +657,7 @@ scn_pane_agent_does_not_block_teardown() {
   make_world
   printf 'ok\n' > "$W/stub.mode"
   use_pane_backend tmux
-  mkdir -p "$W/agent"
-  ln -s "$(command -v sleep)" "$W/agent/claude"
-  start_pane "$COPY" "$W/agent/claude" 300
+  start_pane_agent || why "no agent stand-in survives a foreign name on this host" || return 1
   go
   [ "$(stub_calls)" = 1 ] || why "teardown did not run with only the worker's agent in the pane: $(rec_field t1 reason)" || return 1
   [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed: $(rec_field t1 reason)" || return 1
@@ -1082,9 +1091,7 @@ scn_pane_shell_working_elsewhere_keeps_the_copy() { scn_other_process_in_the_pan
 scn_pane_agent_left_running_keeps_the_copy() {
   make_world
   use_pane_backend tmux
-  mkdir -p "$W/agent"
-  ln -s "$(command -v sleep)" "$W/agent/claude"
-  start_pane "$COPY" "$W/agent/claude" 300
+  start_pane_agent || why "no agent stand-in survives a foreign name on this host" || return 1
   EXIT_WAIT=1 go
   [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy went although the agent is still running in it: $(rec_field t1 reason)" || return 1
   [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
