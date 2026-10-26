@@ -555,40 +555,77 @@ SH
 }
 
 # An unconfined raw claude launch keeps the earlier memory-prefix placement, so
-# shell constructs the confined session rewrite refuses still launch there, and
-# the caller's own command is never handed to this host's /bin/sh first: the
-# interpreter that runs a Bash-only construct stays the pane's own shell.
+# shell constructs the confined session rewrite refuses still launch there.
 test_unconfined_raw_claude_launch_keeps_shell_constructs() {
-  local id out source_line staged probe
-  # A POSIX construct keeps its args, gains no session id, and the staged launch
-  # still runs under a plain dash pane shell.
+  local rec id out source_line probe
+  local FM_COMPAT_LAUNCH_LOG
   id=settle-raw-claude-linux-z9
-  make_unconfined_claude_case raw-claude-linux "$id"
+  rec=$(make_settle_case raw-claude-linux "$id" 0)
+  read_settle_record "$rec"
+  if [ "$(uname -s)" != Linux ]; then
+    cat > "$FAKEBIN_DIR/uname" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != -s ] || { echo Linux; exit 0; }
+exec /usr/bin/uname "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/uname"
+  fi
   probe="$HOME_DIR/data/$id/probe"
-  # --allow-api-key with no account pin and the ordinary claude launcher is the
-  # configuration the earlier review measured, so nothing else wraps this route.
+  cat > "$FAKEBIN_DIR/claude" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
+printf '%s\\n' "\$@" > '$probe'
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+  export FM_COMPAT_LAUNCH_LOG
   # shellcheck disable=SC2016 # the literal constructs are the raw launch text under test
-  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"' --allow-api-key)
+  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"')
   expect_code 0 "$?" "unconfined raw claude spawn refused a shell construct: $out"
   assert_grep 'write_confinement=unconfined-linux' "$HOME_DIR/state/$id.meta" "unconfined raw claude coverage absent from metadata"
   assert_no_grep 'claude_session_id=' "$HOME_DIR/state/$id.meta" "an unconfined raw claude launch must not record a session id"
   assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the unconfined raw claude launch"
   source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  assert_equals $'--print\nhi\n--model\nopus' "$(cat "$probe")" \
+    "the unconfined raw claude launch must run its shell constructs unchanged and without a session id"
+  pass "an unconfined raw claude launch keeps shell constructs and gets no session id"
+}
+
+
+# A Bash-only construct keeps working on the unconfined route: the caller's own
+# command reaches the pane shell, and a real dash pane still runs a POSIX one.
+test_unconfined_raw_claude_launch_keeps_the_caller_shell() {
+  local id out source_line staged probe
+  local FM_COMPAT_LAUNCH_LOG
+  id=settle-raw-claude-caller-z9
+  make_unconfined_claude_case raw-claude-caller "$id"
+  probe="$HOME_DIR/data/$id/probe"
+  # --allow-api-key with no account pin and the ordinary launcher is the
+  # configuration the earlier review measured: nothing else wraps this route.
+  # shellcheck disable=SC2016 # the literal constructs are the raw launch text under test
+  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"' --allow-api-key)
+  expect_code 0 "$?" "unconfined raw claude spawn refused a shell construct: $out"
+  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the unconfined raw claude launch"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
   staged=${source_line#". '"}
   staged=${staged%"'"}
   [ -n "$staged" ] || staged=$source_line
-  assert_present "$staged" "the unconfined raw claude launch was not staged for a source line"
   assert_no_grep '/bin/sh -c' "$staged" "an unconfined raw claude launch must keep the caller's command instead of handing it to this host's /bin/sh"
+  : > "$probe"
   PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  expect_code 0 "$?" "a bash pane could not run the delivered unconfined launch"
   assert_equals $'args=--print hi --model opus\nprompt=' "$(cat "$probe")" \
-    "the unconfined raw claude launch must run its shell constructs unchanged and without a session id"
+    "the unconfined raw claude launch must run its shell constructs unchanged"
   if [ -x /bin/dash ]; then
-    rm -f "$probe"
+    : > "$probe"
     PATH="$FAKEBIN_DIR:$PATH" /bin/dash -c "$source_line"
+    expect_code 0 "$?" "a dash pane could not run the delivered unconfined launch"
     assert_equals $'args=--print hi --model opus\nprompt=' "$(cat "$probe")" \
       "the unconfined raw claude launch must still run under a real dash pane shell"
   else
-    printf 'skip: /bin/dash is absent, so the dash pane-shell run of the unconfined launch is skipped\n'
+    printf 'skip: /bin/dash is absent, so the dash pane-shell run is skipped\n'
   fi
   # Bash-only syntax stays under the pane's own shell: a process substitution must
   # reach claude as data, never fail as a /bin/sh parse error of the raw text.
@@ -598,13 +635,105 @@ test_unconfined_raw_claude_launch_keeps_shell_constructs() {
   # shellcheck disable=SC2016 # the literal process substitution is the raw launch text under test
   out=$(run_settle_spawn "$id" --harness 'claude --print <(printf hi)' --allow-api-key)
   expect_code 0 "$?" "unconfined raw claude spawn refused a process substitution: $out"
-  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the process-substitution raw claude launch"
   assert_no_grep '/bin/sh -c' "$FM_COMPAT_LAUNCH_LOG" "a Bash-only unconfined raw claude launch must not be handed to this host's /bin/sh"
   source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  : > "$probe"
   PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  expect_code 0 "$?" "a bash pane could not run the delivered process-substitution launch"
   assert_grep 'args=--print /dev/fd/' "$probe" "the process substitution did not reach claude as its prompt argument"
   assert_grep 'prompt=hi' "$probe" "the process substitution prompt did not reach claude intact"
-  pass "an unconfined raw claude launch keeps shell constructs, gets no session id and never gains a host /bin/sh"
+  pass "an unconfined raw claude launch keeps the caller's shell and never gains a host /bin/sh"
+}
+
+# make_pane_shell_case <name> <id> builds a settle home whose fake omp records
+# the argv it was run with, so a test can prove which shell parsed the launch.
+make_pane_shell_case() {
+  local name=$1 id=$2 rec
+  rec=$(make_settle_case "$name" "$id" 0)
+  read_settle_record "$rec"
+  mkdir -p "$HOME_DIR/user-home"
+  cat > "$FAKEBIN_DIR/omp" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" != --version ] || { printf 'omp/18.1.20\\n'; exit 0; }
+for argument in "\$@"; do printf 'arg=%s\\n' "\$argument"; done > '$HOME_DIR/data/$id/probe'
+SH
+  chmod +x "$FAKEBIN_DIR/omp"
+  FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+  export FM_COMPAT_LAUNCH_LOG
+  return 0
+}
+
+# A confined raw launch is parsed by the pane's own shell, not by this host's
+# bash: a zsh-only modifier keeps working from a zsh pane, and a bash-only
+# construct still runs from a dash pane, which falls back to /bin/bash.
+test_confined_raw_launch_keeps_the_pane_shell() {
+  local id out source_line staged probe zsh_bin dash_bin bash_bin expected_home
+  local FM_COMPAT_LAUNCH_LOG
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: only the macOS seatbelt route re-parses through a pane shell\n'
+    return 0
+  fi
+  zsh_bin=$(command -v zsh || true)
+  dash_bin=
+  [ ! -x /bin/dash ] || dash_bin=/bin/dash
+  bash_bin=$(command -v bash || true)
+  [ -n "$bash_bin" ] || fail "no bash on PATH for the bash pane case"
+  id=settle-pane-shell-z9
+  make_pane_shell_case pane-shell "$id"
+  probe="$HOME_DIR/data/$id/probe"
+  # shellcheck disable=SC2016 # the literal zsh modifier is the raw launch text under test
+  out=$(run_settle_spawn "$id" --harness 'omp --config "${${HOME}:A}/worker.yml"')
+  expect_code 0 "$?" "a confined raw omp launch with a zsh-only modifier was refused: $out"
+  assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "the raw omp launch recorded no seatbelt coverage"
+  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the confined raw omp launch"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  staged=${source_line#". '"}
+  staged=${staged%"'"}
+  [ -n "$staged" ] || staged=$source_line
+  assert_grep '${fm_launch_shell:-/bin/bash}' "$staged" "the confined launch must select the pane shell with a /bin/bash fallback"
+  expected_home=$(cd "$HOME_DIR/user-home" && pwd -P) || fail "the fixture HOME root is unreadable"
+  if [ -n "$zsh_bin" ]; then
+    # The replay must carry the same HOME the spawn gave its launch, or the
+    # zsh modifier resolves against the operator's home instead of the fixture's.
+    : > "$probe"
+    env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+      "$zsh_bin" -c "$source_line"
+    expect_code 0 "$?" "a zsh pane could not run the delivered confined launch: $(cat "$probe")"
+    assert_grep 'arg=--config' "$probe" "the confined launch did not reach omp from a zsh pane"
+    assert_grep "arg=$expected_home/worker.yml" "$probe" \
+      "a zsh pane must resolve its own modifier inside the confined launch: $(cat "$probe")"
+  else
+    printf 'skip: zsh is absent, so the zsh pane case is not run\n'
+  fi
+  id=settle-pane-shell-expansion-z9
+  make_pane_shell_case pane-shell-expansion "$id"
+  probe="$HOME_DIR/data/$id/probe"
+  out=$(run_settle_spawn "$id" --harness 'omp --config /tmp/{pane,shell}.yml')
+  expect_code 0 "$?" "a confined raw omp launch with a brace list was refused: $out"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  # A bash pane keeps the caller's bash-only argument form: the brace list
+  # expands before omp runs.
+  : > "$probe"
+  env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+    "$bash_bin" -c "$source_line"
+  expect_code 0 "$?" "a bash pane could not run the delivered confined launch: $(cat "$probe")"
+  assert_grep 'arg=--config' "$probe" "the confined launch did not reach omp from a bash pane"
+  assert_grep 'arg=/tmp/pane.yml' "$probe" "a bash pane must expand the caller's brace list"
+  assert_grep 'arg=/tmp/shell.yml' "$probe" "a bash pane must expand the caller's whole brace list"
+  if [ -n "$dash_bin" ]; then
+    # dash cannot parse that form itself, so the same two arguments prove the
+    # selected /bin/bash fallback ran the caller's text.
+    : > "$probe"
+    env -i HOME="$HOME_DIR/user-home" PATH="$FAKEBIN_DIR:$PATH" TERM=xterm \
+      "$dash_bin" -c "$source_line"
+    expect_code 0 "$?" "a dash pane could not run the delivered confined launch: $(cat "$probe")"
+    assert_grep 'arg=--config' "$probe" "the confined launch did not reach omp from a dash pane"
+    assert_grep 'arg=/tmp/pane.yml' "$probe" "a dash pane must hand the caller's bash-only text to /bin/bash"
+    assert_grep 'arg=/tmp/shell.yml' "$probe" "a dash pane must let /bin/bash expand the caller's brace list"
+  else
+    printf 'skip: /bin/dash is absent, so the fallback pane case is not run\n'
+  fi
+  pass "a confined raw launch keeps the pane shell, with /bin/bash as the fallback"
 }
 
 # These are shell-language cases, not vendor behavior: execute only a task-local
@@ -714,12 +843,20 @@ for construct, source in refusals:
 # A plain parameter expansion is data when it only fills an argument, and a
 # program the scanner cannot see when a command word or a wrapper runs it.
 scanned = [
-    ("codex --config \"${HOME}/worker.yml\"", 1, "reads a plain argument expansion"),
+    ("codex --config \"${HOME}/worker.yml\"", 1, "reads a quoted argument expansion"),
+    ("codex --config \"$HOME/worker.yml\"", 1, "reads a quoted unbraced argument expansion"),
+    ("FOO=$X codex --config \"$Y\"", 1, "reads a leading assignment expansion"),
+    ("codex --config $HOME/worker.yml", 1, "reads an unquoted parameter expansion"),
+    ("codex --config ${~P}", 2, "refuses a forced pattern"),
+    ("codex --config $~P", 2, "refuses a forced pattern"),
+    ("codex --config ${=P}", 2, "refuses a forced splitting form"),
+    ("codex --config \"$~P\"", 2, "refuses a forced pattern in a quote"),
     ("codex --config \"${HOME}/x.yml\" && claude --print hi", 0, "still finds a later claude command"),
     ("claude --settings \"${HOME}/s.json\"", 0, "reads a claude argument expansion"),
     ("\"$CMD\" --x", 2, "refuses an expanded command word"),
     ("${CMD} --x", 2, "refuses a braced command word"),
     ("codex --config \"$(claude -p hi)\"", 2, "refuses a command substitution in an argument"),
+    ("codex --config \"${(e)PAYLOAD}\"", 2, "refuses zsh parameter expansion flags"),
     ("codex --config `claude -p hi`", 2, "refuses a backtick in an argument"),
     ("sh -c \"${X}\"", 2, "refuses an expansion a shell wrapper runs"),
     ("sh -c code=\"$CMD\"", 2, "refuses an assignment-shaped wrapper argument expansion"),
@@ -745,6 +882,8 @@ test_measured_harness_launch_runs_confined
 test_confined_raw_claude_launch_runs_through_teamclaude
 test_compound_raw_claude_launch_runs_confined
 test_unconfined_raw_claude_launch_keeps_shell_constructs
+test_unconfined_raw_claude_launch_keeps_the_caller_shell
+test_confined_raw_launch_keeps_the_pane_shell
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted

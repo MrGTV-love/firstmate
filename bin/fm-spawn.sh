@@ -7524,7 +7524,14 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
   # pane, so native tools and grandchildren use only the task temp root.
   LAUNCH="export TMPDIR=$(shell_quote "$TASK_TMP") TMP=$(shell_quote "$TASK_TMP") TEMP=$(shell_quote "$TASK_TMP"); $LAUNCH"
-  LAUNCH="/usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") /bin/bash -c $(shell_quote "$LAUNCH")"
+  # The pane shell, not this wrapper, must parse the caller's launch text: a
+  # zsh-only modifier or a bash-only construct keeps the meaning it has without
+  # confinement. The selector runs in the pane, takes zsh's own absolute path or
+  # bash's "$BASH", and leaves any other shell on /bin/bash, so no bare name is
+  # looked up later inside the sandbox; the caller's text stays one quoted -c
+  # argument, and the subshell keeps the selector out of the pane's environment.
+  LAUNCH_CONFINED_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
+  LAUNCH="( $LAUNCH_CONFINED_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
 # The persistent pane shell, not only the confined child, keeps the task hooks.
 LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
