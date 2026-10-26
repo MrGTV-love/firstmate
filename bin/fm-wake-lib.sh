@@ -1702,8 +1702,8 @@ _fm_lock_monitor_adopt() {  # <lock>
 # a claim that all callers finish that fast. Age is evidence to inspect, not a
 # verdict that the owner is stuck; healthy process-lifetime singletons and the
 # observer's own holds are skipped.
-fm_lock_monitor_check() {
-  local record lock owner pid mtime now age state parent command reason key old identity
+fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
+  local settle=${1:-} record lock owner pid mtime now age state parent command reason key old identity
   local waiter waiter_pid waiter_lock waiters first='' limit=${FM_LOCK_ALARM_SECS:-300}
   local episodes=$'\n' episodes_loaded=0 marker state_abs=''
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
@@ -1804,6 +1804,10 @@ fm_lock_monitor_check() {
       fi
     done
     reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
+    if [ -n "$settle" ] && ! "$settle"; then
+      FM_LOCK_MONITOR_REASON=
+      return 0
+    fi
     if ! _fm_lock_monitor_queue "long-held-lock-$key" "$reason"; then
       reason="$reason queue=unavailable receipt=$record.alerted"
       printf '%s\n%s\n' "$key" "$reason" > "$record.pending" || return 1
@@ -2598,12 +2602,17 @@ FM_WAKE_PENDING_KIND=
 FM_WAKE_PENDING_KEY=
 FM_WAKE_PENDING_PAYLOAD=
 fm_wake_append() {
-  local status=0
+  local status=0 pending
   FM_WAKE_PENDING_KIND=$1 FM_WAKE_PENDING_KEY=${2-} FM_WAKE_PENDING_PAYLOAD=${3-}
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || status=1
+  pending=$FM_WAKE_PENDING_KIND
   FM_WAKE_PENDING_KIND=
   [ "$status" -eq 0 ] || return 1
-  fm_wake_append_locked "$@" || status=$?
+  if [ -n "$pending" ]; then
+    fm_wake_append_locked "$@" || status=$?
+  else
+    _fm_wake_spill_replay_locked || status=$?
+  fi
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$status"
 }
