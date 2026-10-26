@@ -1,0 +1,52 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.qRsxo6
+HOME=/Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces
+jq lookup with PATH excluding $HOME/.local/bin: not found
+jq lookup with PATH including $HOME/.local/bin: /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin/jq
+
+=== X1: Relay opted in, jq only in $HOME/.local/bin ===
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+PATH_MISSING: jq (found: /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin/jq); add /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin to PATH, then rerun bootstrap to verify compatibility
+[exit=0]
+  absent:  state/x-watch.check.sh
+  absent:  config/x-mode.env
+  exec log: none
+
+=== X2: operator adds $HOME/.local/bin to PATH ===
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+FMX: X mode on - relay poll armed via state/x-watch.check.sh; 30s watcher cadence in config/x-mode.env
+[exit=0]
+  present: state/x-watch.check.sh
+  present: config/x-mode.env
+
+=== X3: PATH entry lost again while Relay is armed ===
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+PATH_MISSING: jq (found: /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin/jq); add /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin to PATH, then rerun bootstrap to verify compatibility
+FMX: X mode off - missing relay poll dependencies; resolve the dependency lines above and rerun bootstrap
+[exit=0]
+  absent:  state/x-watch.check.sh
+  absent:  config/x-mode.env
+  exec log: none
+
+=== X4 (base commit d118e2d3, same setup as X3) - previous advice ===
+MISSING: jq (install: brew install jq  # or the platform's package manager)
+FMX: X mode off - missing relay poll dependencies; install them and rerun bootstrap
+
+=== C1: crew-dispatch.json present (malformed), jq only in $HOME/.local/bin ===
+PATH_MISSING: jq (found: /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin/jq); add /Users/charlesabrooker/tmp/fm-pathmiss-jq.Pnk1q0/operator home with spaces/.local/bin to PATH, then rerun bootstrap to verify compatibility
+[exit=0]
+  exec log: none
+
+=== C2: operator adds $HOME/.local/bin to PATH ===
+CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON
+[exit=0]
+  exec log: jq -e . /Users/charlesabrooker/tmp/fm-lab.qRsxo6/config/crew-dispatch.json;
+
+=== C3: jq genuinely absent (no candidate) keeps install advice ===
+MISSING: jq (install: brew install jq  # or the platform's package manager)
+[exit=0]
+
+=== teardown ===
+lab + scratch removed

@@ -1,0 +1,50 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.jPFTaC
+HOME=/Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/operator home with spaces
+PATH(base)=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+total 8
+drwxr-xr-x  4 charlesabrooker  staff  128 Oct 26 11:12 .
+drwxr-xr-x  3 charlesabrooker  staff   96 Oct 26 11:12 ..
+-rwxr-xr-x  1 charlesabrooker  staff  160 Oct 26 11:12 no-mistakes
+lrwxr-xr-x  1 charlesabrooker  staff   65 Oct 26 11:12 treehouse -> /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/launchers/treehouse
+
+=== S1/S2: tools only in $HOME/.local/bin (one is a symlinked launcher), PATH excludes it ===
+PATH_MISSING: treehouse (found: /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/operator home with spaces/.local/bin/treehouse); add /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/operator home with spaces/.local/bin to PATH, then rerun bootstrap to verify compatibility
+PATH_MISSING: no-mistakes (found: /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/operator home with spaces/.local/bin/no-mistakes); add /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/operator home with spaces/.local/bin to PATH, then rerun bootstrap to verify compatibility
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+[exit=0]
+--- exec log after S1 (must be absent):
+(no exec log - candidates were not executed)
+--- HOME contents after S1 (no shell config written):
+<scr>/operator home with spaces
+<scr>/operator home with spaces/.local
+<scr>/operator home with spaces/.local/bin
+<scr>/operator home with spaces/.local/bin/no-mistakes
+<scr>/operator home with spaces/.local/bin/treehouse
+
+=== S3: operator adds $HOME/.local/bin to PATH and reruns ===
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+[exit=0]
+--- exec log after S3 (normal version/lease checks ran through PATH):
+treehouse get --help
+no-mistakes --version
+
+=== S4: selected on-PATH no-mistakes is v1.45.0, newer copy also in $HOME/.local/bin ===
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+[exit=0]
+
+=== S5: unusable candidate shapes in $HOME/.local/bin ===
+--- shape=absent: ls: <scr>/operator home with spaces/.local/bin/no-mistakes: No such file or directory
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+[exit=0]
+--- shape=nonexecutable: -rw-r--r--  1 charlesabrooker  staff  160 Oct 26 11:12 <scr>/operator home with spaces/.local/bin/no-mistakes
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+[exit=0]
+--- shape=directory: drwxr-xr-x  2 charlesabrooker  staff  64 Oct 26 11:12 <scr>/operator home with spaces/.local/bin/no-mistakes
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+[exit=0]
+--- shape=broken-symlink: lrwxr-xr-x  1 charlesabrooker  staff  60 Oct 26 11:12 <scr>/operator home with spaces/.local/bin/no-mistakes -> /Users/charlesabrooker/tmp/fm-pathmiss.5vXt93/does-not-exist
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+[exit=0]
+
+=== teardown ===
+lab + scratch removed
