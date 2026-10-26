@@ -2,6 +2,7 @@
 """Read a raw launch command's shell words without evaluating or expanding them.
 
 Usage: fm-raw-launch.py render-claude COMMAND SESSION_ID PREFIX
+       fm-raw-launch.py runs-claude COMMAND
        fm-raw-launch.py root NAME COMMAND CWD
 
 render-claude inserts the session argument after each literal claude program
@@ -14,6 +15,9 @@ Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
 A claude argument that needs shell expansion ($, unquoted *, ?, a closed
 [...] bracket pattern or brace characters) or that sets its own --session-id refuses too.
+
+runs-claude exits 0 when any command, not only the first, runs claude as its
+program word (past assignments and shell keywords) and 1 when none does.
 
 root prints the absolute path a single leading NAME=value assignment of the
 first command sets, with its quotes removed and a relative value resolved
@@ -62,6 +66,7 @@ CLAUDE_VALUE_OPTIONS = frozenset("""
 CLAUDE_SHORT_VALUES = "Hejmnst"
 CLAUDE_SHORT_OPTIONAL_VALUES = "drw"
 RESUME_OPTIONS = {"--resume", "-r", "--continue", "-c"}
+KEYWORDS = ("if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}", "!", "time", "eval", "exec", "command", "builtin", "source", ".")
 
 
 def refuse(construct):
@@ -242,7 +247,7 @@ def render_claude(text, session, prefix):
         for position, (kind, start, end, value, expands) in enumerate(command):
             if ASSIGNMENT.match(text[start:end]):
                 continue
-            if value in ("if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}", "!", "time", "eval", "exec", "command", "builtin", "source", "."):
+            if value in KEYWORDS:
                 refuse("shell control structure")
             if expands:
                 refuse("expanded program word")
@@ -264,6 +269,18 @@ def render_claude(text, session, prefix):
         if index == 0:
             text = text[:start] + prefix + text[start:]
     return text
+
+
+def runs_claude(text):
+    """Return whether any command's program word, past assignments and shell keywords, is claude."""
+    for command in commands(text):
+        for kind, start, end, value, expands in command:
+            if ASSIGNMENT.match(text[start:end]) or value in KEYWORDS:
+                continue
+            if os.path.basename(value) == "claude":
+                return True
+            break
+    return False
 
 
 def root(name, text, cwd):
@@ -290,6 +307,8 @@ def main(argv):
                 refuse("invalid session id")
             print(render_claude(argv[2], " --session-id " + argv[3] if argv[3] else "", argv[4]), end="")
             return 0
+        if len(argv) == 3 and argv[1] == "runs-claude":
+            return 0 if runs_claude(argv[2]) else 1
         if len(argv) == 5 and argv[1] == "root":
             status, path = root(argv[2], argv[3], argv[4])
             if status == 3:

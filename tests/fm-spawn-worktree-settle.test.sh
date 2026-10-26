@@ -462,6 +462,52 @@ SH
   pass "a confined raw claude launch runs through TeamClaude with its session id and literal config root granted"
 }
 
+# A raw launch that runs claude after another command takes the Claude profile
+# too, so a leading test or command cannot start Claude outside it.
+test_compound_raw_claude_launch_runs_confined() {
+  local rec id out source_line probe session raw index=0
+  local FM_COMPAT_LAUNCH_LOG
+  if [ "$(uname -s)" != Darwin ]; then
+    printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
+    return 0
+  fi
+  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi'; do
+    index=$((index + 1))
+    id=settle-raw-compound-$index-z9
+    rec=$(make_settle_case "raw-compound-$index" "$id" 0)
+    read_settle_record "$rec"
+    probe="$HOME_DIR/data/$id/probe"
+    cat > "$FAKEBIN_DIR/claude" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
+session=
+[ "\${1:-}" != --session-id ] || session=\$2
+{
+  echo "session-id=\$session"
+  echo "args=\${*:3}"
+  echo "confinement=\$FM_WRITE_CONFINEMENT"
+  if { printf 'replaced' >> '$PROJ_DIR/README.md'; } 2>/dev/null; then echo foreign=written; else echo foreign=refused; fi
+} > '$probe'
+SH
+    chmod +x "$FAKEBIN_DIR/claude"
+    FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+    export FM_COMPAT_LAUNCH_LOG
+    out=$(run_settle_spawn "$id" --harness "$raw")
+    expect_code 0 "$?" "compound raw claude spawn was refused: $out"
+    assert_equals claude "$(grep '^harness=' "$HOME_DIR/state/$id.meta" | cut -d= -f2-)" "compound raw claude launch was not recorded as claude: $raw"
+    assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "compound raw claude launch ran unconfined: $raw"
+    session=$(grep '^claude_session_id=' "$HOME_DIR/state/$id.meta" | cut -d= -f2-)
+    [ -n "$session" ] || fail "compound raw claude metadata must record its session id"
+    assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the compound raw claude launch"
+    source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+    (cd "$WT_DIR" && PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line")
+    assert_equals "session-id=$session"$'\nargs=--print hi\nconfinement=seatbelt-v1\nforeign=refused' "$(cat "$probe")" \
+      "compound raw claude launch must run inside its profile under its recorded session id: $raw"
+  done
+  pass "a raw launch that runs claude after another command runs confined under its session id"
+}
+
 # An unconfined raw claude launch keeps the earlier memory-prefix placement, so
 # shell constructs the confined session rewrite refuses still launch there.
 test_unconfined_raw_claude_launch_keeps_shell_constructs() {
@@ -613,6 +659,7 @@ test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
 test_confined_raw_claude_launch_runs_through_teamclaude
+test_compound_raw_claude_launch_runs_confined
 test_unconfined_raw_claude_launch_keeps_shell_constructs
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read

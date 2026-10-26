@@ -3161,6 +3161,12 @@ case "$ARG3" in
     [A-Za-z_]*=*) continue ;;
     *)
       HARNESS=$(basename "$word")
+      # A confined launch takes the Claude profile when any command runs claude,
+      # so `true && claude ...` cannot start Claude outside it.
+      if [ "$HARNESS" != claude ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ] \
+        && python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" 2>/dev/null; then
+        HARNESS=claude
+      fi
       if [ "$HARNESS" = claude ]; then
         if [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
           # Validate before launch; a confined raw Claude command must never
