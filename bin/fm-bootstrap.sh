@@ -11,7 +11,11 @@
 #          bin/fm-api-key-guard-lib.sh owns the active-global-config YAML check;
 #          it never calls models, emits credentials or changes omp configuration.
 #          docs/configuration.md "OMP fallback approvals" owns the approval record.
+#          PATH_MISSING means lookup failed but an executable regular file exists
+#          at $HOME/.local/bin/<tool>. Discovery never executes that candidate or
+#          changes PATH, and does not establish tool compatibility or readiness.
 #          Lines: "MISSING: <tool> (install: <command>)",
+#                 "PATH_MISSING: <tool> (found: <path>); add <directory> to PATH, then rerun bootstrap to verify compatibility",
 #                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
 #                 "BACKEND_INVALID: <name> (known: <names>)",
@@ -849,7 +853,17 @@ manual_install_url() {
 }
 
 missing_tool_diagnostic() {
-  local tool=$1 instructions
+  local tool=$1 instructions candidate
+  # Presence on disk is evidence for PATH repair, not permission to execute an
+  # unselected binary or bypass the normal version and backend capability gates.
+  if ! command -v "$tool" >/dev/null 2>&1 && [ -n "${HOME:-}" ]; then
+    candidate="$HOME/.local/bin/$tool"
+    if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+      printf 'PATH_MISSING: %s (found: %s); add %s to PATH, then rerun bootstrap to verify compatibility\n' \
+        "$tool" "$candidate" "${candidate%/*}"
+      return 0
+    fi
+  fi
   if instructions=$(manual_install_url "$tool"); then
     echo "MISSING_MANUAL: $tool (instructions: $instructions)"
     return 0
