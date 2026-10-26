@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused typed-unknown alias-command relative-nm-home; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -76,6 +76,11 @@ PY
         record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gpt-5.1-codex >/dev/null || fail 'record OpenAI read of both ship families' ;;
       alias-command)
         record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex"]}' >/dev/null || fail 'record Claude read of ship' ;;
+      ship-all-extra)
+        # Main instruction 007: declared:all alone owns typed all extras, so a
+        # Gemini read still covers the derived OpenAI ship group.
+        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","gemini-x"]}' --reader-model gemini-3-pro >/dev/null || fail 'record Gemini read with a typed Google extra'
+        record_review "$case_dir" "$url" "$head" --author-groups '{"declared:all":["gemini-x"]}' >/dev/null || fail 'record Claude read of the typed Google extra' ;;
       ship-multi-read)
         record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gemini-3-pro >/dev/null || fail 'record independent read of both ship families' ;;
       typed-unknown)
@@ -120,7 +125,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|alias-command)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -179,6 +184,30 @@ test_author_verification_names_fetch_for_missing_objects() {
   pass 'author verification names the exact fetch for an unfetched base'
 }
 
+test_author_verification_accepts_sha256_base() {
+  local case_dir wt base head url rc
+  case_dir=$(make_case sha256-author-base)
+  rm "$case_dir/fakebin/git"
+  wt="$case_dir/wt"
+  rm -rf "$wt"
+  mkdir -p "$wt"
+  git -C "$wt" init -q --object-format=sha256 -b main
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q --allow-empty -m initial
+  base=$(git -C "$wt" rev-parse HEAD)
+  git -C "$wt" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q --allow-empty -m 'ship implementation'
+  head=$(git -C "$wt" rev-parse HEAD)
+  [ "${#base}" -eq 64 ] || fail "fixture base is not a SHA-256 object id: $base"
+  url=https://github.com/example/repo/pull/9
+  record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record review at a SHA-256 head'
+  rc=0
+  PATH="$case_dir/fakebin:$PATH" HOME="$case_dir/user-home" \
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    "$ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" --task task-x1 --base "$base" > "$case_dir/out" 2>&1 || rc=$?
+  expect_code 0 "$rc" "a 64-hex forge base must verify author coverage: $(cat "$case_dir/out")"
+  assert_grep 'review: PASS' "$case_dir/out" 'SHA-256 base derives the ship authors'
+  pass 'author verification accepts a 64-hex SHA-256 base'
+}
+
 test_github_unreadable_base_names_the_refusal() {
   local case_dir head url rc
   case_dir=$(make_case github-unreadable-base)
@@ -212,7 +241,7 @@ test_author_verification_requires_exact_identity() {
     case "$scenario" in
       missing-task) assert_grep 'arguments are required: --task' "$case_dir/out" 'missing task diagnosis' ;;
       missing-base) assert_grep 'arguments are required: --base' "$case_dir/out" 'missing base diagnosis' ;;
-      branch-base) assert_grep 'exact 40-hex base SHA' "$case_dir/out" 'branch name is not base evidence' ;;
+      branch-base) assert_grep 'exact full base commit SHA' "$case_dir/out" 'branch name is not base evidence' ;;
     esac
   done
   pass 'author verification requires explicit task and exact base commit'
@@ -1821,6 +1850,7 @@ test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
 test_author_verification_requires_exact_identity
 test_author_verification_names_fetch_for_missing_objects
+test_author_verification_accepts_sha256_base
 test_github_unreadable_base_names_the_refusal
 test_identical_captain_words_follow_append_order
 test_triggered_review_verifies_only_when_independent

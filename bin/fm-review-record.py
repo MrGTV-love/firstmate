@@ -19,7 +19,7 @@ records are never replaced; append order, not wall-clock time, selects the newes
 review and captain-word for each canonical PR URL. Reads share the same lock.
 verify derives authors anew from the exact head's commits outside the merge base,
 with replacement objects disabled. fm-pr-merge.sh supplies --base as the live
-forge's exact 40-hex base SHA, never a stale local target ref. verify requires
+forge's exact full 40- or 64-hex base SHA, never a stale local target ref. verify requires
 --task selecting state/<task>.meta and --base; fetch the exact base and full head
 locally first. Non-pipeline commits form group ship, using the current meta,
 any state/<task>.control-relaunch.meta-prior, and every model in the
@@ -44,7 +44,8 @@ under all, stays unknown.
 --author-groups remains a required declaration of exact author models, not an
 authority to remove or relabel derived groups. Named declarations must include the
 derived family; an all declaration must include every derived family. Additional
-typed groups/families add constraints. --covered-groups is a JSON list naming only
+typed named groups add constraints to that group; typed all families outside the
+derived ones form group declared:all, the one owner of those extra constraints. --covered-groups is a JSON list naming only
 the groups the reader actually read, or ["all"]; omitted, author-groups keys name
 the covered groups. Historical records use those same keys. A PASS covers one
 author family of a group only when it names that group or all, declares its
@@ -433,10 +434,8 @@ def verify(records, rows, head, home, pr, task, base):
             reader = model(row["reader_model"], "reader_model")
             # An 'all' read is usable only when its typed evidence includes every
             # derived family; the old OpenAI-only declaration cannot hide Claude.
-            extras = {a["family"] for a in declared("all", row["author_groups"].get("all", []))} - derived_families
             required = derived_families if "all" in row["author_groups"] else families
-            if ((group in named or "all" in named) and required <= declared_families
-                    and reader != "unknown" and "unknown" not in extras and reader not in extras):
+            if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
         # Every author family needs some reading PASS from a different family.
         uncovered = sorted(f for f in families if f == "unknown" or not readers - {f})
@@ -474,8 +473,8 @@ def main():
     args = parser.parse_args()
     try:
         home = task_home()
-        if args.command == "verify" and not re.fullmatch(r"[0-9a-f]{40}", args.base):
-            raise RecordError("author evidence requires --base with the forge's exact 40-hex base SHA")
+        if args.command == "verify" and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.base):
+            raise RecordError("author evidence requires --base with the forge's exact full base commit SHA (40 or 64 hex)")
         pr = canonical_pr(args.pr)
         row = {"schema": "fm-review-record.v1", "kind": args.command, "pr": pr, "at": int(time.time())}
         if args.command == "review":
