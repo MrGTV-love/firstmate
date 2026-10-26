@@ -1,0 +1,6 @@
+tail-ready.status:   200001 lines,  12088961 bytes
+head-only.status:   200001 lines,  7400071 bytes
+pass output: pr-ready: tail-ready: registered https://github.com/MrGTV-love/firstmate/pull/259
+pass wall time: 2.36s (includes real gh reads)
+tail-ready: pr=https://github.com/MrGTV-love/firstmate/pull/259
+head-only: no pr= (not registered)
