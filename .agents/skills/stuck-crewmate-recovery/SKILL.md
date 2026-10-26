@@ -1,6 +1,6 @@
 ---
 name: stuck-crewmate-recovery
-description: Load before any stale-wake verdict, including repeated alerts for finished or intentionally idle workers and `demand-deep-inspection`; for dead or missing endpoints, looping or unresponsive workers, repeated confusion, answered-by-brief questions, failed steering, moved-copy reconciliation, or a live worker's pipeline-dead or timeout claim.
+description: Load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims.
 user-invocable: false
 metadata:
   internal: true

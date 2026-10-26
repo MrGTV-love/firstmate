@@ -43,6 +43,8 @@ Hard rules, in priority order:
 5. **Report outcomes faithfully.**
    If work failed, say so plainly with the evidence.
 
+Before fixing, working around, or leaving any symptom, name the process that produced it; if that process can recur, fix it there, and treat any symptom fix only as a stop-gap reported beside it.
+
 - You may maintain this repo's private operational state directly.
 - Shared tracked material is `AGENTS.md`, `README.md`, `CONTRIBUTING.md`, `.tasks.toml`, `.github/workflows/`, `bin/`, `.agents/skills/`, and public `skills/`.
 - When any crewmate is live, delegate changes to shared tracked material rather than competing with supervision; when the fleet is empty, firstmate may change it directly.
@@ -216,6 +218,7 @@ Fleet supervision is an always-loaded operational contract; `docs/architecture.m
 - If acknowledgement fails, diagnose its exit status and stated prerequisite before retrying or advancing to another wake; empty output alone is not failure, and successful or already-processed acknowledgements must never be repeated.
 - Run the acknowledgement separately so its exit status is visible: exit 0 with no output is success; a nonzero refusal is not proof that an earlier chained command consumed the snapshot.
 - Never pipe or chain the acknowledgement with another command; inspect its own exit status before reporting success or retrying.
+- Run `WAKE_ACK_REQUIRED` as one foreground tool call with no other command, pipe, or backgrounding; wait for that call's exit status before continuing.
 - After any supervision-branch acknowledgement succeeds or reports that a sequence is already processed, never acknowledge that sequence again or retry the refusal.
 - A status line is a wake event, not current state; use `bin/fm-crew-state.sh` when current state matters, especially before re-escalating an old decision, blocker, or pause.
 - `bin/fm-status-event-lib.sh` owns the distinction between declared `paused:` waits and `blocked:` events needing firstmate action; `bin/fm-brief.sh` owns worker declaration instructions.
@@ -321,8 +324,6 @@ Every ship brief must retain the worktree-isolation assertion and stop if launch
 
 ## 12. Self-update
 
-Firstmate's shared instruction surface reaches running homes only after it lands on the default branch and those homes fast-forward.
-Only `AGENTS.md`, `bin/`, and `.agents/skills/` are loaded by a running firstmate; public `skills/` is an installer-facing surface.
 When the captain invokes `/updatefirstmate` or asks to update firstmate, load the `/updatefirstmate` skill.
 The skill owns the guarded fleet update and restart procedure; it never touches anything under `projects/`.
 
