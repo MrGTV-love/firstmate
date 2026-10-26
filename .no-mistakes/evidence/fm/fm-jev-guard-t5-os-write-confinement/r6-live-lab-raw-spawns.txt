@@ -1,0 +1,197 @@
+=== r6o raw/named launch: claude
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6o harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6o worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/1/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=8e13025a-5fc7-4a62-b5ce-d18320ea128b
+--- stand-in probe for r6o:
+other task ran: confinement=seatbelt-v1
+done
+
+--- other task r6o after setup:
+base.r6o payload: keep
+~/tmp fixture-r6o payload: keep
+data/r6o/eval-target: keep
+state/r6o.status: working: other task
+primary README: notes|
+
+=== r6c3 raw/named launch: [[ -f README.md ]] && claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6c3 harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6c3 worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/2/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=1f3f61da-1e36-4e6f-b64a-8d694e7145da
+--- stand-in probe for r6c3:
+argv: --session-id 1f3f61da-1e36-4e6f-b64a-8d694e7145da --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-r6c3 cwd=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/2/notes
+CURSOR_AGENT=<unset> CURSOR_INVOKED_AS=<unset> GEMINI_CLI=<unset> ANTHROPIC_API_KEY=<unset> LAB_MARK=1
+(a) rm -rf /private/tmp/claude-501/base.r6o* (B3)          -> refused
+    (a) other fixture survives: yes
+(b) find ~/tmp -name '*r6o*' -delete (B15 sweep)           -> ok
+    (b) other ~/tmp fixture survives: yes
+(c) python Path(data/r6o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/r6c3.status                           -> ok
+(e) whole-file rewrite of state/r6o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== r6c1 raw/named launch: [ -d src ] && cd src; claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6c1 harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6c1 worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/3/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=4aa8d578-37f7-44e4-9752-37c760380e89
+--- stand-in probe for r6c1:
+argv: --session-id 4aa8d578-37f7-44e4-9752-37c760380e89 --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-r6c1 cwd=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/3/notes
+CURSOR_AGENT=<unset> CURSOR_INVOKED_AS=<unset> GEMINI_CLI=<unset> ANTHROPIC_API_KEY=<unset> LAB_MARK=1
+(a) rm -rf /private/tmp/claude-501/base.r6o* (B3)          -> refused
+    (a) other fixture survives: yes
+(b) find ~/tmp -name '*r6o*' -delete (B15 sweep)           -> ok
+    (b) other ~/tmp fixture survives: yes
+(c) python Path(data/r6o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/r6c1.status                           -> ok
+(e) whole-file rewrite of state/r6o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== r6c2 raw/named launch: true && claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6c2 harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6c2 worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/4/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=3ea2c16c-d052-4fe2-8f88-f409ae9fee6f
+--- stand-in probe for r6c2:
+argv: --session-id 3ea2c16c-d052-4fe2-8f88-f409ae9fee6f --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-r6c2 cwd=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/4/notes
+CURSOR_AGENT=<unset> CURSOR_INVOKED_AS=<unset> GEMINI_CLI=<unset> ANTHROPIC_API_KEY=<unset> LAB_MARK=1
+(a) rm -rf /private/tmp/claude-501/base.r6o* (B3)          -> refused
+    (a) other fixture survives: yes
+(b) find ~/tmp -name '*r6o*' -delete (B15 sweep)           -> ok
+    (b) other ~/tmp fixture survives: yes
+(c) python Path(data/r6o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/r6c2.status                           -> ok
+(e) whole-file rewrite of state/r6o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== r6c5 raw/named launch: export X=1 && claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6c5 harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6c5 worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/5/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=9d35f79f-c5d5-4c7f-b0ec-c82007a536c0
+--- stand-in probe for r6c5:
+argv: --session-id 9d35f79f-c5d5-4c7f-b0ec-c82007a536c0 --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-r6c5 cwd=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/5/notes
+CURSOR_AGENT=<unset> CURSOR_INVOKED_AS=<unset> GEMINI_CLI=<unset> ANTHROPIC_API_KEY=<unset> LAB_MARK=1
+(a) rm -rf /private/tmp/claude-501/base.r6o* (B3)          -> refused
+    (a) other fixture survives: yes
+(b) find ~/tmp -name '*r6o*' -delete (B15 sweep)           -> ok
+    (b) other ~/tmp fixture survives: yes
+(c) python Path(data/r6o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/r6c5.status                           -> ok
+(e) whole-file rewrite of state/r6o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== r6p raw/named launch: claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6p harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6p worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/6/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=051273ca-d177-48b6-b2b6-847e2f639bbc
+--- stand-in probe for r6p:
+argv: --session-id 051273ca-d177-48b6-b2b6-847e2f639bbc --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-r6p cwd=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/6/notes
+CURSOR_AGENT=<unset> CURSOR_INVOKED_AS=<unset> GEMINI_CLI=<unset> ANTHROPIC_API_KEY=<unset> LAB_MARK=1
+(a) rm -rf /private/tmp/claude-501/base.r6o* (B3)          -> refused
+    (a) other fixture survives: yes
+(b) find ~/tmp -name '*r6o*' -delete (B15 sweep)           -> ok
+    (b) other ~/tmp fixture survives: yes
+(c) python Path(data/r6o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/r6p.status                            -> ok
+(e) whole-file rewrite of state/r6o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+--- other task r6o after accepted compound spawns:
+base.r6o payload: keep
+~/tmp fixture-r6o payload: keep
+data/r6o/eval-target: keep
+state/r6o.status: working: other task
+primary README: notes|
+
+=== r6x1 raw/named launch: true && claude --print "$(date)"
+spawn rc=1
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands
+no state/r6x1.meta (no launch)
+--- no stand-in probe for r6x1 (claude never ran in the task pane)
+
+=== r6x2 raw/named launch: true && claude --print `date`
+spawn rc=1
+malformed raw launch command: backtick command substitution; use a named harness or simplify the raw launch to literal shell commands
+no state/r6x2.meta (no launch)
+--- no stand-in probe for r6x2 (claude never ran in the task pane)
+
+=== r6x3 raw/named launch: true && (claude --print hi)
+spawn rc=1
+malformed raw launch command: shell grouping or array syntax; use a named harness or simplify the raw launch to literal shell commands
+no state/r6x3.meta (no launch)
+--- no stand-in probe for r6x3 (claude never ran in the task pane)
+
+=== r6x4 raw/named launch: claude --print "$(date)"
+spawn rc=1
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands
+no state/r6x4.meta (no launch)
+--- no stand-in probe for r6x4 (claude never ran in the task pane)
+
+=== r6x5 raw/named launch: [[ -f README.md ]] && claude --print hi $X
+spawn rc=1
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+no state/r6x5.meta (no launch)
+--- no stand-in probe for r6x5 (claude never ran in the task pane)
+
+--- other task r6o after adversarial spawns:
+base.r6o payload: keep
+~/tmp fixture-r6o payload: keep
+data/r6o/eval-target: keep
+state/r6o.status: working: other task
+primary README: notes|
+
+=== r6n raw/named launch: true && echo no-claude-here
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned r6n harness=true kind=ship mode=local-only yolo=on window=lab:fm-r6n worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/7/notes
+harness=true
+write_confinement=unconfined-macos-true
+--- no stand-in probe for r6n (claude never ran in the task pane)
+
+=== r6n2 raw/named launch: true && echo "$(date)"
+spawn rc=1
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands
+no state/r6n2.meta (no launch)
+--- no stand-in probe for r6n2 (claude never ran in the task pane)
+
+=== lab driver finished

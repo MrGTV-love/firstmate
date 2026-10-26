@@ -1,0 +1,54 @@
+##### r6c3 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c3.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c3.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6c3'\'' TMP='\''/tmp/fm-r6c3'\'' TEMP='\''/tmp/fm-r6c3'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c3.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''[[ -f README.md ]] && claude --session-id 1f3f61da-1e36-4e6f-b64a-8d694e7145da --print hi'\''\'\'''\'''\'''
+
+##### r6c3 pane tail
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6c3
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6c3+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018231.9137.24369.sh'
+charlesabrooker@Mac-Studio notes %
+
+##### r6c1 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c1.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c1.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6c1'\'' TMP='\''/tmp/fm-r6c1'\'' TEMP='\''/tmp/fm-r6c1'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c1.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''[ -d src ] && cd src; claude --session-id 4aa8d578-37f7-44e4-9752-37c760380e89 --print hi'\''\'\'''\'''\'''
+
+##### r6c1 pane tail
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6c1
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6c1+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018261.27578.30187.sh'
+charlesabrooker@Mac-Studio notes %
+
+##### r6c2 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c2.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c2.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6c2'\'' TMP='\''/tmp/fm-r6c2'\'' TEMP='\''/tmp/fm-r6c2'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c2.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''true && claude --session-id 3ea2c16c-d052-4fe2-8f88-f409ae9fee6f --print hi'\''\'\'''\'''\'''
+
+##### r6c2 pane tail
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6c2
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6c2+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018292.45579.24450.sh'
+charlesabrooker@Mac-Studio notes %
+
+##### r6c5 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c5.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c5.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6c5'\'' TMP='\''/tmp/fm-r6c5'\'' TEMP='\''/tmp/fm-r6c5'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6c5.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''export X=1 && claude --session-id 9d35f79f-c5d5-4c7f-b0ec-c82007a536c0 --print hi'\''\'\'''\'''\'''
+
+##### r6c5 pane tail
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6c5
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6c5+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018322.59211.7731.sh'
+charlesabrooker@Mac-Studio notes %
+
+##### r6p delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6p.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6p.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6p'\'' TMP='\''/tmp/fm-r6p'\'' TEMP='\''/tmp/fm-r6p'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6p.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''claude --session-id 051273ca-d177-48b6-b2b6-847e2f639bbc --print hi'\''\'\'''\'''\'''
+
+##### r6p pane tail
+charlesabrooker@Mac-Studio notes % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6p
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6p+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018356.73615.24725.sh'
+charlesabrooker@Mac-Studio notes %
+
+##### r6n delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6n.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; export FM_WRITE_CONFINEMENT='unconfined-macos-true'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6n.inbox'; true && echo no-claude-here
+
+##### r6n pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=r6n
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6n+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018519.14161.16907.sh'
+no-claude-here
+charlesabrooker@Mac-Studio notes %
+

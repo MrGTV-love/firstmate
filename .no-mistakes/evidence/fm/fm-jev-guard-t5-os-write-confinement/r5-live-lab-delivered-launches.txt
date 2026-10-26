@@ -1,0 +1,76 @@
+##### t5c1 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c1.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c1.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-t5c1'\'' TMP='\''/tmp/fm-t5c1'\'' TEMP='\''/tmp/fm-t5c1'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c1.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI [ -d src ] && cd src; claude --session-id 657672d9-8dd7-4dc9-a2c6-a98232c79a54 --print hi'\'''
+
+##### t5c1 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5c1
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5c1+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017028.72117.15077.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5c2 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c2.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c2.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-t5c2'\'' TMP='\''/tmp/fm-t5c2'\'' TEMP='\''/tmp/fm-t5c2'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c2.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI true && claude --session-id e1ec541a-3d41-484e-ba5f-464d71d872b6 --print hi'\'''
+
+##### t5c2 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5c2
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5c2+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017062.84791.30049.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5c3 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c3.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c3.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-t5c3'\'' TMP='\''/tmp/fm-t5c3'\'' TEMP='\''/tmp/fm-t5c3'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c3.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI [[ -f x ]] && claude --session-id e729f996-f968-4175-97da-637168407e15 --print hi'\'''
+
+##### t5c3 pane tail
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5c3+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017096.91294.2877.sh'
+env: [[: No such file or directory
+charlesabrooker@Mac-Studio notes % 
+
+##### t5c4 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c4.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c4.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-t5c4'\'' TMP='\''/tmp/fm-t5c4'\'' TEMP='\''/tmp/fm-t5c4'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5c4.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI true; FOO=1 claude --session-id bdaca6b9-5862-4a84-8534-e197df11db7d --print hi'\'''
+
+##### t5c4 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5c4
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5c4+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017155.2805.820.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5p delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5p.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5p.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-t5p'\'' TMP='\''/tmp/fm-t5p'\'' TEMP='\''/tmp/fm-t5p'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5p.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI claude --session-id 1b011921-0d8d-495c-8733-6d6465eba706 --print hi'\'''
+
+##### t5p pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5p
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5p+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017188.16615.31364.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5x1 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x1.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; export FM_WRITE_CONFINEMENT='unconfined-macos-true'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x1.inbox'; true && claude --print "$(date)"
+
+##### t5x1 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5x1
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5x1+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017221.27738.11677.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5x2 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x2.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; export FM_WRITE_CONFINEMENT='unconfined-macos-true'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x2.inbox'; true && claude --print `date`
+
+##### t5x2 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5x2
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5x2+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017226.31873.32428.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5x3 delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x3.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; export FM_WRITE_CONFINEMENT='unconfined-macos-true'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5x3.inbox'; true && (claude --print hi)
+
+##### t5x3 pane tail
+charlesabrooker@Mac-Studio notes % export FM_TASK_ID=t5x3
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5x3+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017231.36535.20250.sh'
+charlesabrooker@Mac-Studio notes % 
+
+##### t5n delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5n.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; export FM_WRITE_CONFINEMENT='unconfined-macos-true'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home'; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-lab.XSuKB2/home/state/t5n.inbox'; true && echo no-claude-here
+
+##### t5n pane tail
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-t5n+5fdbc962107a6eacf437f9c847ddd367ad81a9a6f86351e87c34a6f5d7409f3c/launch.s1793017263.49570.21682.sh'
+no-claude-here
+charlesabrooker@Mac-Studio notes % 
+
+##### shell check of the env prefix before a builtin first word
+[[ -f /etc/hosts ]] && echo CLAUDE-RAN => env: [[: No such file or directory 
+export X=1 && echo CLAUDE-RAN => env: export: No such file or directory 
+[ -f /etc/hosts ] && echo CLAUDE-RAN => CLAUDE-RAN 

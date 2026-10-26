@@ -1,0 +1,36 @@
+# Live lab: real bin/fm-spawn.sh raw launch commands (HEAD 603d4edbc), stand-in claude records argv
+=== t5lab3 raw launch: claude --session-id 11111111-2222-4333-8444-555555555555 --print hi
+spawn rc=1
+malformed raw launch command: --session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects; use a named harness or simplify the raw launch to literal shell commands
+=== t5lab4 raw launch: claude $FLAGS
+spawn rc=1
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+=== t5lab5 raw launch: claude --x=[ab]
+spawn rc=1
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+=== t5lab6 raw launch: [ -d src ] && cd src; claude --print hi
+spawn rc=0
+confinement audit: harness=[ write_confinement=unconfined-macos-[
+spawned t5lab6 harness=[ kind=ship mode=local-only yolo=on window=firstmate:fm-t5lab6 worktree=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/3/notes
+write_confinement=unconfined-macos-[
+=== t5lab7 raw launch: [[ -f x ]] && claude --print hi
+spawn rc=0
+confinement audit: harness=[[ write_confinement=unconfined-macos-[[
+spawned t5lab7 harness=[[ kind=ship mode=local-only yolo=on window=firstmate:fm-t5lab7 worktree=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/4/notes
+write_confinement=unconfined-macos-[[
+=== t5lab8 raw launch: claude --resume abc --model opus
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5lab8 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5lab8 worktree=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/5/notes
+write_confinement=seatbelt-v1
+claude_session_id=ac2f55c5-521e-4f74-b856-728c68b2016f
+=== t5lab9 raw launch: true && claude --print hi
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5lab9 harness=true kind=ship mode=local-only yolo=on window=firstmate:fm-t5lab9 worktree=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/6/notes
+write_confinement=unconfined-macos-true
+claude argv recorded by stand-in: --print hi
+sandbox-exec in delivered launch: 0
+=== argv recorded: t5lab6: --print hi  | t5lab8: --session-id ac2f55c5-521e-4f74-b856-728c68b2016f --fork-session --resume abc --model opus
+t5lab6 sandbox-exec in delivered launch: 0
+t5lab8 sandbox-exec in delivered launch: 1

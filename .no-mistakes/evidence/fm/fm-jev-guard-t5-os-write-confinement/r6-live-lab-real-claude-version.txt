@@ -1,0 +1,14 @@
+# r6v: raw '[[ -f README.md ]] && claude --version' with the REAL Claude CLI 2.1.310 (no fakebin on PATH, no model call)
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned r6v harness=claude kind=ship mode=local-only yolo=on window=lab:fm-r6v worktree=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/.treehouse/notes-2fba26/8/notes
+rc=0
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=69e7d8c8-6e1f-422c-8de0-e443cc40cb17
+## delivered launch (final line)
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6v.git-hooks'; unset fm_hooks fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; /usr/bin/sandbox-exec -f '/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6v.write-confinement.sb' /bin/bash -c 'export TMPDIR='\''/tmp/fm-r6v'\'' TMP='\''/tmp/fm-r6v'\'' TEMP='\''/tmp/fm-r6v'\''; export FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''; unset CLAUDE_CONFIG_DIR; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_DURATION_HOME='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home'\''; export FM_TASK_INBOX='\''/Users/charlesabrooker/tmp/fm-lab.9qE1tc/home/state/r6v.inbox'\''; env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN /bin/sh -c '\''env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI /bin/sh -c '\''\'\'''\''[[ -f README.md ]] && claude --session-id 69e7d8c8-6e1f-422c-8de0-e443cc40cb17 --version'\''\'\'''\'''\'''
+
+## pane tail
+charlesabrooker@Mac-Studio notes % . '/tmp/fm-r6v+794c9fa81acd29931c5a4f76ac926524a47ffd71a06d5b063f595d2070421788/launch.s1793018613.42231.26801.sh'
+2.1.310 (Claude Code)
+charlesabrooker@Mac-Studio notes %

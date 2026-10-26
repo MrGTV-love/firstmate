@@ -1,0 +1,180 @@
+=== t5o raw/named launch: claude
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5o harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5o worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/1/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=4903c013-0c29-4ec0-acde-47819d05e354
+--- stand-in probe for t5o:
+other task ran: confinement=seatbelt-v1
+done
+
+=== t5c1 raw/named launch: [ -d src ] && cd src; claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5c1 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5c1 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/2/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=657672d9-8dd7-4dc9-a2c6-a98232c79a54
+--- stand-in probe for t5c1:
+argv: --session-id 657672d9-8dd7-4dc9-a2c6-a98232c79a54 --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-t5c1 cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/2/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> refused
+    (a) other fixture survives: yes
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5c1.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== t5c2 raw/named launch: true && claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5c2 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5c2 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/3/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=e1ec541a-3d41-484e-ba5f-464d71d872b6
+--- stand-in probe for t5c2:
+argv: --session-id e1ec541a-3d41-484e-ba5f-464d71d872b6 --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-t5c2 cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/3/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> refused
+    (a) other fixture survives: yes
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5c2.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== t5c3 raw/named launch: [[ -f x ]] && claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5c3 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5c3 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/4/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=e729f996-f968-4175-97da-637168407e15
+--- no stand-in probe for t5c3 (claude never ran in the task pane)
+
+=== t5c4 raw/named launch: true; FOO=1 claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5c4 harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5c4 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/5/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=bdaca6b9-5862-4a84-8534-e197df11db7d
+--- stand-in probe for t5c4:
+argv: --session-id bdaca6b9-5862-4a84-8534-e197df11db7d --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-t5c4 cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/5/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> refused
+    (a) other fixture survives: yes
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5c4.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== t5p raw/named launch: claude --print hi
+spawn rc=0
+confinement audit: harness=claude write_confinement=seatbelt-v1
+spawned t5p harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5p worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/6/notes
+harness=claude
+write_confinement=seatbelt-v1
+claude_session_id=1b011921-0d8d-495c-8733-6d6465eba706
+--- stand-in probe for t5p:
+argv: --session-id 1b011921-0d8d-495c-8733-6d6465eba706 --print hi
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-t5p cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/6/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> refused
+    (a) other fixture survives: yes
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5p.status                            -> ok
+(e) whole-file rewrite of state/t5o.status                 -> refused
+primary checkout README append                             -> refused
+own data dir write                                         -> ok
+done
+
+=== t5x1 raw/named launch: true && claude --print "$(date)"
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5x1 harness=true kind=ship mode=local-only yolo=on window=firstmate:fm-t5x1 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/7/notes
+harness=true
+write_confinement=unconfined-macos-true
+--- stand-in probe for t5x1:
+argv: --print Mon Oct 26 07:20:22 CDT 2026
+FM_WRITE_CONFINEMENT=unconfined-macos-true TMPDIR=/Users/charlesabrooker/tmp cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/7/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> ok
+    (a) other fixture survives: no
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> ok
+    (c) target survives: no
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5x1.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> ok
+primary checkout README append                             -> ok
+own data dir write                                         -> ok
+done
+
+=== t5x2 raw/named launch: true && claude --print `date`
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5x2 harness=true kind=ship mode=local-only yolo=on window=firstmate:fm-t5x2 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/8/notes
+harness=true
+write_confinement=unconfined-macos-true
+--- stand-in probe for t5x2:
+argv: --print Mon Oct 26 07:20:27 CDT 2026
+FM_WRITE_CONFINEMENT=unconfined-macos-true TMPDIR=/Users/charlesabrooker/tmp cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/8/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> ok
+    (a) other fixture survives: no
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: no
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5x2.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> ok
+primary checkout README append                             -> ok
+own data dir write                                         -> ok
+done
+
+=== t5x3 raw/named launch: true && (claude --print hi)
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5x3 harness=true kind=ship mode=local-only yolo=on window=firstmate:fm-t5x3 worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/9/notes
+harness=true
+write_confinement=unconfined-macos-true
+--- stand-in probe for t5x3:
+argv: --print hi
+FM_WRITE_CONFINEMENT=unconfined-macos-true TMPDIR=/Users/charlesabrooker/tmp cwd=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/9/notes
+(a) rm -rf /private/tmp/claude-501/base.t5o* (B3)          -> ok
+    (a) other fixture survives: no
+(c) python Path(data/t5o/eval-target).unlink() (H3)        -> refused
+    (c) target survives: no
+(d) write in own nested worktree (.claude/worktrees)       -> ok
+(e) append own state/t5x3.status                           -> ok
+(e) whole-file rewrite of state/t5o.status                 -> ok
+primary checkout README append                             -> ok
+own data dir write                                         -> ok
+done
+
+=== t5x4 raw/named launch: claude --print "$(date)"
+spawn rc=1
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands
+no state/t5x4.meta (no launch)
+--- no stand-in probe for t5x4 (claude never ran in the task pane)
+
+=== t5n raw/named launch: true && echo no-claude-here
+spawn rc=0
+confinement audit: harness=true write_confinement=unconfined-macos-true
+spawned t5n harness=true kind=ship mode=local-only yolo=on window=firstmate:fm-t5n worktree=/Users/charlesabrooker/tmp/fm-lab.XSuKB2/user-home/.treehouse/notes-e92bf2/10/notes
+harness=true
+write_confinement=unconfined-macos-true
+--- no stand-in probe for t5n (claude never ran in the task pane)
+
+=== lab driver finished
+DRIVER-EXIT=0

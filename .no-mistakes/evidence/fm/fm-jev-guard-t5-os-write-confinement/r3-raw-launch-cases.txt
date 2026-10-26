@@ -1,0 +1,95 @@
+# bin/fm-raw-launch.py render-claude at 603d4edbc, session 11111111-2222-4333-8444-555555555555, empty prefix
+
+$ render-claude claude\ --print\ hi
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print hi
+
+$ render-claude \[\ -d\ src\ \]\ \&\&\ cd\ src\;\ claude\ --print\ hi
+rc=0
+[ -d src ] && cd src; claude --session-id 11111111-2222-4333-8444-555555555555 --print hi
+
+$ render-claude \[\[\ -f\ x\ \]\]\ \&\&\ claude\ --print\ hi
+rc=0
+[[ -f x ]] && claude --session-id 11111111-2222-4333-8444-555555555555 --print hi
+
+$ render-claude claude\ --resume\ abc\ --model\ opus
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --fork-session --resume abc --model opus
+
+$ render-claude claude\ -c
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --fork-session -c
+
+$ render-claude claude\ --session-id\ X\ --print\ hi
+rc=2
+malformed raw launch command: --session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --session-id=X\ --print\ hi
+rc=2
+malformed raw launch command: --session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ \$FLAGS
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ \$\{FLAGS\}
+rc=2
+malformed raw launch command: command substitution or braced expansion; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --x=\[ab\]
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \*.md
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ a\?b
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \{a,b\}
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \"\$\(cat\ prompt.md\)\"
+rc=2
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \`cat\ prompt.md\`
+rc=2
+malformed raw launch command: backtick command substitution; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \'\$HOME\ \[ab\]\ \*\'
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print '$HOME [ab] *'
+
+$ render-claude claude\ --print\ \"\]\[\"
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print "]["
+
+# extra bracket edge cases
+
+$ render-claude claude\ --print\ \]\[
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print ][
+
+$ render-claude claude\ --print\ a\[b
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print a[b
+
+$ render-claude claude\ --print\ \[a\]b
+rc=2
+malformed raw launch command: shell expansion in a claude argument, which can produce options such as --resume that this check cannot see; use a named harness or simplify the raw launch to literal shell commands
+
+$ render-claude claude\ --print\ \"\[a\]\"b
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print "[a]"b
+
+$ render-claude claude\ --print\ \[a\"\]\"
+rc=0
+claude --session-id 11111111-2222-4333-8444-555555555555 --print [a"]"
+
+$ render-claude \[\ -d\ src\ \]\&\&claude\ --print\ hi
+rc=0
+[ -d src ]&&claude --session-id 11111111-2222-4333-8444-555555555555 --print hi

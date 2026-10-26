@@ -1,0 +1,12 @@
+# (b) B15 age sweep under the real generated profile of task r6c3 (HOME=/Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home)
+total 8
+drwxr-xr-x  3 charlesabrooker  staff  96 Jan  1  2020 .
+drwxr-xr-x  3 charlesabrooker  staff  96 Oct 26 07:37 ..
+-rw-r--r--  1 charlesabrooker  staff   5 Jan  1  2020 payload
+$ sandbox-exec -f state/r6c3.write-confinement.sb find ~/tmp -mindepth 1 -mtime +30 -exec rm -rf {} +
+rm: /Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/tmp/fixture-r6o/payload: Operation not permitted
+rm: /Users/charlesabrooker/tmp/fm-lab.9qE1tc/user-home/tmp/fixture-r6o: Operation not permitted
+exit=1
+other ~/tmp fixture payload: keep
+# own-task ~/tmp entry is deletable under the same profile
+exit=0 own exists after: no

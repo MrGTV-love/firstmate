@@ -1,0 +1,65 @@
+# Live lab: real bin/fm-control.sh t5lab2 relaunch (HEAD 603d4edbc) after the Claude config root $HOME/.claude was moved away (absent)
+# relaunch rc=1 is a fixture limit: the model-free stand-in exits, so no live agent is confirmed within 90s. The relaunch still rebuilt the profile, minted a new session id and created the session folders.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.XGfLMG/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.XGfLMG/home
+WARNING: watcher still down (same stale episode; last beat: 601s ago, grace 300s) - full banner already printed this episode.
+notice: t5lab2 ships mode=local-only while the standing posture for notes is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for t5lab2: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+error: the replacement agent for t5lab2 did not come up within 90s (endpoint reads 'dead')
+error: t5lab2 was relaunched on claude but no running agent could be confirmed; its work is preserved at /private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/2/notes
+## meta after relaunch
+write_confinement=seatbelt-v1
+claude_session_id=a8f625d3-c043-4c13-8a82-7c3361075c61
+## config root created by relaunch (mode path)
+700 .
+700 ./file-history
+755 ./file-history/a8f625d3-c043-4c13-8a82-7c3361075c61
+700 ./projects
+700 ./projects/-private-tmp-fm-lab-XGfLMG-home-projects-notes--claude-worktrees--treehouse-notes-967e99-2-notes
+700 ./session-env
+755 ./session-env/a8f625d3-c043-4c13-8a82-7c3361075c61
+700 ./tasks
+755 ./tasks/a8f625d3-c043-4c13-8a82-7c3361075c61
+## relaunched delivered launch re-sourced in its pane with fresh t5lab1 fixtures
+FM_WRITE_CONFINEMENT=seatbelt-v1 TMPDIR=/tmp/fm-t5lab2 cwd=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/2/notes
+(a) rm -rf /private/tmp/claude-501/base.t5lab1* (B3)           -> refused
+    (a) other task fixture survives: yes
+(b) aged sweep find ~/tmp -name fm-teardown.* -mtime +1 rm (B15) -> refused
+    (b) other task fixture survives: yes
+(c) python eval Path(data/t5lab1/eval-target).unlink() (H3)    -> refused
+    (c) target survives: yes
+(d) write in own nested worktree (.claude/worktrees)           -> ok
+(e) append own state/t5lab2.status                             -> ok
+(e) whole-file rewrite of state/t5lab1.status                  -> refused
+(e) rename-over of state/t5lab1.status                         -> refused
+    (e) other status unchanged: yes
+other task temp root /tmp/fm-t5lab1 write                      -> refused
+other task worktree write                                      -> refused
+own temp dir write                                             -> ok
+own data dir write                                             -> ok
+primary checkout write                                         -> refused
+fleet config write (direct)                                    -> refused
+unprotected path outside every root (default-allow)            -> ok
+delegated write via running tmux server (residual)             -> ok
+session-id from argv: a8f625d3-c043-4c13-8a82-7c3361075c61
+session write session-env/a8f625d3-c043-4c13-8a82-7c3361075c61/probe -> ok
+session write file-history/a8f625d3-c043-4c13-8a82-7c3361075c61/probe -> ok
+session write tasks/a8f625d3-c043-4c13-8a82-7c3361075c61/probe -> ok
+session write projects/-private-tmp-fm-lab-XGfLMG-home-projects-notes--claude-worktrees--treehouse-notes-967e99-2-notes/a8f625d3-c043-4c13-8a82-7c3361075c61.jsonl -> ok
+session write session-env/none/probe                           -> refused
+session write file-history/none/probe                          -> refused
+session write tasks/none/probe                                 -> refused
+session write projects/-private-tmp-fm-lab-XGfLMG-home-projects-notes--claude-worktrees--treehouse-notes-967e99-2-notes/none.jsonl -> refused
+session write session-env/99999999-8888-4777-8666-555555555555/probe -> refused
+session write file-history/99999999-8888-4777-8666-555555555555/probe -> refused
+session write tasks/99999999-8888-4777-8666-555555555555/probe -> refused
+session write projects/-private-tmp-fm-lab-XGfLMG-home-projects-notes--claude-worktrees--treehouse-notes-967e99-2-notes/99999999-8888-4777-8666-555555555555.jsonl -> refused
+done
+## pre-relaunch session id (80eb32d4...) under the regenerated profile
+pre-relaunch session id session-env/80eb32d4-de08-4ebf-9cdb-5cef9a037923/probe under regenerated profile -> refused
+pre-relaunch session id file-history/80eb32d4-de08-4ebf-9cdb-5cef9a037923/probe under regenerated profile -> refused
+pre-relaunch session id tasks/80eb32d4-de08-4ebf-9cdb-5cef9a037923/probe under regenerated profile -> refused

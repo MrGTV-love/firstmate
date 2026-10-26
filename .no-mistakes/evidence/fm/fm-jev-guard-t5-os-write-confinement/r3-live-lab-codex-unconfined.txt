@@ -1,0 +1,5 @@
+# Live lab: real bin/fm-spawn.sh --harness codex (stand-in codex) at HEAD 603d4edbc
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned t5labc harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-t5labc worktree=/private/tmp/fm-lab.XGfLMG/home/projects/notes/.claude/worktrees/.treehouse/notes-967e99/7/notes
+write_confinement=unconfined-macos-codex
+FM_WRITE_CONFINEMENT=unconfined-macos-codex other-task status append: written
