@@ -1199,7 +1199,7 @@ assert_launch_word() {
 # teamclaude_launch_line <log>: the newest launch the pane received. A confined
 # launch spans several lines inside its sandbox-exec wrapper and is kept whole.
 teamclaude_launch_line() {
-  awk '/^\/usr\/bin\/sandbox-exec /{buf=""; open=1}
+  awk '/\/usr\/bin\/sandbox-exec /{buf=""; open=1}
     open{buf=buf $0 "\n"}
     /Firstmate operational input waiting: read/{last=open ? buf : $0 "\n"; open=0}
     END{printf "%s", last}' "$1"

@@ -7497,13 +7497,14 @@ if [ "$LAUNCH_ENV_ENABLED" = 1 ]; then
   fi
   LAUNCH="$LAUNCH_ENV_PREFIX /bin/sh -c $(shell_quote "$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH")"
 fi
-LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
 if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # Set all temp selectors inside the final environment boundary, not in the
   # pane, so native tools and grandchildren use only the task temp root.
   LAUNCH="export TMPDIR=$(shell_quote "$TASK_TMP") TMP=$(shell_quote "$TASK_TMP") TEMP=$(shell_quote "$TASK_TMP"); $LAUNCH"
   LAUNCH="/usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") /bin/bash -c $(shell_quote "$LAUNCH")"
 fi
+# The persistent pane shell, not only the confined child, keeps the task hooks.
+LAUNCH="$GIT_HOOKS_LAUNCH_PREFIX $LAUNCH"
 # Implement the launch-delivery contract in this script's header. The full
 # home-identity hash isolates equal task ids across homes, and the spawn token in
 # the final filename keeps a buffered source line bound to this incarnation.
