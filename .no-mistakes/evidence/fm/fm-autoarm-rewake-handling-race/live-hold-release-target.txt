@@ -1,0 +1,14 @@
+# LIVE hold release (target 9a80424 target snapshot), FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ub9jNS, 2.1.310 (Claude Code)
+1793009007 session lock=51824
+1793009007 wrote hold token: 12345 1793000000 4242
+1793009013 after 6 s idle: hold present
+1793009015 after prompt submit at 1793009015: hold absent
+⏺ OK
+✻ Cogitated for 2s · done 5:03 AM
+                                                                                                  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 4% 47k/1.0M main target:e88f39ca
+  ⏵⏵ auto mode on (shift+tab to cycle)
+torn down /Users/charlesabrooker/tmp/fm-lab.ub9jNS

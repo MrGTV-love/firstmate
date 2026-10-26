@@ -1,0 +1,50 @@
+
+
+  Ran 3 shell commands
+
+⏺ Captain, this was another cycle-boundary wake. I handled it. The acknowledgement exited 0.
+
+  What happened
+  - The same item is still overdue: the backlog file data/backlog.md is missing in this home.
+  - Each new wake shows the item again. Each time, the system needs a fresh escalation recorded before it will accept the acknowledgement.
+  - I recorded that escalation again. No new facts came up.
+
+  Still needed from you
+  1. If this is a new home with no backlog yet, I can initialize the backlog.
+  2. If you had a backlog here before, give me its location. I can point the home at it or restore it.
+
+  Reply with 1 or 2, or the file location. I have not changed the backlog. Until you decide, these wakes will keep repeating.
+
+✻ Brewed for 10s · done 4:48 AM
+
+❯ Lab test step: run bin/fm-wake-drain.sh exactly once, then reply with only the word DRAINED. Do not run any acknowledgement or any other command in this turn.
+
+  Ran 1 shell command
+
+⏺ DRAINED
+
+✻ Brewed for 3s · done 4:48 AM
+
+⏺ Stop hook feedback
+
+  Ran 3 shell commands
+
+⏺ Captain, I handled this cycle-boundary wake. The acknowledgement exited 0.
+
+  What happened
+  - The same item is still overdue: data/backlog.md is missing in this home.
+  - I recorded the escalation again, because the system needs one for each new showing.
+
+  Still needed from you
+  1. If this is a new home with no backlog yet, I can initialize it.
+  2. If you had a backlog here before, give me its location. I can point the home at it or restore it.
+
+  Reply with 1 or 2, or the file location. I have not changed the backlog. Until you decide, these wakes will keep repeating.
+
+✻ Cooked for 8s · done 4:49 AM
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 1 or 2
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 62k/1.0M main target:a9d0b9d9
+  ⏵⏵ auto mode on (shift+tab to cycle)

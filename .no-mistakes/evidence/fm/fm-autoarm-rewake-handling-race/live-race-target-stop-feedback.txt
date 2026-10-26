@@ -1,0 +1,7 @@
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do
+--
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do

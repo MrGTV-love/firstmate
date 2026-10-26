@@ -1,0 +1,18 @@
+LIVE race reproduction: real Claude Code 2.1.310 (haiku) primary, real Stop hook, real supervision host, real watcher, lab FM_HOME,
+FM_SUPERVISION_HOST_PARK_SECONDS=90. Driver: live-driver-race.sh (main-actor bin/fm-wake-drain.sh runs back to back from 12 s
+before the park bound until 4 s after the boundary line, so a drain lands between the stopped watcher's downtime republish and
+the Stop hook's commit, leaving the shared marker in pending:handling with no healthy watcher).
+
+base 74175a585 (plain checkout of git archive):
+  marker at commit: pending:handling:23398.1793008817.2rGYIQ, queue empty, no watcher
+  ledger: outcome=failed ; state/.claude-autoarm-failure-notified written
+  Claude received: "firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed."  (count in transcript: 1)
+
+target d47469fb0:
+  marker at commit: pending:handling:92428.1793008791.ZDijky, queue empty, no watcher
+  ledger: outcome=rewake session_pid=61953 recovery_generation=92428.1793008791.ZDijky ; no failure notice file
+  Claude received: normal "firstmate watcher wake - one supervision event needs a handling turn now." + cycle-boundary line (FAILED count: 0)
+  Main acknowledged that generation; next park started (epoch=3 arming, watch.lock live); 2 Stop-hook rewakes total (first close + boundary), no extra.
+
+Earlier non-race live runs (live-target-lab.txt, live-base-lab.txt): drain-then-wait boundary did NOT discriminate; the stopped
+watcher republishes pending:downtime with the same generation (_fm_recovery_marker_publish), so both versions rewoke normally.

@@ -1,0 +1,19 @@
+# LIVE StopFailure hold release (target d47469fb0 plain copy), FM_HOME=/Users/charlesabrooker/tmp/fm-lab.wuXaoQ, 2.1.310 (Claude Code), ANTHROPIC_BASE_URL=http://127.0.0.1:9 (closed port) for this lab process only
+1793009064 session lock=52378
+1793009068 prompt submitted; then wrote hold token after UserPromptSubmit: 54321 1793000000 5151
+1793009243 hold absent
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-sf.pEpclI
+❯ Reply with only the word OK.
+⏺ API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)
+✻ Crunched for 2m 58s · done 5:07 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 0% 0/0 main fm-sf.pEpclI:97fa2bed
+  ⏵⏵ auto mode on (shift+tab to cycle)
+torn down /Users/charlesabrooker/tmp/fm-lab.wuXaoQ
+Note: this lab registered no supervision need (no task meta, check, or queued row), so bin/fm-claude-stop-autoarm.sh exits at its
+need gate before its own hold release; the hold stayed present for ~175 s of API retries after UserPromptSubmit had already
+fired, and was gone right after the "API Error ... ECONNREFUSED" turn end, i.e. released by the StopFailure registration of
+bin/fm-claude-hold-release.sh. No credential store was read or written; only this lab process's ANTHROPIC_BASE_URL was changed.

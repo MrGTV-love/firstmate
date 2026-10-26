@@ -1,0 +1,55 @@
+# LIVE lab (base): real 2.1.310 (Claude Code) (haiku) primary from /Users/charlesabrooker/tmp/fm-cf.qo7p1v/base (71f1644 base snapshot), FM_HOME=/Users/charlesabrooker/tmp/fm-lab.QmGpsi, FM_SUPERVISION_HOST_PARK_SECONDS=90
+1793008663 session lock=61952
+1793008666 host started
+1793008686 after first host close marker=announced:downtime:127.1793008682.qBiAQI ledger=[epoch=1 owner_pid=99124 outcome=rewake updated_at=1793008683 session_pid=61952 recovery_generation=127.1793008682.qBiAQI] notice=absent queue_rows=1 held=no watchlock=yes
+1793008749 fresh park started at 1793008739 marker=acked:handling:127.1793008682.qBiAQI ledger=[epoch=2 owner_pid=51081 outcome=arming updated_at=1793008739] notice=absent queue_rows=0 held=no watchlock=yes
+1793008817 race loop starting marker=acked:handling:127.1793008682.qBiAQI ledger=[epoch=2 owner_pid=51081 outcome=arming updated_at=1793008739] notice=absent queue_rows=0 held=no watchlock=yes
+1793008834 race loop ran 26 main-actor drains
+1793008837 after the park's boundary close marker=pending:handling:23398.1793008817.2rGYIQ ledger=[epoch=2 owner_pid=51081 outcome=failed updated_at=1793008830] notice= queue_rows=0 held=no watchlock=no
+1793008862 after main handled the delivery marker=acked:handling:23398.1793008817.2rGYIQ ledger=[epoch=3 owner_pid=60310 outcome=arming updated_at=1793008851] notice= queue_rows=0 held=no watchlock=yes
+## state/.supervision-host.log
+1793008666	start	gen=host-99677-1793008666	primary=claude
+1793008683	pass-through	attended	main-only	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793008739	start	gen=host-51515-1793008739	primary=claude
+1793008739	take-over	arm=12695
+1793008830	boundary	after 91s
+1793008851	start	gen=host-60846-1793008851	primary=claude
+## pane
+  Searched for 2 patterns, listed 1 directory, ran 11 shell commands
+⏺ Captain, the wake is handled and acknowledged. The ledger is still degraded, and I need your decision to fix it.
+  What is wrong
+  1. The home is /Users/charlesabrooker/tmp/fm-lab.QmGpsi.
+  2. Its backlog file is missing: data/backlog.md does not exist.
+  3. The data/ folder is empty. The home was created at 04:57 today.
+  4. Because of that, the open-loop check cannot read the backlog. It marks the ledger as degraded.
+  What I did
+  1. I drained the wake queue.
+  2. I reran the reconciler. It still reported the backlog as unavailable.
+  3. I recorded the obligation as escalated to you.
+  4. I acknowledged the wake. The acknowledgement exited 0.
+  5. I did not create any file. I did not change any project.
+  What I need from you, captain
+  Choose one:
+  - A. New home (my recommendation): I create an empty data/backlog.md in fm-lab. Then the check should clear on the next rerun.
+  - B. Restore: If you have an old backlog file for this home, tell me where it is. I will restore it, then rerun the reconciler.
+✻ Cooked for 55s · done 4:58 AM
+⏺ Stop hook feedback
+  Ran 5 shell commands
+⏺ Captain, the wake is handled and acknowledged. The acknowledgement exited 0.
+  What happened
+  1. The wake showed the same open item as before: the fm-lab backlog file is missing.
+  2. I recorded the escalation again, because the drain showed the item again and the acknowledgement needs an action on record.
+  3. The item is still open. Nothing is fixed yet.
+  What is still open
+  1. Backlog file missing (needs you). The file data/backlog.md does not exist in /Users/charlesabrooker/tmp/fm-lab.QmGpsi.
+     - A. New home (my recommendation): I create an empty data/backlog.md. Then the check should clear.
+     - B. Restore: Give me the location of an old backlog file. I restore it and rerun the check.
+  2. Watcher auto-arm failed (not handled). The Stop hook says the supervision host returned a wake, but its rewake could not be committed. I did not run bin/fm-watch-arm.sh, because the hook says not
+     to after an ordinary wake. I did not investigate the cause. Tell me if you want me to check it.
+✻ Cogitated for 21s · done 5:00 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ create the empty backlog
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 65k/1.0M main base:b15a0721
+  ⏵⏵ auto mode on (shift+tab to cycle)
+torn down /Users/charlesabrooker/tmp/fm-lab.QmGpsi

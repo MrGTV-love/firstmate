@@ -1,0 +1,52 @@
+# LIVE lab (target): real 2.1.310 (Claude Code) (haiku) primary from /Users/charlesabrooker/tmp/fm-cf.qo7p1v/target (9a80424 target snapshot), FM_HOME=/Users/charlesabrooker/tmp/fm-lab.71ZZz3, FM_SUPERVISION_HOST_PARK_SECONDS=90
+1793008663 session lock=61953
+1793008669 host started
+1793008686 after first host close marker=announced:downtime:2507.1793008683.WIWhGH ledger=[epoch=1 owner_pid=919 outcome=rewake updated_at=1793008684 session_pid=61953 recovery_generation=2507.1793008683.WIWhGH] notice=absent queue_rows=1 held=no watchlock=yes
+1793008723 fresh park started at 1793008713 marker=acked:handling:2507.1793008683.WIWhGH ledger=[epoch=2 owner_pid=36182 outcome=arming updated_at=1793008713] notice=absent queue_rows=0 held=no watchlock=yes
+1793008791 race loop starting marker=acked:handling:2507.1793008683.WIWhGH ledger=[epoch=2 owner_pid=36182 outcome=arming updated_at=1793008713] notice=absent queue_rows=0 held=no watchlock=yes
+1793008808 race loop ran 26 main-actor drains
+1793008811 after the park's boundary close marker=pending:handling:92428.1793008791.ZDijky ledger=[epoch=2 owner_pid=36182 outcome=rewake updated_at=1793008803 session_pid=61953 recovery_generation=92428.1793008791.ZDijky] notice=absent queue_rows=0 held=no watchlock=no
+1793008836 after main handled the delivery marker=acked:handling:92428.1793008791.ZDijky ledger=[epoch=3 owner_pid=21408 outcome=arming updated_at=1793008816] notice=absent queue_rows=0 held=no watchlock=yes
+## state/.supervision-host.log
+1793008667	start	gen=host-1872-1793008667	primary=claude
+1793008683	pass-through	attended	main-only	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793008713	start	gen=host-36773-1793008713	primary=claude
+1793008713	take-over	arm=13708
+1793008803	boundary	after 90s
+1793008816	start	gen=host-22000-1793008816	primary=claude
+## pane
+✻ Sautéed for 2s · done 4:57 AM
+⏺ Stop hook feedback
+  Ran 8 shell commands
+⏺ Captain, the wake is handled and acknowledged.
+  What happened
+  1. The ledger has one overdue row: "ledger degraded."
+  2. The reason is that this home has no config/ or state/ folders. The fleet snapshot says the backlog is unavailable.
+  3. tasks-axi list works and shows 0 tasks. So the backlog tool runs, but the reconciler cannot read the fleet sources.
+  4. I recorded the row as escalated, with that evidence.
+  5. The acknowledgement passed.
+  What I did not do
+  - I did not create config/ or state/. I do not know the cause yet.
+  Decision for you, captain
+  - Is this home set up correctly? If it should have config/ and state/, tell me where they are. I can then rerun the reconciler.
+  - If this is a new, empty home, the ledger error is expected. Then I can clear the row.
+✻ Churned for 28s · done 4:58 AM
+⏺ Stop hook feedback
+  Ran 4 shell commands
+⏺ Captain, the wake is handled and acknowledged.
+  What happened
+  1. The wake was a routine cycle boundary. No new event came in.
+  2. The same ledger row is still open: "ledger degraded."
+  3. The acknowledgement needed a fresh action on that row. So I recorded it as escalated again.
+  4. The acknowledgement passed.
+  Still waiting on you, captain
+  - This home has no config/ or state/ folders. The reconciler cannot read the fleet sources.
+  - Is this home set up correctly? If not, tell me where those folders are, and I will rerun the reconciler.
+  - If this is a new, empty home, I can clear the row.
+✻ Worked for 12s · done 5:00 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 55k/1.0M main target:9db54f28
+  ⏵⏵ auto mode on (shift+tab to cycle)
+torn down /Users/charlesabrooker/tmp/fm-lab.71ZZz3

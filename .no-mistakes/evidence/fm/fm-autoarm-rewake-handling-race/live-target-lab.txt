@@ -1,0 +1,52 @@
+# LIVE lab: real Claude Code 2.1.310 (Claude Code) (haiku) primary, target tree d47469fb0 copied to plain checkout, FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Yb6GRL, FM_SUPERVISION_HOST_PARK_SECONDS=90
+## state/.supervision-host.log
+1793007839	start	gen=host-64001-1793007839	primary=claude
+1793007856	pass-through	attended	main-only	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793007890	start	gen=host-45442-1793007890	primary=claude
+1793007890	take-over	arm=93877
+1793007981	boundary	after 91s
+1793007996	start	gen=host-37895-1793007996	primary=claude
+1793008086	boundary	after 90s
+1793008097	start	gen=host-58325-1793008096	primary=claude
+1793008186	boundary	after 90s
+1793008195	start	gen=host-85108-1793008195	primary=claude
+## state/.claude-autoarm-epoch (final)
+epoch=5 owner_pid=84359 outcome=arming updated_at=1793008195
+Mon Oct 26 04:49:55 2026     bash /Users/charlesabrooker/tmp/fm-cf.qo7p1v/target/bin/fm-claude-stop-autoarm.sh
+## state/.watcher-down (final)
+acked:handling:67662.1793008104.tskbXy
+## failure notice files
+## Stop hook rewakes Claude received (transcript)
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+--
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+--
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+--
+Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now.
+supervision-host: cycle boundary - the host ended its park at its bound; drain, acknowledge, and end the turn, and the next park starts on its own
+Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.
+## main's drain/ack tool calls (transcript)
+2026-10-26T09:44:20.707Z bin/fm-wake-drain.sh
+2026-10-26T09:44:45.959Z bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 64686.1793007856.ccdwgR; echo "exit=$?"
+2026-10-26T09:46:22.673Z bin/fm-wake-drain.sh; echo "exit=$?"
+2026-10-26T09:46:26.278Z bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 46922.1793007980.8xJdq4; echo "exit=$?"
+2026-10-26T09:46:33.511Z bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 46922.1793007980.8xJdq4; echo "exit=$?"
+2026-10-26T09:48:08.055Z bin/fm-wake-drain.sh; echo "exit=$?"
+2026-10-26T09:48:14.076Z bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 38463.1793008086.qoQJYZ; echo "exit=$?"
+2026-10-26T09:48:23.343Z bin/fm-wake-drain.sh; echo "exit=$?"
+2026-10-26T09:49:48.681Z bin/fm-wake-drain.sh; echo "exit=$?"
+2026-10-26T09:49:53.106Z bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 67662.1793008104.tskbXy; echo "exit=$?"
+## Polled observations during the run (driver tool output, epoch seconds)
+1793007873 marker=announced:handling:64686.1793007856.ccdwgR; ledger epoch=1 outcome=rewake recovery_generation=64686.1793007856.ccdwgR (host pass-through main-only close committed while marker was in handling; no failure notice)
+1793008086-1793008110 lab prompt "run bin/fm-wake-drain.sh exactly once ... Do not run any acknowledgement" ran at 09:48:23Z (main's empty-queue drain mid-park)
+1793008110 marker=pending:handling:67662.1793008104.tskbXy, .wake-queue empty, no .main-eligible-rows.held, watcher .watch.lock live (park 4 still running)
+1793008186 host log: boundary after 90s (host stopped the watcher)
+1793008190 marker still pending:handling:67662.1793008104.tskbXy; ledger epoch=4 outcome=rewake recovery_generation=67662.1793008104.tskbXy; no .claude-autoarm-failure-notified
+09:49:53Z main acknowledged --ack-through 0 --recovery-generation 67662.1793008104.tskbXy; next park (host-85108) started at 1793008195

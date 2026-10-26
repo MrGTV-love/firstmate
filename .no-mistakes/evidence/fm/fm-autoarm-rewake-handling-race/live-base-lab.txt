@@ -1,0 +1,51 @@
+# LIVE lab (base): real 2.1.310 (Claude Code) (haiku) primary from /Users/charlesabrooker/tmp/fm-cf.qo7p1v/base (71f1644 base snapshot), FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ZFRrgc, FM_SUPERVISION_HOST_PARK_SECONDS=90
+1793008302 session lock=92136
+1793008308 host started
+1793008326 after first host close marker=announced:downtime:9473.1793008322.OIFuO3 ledger=[epoch=1 owner_pid=8656 outcome=rewake updated_at=1793008324 session_pid=92136 recovery_generation=9473.1793008322.OIFuO3] notice=absent queue_rows=1 held=no watchlock=yes
+1793008389 fresh park started at 1793008379 marker=acked:handling:9473.1793008322.OIFuO3 ledger=[epoch=2 owner_pid=42189 outcome=arming updated_at=1793008379] notice=absent queue_rows=0 held=no watchlock=yes
+1793008398 after main's mid-park drain marker=pending:handling:48420.1793008392.4jIK3M ledger=[epoch=2 owner_pid=42189 outcome=arming updated_at=1793008379] notice=absent queue_rows=0 held=no watchlock=yes
+1793008473 after the park's boundary close marker=pending:handling:48420.1793008392.4jIK3M ledger=[epoch=2 owner_pid=42189 outcome=rewake updated_at=1793008469 session_pid=92136 recovery_generation=48420.1793008392.4jIK3M] notice=absent queue_rows=0 held=no watchlock=no
+1793008498 after main handled the delivery marker=acked:handling:48420.1793008392.4jIK3M ledger=[epoch=3 owner_pid=99465 outcome=arming updated_at=1793008491] notice=absent queue_rows=0 held=no watchlock=yes
+## state/.supervision-host.log
+1793008306	start	gen=host-9116-1793008306	primary=claude
+1793008323	pass-through	attended	main-only	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793008379	start	gen=host-42716-1793008379	primary=claude
+1793008379	take-over	arm=16709
+1793008469	boundary	after 90s
+1793008491	start	gen=host-104-1793008491	primary=claude
+## pane
+⏺ Captain, the wake is handled and acknowledged.
+  What happened:
+  1. The wake said one job was overdue: the open-work ledger is degraded.
+  2. The cause: the home at /Users/charlesabrooker/tmp/fm-lab.ZFRrgc has an empty data/ folder. The file data/backlog.md is missing.
+  3. I did not write or create any file.
+  4. I recorded the row as "escalated" with that reason.
+  5. I acknowledged the wake. It exited with no error.
+  What you need to decide:
+  - Is fm-lab.ZFRrgc a real home or a test home? Its name and its .fm-lab-home marker suggest a lab test.
+  - If it is real, the backlog file is gone. I found no backup in this home. Tell me whether to recreate it empty or restore it from a source you name.
+  - If it is a test home, no action is needed.
+✻ Cooked for 54s · done 4:52 AM
+❯ Lab test step: run bin/fm-wake-drain.sh exactly once, then reply with only the word DRAINED. Do not run any acknowledgement or any other command in this turn.
+  Ran 1 shell command
+⏺ DRAINED
+✻ Churned for 4s · done 4:53 AM
+⏺ Stop hook feedback
+  Ran 4 shell commands
+⏺ Captain, the wake is handled and acknowledged.
+  What happened:
+  1. The wake was a cycle boundary. Its only item was the same open-work ledger row as before: the lab home's data/backlog.md is still missing.
+  2. The first acknowledgement was refused. It needed a new action recorded for this round.
+  3. I recorded "escalated" again with the same reason.
+  4. I acknowledged the wake. It exited with no error.
+  Still needs your decision:
+  - Is fm-lab.ZFRrgc a real home or a test home?
+  - If real: should I recreate the backlog file empty, or restore it from a source you name? I found no backup.
+  - If test: no action is needed.
+✻ Churned for 21s · done 4:54 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ it's a lab test home, no action needed
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 63k/1.0M main base:0516c21e
+  ⏵⏵ auto mode on (shift+tab to cycle)
+torn down /Users/charlesabrooker/tmp/fm-lab.ZFRrgc

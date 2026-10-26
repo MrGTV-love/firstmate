@@ -1,0 +1,27 @@
+=== tree=base test=test_host_boundary_rewakes_with_the_host_line
+ok - auto-arm: boundary commits the host boundary normally without needing a queued row or watcher
+not ok - boundary-pending-handling: a boundary close must use the normal rewake (unexpected: 'auto-arm FAILED')
+exit=
+=== tree=base test=test_host_handback_during_open_handling_commits_normally
+not ok - pending/absent: a valid actionable handback is not an auto-arm failure (unexpected: 'auto-arm FAILED')
+exit=
+=== tree=base test=test_host_actionable_failed_restoration_still_commits_normally
+not ok - handling phase is not an auto-arm failure (unexpected: 'auto-arm FAILED')
+exit=
+=== tree=target test=test_host_boundary_rewakes_with_the_host_line
+ok - auto-arm: boundary commits the host boundary normally without needing a queued row or watcher
+ok - auto-arm: boundary-pending-handling commits the host boundary normally without needing a queued row or watcher
+ok - auto-arm: boundary-announced-handling commits the host boundary normally without needing a queued row or watcher
+exit=
+=== tree=target test=test_host_handback_during_open_handling_commits_normally
+ok - auto-arm: pending/absent host overlap commits once, stays durable, and is silent after acknowledgement
+ok - auto-arm: pending/live host overlap commits once, stays durable, and is silent after acknowledgement
+ok - auto-arm: announced/absent host overlap commits once, stays durable, and is silent after acknowledgement
+ok - auto-arm: announced/live host overlap commits once, stays durable, and is silent after acknowledgement
+ok - auto-arm: downtime/absent host overlap commits once, stays durable, and is silent after acknowledgement
+ok - auto-arm: downtime/live host overlap commits once, stays durable, and is silent after acknowledgement
+exit=
+=== tree=target test=test_host_actionable_failed_restoration_still_commits_normally
+ok - auto-arm: lost-handback delivers its host diagnostic through the normal rewake
+ok - auto-arm: lost-announced-handback delivers its host diagnostic through the normal rewake
+exit=
