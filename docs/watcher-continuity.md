@@ -356,7 +356,8 @@ An acknowledged episode does not freeze the generation, because the next downtim
 
 While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
 A supervision-host close commits against a valid unacknowledged downtime episode.
-It also commits against a handling episode, but only while main owns a queued row that no presentation hold covers (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
+It also commits against a handling episode whenever no healthy watcher runs, independently of queued rows or a presentation hold.
+With a healthy watcher, it commits only while main owns a queued row that no presentation hold covers (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
 Two invariants keep that refusal from dropping a wake.
 Delivery: the hold lasts only for the main turn that presented the rows, and a row counts as delivered only once main acknowledges it with `--ack-through`.
 Liveness: a supervision-host close that leaves no live successor is never refused in silence, because the host first republishes downtime for that generation ([supervision host](supervision-host.md#failure-direction)), and a handling-episode close is refused only while a healthy watcher runs (`fm_watcher_healthy`).
@@ -368,7 +369,9 @@ A message typed while a turn is still running also releases it: on Claude Code 2
 The next main drain replaces the hold with its own.
 The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
 When main's own drain entered handling, the turn that presented every row still holds them, and a healthy watcher runs, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and that watcher stays live beside it.
-With no healthy watcher, the close commits even while the hold covers its rows, because a refusal could leave nothing to rewake main if that turn then ends with no Stop; main handles the possible duplicate idempotently.
+With no healthy watcher, the close commits even while a hold covers its rows or the queue is empty, because a refusal could leave nothing to rewake main if that turn then ends with no Stop; main handles the possible duplicate idempotently.
+An empty-queue main drain can enter handling for an unacknowledged recovery episode, so a host cycle-boundary close must not depend on a queued row or held flag to take this liveness path.
+The boundary regression in `tests/fm-claude-stop-autoarm.test.sh` covers the downtime control and both pending and announced handling after a real empty-queue drain.
 Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so a host close that arrives after the release is delivered once.
 A close refused before the release is owed too: the refused terminal ledger entry records that held close's recovery generation, and the next Claude Stop firing consumes that entry when it takes a new auto-arm generation.
 Only when that receipt names the current handling episode and main still owns a queued row no hold covers does the firing rewake main before it arms, because `fm_recovery_marker_arm_check` waits on a handling episode.

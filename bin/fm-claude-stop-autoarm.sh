@@ -283,15 +283,16 @@ autoarm_commit() {  # <outcome> [marker-file]
         # presentation hold covers (fm_wake_main_unpresented). While the turn
         # that presented every row still holds them and a healthy watcher
         # stays live, a rewake would duplicate the close; with no healthy
-        # watcher, refusing could end in a blind stop, so the close commits.
+        # watcher, refusing could end in a blind stop, so the close commits
+        # even for a cycle boundary after an empty-queue drain.
         [ "$HOST_MODE" -eq 1 ] || return 2
-        if ! fm_wake_main_unpresented; then
-          [ -e "$STATE/.main-eligible-rows.held" ] \
-            && main_rows=$(fm_wake_main_rows) && [ -n "$main_rows" ] || return 2
-          if fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
+        if ! fm_wake_main_unpresented \
+          && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
+          if [ -e "$STATE/.main-eligible-rows.held" ] \
+            && main_rows=$(fm_wake_main_rows) && [ -n "$main_rows" ]; then
             HELD_CLOSE_RECOVERY=${FM_RECOVERY_MARKER_TOKEN##*:}
-            return 2
           fi
+          return 2
         fi
         recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
         ;;

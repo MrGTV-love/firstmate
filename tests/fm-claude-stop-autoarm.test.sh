@@ -1531,9 +1531,16 @@ write_host_fixture() {
     printf 'echo "$$" >> "$FM_HOME/state/host-ran"\n'
     printf 'printf "gen=%%s owner=%%s primary=%%s mode=%%s\\n" "${FM_SUPERVISION_HOST_AUTOARM_GEN:-}" "${FM_SUPERVISION_HOST_OWNER_PID:-}" "${FM_SUPERVISION_HOST_PRIMARY:-}" "${1:-}" > "$FM_HOME/state/host-env"\n'
     case "$kind" in
-      boundary)
+      boundary|boundary-pending-handling|boundary-announced-handling)
         printf "printf 'pending:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
         printf 'touch "$FM_HOME/state/.last-watcher-beat"\n'
+        if [ "$kind" = boundary-announced-handling ]; then
+          printf "printf 'announced:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
+        fi
+        if [ "$kind" != boundary ]; then
+          printf 'FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$FM_HOME/state/boundary-drain" 2>&1\n'
+          printf 'cp "$FM_HOME/state/.watcher-down" "$FM_HOME/state/before-boundary-handback"\n'
+        fi
         printf "printf 'supervision-host: cycle boundary - fixture\\n'\n"
         ;;
       handed-back)
@@ -1628,27 +1635,29 @@ test_host_absent_flag_runs_the_host() {
 }
 
 test_host_boundary_rewakes_with_the_host_line() {
-  local dir out status
-  dir=$(make_primary_dir "$TMP_ROOT/host-boundary")
-  mkdir -p "$dir/config"
-  rm -f "$dir/config/supervision-host-off"
-  : > "$dir/state/task.meta"
-  write_arm_fixture "$dir" actionable
-  write_host_fixture "$dir" boundary
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a host cycle boundary must rewake main"
-  assert_contains "$out" "firstmate watcher wake" "the host close must carry the wake banner"
-  assert_contains "$out" "supervision-host: cycle boundary - fixture" "the rewake must carry the host's line"
-  [ ! -e "$dir/state/arm-ran" ] || fail "an opted-in home ran the plain arm instead of the host"
-  [ "$(epoch_outcome "$dir")" = rewake ] || fail "a host boundary must record outcome=rewake, got: $(epoch_outcome "$dir")"
-  [ "$(sed -n 's/^.* mode=//p' "$dir/state/host-env")" = park ] || fail "the host was not run in park mode: $(cat "$dir/state/host-env")"
-  [ "$(sed -n 's/^.* primary=\([a-z]*\) .*$/\1/p' "$dir/state/host-env")" = claude ] \
-    || fail "the host was not told its primary harness: $(cat "$dir/state/host-env")"
-  [ "$(sed -n 's/^gen=\([0-9]*\) .*$/\1/p' "$dir/state/host-env")" = "$(epoch_field "$dir" epoch)" ] \
-    || fail "the host was not bound to the hook's generation: $(cat "$dir/state/host-env") vs $(head -n 1 "$dir/state/.claude-autoarm-epoch")"
-  [ "$(sed -n 's/^.* owner=\([0-9]*\) .*$/\1/p' "$dir/state/host-env")" = "$(epoch_field "$dir" owner_pid)" ] \
-    || fail "the host was not bound to the hook's owner pid: $(cat "$dir/state/host-env")"
-  pass "auto-arm: an opted-in home runs the host bound to its generation, and a host line rewakes like a wake"
+  local kind phase dir out status
+  for kind in boundary boundary-pending-handling boundary-announced-handling; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    write_arm_fixture "$dir" actionable
+    write_host_fixture "$dir" "$kind"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" run_autoarm "$dir" 2>/dev/null); status=$?
+    if [ "$kind" != boundary ]; then
+      phase=${kind#boundary-}
+      assert_contains "$(cat "$dir/state/before-boundary-handback")" "${phase%-handling}:handling:fixture-generation" "the empty main drain must enter handling before the close"
+      assert_contains "$(cat "$dir/state/boundary-drain")" '--ack-through 0 --recovery-generation fixture-generation' "the empty handling episode must remain acknowledgeable"
+      [ ! -s "$dir/state/.wake-queue" ] || fail "$kind: the boundary fixture unexpectedly queued a row"
+      assert_absent "$dir/state/.main-eligible-rows.held" "$kind: an empty drain must not manufacture held rows"
+      assert_absent "$dir/state/.watch.lock" "$kind: the fixture must expose delivery without a watcher"
+    fi
+    expect_code 2 "$status" "$kind: a host cycle boundary must rewake main, including after an empty drain"
+    assert_contains "$out" "supervision-host: cycle boundary - fixture" "$kind: the rewake must carry the host's line"
+    assert_not_contains "$out" 'auto-arm FAILED' "$kind: a boundary close must use the normal rewake"
+    [ ! -e "$dir/state/arm-ran" ] || fail "$kind: an opted-in home ran the plain arm instead of the host"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "$kind: a host boundary must record outcome=rewake, got: $(epoch_outcome "$dir")"
+    pass "auto-arm: $kind commits the host boundary normally without needing a queued row or watcher"
+  done
 }
 
 test_host_handback_under_away_record_is_not_a_return() {
