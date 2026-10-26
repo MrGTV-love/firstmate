@@ -171,6 +171,21 @@ for (const host of ['omp', 'claude']) {
     for (const path of paths) assert.equal(existsSync(`${worktree}/${path}`), false);
     assert.equal(execFileSync('git', ['diff', '--name-only'], { cwd: worktree, encoding: 'utf8' }).trim().split('\n').length, 6);
   });
+  if (host === 'omp') await test('omp: rm -f of HEAD-tracked files named in the brief passes without refusal', async () => {
+    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs', 'docs/cd-guard.md'];
+    writeFileSync(`${data}/brief.md`, `# Task\nDelete these obsolete files:\n${paths.map(path => `- ${path}`).join('\n')}\n`);
+    for (const path of paths) {
+      mkdirSync(dirname(`${worktree}/${path}`), { recursive: true });
+      writeFileSync(`${worktree}/${path}`, 'obsolete tracked file\n');
+    }
+    execFileSync('git', ['add', '--', ...paths], { cwd: worktree });
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false',
+      'commit', '-qm', 'fixture', '--', ...paths], { cwd: worktree });
+    await run(`rm -f ${paths.join(' ')}`);
+    for (const path of paths) assert.equal(existsSync(`${worktree}/${path}`), false);
+    assert.deepEqual(execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: worktree, encoding: 'utf8' }).trim().split('\n').sort(),
+      [...paths].sort());
+  });
   await test(`${host} T2(d), B22/B48-B50: dispatch lab teardown command`, async () => {
     const script = `${worktree}/fm-herdr-lab.sh`;
     const marker = `${data}/teardown-args`;
@@ -1116,227 +1131,7 @@ JS
   pass "396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited"
 }
 
-test_authorized_deletions() {
-  local out
-  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
-import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
-const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const bin = dirname(process.env.GUARD);
-const home = `${process.env.HOME_DIR}/deletions`;
-const worktree = `${home}/repo`;
-const state = `${home}/state`;
-const data = `${home}/data/deletion`;
-for (const dir of [state, data, `${home}/config`, worktree]) mkdirSync(dir, { recursive: true });
-writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
-const git = args => execFileSync('git', ['-C', worktree, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-execFileSync('git', ['init', '-q', worktree]);
-const cdPaths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs', 'tests/fm-cd-pretool-check.test.sh',
-  'docs/cd-guard.md', '.grok/hooks/fm-primary-cd-check.json', '.opencode/plugins/fm-primary-cd-check.js'];
-const listed = ['listed.txt', 'nested/listed.txt', 'plain space.txt', ...cdPaths];
-const files = [...listed, 'unlisted.txt', 'nested/unlisted.txt'];
-function restore() {
-  for (const path of files) {
-    mkdirSync(dirname(`${worktree}/${path}`), { recursive: true });
-    writeFileSync(`${worktree}/${path}`, `tracked fixture: ${path}\n`);
-  }
-}
-restore();
-git(['add', '.']);
-git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
-writeFileSync(`${worktree}/untracked.txt`, 'untracked fixture\n');
-writeFileSync(`${home}/outside.txt`, 'outside fixture\n');
-const metaPath = `${state}/deletion.meta`;
-const listPath = `${state}/deletion.authorized-deletions.json`;
-const auditPath = `${state}/deletion.authorized-deletions.jsonl`;
-const brief = paths => `# Task\nAuthorized removal.\n\n## Authorized deletions\n\n\`\`\`json\n${JSON.stringify(paths)}\n\`\`\`\n\n# Setup\nFixture.\n`;
-writeFileSync(metaPath, `worktree=${worktree}\nharness=omp\npr=https://example.invalid/repo/pull/1\n`);
-writeFileSync(`${data}/brief.md`, '# Task\nNo deletion list.\n');
-const context = { home, config: `${home}/config`, state, task: 'deletion', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
-const handlers = {};
-installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
-const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
-const auditRows = () => readFileSync(auditPath, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
-const auditCount = () => { try { return auditRows().length; } catch { return 0; } };
-// Bash stays unjudged (Claude has no Bash pre-call hook at all): an omp call is
-// recorded (allowance consumed), refused, or passes unjudged and unrecorded.
-const ompTool = async (input, cwd = worktree) => {
-  const before = requests();
-  const count = auditCount();
-  const result = await handlers.tool_call({ toolName: 'bash', input }, { cwd });
-  assert.equal(requests(), before, `${input.command}: a bash pre-call must send no TypeSafe request`);
-  if (result?.block === true) return 'refused';
-  assert.equal(result, undefined);
-  return auditCount() === count + 1 ? 'recorded' : 'unjudged';
-};
-const omp = async (command, cwd = worktree) => ompTool({ command }, cwd);
-const publish = paths => execFileSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion', '--replace', ...paths], {
-  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
-});
-assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'no list keeps the unjudged bash path');
-assert.equal(await omp('rm -f listed.txt'), 'unjudged', 'without a declaration every rm spelling stays unjudged');
-// Spawn uses this exact prepare operation under its metadata transaction.
-writeFileSync(`${data}/brief.md`, brief(listed));
-const preparedDigest = execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', `${bin}/fm-jev-deletions.ts`,
-  'prepare', state, 'deletion', worktree, `${data}/brief.md`], { encoding: 'utf8' }).trim();
-writeFileSync(metaPath, `worktree=${worktree}\njev_deletions_sha256=${preparedDigest}\n`);
-assert.equal(await omp('rm -rf listed.txt'), 'recorded', 'initial spawn list is consumed');
-// A worker can edit its own brief, but that must not authorize live additions.
-publish(['listed.txt']);
-writeFileSync(`${data}/brief.md`, brief(['listed.txt', 'unlisted.txt']));
-publish(['listed.txt', 'nested/listed.txt']);
-const workerBriefResults = [];
-for (const [host, call] of [['omp', omp]]) {
-  workerBriefResults.push([host, await call('rm -rf unlisted.txt')]);
-}
-assert.deepEqual(workerBriefResults, [['omp', 'unjudged']], 'worker-edited brief must not supply live authorization');
-assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['listed.txt', 'nested/listed.txt']);
-// Only Firstmate naming that extra path admits it.
-publish(['listed.txt', 'unlisted.txt']);
-for (const [host, call] of [['omp', omp]]) {
-  restore();
-  assert.equal(await call('rm -rf unlisted.txt'), 'recorded', `${host}: explicit Firstmate operand authorizes the extra path`);
-  execFileSync('/bin/sh', ['-c', 'rm -rf unlisted.txt'], { cwd: worktree });
-  assert.equal(existsSync(`${worktree}/unlisted.txt`), false);
-}
-restore();
-// The live publisher replaces the list; the existing omp handler must reread it.
-publish(['nested/listed.txt']);
-assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'revoked path must not stay cached');
-writeFileSync(`${data}/brief.md`, '# Task\nWorker changed this to malformed declaration text.\n## Authorized deletions\nnot JSON\n');
-publish(listed);
-const originalList = readFileSync(listPath);
-const originalMeta = readFileSync(metaPath);
-const digest = createHash('sha256').update(originalList).digest('hex');
-for (const [host, call] of [['omp', omp]]) {
-  const locallyDenied = async reason => {
-    assert.equal(await call('rm -f listed.txt'), 'refused', `${host}: ${reason}`);
-    const row = JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-    assert.equal(row.branch, 'deterministic');
-    assert.equal(row.request_started, false);
-  };
-  assert.equal(await call('rm -f unlisted.txt'), 'unjudged', 'a valid list leaves unlisted files on the unjudged bash path');
-  for (const [command, path] of [['rm -f listed.txt', 'listed.txt'], ['rm -rf -- listed.txt', 'listed.txt'],
-    ['rm -fr nested/listed.txt', 'nested/listed.txt'], [`rm -f ${worktree}/listed.txt`, 'listed.txt']]) {
-    restore();
-    const count = auditRows().length;
-    assert.equal(await call(command), 'recorded', `${host}: ${command}`);
-    const rows = auditRows();
-    assert.equal(rows.length, count + 1);
-    assert.equal(rows.at(-1).task, 'deletion');
-    assert.equal(rows.at(-1).list_sha256, digest);
-    assert.ok(Number.isFinite(Date.parse(rows.at(-1).time)));
-    assert.deepEqual(rows.at(-1).paths, [path]);
-    execFileSync('/bin/sh', ['-c', command], { cwd: worktree });
-    assert.equal(existsSync(`${worktree}/${path}`), false, 'admitted shell deletion actually removed the file');
-  }
-  for (const command of ['/bin/rm -rf listed.txt', 'rm --force listed.txt', 'rm -v listed.txt', "rm -rf 'plain space.txt'"]) {
-    restore();
-    assert.equal(await call(command), 'unjudged', `${host}: ${command} keeps the unjudged bash path without consuming the allowance`);
-  }
-  restore();
-  const denied = ['rm -rf unlisted.txt', 'rm -rf untracked.txt', `rm -rf ${home}/outside.txt`,
-    'rm -rf ../outside.txt', 'rm -rf nested', 'rm -rf nested/*', 'rm -rf listed.txt unlisted.txt',
-    'rm -rf listed.txt; rm -rf unlisted.txt', 'rm -rf $(echo listed.txt)', 'rm -rf "${HOME}/outside.txt"',
-    'rm -rf --no-preserve-root listed.txt', 'rm -rf .git', 'rm -rf listed.txt > unlisted.txt'];
-  for (const command of denied) assert.equal(await call(command), 'unjudged', `${host}: ${command}`);
-  assert.equal(await call('rm -rf listed.txt', home), 'unjudged', 'outside cwd is not a task-relative deletion');
-  assert.equal(await call('rm -rf listed.txt', `${worktree}/nested`), 'recorded', 'nested cwd resolves to the listed nested file');
-  writeFileSync(listPath, originalList.toString().replace('listed.txt', 'unlisted.txt'));
-  assert.equal(await call('rm -rf unlisted.txt'), 'refused', 'list edited without matching digest is refused');
-  await locallyDenied('changed list without matching digest');
-  writeFileSync(listPath, originalList);
-  renameSync(listPath, `${listPath}.saved`);
-  await locallyDenied('missing declared list');
-  mkdirSync(listPath);
-  await locallyDenied('unreadable declared list');
-  execFileSync('rmdir', [listPath]);
-  renameSync(`${listPath}.saved`, listPath);
-  writeFileSync(metaPath, `worktree=${worktree}\n`);
-  await locallyDenied('snapshot without digest');
-  const malformed = '{';
-  writeFileSync(listPath, malformed);
-  writeFileSync(metaPath, `worktree=${worktree}\njev_deletions_sha256=${createHash('sha256').update(malformed).digest('hex')}\n`);
-  await locallyDenied('malformed declared list with matching digest');
-  writeFileSync(listPath, originalList);
-  writeFileSync(metaPath, originalMeta);
-  unlinkSync(`${worktree}/listed.txt`);
-  symlinkSync(`${home}/outside.txt`, `${worktree}/listed.txt`);
-  assert.equal(await call('rm -rf listed.txt'), 'unjudged', 'tracked path replaced by escaping symlink grants nothing');
-  unlinkSync(`${worktree}/listed.txt`);
-  restore();
-  // Even a list+digest naming an untracked file does not confer HEAD tracking.
-  const changed = JSON.parse(originalList);
-  changed.paths.push('untracked.txt');
-  const bytes = JSON.stringify(changed);
-  writeFileSync(listPath, bytes);
-  writeFileSync(metaPath, `worktree=${worktree}\njev_deletions_sha256=${createHash('sha256').update(bytes).digest('hex')}\n`);
-  assert.equal(await call('rm -rf untracked.txt'), 'unjudged');
-  git(['add', 'untracked.txt']);
-  assert.equal(await call('rm -rf untracked.txt'), 'unjudged', 'index-only tracking does not qualify');
-  writeFileSync(listPath, originalList);
-  writeFileSync(metaPath, originalMeta);
-  renameSync(auditPath, `${auditPath}.saved`);
-  mkdirSync(auditPath);
-  assert.equal(await call('rm -rf listed.txt'), 'refused', 'audit failure must refuse the allowance');
-  execFileSync('rmdir', [auditPath]);
-  renameSync(`${auditPath}.saved`, auditPath);
-  const command = `rm -rf -- ${cdPaths.join(' ')}`;
-  assert.equal(await call(command), 'recorded', `${host}: all six named cd-guard files`);
-  assert.deepEqual(JSON.parse(readFileSync(auditPath, 'utf8').trim().split('\n').at(-1)).paths, cdPaths);
-  execFileSync('/bin/sh', ['-c', command], { cwd: worktree });
-  for (const path of cdPaths) assert.equal(existsSync(`${worktree}/${path}`), false);
-  restore();
-}
-// The omp bash cwd/env inputs are not part of the allowance.
-for (const [field, input] of [['cwd', { command: 'rm -f listed.txt', cwd: home }], ['env', { command: 'rm -f listed.txt', env: { PATH: '/usr/bin:/bin' } }]]) {
-  restore();
-  assert.equal(await ompTool(input), 'unjudged', `omp ${field} input keeps the unjudged bash path without consuming the allowance`);
-}
-// Invalid explicit paths cannot publish a new digest or silently broaden it.
-const bad = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion', '--replace', '../outside.txt'], {
-  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state, FM_DATA_OVERRIDE: `${home}/data` }, encoding: 'utf8',
-});
-assert.notEqual(bad.status, 0);
-assert.deepEqual(readFileSync(metaPath), originalMeta);
-assert.deepEqual(readFileSync(listPath), originalList);
-// No implicit brief-reading invocation remains; rejection preserves authorization.
-const legacy = spawnSync('bash', [`${bin}/fm-jev-deletions.sh`, 'deletion'], {
-  env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: state }, encoding: 'utf8',
-});
-assert.notEqual(legacy.status, 0);
-assert.deepEqual(readFileSync(metaPath), originalMeta);
-assert.deepEqual(readFileSync(listPath), originalList);
-// Node keeps a symlinked argv[1] logical; prepare and publication still run.
-symlinkSync(bin, `${home}/linked-bin`);
-const linked = args => execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings',
-  `${home}/linked-bin/fm-jev-deletions.ts`, ...args], { encoding: 'utf8' });
-writeFileSync(`${data}/brief.md`, brief(['listed.txt']));
-const linkedDigest = linked(['prepare', state, 'deletion', worktree, `${data}/brief.md`]).trim();
-assert.equal(linkedDigest, createHash('sha256').update(readFileSync(listPath)).digest('hex'), 'symlinked prepare writes the snapshot');
-assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['listed.txt']);
-writeFileSync(listPath, originalList);
-assert.match(linked(['publish', state, 'deletion', '--replace', 'nested/listed.txt']), /list_sha256/);
-assert.deepEqual(JSON.parse(readFileSync(listPath, 'utf8')).paths, ['nested/listed.txt'], 'symlinked publication narrows the list');
-assert.equal(readFileSync(metaPath, 'utf8').match(/^jev_deletions_sha256=(.*)$/m)[1],
-  createHash('sha256').update(readFileSync(listPath)).digest('hex'));
-assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'symlinked narrowing revokes the dropped path');
-unlinkSync(`${data}/brief.md`);
-publish([]);
-assert.equal(await omp('rm -rf listed.txt'), 'unjudged', 'explicit empty replacement revokes all without a brief');
-console.log('authorized-deletions-ok');
-JS
-) || fail "authorized deletions: $out"
-  [ "$out" = authorized-deletions-ok ] || fail "unexpected authorized deletion output: $out"
-  pass "omp records only listed HEAD-tracked literal file deletions with live updates/revocations and mandatory audit; bash stays unjudged, inconsistent declared lists refuse, and every negative scope consumes no allowance"
-}
-
 test_bash_without_judgment
-test_authorized_deletions
 test_claude_effects
 test_outages_and_scope
 test_bounded_retry

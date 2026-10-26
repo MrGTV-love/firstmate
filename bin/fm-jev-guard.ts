@@ -11,7 +11,6 @@ import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { authorizedDeletion, recordDeletion } from "./fm-jev-deletions.ts";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, withDecisionBudget,
@@ -277,24 +276,6 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         }
       }
       if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });
-      if (tool === "bash" && object(event.input) && typeof event.input.command === "string"
-        && event.input.cwd === undefined && event.input.env === undefined) {
-        // Bash stays unjudged; only a literal rm checked against Firstmate's declared list is recorded or refused here.
-        const deletion = authorizedDeletion(event.input.command, ctx.cwd, c);
-        if (deletion) {
-          if ("invalid" in deletion) {
-            return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-              "the declared authorized-deletion list is missing, unreadable or inconsistent");
-          }
-          try {
-            recordDeletion(c, deletion);
-          } catch {
-            return finishCall({ ...terminal, decision: "review", enforcement: "pretool_deny", branch: "outage",
-              error_type: "AuditUnavailableError" });
-          }
-          return finishCall({ ...terminal, branch: "deterministic" });
-        }
-      }
       if (policy.call !== "write" && policy.call !== "edit") {
         return destination ? finishCall({ ...terminal, branch: "egress" }) : undefined;
       }

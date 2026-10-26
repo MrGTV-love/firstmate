@@ -54,11 +54,9 @@
 # releasing the task's claim and recording it as released_worktree=), and
 # writing the note in the brief. A ship whose recorded copy is gone refuses,
 # because relocation through relaunch --worktree is that copy's only recovery
-# route. It stops, starts, resets, and returns nothing: the old copy's bytes,
-# the endpoint, and any pipeline run are untouched. It deletes only the task's
-# brief-named deletion snapshot and its metadata digest, which are bound to the
-# old copy (docs/configuration.md "Brief-named file deletion allowance").
-# A recorded GitHub PR is retained only when
+# route. It stops, starts,
+# deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
+# any pipeline run are untouched. A recorded GitHub PR is retained only when
 # the replacement's HEAD equals or descends from its recorded head and the
 # current forge head when readable. Missing or contradictory proof refuses.
 # For duplicate slot-root records, first retire the finished records with
@@ -636,8 +634,7 @@ fi
 
 # --- reassociate: re-point the record at a replacement copy -----------------
 #
-# Nothing here stops, starts, resets, or returns anything; the only deletion is
-# each re-pointed task's old-copy deletion snapshot, after records publish.
+# Nothing here stops, starts, deletes, resets, or returns anything.
 #
 # One call re-points the command's task or, with --also, several tasks whose
 # records leave one shared slot root, each at its own replacement copy, under
@@ -1163,7 +1160,6 @@ reassociate_stage() {  # <record-index> <timestamp>
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         worktree=*) printf 'worktree=%s\n' "$new_wt" || exit 1 ;;
-        jev_deletions_sha256=*) continue ;;
         branch=*)
           if [ "$set_branch" = 1 ]; then
             printf 'branch=%s\n' "$new_branch" || exit 1
@@ -1349,7 +1345,7 @@ do_reassociate() {
   REASSOCIATE_OWNER_PATHS=()
   REASSOCIATE_OWNER_BACKUPS=()
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
-    rm -f -- "${RA_BRIEF_BACKUPS[m]}" "${RA_META_BACKUPS[m]}" "$STATE/${RA_IDS[m]}.authorized-deletions.json"
+    rm -f -- "${RA_BRIEF_BACKUPS[m]}" "${RA_META_BACKUPS[m]}"
     RA_BRIEF_BACKUPS[m]=
     RA_META_BACKUPS[m]=
   done

@@ -465,14 +465,6 @@ test_worker_guard_project_scope() {
     id="omp-scope-$scope"
     rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
-    cat >> "$HOME_DIR/data/$id/brief.md" <<'BRIEF'
-
-## Authorized deletions
-
-```json
-["README.md"]
-```
-BRIEF
     out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
     expect_code 0 $? "omp $scope spawn should succeed: $out"
     expected=off
@@ -481,11 +473,9 @@ BRIEF
       "the task overlay must admit native find only for a firstmate-project worker"
     printf 'TYPESAFE_API_KEY=omp-scope-key\nOPENROUTER_API_KEY=omp-fallback-key\n' > "$HOME_DIR/.env"
     out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$scope" WT="$WT_DIR" FM_TEST_SEAM=1 \
-      DELETION_AUDIT="$HOME_DIR/state/$id.authorized-deletions.jsonl" \
       node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 const requests = [];
@@ -520,14 +510,6 @@ try {
     assert.equal(result?.block, true);
     assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.path === "customer-record.txt"));
-    // The initial spawn snapshot, not a later worker edit of the brief, records this file.
-    const admitted = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf README.md" } }, { cwd: process.env.WT });
-    assert.equal(admitted, undefined);
-    assert.equal(requests.length, 1, "a spawn-authorized deletion must not reach the provider");
-    assert.deepEqual(JSON.parse(readFileSync(process.env.DELETION_AUDIT, "utf8").trim().split("\n").at(-1)).paths, ["README.md"],
-      "the spawn snapshot must record the admitted deletion");
-    execFileSync("rm", ["-f", `${process.env.WT}/README.md`]);
-    assert.throws(() => execFileSync("git", ["-C", process.env.WT, "diff", "--quiet"]), "the admitted deletion must actually change the task copy");
   } else {
     assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);
@@ -542,33 +524,6 @@ JS
     [ "$out" = scope-ok ] || fail "generated omp extension lost $scope egress scope: $out"
   done
   pass "real omp spawns give firstmate alone, without no-helpers, native find, a judge credential and guard egress"
-}
-
-test_spawn_retires_a_reused_task_ids_stale_deletion_list() {
-  local rec id=omp-deletions-reuse out
-  rec=$(make_spawn_case deletions-reuse omp "$id" firstmate)
-  read_case_record "$rec"
-  printf '{"schema":"fm-authorized-deletions.v1","task":"%s","worktree":"%s","paths":["README.md"]}\n' \
-    "$id" "$WT_DIR" > "$HOME_DIR/state/$id.authorized-deletions.json"
-  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
-  expect_code 0 $? "a fresh spawn for a reused task id should succeed: $out"
-  assert_absent "$HOME_DIR/state/$id.authorized-deletions.json" \
-    "a fresh spawn without an Authorized deletions section must retire the previous task's list"
-  ! grep -q '^jev_deletions_sha256=' "$HOME_DIR/state/$id.meta" \
-    || fail "a fresh spawn without a deletion section must not publish a deletion digest"
-  out=$(ROOT="$ROOT" DELETIONS_STATE="$HOME_DIR/state" DELETIONS_TASK="$id" DELETIONS_WT="$WT_DIR" \
-    node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
-import assert from "node:assert/strict";
-import { pathToFileURL } from "node:url";
-const { authorizedDeletion } = await import(pathToFileURL(`${process.env.ROOT}/bin/fm-jev-deletions.ts`));
-const context = { state: process.env.DELETIONS_STATE, task: process.env.DELETIONS_TASK, worktree: process.env.DELETIONS_WT };
-assert.equal(authorizedDeletion("rm -f README.md", context.worktree, context), undefined,
-  "a fresh spawn without a section must not leave a declared authorization");
-console.log("stale-list-ok");
-JS
-)
-  [ "$out" = stale-list-ok ] || fail "a reused task id kept a stale declared deletion authorization: $out"
-  pass "a fresh omp spawn retires a reused task id's stale Authorized deletions list"
 }
 
 test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
@@ -4305,7 +4260,6 @@ test_no_helpers_refuses_ultra_effort
 test_omp_workers_disable_openrouter_prompt_helpers
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
-test_spawn_retires_a_reused_task_ids_stale_deletion_list
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_native_fallback_preserves_destination_order
 test_spawn_rejects_retired_fallbacks_before_publication

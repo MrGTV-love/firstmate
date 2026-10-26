@@ -59,14 +59,10 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   `bin/fm-jev-egress.ts` owns the tool classifications and each tool's egress row; the operator contract above owns task grants and the table's non-sandbox limits.
   Native device admission uses the adapter context's host (default `omp`, explicitly `claude` in the Claude adapter), not the model service; host identity remains required even without host-specific result budgets.
   It judges every planned write piece with the unchanged level 6 policy; writes pass only when every planned piece passes.
-  Its one shell exception is the deterministic, model-free brief-named deletion record below.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
-  Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers or classifying read-only commands; only an omp brief-named deletion record writes audit rows.
+  Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers, classifying read-only commands or writing audit rows.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and outage behavior.
-- `bin/fm-jev-deletions.ts` owns the deterministic brief-named deletion record and invalid-declaration refusal for omp `bash` calls, its mandatory task-local audit, and the firstmate-side publisher used by `bin/fm-jev-deletions.sh` and initial spawn.
-  The [operator contract](../../docs/configuration.md#brief-named-file-deletion-allowance) owns the literal-shell grammar, HEAD/file/path checks, live update/revocation route, digest format and same-user consistency-only limit; a worker can deliberately forge both list and digest.
-  It adds no model judgment, shell question or threshold.
 - `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.

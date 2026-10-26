@@ -595,25 +595,18 @@ test_teardown_retires_task_watcher_markers_and_orphan_journal() {
   seed_watcher_markers "$case_dir" task-x1_extra
   printf '%s\n' 'version=1' 'task_id=task-y2' 'projection_id=ZyXwVuTsRqPoNmLkJiHgFe' \
     > "$case_dir/state/task-y2.herdr-presentation"
-  printf '{"schema":"fm-authorized-deletions.v1","task":"task-x1","worktree":"%s","paths":["README.md"]}\n' \
-    "$case_dir/wt" > "$case_dir/state/task-x1.authorized-deletions.json"
-  printf '{"task":"task-x1","paths":["README.md"]}\n' > "$case_dir/state/task-x1.authorized-deletions.jsonl"
-  printf '{"schema":"fm-authorized-deletions.v1","task":"task-y2","worktree":"%s","paths":["README.md"]}\n' \
-    "$case_dir/wt" > "$case_dir/state/task-y2.authorized-deletions.json"
 
   FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_CLOSED="$closed" FM_FAKE_HERDR_RESTORED="$restored" \
     run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "retire-watcher-markers: teardown failed: $(cat "$case_dir/stderr")"
-  for marker in .seen-task-x1_status .seen-task-x1_turn-ended .hb-surfaced-task-x1 task-x1.herdr-presentation \
-    task-x1.authorized-deletions.json; do
+  for marker in .seen-task-x1_status .seen-task-x1_turn-ended .hb-surfaced-task-x1 task-x1.herdr-presentation; do
     assert_absent "$case_dir/state/$marker" "teardown left the torn-down task's $marker behind"
   done
   for marker in .seen-task-y2_status .seen-task-y2_turn-ended .hb-surfaced-task-y2 task-y2.herdr-presentation \
-    task-y2.authorized-deletions.json .seen-task-x1_extra_status .seen-task-x1_extra_turn-ended .hb-surfaced-task-x1_extra; do
+    .seen-task-x1_extra_status .seen-task-x1_extra_turn-ended .hb-surfaced-task-x1_extra; do
     assert_present "$case_dir/state/$marker" "teardown removed another task's $marker"
   done
-  assert_present "$case_dir/state/task-x1.authorized-deletions.jsonl" "teardown removed the task's deletion audit trail"
-  pass "teardown retires the task's own watcher markers, deletion list and orphaned presentation journal, keeping its audit trail and other tasks' markers"
+  pass "teardown retires the task's own watcher markers and orphaned presentation journal, leaving other tasks' markers alone"
 }
 
 test_teardown_retains_journal_bound_to_another_pane() {

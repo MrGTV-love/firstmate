@@ -648,66 +648,6 @@ SH
   pass "failed publication retains the original brief until restoration succeeds"
 }
 
-# deletion_admission <case-dir> <id>: the guard's admission for one literal
-# rm of work.txt from the recorded copy, as JSON ("undefined" means no allowance
-# applies).
-deletion_admission() {
-  local wt
-  wt=$(meta_field "$1" "$2" worktree)
-  ROOT="$ROOT" DELETIONS_STATE="$1/home/state" DELETIONS_TASK="$2" DELETIONS_WT="$wt" \
-    node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
-import { pathToFileURL } from "node:url";
-const { authorizedDeletion } = await import(pathToFileURL(`${process.env.ROOT}/bin/fm-jev-deletions.ts`));
-const context = { state: process.env.DELETIONS_STATE, task: process.env.DELETIONS_TASK, worktree: process.env.DELETIONS_WT };
-const admission = authorizedDeletion("rm -f work.txt", context.worktree, context);
-console.log(admission === undefined ? "undefined" : JSON.stringify(admission.invalid ? admission : admission.paths));
-JS
-}
-
-test_reassociation_retires_the_deletion_snapshot_until_republished() {
-  local id=reassoc-deletions dir new list digest out rc real_mv
-  real_mv=$(command -v mv)
-  dir=$(new_case deletions "$id")
-  new="$dir/new"
-  add_copy "$dir" "$new" "fm/$id-v2"
-  list="$dir/home/state/$id.authorized-deletions.json"
-  out=$(FM_HOME="$dir/home" "$ROOT/bin/fm-jev-deletions.sh" "$id" --replace work.txt 2>&1) \
-    || fail "the spawn-time snapshot could not be published: $out"
-  digest=$(meta_field "$dir" "$id" jev_deletions_sha256)
-  out=$(deletion_admission "$dir" "$id")
-  [ "$out" = '["work.txt"]' ] || fail "the fixture snapshot did not admit its listed file, got: $out"
-  cp "$list" "$dir/list-before"
-  cp "$dir/home/state/$id.meta" "$dir/meta-before"
-  cat > "$dir/fakebin/mv" <<SH
-#!/usr/bin/env bash
-for arg in "\$@"; do
-  case "\$arg" in */.$id.meta.reassociate.*) exit 1 ;; esac
-done
-exec "$real_mv" "\$@"
-SH
-  chmod +x "$dir/fakebin/mv"
-  rc=0
-  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
-  expect_code 1 "$rc" "failed metadata publication must refuse"$'\n'"$out"
-  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "failed publication changed the deletion digest record"
-  cmp -s "$dir/list-before" "$list" || fail "failed publication retired the deletion snapshot"
-  rm -f "$dir/fakebin/mv"
-  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || fail "reassociation failed: $out"
-  assert_absent "$list" "reassociation kept a deletion snapshot bound to the old copy"
-  [ -z "$(meta_field "$dir" "$id" jev_deletions_sha256)" ] || fail "reassociation kept the old copy's deletion digest"
-  out=$(deletion_admission "$dir" "$id")
-  [ "$out" = undefined ] || fail "a reassociated task must carry no deletion allowance, got: $out"
-  printf 'replacement work\n' > "$new/work.txt"
-  git -C "$new" add work.txt
-  git -C "$new" commit -q -m "replacement work"
-  out=$(FM_HOME="$dir/home" "$ROOT/bin/fm-jev-deletions.sh" "$id" --replace work.txt 2>&1) \
-    || fail "Firstmate could not republish for the replacement copy: $out"
-  [ "$(meta_field "$dir" "$id" jev_deletions_sha256)" != "$digest" ] || fail "republication reused the old copy's digest"
-  out=$(deletion_admission "$dir" "$id")
-  [ "$out" = '["work.txt"]' ] || fail "an explicit republish must authorize the replacement copy, got: $out"
-  pass "reassociation retires a deletion snapshot and digest only after publication, until Firstmate republishes"
-}
-
 test_unchanged_ship_branch_requires_consistent_brief() {
   local id=reassoc-same-branch dir new
   dir=$(new_case same-branch "$id")
@@ -2550,7 +2490,6 @@ test_slot_claim_containment_refusals_preserve_both_copies
 test_refusals_change_nothing
 test_finished_relaunch_journal_does_not_block_reassociation
 test_failed_publication_keeps_brief_recovery_until_restored
-test_reassociation_retires_the_deletion_snapshot_until_republished
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor
