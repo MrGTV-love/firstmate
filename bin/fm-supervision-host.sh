@@ -408,7 +408,7 @@ stop_engine_turn() {
   fi
   limit=$(( (ENGINE_GRACE + 10) * 10 ))
   i=0
-  while [ -n "$ENGINE_SUBSHELL" ] && fm_pid_alive "$ENGINE_SUBSHELL" && [ "$i" -lt "$limit" ]; do
+  while [ -n "$ENGINE_SUBSHELL" ] && kill -0 "$ENGINE_SUBSHELL" 2>/dev/null && [ "$i" -lt "$limit" ]; do
     sleep 0.1
     i=$((i + 1))
   done
@@ -539,14 +539,14 @@ stream_ready_line() {
 # or 1 when the park boundary arrives first.
 await_close() {
   local i
-  while fm_pid_alive "$ARM_PID"; do
+  while kill -0 "$ARM_PID" 2>/dev/null; do
     refresh_process "$ARM_PID"
     [ "$READY_PENDING" -eq 0 ] || stream_ready_line
     boundary_reached && return 1
     # Probe the arm's exit twice a second between POLL-cadence checks, without
     # changing the outer identity refresh, readiness, or boundary cadence.
     i=$((POLL * 2))
-    while [ "$i" -gt 0 ] && fm_pid_alive "$ARM_PID"; do
+    while [ "$i" -gt 0 ] && kill -0 "$ARM_PID" 2>/dev/null; do
       sleep 0.5
       i=$((i - 1))
     done

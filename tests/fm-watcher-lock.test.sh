@@ -2358,6 +2358,70 @@ PY
   pass "an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock"
 }
 
+test_lock_alarm_project_and_control_limits() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "project or control lock alarm limits failed"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+dead = subprocess.Popen(["true"]); dead.wait()
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    state = subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip()
+    if state.startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+cases = [
+    (".treehouse-project-abc.lock", os.getpid(), 2246, False),
+    (".treehouse-project-abc.lock", os.getpid(), 1347601, True),
+    (".treehouse-project-abc.lock", dead.pid, 5, True),
+    (".treehouse-project-abc.lock", zombie.pid, 5, True),
+    (".control-task-1.lock", os.getpid(), 5, False),
+    (".control-task-1.lock", os.getpid(), 1347601, False),
+    (".control-task-1.lock", dead.pid, 5, True),
+    (".control-task-1.lock", zombie.pid, 5, True),
+]
+try:
+    for name, pid, age, alarms in cases:
+        with tempfile.TemporaryDirectory(prefix="fm-lock-limits-") as d:
+            lock = pathlib.Path(d, name); lock.mkdir()
+            (lock / "pid").write_text(f"{pid}\n")
+            old = time.time() - age
+            os.utime(lock / "pid", (old, old))
+            env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+            env.pop("FM_LOCK_ALARM_SECS", None)
+            subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check && fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
+            queue = pathlib.Path(d, ".wake-queue")
+            rows = queue.read_text().splitlines() if queue.exists() else []
+            assert len(rows) == (1 if alarms else 0), (name, pid, age, rows)
+            if alarms:
+                assert f"owner={pid}" in rows[0], rows
+                assert pid != zombie.pid or "state=Z" in rows[0], rows
+            assert (lock / "pid").read_text().strip() == str(pid), "alarm changed the owner"
+finally:
+    zombie.wait()
+PY
+  pass "project and control locks alarm on their own limits and on a dead or zombie owner at any age"
+}
+
+test_pid_alive_reads_proc_state_without_ps() {
+  local dir
+  dir=$(make_case pid-alive-proc)
+  mkdir -p "$dir/proc/$$"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/proc" bash -c '
+    . "$1"
+    stat=$2/proc/$3/stat calls=$2/ps-calls
+    ps() { printf x >> "$calls"; return 1; }
+    printf "%s (odd) name) Z 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 10
+    printf "%s (odd) name) S 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 11
+    [ ! -e "$calls" ] || exit 12
+    rm -f "$stat"
+    fm_pid_alive "$3" || exit 13
+    [ -s "$calls" ] || exit 14
+  ' _ "$LIB" "$dir" "$$" || fail "fm_pid_alive did not classify /proc state without ps (rc=$?)"
+  pass "a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict"
+}
+
 test_long_held_lock_alarm() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
@@ -2642,6 +2706,8 @@ test_lock_alarm_threshold_normalizes
 test_alarm_freed_queue_keeps_producer_order
 test_alarm_observation_failure_keeps_waiting_append
 test_startup_queue_wait_alarm_releases_with_downtime
+test_lock_alarm_project_and_control_limits
+test_pid_alive_reads_proc_state_without_ps
 test_long_held_lock_alarm
 test_lock_alarm_discovers_foreign_owners
 test_lock_monitor_prunes_finished_waiters

@@ -80,7 +80,9 @@
 #                          delivery-attempt, busy-deferral, and unavailable-endpoint policy
 #   check: long-held lock: lock=<path> owner=<pid> state=<stat> parent=<pid>
 #                          parent_command=<command> age=<seconds>s waiters=<n>
-#                          shared-helper ownership exceeded FM_LOCK_ALARM_SECS;
+#                          shared-helper ownership exceeded its lock's limit
+#                          (FM_LOCK_ALARM_SECS unless fm_lock_monitor_check
+#                          names another), or a project/control owner died;
 #                          once per ownership episode, observation only
 #                          (bin/fm-wake-lib.sh owns the diagnostic receipts)
 #   check: <script>: <out> authenticated check output, always actionable
