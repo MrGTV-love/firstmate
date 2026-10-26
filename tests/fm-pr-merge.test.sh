@@ -687,7 +687,7 @@ test_recorded_review_merge_conditions() {
       cross-family-model)
         printf '\nmodel=kimi-k2\n' >> "$case_dir/state/task-x1.meta"
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["kimi-k2"]}' >/dev/null ;;
-      unknown-reader) record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null; expected='model family unknown for mistral-large' ;;
+      unknown-reader) record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null; expected='model family unknown for newest reader mistral-large' ;;
       unknown-author-captain)
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["mistral-large"]}' >/dev/null
         review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9 despite the unknown author family.' >/dev/null ;;
