@@ -42,8 +42,7 @@
 # Explicit paths bypass changed-file selection and are linted as given, without
 # the workflow YAML check.
 # Explicit core bin/ and bin/backends/ scripts still receive the
-# backend-purity check and the literal locked-section slow-work audit owned by
-# bin/fm-lock-audit.py. The backend-purity check rejects direct Beads CLI
+# backend-purity check. The backend-purity check rejects direct Beads CLI
 # invocations in the core bin/ and bin/backends/ scripts so every configured
 # backlog backend follows the same tasks-axi lifecycle path.
 # Successful source-aware checks are shared across worktrees via content hashes
@@ -600,9 +599,6 @@ fm_lint_run_backend_purity() {
     done
   fi
   [ "${#purity_roots[@]}" -gt 0 ] || return 0
-  if [ -r "$SELF_DIR/fm-lock-audit.py" ]; then
-    python3 "$SELF_DIR/fm-lock-audit.py" "${purity_roots[@]}" || return $?
-  fi
   findings=$(LC_ALL=C awk '
     function hex_value(character) {
       return index("0123456789abcdef", tolower(character)) - 1

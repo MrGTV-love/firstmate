@@ -2625,6 +2625,19 @@ lock_alarm_tick() {
   fi
 }
 
+# FM_LOCK_WAIT_TICK hook: while this watcher process waits on its own
+# wake-queue lock, run the long-held lock alarm once per poll interval and keep
+# waiting. The pending append is never dropped, reordered or abandoned here;
+# only an alarm wake ends the wait, exactly as it would end any other poll.
+WATCH_QUEUE_WAIT_TICKED=0
+watch_queue_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+  [ "$1" = "$FM_WAKE_QUEUE_LOCK" ] && [ "$3" = "$$" ] || return 0
+  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_QUEUE_WAIT_TICKED)) -ge "$POLL" ] || return 0
+  WATCH_QUEUE_WAIT_TICKED=$SECONDS
+  lock_alarm_tick
+  return 0
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -2718,6 +2731,7 @@ done
 # owner can be reported without first waiting behind that same owner.
 trap 'fm_lock_release "$WATCH_LOCK"' EXIT
 lock_alarm_tick
+FM_LOCK_WAIT_TICK=watch_queue_wait_tick
 if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
 fi

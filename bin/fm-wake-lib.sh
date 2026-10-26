@@ -6,7 +6,9 @@
 # successful release retires them. The watcher checks those receipts and adopts
 # pre-upgrade locks in this home's state tree, without following directory links.
 # FM_LOCK_ALARM_SECS (positive seconds, default 300) reports each ownership
-# episode once through a check wake, including intentionally long-lived locks.
+# episode once through a check wake. The observing watcher's own locks and the
+# process-lifetime singletons state/.watch.lock and state/.supervise-daemon.lock
+# are not reported; a dead or zombie owner of those is still reclaimed.
 # It is an observation threshold, not permission to kill or reclaim anything.
 # Alarm publication only creates uncontended queue/recovery locks; it never
 # reclaims or waits for them. If those locks are unavailable, a .pending receipt
@@ -17,15 +19,9 @@
 # A waiting acquire emits one stderr breadcrumb after 60s per observed owner;
 # it has no new contention deadline. Waiter receipts count only this home's
 # registered waiters; crashed waiter receipts are excluded by PID liveness.
-#
-# fm-lock-metrics.pl implements best-effort timing for this owner. Releases
-# append STATE/.lock-holds.jsonl (lock, command/argv0, pid, duration_ms,
-# acquired_at_ms, released_at_ms, waiters). Duration uses a monotonic clock from
-# the acquisition observation through the release observation, not wall-clock
-# subtraction; it excludes process startup before the acquisition observation.
-# Waiters is null when receipts cannot establish an exact live count. A busy
-# nonblocking O_APPEND/flock writer or an I/O failure drops the measurement,
-# never waits for the writer and never changes lock acquisition/release results.
+# FM_LOCK_WAIT_TICK, when set, names a function each waiting iteration calls
+# with <lock> <wait-start-SECONDS> <waiter-pid>; the watcher uses it to keep
+# observing long-held locks while its own wake-queue append keeps waiting.
 
 FM_WAKE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 FM_WAKE_DEFAULT_ROOT="$(cd "$FM_WAKE_LIB_DIR/.." && pwd)"
@@ -564,30 +560,25 @@ _fm_lock_monitor_state_to() {  # <out-var>; STATE may have been function-local
     "${STATE:-${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT:-$FM_WAKE_DEFAULT_ROOT}}/state}}"
 }
 
-fm_lock_monitor_register() {  # <lock> <owner-directory>
-  local state
-  _fm_lock_monitor_state_to state
-  perl "$FM_WAKE_LIB_DIR/fm-lock-metrics.pl" start "$2" "$1" "$state" 2>/dev/null
-}
-
 # A caller may acquire inside a function-local STATE and release after that
-# scope has ended (the away-contract lock does). The published owner receipt,
-# not the releasing shell's dynamic scope, binds telemetry to its home.
-fm_lock_monitor_release() {  # <owner-directory>
-  local record state
-  IFS= read -r record 2>/dev/null < "$1/monitor-record" || return 0
-  case "$record" in
-    */.lock-monitor/hold.*)
-      state=${record%/.lock-monitor/hold.*}
-      perl "$FM_WAKE_LIB_DIR/fm-lock-metrics.pl" release "$1" "$state" "${0##*/}" 2>/dev/null || true
-      ;;
-  esac
-  return 0
+# scope has ended (the away-contract lock does). The owner's monitor-record,
+# not the releasing shell's dynamic scope, binds the receipt to its home.
+fm_lock_monitor_register() {  # <lock> <owner-directory>
+  local state lock receipt
+  _fm_lock_monitor_state_to state
+  lock=$(fm_lock_abs_path "$1") || return 1
+  [ -d "$state/.lock-monitor" ] || mkdir "$state/.lock-monitor" 2>/dev/null || true
+  receipt=$(mktemp "$state/.lock-monitor/hold.XXXXXX" 2>/dev/null) || return 1
+  if ! printf '%s\n%s\n' "$lock" "$2" > "$receipt" \
+    || ! printf '%s\n' "$receipt" > "$2/monitor-record"; then
+    rm -f "$receipt"
+    return 1
+  fi
 }
 
 fm_lock_clean_known_files() {
   local lockdir=$1 record='' state=${STATE:-}
-  set -- "$lockdir/monitor-record" "$lockdir/hold-start" "$lockdir/pid" \
+  set -- "$lockdir/monitor-record" "$lockdir/pid" \
     "$lockdir/fm-home" "$lockdir/pid-identity" "$lockdir"/reaper-*-identity \
     "$lockdir/role" "$lockdir/watcher-path"
   if [ -f "$lockdir/monitor-record" ]; then
@@ -1516,6 +1507,7 @@ fm_lock_acquire_wait() {
         ;;
       esac
     fi
+    [ -z "${FM_LOCK_WAIT_TICK:-}" ] || "$FM_LOCK_WAIT_TICK" "$lockdir" "$started" "$current"
     sleep 0.1
   done
   [ -z "$record" ] || rm -f "$record"
@@ -1630,13 +1622,11 @@ fm_lock_release() {
     [ "$pid" = "$current" ] || return 0
     fm_lock_points_to_owner "$lockdir" "$ownerdir" || return 0
     rm -f "$lockdir" 2>/dev/null || return 0
-    fm_lock_monitor_release "$ownerdir"
     fm_lock_discard_owner "$ownerdir"
     return 0
   fi
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
   [ "$pid" = "$current" ] || return 0
-  fm_lock_monitor_release "$lockdir"
   fm_lock_clean_known_files "$lockdir"
   rmdir "$lockdir" 2>/dev/null || true
 }
@@ -1697,12 +1687,13 @@ _fm_lock_monitor_adopt() {  # <lock>
 # measured: 25 releases per lock on 2026-10-26 gave p99/max 222.593ms for
 # fleet-ledger, 137.998ms for watcher-down, and 447.383ms for wake-queue. The
 # 300s observation threshold leaves over 600x the largest measured hold, not
-# a claim that all callers finish that fast. Long-lived singleton holds report
-# once: age is evidence to inspect, not a verdict that the owner is stuck.
+# a claim that all callers finish that fast. Age is evidence to inspect, not a
+# verdict that the owner is stuck; healthy process-lifetime singletons and the
+# observer's own holds are skipped.
 fm_lock_monitor_check() {
   local record lock owner pid mtime now age state parent command reason key old identity
   local waiter waiter_pid waiter_lock waiters first='' limit=${FM_LOCK_ALARM_SECS:-300}
-  local episodes=$'\n' episodes_loaded=0 marker
+  local episodes=$'\n' episodes_loaded=0 marker state_abs=''
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
   FM_LOCK_MONITOR_UNQUEUED=0
   FM_LOCK_MONITOR_PENDING=''
@@ -1759,6 +1750,9 @@ fm_lock_monitor_check() {
     pid=''
     IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
     case "$pid" in ''|*[!0-9]*) continue ;; esac
+    [ "$pid" != "$$" ] || continue
+    [ -n "$state_abs" ] || state_abs=$(cd "$STATE" && pwd -P) || state_abs=$STATE
+    case "$lock" in "$state_abs/.watch.lock"|"$state_abs/.supervise-daemon.lock") continue ;; esac
     key="$owner:$pid:$mtime:$identity"
     # Adoption can race the holder's own receipt publication. Deduplicate the
     # ownership episode across all references, including within this poll and

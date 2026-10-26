@@ -1936,6 +1936,126 @@ PY
   pass "a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture"
 }
 
+test_watcher_skips_own_singleton_locks() {
+  local dir
+  dir=$(make_case lock-alarm-singletons)
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "watcher alarmed on a healthy singleton lock"
+import os, pathlib, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+out, err = home / "watch.out", home / "watch.err"
+daemon = subprocess.Popen(["sleep", "300"])
+watcher = None
+def beats(count):
+    seen = set()
+    for _ in range(600):
+        beat = state / ".last-watcher-beat"
+        if beat.exists(): seen.add(beat.stat().st_mtime_ns)
+        if len(seen) >= count: return
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    raise AssertionError("watcher polls did not advance")
+try:
+    singleton = state / ".supervise-daemon.lock"; singleton.mkdir()
+    (singleton / "pid").write_text(f"{daemon.pid}\n")
+    with out.open("w") as stdout, err.open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    beats(2)
+    old = time.time() - 301
+    os.utime(state / ".watch.lock" / "pid", (old, old))
+    os.utime(singleton / "pid", (old, old))
+    beats(4)
+    assert "long-held" not in out.read_text(), out.read_text()
+    # A control lock past the same limit still alarms on that very watcher.
+    control = state / ".fixture.lock"; control.mkdir()
+    (control / "pid").write_text(f"{daemon.pid}\n")
+    os.utime(control / "pid", (old, old))
+    assert watcher.wait(timeout=60) == 0, err.read_text()
+    reason = out.read_text()
+    assert f"lock={control}" in reason or f"lock={control.resolve()}" in reason, reason
+    queued = (state / ".wake-queue").read_text()
+    assert "long-held" in queued and ".watch.lock" not in queued and ".supervise-daemon.lock" not in queued, queued
+finally:
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        try: watcher.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(watcher.pid, signal.SIGKILL)
+            watcher.wait()
+    daemon.kill(); daemon.wait()
+PY
+  pass "a watcher past the alarm limit stays silent about its own and the daemon's singleton locks"
+}
+
+test_lock_alarm_while_queue_append_waits() {
+  local dir
+  dir=$(make_case lock-alarm-queue-wait)
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "a blocked queue append starved the long-held lock alarm"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="1", FM_HEARTBEAT_MAX="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+out, err = home / "watch.out", home / "watch.err"
+watcher = holder = None
+try:
+    with out.open("w") as stdout, err.open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    seen = set()
+    for _ in range(600):
+        beat = state / ".last-watcher-beat"
+        if beat.exists(): seen.add(beat.stat().st_mtime_ns)
+        if len(seen) >= 2: break
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("watcher did not reach its poll loop")
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    # Away mode makes the next heartbeat append to the held queue.
+    (state / ".afk").write_text("away\n")
+    for _ in range(600):
+        waiting = False
+        for receipt in (state / ".lock-monitor").glob("wait.*"):
+            try: fields = receipt.read_text().splitlines()
+            except FileNotFoundError: continue
+            waiting |= len(fields) >= 2 and fields[0] == str(watcher.pid) and fields[1] == str(state.resolve() / lock.name)
+        if waiting: break
+        assert watcher.poll() is None, out.read_text() + err.read_text()
+        time.sleep(.1)
+    else: raise AssertionError("watcher never waited on the held queue lock: " + out.read_text() + err.read_text())
+    assert "long-held" not in out.read_text(), "fresh queue owner alarmed"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    assert watcher.wait(timeout=60) == 0, err.read_text()
+    reason = out.read_text()
+    assert "check: long-held lock:" in reason and f"owner={holder.pid}" in reason and "queue=unavailable" in reason, reason
+    assert holder.poll() is None and (lock / "pid").read_text().strip() == str(holder.pid), "alarm changed the live queue owner"
+    queue = state / ".wake-queue"
+    assert not queue.exists() or "heartbeat" not in queue.read_text(), "append bypassed the held lock"
+finally:
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        try: watcher.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            os.killpg(watcher.pid, signal.SIGKILL)
+            watcher.wait()
+PY
+  pass "a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock"
+}
+
 test_long_held_lock_alarm() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
@@ -2051,7 +2171,7 @@ PY
 
 test_lock_monitor_prunes_finished_waiters() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "finished waiter diagnostic cleanup failed"
-import json, os, pathlib, select, subprocess, sys, tempfile
+import os, pathlib, select, subprocess, sys, tempfile
 lib = sys.argv[1]
 with tempfile.TemporaryDirectory(prefix="fm-finished-waiter-") as d:
     state = pathlib.Path(d)
@@ -2070,8 +2190,6 @@ with tempfile.TemporaryDirectory(prefix="fm-finished-waiter-") as d:
         assert owner.poll() is None and (lock / "pid").read_text().strip() == str(owner.pid)
         owner.stdin.write("release\n"); owner.stdin.flush()
         assert owner.wait(timeout=30) == 0
-        rows = [json.loads(line) for line in (state / ".lock-holds.jsonl").read_text().splitlines()]
-        assert rows[-1]["waiters"] == 0, rows[-1]
     finally:
         if owner.poll() is None:
             owner.stdin.write("release\n"); owner.stdin.flush()
@@ -2080,33 +2198,20 @@ PY
   pass "a timed-out waiter is pruned without alarming on or changing the fresh live owner"
 }
 
-test_lock_hold_metrics() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "lock hold timing behavior failed"
-import fcntl, json, os, pathlib, subprocess, sys, tempfile
-with tempfile.TemporaryDirectory(prefix="fm-lock-metrics-") as d:
+test_lock_receipts_retire_with_release() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "lock receipt retirement failed"
+import os, pathlib, subprocess, sys, tempfile
+with tempfile.TemporaryDirectory(prefix="fm-lock-receipts-") as d:
     lib = sys.argv[1]
     env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
-    code = '. "$1"; fm_lock_acquire_wait "$2" || exit 1; sleep .05; fm_lock_release "$2"; [ ! -e "$2" ]'
+    held = '. "$1"; fm_lock_acquire_wait "$2" || exit 1; cat "$2/monitor-record"'
     lock = d + "/.fixture.lock"
-    holder = subprocess.Popen(["bash", "-c", code, "fixture-holder", lib, lock], env=env)
-    assert holder.wait(timeout=30) == 0
-    ledger = pathlib.Path(d, ".lock-holds.jsonl")
-    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
-    assert len(rows) == 1, rows
-    row = rows[0]
-    assert row["lock"] == lock and row["command"] == "fixture-holder" and row["pid"] == holder.pid, row
-    assert row["duration_ms"] >= 50, row
-    assert row["waiters"] == 0, row
-    # Contended telemetry is dropped, never awaited, and never keeps the lock.
-    with ledger.open("a") as held:
-        fcntl.flock(held, fcntl.LOCK_EX)
-        subprocess.run(["bash", "-c", code, "fixture-holder", lib, lock], env=env, check=True, timeout=30)
-        assert len(ledger.read_text().splitlines()) == 1, "busy metrics writer was not skipped"
-    ledger.unlink(); ledger.mkdir()
-    subprocess.run(["bash", "-c", code, "fixture-holder", lib, lock], env=env, check=True, timeout=30)
-    ledger.rmdir()
+    receipt = pathlib.Path(subprocess.check_output(["bash", "-c", held, "_", lib, lock], env=env, text=True, timeout=30).strip())
+    assert receipt.read_text().splitlines()[0] == str(pathlib.Path(d).resolve() / ".fixture.lock"), receipt.read_text()
+    subprocess.run(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" && fm_lock_release "$2"; [ ! -e "$2" ]', "_", lib, lock], env=env, check=True, timeout=30)
+    assert not list(pathlib.Path(d, ".lock-monitor").glob("hold.*")), "released receipt leaked"
     # Away-contract acquisition has function-local STATE; its EXIT release
-    # happens after that scope ends. Telemetry must not fail the command.
+    # happens after that scope ends. The receipt must still retire.
     scoped = '''
 set -u
 unset STATE
@@ -2121,14 +2226,12 @@ trap 'fm_lock_release "$2/.after-scope.lock"; fm_lock_release "$2/.scoped.lock"'
 fm_lock_acquire_wait "$2/.after-scope.lock" || exit 3
 '''
     holder = subprocess.Popen(["bash", "-c", scoped, "scoped-holder", lib, d], env=env)
-    assert holder.wait(timeout=30) == 0, "bookkeeping depended on expired STATE scope"
-    rows = [json.loads(line) for line in ledger.read_text().splitlines()]
-    assert [(r["lock"], r["pid"], r["command"]) for r in rows] == [(d + name, holder.pid, "scoped-holder") for name in ("/.after-scope.lock", "/.scoped.lock")], rows
+    assert holder.wait(timeout=30) == 0, "receipt bookkeeping depended on expired STATE scope"
     assert not pathlib.Path(d, ".scoped.lock").is_symlink()
     assert not list(pathlib.Path(d).glob(".scoped.lock.owner.*")), "scoped owner metadata leaked"
     assert not list(pathlib.Path(d, ".lock-monitor").glob("hold.*")), "scoped diagnostic receipt leaked"
 PY
-  pass "released holds record millisecond metrics across scoped owners; busy or failed telemetry never blocks release"
+  pass "released locks retire their diagnostic receipts across scoped owners without hold telemetry"
 }
 
 test_zombie_owner_is_reclaimed() {
@@ -2228,10 +2331,12 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
 fi
 
 test_lock_alarm_crosses_threshold_during_capture
+test_watcher_skips_own_singleton_locks
+test_lock_alarm_while_queue_append_waits
 test_long_held_lock_alarm
 test_lock_alarm_discovers_foreign_owners
 test_lock_monitor_prunes_finished_waiters
-test_lock_hold_metrics
+test_lock_receipts_retire_with_release
 test_zombie_owner_is_reclaimed
 test_unreadable_ps_never_reclaims_live_owner
 test_lock_wait_breadcrumb
