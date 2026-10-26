@@ -1,0 +1,31 @@
+=== S6: ship brief, ### Out of scope answered "None." -> dispatch proceeds and a real codex worker launches
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+None.
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-none $LAB/projects/notes --mode local-only --yolo on --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+skill selection for oos-none: unavailable - no TypeSafe or OpenRouter key
+spawned oos-none harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-none worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/1/notes
+exit=0
+--- tmux windows:
+firstmate:lab zsh
+firstmate:fm-oos-none node
+--- guard events:
+{"ts":"2026-10-26T04:37:46Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-25025","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:46Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-25086","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+--- launch-brief.md delivered to the oos-none worker (Task section):
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+None.
+
+# Herdr lifecycle declaration - NOT ENABLED

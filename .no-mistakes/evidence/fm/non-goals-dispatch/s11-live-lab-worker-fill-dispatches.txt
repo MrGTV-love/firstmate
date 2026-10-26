@@ -1,0 +1,36 @@
+=== S11: bin/fm-live-lab.sh spawn_worker brief fill (extracted verbatim from the shipped script) on a real scaffold, then real fm-spawn
+--- extracted fill program:
+import os, sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
+text = text.replace("\n### Out of scope\n", "\n### Out of scope\nNone.\n", 1)
+dod = {
+    "{DOD_CAPABILITY}": "notes/__init__.py gains count_notes(), which returns how many notes are stored.",
+    "{DOD_MANDATORY_ITEMS}": "M1. Source: the task text. Expected: count_notes() returns the stored note count. Verify: python3 -m unittest discover -s tests passes. Edge/negative: an empty store returns 0. Evidence place: tests/test_notes.py and the unittest output. Authority: gate.",
+    "{DOD_SUPPORTING_ITEMS}": "None.",
+    "{DOD_HARD_GATES}": "Do not implement before the gate file exists.",
+    "{DOD_HONESTY_RULE}": "Report an unrun test as unrun; never claim a pass without the unittest output.",
+}
+for token, fill in dod.items():
+    text = text.replace(token, fill, 1)
+open(path, "w", encoding="utf-8").write(text)
+# Task
+## Captain's intent
+Lab gated worker for a live supervision lab.
+
+## Firstmate spec
+Right after setup, append one paused status line and end your turn. Nothing else is in scope.
+
+### Out of scope
+None.
+
+# Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-livelab: unavailable - no TypeSafe or OpenRouter key
+spawned oos-livelab harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-livelab worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/5/notes
+exit=0
+--- guard events:
+{"ts":"2026-10-26T04:40:18Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-99445","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:40:18Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-99494","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}

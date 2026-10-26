@@ -1,0 +1,60 @@
+=== S2: scout brief, blank ### Out of scope
+scaffolded: /private/tmp/fm-lab.pUhbtm/data/oos-scout/brief.md (scout; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-scout $LAB/projects/notes --scout --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+error: /private/tmp/fm-lab.pUhbtm/data/oos-scout/brief.md cannot be dispatched; every input problem is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+error: repair: edit /private/tmp/fm-lab.pUhbtm/data/oos-scout/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+
+=== S3: ship brief, ### Out of scope holds only blank and whitespace lines
+0000000    #   #   #       O   u   t       o   f       s   c   o   p   e
+0000020   \n              \n  \t  \n  \n   #       H   e   r   d   r    
+0000040    l   i   f   e   c   y   c   l   e       d   e   c   l   a   r
+0000060    a   t   i   o   n       -       N   O   T       E   N   A   B
+0000100    L   E   D  \n                                                
+0000104
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+error: /private/tmp/fm-lab.pUhbtm/data/oos-ws/brief.md cannot be dispatched; every input problem is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+error: repair: edit /private/tmp/fm-lab.pUhbtm/data/oos-ws/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+
+=== S4: blank list AND a leftover {DOD_HARD_GATES} token: one refusal lists both
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+error: /private/tmp/fm-lab.pUhbtm/data/oos-mixed/brief.md has an unfinished task Definition of Done; every unfinished item is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+  ### Hard gates still holds {DOD_HARD_GATES}
+error: repair: edit /private/tmp/fm-lab.pUhbtm/data/oos-mixed/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+
+=== S5: Firstmate spec holds only "### Out of scope / None." (no build instructions)
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+
+### Out of scope
+None.
+
+# Herdr lifecycle declaration - NOT ENABLED
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+error: /private/tmp/fm-lab.pUhbtm/data/oos-specnone/brief.md must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn; write the requested change or investigation and the substance of any referenced report, then rerun fm-spawn.sh to complete dispatch
+exit=1
+
+--- tmux windows (no worker launched by any refusal):
+lab
+--- guard events for S2-S5:
+{"ts":"2026-10-26T04:37:27Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-3605","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:29Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-5876","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:30Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-8127","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:30Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-8202","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:32Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-10414","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:37:32Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-10468","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}

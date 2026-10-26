@@ -1,0 +1,44 @@
+$ bin/fm-brief.sh oos-blank notes --mode local-only
+scaffolded: /private/tmp/fm-lab.pUhbtm/data/oos-blank/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+--- # Task section of the filled brief:
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+
+# Herdr lifecycle declaration - NOT ENABLED
+--- DoD section:
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+
+Capability in plain words: Filled for the lab check.
+
+### Mandatory items
+Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+Filled for the lab check.
+
+### Supporting items
+Filled for the lab check.
+
+### Hard gates
+Filled for the lab check.
+
+### Honesty rule
+Filled for the lab check.
+
+$ bin/fm-spawn.sh oos-blank $LAB/projects/notes --mode local-only --yolo on --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+error: /private/tmp/fm-lab.pUhbtm/data/oos-blank/brief.md cannot be dispatched; every input problem is listed once:
+  ### Out of scope is empty: name the work this task does not do, or write None
+error: repair: edit /private/tmp/fm-lab.pUhbtm/data/oos-blank/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+exit=1
+--- tmux windows:
+lab
+--- guard events:
+{"ts":"2026-10-26T04:37:11Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-88243","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

@@ -1,0 +1,17 @@
+=== S7: relaunch of an accepted task (fresh spawn passed with "None."), after its brief list was blanked; previous agent exited
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-rl --relaunch --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-rl: unavailable - no TypeSafe or OpenRouter key
+spawned oos-rl harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-rl worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/1/notes
+exit=0
+--- tmux windows:
+firstmate:lab zsh
+firstmate:fm-oos-rl node
+--- guard events (no spawn-brief-out-of-scope deny):

@@ -1,0 +1,6 @@
+$ bin/fm-spawn.sh --help | grep -n -A3 "Out of scope"
+32-  A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder
+33:  and a blank scaffolded `### Out of scope` list (write None when nothing is
+34-  excluded); one refusal lists every leftover Task body and DoD token and the
+35-  blank exclusion list in a single pass,
+36-  then prints the repair, including the unfenced `DoD file: <absolute path>`

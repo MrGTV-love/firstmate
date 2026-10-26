@@ -1,0 +1,69 @@
+
+=== S8: legacy-shaped brief with no ### Out of scope heading at all -> still dispatchable
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-noheading $LAB/projects/notes --mode local-only --yolo on --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-noheading: unavailable - no TypeSafe or OpenRouter key
+spawned oos-noheading harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-noheading worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/2/notes
+exit=0
+
+=== S9: ### Out of scope names real excluded work -> dispatch proceeds
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+Write CHANGELOG.md with one line; then end your turn without committing.
+
+### Out of scope
+- Any change to README.md.
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-listed $LAB/projects/notes --mode local-only --yolo on --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-listed: unavailable - no TypeSafe or OpenRouter key
+spawned oos-listed harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-listed worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/3/notes
+exit=0
+
+=== S10: spec = ### Out of scope / None. / ### Approach / instructions -> later subsection still counts as spec content
+# Task
+## Captain's intent
+Add a one-line CHANGELOG entry to the notes project.
+
+## Firstmate spec
+
+### Out of scope
+None.
+### Approach
+Write CHANGELOG.md with one line.
+
+# Herdr lifecycle declaration - NOT ENABLED
+$ bin/fm-spawn.sh oos-approach $LAB/projects/notes --mode local-only --yolo on --harness codex
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /private/tmp/fm-lab.pUhbtm
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for oos-approach: unavailable - no TypeSafe or OpenRouter key
+spawned oos-approach harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-oos-approach worktree=/Users/charlesabrooker/.treehouse/notes-969bb7/4/notes
+exit=0
+
+--- tmux windows:
+firstmate:lab zsh
+firstmate:fm-oos-rl zsh
+firstmate:fm-oos-noheading zsh
+firstmate:fm-oos-listed zsh
+firstmate:fm-oos-approach zsh
+--- guard events (S8 logs no out-of-scope event; S9, S10 log allow):
+{"ts":"2026-10-26T04:39:31Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-46412","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:39:43Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-60415","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:39:43Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-60473","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:39:55Z","guard":"spawn-brief-dod-placeholders","version":"1","system":"firstmate","session":"pid-75190","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
+{"ts":"2026-10-26T04:39:56Z","guard":"spawn-brief-out-of-scope","version":"1","system":"firstmate","session":"pid-75277","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"proceed","repeat":1,"override":false}
