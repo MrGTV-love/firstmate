@@ -1,0 +1,15 @@
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+Mac-Studio:notes charlesabrooker$ cd -- '/private/tmp/fmt5.RDQ2Ik/home/projects/notes/.claude/worktrees/.treehouse/notes-56d7e4/2/notes'
+Mac-Studio:notes charlesabrooker$ export GOTMPDIR=/tmp/fm-t5w6604e11c/gotmp
+Mac-Studio:notes charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+Mac-Studio:notes charlesabrooker$ export FM_TASK_ID=t5w6604e11c
+Mac-Studio:notes charlesabrooker$ . '/tmp/fm-t5w6604e11c+b0b21613ec923c43c1a68ce6438d66af1cee01228e4afd3621120394619351b5/launch.s1793001409.49496.18207.sh'
+STUB-WORKER t5w6604e11c done: {
+ "task": "t5w6604e11c",
+ "argv": [
+  "--session-id",
+  "b11cb86a-da07-4e27-b1a3-bb6161c4929d",
+  "--dangerously-skip-permissions",
+  "--add-dir",
+  "/private/tmp/fmt5.RDQ2Ik/home/state/operational-i

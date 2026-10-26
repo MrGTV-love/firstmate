@@ -1,0 +1,49 @@
+=== profile built by target ce11c81b1 builder; fresh CLAUDE_CONFIG_DIR=$LAB/cfg-new; session 8674bd0b-c57a-44de-a961-a0c79f4b509a
+$ sandbox-exec -f profile-new.sb claude -p /cost --session-id 8674bd0b-c57a-44de-a961-a0c79f4b509a  (cwd $LAB/wt, model-free local command)
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Total cost:            $0.0000
+Total duration (API):  0s
+Total duration (wall): 3s
+Total code changes:    0 lines added, 0 lines removed
+Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+claude exit=0
+SessionStart hook marker: hook-ran 1 
+--- files created under fresh config root:
+.
+./projects
+./projects/-private-tmp-fm-lab-YLge0q-wt
+./projects/-private-tmp-fm-lab-YLge0q-wt/8674bd0b-c57a-44de-a961-a0c79f4b509a.jsonl
+./session-env
+./session-env/8674bd0b-c57a-44de-a961-a0c79f4b509a
+
+=== profile built by pre-fix 1381bcf90 builder; fresh CLAUDE_CONFIG_DIR=$LAB/cfg-old; session 10cc2434-398f-4b17-8df3-81af7bf3725d
+$ sandbox-exec -f profile-old.sb claude -p /cost --session-id 10cc2434-398f-4b17-8df3-81af7bf3725d  (cwd $LAB/wt, model-free local command)
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+Total cost:            $0.0000
+Total duration (API):  0s
+Total duration (wall): 3s
+Total code changes:    0 lines added, 0 lines removed
+Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+claude exit=0
+SessionStart hook marker: MISSING
+--- files created under fresh config root:
+.
+
+=== adversarial probes under profile-new.sb against the folders the confined Claude just created
+mv $LAB/cfg-new/projects $LAB/wt/stolen-projects             -> refused (rc=1)
+mv $LAB/cfg-new/session-env $LAB/wt/stolen-env               -> refused (rc=1)
+rm -rf $LAB/cfg-new/projects                                 -> refused (rc=1)
+rm -rf $LAB/cfg-new/session-env                              -> refused (rc=1)
+mv $LAB/cfg-new/projects/-private-tmp-fm-lab-YLge0q-wt $LAB/wt/stolen-slug -> refused (rc=1)
+mkdir -p $LAB/cfg-new/session-env/99999999-8888-4777-8666-555555555555 -> refused (rc=1)
+touch $LAB/cfg-new/projects/-private-tmp-fm-lab-YLge0q-wt/99999999-8888-4777-8666-555555555555.jsonl -> refused (rc=1)
+mkdir $LAB/cfg-new/file-history                              -> ALLOWED
+mkdir $LAB/cfg-new/file-history/99999999-8888-4777-8666-555555555555 -> refused (rc=1)
+touch $LAB/cfg-new/.claude.json                              -> refused (rc=1)
+mkdir $LAB/cfg-new/agents                                    -> refused (rc=1)
+--- config root after probes:
+.
+./file-history
+./projects
+./projects/-private-tmp-fm-lab-YLge0q-wt
+./session-env

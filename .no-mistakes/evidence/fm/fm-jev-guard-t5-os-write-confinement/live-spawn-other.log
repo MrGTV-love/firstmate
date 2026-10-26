@@ -1,0 +1,7 @@
+skill selection for t5o6604e11c: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=claude write_confinement=seatbelt-v1
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "330s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+spawned t5o6604e11c harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-t5o6604e11c worktree=/private/tmp/fmt5.RDQ2Ik/home/projects/notes/.claude/worktrees/.treehouse/notes-56d7e4/1/notes

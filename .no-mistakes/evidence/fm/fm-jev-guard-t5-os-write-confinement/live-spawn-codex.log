@@ -1,0 +1,4 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for t5c6604e11c: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned t5c6604e11c harness=codex kind=ship mode=local-only yolo=on window=firstmate:fm-t5c6604e11c worktree=/private/tmp/fmt5.RDQ2Ik/home/projects/notes/.claude/worktrees/.treehouse/notes-56d7e4/5/notes

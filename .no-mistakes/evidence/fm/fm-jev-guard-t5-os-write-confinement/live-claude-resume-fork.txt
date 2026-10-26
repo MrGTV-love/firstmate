@@ -1,0 +1,62 @@
+granted session G=968075c0-41d1-4a44-b114-ccc4f1c101d4 ; prior session OLD=fe1a36bc-6951-429e-a127-f6f6e259851d (created unconfined first)
+Total cost:            $0.0000
+
+raw:      claude -p /cost --resume OLD
+rendered: claude --session-id G --fork-session -p /cost --resume OLD
+  confined claude: Total cost:            $0.0000
+  confined claude: Total duration (API):  0s
+
+raw:      claude -p /cost -rOLD
+rendered: claude --session-id G --fork-session -p /cost -rOLD
+  confined claude: Error: Session ID 968075c0-41d1-4a44-b114-ccc4f1c101d4 is already in use.
+
+raw:      claude -p /cost --resume=OLD
+rendered: claude --session-id G --fork-session -p /cost --resume=OLD
+  confined claude: Error: Session ID 968075c0-41d1-4a44-b114-ccc4f1c101d4 is already in use.
+
+raw:      claude -pc /cost
+rendered: claude --session-id G --fork-session -pc /cost
+  confined claude: Error: Session ID 968075c0-41d1-4a44-b114-ccc4f1c101d4 is already in use.
+
+raw:      claude --append-system-prompt -- -p /cost --resume OLD
+rendered: claude --session-id G --fork-session --append-system-prompt -- -p /cost --resume OLD
+  confined claude: Error: Session ID 968075c0-41d1-4a44-b114-ccc4f1c101d4 is already in use.
+
+control: same resume without --fork-session (what the pre-R11-1 render delivered):
+  confined claude: Error: --session-id can only be used with --continue or --resume if --fork-session is also specified.
+
+transcripts in slug folder:
+G.jsonl
+OLD.jsonl
+
+=== RE-RUN: one fresh granted id and profile per launch, as fm-spawn.sh mints at every confined Claude launch (the 'already in use' errors above came from reusing one granted id G across launches)
+
+raw:      claude -p /cost --resume OLD
+rendered: claude --session-id G1 --fork-session -p /cost --resume OLD
+  confined claude: Total cost:            $0.0000
+  own transcript G1.jsonl written: yes
+
+raw:      claude -p /cost -rOLD
+rendered: claude --session-id G2 --fork-session -p /cost -rOLD
+  confined claude: Total cost:            $0.0000
+  own transcript G2.jsonl written: yes
+
+raw:      claude -p /cost --resume=OLD
+rendered: claude --session-id G3 --fork-session -p /cost --resume=OLD
+  confined claude: Total cost:            $0.0000
+  own transcript G3.jsonl written: yes
+
+raw:      claude -pc /cost
+rendered: claude --session-id G4 --fork-session -pc /cost
+  confined claude: Total cost:            $0.0000
+  own transcript G4.jsonl written: yes
+
+raw:      claude --append-system-prompt -- -p /cost --resume OLD
+rendered: claude --session-id G5 --fork-session --append-system-prompt -- -p /cost --resume OLD
+  confined claude: Total cost:            $0.0000
+  own transcript G5.jsonl written: yes
+
+raw:      claude --append-system-prompt --continue -p /cost
+rendered: claude --session-id G6 --append-system-prompt --continue -p /cost
+  confined claude: Total cost:            $0.0000
+  own transcript G6.jsonl written: yes

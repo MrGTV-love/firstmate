@@ -1,0 +1,2 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+malformed raw launch command: command substitution or braced expansion in double quote; use a named harness or simplify the raw launch to literal shell commands

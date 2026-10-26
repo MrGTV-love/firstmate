@@ -1,6 +1,48 @@
+ok - raw Claude shell data byte fidelity: reviewer
+ok - raw Claude shell data byte fidelity: literal
+ok - raw Claude shell data byte fidelity: double-quoted
+ok - raw Claude shell data byte fidelity: tab-stripped
+ok - raw Claude shell data byte fidelity: multiple
+ok - raw Claude shell data byte fidelity: quoted
+ok - raw Claude shell data byte fidelity: quoted-placeholder
+ok - raw Claude shell data byte fidelity: quoted-substitution-data
+ok - raw Claude shell data byte fidelity: comment
+ok - raw Claude shell data byte fidelity: option-terminator
+ok - raw Claude forks for: --resume old-session
+ok - raw Claude forks for: -r old-session
+ok - raw Claude forks for: --continue
+ok - raw Claude forks for: -c
+ok - raw Claude forks for: --resume=old-session
+ok - raw Claude forks for: -rold-session
+ok - raw Claude forks for: -pc
+ok - raw Claude forks for: -p -cr
+ok - raw Claude forks for: --append-system-prompt -- --resume old-id
+ok - raw Claude forks for: --model -- --continue
+ok - raw Claude forks for: --append-system-prompt --fork-session --resume old-id
+ok - raw Claude forks for: -n --print -c
+ok - raw Claude does not fork for: --append-system-prompt --continue --print hello
+ok - raw Claude does not fork for: --append-system-prompt=--continue --print hello
+ok - raw Claude does not fork for: -n --resume --print hello
+ok - raw Claude does not fork for: -n--continue --print hello
+ok - raw Claude does not fork for: --print -- --resume
+ok - raw Claude does not fork for: --resume old-session --fork-session
+ok - raw Claude refuses: command substitution
+ok - raw Claude refuses: command substitution
+ok - raw Claude refuses: backtick
+ok - raw Claude refuses: backtick
+ok - raw Claude refuses: double quote
+ok - raw Claude refuses: here-document
+ok - raw Claude refuses: line continuation in here-document delimiter
+ok - raw Claude refuses: unterminated single quote
+ok - raw Claude refuses: unterminated double quote
+ok - raw Claude refuses: unterminated here-document
+ok - raw Claude refuses: unterminated here-document
+ok - raw Claude refuses: process substitution
+ok - raw Claude refuses: here-string
 ok - non-measured harness launches unchanged and explicitly reports unconfined coverage
 ok - measured harness launches run inside their generated write profile
 ok - a confined raw claude launch runs through TeamClaude with its session id and literal config root granted
+ok - an unconfined raw claude launch keeps shell constructs and gets no session id
 ok - a single transient stale pane_current_path read is not accepted as the worktree
 ok - an already-settled pane confirms on the next read, not a whole extra cycle
 ok - a transient primary-checkout pane read is not accepted as the worktree
@@ -8,3 +50,4 @@ ok - a pane stuck on the primary checkout fails loudly at the deadline
 ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
 ok - output activity cannot keep an acquisition alive beyond the absolute extreme
 # all fm-spawn-worktree-settle tests passed
+bash tests/fm-spawn-worktree-settle.test.sh  11.84s user 19.44s system 56% cpu 55.846 total

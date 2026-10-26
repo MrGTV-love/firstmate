@@ -1,0 +1,25 @@
+=== fm-spawn.sh live-fresh-claude-z9 <project> --harness "CLAUDE_CONFIG_DIR='<fresh claude root>' claude -p /cost"
+spawn exit=0
+write_confinement=seatbelt-v1
+claude_session_id=c205348d-cdfe-4497-86ed-317b1f8da3d6
+--- running delivered launch with the real Claude Code binary first on PATH:
+Total cost:            $0.0000
+Total duration (API):  0s
+Total duration (wall): 0s
+Total code changes:    0 lines added, 0 lines removed
+Usage:                 0 input, 0 output, 0 cache read, 0 cache write
+delivered exit=0
+SessionStart hook marker: hook-ran
+--- fresh root contents after the confined real Claude launch:
+.
+./projects
+./projects/-Users-charlesabrooker-tmp-fm-spawn-worktree-settle-axb1Pf-live-wt
+./projects/-Users-charlesabrooker-tmp-fm-spawn-worktree-settle-axb1Pf-live-wt/<recorded-session>.jsonl
+./session-env
+./session-env/<recorded-session>
+--- primary checkout untouched: 0 changes
+--- delivered launch: wrapper file sourced by the pane, and excerpts of its body:
+. '/tmp/fm-live-fresh-claude-z9+<token>/launch.s1793002977.45922.2457.sh'
+/usr/bin/sandbox-exec -f '$CASE/live/home/state/live-fresh-claude-z9.write-confinement.sb'
+FM_WRITE_CONFINEMENT='\''seatbelt-v1'\''
+claude --session-id c205348d-cdfe-4497-86ed-317b1f8da3d6 -p /cost
