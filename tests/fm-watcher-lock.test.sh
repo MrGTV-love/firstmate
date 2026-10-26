@@ -2139,7 +2139,7 @@ eval "$(declare -f fm_lock_monitor_check | sed '1s/fm_lock_monitor_check/observe
 fm_lock_monitor_check() {
   : > "$release"
   while [ -e "$STATE/.wake-queue.lock" ] || [ -L "$STATE/.wake-queue.lock" ]; do sleep 0.05; done
-  observed_fm_lock_monitor_check
+  observed_fm_lock_monitor_check "$@"
 }
 step_commit_probe() {
   if grep -F x-mention-2 "$STATE/.wake-queue" >/dev/null 2>&1; then echo landed; else echo missing; fi > "$STATE/step-commit"

@@ -2615,7 +2615,6 @@ lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures kee
     exit 1
   fi
   [ -n "$FM_LOCK_MONITOR_REASON" ] || return 0
-  [ "$#" -eq 0 ] || "$@" || return 0
   if [ "$FM_LOCK_MONITOR_UNQUEUED" = 1 ]; then
     # A jammed queue must not prevent reporting the jam. Preserve the
     # independent receipt until output succeeds, without signal-phase work
