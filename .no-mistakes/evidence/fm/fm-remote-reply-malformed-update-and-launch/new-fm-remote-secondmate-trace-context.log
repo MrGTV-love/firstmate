@@ -1,0 +1,17 @@
+ok - disabled: a remote-routed second mate records and receives no carrier and stays enabled-off end to end
+ok - enabled: a remote-routed second mate receives one carrier in its pane, identical to the parent's recorded identity, before launch
+ok - relaunch: a remote-routed second mate keeps one stable identity across restarts
+ok - boundary: each remote-routed second mate roots its own trace and never adopts the spawning environment's carrier
+ok - omp: the remote host records the harness and its pane launches the omp executable
+ok - remote reuse: an existing agent is reported rather than claimed as a replacement
+ok - omp: a remote relaunch reaches the ordinary ownership gate and sends no lifecycle input
+ok - allowlist: the remote receiver accepts exactly the declared inherited-material set, including the enablement flag
+ok - delivery: a parent-supplied carrier is accepted only for a secondmate launch and only as a strict W3C value
+ok - captured gtt-cb route: actual identity is reconciled without claiming replacement
+ok - spawned launch: the requested harness is still required
+ok - unknown launch disposition: the confirmed route is kept and reported as unconfirmed
+ok - older host reuse: cross-harness missing profile fields remain unknown
+ok - older host fresh launch: absent profile fields retain the confirmed request
+ok - host profile: explicit empty fields remain empty
+ok - fleet ledger: a reused or unconfirmed remote route records no dispatch and keeps its offset, a fresh launch records one
+ALL TESTS PASSED

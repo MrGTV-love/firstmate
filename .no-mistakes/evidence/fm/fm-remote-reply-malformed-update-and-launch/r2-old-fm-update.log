@@ -1,0 +1,11 @@
+ok - T1 main + secondmate fast-forward (single-parent), reread + restart signalled
+ok - T3 a non-instruction advance still restarts the live secondmate
+ok - T3b a bin/-only advance restarts the secondmate
+ok - T3c an unverifiable secondmate receives the fallback nudge
+ok - T3d an already-stopped secondmate is left to startup recovery
+ok - T3e a legacy remote advance still restarts the live remote mate
+ok - T3e captured gtt-cb scratch update is accepted without inventing an incident reproduction
+not ok - a malformed reply did not report its line count and bounded last line (missing: 'remote secondmate sm1: skipped on remote-mac: malformed update result (lines=3, last line: 'bad?[31mxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')')
+--- output ---
+remote secondmate sm1: skipped on remote-mac: malformed update result
+rc=1

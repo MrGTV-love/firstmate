@@ -1,0 +1,47 @@
+# provisioned fm-lab-hoststay-61456-31330
+# real lab pane w1:p1 (plain shell, no agent)
+
+$ FM_HOME=<remote> fm-remote-secondmate-control.sh stay hoststay-lab   # host-local, real lab pane
+error: no agent is running at task hoststay-lab's recorded endpoint (state: dead); there is no exit picker to close
+rc=1
+ok - host-local stay refuses a pane with no agent (dead endpoint), rc=1
+
+# herdr now reports an idle claude agent in that pane (a process named claude with no FM_SPAWN_GEN, not a real claude process, no matching launch generation)
+$ FM_HOME=<remote> fm-remote-secondmate-control.sh stay hoststay-lab
+error: task hoststay-lab cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+ok - host-local stay refuses an agent it cannot attribute (rc=1)
+ok - refusal comes from the ordinary control plane ownership gate
+ok - no pane/tab input call reached the real lab pane
+
+$ fm-remote-secondmate-control.sh stay (none extra args) -> rc=2
+  fm-remote-secondmate-control.sh stay <id>
+ok - arity none refused with usage rc=2
+
+$ fm-remote-secondmate-control.sh stay (two extra args) -> rc=2
+  fm-remote-secondmate-control.sh stay <id>
+ok - arity two refused with usage rc=2
+
+$ FM_HOME=<parent> fm-control.sh hoststay-lab stay   # parent -> fake ssh -> host-local -> real lab
+error: task hoststay-lab cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+rc=1
+decoded-argv fm-remote-secondmate-control.sh stay hoststay-lab
+ok - parent relays the host refusal text and a nonzero exit
+ok - parent sent exactly: fm-remote-secondmate-control.sh stay hoststay-lab
+$ fm-control.sh hoststay-lab interrupt -> rc=1: error: task hoststay-lab is a remotely placed secondmate on isolated-lab; its agent runs outside this home, so...
+ok - parent interrupt refused before any transport call
+$ fm-control.sh hoststay-lab exit -> rc=1: error: task hoststay-lab is a remotely placed secondmate on isolated-lab; its agent runs outside this home, so...
+ok - parent exit refused before any transport call
+$ fm-control.sh hoststay-lab relaunch -> rc=1: error: task hoststay-lab is a remotely placed secondmate on isolated-lab; its agent runs outside this home, so...
+ok - parent relaunch refused before any transport call
+ok - still no pane input after all calls
+ok - real lab pane visible text unchanged
+ok - endpoint metadata unchanged
+# herdr calls made:
+   3 agent get
+   3 pane get
+   5 pane process-info
+# teardown fm-lab-hoststay-61456-31330
+# teardown ok
+FAILS=0
+rc=0
