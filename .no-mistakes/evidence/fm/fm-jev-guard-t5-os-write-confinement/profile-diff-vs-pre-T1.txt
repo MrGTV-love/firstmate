@@ -1,0 +1,14 @@
+=== diff pre-T-1 (ec5eb87a1) -> HEAD profile, path prefix normalized
+80c80
+< (allow file-write-create (literal "<LAB>/uh/.claude/projects/-Users-charlesabrooker-tmp-fm-prof-XfCP5Y-wt"))
+---
+> (allow file-write-create (require-all (literal "<LAB>/uh/.claude/projects/-Users-charlesabrooker-tmp-fm-prof-XfCP5Y-wt") (vnode-type DIRECTORY)))
+=== diff T-1 (45315c716) -> HEAD
+80,84c80
+< (allow file-write-create (literal "<LAB>/uh/.claude/projects"))
+< (allow file-write-create (literal "<LAB>/uh/.claude/session-env"))
+< (allow file-write-create (literal "<LAB>/uh/.claude/file-history"))
+< (allow file-write-create (literal "<LAB>/uh/.claude/tasks"))
+< (allow file-write-create (literal "<LAB>/uh/.claude/projects/-Users-charlesabrooker-tmp-fm-prof-XfCP5Y-wt"))
+---
+> (allow file-write-create (require-all (literal "<LAB>/uh/.claude/projects/-Users-charlesabrooker-tmp-fm-prof-XfCP5Y-wt") (vnode-type DIRECTORY)))

@@ -1,0 +1,23 @@
+before relaunch: user-home/.claude exists? no
+relaunch rc=0
+relaunched rlfresh harness=claude from=claude model=default effort=default backend=tmux endpoint=fmses:fm-rlfresh worktree=/Users/charlesabrooker/tmp/fm-control-relaunch.RvmBMg/fresh-root-18343/wt
+write_confinement=seatbelt-v1
+new claude_session_id=a499ed4e-50f8-4ccc-b6df-e109d688b5bd
+--- created under user-home/.claude (mode name):
+700 .
+700 ./file-history
+700 ./projects
+700 ./projects/-Users-charlesabrooker-tmp-fm-control-relaunch-RvmBMg-fresh-root-18343-wt
+700 ./session-env
+700 ./tasks
+--- profile file-write-create grants:
+(allow file-write-create (require-all (literal "/Users/charlesabrooker/tmp/fm-co
+--- confined own-session writes under regenerated profile on the relaunch-created folders:
+own session-env/a499ed4e-50f8-4ccc-b6df-e109d688b5bd/probe -> written
+own file-history/a499ed4e-50f8-4ccc-b6df-e109d688b5bd/probe -> written
+own tasks/a499ed4e-50f8-4ccc-b6df-e109d688b5bd/probe -> written
+own projects/-Users-charlesabrooker-tmp-fm-control-relaunch-RvmBMg-fresh-root-18343-wt/a499ed4e-50f8-4ccc-b6df-e109d688b5bd.jsonl -> written
+foreign session-env/99999999-8888-4777-8666-555555555555/probe -> refused
+foreign file-history/99999999-8888-4777-8666-555555555555/probe -> refused
+foreign tasks/99999999-8888-4777-8666-555555555555/probe -> refused
+foreign projects/-Users-charlesabrooker-tmp-fm-control-relaunch-RvmBMg-fresh-root-18343-wt/99999999-8888-4777-8666-555555555555.jsonl -> refused

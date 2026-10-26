@@ -1,0 +1,32 @@
+## HEAD profile, fresh empty Claude root <LAB>/uh/.claude (paths: <LAB>=<LAB>)
+contents before: 
+confined mkdir projects/ (parent folder) -> refused
+confined mkdir session-env/ (parent folder) -> refused
+confined mkdir file-history/ (parent folder) -> refused
+confined mkdir tasks/ (parent folder) -> refused
+confined ln -s worktree projects (symlink plant) -> refused
+confined ln -s worktree session-env (symlink plant) -> refused
+confined ln -s worktree file-history (symlink plant) -> refused
+confined ln -s worktree tasks (symlink plant) -> refused
+-- outside the sandbox, create the parents the way fm-spawn does (mkdir -m 700)
+confined ln -s worktree projects/<slug> (symlink plant) -> refused
+confined plain file at projects/<slug> -> refused
+confined mkdir projects/<slug> (folder) -> ALLOWED
+confined append own transcript projects/<slug>/11111111-2222-4333-8444-555555555555.jsonl -> ALLOWED
+confined append foreign transcript projects/<slug>/9999.jsonl -> refused
+confined mv projects/<slug> to worktree -> refused
+confined rm -rf projects/<slug> -> refused
+confined write own session-env/11111111-2222-4333-8444-555555555555/env -> ALLOWED
+confined write foreign session-env/9999/env -> refused
+confined rmdir tasks/ (parent) -> refused
+confined mv session-env/ away -> refused
+-- unconfined control: same symlink plant succeeds without the sandbox
+unconfined ln -s projects/<slug> -> ALLOWED (control)
+final tree:
+.
+./file-history
+./projects
+./session-env
+./session-env/11111111-2222-4333-8444-555555555555
+./session-env/11111111-2222-4333-8444-555555555555/env
+./tasks
