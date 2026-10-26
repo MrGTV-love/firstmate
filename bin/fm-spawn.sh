@@ -7262,9 +7262,13 @@ case "$LAUNCH" in
 esac
 if [ "$RAW_LAUNCH" = 1 ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$CLAUDE_LAUNCH_BIN --exec /bin/sh -c $(shell_quote "$LAUNCH")"
-elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then
-  # A compound raw claude command can start with a shell keyword env cannot
-  # run, such as `[[`; a shell keeps the unset below on every command.
+elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ] && [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
+  # A confined compound raw claude command can start with a shell keyword env
+  # cannot run, such as `[[`, and it needs the unset below applied to the whole
+  # command; this host shell keeps that on every command inside the seatbelt.
+  # Only the confined route takes it: an unconfined launch keeps exactly the
+  # command its caller wrote, so Bash-only text such as a process substitution
+  # still runs under the pane's own shell instead of this host's /bin/sh.
   LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
 fi
 case "$HARNESS" in

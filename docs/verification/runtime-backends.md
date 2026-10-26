@@ -33,7 +33,7 @@ The unconfined control produced `false` for a, b, c, both foreign-status rewrite
 The gate hooks are the installed no-mistakes hooks with `NM_BIN` pointed at a model-free stand-in for the daemon client, so no real daemon run starts.
 The probes invoke the real `createGuardService.record` and `createTaskSessionProof` writers, including native proof publication and shutdown invalidation; no audit or session writer is mocked.
 The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
-`bash tests/fm-jev-guard-audit.test.sh` passed 21 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
+`bash tests/fm-jev-guard-audit.test.sh` passed 24 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
 The settle case runs the launch `fm-spawn.sh` delivers for omp and Claude with a stand-in harness: the primary-checkout write is refused, the own status append succeeds, `TMPDIR` is the task temp root and `FM_WRITE_CONFINEMENT` is `seatbelt-v1`.
 No checked-in test starts a real harness session.
 One-time measurements on 2026-10-24 ran real sessions of Claude Code 2.1.310 (`haiku` through the TeamClaude launcher) and omp (`openai-codex/gpt-6-luna`) under the generated profiles; the task's private record is `data/fm-jev-guard-t5-os-write-confinement/n2-measurement.md` in the owning home, beside the exact profiles and raw session outputs.

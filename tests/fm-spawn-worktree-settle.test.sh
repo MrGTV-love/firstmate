@@ -523,13 +523,13 @@ SH
   pass "a raw launch that runs claude after another command runs confined under its session id"
 }
 
-# An unconfined raw claude launch keeps the earlier memory-prefix placement, so
-# shell constructs the confined session rewrite refuses still launch there.
-test_unconfined_raw_claude_launch_keeps_shell_constructs() {
-  local rec id out source_line probe
-  local FM_COMPAT_LAUNCH_LOG
-  id=settle-raw-claude-linux-z9
-  rec=$(make_settle_case raw-claude-linux "$id" 0)
+# make_unconfined_claude_case <name> <id> builds a Linux-simulated settle home
+# whose fake claude records its argv and, when its second argument is a readable
+# file, that file's contents. It binds the settle globals itself and leaves the
+# delivered-launch log armed, so a caller only reads the record of its own case.
+make_unconfined_claude_case() {
+  local name=$1 id=$2 rec
+  rec=$(make_settle_case "$name" "$id" 0)
   read_settle_record "$rec"
   if [ "$(uname -s)" != Linux ]; then
     cat > "$FAKEBIN_DIR/uname" <<'SH'
@@ -539,27 +539,72 @@ exec /usr/bin/uname "$@"
 SH
     chmod +x "$FAKEBIN_DIR/uname"
   fi
-  probe="$HOME_DIR/data/$id/probe"
   cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
 [ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
-printf '%s\\n' "\$@" > '$probe'
+{
+  printf 'args=%s\\n' "\$*"
+  if [ -r "\${2:-}" ]; then printf 'prompt=%s\\n' "\$(cat "\$2")"; else printf 'prompt=\\n'; fi
+} > '$HOME_DIR/data/$id/probe'
 SH
   chmod +x "$FAKEBIN_DIR/claude"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
   export FM_COMPAT_LAUNCH_LOG
+  return 0
+}
+
+# An unconfined raw claude launch keeps the earlier memory-prefix placement, so
+# shell constructs the confined session rewrite refuses still launch there, and
+# the caller's own command is never handed to this host's /bin/sh first: the
+# interpreter that runs a Bash-only construct stays the pane's own shell.
+test_unconfined_raw_claude_launch_keeps_shell_constructs() {
+  local id out source_line staged probe
+  # A POSIX construct keeps its args, gains no session id, and the staged launch
+  # still runs under a plain dash pane shell.
+  id=settle-raw-claude-linux-z9
+  make_unconfined_claude_case raw-claude-linux "$id"
+  probe="$HOME_DIR/data/$id/probe"
+  # --allow-api-key with no account pin and the ordinary claude launcher is the
+  # configuration the earlier review measured, so nothing else wraps this route.
   # shellcheck disable=SC2016 # the literal constructs are the raw launch text under test
-  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"')
+  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"' --allow-api-key)
   expect_code 0 "$?" "unconfined raw claude spawn refused a shell construct: $out"
   assert_grep 'write_confinement=unconfined-linux' "$HOME_DIR/state/$id.meta" "unconfined raw claude coverage absent from metadata"
   assert_no_grep 'claude_session_id=' "$HOME_DIR/state/$id.meta" "an unconfined raw claude launch must not record a session id"
   assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the unconfined raw claude launch"
   source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  staged=${source_line#". '"}
+  staged=${staged%"'"}
+  [ -n "$staged" ] || staged=$source_line
+  assert_present "$staged" "the unconfined raw claude launch was not staged for a source line"
+  assert_no_grep '/bin/sh -c' "$staged" "an unconfined raw claude launch must keep the caller's command instead of handing it to this host's /bin/sh"
   PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
-  assert_equals $'--print\nhi\n--model\nopus' "$(cat "$probe")" \
+  assert_equals $'args=--print hi --model opus\nprompt=' "$(cat "$probe")" \
     "the unconfined raw claude launch must run its shell constructs unchanged and without a session id"
-  pass "an unconfined raw claude launch keeps shell constructs and gets no session id"
+  if [ -x /bin/dash ]; then
+    rm -f "$probe"
+    PATH="$FAKEBIN_DIR:$PATH" /bin/dash -c "$source_line"
+    assert_equals $'args=--print hi --model opus\nprompt=' "$(cat "$probe")" \
+      "the unconfined raw claude launch must still run under a real dash pane shell"
+  else
+    printf 'skip: /bin/dash is absent, so the dash pane-shell run of the unconfined launch is skipped\n'
+  fi
+  # Bash-only syntax stays under the pane's own shell: a process substitution must
+  # reach claude as data, never fail as a /bin/sh parse error of the raw text.
+  id=settle-raw-claude-bash-z9
+  make_unconfined_claude_case raw-claude-bash "$id"
+  probe="$HOME_DIR/data/$id/probe"
+  # shellcheck disable=SC2016 # the literal process substitution is the raw launch text under test
+  out=$(run_settle_spawn "$id" --harness 'claude --print <(printf hi)' --allow-api-key)
+  expect_code 0 "$?" "unconfined raw claude spawn refused a process substitution: $out"
+  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the process-substitution raw claude launch"
+  assert_no_grep '/bin/sh -c' "$FM_COMPAT_LAUNCH_LOG" "a Bash-only unconfined raw claude launch must not be handed to this host's /bin/sh"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  assert_grep 'args=--print /dev/fd/' "$probe" "the process substitution did not reach claude as its prompt argument"
+  assert_grep 'prompt=hi' "$probe" "the process substitution prompt did not reach claude intact"
+  pass "an unconfined raw claude launch keeps shell constructs, gets no session id and never gains a host /bin/sh"
 }
 
 # These are shell-language cases, not vendor behavior: execute only a task-local
