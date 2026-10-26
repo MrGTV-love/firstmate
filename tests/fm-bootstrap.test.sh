@@ -438,6 +438,7 @@ test_off_path_tools_get_actionable_path_diagnostics() {
   # inspect candidates only, not execute an unselected binary outside PATH.
   for tool in treehouse no-mistakes; do
     cp "$user/.local/bin/$tool" "$case_dir/$tool-body"
+    # shellcheck disable=SC2016 # The generated child owns these expansions.
     printf '#!/usr/bin/env bash\nprintf executed >> "$FM_TEST_OFF_PATH_EXEC_LOG"\nexec bash "%s" "$@"\n' \
       "$case_dir/$tool-body" > "$user/.local/bin/$tool"
   done
