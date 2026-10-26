@@ -1,0 +1,8 @@
+# Scenario F: real fm_run_progress (bin/fm-timeout-lib.sh -> fm-duration.py keep-going), fix d2ab7c580
+# host=Mac-Studio.local date=2026-10-26T05:36:08Z loadavg={ 18.73 14.82 16.21 }
+## F1 productive command: python root reaps ~0.25s CPU children for 8s, inactivity 2s
+work finished
+exit=0 elapsed=8s
+## F2 truly idle command: sleep 60, inactivity 2s
+no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+exit=124 elapsed=3s

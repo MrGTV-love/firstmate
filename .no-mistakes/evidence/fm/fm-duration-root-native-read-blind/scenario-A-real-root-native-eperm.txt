@@ -1,0 +1,10 @@
+# Scenario A: real root-owned idle pid 361 (/usr/libexec/IOMFB_bics_daemon); native proc_pid_rusage fails (EPERM), no injection
+# host=Mac-Studio.local date=2026-10-26T05:32:40Z loadavg={ 7.62 10.68 15.52 }
+## base (3b3fb14ef)
+call 1: exit=0 record_exists=yes stderr=<none>
+call 2: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 1.7s"
+call 3: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 3.3s"
+## fix (d2ab7c580)
+call 1: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+call 2: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+call 3: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"

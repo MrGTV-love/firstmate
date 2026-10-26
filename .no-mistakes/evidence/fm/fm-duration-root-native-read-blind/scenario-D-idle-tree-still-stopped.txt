@@ -1,0 +1,9 @@
+# Scenario D: truly idle real tree (bash -> sleep 600), real native reads working, fix d2ab7c580
+# host=Mac-Studio.local date=2026-10-26T05:35:27Z loadavg={ 22.49 14.83 16.28 }
+sample 1: exit=0 stderr=<none>
+sample 2: exit=124 stderr=no_progress: "pid=18652 no CPU or watched-file progress for 1.2s"
+sample 3: exit=124 stderr=no_progress: "pid=18652 no CPU or watched-file progress for 2.5s"
+sample 4: exit=124 stderr=no_progress: "pid=18652 no CPU or watched-file progress for 3.7s"
+sample 5: exit=124 stderr=no_progress: "pid=18652 no CPU or watched-file progress for 5.0s"
+bash: line 1: 18654 Terminated: 15          sleep 600
+SUMMARY mode=none workload=idle samples=5 false_or_true_stops(124)=4

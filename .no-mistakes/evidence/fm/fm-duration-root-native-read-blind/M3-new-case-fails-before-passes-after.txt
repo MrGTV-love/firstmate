@@ -1,0 +1,8 @@
+# M3: new case darwin_root_native_failure_is_blind_... from tests/fm-work-progress.test.sh, run alone
+## bin/ from base (3b3fb14ef)
+not ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle: unreadable native root was treated as idle: 124 no_progress: "pid=100 no CPU or watched-file progress for 2.0s"
+
+exit=1
+## bin/ from fix (d2ab7c580)
+ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle
+exit=0

@@ -1,0 +1,18 @@
+# Scenario C: same productive tree, real native reads working (no fault), fix d2ab7c580
+# host=Mac-Studio.local date=2026-10-26T05:34:58Z loadavg={ 17.28 13.10 15.74 }
+sample 1: exit=0 stderr=<none>
+sample 2: exit=0 stderr=<none>
+sample 3: exit=0 stderr=<none>
+sample 4: exit=0 stderr=<none>
+sample 5: exit=0 stderr=<none>
+sample 6: exit=0 stderr=<none>
+sample 7: exit=0 stderr=<none>
+sample 8: exit=0 stderr=<none>
+sample 9: exit=0 stderr=<none>
+sample 10: exit=0 stderr=<none>
+sample 11: exit=0 stderr=<none>
+sample 12: exit=0 stderr=<none>
+sample 13: exit=0 stderr=<none>
+sample 14: exit=0 stderr=<none>
+sample 15: exit=0 stderr=<none>
+SUMMARY mode=none workload=pyreaped samples=15 false_or_true_stops(124)=0

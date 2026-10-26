@@ -1,0 +1,20 @@
+# Scenario E: non-root native reads fail (root read works), fix d2ab7c580; members fall back to ps CPU
+# host=Mac-Studio.local date=2026-10-26T05:35:34Z loadavg={ 21.65 14.79 16.26 }
+## E1 live CPU-burning child (bash -> python busy loop): ps fallback must prove progress, not blind
+sample 1: exit=0 stderr=<none>
+sample 2: exit=0 stderr=<none>
+sample 3: exit=0 stderr=<none>
+sample 4: exit=0 stderr=<none>
+sample 5: exit=0 stderr=<none>
+sample 6: exit=0 stderr=<none>
+sample 7: exit=0 stderr=<none>
+sample 8: exit=0 stderr=<none>
+SUMMARY mode=nonroot workload=live samples=8 false_or_true_stops(124)=0
+## E2 idle child (bash -> sleep 600): complete fallback sample, truly idle tree is stopped
+sample 1: exit=0 stderr=<none>
+sample 2: exit=124 stderr=no_progress: "pid=29018 no CPU or watched-file progress for 1.2s"
+sample 3: exit=124 stderr=no_progress: "pid=29018 no CPU or watched-file progress for 2.5s"
+sample 4: exit=124 stderr=no_progress: "pid=29018 no CPU or watched-file progress for 3.8s"
+sample 5: exit=124 stderr=no_progress: "pid=29018 no CPU or watched-file progress for 5.1s"
+bash: line 1: 29022 Terminated: 15          sleep 600
+SUMMARY mode=nonroot workload=idle samples=5 false_or_true_stops(124)=4
