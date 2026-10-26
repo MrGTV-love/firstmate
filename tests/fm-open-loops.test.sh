@@ -2411,6 +2411,25 @@ second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '-
               '--recheck', recheck)
 assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
 
+# A row once made captain-visible by a refused second deferral gets a working fresh deferral after it changes.
+home, ledger, row, call, ok, drain, ack = case('deferral-visible-change')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
+refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', recheck)
+assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
+assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', recheck)
+stored = json.loads(ledger.read_text())
+assert stored['handling']['actions'][row['id']]['captain_visible'] is False, stored['handling']['actions'][row['id']]
+assert not stored['rows'][0].get('captain_visible'), stored['rows'][0]
+assert ack(boundary).returncode == 0, 'a fresh deferral on changed work did not cover the row'
+
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
 _, boundary = drain()

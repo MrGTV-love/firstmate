@@ -1651,7 +1651,9 @@ def ledger_action(args, state, now):
         wait_history = wait_history + [proof]
     elif args.prerequisite or args.prerequisite_task:
         raise ValueError("prerequisite options are only valid for waiting actions")
-    prior_deferrals = old.get("deferrals", 0) if same_work(old, by_id[ident], now) else 0
+    same = same_work(old, by_id[ident], now)
+    prior_deferrals = old.get("deferrals", 0) if same else 0
+    visible = bool(old.get("captain_visible")) and same
     if args.kind == "deferred":
         if prior_deferrals:
             old["captain_visible"] = True
@@ -1698,7 +1700,7 @@ def ledger_action(args, state, now):
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=prior_deferrals
-                         + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
+                         + int(args.kind == "deferred"), captain_visible=visible,
                          digest=row_digest(by_id[ident]), cited=cited, ledger_epoch=report["generated_epoch"])
     if by_id[ident].get("age_seconds") is not None:
         actions[ident]["clock_start"] = now - by_id[ident]["age_seconds"]
@@ -1712,6 +1714,10 @@ def ledger_action(args, state, now):
         actions[ident]["unverified"] = True
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
+    if not visible:
+        for row in report["rows"]:
+            if row["id"] == ident:
+                row.pop("captain_visible", None)
     write_ledger(state, report, receipt=True)
     print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
     if parked:
