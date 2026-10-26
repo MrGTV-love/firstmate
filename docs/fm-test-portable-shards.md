@@ -266,7 +266,10 @@ The 2026-10-25 main run measured `tests/fm-lint.test.sh` at 1241630 ms, the para
 It is now a shared helpers module plus four groups: changed-file and cache selection (21 cases), modes and installer and policy refusals (16), host slots and memory (19), and the sidecar and CI inputs (17).
 Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` pins the 73-case cover.
 The four parallel hints are apportioned from that measured 1241630 ms by case share (357000, 272000, 323000, and 289000 ms); they are estimates pending the first artifacts for the groups.
-The same change rebalances the two parallel lanes to their measured sums, which the 2026-10-25 run showed 2.1 times apart, and re-sorts both lanes longest-hint-first.
+The same change rebalances the two parallel lanes on their hint sums, 2772520 ms and 2772637 ms, after replacing only the former fm-lint hint, and re-sorts both lanes longest-hint-first.
+Every other parallel hint remains from the previous refresh, and the 2026-10-25 run measured the lanes 2.1 times apart, a larger runtime gap than those hints describe, so the hint balance does not claim a runtime balance.
+The five lint partition hints in `bin/fm-lint.sh` for the split files (1083, 452, 1437, and 600 ms for the four groups and 552 ms for the helpers) are sizing estimates from each file's line count, not measurements, and wait for the first measured lint runs; they affect lint shard assignment only.
+The admission of the three new groups to the proven-isolated set rests on the evidence in the [fm-lint split re-check](fm-test-isolation-proof.md#fm-lint-split-re-check), and a full portable-pool proof remains outstanding.
 
 ## Portable serial remainder
 
