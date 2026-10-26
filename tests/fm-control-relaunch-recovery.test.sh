@@ -1040,24 +1040,24 @@ test_relocation_retires_the_deletion_snapshot_until_republished() {
     "$id" "$dir/wt" > "$list"
   digest=$(shasum -a 256 "$list" | cut -d' ' -f1)
   printf 'jev_deletions_sha256=%s\n' "$digest" >> "$dir/home/state/$id.meta"
-  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "the old copy vanished"); rc=$?
+  out=$(run_control "$dir" "$id" relaunch --worktree "$dir/th/1/dest" --note "the old copy vanished"); rc=$?
   expect_code 0 "$rc" "a vanished copy with a deletion snapshot must relocate"$'\n'"$out"
-  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/dest" ] || fail "the record was not rebound to the fresh copy"
+  [ "$(meta_field "$dir" "$id" worktree)" = "$dir/th/1/dest" ] || fail "the record was not rebound to the fresh copy"
   assert_absent "$list" "relocation kept a deletion snapshot bound to the vanished worktree"
   ! grep -q '^jev_deletions_sha256=' "$dir/home/state/$id.meta" \
     || fail "relocation kept the vanished worktree's deletion digest"
-  out=$(deletion_admission "$dir" "$id" "$dir/dest")
+  out=$(deletion_admission "$dir" "$id" "$dir/th/1/dest")
   [ "$out" = undefined ] || fail "a relocated task must carry no deletion allowance, got: $out"
   out=$(FM_HOME="$dir/home" "$ROOT/bin/fm-jev-deletions.sh" "$id" --replace committed.txt 2>&1); rc=$?
   expect_code 0 "$rc" "Firstmate must be able to republish for the relocated worktree"$'\n'"$out"
-  out=$(deletion_admission "$dir" "$id" "$dir/dest")
+  out=$(deletion_admission "$dir" "$id" "$dir/th/1/dest")
   [ "$out" = '["committed.txt"]' ] || fail "an explicit republish must authorize the relocated worktree, got: $out"
   digest=$(meta_field "$dir" "$id" jev_deletions_sha256)
   printf zsh > "$dir/fake/command"
   out=$(run_control "$dir" "$id" relaunch --note "ordinary relaunch"); rc=$?
   expect_code 0 "$rc" "an ordinary relaunch must complete"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" jev_deletions_sha256)" = "$digest" ] || fail "an ordinary relaunch dropped the republished digest"
-  out=$(deletion_admission "$dir" "$id" "$dir/dest")
+  out=$(deletion_admission "$dir" "$id" "$dir/th/1/dest")
   [ "$out" = '["committed.txt"]' ] || fail "an ordinary relaunch must keep the republished snapshot, got: $out"
   pass "relocation: a deletion snapshot is retired with its digest until Firstmate republishes, and an ordinary relaunch keeps it"
 }
