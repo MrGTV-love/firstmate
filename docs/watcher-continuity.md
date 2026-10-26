@@ -359,7 +359,7 @@ A supervision-host close commits against a valid unacknowledged downtime episode
 It also commits against a handling episode, but only while main owns a queued row that no presentation hold covers (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
 Two invariants keep that refusal from dropping a wake.
 Delivery: the hold lasts only for the main turn that presented the rows, and a row counts as delivered only once main acknowledges it with `--ack-through`.
-Liveness: a supervision-host close that leaves no live successor is never refused in silence, because the host first republishes downtime for that generation ([supervision host](supervision-host.md#failure-direction)).
+Liveness: a supervision-host close that leaves no live successor is never refused in silence, because the host first republishes downtime for that generation ([supervision host](supervision-host.md#failure-direction)), and a handling-episode close is refused only while a healthy watcher runs (`fm_watcher_healthy`).
 A main presentation drain sets that held flag with a token unique to that presentation, and the first proof that the presenting turn ended releases it.
 Every Claude Stop firing of the session-lock owner that passes the AFK and need gates clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
 The firing reads the token before any gate or library load and clears the flag under the queue lock only while it still carries that token, so a late asynchronous firing never clears a hold that a newer turn's drain wrote.
@@ -367,13 +367,14 @@ A turn that ends with no Stop releases it at the next proof: `bin/fm-claude-hold
 Whether Claude also fires `UserPromptSubmit` for a message typed while a turn is still running is not verified live; if it does, the release ends that turn's hold early, and a later host close for its rows is delivered as a duplicate, which main handles idempotently.
 The next main drain replaces the hold with its own.
 The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
-When main's own drain entered handling and the turn that presented every row still holds them, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and a watcher stays live beside it.
+When main's own drain entered handling, the turn that presented every row still holds them, and a healthy watcher runs, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and that watcher stays live beside it.
+With no healthy watcher, the close commits even while the hold covers its rows, because a refusal could leave nothing to rewake main if that turn then ends with no Stop; main handles the possible duplicate idempotently.
 Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so a host close that arrives after the release is delivered once.
 A close refused before the release is owed too: the refused terminal ledger entry records that held close's recovery generation, and the next Claude Stop firing consumes that entry when it takes a new auto-arm generation.
 Only when that receipt names the current handling episode and main still owns a queued row no hold covers does the firing rewake main before it arms, because `fm_recovery_marker_arm_check` waits on a handling episode.
 This allows one early redelivery per recorded held-close refusal, not a new rewake on every Stop that ends without an acknowledgement or whose acknowledgement the overdue-action gate refuses.
 That covers a turn that ended through Stop and the turn after the next prompt, including the prompt after a mid-stream Escape.
-A turn that ended on an API error releases its hold through `StopFailure`, but that hook cannot rewake main, so its owed rows wait for the next turn's Stop.
+A turn that ended on an API error releases its hold through `StopFailure`, but that hook cannot rewake main, so rows owed by a close refused beside a healthy watcher wait for the next turn's Stop while that watcher keeps supervising.
 Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.
 The direct-arm path still requires downtime.
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.

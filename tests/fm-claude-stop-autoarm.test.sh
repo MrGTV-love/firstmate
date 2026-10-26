@@ -1807,12 +1807,14 @@ SH
 # ends with no Stop - the next prompt after an Escape (interrupted) or an API
 # error (api-error) - releases its hold through bin/fm-claude-hold-release.sh,
 # so the close is delivered exactly once. Every close leaves a live watcher or
-# wakes main, so the refusing modes run beside a live watcher.
+# wakes main: a held close with no healthy watcher beside it (the drain landed
+# after the host's downtime publish, and no successor runs) is delivered once,
+# because a refusal there could end in a blind stop.
 test_host_handback_after_main_presentation() {
   local phase watcher watchers mode dir out status pid identity drain generation cutoff queued lib
   for mode in open acked ended late-stop interrupted api-error; do
     watchers="absent live"
-    case "$mode" in open|acked|late-stop) watchers=live ;; esac
+    [ "$mode" != acked ] || watchers=live
     for phase in pending announced; do
       for watcher in $watchers; do
         dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$mode-$phase-$watcher")
@@ -1888,25 +1890,32 @@ SH
         assert_not_contains "$out" 'auto-arm FAILED' "$mode/$phase/$watcher: a main-presented handback is not an auto-arm failure"
         assert_absent "$dir/state/.claude-autoarm-failure-notified" "$mode/$phase/$watcher: a main-presented handback opened a failure episode"
         queued=$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')
-        case "$mode" in
-          open)
+        case "$mode/$watcher" in
+          open/absent|late-stop/absent)
+            expect_code 2 "$status" "$phase: a held close with no healthy watcher must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "$mode/$phase: unwatched held handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "$mode/$phase: unwatched held handback was not delivered exactly once: $out"
+            assert_present "$dir/state/.main-eligible-rows.held" "$mode/$phase: the presenting turn's hold is missing"
+            [ "$queued" -eq 1 ] || fail "$mode/$phase: translation consumed a durable row"
+            ;;
+          open/*)
             expect_code 0 "$status" "$phase/$watcher: a close the open main turn holds must not wake main again"
             [ "$(epoch_outcome "$dir")" = refused ] || fail "open/$phase/$watcher: held handback was not refused: $(epoch_outcome "$dir")"
             [ "$queued" -eq 1 ] || fail "open/$phase/$watcher: refusal consumed a durable row"
             ;;
-          acked)
+          acked/*)
             expect_code 0 "$status" "$phase/$watcher: a close main acknowledged in-turn must not wake main again"
             [ "$(epoch_outcome "$dir")" = refused ] || fail "acked/$phase/$watcher: acknowledged handback was not refused: $(epoch_outcome "$dir")"
             [ "$queued" -eq 0 ] || fail "acked/$phase/$watcher: the in-turn acknowledgement left rows behind"
             ;;
-          ended)
+          ended/*)
             [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "ended/$phase/$watcher: the turn's Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
             expect_code 2 "$status" "$phase/$watcher: a close left unacknowledged by an ended main turn must reach main"
             [ "$(epoch_outcome "$dir")" = rewake ] || fail "ended/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
             [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "ended/$phase/$watcher: handback was not delivered exactly once: $out"
             [ "$queued" -eq 1 ] || fail "ended/$phase/$watcher: translation consumed a durable row"
             ;;
-          interrupted|api-error)
+          interrupted/*|api-error/*)
             [ "$(cat "$dir/state/turn-release-rc")" = 0 ] && [ ! -s "$dir/state/turn-release" ] \
               || fail "$mode/$phase/$watcher: the hold release hook was not silent: $(cat "$dir/state/turn-release")"
             assert_absent "$dir/state/.main-eligible-rows.held" "$mode/$phase/$watcher: the ended turn's hold survived"
@@ -1915,7 +1924,7 @@ SH
             [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "$mode/$phase/$watcher: handback was not delivered exactly once: $out"
             [ "$queued" -eq 1 ] || fail "$mode/$phase/$watcher: translation consumed a durable row"
             ;;
-          late-stop)
+          late-stop/*)
             [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "late-stop/$phase/$watcher: the late Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
             assert_contains "$(cat "$dir/state/next-turn-drain")" 'check: newer main-only host handback' "the next turn's drain must present the row again"
             assert_present "$dir/state/.main-eligible-rows.held" "late-stop/$phase/$watcher: an older Stop firing cleared the newer turn's hold"

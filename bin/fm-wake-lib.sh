@@ -2239,6 +2239,9 @@ fm_failure_episode_reset() {
 #     "epoch=N owner_pid=P outcome=O updated_at=T" record. A "rewake" outcome
 #     also records "session_pid=S recovery_generation=G", binding that
 #     handling turn to its live session-lock owner and watcher recovery episode.
+#     A held-close "refused" outcome also records "recovery_generation=G": it
+#     is the early-redelivery receipt that the next claim (fm_autoarm_claim_next)
+#     consumes, so a refused write must keep that field.
 #     Line 2 is the claiming process's pid-identity, the same identity every other
 #     supervision lock in this repo records (fm_pid_identity above). The
 #     identity is MANDATORY: a claimant that cannot record it does not claim

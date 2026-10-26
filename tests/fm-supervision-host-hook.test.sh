@@ -546,7 +546,7 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
 # watcher's wake while the parked host classifies it (its presentation hold is
 # set and the marker reads handling), that turn ends with no Stop (an Escape or
 # an API error), and the main-only successor is not proven live: it cannot
-# start even when retried (failed), or it is still starting at the readiness
+# start (failed), or it is still starting at the readiness
 # bound and fails later (starting). The host republishes downtime, so the Stop
 # hook still rewakes main, and the row stays queued for main to present again
 # and acknowledge.
@@ -598,9 +598,8 @@ SH
   assert_re '	signal	demo\.status	' "$home/interrupted-turn-drain" "fixture: main's turn did not present the watcher's wake"
   assert_present "$home/state/.main-eligible-rows.held" "fixture: main's presentation hold is missing"
   if [ "$mode" = failed ]; then
-    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 2 ] || fail "held close: the failed successor start was not retried exactly once"
-    assert_re '	pass-through	successor-retry	signal:' "$home/state/.supervision-host.log" "held close: the retry was not logged"
-    assert_re '	pass-through	successor-unverified	signal:' "$home/state/.supervision-host.log" "held close: the second failure was not logged"
+    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "held close: a failed successor must be started exactly once"
+    assert_re '	pass-through	successor-unverified	signal:' "$home/state/.supervision-host.log" "held close: the failed start was not logged"
   else
     [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "held close: a still-starting successor must not be started twice"
     assert_grep 'the successor watcher cycle is still starting' "$home/hook.err" "held close: the close must say the successor is still starting"

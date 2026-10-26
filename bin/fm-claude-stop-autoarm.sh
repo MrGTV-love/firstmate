@@ -280,16 +280,18 @@ autoarm_commit() {  # <outcome> [marker-file]
         # A shared recovery phase is not a delivery receipt for this host's
         # close: a branch drain can enter handling with main's wake still
         # queued. The close stays owed while main has a queued row no
-        # presentation hold covers (fm_wake_main_unpresented); while the turn
-        # that presented every row still holds them, a rewake would duplicate
-        # the close.
+        # presentation hold covers (fm_wake_main_unpresented). While the turn
+        # that presented every row still holds them and a healthy watcher
+        # stays live, a rewake would duplicate the close; with no healthy
+        # watcher, refusing could end in a blind stop, so the close commits.
         [ "$HOST_MODE" -eq 1 ] || return 2
         if ! fm_wake_main_unpresented; then
-          if [ -e "$STATE/.main-eligible-rows.held" ] \
-            && main_rows=$(fm_wake_main_rows) && [ -n "$main_rows" ]; then
+          [ -e "$STATE/.main-eligible-rows.held" ] \
+            && main_rows=$(fm_wake_main_rows) && [ -n "$main_rows" ] || return 2
+          if fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
             HELD_CLOSE_RECOVERY=${FM_RECOVERY_MARKER_TOKEN##*:}
+            return 2
           fi
-          return 2
         fi
         recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
         ;;
