@@ -2031,6 +2031,21 @@ assert row['id'] in digest.stdout and 'new-row' not in digest.stdout
 clock['now'] = now
 print('PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage')
 
+# The away supervise daemon acknowledges the wakes it handled without the ledger gate; firstmate's own acknowledgement stays gated.
+home, ledger, row, call, ok, drain, ack = case('away-daemon-ack')
+_, boundary = drain()
+def daemon_ack():
+    return call('env', 'FM_WAKE_ACK_AWAY_DAEMON=1', code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0],
+                '--recovery-generation', boundary[1])
+assert daemon_ack().returncode == 1, 'outside away mode the daemon marker is no bypass'
+(home / 'state/.afk').write_text(str(now) + '\n')
+assert daemon_ack().returncode == 0, 'an unactioned overdue row retained the away daemon wake'
+assert not (home / 'state/.wake-queue').read_text(), 'the away daemon did not consume the wake it handled'
+assert json.loads(ledger.read_text())['handling']['actions'] == {}, 'the away daemon acknowledgement wrote a receipt'
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'the obligation stays gated for firstmate'
+_, boundary = drain()
+assert ack(boundary).returncode == 1, "firstmate's own acknowledgement keeps the change-gated check"
+
 for kind in ('steered', 'merged', 'escalated', 'deferred'):
     pr_row = dict(category='review_pass_not_merged', subject=PR, owner='firstmate', limit_seconds=600)
     home, ledger, row, call, ok, drain, ack = case(kind, **(pr_row if kind == 'merged' else {}))
@@ -2735,7 +2750,7 @@ for producer, consumer in (('main','branch'),('branch','main')):
 print('PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
-# A firstmate-owned row parked behind a captain hold: its escalation waits on the captain and stands only on the captain's recorded answer.
+# A firstmate-owned row parked behind a captain hold: its escalation waits on the captain, and the end of that hold needs a new action.
 import datetime as dt, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 root, world = map(Path, sys.argv[1:])
@@ -2752,17 +2767,12 @@ ANSWERED = HELD.replace('- [ ] held-job', '- [x] held-job').replace('## In fligh
 DEFERRED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (hold-until: 2999-01-01)')
 BLOCKED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (blocked-by: unfinished-prerequisite)')
 REHELD = HELD.replace(iso(now - 7200), iso(now - 3600))
-def record(mode, label='Captain decision:', resolves=iso(now - 7200)):
-    # The resolution block bin/fm-captain-hold.sh writes first in the task body when it records an answer.
-    return ''.join('  ' + line + '\n' for line in (
-        'Resolution recorded by fm-captain-hold.', 'Decision digest: test-decision', 'Resolution mode: ' + mode,
-        'Resolves hold set: ' + resolves, 'Resolved at: ' + iso(now), 'Answered by: main', label,
-        'Ship the supported recovery control.'))
-ANSWERED_WORDS = ANSWERED.replace(STAMP, record('answered'))
-RELEASED_WORDS = RELEASED.replace(STAMP, record('released'))
-RECONCILED = ANSWERED.replace(STAMP, record('reconciled', label='Reconciliation evidence:'))
-EARLIER_HOLD = ANSWERED.replace(STAMP, record('answered', resolves=iso(now - 90000)))
-WAITING, ANSWERED_STATUS = 'escalated, waiting on the captain', 'escalated, answered by the captain'
+# The resolution block bin/fm-captain-hold.sh writes first in the task body when it records the captain's answer.
+ANSWERED_WORDS = ANSWERED.replace(STAMP, ''.join('  ' + line + '\n' for line in (
+    'Resolution recorded by fm-captain-hold.', 'Decision digest: test-decision', 'Resolution mode: answered',
+    'Resolves hold set: ' + iso(now - 7200), 'Resolved at: ' + iso(now), 'Answered by: main', 'Captain decision:',
+    'Merge it.')))
+WAITING = 'escalated, waiting on the captain'
 PR = 'https://github.com/test/project/pull/9'
 
 def park(name, **fields):
@@ -2812,7 +2822,7 @@ def park(name, **fields):
 def status_of(ok, ident):
     listed = [line for line in ok(loops, '--digest').stdout.splitlines() if line.startswith('  ' + json.dumps(ident) + ',')]
     assert len(listed) == 1, listed
-    return WAITING if WAITING in listed[0] else ANSWERED_STATUS if ANSWERED_STATUS in listed[0] else listed[0]
+    return WAITING if WAITING in listed[0] else listed[0]
 
 # (a) One escalation covers the parked row on unchanged evidence: later drains neither present it nor refuse acknowledgement,
 # and it is listed as waiting on the captain because nothing proves it reached the captain.
@@ -2829,7 +2839,7 @@ for label, later in (('same-day', 0), ('two-days', 2 * 86400)):
     result, boundary = drain(label)
     assert 'OVERDUE' not in result.stdout and row['id'] not in result.stdout, (label, result.stdout)
     assert ack(boundary).returncode == 0, (label, 'an unchanged parked row needs no second receipt')
-assert status_of(ok, row['id']) == WAITING, 'an escalation without the captain answer does not stand'
+assert status_of(ok, row['id']) == WAITING, 'an escalation is listed as waiting on the captain'
 assert row['id'] in ok(loops, '--report').stdout, 'a receipt never resolves the obligation'
 assert call(loops, '--check-actions').returncode == 0
 # With no queued wake the same covered row opens no handling episode and demands nothing.
@@ -2874,11 +2884,12 @@ bound_to('legacy-name', [LEGACY], LEGACY)
 bound_to('order-legacy-first', [ORIGIN, LEGACY], LEGACY)
 home, backlog, row, ok, drain, ack, stored = bound_to('order-key-first', [ORIGIN, LEGACY, KEY], KEY)
 backlog.write_text(held(KEY, answered=[ORIGIN, LEGACY]))
-assert status_of(ok, row['id']) == WAITING, 'only the captain answer to the bound hold makes the escalation stand'
+result, boundary = drain('other-candidates-ended')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'only the bound hold ends the cover'
+assert status_of(ok, row['id']) == WAITING
 backlog.write_text(held(ORIGIN, LEGACY, answered=[KEY]))
 result, boundary = drain('bound-answered')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result.stdout
-assert status_of(ok, row['id']) == ANSWERED_STATUS, 'the keyed decision answered in the captain words stands'
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the captain answer to the bound keyed hold re-presents the row'
 
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('explicit', **KEYED)
 backlog.write_text(held(KEY, ORIGIN, 'elsewhere'))
@@ -2898,42 +2909,59 @@ mentioned = act('escalated', 'asked the captain about held task elsewhere')
 assert mentioned.returncode == 0 and 'no task held for the captain was named' in mentioned.stdout, mentioned
 assert 'hold' not in stored()['handling']['actions'][row['id']], 'a task id written in the evidence must not bind a hold'
 backlog.write_text(held(answered=['elsewhere']))
-assert status_of(ok, row['id']) == WAITING, 'an unbound escalation never stands'
+result, boundary = drain('unbound-later')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'an unbound escalation covers unchanged evidence'
+assert status_of(ok, row['id']) == WAITING
 
-# (b) A changed row needs a new action. A bound hold's later state changes only the listed status: the escalation
-# stands on the captain's own recorded words for that hold lifecycle, and nothing else.
+# (b) A changed row, or a bound hold that is answered, released, blocked on an unresolved task, or re-held, needs a new
+# firstmate action; an unchanged pending hold keeps covering the row.
 def changed_row(record):
     record['rows'][0]['evidence'] = 'blocked: the captain asked for a revised plan'
     return record
-transitions = (('released', RELEASED, WAITING), ('answered', ANSWERED, WAITING), ('blocked', BLOCKED, WAITING),
-               ('reheld', REHELD, WAITING), ('dated', DEFERRED, WAITING), ('reconciled', RECONCILED, WAITING),
-               ('earlier-hold', EARLIER_HOLD, WAITING), ('answered-words', ANSWERED_WORDS, ANSWERED_STATUS),
-               ('released-words', RELEASED_WORDS, ANSWERED_STATUS))
-for label, text, expected in transitions:
+transitions = (('changed', None), ('released', RELEASED), ('answered', ANSWERED), ('answered-words', ANSWERED_WORDS),
+               ('blocked', BLOCKED), ('reheld', REHELD))
+for label, text in transitions:
     home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('hold-' + label)
     _, boundary = drain()
     assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
     assert ack(boundary).returncode == 0
-    backlog.write_text(text)
+    result, boundary = drain('quiet')
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, 'an unchanged pending hold covers the row')
+    assert status_of(ok, row['id']) == WAITING
+    if text is None:
+        ledger.write_text(json.dumps(changed_row(stored())))
+    else:
+        backlog.write_text(text)
     result, boundary = drain('after-' + label)
-    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, 'a pending escalation never blocks', result)
-    assert status_of(ok, row['id']) == expected, (label, ok(loops, '--digest').stdout)
-home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('changed')
+    assert row['id'] in result.stdout and result.stdout.startswith('OVERDUE:'), (label, result.stdout)
+    assert 'STANDING' not in result.stdout, (label, result.stdout)
+    refused = ack(boundary)
+    assert refused.returncode == 1 and row['id'] in refused.stdout, (label, refused)
+    assert row['id'] not in ok(loops, '--digest').stdout, (label, 'a row needing an action belongs in the gate, not the list')
+    renewed = act('escalated', 'asked the captain again')
+    assert renewed.returncode == 0, (label, renewed)
+    if text in (None, REHELD):
+        # A changed row or a fresh hold lifecycle is bound again by the new escalation.
+        assert 'standing: captain hold held-job' in renewed.stdout, renewed
+    else:
+        assert 'hold' not in stored()['handling']['actions'][row['id']]
+    assert ack(boundary).returncode == 0
+    if text not in (None, REHELD):
+        result, boundary = drain('next-' + label)
+        assert ack(boundary).returncode == 0, label
+# A hold the captain defers to a date is still held for the captain: the escalation keeps covering until the hold ends.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated')
 _, boundary = drain()
 assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
 assert ack(boundary).returncode == 0
-backlog.write_text(ANSWERED_WORDS)
-assert status_of(ok, row['id']) == ANSWERED_STATUS
-ledger.write_text(json.dumps(changed_row(stored())))
-result, boundary = drain('after-change')
-assert row['id'] in result.stdout and result.stdout.startswith('OVERDUE:') and 'STANDING' not in result.stdout, result.stdout
-refused = ack(boundary)
-assert refused.returncode == 1 and row['id'] in refused.stdout, refused
-assert row['id'] not in ok(loops, '--digest').stdout, 'changed evidence belongs in the gate, not the waiting list'
-renewed = act('escalated', 'asked the captain about the revised plan')
-assert renewed.returncode == 0 and 'hold' not in stored()['handling']['actions'][row['id']], renewed
-assert ack(boundary).returncode == 0
-assert status_of(ok, row['id']) == WAITING, 'an answer to an earlier presentation does not stand for changed evidence'
+backlog.write_text(DEFERRED)
+for label in ('deferred', 'next-turn'):
+    result, boundary = drain(label)
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
+assert status_of(ok, row['id']) == WAITING
+backlog.write_text(RELEASED)
+result, boundary = drain('released-after-dated')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a deferred hold that is then released needs a new action'
 # An escalation recorded while the hold is already deferred to a date binds it as well.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated-record')
 backlog.write_text(DEFERRED)
@@ -2942,19 +2970,18 @@ recorded = act('escalated', 'asked the captain')
 assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
 assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job'
 assert ack(boundary).returncode == 0
-backlog.write_text(DEFERRED.replace(STAMP, record('answered')).replace(' (hold-kind: captain) (hold-until: 2999-01-01)', ''))
-assert status_of(ok, row['id']) == ANSWERED_STATUS
-# An unreadable backlog never makes an escalation stand, and never blocks an acknowledgement either.
+result, boundary = drain('after-dated-record')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result.stdout
+# An unreadable backlog cannot show the bound hold still waits, so the row needs a new action.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('unreadable')
 _, boundary = drain()
 assert 'standing: captain hold' in act('escalated', 'asked the captain').stdout
 assert ack(boundary).returncode == 0
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 result, boundary = drain('unreadable')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result
-assert status_of(ok, row['id']) == WAITING
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 
-# Other categories cannot bind captain holds; their escalation covers unchanged evidence and never stands.
+# Other categories cannot bind captain holds; their escalation covers unchanged evidence only.
 for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: code or test', limit_seconds=0)),
                          ('stalled_worker', dict(subject='held-job', owner='worker:held-job',
                                                  source=dict(kind='task', task='held-job')))):
@@ -3014,7 +3041,7 @@ assert escalated.returncode == 0 and 'standing: captain hold held-job' in escala
 assert ack(boundary).returncode == 0
 result, boundary = drain('settled')
 assert row['id'] not in result.stdout and ack(boundary).returncode == 0
-# (e) The captain-answer check reads only the local backlog and the row, so a quota-stale ledger neither changes it nor blocks recording it.
+# (e) The hold check reads only the local backlog and the row, so a quota-stale ledger neither voids it nor blocks recording it.
 def go_stale(ledger):
     record_ = json.loads(ledger.read_text())
     record_.update(stale=True, stale_reason='quota low (500 of 5000); resets in an hour', complete=False)
@@ -3032,8 +3059,8 @@ assert row['id'] not in result.stdout and ack(boundary).returncode == 0, ('a pen
 assert status_of(ok, row['id']) == WAITING
 backlog.write_text(ANSWERED_WORDS)
 result, boundary = drain('stale-answered')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result
-assert status_of(ok, row['id']) == ANSWERED_STATUS, 'the captain answer stands on a stale ledger'
+assert row['id'] in result.stdout and result.stdout.startswith('OVERDUE:'), result
+assert ack(boundary).returncode == 1, 'a hold that ended is presented again on a stale ledger'
 for label, hold_args in (('explicit', ('--hold', 'held-job')), ('automatic', ())):
     home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stale-record-' + label)
     _, boundary = drain()
@@ -3078,14 +3105,14 @@ result, boundary = drain('again')
 assert ack(boundary).returncode == 0, 'unchanged reviewer evidence stays covered without a hold binding'
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, refused
-# Even a receipt carrying a forged binding to an answered hold cannot make a reviewer-owned escalation stand.
+# Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row wait on that hold.
 record_ = stored()
 assert 'hold' not in record_['handling']['actions'][row['id']]
 record_['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=marker)
 ledger.write_text(json.dumps(record_))
-backlog.write_text(ANSWERED_WORDS)
-assert status_of(ok, row['id']) == WAITING
-# (g) One digest reads the backlog at most once, however many escalations depend on it, and a failed read never stands.
+result, boundary = drain('forged')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
+# (g) One presentation reads the backlog at most once, however many covered rows depend on it, and a failed read fails closed.
 shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
 counting = code / 'bin/fm-fleet-snapshot.sh'
 counting.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$FM_HOME/snapshot-runs"\n'
@@ -3102,20 +3129,18 @@ for each in covered:
     recorded = call(loops, 'action', each['id'], 'escalated', '--evidence', 'asked the captain')
     assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
 assert ack(boundary).returncode == 0
-backlog.write_text(ANSWERED_WORDS)
 runs.unlink(missing_ok=True)
-healthy = ok(loops, '--digest')
-assert healthy.stdout.count(ANSWERED_STATUS) == 3 and snapshot_runs() == 1, (healthy, snapshot_runs())
+healthy = ok(loops, '--present-overdue')
+assert not any(each['id'] in healthy.stdout for each in covered) and snapshot_runs() == 1, (healthy, snapshot_runs())
 runs.unlink()
 backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
-broken = ok(loops, '--digest')
-assert broken.stdout.count(WAITING) == 3 and snapshot_runs() == 1, ('an unreadable backlog was read again', broken, snapshot_runs())
-assert not any(each['id'] in ok(loops, '--present-overdue').stdout for each in covered)
-print('PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain until'
-      ' the captain recorded answer to its bound hold makes it stand, also on a quota-stale ledger; released, reconciled,'
-      ' re-held or earlier-lifecycle holds never stand and never block; a changed row needs a new action; evidence text,'
-      ' other owners, reviewed PRs and other categories cannot bind holds; the deferral limit remains enforced; one digest'
-      ' reads the backlog once, failed or not')
+broken = ok(loops, '--present-overdue')
+assert all(each['id'] in broken.stdout for each in covered) and 'STANDING' not in broken.stdout, broken
+assert snapshot_runs() == 1, ('an unreadable backlog was read again for each covered row', snapshot_runs())
+print('PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain,'
+      ' also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold'
+      ' needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and'
+      ' other categories cannot bind holds; the deferral limit remains enforced; one presentation reads the backlog once')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 # A real status append and collector refresh reactivate an unchanged paused obligation.

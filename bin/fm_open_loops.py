@@ -38,8 +38,6 @@ GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 # Categories a captain decision can park: the same set a dependency wait may bind.
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
-# bin/fm-captain-hold.sh writes one of these per resolution, newest first in the task body.
-RESOLUTION_RECORD = re.compile(r"Resolution recorded by fm-(?:captain|decision)-hold[.]")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -1291,28 +1289,18 @@ class WaitVerifier:
                 continue
         return None
 
-    def captain_answered(self, action, row):
-        """The captain's own recorded words answered the one hold this escalation is bound to.
+    def hold_stands(self, action, row):
+        """An escalation bound to a captain hold waits on the captain until that hold ends.
 
-        The bound task must no longer be held, and its newest bin/fm-captain-hold.sh resolution record must
-        resolve that hold lifecycle with a Captain decision block. Reconciliation evidence, a live, dated,
-        blocked or re-held hold, and an unreadable backlog are not the captain's answer. Only the local
-        backlog and the row decide it, so a quota-stale ledger does not change it.
+        Only the local backlog and the row decide it, so a quota-stale ledger does not end it.
         """
         hold = action.get("hold")
         if not parkable(row) or not isinstance(hold, dict):
             return False
         try:
-            record = next((r for r in self.backlog_records()
-                           if r.get("structured") and r["id"] == hold.get("task")), None)
+            return self.hold_marker(hold["task"]) == hold["marker"]
         except SOURCE_ERRORS:
-            return False
-        if record is None or record.get("hold_bucket") is not None:
-            return False
-        lines = record.get("body_lines") or []
-        starts = [i for i, line in enumerate(lines) if RESOLUTION_RECORD.fullmatch(line)] + [len(lines)]
-        newest = lines[starts[0]:starts[1]] if len(starts) > 1 else []
-        return "Resolves hold set: " + str(hold.get("marker")) in newest and "Captain decision:" in newest[:-1]
+            return False  # an answered, released, blocked, or unreadable hold restores the action requirement
 
     def current_source(self, source):
         c = self.collector
@@ -1451,17 +1439,17 @@ def receipt_stands(action, row, now, waits=None):
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "escalated":
-        # Only the captain's own recorded answer proves an escalation reached the captain.
-        return waits is not None and waits.captain_answered(action, row)
     return kind in ("steered", "merged")
 
 
 def receipt_covers(action, row, now, waits=None):
-    """The last action still answers the row: a standing receipt, or an escalation waiting on the captain."""
+    """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
+
+    An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
+    """
     if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
             and action.get("digest") == row_digest(row) and not action.get("invalidated"):
-        return True
+        return not action.get("hold") or (waits is not None and waits.hold_stands(action, row))
     return receipt_stands(action, row, now, waits)
 
 
@@ -1496,16 +1484,13 @@ def merge_recorded(state, row, url):
                for marker in state.glob("*.pr-poll-merge-notified"))
 
 
-def render_digest(rows, actions, now, waits):
+def render_digest(rows, actions):
     """One list for the existing periodic ledger wake, with no per-row notification churn."""
     fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "status", "last_action"]
     lines = ["WAITING OPEN WORK (periodic list for the captain):", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
     for row in rows:
         action = actions.get(row["id"], {})
-        status = action.get("kind")
-        if status == "escalated":
-            status = ("escalated, answered by the captain" if receipt_stands(action, row, now, waits)
-                      else "escalated, waiting on the captain")
+        status = "escalated, waiting on the captain" if action.get("kind") == "escalated" else action.get("kind")
         last = {key: action.get(key) for key in ("kind", "evidence", "at_epoch")}
         values = [row.get(field) for field in fields[:-2]] + [status, last]
         lines.append("  " + ",".join(json.dumps(value, ensure_ascii=False) for value in values))
@@ -1562,7 +1547,7 @@ def ledger_action(args, state, now):
     pending = controls["presentations"].setdefault(actor, {})
     if args.digest:
         covered = [row for row in rows if receipt_covers(actions.get(row["id"], {}), row, now, waits)]
-        print(render_digest(covered, actions, now, waits))
+        print(render_digest(covered, actions))
         return 0
     if args.present_overdue:
         needing, standing = [], []
@@ -1710,8 +1695,8 @@ def ledger_action(args, state, now):
     print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
     if parked:
         if hold:
-            print("standing: captain hold " + hold["task"] + "; waits on the captain until the captain's"
-                  " recorded answer resolves that hold, and covers this row only until it changes")
+            print("standing: captain hold " + hold["task"] + "; covers this row until it changes"
+                  " or that hold is answered, released, blocked or held again")
         elif unverified:
             print(f"standing: no; the captain hold could not be verified ({unverified}), so this escalation"
                   " waits on the captain without a hold binding and covers this row only until it changes")

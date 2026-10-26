@@ -885,10 +885,15 @@ fi
 # The same ledger receipt boundary applies to main, the supervision-host's
 # branch actor, and secondmate homes. New or changed overdue obligations require
 # an action; unchanged evidence remains visible through the periodic digest.
+# The away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk exists)
+# records no action and acknowledges only the wakes it handled; the obligation
+# stays gated in the ledger for firstmate's own acknowledgement.
 OVERDUE_SECTION=
 if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
   if [ -n "$ACK_THROUGH" ]; then
-    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
+    if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
+      "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
+    fi
   else
     OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
