@@ -2056,6 +2056,178 @@ PY
   pass "a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock"
 }
 
+test_alarm_spills_consumed_append_for_next_watcher() {
+  local dir
+  dir=$(make_case lock-alarm-spill)
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm exit lost a consumed source's wake"
+import os, pathlib, select, signal, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           FM_CHECK_INTERVAL="999999", FM_HEARTBEAT="999999",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+holder = watcher = None
+try:
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", str(lib), str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    old = time.time() - 301
+    os.utime(lock / "pid", (old, old))
+    # The x-poll shape: the source records its event as offered before the
+    # watcher appends the wake, so a lost append can never be re-offered.
+    source = '. "$1"; FM_LOCK_WAIT_TICK=watch_queue_wait_tick; : > "$STATE/offered"; fm_wake_append check x-mention-1 "check: x mention 1" || exit 1; wake "check: x mention 1"'
+    first = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh")], env=env, capture_output=True, text=True, timeout=60)
+    assert first.returncode == 0, first
+    assert "check: long-held lock:" in first.stdout and "x mention 1" not in first.stdout, first
+    assert (state / "offered").exists()
+    spills = sorted(state.glob(".wake-spill.[0-9]*"))
+    assert len(spills) == 1 and spills[0].read_text().splitlines() == ["check", "x-mention-1", "check: x mention 1"], spills
+    queue = state / ".wake-queue"
+    assert not queue.exists() or "x-mention-1" not in queue.read_text(), "append bypassed the held lock"
+    holder.stdin.write("release\n"); holder.stdin.flush()
+    assert holder.wait(timeout=30) == 0
+    with (home / "watch.out").open("w") as stdout, (home / "watch.err").open("w") as stderr:
+        watcher = subprocess.Popen(["bash", str(root / "bin/fm-watch.sh")], env=env, stdout=stdout, stderr=stderr, start_new_session=True)
+    assert watcher.wait(timeout=60) == 0, (home / "watch.err").read_text()
+    assert (home / "watch.out").read_text().strip(), "next watcher did not wake Main"
+    assert not list(state.glob(".wake-spill.[0-9]*")), "replayed spill was retained"
+    subprocess.run(["bash", "-c", '. "$1"; fm_wake_append check newer "check: newer"', "_", str(lib)], env=env, check=True, timeout=30)
+    keys = [line.split("\t")[3] for line in queue.read_text().splitlines()]
+    assert keys == ["x-mention-1", "newer"], keys
+finally:
+    if holder is not None and holder.poll() is None:
+        try: holder.stdin.write("release\n"); holder.stdin.flush()
+        except BrokenPipeError: pass
+        holder.wait(timeout=30)
+    if watcher is not None and watcher.poll() is None:
+        os.killpg(watcher.pid, signal.SIGTERM)
+        watcher.wait(timeout=30)
+PY
+  pass "an alarm exit spills a consumed source's pending wake and the next watcher queues it first"
+}
+
+test_alarm_after_queue_frees_appends_before_after_output() {
+  local dir
+  dir=$(make_case lock-alarm-freed-queue)
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm wake ran after-output work before the pending append landed"
+import os, pathlib, select, subprocess, sys, time
+root, home = map(pathlib.Path, sys.argv[1:])
+state = home / "state"
+lock = state / ".wake-queue.lock"
+release = home / "release"
+lib = root / "bin/fm-wake-lib.sh"
+env = dict(os.environ, FM_HOME=str(home), FM_STATE_OVERRIDE=str(state),
+           FM_CONFIG_OVERRIDE=str(home / "config"), FM_POLL="1",
+           PATH=str(home / "fakebin") + os.pathsep + os.environ["PATH"])
+fixture = state / ".fixture.lock"; fixture.mkdir()
+(fixture / "pid").write_text(f"{os.getpid()}\n")
+old = time.time() - 301
+os.utime(fixture / "pid", (old, old))
+holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; until [ -e "$3" ]; do sleep 0.05; done; fm_lock_release "$2"; IFS= read -r _', "_", str(lib), str(lock), str(release)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+try:
+    assert select.select([holder.stdout], [], [], 30)[0], "live holder did not acquire"
+    assert holder.stdout.readline().strip() == "ready"
+    # The queue lock frees while the alarm check runs, so the alarm is queued
+    # and its ordinary wake reaches the after-output step-commit callback.
+    source = """
+. "$1"
+release=$2
+eval "$(declare -f fm_lock_monitor_check | sed '1s/fm_lock_monitor_check/observed_fm_lock_monitor_check/')"
+fm_lock_monitor_check() {
+  : > "$release"
+  while [ -e "$STATE/.wake-queue.lock" ] || [ -L "$STATE/.wake-queue.lock" ]; do sleep 0.05; done
+  observed_fm_lock_monitor_check
+}
+step_commit_probe() {
+  if grep -F x-mention-2 "$STATE/.wake-queue" >/dev/null 2>&1; then echo landed; else echo missing; fi > "$STATE/step-commit"
+}
+FM_WAKE_AFTER_OUTPUT_ACTION=step_commit_probe
+FM_LOCK_WAIT_TICK=watch_queue_wait_tick
+fm_wake_append check x-mention-2 "check: x mention 2" || exit 1
+wake "check: x mention 2"
+"""
+    run = subprocess.run(["bash", "-c", source, "_", str(root / "bin/fm-watch.sh"), str(release)], env=env, capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run
+    assert "check: long-held lock:" in run.stdout and fixture.name in run.stdout, run
+    assert (state / "step-commit").read_text().strip() == "landed", "step commit ran without the pending append"
+    keys = [line.split("\t")[3] for line in (state / ".wake-queue").read_text().splitlines()]
+    assert keys.count("x-mention-2") == 1, keys
+    assert not list(state.glob(".wake-spill.[0-9]*")), "a landed append was also spilled"
+finally:
+    release.touch()
+    if holder.poll() is None:
+        holder.stdin.write("done\n"); holder.stdin.flush()
+        holder.wait(timeout=30)
+PY
+  pass "a queue lock freed during the alarm check lands the pending append before after-output work"
+}
+
+test_wake_spill_replay_waits_for_held_queue() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "spill replay under a held queue lock lost or reordered rows"
+import os, pathlib, select, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+with tempfile.TemporaryDirectory(prefix="fm-wake-spill-") as d:
+    state = pathlib.Path(d)
+    lock = state / ".wake-queue.lock"
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT; echo ready; IFS= read -r _', "_", lib, str(lock)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    replay = None
+    try:
+        assert select.select([holder.stdout], [], [], 30)[0]
+        assert holder.stdout.readline().strip() == "ready"
+        settle = '. "$1"; FM_WAKE_PENDING_KIND=check FM_WAKE_PENDING_KEY=$2 FM_WAKE_PENDING_PAYLOAD="check: $2"; fm_wake_pending_settle'
+        for key in ("spilled-1", "spilled-2"):
+            subprocess.run(["bash", "-c", settle, "_", lib, key], env=env, check=True, timeout=30)
+        spills = sorted(state.glob(".wake-spill.[0-9]*"))
+        assert [p.read_text().splitlines()[1] for p in spills] == ["spilled-1", "spilled-2"], spills
+        replay = subprocess.Popen(["bash", "-c", '. "$1"; fm_wake_spill_replay', "_", lib], env=env)
+        time.sleep(1.5)
+        assert replay.poll() is None, "replay gave up behind a live holder"
+        assert sorted(state.glob(".wake-spill.[0-9]*")) == spills, "replay removed spill files without the lock"
+        queue = state / ".wake-queue"
+        assert not queue.exists() or not queue.read_text(), "replay appended without the lock"
+        holder.stdin.write("release\n"); holder.stdin.flush()
+        assert holder.wait(timeout=30) == 0
+        assert replay.wait(timeout=30) == 0
+        subprocess.run(["bash", "-c", '. "$1"; fm_wake_append check newer "check: newer"', "_", lib], env=env, check=True, timeout=30)
+        keys = [line.split("\t")[3] for line in queue.read_text().splitlines()]
+        assert keys == ["spilled-1", "spilled-2", "newer"], keys
+        assert not list(state.glob(".wake-spill.[0-9]*")), "replayed spill files remained"
+    finally:
+        if holder.poll() is None:
+            holder.stdin.write("release\n"); holder.stdin.flush()
+            holder.wait(timeout=30)
+        if replay is not None and replay.poll() is None:
+            replay.terminate(); replay.wait(timeout=30)
+PY
+  pass "spilled rows wait for a held queue lock, then replay in order ahead of newer rows"
+}
+
+test_lock_alarm_threshold_normalizes() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "alarm threshold normalization failed"
+import os, pathlib, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+check = '. "$1"; fm_lock_monitor_check || exit $?; fm_lock_monitor_check || exit $?'
+for value, age, alarms in (("5m", 301, True), ("5m", 200, False), ("0", 200, False), ("00", 200, False), ("010", 20, True), ("", 200, False)):
+    with tempfile.TemporaryDirectory(prefix="fm-lock-threshold-") as d:
+        lock = pathlib.Path(d, ".fixture.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{os.getpid()}\n")
+        old = time.time() - age
+        os.utime(lock / "pid", (old, old))
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_LOCK_ALARM_SECS=value)
+        run = subprocess.run(["bash", "-c", check, "_", lib], env=env, capture_output=True, text=True, timeout=30)
+        assert run.returncode == 0, (value, run)
+        warned = run.stderr.count("invalid FM_LOCK_ALARM_SECS")
+        assert warned == (1 if value in ("5m", "0", "00") else 0), (value, run.stderr)
+        queued = pathlib.Path(d, ".wake-queue")
+        assert (queued.exists() and "long-held" in queued.read_text()) == alarms, (value, age)
+PY
+  pass "invalid or zero alarm thresholds warn once and use 300s without stopping observation"
+}
+
 test_long_held_lock_alarm() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
@@ -2333,6 +2505,10 @@ fi
 test_lock_alarm_crosses_threshold_during_capture
 test_watcher_skips_own_singleton_locks
 test_lock_alarm_while_queue_append_waits
+test_alarm_spills_consumed_append_for_next_watcher
+test_alarm_after_queue_frees_appends_before_after_output
+test_wake_spill_replay_waits_for_held_queue
+test_lock_alarm_threshold_normalizes
 test_long_held_lock_alarm
 test_lock_alarm_discovers_foreign_owners
 test_lock_monitor_prunes_finished_waiters

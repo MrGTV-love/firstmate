@@ -5,8 +5,9 @@
 # Shared-helper locks publish diagnostic receipts in STATE/.lock-monitor;
 # successful release retires them. The watcher checks those receipts and adopts
 # pre-upgrade locks in this home's state tree, without following directory links.
-# FM_LOCK_ALARM_SECS (positive seconds, default 300) reports each ownership
-# episode once through a check wake. The observing watcher's own locks and the
+# FM_LOCK_ALARM_SECS (positive seconds, default 300; an invalid or zero value
+# warns once and uses 300) reports each ownership episode once through a check
+# wake. The observing watcher's own locks and the
 # process-lifetime singletons state/.watch.lock and state/.supervise-daemon.lock
 # are not reported; a dead or zombie owner of those is still reclaimed.
 # It is an observation threshold, not permission to kill or reclaim anything.
@@ -21,7 +22,10 @@
 # registered waiters; crashed waiter receipts are excluded by PID liveness.
 # FM_LOCK_WAIT_TICK, when set, names a function each waiting iteration calls
 # with <lock> <wait-start-SECONDS> <waiter-pid>; the watcher uses it to keep
-# observing long-held locks while its own wake-queue append keeps waiting.
+# observing long-held locks while its own wake-queue append keeps waiting. An
+# alarm that ends such a wait first settles the pending row: appended if the
+# queue lock is free, else spilled to STATE/.wake-spill.<seq>. Every locked
+# append replays spilled rows first, in order, so none is dropped or reordered.
 
 FM_WAKE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 FM_WAKE_DEFAULT_ROOT="$(cd "$FM_WAKE_LIB_DIR/.." && pwd)"
@@ -1464,6 +1468,7 @@ fm_lock_try_acquire() {
 fm_lock_acquire_wait() {
   local lockdir=$1 parent gone_since='' current='' rc=0
   local started=$SECONDS since='' record='' absolute='' owner state monitor_state reported=$'\n'
+  local seen_pid='' seen_ref=''
   local bound=${2:-} deadline=0
   [ -z "$bound" ] || deadline=$((SECONDS + bound))
   parent=${lockdir%/*}
@@ -1495,9 +1500,16 @@ fm_lock_acquire_wait() {
       rc=1; break
     fi
     # measured: requested 60s breadcrumb, not an acquisition deadline.
-    if [ $((SECONDS - started)) -ge 60 ]; then
-      owner=$(readlink "$lockdir" 2>/dev/null || printf '%s' "$lockdir")
-      owner="$owner:${FM_LOCK_HELD_PID:-unknown}"
+    # The owner generation is re-read only when the pid or its pid file changes.
+    if [ $((SECONDS - started)) -ge 60 ] \
+      && { [ "${FM_LOCK_HELD_PID:-unknown}" != "$seen_pid" ] || [ ! "$lockdir/pid" -ef "$seen_ref" ]; }; then
+      seen_pid=${FM_LOCK_HELD_PID:-unknown}
+      if owner=$(readlink "$lockdir" 2>/dev/null); then
+        case "$owner" in /*) seen_ref=$owner/pid ;; *) seen_ref=$parent/$owner/pid ;; esac
+      else
+        owner=$lockdir seen_ref=$lockdir/pid
+      fi
+      owner="$owner:$seen_pid"
       case "$reported" in *$'\n'"$owner"$'\n'*) ;; *)
         state=$(ps -o stat= -p "${FM_LOCK_HELD_PID:-0}" 2>/dev/null) || state=unknown
         read -r state <<< "$state"
@@ -1697,7 +1709,13 @@ fm_lock_monitor_check() {
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
   FM_LOCK_MONITOR_UNQUEUED=0
   FM_LOCK_MONITOR_PENDING=''
-  case "$limit" in ''|*[!0-9]*|0) return 2 ;; esac
+  case "$limit" in ''|*[!0-9]*) limit=0 ;; *) limit=$((10#$limit)) ;; esac
+  if [ "$limit" -le 0 ]; then
+    [ -n "${_FM_LOCK_ALARM_WARNED:-}" ] \
+      || printf 'fm-lock: invalid FM_LOCK_ALARM_SECS=%s; using 300\n' "$FM_LOCK_ALARM_SECS" >&2
+    _FM_LOCK_ALARM_WARNED=1
+    limit=300
+  fi
   [ -d "$STATE/.lock-monitor" ] || mkdir -p "$STATE/.lock-monitor" || return 1
   # Adopt pre-upgrade/foreign-home holds into this diagnostic index only.
   while IFS= read -r -d '' lock; do
@@ -2574,12 +2592,76 @@ fm_autoarm_release_abandoned() {  # <state-dir> [grace]
 fm_wake_clean_field() {
   LC_ALL=C tr '\t\r\n' '   '
 }
+# While fm_wake_append waits for the queue lock, its row is the pending record
+# that fm_wake_pending_settle can make durable from an FM_LOCK_WAIT_TICK hook.
+FM_WAKE_PENDING_KIND=
+FM_WAKE_PENDING_KEY=
+FM_WAKE_PENDING_PAYLOAD=
 fm_wake_append() {
   local status=0
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  FM_WAKE_PENDING_KIND=$1 FM_WAKE_PENDING_KEY=${2-} FM_WAKE_PENDING_PAYLOAD=${3-}
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || status=1
+  FM_WAKE_PENDING_KIND=
+  [ "$status" -eq 0 ] || return 1
   fm_wake_append_locked "$@" || status=$?
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   return "$status"
+}
+
+# fm_wake_pending_settle: make the waiting fm_wake_append row durable without
+# waiting. It is appended when the queue lock is free now; otherwise it is
+# spilled to STATE/.wake-spill.<seq> (temp file plus rename, sequence order).
+# Returns 1 only when the row is neither appended nor spilled.
+fm_wake_pending_settle() {
+  local status=0 f n seq=0 tmp
+  [ -n "$FM_WAKE_PENDING_KIND" ] || return 0
+  set -- "$FM_WAKE_PENDING_KIND" "$FM_WAKE_PENDING_KEY" "$FM_WAKE_PENDING_PAYLOAD"
+  if fm_lock_try_acquire "$FM_WAKE_QUEUE_LOCK"; then
+    fm_wake_append_locked "$@" || status=$?
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+    if [ "$status" -eq 0 ]; then
+      FM_WAKE_PENDING_KIND=
+      return 0
+    fi
+  fi
+  case "$1" in signal|stale|check|heartbeat) ;; *) return 1 ;; esac
+  for f in "$STATE"/.wake-spill.[0-9]*; do
+    case "${f##*.}" in *[!0-9]*) continue ;; esac
+    n=$((10#${f##*.}))
+    [ "$n" -le "$seq" ] || seq=$n
+  done
+  printf -v n '%010d' $((seq + 1))
+  tmp="$STATE/.wake-spill.tmp.$$"
+  if { printf '%s\n' "$1" && printf '%s' "$2" | fm_wake_clean_field && printf '\n' \
+      && printf '%s' "$3" | fm_wake_clean_field && printf '\n'; } > "$tmp" \
+    && mv -f "$tmp" "$STATE/.wake-spill.$n"; then
+    FM_WAKE_PENDING_KIND=
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# fm_wake_spill_replay: queue every spilled row in sequence order, waiting for
+# the queue lock. A spill file is removed only after its row is appended.
+fm_wake_spill_replay() {
+  local status=0
+  set -- "$STATE"/.wake-spill.[0-9]*
+  [ -f "$1" ] || return 0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
+  _fm_wake_spill_replay_locked || status=$?
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$status"
+}
+
+_fm_wake_spill_replay_locked() {
+  local f kind key payload
+  for f in "$STATE"/.wake-spill.[0-9]*; do
+    [ -f "$f" ] || continue
+    { IFS= read -r kind && IFS= read -r key && IFS= read -r payload; } < "$f" || return 1
+    _fm_wake_append_row_locked "$kind" "$key" "$payload" || return 1
+    rm -f "$f" || return 1
+  done
 }
 
 # fm_wake_append_locked <kind> <key> <payload>
@@ -2587,8 +2669,13 @@ fm_wake_append() {
 # FM_WAKE_QUEUE_LOCK. Callers that must commit another durable record atomically
 # with the append (holding this lock excludes the drain's acknowledgement, which
 # deletes consumed rows under the same lock) acquire the lock once, run this and
-# their own write, then release.
+# their own write, then release. Spilled rows are appended first, in order.
 fm_wake_append_locked() {
+  _fm_wake_spill_replay_locked || return 1
+  _fm_wake_append_row_locked "$@"
+}
+
+_fm_wake_append_row_locked() {
   local kind=$1 key=$2 payload=$3 clean_key clean_payload epoch seq seq_file status
   local recovery_marker
   case "$kind" in

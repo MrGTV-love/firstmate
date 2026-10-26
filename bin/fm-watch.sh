@@ -2608,12 +2608,13 @@ event_wait_or_sleep() {
   esac
 }
 
-lock_alarm_tick() {
+lock_alarm_tick() {  # [command that must succeed before the alarm wake]
   fm_lock_monitor_check || {
     echo "watcher: long-held lock observation failed" >&2
     exit 1
   }
   [ -n "$FM_LOCK_MONITOR_REASON" ] || return 0
+  [ "$#" -eq 0 ] || "$@" || return 0
   if [ "$FM_LOCK_MONITOR_UNQUEUED" = 1 ]; then
     # A jammed queue must not prevent reporting the jam. Preserve the
     # independent receipt until output succeeds, without signal-phase work
@@ -2627,14 +2628,15 @@ lock_alarm_tick() {
 
 # FM_LOCK_WAIT_TICK hook: while this watcher process waits on its own
 # wake-queue lock, run the long-held lock alarm once per poll interval and keep
-# waiting. The pending append is never dropped, reordered or abandoned here;
-# only an alarm wake ends the wait, exactly as it would end any other poll.
+# waiting. Before an alarm wake ends the wait, the pending append is made
+# durable (appended now, or spilled for the next locked append to replay first);
+# if neither succeeds, the alarm is deferred and the append keeps waiting.
 WATCH_QUEUE_WAIT_TICKED=0
 watch_queue_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
   [ "$1" = "$FM_WAKE_QUEUE_LOCK" ] && [ "$3" = "$$" ] || return 0
   [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_QUEUE_WAIT_TICKED)) -ge "$POLL" ] || return 0
   WATCH_QUEUE_WAIT_TICKED=$SECONDS
-  lock_alarm_tick
+  lock_alarm_tick fm_wake_pending_settle
   return 0
 }
 
@@ -2728,9 +2730,12 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
   exit 0
 done
 # Startup alarms precede recovery's own queue locks, so an already aged queue
-# owner can be reported without first waiting behind that same owner.
-trap 'fm_lock_release "$WATCH_LOCK"' EXIT
+# owner can be reported without first waiting behind that same owner. Only that
+# alarm's exit closes like an ordinary watcher; later startup failures retain
+# the lock as stale evidence for the next arm.
+trap 'fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
 lock_alarm_tick
+trap - EXIT
 FM_LOCK_WAIT_TICK=watch_queue_wait_tick
 if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
@@ -2754,6 +2759,10 @@ if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   WATCHER_RECOVERY_PENDING=0
 elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
+fi
+if ! fm_wake_spill_replay; then
+  echo "watcher: spilled wakes could not be replayed; retaining them and stale lock evidence" >&2
+  exit 1
 fi
 # Side-band ledger publication, detached from the poll loop.
 #

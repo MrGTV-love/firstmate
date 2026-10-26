@@ -3340,12 +3340,28 @@ test_bounded_lock_malformed_steal_reports_acquire_failure() {
   pass "a malformed steal mutex reports acquisition error instead of contention"
 }
 
+drain_elapsed_ms() {  # <state> <out> <err>; elapsed wall time of one bounded drain
+  local started ended rc=0
+  started=$(perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000')
+  FM_STATE_OVERRIDE="$1" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 "$DRAIN" > "$2" 2> "$3" || rc=$?
+  ended=$(perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000')
+  DRAIN_ELAPSED_MS=$((ended - started))
+  return "$rc"
+}
+
+# Decision 007: a drain behind a live holder may exceed an identical
+# no-holder control drain by at most its 1s lock deadline plus this margin for
+# the bounded helper's process start and handoff, so host start-up cost is not
+# mistaken for lock waiting.
+DRAIN_DEADLINE_MARGIN_MS=1500
+
 # A live-but-stuck presentation lock must not strand the executable drain. The
 # presentation remains retriable on the next pass, while the separate queue
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
 test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   local dir state status queue_out queue_err first_out first_err second_out second_err replay_out replay_err
   local queue_holder presentation_holder ack_holder i elapsed rc advisory_count ack_count
+  local control control_ms held_ms
   dir=$(make_case presentation-lock-deadline)
   state="$dir/state"
   status="$state/task.status"
@@ -3377,11 +3393,21 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/queue.ready" ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue holder never acquired its lock"; }
 
-  FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
-    "$DRAIN" > "$queue_out" 2> "$queue_err" \
+  control=$(make_case presentation-lock-deadline-queue-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "could not seed the queue control drain"; }
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "queue control drain failed"; }
+  control_ms=$DRAIN_ELAPSED_MS
+  drain_elapsed_ms "$state" "$queue_out" "$queue_err" \
     || { kill "$queue_holder" 2>/dev/null || true; fail "bounded queue presentation drain failed"; }
+  held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$queue_holder" 2>/dev/null \
     || fail "queue presentation returned only after its live holder exited"
+  [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
+    || { kill "$queue_holder" 2>/dev/null || true; fail "queue lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
+  printf 'drain timing: queue held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
   advisory_count=$(grep -Fc \
     "WAKE DRAIN SKIPPED: queue lock remains held by live pid $queue_holder" \
     "$queue_out" || true)
@@ -3415,9 +3441,6 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/presentation.ready" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation holder never acquired its lock"; }
 
-  # Instruction 003 decision: five interleaved base/branch trials both broke
-  # the old whole-drain ceiling. Time the bounded acquire, not startup/guard
-  # work; preserve the same four-second bound and all lock/ack assertions.
   # Assert helper silence separately from the drain's valid supervision alarms.
   rc=0
   FM_STATE_OVERRIDE="$state" bash -c '
@@ -3437,11 +3460,21 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ ! -s "$dir/presentation-helper.err" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline leaked helper-process diagnostics"; }
 
-  FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
-    "$DRAIN" > "$first_out" 2> "$first_err" \
+  control=$(make_case presentation-lock-deadline-presentation-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "could not seed the presentation control drain"; }
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation control drain failed"; }
+  control_ms=$DRAIN_ELAPSED_MS
+  drain_elapsed_ms "$state" "$first_out" "$first_err" \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation drain failed"; }
+  held_ms=$DRAIN_ELAPSED_MS
   kill -0 "$presentation_holder" 2>/dev/null \
     || fail "status presentation returned only after its live holder exited"
+  [ $((held_ms - control_ms)) -le $((1000 + DRAIN_DEADLINE_MARGIN_MS)) ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation lock delayed the drain ${held_ms}ms against a ${control_ms}ms control"; }
+  printf 'drain timing: presentation held=%sms control=%sms\n' "$held_ms" "$control_ms" >&2
   advisory_count=$(grep -Fc \
     "STATUS PRESENTATION SKIPPED: lock remains held by live pid $presentation_holder" \
     "$first_out" || true)
