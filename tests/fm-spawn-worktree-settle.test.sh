@@ -327,7 +327,7 @@ test_measured_harness_launch_runs_confined() {
     cat > "$FAKEBIN_DIR/$harness" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in --version) printf '%s\\n' '$version'; exit 0 ;; esac
-[ -n "\${FM_TASK_INBOX:-}" ] || exit 0
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
 {
   if { printf 'replaced' >> '$PROJ_DIR/README.md'; } 2>/dev/null; then echo foreign=written; else echo foreign=refused; fi
   if { printf 'probe-status-append\\n' >> '$HOME_DIR/state/$id.status'; } 2>/dev/null; then echo status=appended; else echo status=refused; fi
@@ -394,7 +394,7 @@ test_confined_raw_claude_launch_runs_through_teamclaude() {
   cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
-[ -n "\${FM_TASK_INBOX:-}" ] || exit 0
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
 session=
 [ "\${1:-}" != --session-id ] || session=\$2
 {
@@ -413,7 +413,7 @@ SH
   if [ "$?" = 0 ]; then fail "raw Claude spawn silently accepted command substitution: $out"; fi
   case "$out" in *'command substitution'*'named harness'*) ;; *) fail "raw Claude refusal omitted construct or remedy: $out" ;; esac
   assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused raw Claude command must not reach the worker"
-  out=$(run_settle_spawn "$id" --harness "CLAUDE_CONFIG_DIR='$raw_root' claude --model opus")
+  out=$(run_settle_spawn "$id" --harness "CLAUDE_CONFIG_DIR='$raw_root' claude --resume $other --model opus")
   expect_code 0 "$?" "confined raw claude spawn was refused: $out"
   assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "confined raw claude coverage absent from metadata"
   session=$(grep '^claude_session_id=' "$HOME_DIR/state/$id.meta" | cut -d= -f2-)
@@ -421,7 +421,7 @@ SH
   assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the raw claude launch"
   source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
   PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
-  assert_equals "session-id=$session"$'\nargs=--model opus\nconfig='"$raw_root"$'\nproxy=set\nown=created\nother=refused' "$(cat "$probe")" \
+  assert_equals "session-id=$session"$'\nargs=--fork-session --resume '"$other"$' --model opus\nconfig='"$raw_root"$'\nproxy=set\nown=created\nother=refused' "$(cat "$probe")" \
     "the raw claude launch must reach claude through TeamClaude under its recorded session id, with only that session writable in its own root"
   pass "a confined raw claude launch runs through TeamClaude with its session id and literal config root granted"
 }
@@ -455,6 +455,7 @@ bodies = [
     ("quoted-placeholder", "claude --print '__CLAUDERAWSESSION__ __CLAUDERAWPREFIX__'"),
     ("quoted-substitution-data", "claude --print <<'END'\n$(claude --help) `claude --help`\nEND\n"),
     ("comment", "claude --print <<END # claude --help\nclaude --help\nEND\n"),
+    ("option-terminator", "claude -- --resume"),
 ]
 for label, source in bodies:
     marked = subprocess.run([sys.executable, helper, "mark-claude", source], check=True, capture_output=True, text=True).stdout
@@ -469,6 +470,14 @@ for label, source in bodies:
     assert args == ["--session-id", session] + old_args, label
     assert stdin == old_stdin, label
     print("ok - raw Claude shell data byte fidelity:", label)
+for arguments in (["--resume", "old-session"], ["-r", "old-session"], ["--continue"], ["-c"]):
+    source = "claude " + " ".join(arguments)
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    result = subprocess.run(["bash", "-c", rendered], input="resume prompt", check=True, capture_output=True, text=True, env=env)
+    args, stdin = json.loads(result.stdout)
+    assert args == ["--session-id", session, "--fork-session"] + arguments, args
+    assert stdin == "resume prompt", stdin
+    print("ok - raw Claude forks resumed session:", arguments[0])
 refusals = [
     ("command substitution", "claude --print $(claude --help)"),
     ("command substitution", "claude --print $(cat <<END\nclaude --help\nEND\n)"),
@@ -476,6 +485,7 @@ refusals = [
     ("backtick", "claude --print `cat <<END\nclaude --help\nEND\n`"),
     ("double quote", 'claude --print "$(claude --help)"'),
     ("here-document", "claude <<END\n$(claude --help)\nEND\n"),
+    ("line continuation in here-document delimiter", "claude <<E\\\nND\n$(claude --help)\nEND\n"),
     ("unterminated single quote", "claude 'prompt"),
     ("unterminated double quote", 'claude "prompt'),
     ("unterminated here-document", "claude <<END\nclaude --help\n"),

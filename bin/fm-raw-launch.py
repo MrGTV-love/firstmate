@@ -6,8 +6,9 @@ Usage: fm-raw-launch.py mark-claude COMMAND
        fm-raw-launch.py root NAME COMMAND CWD
 
 mark-claude inserts __CLAUDERAWSESSION__ after each literal claude program word.
-render-claude instead inserts the resolved session argument and prefixes only
-the first claude invocation. Both splice original source spans, preserving
+render-claude instead inserts the resolved session argument, forks resumed or
+continued sessions into that id and prefixes only the first claude invocation.
+Both splice original source spans, preserving
 quoted data, comments and here-document bodies. Here-documents support literal,
 single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
@@ -133,6 +134,8 @@ def words(text):
             i = token[2]
             if here:
                 raw = text[token[1]:token[2]]
+                if "\\\n" in raw:
+                    refuse("line continuation in here-document delimiter")
                 if token[4]:
                     refuse("expanded here-document delimiter")
                 documents.append((token[3], strip_tabs, any(c in raw for c in "'\"\\")))
@@ -174,7 +177,7 @@ def commands(text):
 def mark_claude(text, session=MARK, prefix=""):
     marks = []
     for command in commands(text):
-        for kind, start, end, value, expands in command:
+        for position, (kind, start, end, value, expands) in enumerate(command):
             if ASSIGNMENT.match(text[start:end]):
                 continue
             if value in ("if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac", "function", "{", "}", "!", "time", "eval", "exec", "command", "builtin", "source", "."):
@@ -182,11 +185,20 @@ def mark_claude(text, session=MARK, prefix=""):
             if expands:
                 refuse("expanded program word")
             if os.path.basename(value) == "claude":
-                marks.append((start, end))
+                options = []
+                for argument in command[position + 1:]:
+                    if argument[3] == "--":
+                        break
+                    options.append(argument[3])
+                resumes = any(option in ("--resume", "-r", "--continue", "-c") for option in options)
+                suffix = session
+                if session and session != MARK and resumes and "--fork-session" not in options:
+                    suffix += " --fork-session"
+                marks.append((start, end, suffix))
             break
     for index in range(len(marks) - 1, -1, -1):
-        start, end = marks[index]
-        text = text[:end] + session + text[end:]
+        start, end, suffix = marks[index]
+        text = text[:end] + suffix + text[end:]
         if index == 0:
             text = text[:start] + prefix + text[start:]
     return text
