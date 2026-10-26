@@ -784,6 +784,7 @@ test_confined_raw_launch_keeps_the_pane_shell() {
   staged=${source_line#". '"}
   staged=${staged%"'"}
   [ -n "$staged" ] || staged=$source_line
+  # shellcheck disable=SC2016 # the literal selector expansion is the staged launch text under test
   assert_grep '${fm_launch_shell:-/bin/bash}' "$staged" "the confined launch must select the pane shell with a /bin/bash fallback"
   expected_home=$(cd "$HOME_DIR/user-home" && pwd -P) || fail "the fixture HOME root is unreadable"
   if [ -n "$zsh_bin" ]; then

@@ -7534,6 +7534,7 @@ if [ "$WRITE_CONFINEMENT" = seatbelt-v1 ]; then
   # bash's "$BASH", and leaves any other shell on /bin/bash, so no bare name is
   # looked up later inside the sandbox; the caller's text stays one quoted -c
   # argument, and the subshell keeps the selector out of the pane's environment.
+  # shellcheck disable=SC2016 # The pane shell expands this selector.
   LAUNCH_CONFINED_SELECTOR='fm_launch_shell=${ZSH_VERSION:+${commands[zsh]:-/bin/zsh}}; fm_launch_shell=${fm_launch_shell:-${BASH_VERSION:+$BASH}}'
   LAUNCH="( $LAUNCH_CONFINED_SELECTOR; exec /usr/bin/sandbox-exec -f $(shell_quote "$WRITE_CONFINEMENT_PROFILE") \"\${fm_launch_shell:-/bin/bash}\" -c $(shell_quote "$LAUNCH") )"
 fi
