@@ -30,14 +30,17 @@
 #   classifier: other prose is accepted. Legacy briefs use marked captain words
 #   when present, otherwise their Task body. Relaunches and secondmate charters
 #   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
-#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
-#   one refusal lists every leftover Task body and DoD token in a single pass,
+#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder
+#   and a blank scaffolded `### Out of scope` list (write None when nothing is
+#   excluded); one refusal lists every leftover Task body and DoD token and the
+#   blank exclusion list in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
 #   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
 #   proceeds. A relaunch re-checks only the Task bodies, because the Definition
-#   of Done was accepted at the fresh spawn; a secondmate charter never reaches
+#   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
+#   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract, the extracted captain
@@ -4356,7 +4359,7 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
   done <<EOF
 $problems
 EOF
-  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
 }
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   # One verdict, one refusal: the helper lists every unfinished Task body and
@@ -4366,11 +4369,19 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   if [ "$RELAUNCH" -eq 0 ]; then
     if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF"); then
       print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
-      # One event per decision: this refusal is the decision the brief gate took.
-      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+      # One event per decision: this refusal is the decision each brief gate took.
+      case "$DISPATCH_PROBLEMS" in
+      *'### Out of scope is empty'*) "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope deny --source-ok true 2>/dev/null || true ;;
+      esac
+      if printf '%s\n' "$DISPATCH_PROBLEMS" | grep -vqF '### Out of scope is empty'; then
+        "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
+      fi
       exit 1
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders allow --cleared-by proceed 2>/dev/null || true
+    if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
+      "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
+    fi
     if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
       echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
     fi

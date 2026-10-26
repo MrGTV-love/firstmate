@@ -400,6 +400,9 @@ fm_dod_text_problem_list() {  # <text>
 # problem, and return 0 when at least one exists; return 1 when none does.
 # Covers, in the order an operator fills them, unfenced standalone {TASK} and
 # {FIRSTMATE_SPEC} lines in their respective Task subsections,
+# an empty scaffolded `### Out of scope` exclusion list, which is dispatched
+# only as a stated answer (`None` is an answer) so independent review is never
+# handed a blank to fill with scope the task never had,
 # every DoD token from FM_TASK_DOD_PLACEHOLDERS still standing in its section,
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
@@ -409,7 +412,8 @@ fm_dod_text_problem_list() {  # <text>
 # dispatches it.
 # The optional second argument `task-only` stops after the two Task bodies,
 # which is the scope a relaunch and scout promotion re-check: the Definition of
-# Done was accepted at the fresh spawn, exactly as before.
+# Done and its exclusion list were accepted at the fresh spawn, exactly as
+# before.
 fm_brief_dispatch_problems() {  # <brief> [task-only]
   local brief=$1 scope=${2:-all} intent spec span dod_file more line problems=1
   [ -f "$brief" ] || return 1
@@ -430,6 +434,11 @@ $(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
     problems=0
   fi
   [ "$scope" != task-only ] || return "$problems"
+  if fm_brief_task_heading_present "$brief" "### Out of scope" \
+    && [ -z "$(fm_brief_out_of_scope "$brief" | tr -d '[:space:]')" ]; then
+    printf '%s\n' "### Out of scope is empty: name the work this task does not do, or write None"
+    problems=0
+  fi
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return "$problems"
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
@@ -603,6 +612,37 @@ fm_brief_text_has_content() {  # <text>
   printf '%s\n' "$1" | grep -Evq '^ {0,3}#{1,6}([[:space:]]|$)|^[[:space:]]*$'
 }
 
+# The `## Firstmate spec` body without its nested `### Out of scope` subsection.
+# The exclusion list is specification, but it is never the build instructions,
+# so a stated `None.` must not satisfy a spec that holds nothing else.
+fm_brief_spec_instructions() {  # <file>
+  fm_brief_task_heading_body "$1" "## Firstmate spec" | awk '
+    {
+      scan = $0
+      sub(/^(   |  | )?/, "", scan)
+      was_fenced = fenced
+      if (scan ~ /^(```|~~~)/) {
+        marker = substr(scan, 1, 1)
+        rest = scan
+        sub(marker == "`" ? "^`+" : "^~+", "", rest)
+        len = length(scan) - length(rest)
+        if (!fenced) {
+          fenced = 1
+          fence_marker = marker
+          fence_len = len
+        } else if (marker == fence_marker && len >= fence_len && rest ~ /^[[:space:]]*$/) {
+          fenced = 0
+        }
+      }
+      if (!was_fenced && !fenced && scan ~ /^#+([[:space:]]|$)/) {
+        if ($0 == "### Out of scope") { skip = 1; next }
+        if (match(scan, /^#+/) && RLENGTH <= 3) skip = 0
+      }
+    }
+    !skip { print }
+  '
+}
+
 # Accept the current two-subsection contract only when both bodies have content;
 # briefs predating that contract remain valid when their # Task body has content.
 fm_brief_task_content_valid() {  # <file>
@@ -613,7 +653,7 @@ fm_brief_task_content_valid() {  # <file>
   if [ "$has_intent" -eq 1 ] || [ "$has_spec" -eq 1 ]; then
     [ "$has_intent" -eq 1 ] && [ "$has_spec" -eq 1 ] || return 1
     intent=$(fm_brief_task_heading_body "$file" "## Captain's intent")
-    spec=$(fm_brief_task_heading_body "$file" "## Firstmate spec")
+    spec=$(fm_brief_spec_instructions "$file")
     fm_brief_text_has_content "$intent" || return 1
     fm_brief_text_has_content "$spec" || return 1
     return 0

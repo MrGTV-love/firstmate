@@ -1871,7 +1871,7 @@ EOF
   assert_contains "$out" "  ## Definition Of Done (task) still holds {DOD_CAPABILITY}" "the refusal omitted the capability token"
   assert_contains "$out" "  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}" "the refusal omitted the mandatory item token"
   assert_contains "$out" "  ### Honesty rule still holds {DOD_HONESTY_RULE}" "the refusal omitted the honesty token"
-  assert_contains "$out" "error: repair: edit $brief and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief" \
+  assert_contains "$out" "error: repair: edit $brief and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief" \
     "the refusal did not end with the complete repair"
   pass "fm-spawn: a half-filled brief produces one refusal naming all five tokens and the repair"
 }

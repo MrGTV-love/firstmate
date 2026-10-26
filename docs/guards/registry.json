@@ -7,7 +7,8 @@
     "jev-tool-coverage",
     "jev-egress-grant",
     "jev-github-write-op",
-    "omp-worker-url-reads-off"
+    "omp-worker-url-reads-off",
+    "spawn-brief-out-of-scope"
   ],
   "guards": [
     {
@@ -206,6 +207,33 @@
       "remedy": "edit <brief> and fill the listed DoD tokens, or add an unfenced line 'DoD file: <absolute path>' to the section; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
       "budget": 1,
       "test": "tests/fm-brief.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "emitters": [
+        "bin/fm-spawn.sh"
+      ]
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "spawn-brief-out-of-scope",
+      "owner": "bin/fm-dod-lib.sh",
+      "invariant": "a fresh dispatch refuses a brief whose scaffolded exclusion list is still blank",
+      "layer": "runtime-block",
+      "source": "brief text under ### Out of scope in # Task",
+      "trigger": "fm_brief_dispatch_problems finds a ### Out of scope heading in # Task with no stated exclusion",
+      "remedy": "edit <brief> and list the excluded work under ### Out of scope or write None; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the heading",
+      "budget": 1,
+      "test": "tests/fm-dod-lib.test.sh",
       "tier": "B",
       "harm": "reversible",
       "remedy_verified": "fixture",

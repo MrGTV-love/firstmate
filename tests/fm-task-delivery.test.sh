@@ -57,6 +57,12 @@ fill_task_subsections() {  # <file> <intent> <spec>
   content=$(cat "$file")
   content=${content//'{TASK}'/$intent}
   content=${content//'{FIRSTMATE_SPEC}'/$spec}
+  # The scaffold's exclusion list is required at dispatch, so these fixtures
+  # answer it the way a task with no exclusions does.
+  content=$(printf '%s\n' "$content" | awk '
+    { print }
+    $0 == "### Out of scope" { print "None." }
+  ')
   printf '%s\n' "$content" > "$file"
 }
 
