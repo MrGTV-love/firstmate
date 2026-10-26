@@ -11,9 +11,9 @@
 # (fm_wake_main_presentation_hold in bin/fm-wake-lib.sh) no longer holds its
 # rows, so a later supervision-host close for them is delivered, and the next
 # Stop firing rewakes main for any still queued (bin/fm-claude-stop-autoarm.sh).
-# A UserPromptSubmit for a message typed while a turn still runs is not verified
-# live; if Claude fires one, that turn's hold ends early, and the cost is a
-# duplicate wake that main handles idempotently.
+# A message typed while a turn still runs also fires UserPromptSubmit
+# (docs/verification/supervision.md), so that turn's hold ends early, and the
+# cost is a duplicate wake that main handles idempotently.
 #
 # Only the genuine primary's session-lock owner releases it, and a home without
 # a hold is untouched. The hook is always silent and exits 0: its stdout would
