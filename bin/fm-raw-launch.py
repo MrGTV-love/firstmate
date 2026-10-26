@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Read a raw launch command's shell words without evaluating or expanding them.
 
-Usage: fm-raw-launch.py mark-claude COMMAND
-       fm-raw-launch.py render-claude COMMAND SESSION_ID PREFIX
+Usage: fm-raw-launch.py render-claude COMMAND SESSION_ID PREFIX
        fm-raw-launch.py root NAME COMMAND CWD
 
-mark-claude inserts __CLAUDERAWSESSION__ after each literal claude program word.
-render-claude instead inserts the resolved session argument, forks resumed or
-continued sessions into that id and prefixes only the first claude invocation.
-Both splice original source spans, preserving
+render-claude inserts the session argument after each literal claude program
+word, forks resumed or continued sessions into that id and prefixes only the
+first claude invocation; empty SESSION_ID and PREFIX only validate the command.
+It splices original source spans, preserving
 quoted data, comments and here-document bodies. Here-documents support literal,
 single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
@@ -26,7 +25,6 @@ import re
 import sys
 
 OPERATORS = "\n;&|()"
-MARK = "__CLAUDERAWSESSION__"
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 
 
@@ -174,7 +172,7 @@ def commands(text):
     yield current
 
 
-def mark_claude(text, session=MARK, prefix=""):
+def render_claude(text, session, prefix):
     marks = []
     for command in commands(text):
         for position, (kind, start, end, value, expands) in enumerate(command):
@@ -192,7 +190,7 @@ def mark_claude(text, session=MARK, prefix=""):
                     options.append(argument[3])
                 resumes = any(option in ("--resume", "-r", "--continue", "-c") for option in options)
                 suffix = session
-                if session and session != MARK and resumes and "--fork-session" not in options:
+                if session and resumes and "--fork-session" not in options:
                     suffix += " --fork-session"
                 marks.append((start, end, suffix))
             break
@@ -223,13 +221,10 @@ def root(name, text, cwd):
 
 def main(argv):
     try:
-        if len(argv) == 3 and argv[1] == "mark-claude":
-            print(mark_claude(argv[2]), end="")
-            return 0
         if len(argv) == 5 and argv[1] == "render-claude":
             if argv[3] and not re.fullmatch(r"[0-9a-fA-F-]{36}", argv[3]):
                 refuse("invalid session id")
-            print(mark_claude(argv[2], " --session-id " + argv[3] if argv[3] else "", argv[4]), end="")
+            print(render_claude(argv[2], " --session-id " + argv[3] if argv[3] else "", argv[4]), end="")
             return 0
         if len(argv) == 5 and argv[1] == "root":
             status, path = root(argv[2], argv[3], argv[4])

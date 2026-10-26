@@ -426,6 +426,44 @@ SH
   pass "a confined raw claude launch runs through TeamClaude with its session id and literal config root granted"
 }
 
+# An unconfined raw claude launch keeps the earlier memory-prefix placement, so
+# shell constructs the confined session rewrite refuses still launch there.
+test_unconfined_raw_claude_launch_keeps_shell_constructs() {
+  local rec id out source_line probe
+  local FM_COMPAT_LAUNCH_LOG
+  id=settle-raw-claude-linux-z9
+  rec=$(make_settle_case raw-claude-linux "$id" 0)
+  read_settle_record "$rec"
+  if [ "$(uname -s)" != Linux ]; then
+    cat > "$FAKEBIN_DIR/uname" <<'SH'
+#!/usr/bin/env bash
+[ "$*" != -s ] || { echo Linux; exit 0; }
+exec /usr/bin/uname "$@"
+SH
+    chmod +x "$FAKEBIN_DIR/uname"
+  fi
+  probe="$HOME_DIR/data/$id/probe"
+  cat > "$FAKEBIN_DIR/claude" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) printf '2.1.310 (Claude Code)\\n'; exit 0 ;; esac
+[ "\${FM_TASK_INBOX:-}" = '$HOME_DIR/state/$id.inbox' ] || exit 0
+printf '%s\\n' "\$@" > '$probe'
+SH
+  chmod +x "$FAKEBIN_DIR/claude"
+  FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+  export FM_COMPAT_LAUNCH_LOG
+  out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"')
+  expect_code 0 "$?" "unconfined raw claude spawn refused a shell construct: $out"
+  assert_grep 'write_confinement=unconfined-linux' "$HOME_DIR/state/$id.meta" "unconfined raw claude coverage absent from metadata"
+  assert_no_grep 'claude_session_id=' "$HOME_DIR/state/$id.meta" "an unconfined raw claude launch must not record a session id"
+  assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver the unconfined raw claude launch"
+  source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
+  PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
+  assert_equals $'--print\nhi\n--model\nopus' "$(cat "$probe")" \
+    "the unconfined raw claude launch must run its shell constructs unchanged and without a session id"
+  pass "an unconfined raw claude launch keeps shell constructs and gets no session id"
+}
+
 # These are shell-language cases, not vendor behavior: execute only a task-local
 # fake claude and compare the real Bash argv/stdin before and after rewriting.
 test_raw_claude_shell_data_fidelity() {
@@ -444,7 +482,7 @@ fake.write_text("#!/usr/bin/env python3\nimport json,sys\nprint(json.dumps([sys.
 fake.chmod(0o755)
 env = dict(os.environ, PATH=str(base) + os.pathsep + os.environ["PATH"])
 session = "12345678-1234-4234-8234-123456789012"
-marker = "__CLAUDERAWSESSION__"
+marker = " --session-id " + session
 bodies = [
     ("reviewer", "claude --print <<'PROMPT'\nA plain CLI usage example follows.\nclaude --help\nPROMPT\n"),
     ("literal", "claude --print <<END\nclaude --help\nEND\n"),
@@ -452,17 +490,17 @@ bodies = [
     ("tab-stripped", "claude --print <<-END\n\tclaude --help\n\tEND\n"),
     ("multiple", "claude --print <<ONE <<'TWO'\nclaude --help\nONE\nclaude --version\nTWO\n"),
     ("quoted", "claude --print 'a literal line\nclaude --help'"),
-    ("quoted-placeholder", "claude --print '__CLAUDERAWSESSION__ __CLAUDERAWPREFIX__'"),
+    ("quoted-placeholder", "claude --print '__CLAUDESESSION__ __CLAUDERAWPREFIX__'"),
     ("quoted-substitution-data", "claude --print <<'END'\n$(claude --help) `claude --help`\nEND\n"),
     ("comment", "claude --print <<END # claude --help\nclaude --help\nEND\n"),
     ("option-terminator", "claude -- --resume"),
 ]
 for label, source in bodies:
-    marked = subprocess.run([sys.executable, helper, "mark-claude", source], check=True, capture_output=True, text=True).stdout
-    assert marked == source.replace("claude", "claude" + marker, 1), label
-    if label != "quoted-placeholder":
-        assert marked.count(marker) == 1, label
     rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    assert rendered == source.replace("claude", "claude" + marker, 1), label
+    assert rendered.count(marker) == 1, label
+    validated = subprocess.run([sys.executable, helper, "render-claude", source, "", ""], check=True, capture_output=True, text=True).stdout
+    assert validated == source, label
     before = subprocess.run(["bash", "-c", source], check=True, capture_output=True, text=True, env=env)
     after = subprocess.run(["bash", "-c", rendered], check=True, capture_output=True, text=True, env=env)
     old_args, old_stdin = json.loads(before.stdout)
@@ -494,9 +532,9 @@ refusals = [
     ("here-string", "claude <<<prompt"),
 ]
 for construct, source in refusals:
-    for mode, extra in (("mark-claude", []), ("render-claude", [session, ""])):
-        result = subprocess.run([sys.executable, helper, mode, source, *extra], capture_output=True, text=True)
-        assert result.returncode != 0 and result.stdout == "", (construct, mode)
+    for extra in ([session, ""], ["", ""]):
+        result = subprocess.run([sys.executable, helper, "render-claude", source, *extra], capture_output=True, text=True)
+        assert result.returncode != 0 and result.stdout == "", (construct, extra)
         assert construct in result.stderr and "named harness" in result.stderr, (construct, result.stderr)
     print("ok - raw Claude refuses:", construct)
 PY
@@ -507,6 +545,7 @@ test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
 test_confined_raw_claude_launch_runs_through_teamclaude
+test_unconfined_raw_claude_launch_keeps_shell_constructs
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted
