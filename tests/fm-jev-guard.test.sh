@@ -813,7 +813,7 @@ JS
 # repeated event identity writes nothing, and a writer failure never changes
 # the refusal. Only digests and typed tokens reach the ledger.
 test_friction_refusal_ledger() {
-  local out ledger before line digest_task digest_subject digest_revision scratch
+  local out ledger before line digest_task digest_subject digest_revision scratch scratch_lines writer_diagnostic guard_diagnostic writer_lines guard_lines
   ledger="$HOME_DIR/state/friction.jsonl"
   friction_lines() { if [ -f "$ledger" ]; then grep -c '' "$ledger"; else echo 0; fi; }
   sha() { node -e 'const { createHash } = require("node:crypto"); const { readFileSync } = require("node:fs"); const [mode, value] = process.argv.slice(1); console.log("sha256:" + createHash("sha256").update(mode === "file" ? readFileSync(value) : value).digest("hex"));' "$@"; }
@@ -842,7 +842,8 @@ test_friction_refusal_ledger() {
   scratch="$TMP_ROOT/friction-validate"
   mkdir -p "$scratch"
   printf '%s\n' "$line" | FM_HOME="$scratch" python3 "$ROOT/bin/fm-friction-ledger.py" 2>"$scratch/err"
-  [ ! -s "$scratch/err" ] && [ "$(grep -c '' "$scratch/state/friction.jsonl")" -eq 1 ] || fail "the writer rejected the Jev refusal event as invalid: $(cat "$scratch/err")"
+  scratch_lines=$(grep -c '' "$scratch/state/friction.jsonl")
+  [ ! -s "$scratch/err" ] && [ "$scratch_lines" -eq 1 ] || fail "the writer rejected the Jev refusal event as invalid: $(cat "$scratch/err")"
   ! grep -F -q -e fm-jev-guard-friction-path-canary -e friction-content-canary -e "$WT" -e "$HOME_DIR" -e "$KEY" "$ledger" \
     || fail "a raw path, content or credential reached the friction ledger"
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
@@ -919,10 +920,12 @@ JS
   [ "${out##*$'\n'}" = friction-ok ] || fail "friction refusal ledger did not reach its final line: $out"
   # Exactly one writer-side line (the unwritable ledger, where the writer ran) and exactly one
   # guard-side line (the missing runtime, where it could not), so neither failure prints both.
-  [ "$(grep -c 'fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id=' <<<"$out")" -eq 1 ] \
-    || fail "the writer's own diagnostic was not printed exactly once, for the unwritable ledger: $out"
-  [ "$(grep -c 'fm-friction: refusal telemetry unavailable; guarded result unchanged; no event identity was recorded' <<<"$out")" -eq 1 ] \
-    || fail "the guard-side diagnostic was not printed exactly once, for the missing writer: $out"
+  writer_diagnostic='fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id='
+  guard_diagnostic='fm-friction: refusal telemetry unavailable; guarded result unchanged; no event identity was recorded'
+  writer_lines=$(grep -c "$writer_diagnostic" <<<"$out")
+  guard_lines=$(grep -c "$guard_diagnostic" <<<"$out")
+  [ "$writer_lines" -eq 1 ] || fail "the writer diagnostic was not printed exactly once, for the unwritable ledger: $out"
+  [ "$guard_lines" -eq 1 ] || fail "the guard-side diagnostic was not printed exactly once, for the missing writer: $out"
   pass "every pre-tool refusal mirrors one digest-only fm-friction.v1 event keyed by its audit branch; allows, repeated identities and writer failures write nothing and never change the refusal"
 }
 
