@@ -6182,8 +6182,8 @@ BUSY_GEN=
   esac
   case "$HARNESS" in
   claude* | omp)
-    # The ten-levels jev-guard (bin/fm-jev-guard.ts) judges against the owning
-    # home's key, never-send policy, ledger and this task's data directory.
+    # The ten-levels jev-guard (bin/fm-jev-guard.ts) checks calls against the
+    # owning home's key, never-send policy, ledger and this task's data directory.
     guard_config=$CONFIG
     case "$guard_config" in
     /*) ;;
