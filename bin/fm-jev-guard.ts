@@ -252,6 +252,8 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
     }
     try {
+      const confinement_owner = confinementOwner(tool, event.input);
+      if (confinement_owner) terminal.confinement_owner = confinement_owner;
       const egressStarted = performance.now();
       const memory = policy.call === "memory" ? memoryEgress(tool, c.ompSetting) : undefined;
       const destination = memory ? "provider" : egressClass(tool);
@@ -273,8 +275,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
             `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
         }
       }
-      const confinement_owner = confinementOwner(tool, event.input);
-      if (confinement_owner) return finishCall({ ...terminal, branch: "confinement", confinement_owner });
+      if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });
       if (policy.call !== "write" && policy.call !== "edit") {
         return destination ? finishCall({ ...terminal, branch: "egress" }) : undefined;
       }

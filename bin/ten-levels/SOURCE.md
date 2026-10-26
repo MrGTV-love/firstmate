@@ -46,7 +46,8 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
   The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, bounded write planner, coverage accounting, failure normalization and cancellation budgets.
   Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only the tool's single destination class from the egress policy, never outbound arguments or destinations.
-  Confinement-owned calls record `confinement_owner: T5`; this identifies the launch-time enforcement owner and is not proof that confinement is active.
+  Confinement-owned effects record `confinement_owner: T5` before egress authorization, so a compound skill-bearing `learn` retains its write owner even when its memory effect is refused for a missing provider grant.
+  This identifies the launch-time enforcement owner and is not proof that confinement is active.
   The canonical client, write questions and thresholds are unchanged.
   There is no result policy, result request budget or result audit path.
 

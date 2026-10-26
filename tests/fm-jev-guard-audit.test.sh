@@ -300,6 +300,25 @@ await test('Claude native WebSearch retains its outbound character at the CLI bo
     assert.equal((await handlers.tool_call({ toolName: 'find', input: {} }, { cwd: state }))?.block, true, 'a copied grant behind a symlink is not this task record');
   } finally { rmSync(`${state}/audit.meta`); rmSync(`${state}/copied.meta`); }
 });
+await test('observed Claude signed-in artifact tools require provider grants at the CLI boundary', async () => {
+  const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
+  const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'firstmate', report.GUARD_POLICY_VERSION];
+  const call = tool_name => execFileSync(process.execPath, args, { input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name, tool_input: { artifact: 'private-artifact-canary' }, cwd: state }), encoding: 'utf8' });
+  for (const tool of ['ArtifactCheck', 'ArtifactComments', 'ArtifactData']) {
+    const denied = await fresh(async () => { assert.equal(JSON.parse(call(tool)).hookSpecificOutput.permissionDecision, 'deny', tool); });
+    assert.equal(denied.branch, 'egress', tool);
+    assert.equal(denied.destination_class, 'provider', tool);
+    assert.equal(denied.request_started, false);
+    assert.ok(!JSON.stringify(denied).includes('private-artifact-canary'));
+    writeFileSync(`${state}/audit.meta`, 'egress=["provider"]\n');
+    try {
+      const allowed = await fresh(async () => { assert.equal(call(tool), '', tool); });
+      assert.equal(allowed.decision, 'allow', tool);
+      assert.equal(allowed.destination_class, 'provider', tool);
+      assert.equal(allowed.request_started, false);
+    } finally { rmSync(`${state}/audit.meta`); }
+  }
+});
 await test('coverage and egress refusals hold in an inactive project scope', async () => {
   const adapter = `${process.env.AUDIT_ROOT}/bin/fm-jev-guard-claude.ts`;
   const args = ['--experimental-strip-types', '--no-warnings', adapter, state, `${state}/config`, state, 'audit', state, state, 'other-project', report.GUARD_POLICY_VERSION];
@@ -381,9 +400,25 @@ await test('memory operations need a provider grant unless the live worker setti
     assert.equal(r.confinement_owner, 'T5');
     assert.ok(!JSON.stringify(r).includes('private-memory-canary'));
   }
-  settings = live;
-  assert.equal((await memory.tool_call({ toolName: 'learn', input: { memory: 'synthetic', skill } }, { cwd: state }))?.block, true,
-    'a skill argument never admits a model-calling learn without its provider grant');
+  for (const backend of ['mnemopi', 'local']) {
+    settings = { ...live, 'memory.backend': backend };
+    let patch;
+    const r = await fresh(async () => { patch = await memory.tool_call({ toolName: 'learn', input: { memory: 'synthetic', skill } }, { cwd: state }); });
+    assert.equal(r.confinement_owner, 'T5', `${backend}: skill ownership is recorded independently of memory authorization`);
+    assert.equal(r.request_started, false);
+    assert.ok(!JSON.stringify(r).includes('private-memory-canary'));
+    if (backend === 'mnemopi') {
+      assert.equal(patch?.block, true, 'a skill argument never admits a model-calling learn without its provider grant');
+      assert.equal(r.decision, 'block');
+      assert.equal(r.branch, 'egress');
+      assert.equal(r.destination_class, 'provider');
+    } else {
+      assert.equal(patch, undefined, 'the local memory effect needs no provider grant');
+      assert.equal(r.decision, 'allow');
+      assert.equal(r.branch, 'confinement');
+      assert.equal(r.destination_class, undefined);
+    }
+  }
   settings = { ...live, 'mnemopi.llmMode': 'none' };
   for (const [indeterminate, toolName, effect] of [
     [new Error('unreadable'), 'recall', 'could not be proven local because the worker\'s live memory settings are unreadable'],
@@ -618,8 +653,9 @@ else
   printf 'SKIP: installed tool coverage requires omp; offline added-tool regression ran above\n'
 fi
 
-# The init event lists the tools the installed Claude Code binary exposes before any request;
-# the dead proxy and base URL keep the run off the network, so no model turn is submitted.
+# Only init.tools from an API-key session is enumerated, not claude.ai sign-in tools.
+# ArtifactCheck/ArtifactComments/ArtifactData are covered by the explicit adapter cases above.
+# The dead proxy and base URL keep the run off the network, so no model turn is submitted.
 if command -v claude >/dev/null 2>&1; then
   node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'installed Claude tool coverage'
 import assert from 'node:assert/strict';

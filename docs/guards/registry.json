@@ -731,7 +731,7 @@
       "owner": "bin/fm-jev-guard.ts",
       "invariant": "a tool whose policy row names a destination class, or a memory operation whose local effect the live worker settings do not prove, never runs without a task grant for that class",
       "layer": "runtime-block",
-      "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta",
+      "source": "the tool's TOOL_POLICY row in bin/fm-jev-egress.ts; for a memory row, memoryEgress over the worker's live omp memory.backend, mnemopi.noEmbeddings and mnemopi.llmMode settings, read through omp's settings registry by the extension bin/fm-spawn.sh generates; plus the single egress= JSON line in state/<task>.meta; a skill-bearing learn retains its independently recorded T5 write owner even when its memory effect is refused",
       "trigger": "egressClass(<tool>) returns a destination class, or memoryEgress(<tool>) names a model or remote call or an effect it could not prove local and so requires provider, and state/<task>.meta has no single valid egress= line listing that class: absent, malformed, duplicated, an unknown class, unreadable or symlinked",
       "remedy": "Firstmate, never the worker, records exactly one grant line in state/<task>.meta, for example `printf 'egress=[\"<class>\"]\\n' >> state/<task>.meta` when none exists; the deny line names the missing class and no outbound call was made; a memory refusal also names the operation and the model call, remote call or local effect it could not prove",
       "budget": 1,
