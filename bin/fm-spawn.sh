@@ -3153,21 +3153,16 @@ case "$ARG3" in
   RAW_LAUNCH=1
   LAUNCH=$ARG3
   HARNESS=""
-  RAW_LAUNCH_TAIL=$LAUNCH
   for word in $LAUNCH; do
-    RAW_LAUNCH_TAIL=${RAW_LAUNCH_TAIL#*"$word"}
     case "$word" in
     CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=*) RAW_FUNCTION_HOOKS_SET=1 ;;
     [A-Za-z_]*=*) continue ;;
     *)
       HARNESS=$(basename "$word")
       if [ "$HARNESS" = claude ]; then
-        RAW_PROGRAM_PREFIX=${LAUNCH:0:${#LAUNCH}-${#RAW_LAUNCH_TAIL}-${#word}}
-        LAUNCH="$RAW_PROGRAM_PREFIX"'__CLAUDERAWPREFIX__'"${LAUNCH:${#RAW_PROGRAM_PREFIX}}"
-        RAW_MARK_INPUT=$LAUNCH
-        # Marks each claude program word outside quotes, so a confined launch
-        # can splice the session id its write profile grants after each one.
-        LAUNCH=$(python3 "$SCRIPT_DIR/fm-raw-launch.py" mark-claude "$LAUNCH") || LAUNCH=$RAW_MARK_INPUT
+        # Validate before launch; unsupported shell constructs must never fall
+        # back to an unmarked raw Claude command.
+        python3 "$SCRIPT_DIR/fm-raw-launch.py" mark-claude "$LAUNCH" >/dev/null || exit 1
       fi
       break
       ;;
@@ -7123,8 +7118,7 @@ if [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then
   if [ -n "$CLAUDE_MD_EXCLUDES" ]; then
     CLAUDE_RAW_PREFIX="bash $(shell_quote "$SCRIPT_DIR/fm-claude-memory-lib.sh") '{${CLAUDE_MD_EXCLUDES#,}}' "
   fi
-  LAUNCH=${LAUNCH//__CLAUDERAWPREFIX__/"$CLAUDE_RAW_PREFIX"}
-  LAUNCH=${LAUNCH//__CLAUDERAWSESSION__/${CLAUDE_SESSION_ID:+ --session-id $CLAUDE_SESSION_ID}}
+  LAUNCH=$(python3 "$SCRIPT_DIR/fm-raw-launch.py" render-claude "$LAUNCH" "${CLAUDE_SESSION_ID:-}" "$CLAUDE_RAW_PREFIX") || exit 1
 fi
 if [ "$HARNESS" = rovo ]; then
   ROVOCONFIGOVERRIDE=$(rovo_config_override_flag "$EFFORT" "$DATA" "$STATE" "$ID") || {

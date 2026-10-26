@@ -591,7 +591,24 @@ def build_profile(repo, manifest, harness, profile, env, agent_dir=None):
         command += ["--claude-session", OWN_SESSION]
     if agent_dir:
         command += ["--agent-dir", str(agent_dir)]
-    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True)
+    subprocess.run(command, env=dict(env, NM_HOME=manifest["nm"]), check=True, capture_output=True, text=True)
+
+
+def invalid_project_source(repo, manifest, base, env):
+    project = Path(manifest["home"]) / "projects/invalid-source"
+    assert git("init", "-q", str(project)).returncode == 0
+    (project / ".git/config").write_text("[invalid configuration\n")
+    profile = base / "invalid-source.sb"
+    try:
+        build_profile(repo, manifest, "claude", profile, env)
+    except subprocess.CalledProcessError as error:
+        assert str(project) in error.stderr and "git rev-parse --git-dir failed" in error.stderr, error.stderr
+        assert not profile.exists(), "invalid source published a partial confinement profile"
+    else:
+        raise AssertionError("invalid project Git configuration was treated as repository absence")
+    finally:
+        shutil.rmtree(project)
+    print("invalid project source: refused with project and failed command; no profile published")
 
 
 # A new task's worktree has a new slug, so its first Claude launch creates the
@@ -656,6 +673,8 @@ for harness in ("claude", "omp"):
             (base / "temp").mkdir()
             profile = base / "profile.sb"
             build_profile(repo, manifest, harness, profile, env)
+            if harness == "claude" and mode == "baseline":
+                invalid_project_source(repo, manifest, base, env)
             # A process of this user whose arguments ps must escape: non-ASCII
             # bytes, a newline, a tab and an empty word.
             unusual = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)", "jos\u00e9", "a\nb", "t\tb", ""])

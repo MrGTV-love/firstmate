@@ -70,10 +70,16 @@ def under(root, pattern):
 def worktrees(primary):
     # A projects entry that is not a repository has no worktrees; any other
     # Git failure leaves the protect list underivable and refuses the launch.
-    if subprocess.run(["git", "-C", primary, "rev-parse", "--git-dir"], capture_output=True).returncode:
-        return []
-    listing = subprocess.check_output(["git", "-C", primary, "worktree", "list", "--porcelain"], text=True)
-    return [canonical(line[9:]) for line in listing.splitlines() if line.startswith("worktree ")]
+    command = ["git", "-C", primary, "rev-parse", "--git-dir"]
+    inspected = subprocess.run(command, capture_output=True, text=True, env=dict(os.environ, LC_ALL="C"))
+    if inspected.returncode:
+        if inspected.stderr.strip() == "fatal: not a git repository (or any of the parent directories): .git":
+            return []
+        raise ValueError(f"project {primary}: git rev-parse --git-dir failed (exit {inspected.returncode})")
+    listed = subprocess.run(["git", "-C", primary, "worktree", "list", "--porcelain"], capture_output=True, text=True)
+    if listed.returncode:
+        raise ValueError(f"project {primary}: git worktree list --porcelain failed (exit {listed.returncode})")
+    return [canonical(line[9:]) for line in listed.stdout.splitlines() if line.startswith("worktree ")]
 
 
 def task_ids(state):

@@ -409,6 +409,10 @@ SH
   chmod +x "$FAKEBIN_DIR/claude"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
   export FM_COMPAT_LAUNCH_LOG
+  out=$(run_settle_spawn "$id" --harness 'claude --print $(claude --help)')
+  if [ "$?" = 0 ]; then fail "raw Claude spawn silently accepted command substitution: $out"; fi
+  case "$out" in *'command substitution'*'named harness'*) ;; *) fail "raw Claude refusal omitted construct or remedy: $out" ;; esac
+  assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused raw Claude command must not reach the worker"
   out=$(run_settle_spawn "$id" --harness "CLAUDE_CONFIG_DIR='$raw_root' claude --model opus")
   expect_code 0 "$?" "confined raw claude spawn was refused: $out"
   assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "confined raw claude coverage absent from metadata"
@@ -422,6 +426,74 @@ SH
   pass "a confined raw claude launch runs through TeamClaude with its session id and literal config root granted"
 }
 
+# These are shell-language cases, not vendor behavior: execute only a task-local
+# fake claude and compare the real Bash argv/stdin before and after rewriting.
+test_raw_claude_shell_data_fidelity() {
+  python3 - "$ROOT/bin/fm-raw-launch.py" "$TMP_ROOT/raw-shell" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+helper, directory = sys.argv[1:]
+base = Path(directory)
+base.mkdir()
+fake = base / "claude"
+fake.write_text("#!/usr/bin/env python3\nimport json,sys\nprint(json.dumps([sys.argv[1:],sys.stdin.read()]))\n")
+fake.chmod(0o755)
+env = dict(os.environ, PATH=str(base) + os.pathsep + os.environ["PATH"])
+session = "12345678-1234-4234-8234-123456789012"
+marker = "__CLAUDERAWSESSION__"
+bodies = [
+    ("reviewer", "claude --print <<'PROMPT'\nA plain CLI usage example follows.\nclaude --help\nPROMPT\n"),
+    ("literal", "claude --print <<END\nclaude --help\nEND\n"),
+    ("double-quoted", 'claude --print <<"END"\nclaude --help\nEND\n'),
+    ("tab-stripped", "claude --print <<-END\n\tclaude --help\n\tEND\n"),
+    ("multiple", "claude --print <<ONE <<'TWO'\nclaude --help\nONE\nclaude --version\nTWO\n"),
+    ("quoted", "claude --print 'a literal line\nclaude --help'"),
+    ("quoted-placeholder", "claude --print '__CLAUDERAWSESSION__ __CLAUDERAWPREFIX__'"),
+    ("quoted-substitution-data", "claude --print <<'END'\n$(claude --help) `claude --help`\nEND\n"),
+    ("comment", "claude --print <<END # claude --help\nclaude --help\nEND\n"),
+]
+for label, source in bodies:
+    marked = subprocess.run([sys.executable, helper, "mark-claude", source], check=True, capture_output=True, text=True).stdout
+    assert marked == source.replace("claude", "claude" + marker, 1), label
+    if label != "quoted-placeholder":
+        assert marked.count(marker) == 1, label
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    before = subprocess.run(["bash", "-c", source], check=True, capture_output=True, text=True, env=env)
+    after = subprocess.run(["bash", "-c", rendered], check=True, capture_output=True, text=True, env=env)
+    old_args, old_stdin = json.loads(before.stdout)
+    args, stdin = json.loads(after.stdout)
+    assert args == ["--session-id", session] + old_args, label
+    assert stdin == old_stdin, label
+    print("ok - raw Claude shell data byte fidelity:", label)
+refusals = [
+    ("command substitution", "claude --print $(claude --help)"),
+    ("command substitution", "claude --print $(cat <<END\nclaude --help\nEND\n)"),
+    ("backtick", "claude --print `claude --help`"),
+    ("backtick", "claude --print `cat <<END\nclaude --help\nEND\n`"),
+    ("double quote", 'claude --print "$(claude --help)"'),
+    ("here-document", "claude <<END\n$(claude --help)\nEND\n"),
+    ("unterminated single quote", "claude 'prompt"),
+    ("unterminated double quote", 'claude "prompt'),
+    ("unterminated here-document", "claude <<END\nclaude --help\n"),
+    ("unterminated here-document", "claude <<END"),
+    ("process substitution", "claude <(claude --help)"),
+    ("here-string", "claude <<<prompt"),
+]
+for construct, source in refusals:
+    for mode, extra in (("mark-claude", []), ("render-claude", [session, ""])):
+        result = subprocess.run([sys.executable, helper, mode, source, *extra], capture_output=True, text=True)
+        assert result.returncode != 0 and result.stdout == "", (construct, mode)
+        assert construct in result.stderr and "named harness" in result.stderr, (construct, result.stderr)
+    print("ok - raw Claude refuses:", construct)
+PY
+  expect_code 0 "$?" "raw Claude shell-data or refusal regression failed"
+}
+
+test_raw_claude_shell_data_fidelity
 test_nonmeasured_harness_stays_unconfined_and_audited
 test_measured_harness_launch_runs_confined
 test_confined_raw_claude_launch_runs_through_teamclaude
