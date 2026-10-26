@@ -12,6 +12,8 @@ quoted data, comments and here-document bodies. Here-documents support literal,
 single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
+A claude argument that needs shell expansion ($, unquoted glob or brace
+characters) or that sets its own --session-id refuses too.
 
 root prints the absolute path a single leading NAME=value assignment of the
 first command sets, with its quotes removed and a relative value resolved
@@ -68,7 +70,7 @@ def refuse(construct):
 
 def word(text, i):
     """Read one literal/expanded word, without executing shell text."""
-    start, value, expands = i, [], False
+    start, value, expands, pattern = i, [], False, False
     n = len(text)
     while i < n and text[i] not in " \t\n;&|()<>":
         char = text[i]
@@ -110,8 +112,11 @@ def word(text, i):
             i += 2
         else:
             expands = expands or char == "$"
+            pattern = pattern or char in "*?[{"
             value.append(char)
             i += 1
+    # Assignments are not glob- or brace-expanded; every other word is.
+    expands = expands or (pattern and not ASSIGNMENT.match(text[start:i]))
     return "word", start, i, "".join(value), expands
 
 
@@ -240,7 +245,12 @@ def render_claude(text, session, prefix):
             if expands:
                 refuse("expanded program word")
             if os.path.basename(value) == "claude":
-                options = claude_options(argument[3] for argument in command[position + 1:])
+                arguments = command[position + 1:]
+                if any(argument[4] for argument in arguments):
+                    refuse("shell expansion in a claude argument, which can produce options such as --resume that this check cannot see")
+                options = claude_options(argument[3] for argument in arguments)
+                if "--session-id" in options:
+                    refuse("--session-id in the raw claude command; the confinement profile grants only the session id Firstmate injects")
                 suffix = session
                 if session and options & RESUME_OPTIONS and "--fork-session" not in options:
                     suffix += " --fork-session"

@@ -334,7 +334,7 @@ SH
 # The launch fm-spawn delivers for a measured harness runs inside the generated
 # profile: a model-free stand-in for the harness records what it could do.
 test_measured_harness_launch_runs_confined() {
-  local harness rec id out source_line probe before version session_probe session other
+  local harness rec id out source_line probe before version session_probe session other slug
   local FM_COMPAT_LAUNCH_LOG
   if [ "$(uname -s)" != Darwin ]; then
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
@@ -364,6 +364,10 @@ SH
     session_probe="$HOME_DIR/data/$id/claude-session-probe"
     other=99999999-8888-4777-8666-555555555555
     if [ "$harness" = claude ]; then
+      # An existing 0755 config root: the session folders the spawn creates
+      # are owner-only, and a folder that was already there keeps its mode.
+      mkdir -p "$HOME_DIR/user-home/.claude/unrelated"
+      chmod 755 "$HOME_DIR/user-home/.claude" "$HOME_DIR/user-home/.claude/unrelated"
       write_claude_session_probe "$FAKEBIN_DIR"
       cat >> "$FAKEBIN_DIR/claude" <<SH
 session=
@@ -379,6 +383,12 @@ SH
     out=$(run_settle_spawn "$id")
     expect_code 0 "$?" "confined $harness spawn was refused: $out"
     assert_grep 'write_confinement=seatbelt-v1' "$HOME_DIR/state/$id.meta" "confined $harness coverage absent from metadata"
+    if [ "$harness" = claude ]; then
+      slug=$(cd "$WT_DIR" && pwd -P | sed 's/[^A-Za-z0-9]/-/g')
+      assert_equals '755 755 700 700 700 700 700' "$(cd "$HOME_DIR/user-home/.claude" \
+        && stat -f %Lp . unrelated session-env file-history tasks projects "projects/$slug" | tr '\n' ' ' | sed 's/ $//')" \
+        "the spawn must create the Claude session folders owner-only and leave existing folders unchanged"
+    fi
     assert_present "$FM_COMPAT_LAUNCH_LOG" "spawn did not deliver a $harness launch command"
     source_line=$(cat "$FM_COMPAT_LAUNCH_LOG")
     PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line"
@@ -520,6 +530,8 @@ bodies = [
     ("quoted-substitution-data", "claude --print <<'END'\n$(claude --help) `claude --help`\nEND\n"),
     ("comment", "claude --print <<END # claude --help\nclaude --help\nEND\n"),
     ("option-terminator", "claude -- --resume"),
+    ("quoted-expansion-data", "claude --print '$FLAGS ${X} * [x] {a,b} --session-id x' \"literal \\$HOME\""),
+    ("value-session-id", "claude --append-system-prompt --session-id --print hello"),
 ]
 for label, source in bodies:
     rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
@@ -573,6 +585,13 @@ refusals = [
     ("unterminated here-document", "claude <<END"),
     ("process substitution", "claude <(claude --help)"),
     ("here-string", "claude <<<prompt"),
+    ("--session-id", "claude --session-id 12345678-1234-4234-8234-123456789999 --print hi"),
+    ("--session-id", "claude --print hi --session-id=other"),
+    ("shell expansion", "claude $FLAGS"),
+    ("shell expansion", 'claude --print "$PROMPT"'),
+    ("shell expansion", "claude --model claude-sonnet-5-5[1m]"),
+    ("shell expansion", "claude --print *.md"),
+    ("shell expansion", "claude {--resume,old-id}"),
 ]
 for construct, source in refusals:
     for extra in ([session, ""], ["", ""]):

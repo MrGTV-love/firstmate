@@ -6196,13 +6196,12 @@ if [ "$KIND" != secondmate ]; then
         confinement_claude_root=${confinement_agent:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}
         confinement_claude_dirs=
         if confinement_wt_real=$(cd "$WT" && pwd -P) \
-          && { [ -d "$confinement_claude_root" ] || mkdir -m 700 "$confinement_claude_root"; } \
-          && confinement_claude_mode=$(stat -f %Lp "$confinement_claude_root"); then
+          && { [ -d "$confinement_claude_root" ] || mkdir -m 700 "$confinement_claude_root"; }; then
           confinement_claude_dirs="session-env file-history tasks projects projects/${WT//[^A-Za-z0-9]/-} projects/${confinement_wt_real//[^A-Za-z0-9]/-}"
         fi
         [ -n "$confinement_claude_dirs" ] || { confinement_refuse false "cannot read the Claude config root $confinement_claude_root"; exit 1; }
         for confinement_dir in $confinement_claude_dirs; do
-          [ -d "$confinement_claude_root/$confinement_dir" ] || mkdir -m "$confinement_claude_mode" "$confinement_claude_root/$confinement_dir" \
+          [ -d "$confinement_claude_root/$confinement_dir" ] || mkdir -m 700 "$confinement_claude_root/$confinement_dir" \
             || { confinement_refuse false "cannot create $confinement_claude_root/$confinement_dir for this Claude session"; exit 1; }
         done
       fi
