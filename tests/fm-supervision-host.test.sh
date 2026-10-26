@@ -827,8 +827,7 @@ test_failed_successor_fails_fast() {
   assert_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a failed successor must be reported unverified"
   [ "$(cat "$home/arm-calls")" -eq 2 ] || fail "failed successor: the failed start delayed the close with another attempt"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must still reach main"
-  [ "$(marker_kind "$home")" = downtime ] || fail "failed successor: the close must remain deliverable without a live watcher"
-  pass "host: a successor that reports failure ends the readiness wait at once and leaves its close deliverable"
+  pass "host: a successor that reports failure ends the readiness wait at once"
 }
 
 # The live failure this guards: a main-only pass-through used to exit without

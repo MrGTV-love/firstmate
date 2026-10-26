@@ -1652,6 +1652,7 @@ test_host_boundary_rewakes_with_the_host_line() {
       assert_absent "$dir/state/.watch.lock" "$kind: the fixture must expose delivery without a watcher"
     fi
     expect_code 2 "$status" "$kind: a host cycle boundary must rewake main, including after an empty drain"
+    assert_contains "$out" "firstmate watcher wake - one supervision event needs a handling turn now." "$kind: the host close must carry the wake banner"
     assert_contains "$out" "supervision-host: cycle boundary - fixture" "$kind: the rewake must carry the host's line"
     assert_not_contains "$out" 'auto-arm FAILED' "$kind: a boundary close must use the normal rewake"
     [ ! -e "$dir/state/arm-ran" ] || fail "$kind: an opted-in home ran the plain arm instead of the host"

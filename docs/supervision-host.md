@@ -109,10 +109,10 @@ Only an away record is away: no record, or the record daemon-backed quiet mode w
 The host asks the Pi branch's offer rule (`branchOfferForWake`, through `bin/fm-branch-dispatch.mjs offer`) whether the branch may take the close.
 So a close reaches main off Pi exactly when it would on Pi: a check trigger, a decision-owned signal or stale trigger, and a scan that is unsafe or holds nothing for the branch stay main's.
 On that main-only pass-through the host starts the successor watcher cycle and leaves it running, then prints the close unchanged.
-When the successor start fails, the successor is still starting and so not yet proven live, or any other attended pass-through starts no successor, the host republishes downtime before it prints the close, so a concurrent drain's handling marker cannot leave the re-arm owner refusing a close while no watcher runs.
+When the successor start fails or the successor is still starting, the close still reaches main unchanged; with no healthy watcher, the re-arm owner commits it even when a concurrent drain left the marker in handling.
 A failed start is not retried before the close reaches main.
 That successor, like one a turn hands back at its start (see [Away](#away)), runs in a process group of its own, so the harness tearing down the hook's group after the rewake does not stop it.
-The host leaves the watcher's recovery marker reading downtime, confirming no engine handling handoff; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns the re-arm owner's commit when a concurrent drain changes that phase.
+The host leaves the watcher's recovery marker as it found it, confirming no engine handling handoff; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns the re-arm owner's commit when a concurrent drain changes that phase.
 The session's next park without `--restart` requests a take-over to restore a single host-owned arm; the [host header](../bin/fm-supervision-host.sh) owns successor persistence and cleanup, and the [arm header](../bin/fm-watch-arm.sh) owns take-over eligibility and fallback.
 OpenCode and omp still launch the host with `--restart`, which takes precedence over recorded take-over and lacks its acknowledgement-preserving handover; changing that first-cycle path remains a follow-up.
 The host-off Claude Stop hook's detached handling successor is also unchanged; see [Claude handling successor](watcher-continuity.md#claude-handling-successor).
@@ -232,10 +232,10 @@ The captain row is still durable, and the next drain presents it until it is ack
 
 Every path that cannot finish a wake the engine took hands that wake to main, with one `supervision-host: <why>` line after the close.
 Before handing it back, the host stops its successor cycle, and whenever a successor generation was recorded (confirmed or not), it explicitly republishes downtime for that generation.
-With no recorded successor generation, it republishes downtime whenever a drain left the marker in handling, keeping that generation, so no close it hands to main without a live successor is refused in silence.
+With no recorded successor generation, it leaves the marker as the closed watcher and any drain left it, and an acknowledgement main made meanwhile stays in force; no close it hands to main without a live successor is refused in silence, because the re-arm owner commits a handling-episode close whenever no healthy watcher runs.
 That publication is required even when the successor already exited, because no watcher cleanup remains to make the close deliverable to the arm owner.
 If that publication fails, the hand-back adds a `supervision-host: watcher downtime could not be restored` line and the host exits nonzero.
-Claude delivers an actionable host close through its normal generation-owned rewake even when a concurrent drain leaves the unacknowledged marker in handling, as long as main still has a queued row its drains have not presented, or no healthy watcher runs beside the presenting turn's hold.
+Claude delivers an actionable host close through its normal generation-owned rewake even when a concurrent drain leaves the unacknowledged marker in handling, as long as main still has a queued row its drains have not presented, or no healthy watcher runs, regardless of queued rows or a hold.
 When main's own drain presented every row, the main turn that presented them still holds them, and a healthy watcher runs, the rewake is refused, because that turn holds the close; once that hold is released without an acknowledgement, a later close is delivered once, and a close refused before the release is redelivered by the next Stop firing that takes a new generation; [watcher continuity](watcher-continuity.md#who-presents-queued-wakes-between-turns) owns eligibility and refusal.
 So the owner's next arm starts from the same state as without the host, and the wake stays durable in the queue.
 
