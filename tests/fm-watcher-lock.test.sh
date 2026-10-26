@@ -2382,36 +2382,7 @@ for _ in range(200):
     if state.startswith("Z"): break
     time.sleep(.05)
 else: raise AssertionError("killed child did not stay a zombie")
-import contextlib
-@contextlib.contextmanager
-def blocked_waiter(lock, lib, env):
-    # Reclaim stays blocked only while another live process holds the steal
-    # mutex; the waiter must register and still be waiting after the check.
-    steal = pathlib.Path(str(lock) + ".steal")
-    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" || exit 1; echo ready; IFS= read -r _; fm_lock_release "$2"', "_", str(lib), str(steal)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    waiter = None
-    try:
-        assert holder.stdout.readline().strip() == "ready", "steal mutex holder did not acquire"
-        waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"', "_", str(lib), str(lock)], env=env)
-        target = str(lock.parent.resolve() / lock.name)
-        monitor = pathlib.Path(env["FM_STATE_OVERRIDE"], ".lock-monitor")
-        for _ in range(400):
-            found = False
-            for receipt in monitor.glob("wait.*"):
-                try: fields = receipt.read_text().splitlines()
-                except FileNotFoundError: continue
-                found |= len(fields) >= 2 and fields[0] == str(waiter.pid) and fields[1] == target
-            if found: break
-            assert waiter.poll() is None, "waiter reclaimed instead of blocking"
-            time.sleep(.05)
-        else: raise AssertionError("waiter never registered")
-        yield waiter
-        assert waiter.poll() is None, "waiter stopped blocking during the check"
-    finally:
-        if waiter is not None and waiter.poll() is None:
-            waiter.terminate(); waiter.wait(timeout=30)
-        if holder.poll() is None:
-            holder.stdin.write("release\n"); holder.stdin.flush(); holder.wait(timeout=30)
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
 cases = [
     (".treehouse-project-abc.lock", os.getpid(), 2246, False),
     (".treehouse-project-abc.lock", os.getpid(), 301, False),
@@ -2448,8 +2419,13 @@ try:
         lock = pathlib.Path(d, ".control-task-2.lock"); lock.mkdir()
         (lock / "pid").write_text(f"{dead.pid}\n")
         env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
-        released = '. "$1"; lockdir=$2; fm_pid_alive() { rm -rf "$lockdir"; return 1; }; fm_lock_monitor_check'
-        subprocess.run(["bash", "-c", released, "_", lib, str(lock)], env=env, check=True, timeout=30)
+        released = '''. "$1"; fixture_lock=$2 fixture_owner=$3 fixture_live=$4
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
+fm_lock_monitor_check
+fm_pid_alive() { if [ "$1" = "$fixture_owner" ]; then printf '%s\\n' "$fixture_live" > "$fixture_lock/pid"; return 1; fi; observed_fm_pid_alive "$1"; }
+fm_lock_monitor_check'''
+        with blocked_waiter(lock, lib, env):
+            subprocess.run(["bash", "-c", released, "_", lib, str(lock), str(dead.pid), str(os.getpid())], env=env, check=True, timeout=30)
         assert not pathlib.Path(d, ".wake-queue").exists(), "a released lock was reported dead"
 finally:
     zombie.wait()
@@ -2489,36 +2465,7 @@ for _ in range(200):
 else: raise AssertionError("killed child did not stay a zombie")
 check = '. "$1"; fm_lock_monitor_check'
 unreadable_ps = '. "$1"; ps() { return 1; }; fm_lock_monitor_check'
-import contextlib
-@contextlib.contextmanager
-def blocked_waiter(lock, lib, env):
-    # Reclaim stays blocked only while another live process holds the steal
-    # mutex; the waiter must register and still be waiting after the check.
-    steal = pathlib.Path(str(lock) + ".steal")
-    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" || exit 1; echo ready; IFS= read -r _; fm_lock_release "$2"', "_", str(lib), str(steal)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    waiter = None
-    try:
-        assert holder.stdout.readline().strip() == "ready", "steal mutex holder did not acquire"
-        waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"', "_", str(lib), str(lock)], env=env)
-        target = str(lock.parent.resolve() / lock.name)
-        monitor = pathlib.Path(env["FM_STATE_OVERRIDE"], ".lock-monitor")
-        for _ in range(400):
-            found = False
-            for receipt in monitor.glob("wait.*"):
-                try: fields = receipt.read_text().splitlines()
-                except FileNotFoundError: continue
-                found |= len(fields) >= 2 and fields[0] == str(waiter.pid) and fields[1] == target
-            if found: break
-            assert waiter.poll() is None, "waiter reclaimed instead of blocking"
-            time.sleep(.05)
-        else: raise AssertionError("waiter never registered")
-        yield waiter
-        assert waiter.poll() is None, "waiter stopped blocking during the check"
-    finally:
-        if waiter is not None and waiter.poll() is None:
-            waiter.terminate(); waiter.wait(timeout=30)
-        if holder.poll() is None:
-            holder.stdin.write("release\n"); holder.stdin.flush(); holder.wait(timeout=30)
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
 def observe(name, pid, age, code, waiter=False):
     with tempfile.TemporaryDirectory(prefix="fm-dead-owner-") as d:
         lock = pathlib.Path(d, name); lock.mkdir()
@@ -2528,7 +2475,8 @@ def observe(name, pid, age, code, waiter=False):
         env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_PROC_ROOT_OVERRIDE=os.path.join(d, "missing-proc"))
         env.pop("FM_LOCK_ALARM_SECS", None)
         with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
-            subprocess.run(["bash", "-c", code, "_", lib], env=env, check=True, timeout=30)
+            for _ in range(2 if waiter else 1):
+                subprocess.run(["bash", "-c", code, "_", lib], env=env, check=True, timeout=30)
         queue = pathlib.Path(d, ".wake-queue")
         return queue.read_text().splitlines() if queue.exists() else []
 try:
@@ -2557,36 +2505,7 @@ for _ in range(200):
     if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
     time.sleep(.05)
 else: raise AssertionError("killed child did not stay a zombie")
-import contextlib
-@contextlib.contextmanager
-def blocked_waiter(lock, lib, env):
-    # Reclaim stays blocked only while another live process holds the steal
-    # mutex; the waiter must register and still be waiting after the check.
-    steal = pathlib.Path(str(lock) + ".steal")
-    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" || exit 1; echo ready; IFS= read -r _; fm_lock_release "$2"', "_", str(lib), str(steal)], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    waiter = None
-    try:
-        assert holder.stdout.readline().strip() == "ready", "steal mutex holder did not acquire"
-        waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"', "_", str(lib), str(lock)], env=env)
-        target = str(lock.parent.resolve() / lock.name)
-        monitor = pathlib.Path(env["FM_STATE_OVERRIDE"], ".lock-monitor")
-        for _ in range(400):
-            found = False
-            for receipt in monitor.glob("wait.*"):
-                try: fields = receipt.read_text().splitlines()
-                except FileNotFoundError: continue
-                found |= len(fields) >= 2 and fields[0] == str(waiter.pid) and fields[1] == target
-            if found: break
-            assert waiter.poll() is None, "waiter reclaimed instead of blocking"
-            time.sleep(.05)
-        else: raise AssertionError("waiter never registered")
-        yield waiter
-        assert waiter.poll() is None, "waiter stopped blocking during the check"
-    finally:
-        if waiter is not None and waiter.poll() is None:
-            waiter.terminate(); waiter.wait(timeout=30)
-        if holder.poll() is None:
-            holder.stdin.write("release\n"); holder.stdin.flush(); holder.wait(timeout=30)
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
 try:
     for pid, waiter in ((dead.pid, False), (zombie.pid, True)):
         with tempfile.TemporaryDirectory(prefix="fm-dead-owner-waiter-") as d:
@@ -2594,7 +2513,7 @@ try:
             (lock / "pid").write_text(f"{pid}\n")
             env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
             with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
-                subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
+                subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check; fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
                 assert (lock / "pid").read_text().strip() == str(pid), "the observer reclaimed the lock"
             queue = pathlib.Path(d, ".wake-queue")
             rows = queue.read_text().splitlines() if queue.exists() else []
@@ -2606,6 +2525,83 @@ finally:
     zombie.wait()
 PY
   pass "a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms"
+}
+
+test_dead_owner_alarm_needs_two_checks() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not require two consecutive blocked checks"
+import os, pathlib, select, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
+check = ["bash", "-c", '. "$1"; fm_lock_monitor_check', "_", lib]
+def rows(d):
+    queue = pathlib.Path(d, ".wake-queue")
+    return queue.read_text().splitlines() if queue.exists() else []
+def held(lock, env):
+    holder = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo ready; exec sleep 300', "_", lib, str(lock)], env=env, stdout=subprocess.PIPE, text=True)
+    assert select.select([holder.stdout], [], [], 30)[0] and holder.stdout.readline().strip() == "ready", "holder did not acquire"
+    return holder
+# (a) The owner dies while a waiter is blocked, then the waiter reclaims
+# before the next check: one blocked observation never wakes Main.
+with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+    env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+    lock = pathlib.Path(d, ".control-task-a.lock")
+    owner = held(lock, env)
+    steal = held(pathlib.Path(str(lock) + ".steal"), env)
+    waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo got; exec sleep 300', "_", lib, str(lock)], env=env, stdout=subprocess.PIPE, text=True)
+    try:
+        for _ in range(400):
+            if any(r.read_text().splitlines()[:1] == [str(waiter.pid)] for r in pathlib.Path(d, ".lock-monitor").glob("wait.*") if r.exists()): break
+            time.sleep(.05)
+        else: raise AssertionError("waiter never registered")
+        owner.kill(); owner.wait()
+        subprocess.run(check, env=env, check=True, timeout=30)
+        assert rows(d) == [], "the first blocked observation woke Main"
+        steal.kill(); steal.wait()
+        assert select.select([waiter.stdout], [], [], 30)[0] and waiter.stdout.readline().strip() == "got", "waiter did not reclaim"
+        subprocess.run(check, env=env, check=True, timeout=30)
+        subprocess.run(check, env=env, check=True, timeout=30)
+        assert rows(d) == [], f"a reclaimed lock woke Main: {rows(d)}"
+    finally:
+        for p in (owner, steal, waiter):
+            if p.poll() is None: p.kill(); p.wait()
+# (b) A zombie owner keeps blocking a live waiter: silent on the first check,
+# one wake on the second, nothing more for the same episode.
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+dead = subprocess.Popen(["true"]); dead.wait()
+try:
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-b.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{zombie.pid}\n")
+        with blocked_waiter(lock, lib, env):
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert rows(d) == [], "the first blocked observation woke Main"
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert len(rows(d)) == 1 and " state=Z" in rows(d)[0] and rows(d)[0].endswith(" trigger=dead-owner"), rows(d)
+            subprocess.run(check, env=env, check=True, timeout=30)
+            assert len(rows(d)) == 1, "the same episode woke Main twice"
+    # (c) An owner record that changes after the waiter count is revalidated
+    # before publication, so a replaced owner never publishes the old verdict.
+    with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
+        lock = pathlib.Path(d, ".control-task-c.lock"); lock.mkdir()
+        (lock / "pid").write_text(f"{dead.pid}\n")
+        replaced = """. "$1"; fixture_lock=$2 fixture_waiter=$3 fixture_live=$4
+eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
+fm_lock_monitor_check
+fm_pid_alive() { [ "$1" != "$fixture_waiter" ] || printf '%s\\n' "$fixture_live" > "$fixture_lock/pid"; observed_fm_pid_alive "$1"; }
+fm_lock_monitor_check"""
+        with blocked_waiter(lock, lib, env) as waiter:
+            subprocess.run(["bash", "-c", replaced, "_", lib, str(lock), str(waiter.pid), str(os.getpid())], env=env, check=True, timeout=30)
+        assert rows(d) == [], f"a replaced owner published the old dead verdict: {rows(d)}"
+finally:
+    zombie.wait()
+PY
+  pass "a dead owner alarms only after two consecutive blocked checks, revalidated before publication"
 }
 
 test_long_held_lock_alarm() {
@@ -2896,6 +2892,7 @@ test_lock_alarm_project_and_control_limits
 test_pid_alive_reads_proc_state_without_ps
 test_dead_owner_alarm_names_its_trigger
 test_dead_owner_alarm_requires_blocked_waiter
+test_dead_owner_alarm_needs_two_checks
 test_long_held_lock_alarm
 test_lock_alarm_discovers_foreign_owners
 test_lock_monitor_prunes_finished_waiters

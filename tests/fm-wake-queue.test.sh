@@ -3062,6 +3062,37 @@ lock_wait_pid_is_live() {  # <pid>: running, not a zombie awaiting its parent
   case "$stat" in Z*) return 1 ;; esac
 }
 
+# Diagnostic registration runs after the parent check; it must never recreate a
+# state directory that vanished in between and turn that wait into a success.
+test_lock_wait_diagnostics_never_recreate_a_vanished_parent() {
+  local dir state lock other rc=0
+  dir=$(make_case lock-wait-parent-vanishes)
+  state="$dir/state"
+  lock="$state/.fixture.lock"
+  sleep 300 &
+  other=$!
+  if ! mkdir "$lock" || ! printf '%s\n' "$other" > "$lock/pid"; then
+    kill "$other"
+    fail "could not seed the held lock"
+  fi
+  # shellcheck disable=SC2016 # Expanded by the child shell, not this one.
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-proc-budget.sh" 64 -- bash -c '
+    . "$1"
+    state_dir=$2
+    eval "$(declare -f _fm_lock_monitor_state_to | sed "1s/_fm_lock_monitor_state_to/observed_state_to/")"
+    _fm_lock_monitor_state_to() {
+      [ ! -d "$state_dir" ] || mv "$state_dir" "$state_dir.gone"
+      observed_state_to "$@"
+    }
+    fm_lock_acquire_wait "$3"
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$lock" || rc=$?
+  kill "$other" 2>/dev/null || true
+  wait "$other" 2>/dev/null || true
+  [ "$rc" -ne 0 ] || fail "the wait succeeded in a recreated state directory"
+  [ ! -e "$state" ] || fail "lock-wait diagnostics recreated the vanished state directory"
+  pass "lock-wait diagnostics never recreate a vanished state directory"
+}
+
 test_lock_wait_ends_when_the_lock_directory_is_gone() {
   local dir state lock waiter_pid i rc
   dir=$(make_case lock-wait-parent-gone)
@@ -4262,6 +4293,7 @@ test_self_held_lock_reclaims_instead_of_deadlocking
 test_unremovable_self_held_lock_refuses_without_waiting
 test_unreclaimable_dead_lock_refuses_without_waiting
 test_lock_wait_ends_when_the_lock_directory_is_gone
+test_lock_wait_diagnostics_never_recreate_a_vanished_parent
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
 test_bounded_lock_deadline_holder_release

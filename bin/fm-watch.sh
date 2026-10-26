@@ -85,7 +85,8 @@
 #                          exceeded FM_LOCK_ALARM_SECS; or, with
 #                          trigger=dead-owner, any other lock's owner is a
 #                          zombie (state Z) or gone (state=dead) while a live
-#                          waiter is still blocked on it, at any age
+#                          waiter stays blocked on it across two consecutive
+#                          checks, at any age
 #                          (fm_lock_monitor_check);
 #                          once per ownership episode, observation only
 #                          (bin/fm-wake-lib.sh owns the diagnostic receipts)

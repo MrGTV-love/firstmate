@@ -8,9 +8,9 @@
 # FM_LOCK_ALARM_SECS (positive seconds, default 300; an invalid or zero value
 # warns once and uses 300) is the age limit for the measured fleet-ledger,
 # watcher-down and wake-queue locks; every other lock reports only a dead or
-# zombie owner that still blocks a live waiter (fm_lock_monitor_check). Each
-# ownership episode reports once
-# through a check wake. The observing watcher's own locks and the
+# zombie owner that still blocks a live waiter on two consecutive checks
+# (fm_lock_monitor_check). Each ownership episode reports once through a check
+# wake. The observing watcher's own locks and the
 # process-lifetime singletons state/.watch.lock and state/.supervise-daemon.lock
 # are not reported; a dead or zombie owner of those is still reclaimed.
 # It is an observation threshold, not permission to kill or reclaim anything.
@@ -1501,7 +1501,7 @@ fm_lock_acquire_wait() {
         fm_epoch_seconds_to since
         absolute=$(fm_lock_abs_path "$lockdir") || absolute=$lockdir
         _fm_lock_monitor_state_to monitor_state
-        if mkdir -p "$monitor_state/.lock-monitor"; then
+        if [ -d "$monitor_state/.lock-monitor" ] || mkdir "$monitor_state/.lock-monitor" 2>/dev/null; then
           record=$(mktemp "$monitor_state/.lock-monitor/wait.XXXXXX") || record=''
           [ -z "$record" ] || printf '%s\n%s\n%s\n' "$current" "$absolute" "$since" > "$record"
         fi
@@ -1715,9 +1715,9 @@ _fm_lock_monitor_adopt() {  # <lock>
 #   wake-queue. The 300s threshold leaves over 600x the largest measured hold,
 #   not a claim that all callers finish that fast.
 # - every other lock: a dead or zombie owner that still blocks a live
-#   registered waiter, at any age, never hold age. A dead owner with no live
-#   waiter is not reported: the next acquire reclaims it (decision 011 in the
-#   task report). No measured or computable bound covers them: the primary
+#   registered waiter on two consecutive completed checks, at any age, never
+#   hold age. A dead owner with no live waiter, or one a waiter reclaims
+#   between checks, is not reported (decisions 011 and 012 in the task report). No measured or computable bound covers them: the primary
 #   home's state/.treehouse-project-*.lock.holds records (2026-10-13..26) reach
 #   2246s; control locks (state/.control-<id>.lock, taken by fm-pr-merge,
 #   fm-teardown, fm-spawn, fm-promote, fm-tasks-axi, fm-captain-hold,
@@ -1731,6 +1731,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
   local settle=${1:-} record lock owner pid mtime now age state parent command reason key old identity
   local waiter waiter_pid waiter_lock waiters first='' limit=${FM_LOCK_ALARM_SECS:-300}
   local episodes=$'\n' episodes_loaded=0 marker state_abs='' dead_pid
+  local candidates="$STATE/.lock-monitor/dead-owner-candidates" seen=$'\n' observed=$'\n'
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
   FM_LOCK_MONITOR_UNQUEUED=0
   FM_LOCK_MONITOR_PENDING=''
@@ -1741,7 +1742,15 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     _FM_LOCK_ALARM_WARNED=1
     limit=300
   fi
-  [ -d "$STATE/.lock-monitor" ] || mkdir -p "$STATE/.lock-monitor" || return 1
+  [ -d "$STATE/.lock-monitor" ] || mkdir "$STATE/.lock-monitor" || return 1
+  # Dead-owner candidates from the previous completed check only: an
+  # interrupted or failed check leaves none, so it never counts as a poll.
+  if [ -f "$candidates" ]; then
+    while IFS= read -r key; do
+      [ -z "$key" ] || seen="$seen$key"$'\n'
+    done < "$candidates"
+    rm -f "$candidates"
+  fi
   # Adopt pre-upgrade/foreign-home holds into this diagnostic index only.
   while IFS= read -r -d '' lock; do
     _fm_lock_monitor_adopt "$lock" || return 1
@@ -1822,16 +1831,6 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     fi
     case "$episodes" in *$'\n'"$key"$'\n'*) continue ;; esac
     episodes="$episodes$key"$'\n'
-    state=$(ps -o stat= -p "$pid" 2>/dev/null) || state=unknown
-    read -r state <<< "$state"
-    if [ -n "$dead_pid" ]; then
-      case "$state" in ''|unknown) state=dead ;; esac
-    fi
-    parent=$(ps -o ppid= -p "$pid" 2>/dev/null) || parent=unknown
-    read -r parent <<< "$parent"
-    # comm names the parent executable without copying prompts or credentials
-    # from an arbitrarily large argv into the durable wake queue.
-    command=$(ps -o comm= -p "${parent:-0}" 2>/dev/null) || command=unknown
     waiters=0
     for waiter in "$STATE"/.lock-monitor/wait.*; do
       [ -f "$waiter" ] || continue
@@ -1842,9 +1841,25 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
         waiters=$((waiters + 1))
       fi
     done
-    reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
+    # A dead owner alarms only when the same owner generation blocks a live
+    # waiter on two consecutive completed checks; a reclaim in between clears it.
     if [ -n "$dead_pid" ]; then
       [ "$waiters" -gt 0 ] || continue
+      observed="$observed$key"$'\n'
+      case "$seen" in *$'\n'"$key"$'\n'*) ;; *) continue ;; esac
+    fi
+    state=$(ps -o stat= -p "$pid" 2>/dev/null) || state=unknown
+    read -r state <<< "$state"
+    if [ -n "$dead_pid" ]; then
+      case "$state" in ''|unknown) state=dead ;; esac
+    fi
+    parent=$(ps -o ppid= -p "$pid" 2>/dev/null) || parent=unknown
+    read -r parent <<< "$parent"
+    # comm names the parent executable without copying prompts or credentials
+    # from an arbitrarily large argv into the durable wake queue.
+    command=$(ps -o comm= -p "${parent:-0}" 2>/dev/null) || command=unknown
+    reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
+    if [ -n "$dead_pid" ]; then
       pid=''
       IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
       [ "$pid" = "$dead_pid" ] || continue
@@ -1868,6 +1883,9 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     fi
     [ -n "$first" ] || first=$reason
   done
+  if [ "$observed" != $'\n' ]; then
+    printf '%s' "$observed" > "$candidates.tmp.$$" && mv -f "$candidates.tmp.$$" "$candidates" || return 1
+  fi
   # shellcheck disable=SC2034 # The watcher delivers this already-queued reason.
   FM_LOCK_MONITOR_REASON=$first
 }
