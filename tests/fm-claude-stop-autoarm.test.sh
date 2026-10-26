@@ -1725,7 +1725,7 @@ test_host_handback_carries_every_host_line() {
 # main-only row is still queued. Drive that interleaving with the real queue,
 # grant and drain, rather than manufacturing a handling token in the stub.
 test_host_handback_during_open_handling_commits_normally() {
-  local phase watcher dir out status pid identity drain generation cutoff replay
+  local phase watcher dir out status pid identity drain generation cutoff
   for phase in pending announced downtime; do
     for watcher in absent live; do
       dir=$(make_primary_dir "$TMP_ROOT/host-overlap-$phase-$watcher")
@@ -1787,7 +1787,7 @@ SH
       cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
       FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "overlap acknowledgement failed"
       [ ! -s "$dir/state/.wake-queue" ] || fail "overlap acknowledgement left rows behind"
-      replay=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" >/dev/null 2>&1; status=$?
       expect_code 0 "$status" "an acknowledged host close must not be delivered again"
       [ "$(epoch_outcome "$dir")" = refused ] || fail "acknowledged handback was not refused"
       # Exit 0 is the harness's discard boundary, including buffered stderr.
