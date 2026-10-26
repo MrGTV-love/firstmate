@@ -45,6 +45,8 @@
 #
 # The data directory is FM_DATA_OVERRIDE, else $FM_HOME/data, else the code
 # root's data/ (FM_HOME unset keeps the single-home layout unchanged).
+# Relative FM_HOME, FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE paths are anchored
+# to the caller before changing directory, so ledger writes keep the same home.
 #
 # Refusals (exit 2, nothing run):
 #   - tasks-axi missing from PATH;
@@ -114,6 +116,11 @@ case "${1:-}" in
 esac
 
 CALLER_DIR=$(pwd)
+# These directories are used again after entering the backlog root. Preserve
+# their caller-relative meaning for ledger configuration and state writes too.
+case "$FM_HOME" in /*) ;; *) FM_HOME="$CALLER_DIR/$FM_HOME" ;; esac
+case "${FM_STATE_OVERRIDE:-}" in ''|/*) ;; *) FM_STATE_OVERRIDE="$CALLER_DIR/$FM_STATE_OVERRIDE" ;; esac
+case "${FM_CONFIG_OVERRIDE:-}" in ''|/*) ;; *) FM_CONFIG_OVERRIDE="$CALLER_DIR/$FM_CONFIG_OVERRIDE" ;; esac
 
 absolute_from_caller() {  # <path-value>
   case "$1" in

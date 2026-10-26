@@ -310,15 +310,14 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # 1200000 ms bounds a real lane near 20 minutes, and a new member or a slow
 # path fails the coverage guard instead of quietly stretching the workflow.
 # The 2026-10-26 refresh measured every parallel hint, including the five the
-# fm-lint split had apportioned; the fm-cd-pretool-check hint has since become a
-# scaled estimate that docs/fm-test-portable-shards.md records. Lane 1 is
+# fm-lint split had apportioned. Lane 1 is
 # fm-test-run, fm-lint, fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
 # fm-backend-herdr, fm-arm-pretool-check, fm-brief, fm-grok-harness,
 # fm-send-strict, fm-pi-primary-types, and fm-supervision-instructions;
 # fm-pi-primary-types stays in lane 1 because that is the job that installs the
 # Pi package and the TypeScript compiler it typechecks with. Lane 2 holds the
-# other twenty. Their three-bin packings model at 1030514 ms and 1043313 ms, so
-# the reported parallel_makespan_ms is 1043313 ms, and replaying each run's own
+# other nineteen. Their three-bin packings model at 1030514 ms and 1023089 ms, so
+# the reported parallel_makespan_ms is 1030514 ms, and replaying each run's own
 # durations through that membership puts a real lane between 958965 ms and
 # 1027567 ms. Like the serial target this is packing arithmetic, not an
 # execution timeout.
@@ -422,7 +421,7 @@ family_for_basename() {
     fm-arm-pretool-check.test.sh|fm-ask-user-authority.test.sh|\
     fm-bearings-board.test.sh|\
     fm-brief.test.sh|fm-dod-lib.test.sh|fm-vendor-auth-probe.test.sh|\
-    fm-calm-pi-extension.test.sh|fm-cd-pretool-check.test.sh|\
+    fm-calm-pi-extension.test.sh|\
     fm-classify-decision-key.test.sh|\
     fm-composer-ghost.test.sh|fm-composer-lib.test.sh|\
     fm-crew-state.test.sh|fm-captain-hold-archive.test.sh|fm-captain-hold-cleanup.test.sh|\
@@ -545,7 +544,7 @@ family_for_basename() {
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
     fm-worker-account.test.sh|fm-teamclaude-launch.test.sh|\
     fm-git-strip-ai-trailers.test.sh|\
-    fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
+    fm-home-writes.test.sh|fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
     fm-spawn-acquisition-cleanup.test.sh|\
     fm-spawn-retained-copy.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
@@ -659,7 +658,6 @@ tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-captain-hold-sweep.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-composer-ghost.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-crew-state.test.sh
@@ -699,7 +697,6 @@ tests/fm-captain-hold-keyed-answers.test.sh 350046
 tests/fm-captain-hold-lifecycle.test.sh 509030
 tests/fm-captain-hold-reconcile.test.sh 446667
 tests/fm-captain-hold-sweep.test.sh 494535
-tests/fm-cd-pretool-check.test.sh 66063
 tests/fm-composer-ghost.test.sh 5046
 tests/fm-composer-lib.test.sh 373103
 tests/fm-crew-state.test.sh 251251
@@ -770,7 +767,6 @@ tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-lint-report.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-lint-slots.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
 tests/fm-lint-policy.test.sh

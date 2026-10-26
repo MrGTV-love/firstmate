@@ -2946,8 +2946,8 @@ launch_template() {
   # release that drops this flag fails the launch loudly instead of silently
   # restoring the modal.
   # A secondmate is a firstmate PRIMARY in its own home, and its turn-end guard,
-  # session-start digest, and cd/arm seatbelts are exactly those project hooks
-  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/cd-guard.md), so the
+  # session-start digest, and watcher-arm seatbelt are exactly those project hooks
+  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/arm-pretool-check.md), so the
   # secondmate launch deliberately keeps hooks on.
   codex)
     if [ "$kind" = secondmate ]; then

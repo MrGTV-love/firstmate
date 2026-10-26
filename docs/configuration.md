@@ -484,7 +484,10 @@ If the target is a symlink, the write replaces it with a regular file.
 Linking the code-root copy into the home therefore forks the queue on the first write instead of keeping the copies in sync.
 
 Run every routine Firstmate backlog command through [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh).
-Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
+Like lifecycle transitions, it addresses this home's backlog, archive, and opt-in fleet ledger from any working directory, including a caller-relative `FM_HOME`.
+Changing directories is not the correctness boundary: a bare relative write still addresses the caller's directory, while home-owned entry points resolve their destinations themselves.
+[`tests/fm-home-writes.test.sh`](../tests/fm-home-writes.test.sh) exercises those write paths from a project-like foreign directory, including a negative control reproducing the bare relative-append incident.
+[`tests/fm-tasks-axi.test.sh`](../tests/fm-tasks-axi.test.sh) also covers nested relative homes and caller-relative state/config overrides with the fleet ledger enabled.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
 ## Runtime backend (config/backend / FM_BACKEND)

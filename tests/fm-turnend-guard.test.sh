@@ -798,7 +798,7 @@ test_hook_loop_guard_allows_retry() {
 # exactly like the main primary. This was the guard's proven blind spot: the
 # .fm-secondmate-home marker used to early-exit here, so an overnight secondmate
 # could end a turn with an unsupervised child and sit blind. Removing that marker
-# check makes the guard fire, mirroring the cd-guard.
+# check makes the guard fire.
 test_hook_blocks_in_secondmate_own_home() {
   local dir out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-secondmate")
@@ -1182,7 +1182,6 @@ const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 const contracts = {
   'fm-sessionstart-run.sh': ['SessionStart'],
   'fm-arm-pretool-check.sh': ['PreToolUse'],
-  'fm-cd-pretool-check.sh': ['PreToolUse'],
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
@@ -1283,7 +1282,6 @@ function payloadFor(registration, tool = 'Bash', ordinary = false) {
     last_assistant_message: 'The fleet is being watched.', tool_name: tool,
     tool_input: tool === 'Read' ? { file_path: 'README.md' } : { command: 'cat README.md' } };
   if (!ordinary && registration.target === 'fm-arm-pretool-check.sh') payload.tool_input.command = 'bin/fm-watch-arm.sh &';
-  if (!ordinary && registration.target === 'fm-cd-pretool-check.sh') payload.tool_input.command = 'cd projects/example';
   return payload;
 }
 if (mode === 'contexts') {
@@ -1311,7 +1309,6 @@ if (mode === 'contexts') {
                 assert.ok(result.stdout.includes('bin/fm-session-start.sh'), `${label}: no startup instruction`);
                 break;
               case 'fm-arm-pretool-check.sh':
-              case 'fm-cd-pretool-check.sh':
                 deny(result, label);
                 break;
               case 'fm-host-mirror.sh':
@@ -1387,7 +1384,7 @@ if (mode === 'contexts') {
         }
       }
     }
-    if (['fm-arm-pretool-check.sh', 'fm-cd-pretool-check.sh', 'fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(registration.target)) {
+    if (['fm-arm-pretool-check.sh', 'fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(registration.target)) {
       reset(primary, registration.target, true);
       const before = snapshot(primary);
       silent(invoke(registration, primary, 'native', payloadFor(registration, 'Bash', true)), `${registration.target}/ordinary`);
@@ -1413,15 +1410,13 @@ if (mode === 'contexts') {
       const payload = payloadFor(registration, tool, true);
       if (command !== null) payload.tool_input.command = command;
       const result = invoke(registration, primary, 'native', payload);
-      const expectedDeny = command === 'bin/fm-watch-arm.sh &' && registration.target === 'fm-arm-pretool-check.sh'
-        || command === 'cd projects/example' && registration.target === 'fm-cd-pretool-check.sh';
+      const expectedDeny = command === 'bin/fm-watch-arm.sh &' && registration.target === 'fm-arm-pretool-check.sh';
       if (expectedDeny) {
         deny(result, `${registration.target}/${command}`);
         deniers.push(registration.target);
       } else silent(result, `${registration.target}/${command}`);
     }
-    assert.deepEqual(deniers, command === null || command === 'cat README.md' ? []
-      : [command === 'cd projects/example' ? 'fm-cd-pretool-check.sh' : 'fm-arm-pretool-check.sh'],
+    assert.deepEqual(deniers, command === 'bin/fm-watch-arm.sh &' ? ['fm-arm-pretool-check.sh'] : [],
       `${tool}/${command}: missing, duplicated, or crossed Bash authorization`);
   }
 } else assert.fail(`unknown config consumer mode: ${mode}`);
@@ -1435,7 +1430,7 @@ test_tracked_claude_entries_inert_under_grok() {
 
 test_claude_helper_tools_are_not_intercepted() {
   claude_config_hook_behavior tools
-  pass "Claude tools: helpers excluded, exact Bash/Read surface, both real Bash authorizations retained"
+  pass "Claude tools: helpers excluded, exact Bash/Read surface, watcher-arm denial retained and directory changes allowed"
 }
 
 test_codex_hook_uses_process_pwd_when_payload_cwd_is_outside_root() {
