@@ -18,6 +18,3 @@ graft/.cache/
 /jiti/
 /node-compile-cache/
 .live-lavish-validation/
-
-# graft's local graph cache — regenerable, not committed (run `graft build`).
-/graft/
