@@ -3164,7 +3164,10 @@ case "$ARG3" in
       # A confined launch takes the Claude profile when any command runs claude,
       # so `true && claude ...` cannot start Claude outside it. Text the scanner
       # cannot read (exit 2) refuses; only a proven claude-free command (exit 1)
-      # keeps its first program word.
+      # keeps its first program word. The scanner reads a plain parameter
+      # expansion that only fills an argument and refuses one a command word or
+      # a shell or exec wrapper runs as a program, so an ordinary
+      # `codex --config "${HOME}/x"` launch reaches its own harness.
       if [ "$HARNESS" != claude ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
         raw_runs_claude=0
         python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" || raw_runs_claude=$?

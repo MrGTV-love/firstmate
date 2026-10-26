@@ -13,6 +13,11 @@ quoted data, comments and here-document bodies. Here-documents support literal,
 single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
+A plain parameter expansion ($NAME, ${NAME}) is read as ordinary argument text;
+in a command word, or in text a shell or exec wrapper runs as a program, it
+refuses because it can name a program this check cannot see. Expansion flags,
+a forced pattern and the forced `$~`, `$=` or `$^` forms refuse everywhere,
+because zsh globs such a value and a glob qualifier in it runs a command.
 A claude argument that needs shell expansion ($, unquoted *, ?, a closed
 [...] bracket pattern or brace characters) or that sets its own --session-id refuses too.
 
@@ -32,6 +37,36 @@ import sys
 
 OPERATORS = "\n;&|()"
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+# Words that run the rest of the command as a program instead of passing those
+# words as arguments, so the scanner cannot see what an expansion there names.
+EXECUTING_WRAPPERS = frozenset("""
+    sh bash zsh dash ksh ksh93 mksh ash fish env exec command builtin nohup
+    sudo doas xargs timeout time eval source .
+""".split())
+# Keywords that introduce another command rather than being one: the word after
+# them is still a program word.
+INTRODUCING_KEYWORDS = frozenset("if then else elif fi for while until do done case esac function { } !".split())
+PARAMETER_EXPANSION_REFUSAL = (
+    "parameter expansion where a command word or a shell or exec wrapper runs the text as a program, "
+    "which can name a program this check cannot see"
+)
+PARAMETER_FLAGS_REFUSAL = (
+    "a forced pattern or splitting form, which makes zsh glob the value, so a glob qualifier in it runs a command"
+)
+# A forced-glob, forced-splitting or forced-quoting `$` form.
+FORCED_EXPANSION_START = frozenset("~=^")
+# A `$` starts an expansion only when a name, a positional or special parameter,
+# or a forced form follows it; a bare `$` in an argument stays literal text.
+DOLLAR_EXPANSION_NAMES = frozenset("_@*#?$!-")
+DOLLAR_EXPANSION_START = DOLLAR_EXPANSION_NAMES | FORCED_EXPANSION_START
+
+
+def starts_expansion(text, i):
+    """True when text[i] is a `$` that starts a parameter expansion."""
+    if i + 1 >= len(text):
+        return False
+    follower = text[i + 1]
+    return follower.isalnum() or follower in DOLLAR_EXPANSION_START
 # Claude Code 2.1.310 options whose value is required: its parser takes the next
 # word as that value even when it starts with "-".
 CLAUDE_VALUE_OPTIONS = frozenset("""
@@ -73,18 +108,38 @@ def refuse(construct):
     raise ValueError(f"{construct}; use a named harness or simplify the raw launch to literal shell commands")
 
 
-def word(text, i):
-    """Read one literal/expanded word, without executing shell text."""
+def word(text, i, run_as_command=False):
+    """Read one literal/expanded word, without executing shell text.
+
+    run_as_command marks a word whose expansion a shell would run as a program:
+    the command word itself, or any word of a command a wrapper executes.
+    A plain parameter expansion stays readable only where it merely fills an
+    argument, and a forced pattern or splitting form refuses even there, because
+    zsh turns such a value into a glob whose qualifiers run commands.
+    """
     start, value, expands, pattern, bracket = i, [], False, False, False
     n = len(text)
     while i < n and text[i] not in " \t\n;&|()<>":
         char = text[i]
-        if text.startswith("$(", i) or text.startswith("${", i):
-            refuse("command substitution or braced expansion")
+        if text.startswith("$(", i):
+            refuse("command substitution")
+        if text.startswith("${", i):
+            if run_as_command:
+                refuse(PARAMETER_EXPANSION_REFUSAL)
+            if text[i + 2:i + 3] in ("(", "~", "=", "^"):
+                refuse(PARAMETER_FLAGS_REFUSAL)
+            expands = True
+            value.append("${")
+            i += 2
+            continue
         if char == "`":
             refuse("backtick command substitution")
         if char == "$" and i + 1 < n and text[i + 1] in "'\"":
             refuse("dollar-quoted string")
+        if char == "$" and i + 1 < n and text[i + 1] in FORCED_EXPANSION_START:
+            if run_as_command:
+                refuse(PARAMETER_EXPANSION_REFUSAL)
+            refuse(PARAMETER_FLAGS_REFUSAL)
         if char == "'":
             end = text.find("'", i + 1)
             if end < 0:
@@ -99,10 +154,25 @@ def word(text, i):
                         value.append(text[i + 1])
                     i += 2
                     continue
-                if text.startswith("$(", i) or text.startswith("${", i):
-                    refuse("command substitution or braced expansion in double quote")
+                if text.startswith("$(", i):
+                    refuse("command substitution in double quote")
+                if text.startswith("${", i):
+                    if run_as_command:
+                        refuse(PARAMETER_EXPANSION_REFUSAL)
+                    if text[i + 2:i + 3] in ("(", "~", "=", "^"):
+                        refuse(PARAMETER_FLAGS_REFUSAL)
+                    expands = True
+                    value.append("${")
+                    i += 2
+                    continue
                 if text[i] == "`":
                     refuse("backtick command substitution in double quote")
+                if text[i] == "$" and i + 1 < n and text[i + 1] in FORCED_EXPANSION_START:
+                    if run_as_command:
+                        refuse(PARAMETER_EXPANSION_REFUSAL)
+                    refuse(PARAMETER_FLAGS_REFUSAL)
+                if text[i] == "$" and run_as_command and starts_expansion(text, i):
+                    refuse(PARAMETER_EXPANSION_REFUSAL)
                 expands = expands or text[i] == "$"
                 value.append(text[i])
                 i += 1
@@ -116,6 +186,8 @@ def word(text, i):
                 value.append(text[i + 1])
             i += 2
         else:
+            if char == "$" and run_as_command and starts_expansion(text, i):
+                refuse(PARAMETER_EXPANSION_REFUSAL)
             expands = expands or char == "$"
             # A bracket is a pattern only when a later unquoted ] closes it.
             pattern = pattern or char in "*?{" or (bracket and char == "]")
@@ -123,13 +195,19 @@ def word(text, i):
             value.append(char)
             i += 1
     # Assignments are not glob- or brace-expanded; every other word is.
-    expands = expands or (pattern and not ASSIGNMENT.match(text[start:i]))
+    expands = expands or (pattern and not ASSIGNMENT.match(text, start))
     return "word", start, i, "".join(value), expands
 
 
 def words(text):
-    """Yield executable words/operators, skipping redirections and here-doc data."""
+    """Yield executable words/operators, skipping redirections and here-doc data.
+
+    The command word and the words of a command an executing wrapper runs are
+    parsed as text a shell could run as a program, so an expansion there refuses.
+    """
     i, n, documents = 0, len(text), []
+    program = None
+    executes_text = False
     while i < n:
         if text[i] in " \t":
             i += 1
@@ -144,6 +222,7 @@ def words(text):
         if text[i] == "\n":
             yield "op", i, i + 1, "\n", False
             i += 1
+            program, executes_text = None, False
             for delimiter, strip_tabs, quoted in documents:
                 while True:
                     if i >= n:
@@ -195,12 +274,20 @@ def words(text):
             if text[start:i] in (";;", ";&"):
                 refuse("case control operator")
             yield "op", start, i, text[start:i], False
+            program, executes_text = None, False
             continue
-        token = word(text, i)
+        # Only a leading NAME=value is a shell assignment whose expansion cannot
+        # run anything; after the program word the same shape is an argument, and
+        # an executing wrapper runs it, so the wrapper refusal wins there.
+        assignment_word = program is None and ASSIGNMENT.match(text, i) is not None
+        token = word(text, i, not assignment_word and (program is None or executes_text))
         i = token[2]
         # A numeric fd immediately preceding a redirection is not a program.
         if token[3].isdigit() and i < n and text[i] in "<>":
             continue
+        if not assignment_word and program is None and token[3] not in INTRODUCING_KEYWORDS:
+            program = token[3]
+            executes_text = os.path.basename(program) in EXECUTING_WRAPPERS
         yield token
     if documents:
         refuse("unterminated here-document")

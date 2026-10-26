@@ -711,6 +711,30 @@ for construct, source in refusals:
         assert result.returncode != 0 and result.stdout == "", (construct, extra)
         assert construct in result.stderr and "named harness" in result.stderr, (construct, result.stderr)
     print("ok - raw Claude refuses:", construct)
+# A plain parameter expansion is data when it only fills an argument, and a
+# program the scanner cannot see when a command word or a wrapper runs it.
+scanned = [
+    ("codex --config \"${HOME}/worker.yml\"", 1, "reads a plain argument expansion"),
+    ("codex --config \"${HOME}/x.yml\" && claude --print hi", 0, "still finds a later claude command"),
+    ("claude --settings \"${HOME}/s.json\"", 0, "reads a claude argument expansion"),
+    ("\"$CMD\" --x", 2, "refuses an expanded command word"),
+    ("${CMD} --x", 2, "refuses a braced command word"),
+    ("codex --config \"$(claude -p hi)\"", 2, "refuses a command substitution in an argument"),
+    ("codex --config `claude -p hi`", 2, "refuses a backtick in an argument"),
+    ("sh -c \"${X}\"", 2, "refuses an expansion a shell wrapper runs"),
+    ("sh -c code=\"$CMD\"", 2, "refuses an assignment-shaped wrapper argument expansion"),
+    ("bash -lc \"$X\"", 2, "refuses an expansion a shell wrapper runs"),
+    ("env \"$X\" --print hi", 2, "refuses an expansion env runs as a program"),
+    ("exec claude --settings \"$HOME/s.json\"", 2, "refuses an expansion exec runs as a program"),
+    ("nohup \"$X\" --print hi", 2, "refuses an expansion nohup runs as a program"),
+    ("time \"$CMD\" --x", 2, "refuses an expansion time runs as a program"),
+    ("command \"$X\" --print hi", 2, "refuses an expansion command runs as a program"),
+    ("if [ -n \"$LOCK\" ]; then omp --resume=bare-session; fi", 1, "reads an expansion in a test command"),
+]
+for source, expected, label in scanned:
+    result = subprocess.run([sys.executable, helper, "runs-claude", source], capture_output=True, text=True)
+    assert result.returncode == expected, (label, source, result.returncode, result.stderr)
+    print("ok - raw launch scanner", label + ":", source)
 PY
   expect_code 0 "$?" "raw Claude shell-data or refusal regression failed"
 }
