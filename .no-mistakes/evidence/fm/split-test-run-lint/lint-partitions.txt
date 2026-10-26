@@ -1,0 +1,5 @@
+partition 1of3: 220 files; fm-lint test files: tests/fm-lint-report.test.sh tests/fm-lint-slots.test.sh 
+partition 2of3: 219 files; fm-lint test files: tests/fm-lint-helpers.sh tests/fm-lint-workflows.test.sh 
+partition 3of3: 219 files; fm-lint test files: tests/fm-lint-policy.test.sh tests/fm-lint.test.sh 
+full inventory: 658; union of partitions: 658; duplicates: 0
+partitions are complete and disjoint

@@ -1,0 +1,14 @@
+$ bash tests/fm-lint-policy.test.sh no_such_case
+Unknown test case: no_such_case
+Usage: bash fm-lint-policy.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-lint-slots.test.sh test_pins_an_explicit_version   # registered in policy, not slots
+Unknown test case: test_pins_an_explicit_version
+Usage: bash fm-lint-slots.test.sh [test_function_name ...]
+exit=2
+
+$ bash tests/fm-lint-policy.test.sh test_pins_an_explicit_version test_ci_rejects_explicit_fast_mode
+ok - fm-lint.sh rejects explicit --fast mode in CI
+ok - fm-lint.sh pins an explicit ShellCheck version (0.11.0)
+exit=0

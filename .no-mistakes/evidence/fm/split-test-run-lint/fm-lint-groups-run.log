@@ -1,0 +1,95 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5V55MK2P89DPK8SJGZ9XW98/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-policy.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-report.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - fm-lint.sh rejects explicit --fast mode in CI
+ok - fm-lint.sh --fast catches an ordinary shell lint defect
+ok - fm-lint.sh pins an explicit ShellCheck version (0.11.0)
+ok - ShellCheck installer retries a transient download failure
+ok - ShellCheck installer selects the official archive, URL, and checksum per OS/arch
+ok - ShellCheck installer rejects a wrong checksum
+ok - ShellCheck installer falls back to shasum -a 256 when sha256sum is absent
+ok - ShellCheck installer prefers sha256sum when both hashers are present
+ok - ShellCheck installer rejects an unsupported OS or architecture
+ok - missing ShellCheck fails closed
+ok - fm-lint.sh refuses to lint under a non-pinned ShellCheck version
+ok - fm-lint.sh catches a real lint defect the old no-op gate passed
+ok - fm-lint.sh rejects direct Beads CLI invocations in firstmate core
+ok - fm-lint.sh enforces backend purity for explicit core paths
+ok - fm-lint.sh ignores ambient ShellCheck options
+ok - fm-lint.sh passes a clean fixture
+FM_TEST_END 2026-10-26T04:05:38Z tests/fm-lint-policy.test.sh exit=0 duration_ms=28575 gate_skip=false
+ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention coordinator/scan lock failures warn and run ungated
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry
+ok - SKIP (host cannot enforce the bounded envelope): root deadline kill check
+ok - SKIP (host cannot enforce the bounded envelope): memory-limit death check
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+FM_TEST_END 2026-10-26T04:06:45Z tests/fm-lint-slots.test.sh exit=0 duration_ms=95391 gate_skip=false
+ok - SKIP (host cannot enforce the bounded envelope): fallback deadline check
+ok - explicit memory evidence outranks findings and signal reasons (modes: 0)
+ok - OOM words in a source excerpt or a root path never classify a root as memory
+ok - FM_LINT_REQUIRE_BOUNDS refuses missing enforcement and proceeds when enforceable
+ok - SKIP (host cannot enforce the bounded envelope): pinned memory-envelope check
+ok - the roots sidecar and telemetry record the run's final exit status
+ok - the retained sidecar records each root's lifecycle with a mode, reason, and duration
+ok - jointly sourced dispatcher, adapter, production-owner, and test-local diagnostics preserve parity
+ok - CI=true checks the complete uncached inventory even with an empty diff
+ok - fm-lint.sh forces a full lint when HEAD is on main
+ok - fm-lint.sh explicit paths bypass changed-file mode selection
+ok - an explicit leading-dash root retains real ShellCheck findings
+ok - fm-lint.sh exits 0 with a note when the local branch has no changed lint targets
+ok - fm-lint.sh CI keeps source following without the local exclusion list
+ok - fm-lint.sh on main keeps source following without the local exclusion list
+ok - fm-lint.sh without a merge-base keeps source following without the local exclusion list
+ok - fm-lint.sh explicit paths keep source following
+FM_TEST_END 2026-10-26T04:07:22Z tests/fm-lint-report.test.sh exit=0 duration_ms=132478 gate_skip=false
+ok - inert quoted programs, prose, comments, conditionals, and heredocs are not imports
+ok - child-shell positional imports and executable substitutions govern selection and cache inputs
+ok - executable stdin imports select direct and transitive callers and invalidate reusable closures
+ok - command-string, script-file, and non-stdin heredocs remain import data
+ok - production fixture stdin helper imports select callers and never authorize stale reuse
+ok - production nested source words reuse results and the real pending-reply closure invalidates on adapter sources
+ok - unresolved runtime sources select possible direct and transitive callers
+ok - unproved transitive runtime closures never reuse successful analysis
+ok - source spellings and command prefixes retain changed/cached dataflow findings
+ok - joint-source calls retain SC2119 in explicit, changed, cold, mutated-cache, and CI modes
+ok - private-source imports retain changed-library call diagnostics across selection and cache modes
+ok - declaration words permit reuse without hiding changed cross-file argument requirements
+ok - a fast-mode success cannot satisfy source-aware extended analysis
+ok - changed and deleted libraries recheck transitive callers with the full diagnostic rules
+ok - selection analyzes unchanged imports only through changed or explicit callers
+ok - each runtime backend change selects every direct and transitive dispatcher consumer
+ok - changes and deletions of every runtime backend invalidate dispatcher and caller caches
+ok - shared cache single-flights identical misses and invalidates sources, binaries and failures
+ok - fm-lint.sh --list-files reports the complete shell inventory
+ok - three canonical lint partitions preserve complete source-aware coverage and reject weakened modes
+ok - canonical partitions balance measured analysis cost rather than equal direct bytes
+FM_TEST_END 2026-10-26T04:09:28Z tests/fm-lint.test.sh exit=0 duration_ms=258525 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=259133
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=4 duration_ms=514969 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-lint.test.sh duration_ms=258525
+FM_TEST_SLOWEST rank=2 script=tests/fm-lint-report.test.sh duration_ms=132478
+FM_TEST_SLOWEST rank=3 script=tests/fm-lint-slots.test.sh duration_ms=95391
+FM_TEST_SLOWEST rank=4 script=tests/fm-lint-policy.test.sh duration_ms=28575
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5V55MK2P89DPK8SJGZ9XW98/fm-lint-groups-run.json
+exit=0

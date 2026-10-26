@@ -1,0 +1,4 @@
+Function bodies: base tests/fm-lint.test.sh@8c6bb40a vs tests/fm-lint-helpers.sh + 4 groups @f72fa51e (bash declare -f, fm_lint_run excluded as the one new helper)
+functions in base: 143  after split: 143
+$ diff base.fns new.fns
+ALL FUNCTION BODIES IDENTICAL

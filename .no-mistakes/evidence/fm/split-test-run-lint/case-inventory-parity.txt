@@ -1,0 +1,6 @@
+base: test functions called at bottom of tests/fm-lint.test.sh @8c6bb40a:       73
+after split: fm_lint_test_cases loaded in bash from 4 groups, each checked with declare -F:       73
+undefined: 0
+duplicates: 0
+$ diff base_order groups_concatenated_order (fm-lint, policy, slots, report)
+IDENTICAL ORDER

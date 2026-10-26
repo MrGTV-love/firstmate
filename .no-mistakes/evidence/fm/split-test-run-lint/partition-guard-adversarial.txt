@@ -1,0 +1,15 @@
+== clean tree
+PASS: the fm-lint groups are a duplicate-free 73-case cover, each case registered by the file that defines it
+exit=0
+== tamper: register test_pins_an_explicit_version also in fm-lint-slots
+FAIL: tests/fm-lint-slots.test.sh registers test_pins_an_explicit_version but does not define it
+exit=1
+== tamper: drop test_zero_changed_files_exits_clean from fm-lint-report registration
+FAIL: the fm-lint groups register 72 cases, not the 73-case inventory they partition
+exit=1
+== tamper: register an undefined case in fm-lint-policy
+FAIL: tests/fm-lint-policy.test.sh registers test_pins_an_explicit_versionX but does not define it
+exit=1
+== tamper: delete group file tests/fm-lint-report.test.sh
+FAIL: missing fm-lint group file: tests/fm-lint-report.test.sh
+exit=1

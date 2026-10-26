@@ -1,0 +1,23 @@
+$ (scratch clone, one commit touching bin/fm-lint.sh) bin/fm-test-run.sh --list --changed --base HEAD~1 | grep -E 'fm-lint|fm-test-run'
+tests/fm-lint-policy.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-workflows.test.sh
+tests/fm-lint.test.sh
+tests/fm-test-run.test.sh
+
+$ (scratch clone, one commit touching bin/fm-duration-lib.sh) bin/fm-test-run.sh --list --changed --base HEAD~1 | grep -E 'fm-lint|fm-test-run'
+tests/fm-lint.test.sh
+tests/fm-lint-policy.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-test-run.test.sh
+
+$ (scratch clone, one commit touching tests/fm-lint-helpers.sh) bin/fm-test-run.sh --list --changed --base HEAD~1 | grep -E 'fm-lint|fm-test-run'
+tests/fm-lint-policy.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-slots.test.sh
+tests/fm-lint-workflows.test.sh
+tests/fm-lint.test.sh
+tests/fm-test-run.test.sh
+
