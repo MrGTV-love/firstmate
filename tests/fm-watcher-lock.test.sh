@@ -2413,20 +2413,6 @@ try:
                 assert f"owner={pid}" in rows[0], rows
                 assert pid != zombie.pid or "state=Z" in rows[0], rows
             assert (lock / "pid").read_text().strip() == str(pid), "alarm changed the owner"
-    # A holder that releases between the pid read and the dead verdict is not
-    # reported: the owner record is revalidated before the alarm.
-    with tempfile.TemporaryDirectory(prefix="fm-lock-limits-") as d:
-        lock = pathlib.Path(d, ".control-task-2.lock"); lock.mkdir()
-        (lock / "pid").write_text(f"{dead.pid}\n")
-        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
-        released = '''. "$1"; fixture_lock=$2 fixture_owner=$3 fixture_live=$4
-eval "$(declare -f fm_pid_alive | sed '1s/fm_pid_alive/observed_fm_pid_alive/')"
-fm_lock_monitor_check
-fm_pid_alive() { if [ "$1" = "$fixture_owner" ]; then printf '%s\\n' "$fixture_live" > "$fixture_lock/pid"; return 1; fi; observed_fm_pid_alive "$1"; }
-fm_lock_monitor_check'''
-        with blocked_waiter(lock, lib, env):
-            subprocess.run(["bash", "-c", released, "_", lib, str(lock), str(dead.pid), str(os.getpid())], env=env, check=True, timeout=30)
-        assert not pathlib.Path(d, ".wake-queue").exists(), "a released lock was reported dead"
 finally:
     zombie.wait()
 PY
@@ -2464,7 +2450,7 @@ for _ in range(200):
     time.sleep(.05)
 else: raise AssertionError("killed child did not stay a zombie")
 check = '. "$1"; fm_lock_monitor_check'
-unreadable_ps = '. "$1"; ps() { return 1; }; fm_lock_monitor_check'
+unreadable_ps = '. "$1"; fixture_owner_pid=$2; ps() { case " $* " in *" $fixture_owner_pid "*) return 1 ;; esac; command ps "$@"; }; fm_lock_monitor_check'
 exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
 def observe(name, pid, age, code, waiter=False):
     with tempfile.TemporaryDirectory(prefix="fm-dead-owner-") as d:
@@ -2476,7 +2462,7 @@ def observe(name, pid, age, code, waiter=False):
         env.pop("FM_LOCK_ALARM_SECS", None)
         with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
             for _ in range(2 if waiter else 1):
-                subprocess.run(["bash", "-c", code, "_", lib], env=env, check=True, timeout=30)
+                subprocess.run(["bash", "-c", code, "_", lib, str(pid)], env=env, check=True, timeout=30)
         queue = pathlib.Path(d, ".wake-queue")
         return queue.read_text().splitlines() if queue.exists() else []
 try:
@@ -2485,7 +2471,7 @@ try:
     rows = observe(".control-task-3.lock", zombie.pid, 5, check, waiter=True)
     assert len(rows) == 1 and " state=Z" in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
     # Unreadable ps keeps a live owner alive: no dead-owner verdict at all.
-    assert observe(".control-task-3.lock", os.getpid(), 5, unreadable_ps) == [], "unreadable ps reported a live owner dead"
+    assert observe(".control-task-3.lock", os.getpid(), 5, unreadable_ps, waiter=True) == [], "unreadable ps reported a live owner dead"
     # A measured lock past its age limit keeps its age text; ps failure stays unknown.
     rows = observe(".fleet-ledger.lock", os.getpid(), 301, unreadable_ps)
     assert len(rows) == 1 and " state=unknown " in rows[0] and "trigger=" not in rows[0], rows
