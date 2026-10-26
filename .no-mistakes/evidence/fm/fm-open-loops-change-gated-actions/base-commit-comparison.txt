@@ -1,0 +1,45 @@
+
+### BASE 4c4ffde turn 1: three new overdue rows, one deferral each
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/base-turn defer
+OVERDUE rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+kind: deferred
+kind: deferred
+kind: deferred
+ack exit 0
+[exit 0]
+
+### BASE 4c4ffde turn 2: same unchanged rows, zero new actions (old gate)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/base-turn none
+ack exit 0
+[exit 0]
+
+### BASE 4c4ffde turn 3: three more new rows y1-y3, one escalation each
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/base-turn escalate y
+OVERDUE rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+kind: escalated
+kind: escalated
+kind: escalated
+ack exit 0
+[exit 0]
+
+### BASE 4c4ffde turn 4: unchanged rows, zero new actions (old gate refuses: escalations answered only one turn)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/base-turn none
+OVERDUE rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+ack exit 1
+[exit 0]
+
+### NEW 751b8b1 turn: three new rows z1-z3, one escalation each
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/new-esc-turn
+OVERDUE rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+kind: escalated
+kind: escalated
+kind: escalated
+ack exit 0
+[exit 0]
+
+### NEW 751b8b1 next turn: unchanged rows, zero new actions (expect ack pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/turn z
+OVERDUE rows needing action: 
+ack exit 0 in 1s with 0 new actions
+[exit 0]

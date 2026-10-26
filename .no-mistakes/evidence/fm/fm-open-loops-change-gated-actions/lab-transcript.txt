@@ -1,0 +1,787 @@
+
+### S1a: drain the change wake (two new overdue rows)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: unknown (no owner task recorded)",7258,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",7258,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008579	1	check	open-loop-ledger	check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 39681.1793008579.8rnj5M
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S1b: ack before any action (expect refused)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 39681.1793008579.8rnj5M
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: unknown (no owner task recorded)",7265,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",7265,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+[exit 1]
+
+### S1c: escalate row a1
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action d788965ec4aeb8ea56a942f1 escalated --evidence told the captain board a1 needs a route decision
+action: "d788965ec4aeb8ea56a942f1"
+kind: escalated
+[exit 0]
+
+### S1d: defer row b2 once
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 14ae64deb23cdb42434edd69 deferred --evidence owner lane paused by captain --recheck 2026-10-26T15:56:41Z
+action: "14ae64deb23cdb42434edd69"
+kind: deferred
+[exit 0]
+
+### S1e: ack after one action per row (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 39681.1793008579.8rnj5M
+[exit 0]
+
+### S2a: heartbeat republishes unchanged rows (ages grow)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008612
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: unknown (no owner task recorded)",7276,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",7276,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S2b: watcher on unchanged overdue rows (expect no wake; timeout 124)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-wake-lib.sh: line 648: 77537 Terminated: 15          ln -s "$ownerdir" "$lockdir" 2> /dev/null
+[exit 124]
+
+### S2c: wake queue after watcher (expect empty)
+$ cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.wake-queue
+[exit 0]
+
+### S2d: an unrelated wake arrives next turn
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c . bin/fm-wake-lib.sh; fm_wake_append check report "check: board report from a lane"
+[exit 0]
+
+### S2e: drain next turn (expect no OVERDUE block: both rows covered)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+1793008643	2	check	report	check: board report from a lane
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 55476.1793008637.Gx7JpD
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S2f: ack next turn with no new actions (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 55476.1793008637.Gx7JpD
+[exit 0]
+
+### S3a: watcher with FM_OPEN_LOOPS_RESURFACE=5 (expect periodic resurface wake)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch FM_OPEN_LOOPS_RESURFACE=5
+check: open-loop-ledger-resurface (2 overdue assigned obligations; periodic waiting list)
+[exit 0]
+
+### S3b: drain the resurface wake (expect WAITING OPEN WORK list)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+1793008654	3	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (2 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: unknown (no owner task recorded)",7319,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result","escalated, waiting on the captain",{"kind": "escalated", "evidence": "told the captain board a1 needs a route decision", "at_epoch": 1793008601}
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",7319,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result","deferred",{"kind": "deferred", "evidence": "owner lane paused by captain", "at_epoch": 1793008601}
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 88900.1793008654.rwp0kH
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S3c: ack the resurface turn with no new actions (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 88900.1793008654.rwp0kH
+[exit 0]
+
+### S4a: lane resumes: a1 gets an owner task (text change); b2 result rewritten 70 min ago (clock restart, same text)
+$ bash -c echo lane-a1 > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.owner-task; touch -t $(date -v-70M +%Y%m%d%H%M.%S) /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; ls -lT /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox
+total 40
+-rw-r--r--  1 charlesabrooker  staff   7 Oct 26 04:55:36 2026 a1.adapter
+-rw-r--r--  1 charlesabrooker  staff   8 Oct 26 04:57:46 2026 a1.owner-task
+-rw-r--r--  1 charlesabrooker  staff  25 Oct 26 02:55:36 2026 a1.result
+-rw-r--r--  1 charlesabrooker  staff   7 Oct 26 04:55:36 2026 b2.adapter
+-rw-r--r--  1 charlesabrooker  staff  25 Oct 26 03:47:46 2026 b2.result
+[exit 0]
+
+### S4b: heartbeat publishes the changed rows
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008666
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7330,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",4200,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S4c: watcher sees changed evidence (expect open-loop-ledger change wake)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch
+check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+
+### S4d: drain the change wake (expect both changed rows in OVERDUE, no WAITING list)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7333,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",4203,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008668	4	check	open-loop-ledger	check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 1339.1793008668.ehzrLP
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S4e: ack with changed rows and no new action (expect refused)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 1339.1793008668.ehzrLP
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7342,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",4212,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+[exit 1]
+
+### S5a: defer changed b2 (already deferred once before the change; expect accepted: fresh allowance)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 14ae64deb23cdb42434edd69 deferred --evidence waiting for the resumed lane's first CI run --recheck 2026-10-26T15:57:58Z
+action: "14ae64deb23cdb42434edd69"
+kind: deferred
+[exit 0]
+
+### S4f: escalate changed a1
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action d788965ec4aeb8ea56a942f1 escalated --evidence told the captain lane-a1 now owns board a1
+action: "d788965ec4aeb8ea56a942f1"
+kind: escalated
+[exit 0]
+
+### S4g: ack after new actions on changed rows (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 1339.1793008668.ehzrLP
+[exit 0]
+
+### S5b: second deferral of unchanged b2 (expect refused, captain_visible)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 14ae64deb23cdb42434edd69 deferred --evidence still waiting --recheck 2026-10-26T15:57:58Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+
+### S5c: check-actions after refused deferral (expect b2 listed, refused)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",4213,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",true
+[exit 1]
+
+### S5d: escalate b2 after refused deferral
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 14ae64deb23cdb42434edd69 escalated --evidence told the captain b2 is stuck behind the pause
+action: "14ae64deb23cdb42434edd69"
+kind: escalated
+[exit 0]
+
+### S5e: check-actions after escalation (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+### S6a: b2 changes again after refused deferral + escalation (result rewritten 60 min ago)
+$ bash -c touch -t $(date -v-60M +%Y%m%d%H%M.%S) /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result
+[exit 0]
+
+### S6b: heartbeat
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008686
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7350,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3600,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S6c: queue an unrelated wake
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c . bin/fm-wake-lib.sh; fm_wake_append check report "check: lane status"
+[exit 0]
+
+### S6d: drain (expect b2 in OVERDUE, captain_visible false; a1 covered)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3600,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",true
+STANDING (its last action still covers unchanged evidence; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7350,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008686	5	check	report	check: lane status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 15980.1793008686.3iZso5
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S6e: defer changed b2 (expect accepted)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 14ae64deb23cdb42434edd69 deferred --evidence lane resumed; waiting for its new CI run --recheck 2026-10-26T15:58:13Z
+action: "14ae64deb23cdb42434edd69"
+kind: deferred
+[exit 0]
+
+### S6f: ack (expect pass: fresh deferral covers changed work; captain_visible reset)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 15980.1793008686.3iZso5
+[exit 0]
+
+### S6g: stored action for b2
+$ jq .handling.actions["14ae64deb23cdb42434edd69"] /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/open-loops.json
+{
+  "kind": "deferred",
+  "evidence": "lane resumed; waiting for its new CI run",
+  "at_epoch": 1793008693,
+  "sequence": 6,
+  "deferrals": 1,
+  "captain_visible": false,
+  "digest": "f3f41dedd12ac5921a8eb346",
+  "cited": [],
+  "ledger_epoch": 1793008686,
+  "clock_start": 1793005086,
+  "recheck_epoch": 1793030293
+}
+[exit 0]
+
+### S7a: queue an unrelated wake
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c . bin/fm-wake-lib.sh; fm_wake_append check report "check: another lane status"
+[exit 0]
+
+### S7b: drain (both rows covered: no OVERDUE block)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+1793008699	6	check	report	check: another lane status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 26046.1793008699.kkIzIF
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S7c: a new board answer c3 lands (2h old) and the heartbeat publishes it after the drain
+$ bash -c printf 'option c\n' > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; echo lavish > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.adapter; touch -t $(date -v-2H +%Y%m%d%H%M.%S) /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008707
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7371,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3621,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+  "unhandled_board_answer","c3.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7200,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S7d: ack the already-handled wake (expect pass: c3 unpresented)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 26046.1793008699.kkIzIF
+[exit 0]
+
+### S7e: action on unpresented c3 (expect refused: not presented)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action f2ac9d8238ae3cf69cfe0e33 escalated --evidence x
+error: "row has not been presented; run bin/fm-wake-drain.sh first"
+[exit 1]
+
+### S7f: watcher queues the change wake for c3
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch
+check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+
+### S7g: next drain presents c3 in OVERDUE
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7203,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result",false
+STANDING (its last action still covers unchanged evidence; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7374,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3624,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008710	7	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 31733.1793008710.tnun2O
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S7h: ack after c3 is presented (expect refused, c3 listed)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 31733.1793008710.tnun2O
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7211,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result",false
+[exit 1]
+
+### S7i: --digest while c3 is gated (expect a1,b2 listed; c3 absent: in gate instead)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7382,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result","escalated, waiting on the captain",{"kind": "escalated", "evidence": "told the captain lane-a1 now owns board a1", "at_epoch": 1793008678}
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3632,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result","deferred",{"kind": "deferred", "evidence": "lane resumed; waiting for its new CI run", "at_epoch": 1793008693}
+[exit 0]
+
+### S7j: escalate c3
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action f2ac9d8238ae3cf69cfe0e33 escalated --evidence asked the captain where board c3 goes
+action: "f2ac9d8238ae3cf69cfe0e33"
+kind: escalated
+[exit 0]
+
+### S7k: ack (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 31733.1793008710.tnun2O
+[exit 0]
+
+### S8a: captain hold lab-q1 is created in the lab backlog
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-captain-hold.sh hold lab-q1 --reason approve the lab budget --title Lab budget call
+lab-q1
+[exit 0]
+
+### S8b: heartbeat publishes question rows
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008750
+rows[5]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","lab-q1:captain-hold","captain","resolve the captain hold or record its next decision date",4,true,"approve the lab budget"
+  "unanswered_question","lab-q1:default","firstmate","answer or close this question, or record why it no longer applies",3602,true,"needs-decision: lab-q1 asks: approve the lab budget?"
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7414,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3664,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+  "unhandled_board_answer","c3.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7243,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S8c: watcher queues change wake for the two question rows
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch
+signal: /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/lab-q1.status
+[exit 0]
+
+### S8d: drain (expect only the two question rows in OVERDUE)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "eeea2026a6a306a6b9ff52d8","captain","lab-q1:captain-hold","resolve the captain hold or record its next decision date",13,"approve the lab budget",false
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3611,"needs-decision: lab-q1 asks: approve the lab budget?",false
+STANDING (its last action still covers unchanged evidence; no action needed):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7423,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3673,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7252,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008759	9	signal	lab-q1.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/lab-q1.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 66065.1793008759.V0vXgr
+wake annotation: latest wake-EVENT observed at drain, not current state: lab-q1.status: needs-decision [at=1793005148]: lab-q1 asks: approve the lab budget?
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lab-q1 needs-decision: lab-q1 asks: approve the lab budget?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S8e: escalate captain-owned hold row
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action eeea2026a6a306a6b9ff52d8 escalated --evidence budget call sent to the captain
+action: "eeea2026a6a306a6b9ff52d8"
+kind: escalated
+[exit 0]
+
+### S8f: escalate firstmate-owned question bound to captain hold lab-q1
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action af2a5a831056acff8256c87d escalated --evidence budget question is held for the captain --hold lab-q1
+action: "af2a5a831056acff8256c87d"
+kind: escalated
+standing: captain hold lab-q1; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]
+
+### S8g: ack (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 66065.1793008759.V0vXgr
+[exit 0]
+
+### S8h: heartbeat + check-actions while hold is live (expect pass)
+$ bash -c /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat >/dev/null && /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+### S8i: --digest lists the bound question as escalated, waiting on the captain
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[5]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "eeea2026a6a306a6b9ff52d8","captain","lab-q1:captain-hold","resolve the captain hold or record its next decision date",25,"approve the lab budget","escalated, waiting on the captain",{"kind": "escalated", "evidence": "budget call sent to the captain", "at_epoch": 1793008769}
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3623,"needs-decision: lab-q1 asks: approve the lab budget?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "budget question is held for the captain", "at_epoch": 1793008769}
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7435,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result","escalated, waiting on the captain",{"kind": "escalated", "evidence": "told the captain lane-a1 now owns board a1", "at_epoch": 1793008678}
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3685,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result","deferred",{"kind": "deferred", "evidence": "lane resumed; waiting for its new CI run", "at_epoch": 1793008693}
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7264,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain where board c3 goes", "at_epoch": 1793008718}
+[exit 0]
+
+### S8j: the captain answers hold lab-q1 (proof it reached the captain)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-captain-hold.sh answer lab-q1 --decision-file /Users/charlesabrooker/tmp/fm-lab.UgvAtG/data/answers/lab-q1.txt --release
+released: lab-q1
+[exit 0]
+
+### S8k: heartbeat after the answer
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008778
+rows[5]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","lab-q1","firstmate","dispatch the dependency-cleared work",35978,true,""
+  "unanswered_question","lab-q1:default","firstmate","answer or close this question, or record why it no longer applies",3630,true,"needs-decision: lab-q1 asks: approve the lab budget?"
+  "unhandled_board_answer","a1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7442,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result"
+  "unhandled_board_answer","b2.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3692,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result"
+  "unhandled_board_answer","c3.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7271,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S8l: check-actions (expect refused: lab-q1:default returned for firstmate's next action)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3631,"needs-decision: lab-q1 asks: approve the lab budget?",false
+[exit 1]
+
+### S9a: drain turn A
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "24501bade29302f4dc81d32a","firstmate","lab-q1","dispatch the dependency-cleared work",35987,"",false
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3639,"needs-decision: lab-q1 asks: approve the lab budget?",false
+STANDING (its last action still covers unchanged evidence; no action needed):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7451,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3701,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7280,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008787	10	check	report	check: turn A
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 89624.1793008787.7e3M3s
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lab-q1 needs-decision: lab-q1 asks: approve the lab budget?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S9b: escalate lab-q1:default while the backlog is unreadable (expect: hold could not be verified)
+$ bash -c chmod 000 /Users/charlesabrooker/tmp/fm-lab.UgvAtG/data/backlog.md; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action af2a5a831056acff8256c87d escalated --evidence 'asked the captain to confirm the budget answer'; rc=$?; chmod 644 /Users/charlesabrooker/tmp/fm-lab.UgvAtG/data/backlog.md; exit $rc
+action: "af2a5a831056acff8256c87d"
+kind: escalated
+standing: no; the captain hold could not be verified (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-fleet-snapshot.sh: line 474), so this receipt answers only the turn it followed (record it again once the backlog is readable)
+[exit 0]
+
+### S9c: steer-free escalation of the ready_not_started row
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 24501bade29302f4dc81d32a escalated --evidence asked the captain whether to dispatch lab-q1
+action: "24501bade29302f4dc81d32a"
+kind: escalated
+[exit 0]
+
+### S9d: ack turn A (expect pass: unverified escalation answers this turn)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 89624.1793008787.7e3M3s
+[exit 0]
+
+### S9e: drain turn B (expect lab-q1:default back in OVERDUE)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3648,"needs-decision: lab-q1 asks: approve the lab budget?",false
+STANDING (its last action still covers unchanged evidence; no action needed):
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "24501bade29302f4dc81d32a","firstmate","lab-q1","dispatch the dependency-cleared work",35996,"",false
+  "d788965ec4aeb8ea56a942f1","firstmate","a1.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result; owner task: lane-a1",7460,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/a1.result",false
+  "14ae64deb23cdb42434edd69","firstmate","b2.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result; owner task: unknown (no owner task recorded)",3710,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/b2.result",false
+  "f2ac9d8238ae3cf69cfe0e33","firstmate","c3.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result; owner task: unknown (no owner task recorded)",7289,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/c3.result",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793008795	11	check	report	check: turn B
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 97868.1793008796.nysoOR
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lab-q1 needs-decision: lab-q1 asks: approve the lab budget?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S9f: ack turn B with no new action (expect refused)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 97868.1793008796.nysoOR
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "af2a5a831056acff8256c87d","firstmate","lab-q1:default","answer or close this question, or record why it no longer applies",3654,"needs-decision: lab-q1 asks: approve the lab budget?",false
+[exit 1]
+
+### S9g: escalate again with a readable backlog
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action af2a5a831056acff8256c87d escalated --evidence asked the captain to confirm the budget answer
+action: "af2a5a831056acff8256c87d"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation waits on the captain without a hold binding and covers this row only until it changes (name the hold with --hold TASK_ID)
+[exit 0]
+
+### S9h: ack turn B (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 97868.1793008796.nysoOR
+[exit 0]
+
+### S10a: captain goes away (state/.afk); new board answer d4 published; unrelated wake queued
+$ bash -c date +%s > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.afk; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat | grep d4; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c '. bin/fm-wake-lib.sh; fm_wake_append check report "check: lane report while away"'; cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.wake-queue
+  "unhandled_board_answer","d4.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result; owner task: unknown (no owner task recorded)",7200,true,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result"
+1793008833	12	check	report	check: lane report while away
+[exit 0]
+
+### S10b: one real away-daemon durable-wake cycle (drain, handle, forward, ack)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash /Users/charlesabrooker/tmp/fm-drv.zc1S07/daemon-cycle
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S10c: wake queue after daemon cycle (expect empty: daemon acked past the unactioned row)
+$ cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.wake-queue
+[exit 0]
+
+### S10d: daemon escalation buffer (expect d4 forwarded once, plus the wake)
+$ cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.subsuper-escalations
+check: lane report while away
+overdue open work: "6a45fc72ecc2d0d172a7177a","firstmate","d4.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result; owner task: unknown (no owner task recorded)",7202,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result",false
+[exit 0]
+
+### S10e: d4 action record (expect none: daemon writes no receipt)
+$ jq --arg id 6a45fc72ecc2d0d172a7177a .handling.actions[$id] /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/open-loops.json
+null
+[exit 0]
+
+### S10f: firstmate's own check-actions (expect refused: d4 still gated)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "6a45fc72ecc2d0d172a7177a","firstmate","d4.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result; owner task: unknown (no owner task recorded)",7202,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result",false
+[exit 1]
+
+### S10g: second away cycle with d4 unchanged (expect no second forward of d4)
+$ bash -c /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c '. bin/fm-wake-lib.sh; fm_wake_append check report "check: second lane report while away"' && /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash /Users/charlesabrooker/tmp/fm-drv.zc1S07/daemon-cycle 2>/dev/null; echo '--- buffer:'; cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.subsuper-escalations; echo '--- d4 forwards:'; grep -c 'overdue open work: "6a45fc72ecc2d0d172a7177a"' /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.subsuper-escalations; echo '--- queue:'; cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.wake-queue
+--- buffer:
+check: lane report while away
+overdue open work: "6a45fc72ecc2d0d172a7177a","firstmate","d4.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result; owner task: unknown (no owner task recorded)",7202,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/d4.result",false
+check: second lane report while away
+--- d4 forwards:
+1
+--- queue:
+[exit 0]
+
+### S10h: captain returns; firstmate escalates d4; check-actions passes
+$ bash -c rm -f /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.afk; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action 6a45fc72ecc2d0d172a7177a escalated --evidence 'asked the captain where board d4 goes' && /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --check-actions
+action: "6a45fc72ecc2d0d172a7177a"
+kind: escalated
+[exit 0]
+
+### S11a: 58 paused-lane board answers published (like the 2026-10-25 backlog)
+$ bash -c /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat | head -5; jq '[.rows[]|select(.overdue)]|length' /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/open-loops.json
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008855
+rows[64]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+Exception ignored on flushing sys.stdout:
+BrokenPipeError: [Errno 32] Broken pipe
+64
+[exit 0]
+
+### S11b: watcher change wake
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch
+check: open-loop-ledger (64 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+
+### S11c: drain turn 1 (count OVERDUE rows needing action)
+$ bash -c /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/d1.out 2>&1; grep -m1 -A0 '^rows\[' /Users/charlesabrooker/tmp/fm-lab.UgvAtG/d1.out; grep WAKE_ACK /Users/charlesabrooker/tmp/fm-lab.UgvAtG/d1.out
+rows[58]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 66332.1793008856.es6lwh
+[exit 0]
+
+### S11d: turn 1: one action per new row (58 deferrals)
+$ bash -c n=0; for id in cf7f3c296d8800688de76ba7
+7735621af6d7265b74ad4002
+7537000c0cd59b4520ebe990
+bce7553237c1461086535177
+0fc02bc299dbb55c9689d165
+d72c966ebdd9629b0b5f4726
+c4780e3466bee0fc3172598f
+36b085e5a969ebb7fc5c1ec9
+88b1f0dfff57d0c854e72b4a
+f6bbd84ca4cb730fb371c24a
+41efd17ea8d20e4c717c3301
+b9b0a9f2b07b5d6b589973e1
+eb9e273895aba583c6d6a648
+d2f3a68ca3715f9840436d0d
+aabf4bbea299b00f77b0ce5e
+6a3aaa9d4ca6be0cf0f84410
+acd12f9f4bae46faa0ce6dd2
+517ae2be98450f623656b8da
+550dc4e5413253ae8041ae01
+d5391e6d7d1367f34306b8f6
+95ac2f3524e9b2653d69dc6a
+8fab5d4787987c24f4f07a83
+d91f30e265845379b3b25254
+7ace708073286b90cef1d7cb
+29eb5e2a41e0757d11b0bd7d
+40a813929ce5f0523396d44c
+55fb5a800f08951bcd4081aa
+164ab75b7ce7835055bfa05b
+ab2582f0e7c65e4800d20bfd
+f9f8279f57d06a0c1d2f1c13
+a36845958786ef579c541e24
+aef9d3d1dd0fe520d3a33ead
+0f27bbfdb9a61b92b630f857
+3f04919d2e9b28374ac0e680
+37275a2badb922fdd6d048b5
+a4847a1ad199bc8d9227ae73
+c3dd4f8d845f06bb4e18986a
+1ac60c897ecfef2c128ff3b5
+b28382e22c550683814368b0
+9dc2f4f48dff633031b58a8d
+914ce4434dd0d5355589253f
+5d4f000c250fdfc0bba825ec
+f50f3ced46ffaf027d0721a1
+5b28936604747febe95b9080
+44d65dfd0273856711c372ec
+e1911c2c6e6e69f1eca3de2f
+a206d455af8b9050253e80c3
+ffd25347bd11bf01d95e7da6
+d717f3d407cd932374eb2337
+63ea07d858ce54e255aa3186
+48be09fd82e13dc5b6d6ffc5
+859ac94af8a680bf509871d0
+08115994f848c3ec5baf59b4
+e82c54c71267452c066e3bbb
+dfa109af3a8e3100bc288dc4
+5c2997c920881f3e4efba2ad
+45873ba8b2632f6d25210acb
+f102960b4f7f11ea1b9584f0; do /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh action $id deferred --evidence "lane paused by the captain (row $id)" --recheck 2026-10-26T16:01:03Z >/dev/null || exit 1; n=$((n+1)); done; echo recorded $n actions
+bash: -c: line 1: syntax error near unexpected token `7735621af6d7265b74ad4002'
+bash: -c: line 1: `7735621af6d7265b74ad4002'
+[exit 2]
+
+### S11e: turn 1 ack (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 66332.1793008856.es6lwh
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[58]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "cf7f3c296d8800688de76ba7","firstmate","p01.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p01.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p01.result",false
+  "7735621af6d7265b74ad4002","firstmate","p02.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p02.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p02.result",false
+  "7537000c0cd59b4520ebe990","firstmate","p03.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p03.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p03.result",false
+  "bce7553237c1461086535177","firstmate","p04.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p04.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p04.result",false
+  "0fc02bc299dbb55c9689d165","firstmate","p05.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p05.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p05.result",false
+  "d72c966ebdd9629b0b5f4726","firstmate","p06.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p06.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p06.result",false
+  "c4780e3466bee0fc3172598f","firstmate","p07.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p07.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p07.result",false
+  "36b085e5a969ebb7fc5c1ec9","firstmate","p08.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p08.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p08.result",false
+  "88b1f0dfff57d0c854e72b4a","firstmate","p09.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p09.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p09.result",false
+  "f6bbd84ca4cb730fb371c24a","firstmate","p10.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p10.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p10.result",false
+  "41efd17ea8d20e4c717c3301","firstmate","p11.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p11.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p11.result",false
+  "b9b0a9f2b07b5d6b589973e1","firstmate","p12.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p12.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p12.result",false
+  "eb9e273895aba583c6d6a648","firstmate","p13.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p13.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p13.result",false
+  "d2f3a68ca3715f9840436d0d","firstmate","p14.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p14.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p14.result",false
+  "aabf4bbea299b00f77b0ce5e","firstmate","p15.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p15.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p15.result",false
+  "6a3aaa9d4ca6be0cf0f84410","firstmate","p16.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p16.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p16.result",false
+  "acd12f9f4bae46faa0ce6dd2","firstmate","p17.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p17.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p17.result",false
+  "517ae2be98450f623656b8da","firstmate","p18.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p18.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p18.result",false
+  "550dc4e5413253ae8041ae01","firstmate","p19.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p19.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p19.result",false
+  "d5391e6d7d1367f34306b8f6","firstmate","p20.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p20.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p20.result",false
+  "95ac2f3524e9b2653d69dc6a","firstmate","p21.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p21.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p21.result",false
+  "8fab5d4787987c24f4f07a83","firstmate","p22.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p22.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p22.result",false
+  "d91f30e265845379b3b25254","firstmate","p23.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p23.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p23.result",false
+  "7ace708073286b90cef1d7cb","firstmate","p24.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p24.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p24.result",false
+  "29eb5e2a41e0757d11b0bd7d","firstmate","p25.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p25.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p25.result",false
+  "40a813929ce5f0523396d44c","firstmate","p26.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p26.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p26.result",false
+  "55fb5a800f08951bcd4081aa","firstmate","p27.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p27.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p27.result",false
+  "164ab75b7ce7835055bfa05b","firstmate","p28.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p28.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p28.result",false
+  "ab2582f0e7c65e4800d20bfd","firstmate","p29.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p29.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p29.result",false
+  "f9f8279f57d06a0c1d2f1c13","firstmate","p30.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p30.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p30.result",false
+  "a36845958786ef579c541e24","firstmate","p31.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p31.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p31.result",false
+  "aef9d3d1dd0fe520d3a33ead","firstmate","p32.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p32.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p32.result",false
+  "0f27bbfdb9a61b92b630f857","firstmate","p33.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p33.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p33.result",false
+  "3f04919d2e9b28374ac0e680","firstmate","p34.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p34.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p34.result",false
+  "37275a2badb922fdd6d048b5","firstmate","p35.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p35.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p35.result",false
+  "a4847a1ad199bc8d9227ae73","firstmate","p36.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p36.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p36.result",false
+  "c3dd4f8d845f06bb4e18986a","firstmate","p37.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p37.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p37.result",false
+  "1ac60c897ecfef2c128ff3b5","firstmate","p38.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p38.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p38.result",false
+  "b28382e22c550683814368b0","firstmate","p39.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p39.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p39.result",false
+  "9dc2f4f48dff633031b58a8d","firstmate","p40.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p40.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p40.result",false
+  "914ce4434dd0d5355589253f","firstmate","p41.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p41.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p41.result",false
+  "5d4f000c250fdfc0bba825ec","firstmate","p42.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p42.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p42.result",false
+  "f50f3ced46ffaf027d0721a1","firstmate","p43.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p43.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p43.result",false
+  "5b28936604747febe95b9080","firstmate","p44.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p44.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p44.result",false
+  "44d65dfd0273856711c372ec","firstmate","p45.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p45.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p45.result",false
+  "e1911c2c6e6e69f1eca3de2f","firstmate","p46.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p46.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p46.result",false
+  "a206d455af8b9050253e80c3","firstmate","p47.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p47.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p47.result",false
+  "ffd25347bd11bf01d95e7da6","firstmate","p48.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p48.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p48.result",false
+  "d717f3d407cd932374eb2337","firstmate","p49.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p49.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p49.result",false
+  "63ea07d858ce54e255aa3186","firstmate","p50.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p50.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p50.result",false
+  "48be09fd82e13dc5b6d6ffc5","firstmate","p51.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p51.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p51.result",false
+  "859ac94af8a680bf509871d0","firstmate","p52.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p52.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p52.result",false
+  "08115994f848c3ec5baf59b4","firstmate","p53.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p53.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p53.result",false
+  "e82c54c71267452c066e3bbb","firstmate","p54.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p54.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p54.result",false
+  "dfa109af3a8e3100bc288dc4","firstmate","p55.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p55.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p55.result",false
+  "5c2997c920881f3e4efba2ad","firstmate","p56.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p56.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p56.result",false
+  "45873ba8b2632f6d25210acb","firstmate","p57.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p57.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p57.result",false
+  "f102960b4f7f11ea1b9584f0","firstmate","p58.result","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p58.result; owner task: unknown (no owner task recorded)",7208,"/Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/p58.result",false
+[exit 1]
+
+### S11d (retry; the S11e refusal above came from a quoting error in my loop, before any action): turn 1 records one action per new row
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/defer-all
+recorded 58 actions
+[exit 0]
+
+### S11e: turn 1 ack (expect pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 66332.1793008856.es6lwh
+[exit 0]
+
+### S11f: turn 2 with 58+ unchanged overdue rows and zero new actions (expect ack pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/turn 2
+OVERDUE rows needing action: 
+ack exit 0 in 0s with 0 new actions
+[exit 0]
+
+### S11f: turn 3 with 58+ unchanged overdue rows and zero new actions (expect ack pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/turn 3
+OVERDUE rows needing action: 
+ack exit 0 in 0s with 0 new actions
+[exit 0]
+
+### S11f: turn 4 with 58+ unchanged overdue rows and zero new actions (expect ack pass)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/turn 4
+OVERDUE rows needing action: 
+ack exit 0 in 0s with 0 new actions
+[exit 0]
+
+### S12a: G1 coverage, all rows covered
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/g1
+overdue=67 digest=67 gate=0
+missing from both: 0
+in both: 0
+[exit 0]
+
+### S12b: G1 coverage after two rows change (p07 clock restart, p13 owner)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/g1
+Exception ignored on flushing sys.stdout:
+BrokenPipeError: [Errno 32] Broken pipe
+overdue=67 digest=65 gate=2
+missing from both: 0
+in both: 0
+[exit 0]
+
+### S13a: all work resolves (board answers handled, question closed, hold task removed)
+$ bash -c for f in /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/procevent-inbox/*.result; do : > ${f%.result}.handled; done; rm -f /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/lab-q1.status; printf '# Backlog\n\n## In flight\n\n## Ready\n\n## Done\n' > /Users/charlesabrooker/tmp/fm-lab.UgvAtG/data/backlog.md; /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793008966
+rows: []
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S13b: a resurface wake queued just before the rows cleared
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bash -c . bin/fm-wake-lib.sh; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue assigned obligations; periodic waiting list)"
+[exit 0]
+
+### S13c: drain the resurface wake with nothing waiting (expect no WAITING OPEN WORK header)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh
+1793008966	20	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (1 overdue assigned obligations; periodic waiting list)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 20 --recovery-generation 11073.1793008966.c08ncF
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S13d: --digest with nothing waiting (expect empty output)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-open-loops.sh --digest
+[exit 0]
+
+### S13e: ack the empty resurface turn
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/fm bin/fm-wake-drain.sh --ack-through 20 --recovery-generation 11073.1793008966.c08ncF
+[exit 0]
+
+### S13f: watcher with no overdue rows and FM_OPEN_LOOPS_RESURFACE=1 (expect no ledger wake; timeout 124)
+$ /Users/charlesabrooker/tmp/fm-drv.zc1S07/watch FM_OPEN_LOOPS_RESURFACE=1
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VFBWRYAWXVRQN9NZXCRV84/bin/fm-wake-lib.sh: line 648: 46276 Terminated: 15          sleep "$POLL"
+[exit 124]
+
+### S13g: queue and markers after
+$ bash -c cat /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state/.wake-queue; ls -a /Users/charlesabrooker/tmp/fm-lab.UgvAtG/state | grep open-loops
+.open-loops.lock
+open-loops.json
+[exit 0]
