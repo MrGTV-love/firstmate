@@ -124,7 +124,43 @@ SH
       pass "$subject: $evidence"
     done
   done
+  [ "$backend" != omp ] || fm_jev_native_omp_url_reads "$subject" "$lab" "$base"
   [ "$backend" != omp ] || fm_jev_native_omp_pretool "$subject" "$lab" "$base"
+}
+
+# The worker overlay disables omp URL reads, so an ungranted worker's read or grep of a URL fails
+# with omp's own settings error while an ordinary file read still returns the file.
+fm_jev_native_omp_url_reads() {  # <subject> <lab> <provider-base>
+  local subject=$1 lab=$2 base=$3 case_name status request
+  for case_name in read-url grep-url read-file; do
+    rm -rf -- "${lab:?}/home" "${lab:?}/worktree"
+    mkdir -p "$lab/home/config" "$lab/home/state" "$lab/home/data" "$lab/worktree"
+    printf 'TYPESAFE_API_KEY=synthetic-local-only\n' > "$lab/home/.env"
+    printf 'fm-url-read-file-canary\n' > "$lab/worktree/local.txt"
+    case "$case_name" in
+      read-url) jq -n '{phase:"normal",tool:"read",benign:true,args:{path:"https://example.invalid/fm-url-read",i:"Read one URL"}}' ;;
+      grep-url) jq -n '{phase:"normal",tool:"grep",benign:true,args:{pattern:"canary",path:"https://example.invalid/fm-url-read",i:"Search one URL"}}' ;;
+      read-file) jq -n '{phase:"normal",tool:"read",benign:true,args:{path:"local.txt",i:"Read one file"}}' ;;
+    esac > "$lab/scenario.json"
+    : > "$lab/jev.jsonl"
+    : > "$lab/model.jsonl"
+    curl --max-time 10 -fsS -X POST -d '{}' "$base/reset" > /dev/null || fail "$subject: provider reset failed"
+    (cd "$lab/worktree" && HOME="$lab/os-home" PI_CODING_AGENT_DIR="$lab/agent" OMP_SKIP_SETUP=1 \
+      fm_run_timed 90 omp -p "Use the one tool call, then stop." --model native/gpt-6.1-sol --thinking off --no-session \
+      --no-extensions -e "$lab/extension.ts" --config "$ROOT/.omp/fm-worker-overlay.yml" --no-skills --no-rules --no-title --no-lsp --tools read,grep \
+      < /dev/null > "$lab/native.out" 2>&1)
+    status=$?
+    [ "$status" -eq 0 ] || fail "$subject: $case_name native run exited $status: $(cat "$lab/native.out")"
+    request=$(tail -n 1 "$lab/model.jsonl")
+    if [ "$case_name" = read-file ]; then
+      printf '%s' "$request" | grep -qF 'fm-url-read-file-canary' \
+        || fail "$subject: an ordinary file read did not return the file: $(cat "$lab/native.out")"
+    else
+      printf '%s' "$request" | grep -qF 'URL reads are disabled by settings.' \
+        || fail "$subject: $case_name was not refused by the worker overlay: $request"
+    fi
+  done
+  pass "$subject: worker overlay refuses ungranted URL read and grep paths and keeps ordinary file reads"
 }
 
 # omp's tool_call handler is refused by the host after 30 seconds unless the worker overlay raises its deadline,

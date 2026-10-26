@@ -2475,16 +2475,80 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Both integrations enforce only pre-tool checks on write and edit calls; neither screens, annotates or withholds tool results.
+Both integrations enforce only pre-tool checks; neither screens, annotates or withholds tool results.
+Claude's guard runs at the pre-tool boundary for every tool except the shell-command tools `Bash`, `Monitor` and `PowerShell`; omp's runs for every tool call.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Write|Edit` only, so a Claude `Bash` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
-A Claude worker launched before the `Bash` registration was removed keeps its old matcher until it is respawned: its shell calls still get no judgment, but a missing or crashing runtime still stops them.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except the shell-command tools `Bash`, `Monitor` and `PowerShell`, so every other native call passes tool coverage and egress authorization while a Claude `Bash`, `Monitor` or `PowerShell` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+A Claude worker launched with an older matcher keeps it until it is respawned: an old `Bash` registration gives shell calls no judgment, but a missing or crashing runtime still stops them, and an old `Write|Edit` matcher leaves other calls without coverage or egress checks.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
+
+### Tool coverage and outbound calls
+
+[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls.
+An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
+The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry joined with omp's own built-in and hidden tool name lists, so settings-gated tools such as `github` and `ida` and the subagent-only `yield` are checked even when the default registry omits them, and with the tool list in the installed Claude Code init event, reached through a dead local proxy, without submitting a model turn, and proves that adding an unclassified tool fails coverage.
+The Claude probe reads only `init.tools` from an API-key session, not the complete claude.ai signed-in tool inventory.
+The observed signed-in tools `ArtifactCheck`, `ArtifactComments` and `ArtifactData` have explicit `provider` rows requiring a task grant, but are not enumerated by that probe; any other gated tool absent from the probe remains subject to call-time coverage refusal until classified.
+Optional host tools need not be installed for the offline regression; each installed-host portion explicitly skips when its host is absent.
+Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
+Other harnesses remain outside this guard integration.
+
+Native semantic `find`, web search, browser automation and provider-backed tools require a task egress grant before execution.
+Subagent dispatch (omp `task`, Claude `Agent`, `SendMessage` and `Workflow`) is local: it needs no grant, and each tool a subagent then calls meets its own coverage and egress row.
+omp's memory operations `recall`, `reflect`, `memory_edit`, `retain` and `learn` are classified by their effect under the worker's live omp settings, which the generated worker extension reads from omp's own settings registry, so the global configuration, project settings and every `--config` overlay count.
+Only an effect proven local runs without a grant: with `memory.backend: mnemopi` and `mnemopi.noEmbeddings: true`, `recall`, `reflect` and `memory_edit` read or edit the local SQLite store, and `retain` and `learn` are local only when `mnemopi.llmMode` is `none`; a `learn` under `memory.backend: local` appends to a local file.
+A `learn` that carries a `skill` argument has two effects: the guard records the skill write's T5 confinement owner before and independently of memory authorization, then applies the memory backend's provider check to the memory effect.
+Without a grant, a provider-backed memory effect is refused with `destination_class=provider` while retaining `confinement_owner=T5`; a proven-local memory effect is admitted with that same owner.
+A `retain` or `learn` whose `mnemopi.llmMode` is `smol` or `remote` makes an extraction model call, and every `memory.backend: hindsight` operation calls the remote Hindsight API, so each requires a `provider` grant.
+An unreadable setting, another backend, `mnemopi.noEmbeddings` other than `true` or an unrecognized `mnemopi.llmMode` cannot prove a local effect, so the operation also requires a `provider` grant and its refusal names the operation, the effect it could not prove and the grant remedy; a host without live omp settings, such as Claude, proves nothing local.
+These effects were measured in the installed omp 18.12.6 binary; Mnemopi's background auto-recall and auto-retain are session behavior, not tool calls, and this rule does not judge them.
+`xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
+Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
+Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
+omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
+The rule is deterministic and needs neither a model verdict nor a working provider credential.
+Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
+A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
+
+Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
+An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
+Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
+This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
+Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
+
+Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
+A native paid `find` records its deterministic decision even though it has no model classification.
+Local file `read` remains pre-tool unjudged, `bash` receives no model screening, and `write` and `edit` keep credential/path screening.
+This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
+The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
+That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
+omp's `python`, `debug` and `run_experiment` code runners, and `ida`, which runs Python against IDA databases and saves them, have the same effect as `eval` and use the same confinement-owned classification.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), managed-skill writes, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+`manage_skill` and the skill-write effect of `learn` use that owner; skill-bearing `learn` also meets the independent memory-effect rule above.
+A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
+`report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
+A coverage refusal names the refused host tool, states the remedy of a `TOOL_POLICY` row classified by its real effect, notes that `report_issue` and `SendFeedback` never get one, and states that no call was made.
+Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop`, `SubagentHandback` and `StructuredOutput` (which only returns the final structured answer to its caller), are classified `local`.
+omp `think`, `yield`, `checkpoint`, `rewind`, `context_notes` and `new_context` change only the session's own conversation state, so they are also `local`, and omp `ast_grep` shares the `grep` path-search classification.
+Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
+omp `github` reaches GitHub, so a top-level `github` call requires a `remote-storage` grant, and only its read ops (`repo_view`, `file_read`, `search_issues`, `search_prs`, `search_code`, `search_commits`, `search_repos` and `run_watch`, the ops installed omp 18.12.6 approves as reads) can run under it.
+Every other `github` op, including `pr_checkout`, `pr_create`, `pr_push`, an unknown op or a missing op, writes worktrees, branches, git config, refs or the remote, so it is refused under every grant; the refusal names the op and points to git and the no-mistakes pipeline, or `gh-axi` through the shell for reads, and its terminal audit row records `branch=github-write-op` rather than the `branch=egress` of a missing-grant refusal.
+The `xd://github` device write stays refused by the native-device rule under every grant.
+Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
+Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
+The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the native-device rule of the existing `jev-write-path-gate`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for `jev-egress-grant`) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
+The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
+
+### Model policy
 
 Questions and numeric policy are code-owned:
 
@@ -2509,8 +2573,8 @@ Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-
 | --- | --- |
 | `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
 | `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
-| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. |
-| `xd://github` | Refused: its native results return as `write` tool output, which the result screen never inspects, so remote content would reach the worker unscreened. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. |
+| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. No egress grant admits it. |
+| `xd://github` | Refused by the native-device rule: its native results return as `write` tool output; no tool-result screening is active. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. A top-level `github` call instead follows its [tool row](#tool-coverage-and-outbound-calls): read ops need a `remote-storage` grant and the same write ops are refused under every grant. |
 | `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
 | `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
 | Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
@@ -2591,12 +2655,12 @@ Write/edit screening remains mandatory during a provider outage.
 While active, required write/edit judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
 The former shell effect and destructive-intent questions, shell outage denial, read-only shell classifier and `.fm-lab-home` outage admission are retired.
 Shell pre-calls bypass this policy rather than receiving an exception or an allow-list match; write/edit model coverage follows the bounded-write rule above.
-Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool write/edit execution with a stable error type, and no post-tool notice could undo a tool's effects.
+Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop every pre-tool call the guard receives, not only write/edit, with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 
 Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
-They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.
+They perform no guard key lookup or provider request and retain deterministic tool-coverage, egress-grant, path, root, native-device and edit-schema checks.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.

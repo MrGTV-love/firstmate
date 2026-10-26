@@ -354,7 +354,9 @@
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
-#   300-second write and edit judgment budget (docs/configuration.md "Jev guard").
+#   300-second write and edit judgment budget (docs/configuration.md "Jev guard"),
+#   and disables omp URL reads so read and grep never fetch the web; web access
+#   needs a task egress grant for a web-classed tool.
 #   It also sets dev.autoqa false, so workers never upload Auto QA reports.
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
@@ -6234,7 +6236,9 @@ BUSY_GEN=
       # doorbell were retired because they could not withhold anything, so the
       # PostToolUse and UserPromptSubmit registrations are deliberately absent:
       # a registration that the adapter ignores is a dead guard, not coverage.
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
+      # Shell-command tools have no pre-call rule, so Bash, Monitor and
+      # PowerShell start no guard process. Every other tool reaches coverage.
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(?!(Bash|Monitor|PowerShell)\$).*\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
@@ -6495,6 +6499,11 @@ import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-se
 import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 import { appendFileSync, readFileSync } from "node:fs";
 
+// omp resolves its settings modules only for this entry file. They hold the
+// worker's live layered settings for the Jev guard's memory-effect rule; an
+// omp without them leaves the settings unreadable, so memory calls fail closed.
+const ompSetting = await Promise.all([import("@oh-my-pi/pi-coding-agent/config/settings"), import("@oh-my-pi/pi-coding-agent/config/registry")])
+  .then(([{ settings }, { lookup }]) => (id: string) => lookup(id)?.get(settings), () => undefined);
 const notifyTurnEnd = $busy_notify_turnend;
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
@@ -6507,7 +6516,7 @@ export default function (pi: any) {
   const guardContext = $guard_context;
   if (notifyTurnEnd) {
     installTypesafeJudge(pi, guardContext);
-    installJevGuard(pi, guardContext);
+    installJevGuard(pi, { ...guardContext, ompSetting });
     installTaskSessionProof(pi, "$STATE_REAL", "$ID");
     // Secondmates publish their live model through their home-local extension.
     installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
@@ -6822,7 +6831,8 @@ preserve_relaunch_meta() {
     echo "projects=$SECONDMATE_PROJECTS"
   fi
   # Keep relaunch fields before the preserved PR block so monitoring can parse it;
-  # fm_pr_metadata_identity_parse owns the allowed fields following pr=.
+  # fm_pr_metadata_identity_parse owns the allowed fields following pr=, including
+  # a preserved egress= grant that Firstmate appended after the PR was recorded.
   if [ "$SPAWN_CONTROL_PARENT" = 1 ] && [ -n "${FM_CONTROL_RELAUNCH_TX:-}" ]; then
     echo "control_relaunch_tx=$FM_CONTROL_RELAUNCH_TX"
   fi

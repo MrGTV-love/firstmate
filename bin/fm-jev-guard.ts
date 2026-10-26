@@ -4,9 +4,13 @@
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
+import { confinementOwner, egressClass, egressGranted, memoryEgress, refusedGithubOp, toolPolicy } from "./fm-jev-egress.ts";
+import { execFile } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
 import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, SIZE_REFUSAL_NOTICE, withDecisionBudget,
@@ -20,6 +24,8 @@ export interface JevGuardContext extends GuardServiceContext {
   data: string;
   /** Native device admission belongs to the adapter, not the model service. */
   host?: "omp" | "claude";
+  /** The omp worker's live setting values by id, supplied by the generated omp extension; absent on other hosts. */
+  ompSetting?: (id: string) => unknown;
 }
 
 export interface GuardRuntimeContext {
@@ -185,6 +191,10 @@ function credentialShaped(content: string): boolean {
     || /(?<![a-z0-9+.-])[a-z0-9+.-]+:\/\/[^\s/:@?#"'`<>()\[\]{}\\,;|]*:[^\s/@?#"'`<>()\[\]{}\\,;|]{8,}@/i.test(content);
 }
 
+// Central guard decisions go through the shared state/guard-events.jsonl writer.
+const GUARD_EVENT_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "fm-guard-event.sh");
+const runWriter = promisify(execFile);
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -216,66 +226,108 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     return { block: true, reason: `[jev-guard] ${why}${path} ${OUTAGE_POLICY}. ${guidance}` };
   }
 
-  pi.on("tool_call", async (event, ctx) => {
+  const guardEvent = async (guard: string, subject: string, decision: "allow" | "deny", started: number, remainingMs: () => number, sourceOk = true): Promise<void> => {
+    try {
+      await runWriter("bash", [GUARD_EVENT_WRITER, guard, decision, "--session", `${c.task}:${subject}`, "--source-ok", String(sourceOk), "--elapsed-ms", String(Math.round(performance.now() - started))], {
+        env: { PATH: process.env.PATH ?? "/usr/bin:/bin", FM_HOME: c.home,
+          ...(process.env.FM_GUARD_EVENT_LOG ? { FM_GUARD_EVENT_LOG: process.env.FM_GUARD_EVENT_LOG } : {}) },
+        timeout: remainingMs(),
+      });
+    } catch {}
+  };
+
+  pi.on("tool_call", async (event, ctx) => withDecisionBudget(async (remainingMs) => {
+    const started = performance.now();
     const tool = event.toolName;
-    if (tool !== "write" && tool !== "edit") return;
-    return withDecisionBudget(async () => {
-      let result: SystemOneResult | undefined;
-      let trail: Trail = {};
-      const terminal: GuardTerminal = { hook: "tool_call", tool, decision: "allow", enforcement: "pretool_allow",
-        branch: "policy", error_type: null, request_started: false,
-        ...(object(event.input) && typeof event.input.path === "string" ? { refused_path: event.input.path } : {}) };
-      try {
-        const input = object(event.input) ? event.input : {};
-        if (tool === "edit" && (typeof input.path !== "string" || typeof input.new_string !== "string")) {
-          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-            "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it.");
+    const policy = toolPolicy(tool);
+    let result: SystemOneResult | undefined;
+    let trail: Trail = {};
+    const terminal: GuardTerminal = { hook: "tool_call", tool, decision: "allow", enforcement: "pretool_allow",
+      branch: "policy", error_type: null, request_started: false,
+      ...((tool === "write" || tool === "edit") && object(event.input) && typeof event.input.path === "string"
+        ? { refused_path: event.input.path } : {}) };
+    await guardEvent("jev-tool-coverage", tool, policy ? "allow" : "deny", started, remainingMs);
+    if (!policy) {
+      return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
+        `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
+    }
+    try {
+      const confinement_owner = confinementOwner(tool, event.input);
+      if (confinement_owner) terminal.confinement_owner = confinement_owner;
+      const egressStarted = performance.now();
+      const memory = policy.call === "memory" ? memoryEgress(tool, c.ompSetting) : undefined;
+      const destination = memory ? "provider" : egressClass(tool);
+      if (destination) terminal.destination_class = destination;
+      if (tool === "github") {
+        const githubOp = refusedGithubOp(event.input);
+        await guardEvent("jev-github-write-op", githubOp ? "github-write" : "github-read", githubOp ? "deny" : "allow", egressStarted, remainingMs);
+        if (githubOp) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "github-write-op" },
+            `GitHub op ${githubOp} refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made.`,
+            "Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read.");
         }
-        const path = typeof input.path === "string" ? input.path : "";
-        const device = deviceRule(path);
-        if (device) {
-          terminal.branch = "device";
-          const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
-          if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
-          if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
-          if (device.effect === "refused") {
-            let alternative: string | undefined;
-            try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
-            return deny(`${device.reason}.`, alternative);
-          }
-          let admitted = false;
-          try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
-          return admitted ? finishCall(terminal) : deny(device.remedy);
-        }
-        if (!plainPath(path)) {
-          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-            "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block.");
-        }
-        const repo = roots.find((root) => insideRepo(path, root));
-        if (!repo) return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" }, `outside the repo: ${path}`);
-        if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
-        const content = tool === "edit" ? input.new_string : input.content;
-        if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-        const { pieces, ...coverage } = service.planWrite({ path, content }, WRITE_QUESTIONS);
-        if (coverage.local_only_bytes > 0 && credentialShaped(content)) {
-          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
-            "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
-        }
-        const settled = settle(await screenParts(pieces, async (piece, judge) => {
-          const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
-          if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
-          return { ...gateWrite({ kind, contains_secret }), risk: contains_secret.noul };
-        }, service), (decision: Gated) => decision.block, (decision) => decision.risk);
-        ({ result, trail } = settled);
-        if ("failure" in settled) throw settled.failure;
-        return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
-          ...(!settled.decision.block ? { write_coverage: coverage } : {}),
-          enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
-      } catch (error) {
-        const error_type = failureType(error);
-        const request_started = result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted);
-        return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type, request_started, result });
       }
-    });
-  });
+      if (destination) {
+        const { granted, sourceOk } = egressGranted(c.state, c.task, destination);
+        await guardEvent("jev-egress-grant", destination, granted ? "allow" : "deny", egressStarted, remainingMs, sourceOk);
+        if (!granted) {
+          return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "egress" },
+            `Missing task egress grant: ${memory ? `memory operation ${JSON.stringify(tool)} ${memory}; ` : ""}request Firstmate authorization for egress=${JSON.stringify([destination])} in state/<task>.meta. No outbound call was made.`);
+        }
+      }
+      if (confinement_owner) return finishCall({ ...terminal, branch: "confinement" });
+      if (policy.call !== "write" && policy.call !== "edit") {
+        return destination ? finishCall({ ...terminal, branch: "egress" }) : undefined;
+      }
+      const input = object(event.input) ? event.input : {};
+      if (tool === "edit" && (typeof input.path !== "string" || typeof input.new_string !== "string")) {
+        return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+          "jev-guard needs omp replace edit mode. Report this configuration problem rather than working around it.");
+      }
+      const path = typeof input.path === "string" ? input.path : "";
+      const device = deviceRule(path);
+      if (device) {
+        terminal.branch = "device";
+        const deny = (reason: string, alternative?: string) => finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny" }, `Device ${JSON.stringify(path)} refused: ${reason}`, alternative);
+        if (tool !== "write" || (c.host ?? "omp") !== "omp") return deny("native devices require omp write, not filesystem edit or a different host. Report this invocation mismatch to Firstmate.");
+        if (device.effect === "unknown") return deny(`${device.reason}. Read the device documentation with read ${path} and report its installed implementation and intended effect to Firstmate so bin/fm-jev-guard.ts can register a measured rule before retrying.`);
+        if (device.effect === "refused") {
+          let alternative: string | undefined;
+          try { alternative = device.alternative?.(input); } catch { /* Unparsed arguments name no alternative. */ }
+          return deny(`${device.reason}.`, alternative);
+        }
+        let admitted = false;
+        try { admitted = device.prove(input, ctx, c.worktree); } catch { /* Missing source or target proof fails closed. */ }
+        return admitted ? finishCall(terminal) : deny(device.remedy);
+      }
+      if (!plainPath(path)) {
+        return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+          "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block.");
+      }
+      const repo = roots.find((root) => insideRepo(path, root));
+      if (!repo) return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" }, `outside the repo: ${path}`);
+      if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
+      const content = tool === "edit" ? input.new_string : input.content;
+      if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
+      const { pieces, ...coverage } = service.planWrite({ path, content }, WRITE_QUESTIONS);
+      if (coverage.local_only_bytes > 0 && credentialShaped(content)) {
+        return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" },
+          "contains a credential-shaped value: the whole write was checked locally; no content was sent for model screening");
+      }
+      const settled = settle(await screenParts(pieces, async (piece, judge) => {
+        const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
+        if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
+        return { ...gateWrite({ kind, contains_secret }), risk: contains_secret.noul };
+      }, service), (decision: Gated) => decision.block, (decision) => decision.risk);
+      ({ result, trail } = settled);
+      if ("failure" in settled) throw settled.failure;
+      return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
+        ...(!settled.decision.block ? { write_coverage: coverage } : {}),
+        enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
+    } catch (error) {
+      const error_type = failureType(error);
+      const request_started = result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted);
+      return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type, request_started, result });
+    }
+  }));
 }

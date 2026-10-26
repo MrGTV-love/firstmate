@@ -14,6 +14,7 @@ The machine-readable registry is `docs/guards/registry.json`.
 It is checked in, reviewed like code, and validated by `bin/fm-guard-lint.sh`.
 The retirement changelog is `docs/guards/retired.json`, owned by the same lint.
 The ratchet allowlist is `docs/guards/lint-allowlist.json`; it may only shrink.
+Guards registered after the audit are named in the registry's `beyond_audit_active` list, so `--counts` keeps the audited population arithmetic exact.
 
 `bin/fm-guard-refcheck.sh` owns the wiring proof: every hook registration
 resolves to a file that exists, every retired guard has zero live references,
@@ -67,7 +68,7 @@ because the captain or the runtime creates them per home.
 7. **Wiring is tested.** Every owner path, test path, and hook registration
    resolves to an existing file; `bin/fm-guard-refcheck.sh` fails the build when
    one does not.
-8. **Every guard emits one event per decision.** An instrumented guard that
+8. **Every Firstmate guard decision point emits one event per decision.** An instrumented guard that
    emits no event, or that never fires across 30 real opportunities, enters the
    cut list at the next threshold. A guard is not exempt because it was hard to
    write.

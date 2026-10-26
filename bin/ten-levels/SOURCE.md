@@ -45,6 +45,9 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 - `tests/level06.test.ts` exercises write threshold boundaries and outside-root refusal.
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
   The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, bounded write planner, coverage accounting, failure normalization and cancellation budgets.
+  Its terminal records also cover every host tool name and deterministic egress/coverage decisions, retaining only the tool's single destination class from the egress policy, never outbound arguments or destinations.
+  Confinement-owned effects record `confinement_owner: T5` before egress authorization, so a compound skill-bearing `learn` retains its write owner even when its memory effect is refused for a missing provider grant.
+  This identifies the launch-time enforcement owner and is not proof that confinement is active.
   The canonical client, write questions and thresholds are unchanged.
   There is no result policy, result request budget or result audit path.
 
@@ -52,14 +55,15 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts` is the single worker pre-tool event entry point and applies deterministic input/root/device checks before model screening.
+- `bin/fm-jev-guard.ts` is the single worker pre-tool event entry point and applies deterministic tool coverage, egress authorization and input/root/device checks before model screening.
+  `bin/fm-jev-egress.ts` owns the tool classifications and each tool's egress row; the operator contract above owns task grants and the table's non-sandbox limits.
   Native device admission uses the adapter context's host (default `omp`, explicitly `claude` in the Claude adapter), not the model service; host identity remains required even without host-specific result budgets.
   It judges every planned write piece with the unchanged level 6 policy; writes pass only when every planned piece passes.
   Its local credential-URL matcher consumes complete scheme-character runs, including punctuation-led runs, so long hyphenated report lines do not repeatedly rescan overlapping suffixes or hide credential URLs.
   Bash pre-calls return without judging effects or destructive intent, planning provider requests, inspecting lab markers, classifying read-only commands or writing audit rows.
   Write/edit refusals record their target and direct an authorized correction; write roots remain worktree, task data and temporary directory only.
   The [operator contract](../../docs/configuration.md#jev-guard) owns enforcement and outage behavior.
-- `bin/fm-jev-guard-claude.ts` forwards actual write/edit input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.
+- `bin/fm-jev-guard-claude.ts` normalizes native tool names, forwards actual input and call identity and maps pre-tool refusal to Claude denial; non-pre-tool events return without output.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
 - `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.

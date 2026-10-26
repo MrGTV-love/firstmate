@@ -92,10 +92,14 @@ export interface GuardServiceContext {
 
 export interface GuardTerminal {
   hook: "tool_call";
-  tool: "write" | "edit";
+  tool: string;
   decision: "allow" | "block" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "outage" | "inactive";
+  branch: "policy" | "deterministic" | "device" | "outage" | "inactive" | "egress" | "coverage" | "confinement" | "github-write-op";
+  /** Policy owner only; not proof that launch-time OS confinement is active. */
+  confinement_owner?: "T5";
+  /** The tool's fixed egress class only; no outbound text or addresses. */
+  destination_class?: string;
   /** Only refused write/edit paths; never command text or content. */
   refused_path?: string;
   /** Unique UTF-8 content bytes, excluding repeated overlap and request framing. */
@@ -120,11 +124,11 @@ export interface GuardService {
   record(terminal: GuardTerminal): void;
 }
 
-export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
+export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), DECISION_MS);
   try {
-    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run);
+    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run, preflightTimeout);
   } finally {
     clearTimeout(timer);
   }
@@ -305,6 +309,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
         cost,
         chunks, planned_chunks: plannedChunks, answers,
+        ...(terminal.destination_class ? { destination_class: terminal.destination_class } : {}),
+        ...(terminal.confinement_owner ? { confinement_owner: terminal.confinement_owner } : {}),
         ...(terminal.write_coverage ? { write_coverage: terminal.write_coverage,
           ...(terminal.write_coverage.local_only_bytes > 0 ? { note: "unscreened remainder: deterministic local rules only" } : {}) } : {}),
       };
