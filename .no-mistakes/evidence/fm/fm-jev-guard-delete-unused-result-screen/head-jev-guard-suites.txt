@@ -1,0 +1,32 @@
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool credential tails and large writes send nothing, audit failure, inactive independence, provider-independent writes and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+ok - actual stalled requests produce a typed service timeout inside the decision budget and before a host deadline
+ok - oversized, unplannable and never-send write content is admitted locally with no request, size refusal or friction event
+ok - private terminal audit keeps admissions, usage and cost certainty without payloads, answers or provider extensions
+FM_TEST_END 2026-10-26T17:19:42Z tests/fm-jev-guard.test.sh exit=0 duration_ms=331243 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5WK7CNQVZRHN2X1PP9947FR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T17:19:42Z tests/fm-retired-jev-omp-result-screen.test.sh family=unclassified expected_gate_skip=none
+✔ T1(a): the recorded omp background-job notice reaches the worker verbatim (0.37375ms)
+✔ T1(d): a worker session records only pre-tool work and sends no result to TypeSafe (0.377167ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2.586083
+ok - T1(a, d): flagged omp output reaches the worker unchanged; the session audits only pre-tool work, with no omp_replace row and no result provider call
+FM_TEST_END 2026-10-26T17:19:52Z tests/fm-retired-jev-omp-result-screen.test.sh exit=0 duration_ms=10604 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5WK7CNQVZRHN2X1PP9947FR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=342549
+FM_TEST_SUMMARY_FAMILY family=unclassified count=2 duration_ms=341847 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard.test.sh duration_ms=331243
+FM_TEST_SLOWEST rank=2 script=tests/fm-retired-jev-omp-result-screen.test.sh duration_ms=10604
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5WK7CNQVZRHN2X1PP9947FR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+bash bin/fm-test-run.sh tests/fm-jev-guard.test.sh  2>&1  18.48s user 38.30s system 16% cpu 5:42.81 total
+tail -30  0.00s user 0.00s system 0% cpu 5:42.81 total

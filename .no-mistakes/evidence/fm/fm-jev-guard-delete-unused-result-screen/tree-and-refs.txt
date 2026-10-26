@@ -1,0 +1,22 @@
+### head aaaf6869e: ls level06
+index.ts
+write-gate.ts
+### git ls-tree head level06
+100644 blob 399e65ac5ed532069d803fd05fe51db07c5a8b66	bin/ten-levels/src/levels/level06/index.ts
+100644 blob e2b4d81b4a6cfcc4bd821dddb2a337ba7b3a9c36	bin/ten-levels/src/levels/level06/write-gate.ts
+### git ls-tree base level06
+100644 blob 7ecf6c0f8a93baa36617e9e257e786e461a065f1	bin/ten-levels/src/levels/level06/bash-gate.ts
+100644 blob 399e65ac5ed532069d803fd05fe51db07c5a8b66	bin/ten-levels/src/levels/level06/index.ts
+100644 blob 4634bb25b277d3f90d7b0d9974e76644e3416f3e	bin/ten-levels/src/levels/level06/result-screen.ts
+100644 blob e2b4d81b4a6cfcc4bd821dddb2a337ba7b3a9c36	bin/ten-levels/src/levels/level06/write-gate.ts
+### diff --name-status base..head
+M	bin/ten-levels/SOURCE.md
+D	bin/ten-levels/src/levels/level06/bash-gate.ts
+D	bin/ten-levels/src/levels/level06/result-screen.ts
+### git grep at base for result-screen.ts|bash-gate (outside the two files)
+790f0ec04:bin/ten-levels/SOURCE.md:17:- `src/levels/level06/bash-gate.ts` (unused)
+790f0ec04:bin/ten-levels/SOURCE.md:40:  `src/levels/level06/result-screen.ts` is unchanged by this ship and unused: no import or call loads it.
+790f0ec04:bin/ten-levels/SOURCE.md:42:  The unchanged vendored `bash-gate.ts` is unused: no imports or calls load it.
+790f0ec04:bin/ten-levels/SOURCE.md:43:  Follow-up task `fm-jev-guard-delete-unused-result-screen` deletes both `result-screen.ts` and `bash-gate.ts`; ship T2 already removed the bash model gate.
+### git grep at head
+(no matches)

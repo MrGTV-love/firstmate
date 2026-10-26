@@ -1,0 +1,42 @@
+Live drive of base-790f0ec04/bin/fm-jev-guard-hook.sh; level06 files: bash-gate.ts index.ts result-screen.ts write-gate.ts 
+
+### Write outside worktree (/etc/passwd)
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: /etc/passwd Refused path: \"/etc/passwd\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+stderr=
+
+### Edit outside worktree (/etc/hosts)
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: /etc/hosts Refused path: \"/etc/hosts\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+stderr=
+
+### Write via .. escape
+exit=0
+stdout=
+stderr=
+
+### Write to worktree root itself
+exit=0
+stdout=
+stderr=
+
+### Write inside worktree
+exit=0
+stdout=
+stderr=
+
+### Read inside worktree
+exit=0
+stdout=
+stderr=
+
+### PostToolUse with injection-looking output (no result screen)
+exit=0
+stdout=
+stderr=
+
+### Malformed payload
+exit=2
+stdout=
+stderr=[jev-guard] Review required: RuntimeExecutionError (exit_status=2). REVIEW_ON_UNAVAILABLE_V1.
+
