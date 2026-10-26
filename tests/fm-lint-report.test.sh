@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# bin/fm-lint.sh's reporting and selection modes: the per-root sidecar, the
-# exit status it reflects, CI and main-branch inputs, explicit paths, an empty
-# diff, and the external-source rules around them.
+# bin/fm-lint.sh's reporting and selection modes: the memory fallback's root
+# deadline, memory evidence over findings and signals, required bounds and the
+# pinned memory limit, the per-root sidecar and the exit status it reflects,
+# seeded joint-source parity, CI and main-branch inputs, explicit paths, an
+# empty diff, and the external-source rules around them.
 # Changed-file selection lives in tests/fm-lint.test.sh; modes and installer
-# refusals in tests/fm-lint-policy.test.sh; host slots and memory in
-# tests/fm-lint-slots.test.sh.
+# refusals in tests/fm-lint-policy.test.sh; host slots, scheduling and
+# memory-limit retry in tests/fm-lint-slots.test.sh.
+# The groups are contiguous slices of the former registration order, so these
+# themes are approximate at the slice edges.
 # Shared fixtures: tests/fm-lint-helpers.sh.
 
 # shellcheck source=tests/fm-lint-helpers.sh

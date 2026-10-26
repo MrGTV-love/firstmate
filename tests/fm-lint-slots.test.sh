@@ -2,10 +2,13 @@
 # bin/fm-lint.sh's host slots and resource bounds: deterministic job
 # completion, the CPU-derived host cap, waiter and admission fairness,
 # cache hits that skip the pool, disabled or failing slot state, per-root
-# deadlines, memory limits and their retry and evidence rules.
+# deadlines, a named memory-limit death and its retry without external sources.
 # Changed-file selection lives in tests/fm-lint.test.sh; modes and installer
-# refusals in tests/fm-lint-policy.test.sh; the sidecar and CI inputs in
+# refusals in tests/fm-lint-policy.test.sh; memory fallback and evidence,
+# required bounds, the sidecar, seeded parity and CI inputs in
 # tests/fm-lint-report.test.sh.
+# The groups are contiguous slices of the former registration order, so these
+# themes are approximate at the slice edges.
 # Shared fixtures: tests/fm-lint-helpers.sh.
 
 # shellcheck source=tests/fm-lint-helpers.sh

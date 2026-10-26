@@ -3,8 +3,11 @@
 # change selects, when cached findings must be invalidated, and the dataflow
 # findings that survive a joint or private source.
 # Modes, installer and policy refusals live in tests/fm-lint-policy.test.sh;
-# host slots, memory and scheduling in tests/fm-lint-slots.test.sh; the
-# sidecar, selection modes and CI inputs in tests/fm-lint-report.test.sh.
+# host slots, scheduling and memory-limit retry in tests/fm-lint-slots.test.sh;
+# memory fallback and evidence, required bounds, the sidecar, seeded parity,
+# selection modes and CI inputs in tests/fm-lint-report.test.sh.
+# The groups are contiguous slices of the former registration order, so these
+# themes are approximate at the slice edges.
 # Shared fixtures: tests/fm-lint-helpers.sh.
 
 # shellcheck source=tests/fm-lint-helpers.sh

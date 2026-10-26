@@ -2,9 +2,12 @@
 # bin/fm-lint.sh's modes and refusals: CI and fast mode, version pins, the
 # installer's platform, checksum and retry behavior, a missing or wrong
 # ShellCheck, and the policy refusals around direct beads and ambient options.
-# Changed-file selection lives in tests/fm-lint.test.sh; host slots, memory and
-# scheduling in tests/fm-lint-slots.test.sh; the sidecar and CI inputs in
+# Changed-file selection lives in tests/fm-lint.test.sh; host slots, scheduling
+# and memory-limit retry in tests/fm-lint-slots.test.sh; memory fallback and
+# evidence, required bounds, the sidecar, seeded parity and CI inputs in
 # tests/fm-lint-report.test.sh.
+# The groups are contiguous slices of the former registration order, so these
+# themes are approximate at the slice edges.
 # Shared fixtures: tests/fm-lint-helpers.sh.
 
 # shellcheck source=tests/fm-lint-helpers.sh
