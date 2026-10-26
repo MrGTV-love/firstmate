@@ -60,8 +60,13 @@ forge/hold check remain mandatory.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama); route prefixes ending in / are dropped. Stored typed family fields
-never decide independence. Uncovered-group refusals name each uncovered family and print a
-recording command; substitute the actual reader, local report and trigger answers.
+never decide independence. Uncovered-group refusals name each uncovered family.
+For known families they print a review recording command; substitute the actual
+reader, local report and trigger answers. A PASS never covers unknown, so an
+unknown-family refusal instead asks for repaired author evidence or prints the
+exact-head captain-word command, whose words must be the captain's actual fresh
+instruction. When every group is covered but the newest reader is unknown, the
+refusal names that reader and prints a known-family reread command.
 verify accepts the newest captain-word only at the exact live head, unless a FAIL
 at that head was appended after it. Any exact-head FAIL blocks regardless of later
 PASS reads until fresh exact-head captain words are recorded. Reviews of other
@@ -424,6 +429,17 @@ def verify(records, rows, head, home, pr, task, base):
             else:
                 target = groups.setdefault(group, [])
                 target.extend(a for a in authors if a not in target)
+    env = f"FM_HOME={shlex.quote(str(home))} FM_STATE_OVERRIDE={shlex.quote(str(state_dir(home)))}"
+
+    def review_command(reader, covered):
+        models = {key: sorted({a["model"] for a in values}) for key, values in groups.items()}
+        return shlex.join([str(BIN / "fm-review-record.py"), "review", "--pr", pr, "--head", head,
+                           "--verdict", "PASS", "--reader-model", reader,
+                           "--author-groups", json.dumps(models, separators=(",", ":")),
+                           "--covered-groups", json.dumps(covered),
+                           "--loosens-deny-allow-list", "no", "--widens-guard", "no",
+                           "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
+
     for group, authors in sorted(groups.items()):
         families = {a["family"] for a in authors}
         readers = set()
@@ -439,17 +455,16 @@ def verify(records, rows, head, home, pr, task, base):
                 readers.add(reader)
         # Every author family needs some reading PASS from a different family.
         uncovered = sorted(f for f in families if f == "unknown" or not readers - {f})
-        if uncovered or unknown_reader:
-            reason = f"model family unknown for {review['reader_model']}; " if unknown_reader else ""
-            models = {key: sorted({a["model"] for a in values}) for key, values in groups.items()}
-            command = shlex.join([str(BIN / "fm-review-record.py"), "review",
-                                  "--pr", pr, "--head", head,
-                                  "--verdict", "PASS", "--reader-model", "OUTSIDE_FAMILY_MODEL",
-                                  "--author-groups", json.dumps(models, separators=(",", ":")),
-                                  "--covered-groups", json.dumps([group]),
-                                  "--loosens-deny-allow-list", "no", "--widens-guard", "no",
-                                  "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
-            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered or sorted(families))}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME={shlex.quote(str(home))} FM_STATE_OVERRIDE={shlex.quote(str(state_dir(home)))} {command}")
+        if not uncovered:
+            continue
+        reason = f"model family unknown for newest reader {review['reader_model']}; " if unknown_reader else ""
+        if "unknown" in uncovered:
+            captain = shlex.join([str(BIN / "fm-review-record.py"), "captain-word", "--pr", pr, "--head", head,
+                                  "--words", "FRESH_CAPTAIN_WORDS"])
+            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered)}; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: {env} {captain}")
+        raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group])}")
+    if unknown_reader:
+        raise RecordError(f"model family unknown for newest reader {review['reader_model']}; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: {env} {review_command('KNOWN_FAMILY_MODEL', sorted(groups))}")
     return "PASS"
 
 

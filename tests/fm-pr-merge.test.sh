@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -40,7 +40,7 @@ CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provi
     db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic'))
 PY
     case "$scenario" in
-      unreadable|config-fallback|changed-config)
+      unreadable|config-fallback|changed-config|unknown-captain-word)
         printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
     esac
     case "$scenario" in
@@ -88,7 +88,10 @@ PY
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
-      unreadable)
+      ship-unknown-reader)
+        record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record covering Claude read'
+        record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null || fail 'record newest unknown-family read' ;;
+      unreadable|unknown-captain-word)
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown pipeline read' ;;
       *)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail "record Claude read for $scenario"
@@ -124,8 +127,34 @@ PY
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
+    if [ "$scenario" = unknown-captain-word ]; then
+      expect_code 1 "$rc" "an unknown pipeline family must refuse every PASS: $(cat "$case_dir/stderr")"
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'unknown group is named accurately'
+      assert_no_grep 'covered-groups' "$case_dir/stderr" 'no PASS recording command is offered for an unknown family'
+      command=$(sed -n 's/.* in place of FRESH_CAPTAIN_WORDS with: //p' "$case_dir/stderr")
+      command=${command%; inspect review-records.jsonl in the PR task home before retrying}
+      [ -n "$command" ] || fail "unknown-family refusal printed no captain-word command: $(cat "$case_dir/stderr")"
+      command=${command//FRESH_CAPTAIN_WORDS/\'Merge PR 9 at this exact head.\'}
+      eval "$command" > "$case_dir/captain.out" 2>&1 || fail "the printed captain-word command failed: $(cat "$case_dir/captain.out")"
+      rc=0
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    if [ "$scenario" = ship-unknown-reader ]; then
+      expect_code 1 "$rc" "an unknown newest reader must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'model family unknown for newest reader mistral-large; every group is covered' "$case_dir/stderr" 'the unknown reader is the named problem'
+      assert_no_grep 'uncovered commit group' "$case_dir/stderr" 'a covered group is not reported as uncovered'
+      command=$(sed -n 's/.*record it with: //p' "$case_dir/stderr")
+      command=${command%; inspect review-records.jsonl in the PR task home before retrying}
+      [ -n "$command" ] || fail "unknown-reader refusal printed no reread command: $(cat "$case_dir/stderr")"
+      printf 'VERDICT: PASS head=%s\nKnown-family reread.\n' "$head" > "$case_dir/reread.md"
+      command=${command//KNOWN_FAMILY_MODEL/claude-opus-5-5}
+      command=${command//LOCAL_READER_REPORT/$case_dir/reread.md}
+      eval "$command" > "$case_dir/reread.out" 2>&1 || fail "the printed reread command failed: $(cat "$case_dir/reread.out")"
+      rc=0
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
