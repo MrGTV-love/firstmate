@@ -36,7 +36,7 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 ## Changed copies: Level 6 policies and service
 
 - `src/levels/level06/index.ts` exports only the lexical write-root helper.
-- `src/levels/level06/write-gate.ts` retains only the lexical root helper and the shared `Decide` type; file-kind and credential questions, thresholds, `GateDecision` and model-call entry points are removed in favor of the per-task Git credential hooks.
+- `src/levels/level06/write-gate.ts` retains only the lexical root helper and the `Decide` type, which no code imports; file-kind and credential questions, thresholds, `GateDecision` and model-call entry points are removed in favor of the per-task Git credential hooks.
 - `tests/level06.test.ts` exercises lexical root admission and the refusal of escapes and the root itself.
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.
   The [operator contract](../../docs/configuration.md#jev-guard) owns its privacy checks, failure normalization and cancellation budgets.
