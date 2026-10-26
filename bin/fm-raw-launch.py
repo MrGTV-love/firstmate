@@ -8,7 +8,10 @@ Usage: fm-raw-launch.py render-claude COMMAND SESSION_ID PREFIX
 A command's program is its first word after leading assignments, or, behind
 a named wrapper (env, command, exec, nohup, time, timeout, nice, caffeinate,
 arch, stdbuf), the word after that wrapper's own options and operands; the -c
-text of sh, bash or zsh is read again by the same rules.
+text of sh, bash or zsh is read again by the same rules. A quoted expansion
+("$T") is one word, so it fills an option value, operand or env assignment the
+way a literal would; an unquoted one can split into any number of words, so a
+program behind it is not decided.
 
 render-claude inserts the session argument after each literal claude program
 word, forks resumed or continued sessions into that id and prefixes only the
@@ -64,6 +67,9 @@ WRAPPERS = {
 }
 ARCH_VALUE_OPTIONS = ("-arch", "-d", "-e")
 SHELLS = ("sh", "bash", "zsh")
+SHELL_VALUE_LONG_OPTIONS = ("--rcfile", "--init-file", "--emulate")
+# What a word's expansion can produce: one word, or any number of words.
+ONE_WORD, SPLITS = 1, 2
 PARAMETER_FLAGS_REFUSAL = (
     "a forced pattern or splitting form, which makes zsh glob the value, so a glob qualifier in it runs a command"
 )
@@ -114,9 +120,11 @@ def word(text, i):
     """Read one literal/expanded word, without executing shell text.
 
     A forced pattern or splitting form refuses, because zsh turns such a value
-    into a glob whose qualifiers run commands.
+    into a glob whose qualifiers run commands. The expansion field is false,
+    ONE_WORD for a quoted expansion, or SPLITS when an unquoted expansion,
+    pattern or "$@" can produce any number of words.
     """
-    start, value, expands, pattern, bracket = i, [], False, False, False
+    start, value, expands, splits, pattern, bracket = i, [], False, False, False, False
     n = len(text)
     while i < n and text[i] not in " \t\n;&|()<>":
         char = text[i]
@@ -125,7 +133,7 @@ def word(text, i):
         if text.startswith("${", i):
             if text[i + 2:i + 3] in ("(", "~", "=", "^"):
                 refuse(PARAMETER_FLAGS_REFUSAL)
-            expands = True
+            expands = splits = True
             value.append("${")
             i += 2
             continue
@@ -155,6 +163,7 @@ def word(text, i):
                     if text[i + 2:i + 3] in ("(", "~", "=", "^"):
                         refuse(PARAMETER_FLAGS_REFUSAL)
                     expands = True
+                    splits = splits or "@" in text[i + 2:text.find("}", i)]
                     value.append("${")
                     i += 2
                     continue
@@ -163,6 +172,7 @@ def word(text, i):
                 if text[i] == "$" and i + 1 < n and text[i + 1] in FORCED_EXPANSION_START:
                     refuse(PARAMETER_FLAGS_REFUSAL)
                 expands = expands or text[i] == "$"
+                splits = splits or text.startswith("$@", i)
                 value.append(text[i])
                 i += 1
             if i >= n:
@@ -176,13 +186,15 @@ def word(text, i):
             i += 2
         else:
             expands = expands or char == "$"
+            splits = splits or char == "$"
             # A bracket is a pattern only when a later unquoted ] closes it.
             pattern = pattern or char in "*?{" or (bracket and char == "]")
             bracket = bracket or char == "["
             value.append(char)
             i += 1
     # Assignments are not glob- or brace-expanded; every other word is.
-    expands = expands or (pattern and not ASSIGNMENT.match(text, start))
+    splits = splits or (pattern and not ASSIGNMENT.match(text, start))
+    expands = SPLITS if splits else ONE_WORD if expands else False
     return "word", start, i, "".join(value), expands
 
 
@@ -304,15 +316,15 @@ def wrapped(name, command, position):
     """Return the position after a named wrapper's own options and operands,
     or None when it takes an option this check does not know."""
     flags, values, operands = WRAPPERS[name]
-    while position < len(command) and not command[position][4]:
-        argument = command[position][3]
-        if argument == "--":
-            position += 1
-            break
-        if name == "env" and (argument == "-" or ASSIGNMENT.match(argument)):
+    while position < len(command):
+        argument, expands = command[position][3], command[position][4]
+        if name == "env" and expands != SPLITS and (argument == "-" or ASSIGNMENT.match(argument)):
             position += 1
             continue
-        if not argument.startswith("-") or argument == "-":
+        if expands or not argument.startswith("-") or argument == "-":
+            break
+        if argument == "--":
+            position += 1
             break
         if name == "arch":
             position += 2 if argument in ARCH_VALUE_OPTIONS else 1
@@ -325,7 +337,7 @@ def wrapped(name, command, position):
                 return None
         position += 1
     if name == "env":
-        while position < len(command) and not command[position][4] and ASSIGNMENT.match(command[position][3]):
+        while position < len(command) and command[position][4] != SPLITS and ASSIGNMENT.match(command[position][3]):
             position += 1
     return position + operands
 
@@ -341,17 +353,19 @@ def shell_text(command, position):
         if argument[:1] not in ("-", "+") or argument in ("-", "+"):
             break
         if argument.startswith("--"):
-            return None
+            position += 2 if argument in SHELL_VALUE_LONG_OPTIONS else 1
+            continue
         reads_text = reads_text or (argument[0] == "-" and "c" in argument)
-        position += 2 if "o" in argument else 1
+        position += 2 if "o" in argument or "O" in argument else 1
     return position if reads_text and position < len(command) else None
 
 
 def program(text, command):
     """Return (position, shell) for the word a command runs as its program, past
     leading assignments, shell keywords and named wrappers; shell is true when
-    that word is a named shell's -c text. An expanded word on the way is that
-    program, because it can name one; (None, False) when none is known."""
+    that word is a named shell's -c text. An expanded word in a program or
+    option position is that program, because it can name one, and so is a
+    skipped word that can split; (None, False) when none is known."""
     position = 0
     while position < len(command) and (ASSIGNMENT.match(text, command[position][1]) or command[position][3] in KEYWORDS):
         position += 1
@@ -364,7 +378,7 @@ def program(text, command):
         if position is None:
             return None, False
         for skipped in range(start, min(position, len(command))):
-            if command[skipped][4]:
+            if command[skipped][4] == SPLITS:
                 return skipped, False
         if name in SHELLS:
             return position, True
@@ -423,7 +437,7 @@ def runs_claude(text):
         elif token[0] == "word":
             command.append(token)
             position, shell = program(text, command)
-            if position is None or command[position][4]:
+            if position is None or command[position][4] == SPLITS:
                 continue
             value = command[position][3]
             if runs_claude(value) if shell else os.path.basename(value) == "claude":

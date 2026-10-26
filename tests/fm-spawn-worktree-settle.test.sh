@@ -832,7 +832,7 @@ for source in (
     "env -i FOO=1 claude --print hi", "command -p claude --print hi", "timeout 3600 claude --print hi", "timeout -k 5 -s TERM 10 claude --print hi", "caffeinate claude --print hi",
     "caffeinate -i claude --print hi", "caffeinate -t 60 -di claude --print hi", "arch -arm64 claude --print hi",
     "arch -x86_64 claude --print hi", "arch -arch arm64 -e A=b claude --print hi", "stdbuf -o0 -e L claude --print hi",
-    "stdbuf -i 0 claude --print hi",
+    "stdbuf -i 0 claude --print hi", "timeout \"$T\" claude --print hi", "env -u \"$V\" A=\"$X\" claude --print hi",
 ):
     rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
     assert rendered == source.replace("claude", "claude" + marker, 1), (source, rendered)
@@ -963,6 +963,18 @@ scanned = [
     ("env -S 'claude --print hi'", 1, "does not find claude behind an env option outside the named list"),
     ("command -v claude", 1, "does not take command -v for a claude run"),
     ("bash script.sh", 1, "does not read a shell script"),
+    ("timeout \"$T\" claude --print hi", 0, "finds claude behind a quoted timeout duration"),
+    ("env A=\"$X\" claude -p hi", 0, "finds claude behind a quoted env assignment"),
+    ("env -u \"$V\" claude -p hi", 0, "finds claude behind a quoted env -u name"),
+    ("nice -n \"$N\" claude -p hi", 0, "finds claude behind a quoted nice value"),
+    ("bash -c \"claude -p $X\"", 0, "finds claude in quoted shell -c text"),
+    ("true && timeout \"$T\" claude --print hi", 0, "finds claude behind a quoted timeout duration after a command"),
+    ("bash --login -c 'claude -p hi'", 0, "finds claude past bash --login"),
+    ("bash --norc -c 'claude -p hi'", 0, "finds claude past bash --norc"),
+    ("bash --noprofile -c 'claude -p hi'", 0, "finds claude past bash --noprofile"),
+    ("bash -O extglob -c 'claude -p hi'", 0, "finds claude past bash -O and its shopt name"),
+    ("timeout $T claude --print hi", 1, "does not decide claude behind an unquoted expansion that can split"),
+    ("env $OPTS claude --print hi", 1, "does not decide claude behind an unquoted env expansion"),
 ]
 for source, expected, label in scanned:
     result = subprocess.run([sys.executable, helper, "runs-claude", source], capture_output=True, text=True)
