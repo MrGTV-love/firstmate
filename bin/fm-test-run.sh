@@ -339,7 +339,7 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # The 2026-10-26 hint refresh keeps twenty-one shards and packs them at
 # serial_max_ms 1183250 ms; replaying the three refresh runs' own per-script
 # durations through that assignment puts the slowest shard between 1168860 ms
-# and 1179209 ms, so the target reads slightly high rather than low for the
+# and 1179209 ms, so the model reads slightly high rather than low for the
 # first time since the hints became measured.
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
