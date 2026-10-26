@@ -1041,14 +1041,14 @@ x_mode_setup() {
   missing=0
   for tool in curl jq; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-      echo "MISSING: $tool (install: $(install_cmd "$tool"))"
+      missing_tool_diagnostic "$tool"
       missing=1
     fi
   done
   if [ "$missing" -ne 0 ]; then
     if x_mode_artifact_present "$shim" || x_mode_artifact_present "$cadence"; then
       if x_mode_remove_artifacts; then
-        echo "FMX: X mode off - missing relay poll dependencies; install them and rerun bootstrap"
+        echo "FMX: X mode off - missing relay poll dependencies; resolve the dependency lines above and rerun bootstrap"
       else
         echo "FMX: X mode off - failed to remove relay poll shim or 30s cadence after missing relay poll dependencies"
       fi
@@ -1114,7 +1114,7 @@ crew_dispatch_validate() {
   file="$CONFIG/crew-dispatch.json"
   [ -f "$file" ] || return 0
   if ! command -v jq >/dev/null 2>&1; then
-    echo "MISSING: jq (install: $(install_cmd jq))"
+    missing_tool_diagnostic jq
     return 0
   fi
   if ! jq -e . "$file" >/dev/null 2>&1; then

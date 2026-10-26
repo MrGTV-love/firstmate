@@ -903,6 +903,59 @@ ROWS
   pass "bootstrap: JSON-emitting backends require jq (their genuine dep), never tmux"
 }
 
+test_crew_dispatch_reports_off_path_jq() {
+  local case_dir fakebin user user_bin bash_env real_jq out
+  case_dir="$TMP_ROOT/crew-dispatch-off-path-jq"
+  user="$case_dir/operator with spaces"
+  user_bin="$user/.local/bin"
+  mkdir -p "$case_dir/home/config" "$user_bin"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' '{"rules":[' > "$case_dir/home/config/crew-dispatch.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  real_jq=$(command -v jq) || fail "test host must provide jq"
+  cat > "$user_bin/jq" <<SH
+#!/usr/bin/env bash
+printf 'executed\\n' >> "\$FM_TEST_OFF_PATH_EXEC_LOG"
+exec '$real_jq' "\$@"
+SH
+  chmod +x "$user_bin/jq"
+  # Mask any system jq unless the user-local directory is on PATH, so only that
+  # copy can satisfy the crew-dispatch lookup.
+  bash_env="$case_dir/no-system-jq.bash"
+  cat > "$bash_env" <<'SH'
+case ":$PATH:" in
+  *":$FM_TEST_USER_BIN:"*) ;;
+  *)
+    command() {
+      if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+        return 1
+      fi
+      builtin command "$@"
+    }
+    jq() {
+      return 127
+    }
+    ;;
+esac
+SH
+  out=$(PATH="$fakebin:$BASE_PATH" BASH_ENV="$bash_env" HOME="$user" FM_TEST_USER_BIN="$user_bin" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "PATH_MISSING: jq (found: $user_bin/jq); add $user_bin to PATH" \
+    "crew dispatch needs PATH guidance for an off-PATH jq"
+  assert_not_contains "$out" "MISSING: jq (install:" "crew dispatch must not recommend reinstalling an off-PATH jq"
+  assert_not_contains "$out" "CREW_DISPATCH:" "crew dispatch must not validate through an off-PATH jq"
+  assert_absent "$case_dir/executed" "bootstrap executed an off-PATH jq"
+  out=$(PATH="$user_bin:$fakebin:$BASE_PATH" BASH_ENV="$bash_env" HOME="$user" FM_TEST_USER_BIN="$user_bin" \
+    FM_TEST_OFF_PATH_EXEC_LOG="$case_dir/executed" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$out" "CREW_DISPATCH: invalid config/crew-dispatch.json - malformed JSON" \
+    "corrected PATH must restore normal crew-dispatch validation"
+  assert_not_contains "$out" "PATH_MISSING:" "corrected PATH is not a PATH problem"
+  assert_present "$case_dir/executed" "corrected PATH did not validate through normal jq lookup"
+  pass "crew dispatch reports an off-PATH jq without executing it until PATH lookup succeeds"
+}
+
 test_treehouse_lease_check_follows_resolved_backend() {
   local case_dir fakebin out
   # A treehouse that lacks durable --lease support is only a problem for a backend
@@ -1868,6 +1921,7 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
 }
 
 test_off_path_tools_get_actionable_path_diagnostics
+test_crew_dispatch_reports_off_path_jq
 test_omp_api_billing_config_diagnostics
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
