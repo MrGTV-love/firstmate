@@ -28,6 +28,9 @@ const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-
 /** The optional fm-friction.v1 writer (docs/configuration.md "Friction ledger"); every pre-tool refusal is mirrored under this guard id. */
 const FRICTION_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py");
 export const FRICTION_GUARD_ID = "FM-JEV-GUARD";
+// Optional telemetry only, so the writer is stopped at this bound and the refusal stands; never the decision budget.
+// measured: value=5000ms date=2026-10-26 host=linux-wsl2 margin=96x (writer p100 29 ms over 40 appends and 52 ms against a 2,041-line history at load 1.4; its own lock budget is 200 ms)
+const FRICTION_TIMEOUT_MS = 5_000;
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
@@ -255,10 +258,11 @@ export function createGuardService(context: GuardServiceContext): GuardService {
           execFileSync("python3", [FRICTION_WRITER, "refusal", FRICTION_GUARD_ID, terminal.branch, `${terminal.hook}-${terminal.tool}`,
             `${context.task}:${terminal.hook}:${terminal.tool}`, "machine",
             context.task, fileURLToPath(import.meta.url)], {
-            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
+            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"],
+            timeout: Math.min(FRICTION_TIMEOUT_MS, preflightTimeout()), killSignal: "SIGKILL",
           });
         } catch {
-          console.error("fm-friction: refusal telemetry unavailable; guarded result unchanged; retry telemetry later with the same event identity");
+          console.error("fm-friction: refusal telemetry unavailable; guarded result unchanged; no event identity was recorded");
         }
       }
     },

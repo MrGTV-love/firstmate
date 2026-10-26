@@ -918,7 +918,7 @@ JS
 ) || fail "friction refusal ledger: $out"
   [ "${out##*$'\n'}" = friction-ok ] || fail "friction refusal ledger did not reach its final line: $out"
   grep -q 'fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id=' <<<"$out" || fail "the writer's own diagnostic was not printed for an unwritable ledger: $out"
-  grep -q 'fm-friction: refusal telemetry unavailable; guarded result unchanged' <<<"$out" || fail "the guard-side diagnostic was not printed for a missing writer: $out"
+  grep -q 'fm-friction: refusal telemetry unavailable; guarded result unchanged; no event identity was recorded' <<<"$out" || fail "the guard-side diagnostic was not printed for a missing writer: $out"
   pass "every pre-tool refusal mirrors one digest-only fm-friction.v1 event keyed by its audit branch; allows, repeated identities and writer failures write nothing and never change the refusal"
 }
 
