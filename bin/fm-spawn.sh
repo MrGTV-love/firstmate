@@ -3162,10 +3162,17 @@ case "$ARG3" in
     *)
       HARNESS=$(basename "$word")
       # A confined launch takes the Claude profile when any command runs claude,
-      # so `true && claude ...` cannot start Claude outside it.
-      if [ "$HARNESS" != claude ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ] \
-        && python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" 2>/dev/null; then
-        HARNESS=claude
+      # so `true && claude ...` cannot start Claude outside it. Text the scanner
+      # cannot read (exit 2) refuses; only a proven claude-free command (exit 1)
+      # keeps its first program word.
+      if [ "$HARNESS" != claude ] && [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
+        raw_runs_claude=0
+        python3 "$SCRIPT_DIR/fm-raw-launch.py" runs-claude "$LAUNCH" || raw_runs_claude=$?
+        case "$raw_runs_claude" in
+        0) HARNESS=claude ;;
+        1) ;;
+        *) exit 1 ;;
+        esac
       fi
       if [ "$HARNESS" = claude ]; then
         if [ "$KIND" != secondmate ] && [ "$(uname -s)" = Darwin ]; then
@@ -7255,6 +7262,10 @@ case "$LAUNCH" in
 esac
 if [ "$RAW_LAUNCH" = 1 ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$CLAUDE_LAUNCH_BIN --exec /bin/sh -c $(shell_quote "$LAUNCH")"
+elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then
+  # A compound raw claude command can start with a shell keyword env cannot
+  # run, such as `[[`; a shell keeps the unset below on every command.
+  LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
 fi
 case "$HARNESS" in
 claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy | devin)

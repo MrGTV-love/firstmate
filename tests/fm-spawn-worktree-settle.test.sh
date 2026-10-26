@@ -471,7 +471,7 @@ test_compound_raw_claude_launch_runs_confined() {
     printf 'skip: macOS Seatbelt launch; Linux remains unconfined\n'
     return 0
   fi
-  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi'; do
+  for raw in '[ -d src ] && cd src; claude --print hi' 'true && claude --print hi' '[[ -f README.md ]] && claude --print hi'; do
     index=$((index + 1))
     id=settle-raw-compound-$index-z9
     rec=$(make_settle_case "raw-compound-$index" "$id" 0)
@@ -504,6 +504,21 @@ SH
     (cd "$WT_DIR" && PATH="$FAKEBIN_DIR:$PATH" bash -c "$source_line")
     assert_equals "session-id=$session"$'\nargs=--print hi\nconfinement=seatbelt-v1\nforeign=refused' "$(cat "$probe")" \
       "compound raw claude launch must run inside its profile under its recorded session id: $raw"
+  done
+  # A construct the scanner cannot prove after a leading command refuses rather
+  # than launching claude unconfined.
+  # shellcheck disable=SC2016 # the literal constructs are the refused raw launch text
+  for raw in 'true && claude --print "$(date)"' 'true && claude --print `date`' 'true && (claude --print hi)'; do
+    index=$((index + 1))
+    id=settle-raw-compound-$index-z9
+    rec=$(make_settle_case "raw-compound-$index" "$id" 0)
+    read_settle_record "$rec"
+    FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
+    export FM_COMPAT_LAUNCH_LOG
+    if out=$(run_settle_spawn "$id" --harness "$raw"); then fail "compound raw claude spawn with an unprovable construct was accepted: $raw: $out"; fi
+    case "$out" in *'malformed raw launch command'*) ;; *) fail "compound raw claude refusal omitted the construct: $raw: $out" ;; esac
+    assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused compound raw claude command must not reach the worker: $raw"
+    assert_absent "$HOME_DIR/state/$id.meta" "a refused compound raw claude spawn published task metadata: $raw"
   done
   pass "a raw launch that runs claude after another command runs confined under its session id"
 }
