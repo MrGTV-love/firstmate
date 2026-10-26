@@ -4356,7 +4356,7 @@ print_brief_dispatch_refusal() { # <brief> <problem-lines>
   done <<EOF
 $problems
 EOF
-  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
+  printf "error: repair: edit %s and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief\n" "$brief" >&2
 }
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
   # One verdict, one refusal: the helper lists every unfinished Task body and

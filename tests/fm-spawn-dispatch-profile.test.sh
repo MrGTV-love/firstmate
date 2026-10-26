@@ -2088,6 +2088,7 @@ test_worker_launch_delivers_role_scope() {
       for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
         content=${content//"$token"/Filled for the test.}
       done
+      content=${content//$'\n### Out of scope'/$'\n### Out of scope\nNone.'}
       printf '%s\n' "$content" > "$brief"
     fi
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"

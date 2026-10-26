@@ -958,6 +958,41 @@ EOF
   pass "the exclusion list does not satisfy an empty Firstmate spec"
 }
 
+# The exclusion list ends where the reader of that list ends it, so a later spec
+# subsection, or a fenced example of the heading, still counts as the spec.
+test_spec_content_survives_the_exclusion_list() {
+  local brief
+  brief="$TMP_ROOT/spec-after-exclusions.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+### Out of scope
+None.
+
+### Approach
+Edit bin/x.sh.
+EOF
+  fm_brief_task_content_valid "$brief" \
+    || fail "a spec subsection after the exclusion list was dropped from the Firstmate spec"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+```
+### Out of scope
+```
+Print one complete list and the repair.
+EOF
+  fm_brief_task_content_valid "$brief" \
+    || fail "a fenced exclusion heading hid the Firstmate spec after it"
+  pass "spec content survives the exclusion list"
+}
+
 # An empty DoD file is a named problem, with the path the operator must fill.
 test_dispatch_verdict_reports_an_empty_dod_file() {
   local brief criteria out rc
@@ -1117,6 +1152,7 @@ test_dispatch_verdict_accepts_none_as_the_exclusion_answer
 test_dispatch_verdict_task_only_scope_skips_the_exclusion_list
 test_verification_plan_carries_the_stated_exclusions
 test_exclusion_list_does_not_satisfy_an_empty_firstmate_spec
+test_spec_content_survives_the_exclusion_list
 test_dispatch_verdict_reports_an_empty_dod_file
 test_dispatch_verdict_lists_every_token_in_the_dod_file
 test_dispatch_verdict_task_only_skips_the_definition_of_done

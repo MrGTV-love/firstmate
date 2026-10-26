@@ -617,8 +617,28 @@ fm_brief_text_has_content() {  # <text>
 # so a stated `None.` must not satisfy a spec that holds nothing else.
 fm_brief_spec_instructions() {  # <file>
   fm_brief_task_heading_body "$1" "## Firstmate spec" | awk '
-    /^ {0,3}###[[:space:]]*Out of scope[[:space:]]*$/ { skip = 1; next }
-    /^ {0,3}#{1,2}([[:space:]]|$)/ { skip = 0 }
+    {
+      scan = $0
+      sub(/^(   |  | )?/, "", scan)
+      was_fenced = fenced
+      if (scan ~ /^(```|~~~)/) {
+        marker = substr(scan, 1, 1)
+        rest = scan
+        sub(marker == "`" ? "^`+" : "^~+", "", rest)
+        len = length(scan) - length(rest)
+        if (!fenced) {
+          fenced = 1
+          fence_marker = marker
+          fence_len = len
+        } else if (marker == fence_marker && len >= fence_len && rest ~ /^[[:space:]]*$/) {
+          fenced = 0
+        }
+      }
+      if (!was_fenced && !fenced && scan ~ /^#+([[:space:]]|$)/) {
+        if ($0 == "### Out of scope") { skip = 1; next }
+        if (match(scan, /^#+/) && RLENGTH <= 3) skip = 0
+      }
+    }
     !skip { print }
   '
 }
