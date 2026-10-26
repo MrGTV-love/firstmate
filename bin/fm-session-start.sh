@@ -798,8 +798,11 @@ if [ -f "$GUARD_STAMP" ]; then
 else
   guard_mtime=0
 fi
+if [ "$SCRIPT_DIR/../docs/guards/registry.json" -nt "$GUARD_STAMP" ]; then
+  guard_mtime=0
+fi
 if [ $(( $(date +%s) - guard_mtime )) -ge 86400 ]; then
-  guard_ids=$("$SCRIPT_DIR/fm-guard-metrics.sh" --undecided 2>/dev/null) || guard_ids=''
+  guard_ids=$(FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-guard-metrics.sh" --undecided 2>/dev/null) || guard_ids=''
   if [ -n "$guard_ids" ]; then
     guard_line="GUARD PASS: $(printf '%s' "$guard_ids" | tr '\n' ' ' | sed 's/ $//') nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json"
   fi

@@ -104,6 +104,7 @@ emit() {  # <id> <opps> <denies> <warns> <override_rate> <median> <recurrences> 
 }
 
 if [ ! -f "$LOG" ]; then
+  [ "$UNDECIDED" -eq 1 ] && exit 0
   if [ "$JSON" -eq 1 ]; then
     printf '{"guards":[],"summary":{"guards":0,"measured":0,"cut":0,"unmeasured":0},"log":"%s","present":false}\n' "$LOG"
   else

@@ -164,5 +164,12 @@ pass "a recurrence after a clear cuts even an irreversible guard"
 absent=$("$METRICS" --log "$TMP/none.jsonl" 2>&1) || fail "a missing log must exit 0"
 printf '%s\n' "$absent" | grep -q 'log_absent=true' || fail "a missing log must report itself: $absent"
 pass "a missing log reports unmeasured and exits 0"
+for mode in --undecided "--undecided --json"; do
+  # shellcheck disable=SC2086
+  got=$("$METRICS" --log "$TMP/none.jsonl" --registry "$TMP/undecided.json" $mode 2>&1) \
+    || fail "$mode on a missing log must exit 0"
+  [ -z "$got" ] || fail "$mode on a missing log must print nothing, got '$got'"
+done
+pass "--undecided on a missing log prints nothing"
 
 printf 'ok - fm-guard-telemetry\n'
