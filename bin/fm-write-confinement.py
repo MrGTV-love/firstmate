@@ -171,8 +171,10 @@ def build(args):
         runtime += [under(claude, r"history\.jsonl(\.lock(/.*)?)?")]
         runtime += [f"(subpath {quoted(claude + '/' + name)})"
                     for name in ("backups", "statsig", "debug", "session-env/" + session, "file-history/" + session, "tasks/" + session)]
-        # The transcript container holds other sessions' transcripts, so the
-        # worker may create it but never rename or delete it.
+        # The transcript container and the session folders above this
+        # session's own entries hold other sessions' entries, so the worker
+        # may create them on a new config root but never rename or delete them.
+        created += [f"(literal {quoted(claude + '/' + name)})" for name in ("projects", "session-env", "file-history", "tasks")]
         for slug in slugs(worktree, args.worktree):
             project = claude + "/projects/" + slug
             created.append(f"(literal {quoted(project)})")
