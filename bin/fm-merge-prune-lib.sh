@@ -88,6 +88,8 @@ FM_MP_PANE_SHELL=
 FM_MP_PR_HEAD=
 FM_MP_PRESERVE=()
 FM_MP_NESTED=()
+FM_MP_TREE_PIDS=()
+FM_MP_TREE_PARENTS=()
 
 # A bound for one external call. Calibrated by bin/fm-duration.py limit when the
 # host has samples for the key; otherwise the fallback, in seconds.
@@ -428,6 +430,83 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
     return 1
   fi
   return 0
+}
+
+# A job running in the task's own terminal pane keeps the copy. Teardown ends a
+# process working at the copy root, so this runs before teardown: under the
+# pane's process (<pane-pid>), any process that is not a shell, not the worker's
+# agent (fm_agent_process_classify), not started by it and not a wrapper the
+# agent runs under, and whose working directory is inside <real-copy>, keeps it.
+# The finished worker's agent is teardown's to stop. No pane pid (any backend
+# but tmux and herdr, or a pane that cannot be read) checks nothing here.
+fm_mp_prove_pane_idle() {  # <real-copy> <pane-pid>
+  local copy=$1 pane=${2:-} tree p n comm args cwd agents=' ' worker=' ' kept=
+  FM_MP_TREE_PIDS=()
+  FM_MP_TREE_PARENTS=()
+  [ -n "$pane" ] || return 0
+  if ! tree=$(ps -axo pid=,ppid= 2>/dev/null | awk -v root="$pane" '
+    { parent[$1] = $2; kids[$2] = kids[$2] " " $1 }
+    END {
+      if (!(root in parent)) exit 0
+      q[1] = root; n = 1
+      for (i = 1; i <= n; i++) {
+        print q[i], parent[q[i]]
+        c = split(kids[q[i]], k, " ")
+        for (j = 1; j <= c; j++) q[++n] = k[j]
+      }
+    }'); then
+    fm_mp_verdict transient "process check of the task's terminal pane failed"
+    return 1
+  fi
+  while read -r p n; do
+    [ -z "$p" ] || { FM_MP_TREE_PIDS+=("$p"); FM_MP_TREE_PARENTS+=("$n"); }
+  done <<EOF
+$tree
+EOF
+  [ "${#FM_MP_TREE_PIDS[@]}" -gt 0 ] || return 0
+  for p in "${FM_MP_TREE_PIDS[@]}"; do
+    comm=$(ps -o comm= -p "$p" 2>/dev/null) || continue
+    args=$(ps -o args= -p "$p" 2>/dev/null) || args=
+    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" = agent ] || continue
+    agents="$agents$p "
+    # The agent and every process it runs under, up to the pane.
+    n=$p
+    while [ -n "$n" ]; do
+      worker="$worker$n "
+      [ "$n" != "$pane" ] || break
+      n=$(fm_mp_tree_parent "$n")
+    done
+  done
+  for p in "${FM_MP_TREE_PIDS[@]}"; do
+    case "$worker" in *" $p "*) continue ;; esac
+    # A process the agent started is teardown's, like the agent.
+    n=$(fm_mp_tree_parent "$p")
+    while [ -n "$n" ]; do
+      case "$agents" in *" $n "*) break ;; esac
+      [ "$n" != "$pane" ] || { n=; break; }
+      n=$(fm_mp_tree_parent "$n")
+    done
+    [ -z "$n" ] || continue
+    comm=$(ps -o comm= -p "$p" 2>/dev/null) || continue
+    comm=$(printf '%s' "$comm" | tr -d '[:space:]')
+    [ "$(fm_agent_process_classify_name "$comm")" != shell ] || continue
+    cwd=$(lsof -a -d cwd -p "$p" -Fn 2>/dev/null </dev/null | sed -n 's/^n//p' | sed -n 1p)
+    case "$cwd" in "$copy"|"$copy"/*) kept="${kept:+$kept }$p" ;; esac
+  done
+  if [ -n "$kept" ]; then
+    fm_mp_verdict keep "process(es) inside $copy running in the task's terminal pane: $kept"
+    return 1
+  fi
+  return 0
+}
+
+# The parent of <pid> in the pane's process tree that fm_mp_prove_pane_idle read;
+# nothing outside it.
+fm_mp_tree_parent() {  # <pid>
+  local i
+  for i in "${!FM_MP_TREE_PIDS[@]}"; do
+    [ "${FM_MP_TREE_PIDS[$i]}" != "$1" ] || { printf '%s' "${FM_MP_TREE_PARENTS[$i]}"; return 0; }
+  done
 }
 
 # A system search indexer (macOS Spotlight) holds a recently written tree open

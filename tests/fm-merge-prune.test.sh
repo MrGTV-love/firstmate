@@ -620,6 +620,42 @@ scn_nested_unpushed_commit_keeps_the_slot_before_teardown() {  # <clone|worktree
 scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown() { scn_nested_unpushed_commit_keeps_the_slot_before_teardown clone; }
 scn_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown() { scn_nested_unpushed_commit_keeps_the_slot_before_teardown worktree; }
 
+# Teardown would succeed here and end a job working at the copy root, so a job
+# in the task's terminal pane keeps the copy with one wake before teardown runs,
+# and the job is left alone.
+scn_pane_job_keeps_the_copy_before_teardown() {
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  use_pane_backend tmux
+  start_pane "$COPY" sleep 300
+  go
+  prune run t1 --now >/dev/null 2>&1
+  [ "$(stub_calls)" = 0 ] || why "teardown ran although a job runs in the task's pane" || return 1
+  [ -e "$COPY" ] && [ -f "$STATE/t1.meta" ] && [ "$(destroy_calls)" = 0 ] || why "the copy or the task record did not stay" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although a job runs in its pane" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the record is not retained: $(rec_field t1 state)" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake over two attempts, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'process(es) inside' || why "the wake does not name the copy and the process: $(cat "$STATE/.wake-queue")" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "the pane's job was ended" || return 1
+  return 0
+}
+
+# The finished worker's agent in its pane is teardown's to stop: it does not keep
+# the copy, and teardown runs.
+scn_pane_agent_does_not_block_teardown() {
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  use_pane_backend tmux
+  mkdir -p "$W/agent"
+  ln -s "$(command -v sleep)" "$W/agent/claude"
+  start_pane "$COPY" "$W/agent/claude" 300
+  go
+  [ "$(stub_calls)" = 1 ] || why "teardown did not run with only the worker's agent in the pane: $(rec_field t1 reason)" || return 1
+  [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "the worker's agent raised a wake" || return 1
+  return 0
+}
+
 scn_clean_nested_copy_goes_with_the_slot() {
   make_world
   make_nested .claude/worktrees/n1
@@ -1039,6 +1075,23 @@ scn_pane_build_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy b
 scn_pane_busy_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy busy-shell; }
 scn_stray_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy stray-shell; }
 scn_pane_shell_working_elsewhere_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy holder; }
+
+# An agent still running in the pane after the exit verb passes the check before
+# teardown (it is teardown's to stop), but in the fallback it is not the pane's
+# idle shell: it keeps the copy with one wake and is never signalled.
+scn_pane_agent_left_running_keeps_the_copy() {
+  make_world
+  use_pane_backend tmux
+  mkdir -p "$W/agent"
+  ln -s "$(command -v sleep)" "$W/agent/claude"
+  start_pane "$COPY" "$W/agent/claude" 300
+  EXIT_WAIT=1 go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy went although the agent is still running in it: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'process(es) inside' || why "the wake does not name the copy and the process" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "the agent was signalled as if it were the pane's idle shell" || return 1
+  return 0
+}
 
 # The pane's own shell is not a strict descendant of the pane: ending it would
 # close the pane, so a bare pane shell inside the copy keeps the copy, with one
@@ -1785,6 +1838,8 @@ test_fallback_keeps_a_stash() { assert_scenario scn_stash_is_kept "a stash entry
 test_fallback_keeps_a_live_process() { assert_scenario scn_live_process_is_kept "a live process inside keeps the copy with exactly one wake"; }
 test_fallback_nested_unpushed_commit_keeps_the_slot() { assert_scenario scn_nested_unpushed_commit_keeps_the_slot "an unpushed commit in a NESTED copy keeps the whole slot"; }
 test_nested_clone_unpushed_commit_keeps_the_slot_before_teardown() { assert_scenario scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "an unpushed commit in a nested clone keeps the whole slot with one wake before a teardown that would return it"; }
+test_pane_job_keeps_the_copy_before_teardown() { assert_scenario scn_pane_job_keeps_the_copy_before_teardown "a job in the task's terminal pane keeps the copy with one wake before a teardown that would end it"; }
+test_pane_agent_does_not_block_teardown() { assert_scenario scn_pane_agent_does_not_block_teardown "the finished worker's agent in its pane does not keep the copy: teardown runs"; }
 test_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown() { assert_scenario scn_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown "an unpushed commit in a nested linked worktree keeps the whole slot with one wake before a teardown that would close the task"; }
 test_fallback_removes_a_clean_nested_copy_with_the_slot() { assert_scenario scn_clean_nested_copy_goes_with_the_slot "a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved"; }
 test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot() { assert_scenario scn_unignored_nested_clone_goes_with_the_slot "a clean pushed nested clone that the project's .gitignore does not cover, and a clone inside it, go with the slot: the clones are not untracked files of the copy that holds them, and their own proofs ran"; }
@@ -1838,6 +1893,7 @@ test_long_retained_reason_is_logged_once() { assert_scenario scn_long_reason_is_
 test_fallback_ends_the_tasks_idle_pane_shell_on_tmux() { assert_scenario scn_lingering_pane_shell_on_tmux "the idle shell the task's tmux pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open"; }
 test_fallback_ends_the_tasks_idle_pane_shell_on_herdr() { assert_scenario scn_lingering_pane_shell_on_herdr "the idle shell the task's herdr pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open"; }
 test_fallback_keeps_a_non_shell_process_in_the_pane() { assert_scenario scn_pane_build_keeps_the_copy "a build, editor or test started in the pane keeps the copy with exactly one wake"; }
+test_fallback_keeps_an_agent_left_running_in_the_pane() { assert_scenario scn_pane_agent_left_running_keeps_the_copy "an agent still running in the pane after the exit verb keeps the copy with one wake and is never signalled"; }
 test_fallback_keeps_a_pane_shell_that_runs_something() { assert_scenario scn_pane_busy_shell_keeps_the_copy "a pane shell with a child process keeps the copy with exactly one wake"; }
 test_fallback_keeps_a_pane_shell_that_works_elsewhere() { assert_scenario scn_pane_shell_working_elsewhere_keeps_the_copy "a pane shell with a file of the copy open but its working directory elsewhere keeps the copy and is left alone"; }
 test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup() { assert_scenario scn_stubborn_pane_shell_keeps_the_copy "a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced"; }
@@ -1907,6 +1963,7 @@ test_unsafe_mutations_are_caught() {
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
   expect_caught no-nested-proof-before-teardown $orch '  prove_nested_first || return 0' '  :' scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "nested-copy proof before teardown"
+  expect_caught no-pane-job-proof-before-teardown $orch '  fm_mp_prove_pane_idle "$real" "$(fm_mp_pane_pid "$META")" || { record_verdict "$real"; return 1; }' '  :' scn_pane_job_keeps_the_copy_before_teardown "pane-job proof before teardown"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
   expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
   expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
@@ -1941,7 +1998,7 @@ test_unsafe_mutations_are_caught() {
       *) return 1 ;;' scn_orphan_nested_copy_refusal_keeps_the_copy "orphan-nested-copy refusal"
   expect_caught allow-unknown-text $orch '      *) return 1 ;;' '      *) seen=1 ;;' scn_unknown_refusal_keeps_the_copy "unknown refusal text"
   expect_caught allow-when-any-line-is-landing $orch '      *) return 1 ;;' '      *) ;;' scn_mixed_refusals_keep_the_copy "every-line rule"
-  expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
+  expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_agent_left_running_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
   expect_caught independent-clone-proved-as-linked $orch "    printf 'all'" "    printf 'own'" scn_independent_clone_side_branch_and_stash_is_kept "full proof of an independent clone"
@@ -1984,6 +2041,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
   expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
+  expect_caught pane-agent-not-exempt $lib '    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" = agent ] || continue' '    continue' scn_pane_agent_does_not_block_teardown "worker-agent exemption before teardown"
   expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
   expect_caught nofetch-forgets-pr-head $lib '    [ -z "$prn" ] || prsha=$FM_MP_PR_HEAD' '    :' scn_pr_head_proves_a_squash_merged_commit "reuse of the merged PR head"
   expect_caught other-branches-count-again $lib '  [ "$scope" != all ] || refs+=(--branches)' '  refs+=(--branches)' scn_linked_slot_ignores_other_tasks_work "own-work-only branch proof"
@@ -2294,6 +2352,8 @@ ALL_TESTS=(
   test_fallback_nested_unpushed_commit_keeps_the_slot
   test_nested_clone_unpushed_commit_keeps_the_slot_before_teardown
   test_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown
+  test_pane_job_keeps_the_copy_before_teardown
+  test_pane_agent_does_not_block_teardown
   test_fallback_removes_a_clean_nested_copy_with_the_slot
   test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot
   test_fallback_removes_an_unignored_clean_nested_worktree_with_the_slot
@@ -2341,6 +2401,7 @@ ALL_TESTS=(
   test_fallback_ends_the_tasks_idle_pane_shell_on_tmux
   test_fallback_ends_the_tasks_idle_pane_shell_on_herdr
   test_fallback_keeps_a_non_shell_process_in_the_pane
+  test_fallback_keeps_an_agent_left_running_in_the_pane
   test_fallback_keeps_a_pane_shell_that_runs_something
   test_fallback_keeps_a_shell_no_pane_started
   test_fallback_keeps_a_pane_shell_that_works_elsewhere

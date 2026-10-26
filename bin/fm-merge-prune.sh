@@ -23,7 +23,9 @@
 # stash and status proofs of the fallback (below). A teardown that succeeds
 # returns the slot with its nested copies in it, or closes the task and holds
 # the slot, so a nested copy with work of its own keeps the whole slot with one
-# wake and teardown does not run.
+# wake and teardown does not run. Teardown ends a job working at the copy root,
+# so a job in the task's terminal pane (not the worker's agent or what it
+# started) keeps the copy with one wake before teardown runs, too.
 #
 # Transient refusals retry on later sweeps with backoff (60s, doubling to 3600s)
 # and stay silent: the task lease or project lock is held by another actor
@@ -579,7 +581,9 @@ stop_worker() {
 # A teardown that succeeds returns the slot with its nested copies in it, or
 # closes the task and holds the slot, so the commit, stash and status proofs of
 # every nested copy run before teardown: a nested copy with work of its own keeps
-# the whole slot with one wake, and teardown does not run.
+# the whole slot with one wake, and teardown does not run. Teardown also ends a
+# job working at the copy root, so a job in the task's terminal pane keeps the
+# copy the same way (fm_mp_prove_pane_idle).
 prove_nested_first() {
   local wt real
   wt=$(fm_meta_get "$META" worktree)
@@ -590,6 +594,7 @@ prove_nested_first() {
   fi
   fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   prove_nested_git fetch || { record_verdict "$real"; return 1; }
+  fm_mp_prove_pane_idle "$real" "$(fm_mp_pane_pid "$META")" || { record_verdict "$real"; return 1; }
 }
 
 attempt() {
