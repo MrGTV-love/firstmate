@@ -11,7 +11,8 @@
 # Usage:
 #   fm-lab-home.sh env               mint a marked lab home and print the
 #                                    FM_HOME and TMUX_TMPDIR exports to eval
-#   fm-lab-home.sh create <dir>       make a marked lab home and print it
+#   fm-lab-home.sh create <dir>       make a marked lab home and print its
+#                                    canonical path
 #   fm-lab-home.sh tmux-dir <dir>     create or print its private tmux socket dir
 #   fm-lab-home.sh teardown <dir>     remove its private tmux socket dir
 #
@@ -28,8 +29,9 @@
 # env is the one-command form of the supported setup: it mints a fresh lab home
 # plus its private socket directory and prints `export FM_HOME=...` and
 # `export TMUX_TMPDIR=...`, so a caller evals it once per scenario shell instead
-# of composing mktemp, create, and a mkdir for tmux. It prints a teardown line
-# too, and it is the recipe the gate-context refusal names; never re-express it
+# of composing mktemp, create, and a mkdir for tmux. It prints the teardown line,
+# with literal paths, to stderr so it stays visible past the eval, and it is the
+# recipe the gate-context refusal names; never re-express it
 # in prose somewhere else.
 # A refused teardown reports the tmux probe's exit status and stderr while
 # retaining the socket directory and its durable ownership record.
@@ -57,11 +59,10 @@ case "${1:-}" in
     base=${base%/}
     dir=$(mktemp -d "$base/fm-lab.XXXXXX") || exit 1
     lab=$("$SCRIPT_DIR/fm-lab-home.sh" create "$dir") || { rmdir "$dir" 2>/dev/null || true; exit 1; }
-    socket=$("$SCRIPT_DIR/fm-lab-home.sh" tmux-dir "$lab") || exit 1
+    socket=$("$SCRIPT_DIR/fm-lab-home.sh" tmux-dir "$lab") || { rm -rf "$lab"; exit 1; }
     printf 'export FM_HOME=%q\n' "$lab"
     printf 'export TMUX_TMPDIR=%q\n' "$socket"
-    # shellcheck disable=SC2016 # Print the teardown line for the caller to expand.
-    printf '# teardown: %q teardown "$FM_HOME" && rm -rf "$FM_HOME"\n' "${BASH_SOURCE[0]}"
+    printf 'fm-lab-home: teardown: %q teardown %q && rm -rf %q\n' "$SCRIPT_DIR/fm-lab-home.sh" "$lab" "$lab" >&2
     ;;
   create)
     dir=${2:-}
@@ -80,6 +81,7 @@ case "${1:-}" in
       exit 1
     fi
     mkdir -p "$dir" || exit 1
+    dir=$(cd -P -- "$dir" && pwd -P) || exit 1
     fm_gate_lab_mark "$dir" || {
       fm_lab_home_error "refusing '$dir': a lab marker is only ever stamped on a fresh empty dir"
       exit 1

@@ -327,26 +327,37 @@ test_lab_home_helper() {
 # env is the one-command form the refusal names: it mints a marked lab home,
 # exports it with its private socket directory, and prints the teardown line,
 # so a gate agent never composes mktemp, create, and a tmux mkdir by hand.
-test_lab_home_env_provisions_the_gate_lab() {
-  local out lab socket rc
-  out=$(TMPDIR="$TMP" "$LABHOME" env 2>&1) || fail "lab-home: env must provision a lab: $out"
-  assert_contains "$out" 'export FM_HOME=' "lab-home: env must export FM_HOME"
-  assert_contains "$out" 'export TMUX_TMPDIR=' "lab-home: env must export TMUX_TMPDIR"
-  assert_contains "$out" 'teardown' "lab-home: env must print the teardown line"
+# <tmpdir> may be a symlink (macOS /tmp and /var are); the exported home must
+# still be the canonical path the gate boundary admits.
+lab_home_env_provisions() {  # <tmpdir> <expected-real-parent> <label>
+  local tmpdir=$1 parent=$2 label=$3 out err lab socket rc teardown
+  out=$(TMPDIR="$tmpdir" "$LABHOME" env 2>"$TMP/env.err") || fail "lab-home $label: env must provision a lab: $(cat "$TMP/env.err")"
+  err=$(cat "$TMP/env.err")
+  assert_contains "$out" 'export FM_HOME=' "lab-home $label: env must export FM_HOME"
+  assert_contains "$out" 'export TMUX_TMPDIR=' "lab-home $label: env must export TMUX_TMPDIR"
+  assert_contains "$err" 'teardown' "lab-home $label: env must print the teardown line on stderr"
   printf '%s\n' "$out" > "$TMP/env.exports"
   # shellcheck source=/dev/null
   ( . "$TMP/env.exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.paths" )
   lab=$(sed -n '1p' "$TMP/env.paths")
   socket=$(sed -n '2p' "$TMP/env.paths")
-  [ -f "$lab/.fm-lab-home" ] || fail "lab-home: env did not mint a marked lab home"
-  case "$lab" in "$TMP"/*) ;; *) fail "lab-home: env must mint under TMPDIR, got $lab" ;; esac
-  [ -d "$socket" ] || fail "lab-home: env did not create the private tmux socket directory"
+  [ -f "$lab/.fm-lab-home" ] || fail "lab-home $label: env did not mint a marked lab home"
+  case "$lab" in "$parent"/*) ;; *) fail "lab-home $label: env must mint under $parent, got $lab" ;; esac
+  [ -d "$socket" ] || fail "lab-home $label: env did not create the private tmux socket directory"
   out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1); rc=$?
-  expect_code 0 "$rc" "lab-home: the home env mints must be permitted by the gate boundary"
-  "$LABHOME" teardown "$lab" || fail "lab-home: teardown of the env lab failed"
-  [ ! -e "$socket" ] || fail "lab-home: teardown left the env socket directory behind"
-  rm -rf "$lab"
-  pass "fm-lab-home: env provisions the marked lab home the gate boundary admits"
+  expect_code 0 "$rc" "lab-home $label: the home env mints must be permitted by the gate boundary"
+  teardown=${err#fm-lab-home: teardown: }
+  (cd / && eval "$teardown") || fail "lab-home $label: the printed teardown line failed: $teardown"
+  [ ! -e "$socket" ] || fail "lab-home $label: teardown left the env socket directory behind"
+  [ ! -e "$lab" ] || fail "lab-home $label: teardown left the env lab home behind"
+}
+
+test_lab_home_env_provisions_the_gate_lab() {
+  lab_home_env_provisions "$TMP" "$TMP" plain
+  mkdir -p "$TMP/real-tmpdir"
+  ln -s "$TMP/real-tmpdir" "$TMP/linked-tmpdir"
+  lab_home_env_provisions "$TMP/linked-tmpdir" "$TMP/real-tmpdir" symlinked
+  pass "fm-lab-home: env provisions the marked lab home the gate boundary admits, even under a symlinked TMPDIR"
 }
 
 test_lab_home_refuses_work_tree() {
