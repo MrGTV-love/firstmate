@@ -611,42 +611,59 @@ def invalid_project_source(repo, manifest, base, env):
     print("invalid project source: refused with project and failed command; no profile published")
 
 
-# A new task's worktree has a new slug, so its first Claude launch creates the
-# transcript container, and a new config root holds none of the session
-# folders yet. Run under a profile for a fresh config root that holds no
-# session folder: create each one with this session's own entry, try a foreign
-# session's entry, then try to move each created folder to a writable place
-# and to delete it.
+# A new config root holds none of Claude's session folders; fm-spawn.sh creates
+# them outside the profile, which grants none of them.
+FOLDERS_PROBE = r'''
+import json, os, sys
+root = sys.argv[1]
+made = []
+for name in ("projects", "session-env", "file-history", "tasks"):
+    try:
+        os.mkdir(os.path.join(root, name))
+        made.append(name)
+    except OSError:
+        pass
+print(json.dumps(made))
+'''
+
+# A new task's worktree has a new slug, so its first Claude launch may create
+# the transcript container. Run under a profile for a fresh config root that
+# holds no container yet: try to plant it as a symlink to a writable place and
+# as a plain file, create it as a folder, append this session's transcript,
+# then try to move it to a writable place and to delete it.
 CONTAINER_PROBE = r'''
 import json, os, shutil, sys
-root, slug, own, other, moved = sys.argv[1:6]
-owned = {"projects/" + slug: own + ".jsonl", "session-env": own + "/hook.sh",
-         "file-history": own + "/backup", "tasks": own + "/1.json"}
-result = {"create-and-append": True, "foreign-written": False, "renamed": False, "deleted": False}
-for folder, entry in owned.items():
-    for name, key in ((entry, "create-and-append"), (entry.replace(own, other), "foreign-written")):
-        path = os.path.join(root, folder, name)
-        try:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "a") as stream:
-                stream.write("session\n")
-            written = True
-        except OSError:
-            written = False
-        result[key] = result[key] and written if key == "create-and-append" else result[key] or written
-for folder in owned:
-    path = os.path.join(root, folder)
+container, own, moved, target = sys.argv[1:5]
+result = {}
+for key, plant in (("symlink", lambda: os.symlink(target, container)), ("file", lambda: open(container, "x").close())):
     try:
-        os.rename(path, moved)
-        os.rename(moved, path)
-        result["renamed"] = True
+        plant()
+    except OSError:
+        result[key] = False
+        continue
+    result[key] = True
+    try:
+        os.unlink(container)
     except OSError:
         pass
-    try:
-        shutil.rmtree(path)
-    except OSError:
-        pass
-    result["deleted"] = result["deleted"] or not os.path.isdir(path)
+try:
+    os.mkdir(container)
+    with open(own, "a") as stream:
+        stream.write("transcript\n")
+    result["create-and-append"] = True
+except OSError:
+    result["create-and-append"] = False
+try:
+    os.rename(container, moved)
+    os.rename(moved, container)
+    result["renamed"] = True
+except OSError:
+    result["renamed"] = False
+try:
+    shutil.rmtree(container)
+except OSError:
+    pass
+result["deleted"] = not os.path.isdir(container)
 print(json.dumps(result))
 '''
 
@@ -656,11 +673,14 @@ def fresh_container(repo, manifest, base, mode, env):
     root.mkdir()
     profile = base / "fresh-profile.sb"
     build_profile(repo, manifest, "claude", profile, env, agent_dir=root)
-    slug = re.sub(r"[^A-Za-z0-9]", "-", manifest["worktree"])
-    command = [sys.executable, "-c", CONTAINER_PROBE, str(root), slug, OWN_SESSION, OTHER_SESSION, str(base / "temp/moved")]
-    invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
-    result = subprocess.run(invocation, capture_output=True, text=True, env=env)
-    return json.loads(result.stdout)
+    sandbox = [] if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)]
+    folders = subprocess.run(sandbox + [sys.executable, "-c", FOLDERS_PROBE, str(root)], capture_output=True, text=True, env=env)
+    (root / "projects").mkdir(exist_ok=True)
+    container = root / "projects" / re.sub(r"[^A-Za-z0-9]", "-", manifest["worktree"])
+    command = [sys.executable, "-c", CONTAINER_PROBE, str(container), str(container / f"{OWN_SESSION}.jsonl"),
+               str(base / "temp/moved"), str(base / "temp")]
+    result = subprocess.run(sandbox + command, capture_output=True, text=True, env=env)
+    return {"session-folders-created": json.loads(folders.stdout), **json.loads(result.stdout)}
 
 
 if sys.argv[1] == "--child":
@@ -709,8 +729,9 @@ for harness in ("claude", "omp"):
             fresh = fresh_container(repo, manifest, base, mode, env)
             print(f"{harness} {mode} fresh container: " + json.dumps(fresh, sort_keys=True))
             confined = mode == "confined"
-            assert fresh == {"create-and-append": True, "foreign-written": not confined, "renamed": not confined,
-                             "deleted": not confined}, (harness, mode, fresh)
+            assert fresh == {"session-folders-created": [] if confined else ["projects", "session-env", "file-history", "tasks"],
+                             "symlink": not confined, "file": not confined, "create-and-append": True,
+                             "renamed": not confined, "deleted": not confined}, (harness, mode, fresh)
         if mode == "baseline":
             for name in actual:
                 if name in CONTROL_KEYS or name.startswith("refused-"):

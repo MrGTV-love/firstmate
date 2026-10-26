@@ -6190,6 +6190,22 @@ if [ "$KIND" != secondmate ]; then
         --data "$DATA/$ID" --state "$STATE_REAL" --task "$ID" \
         --harness "$HARNESS" --profile "$WRITE_CONFINEMENT_PROFILE" \
         ${confinement_args[@]+"${confinement_args[@]}"} || { confinement_refuse false "cannot derive the protected-asset write profile"; exit 1; }
+      # The profile grants only this session's entries, so the session folders
+      # above them are created here, outside the profile.
+      if [ "$HARNESS" = claude ]; then
+        confinement_claude_root=${confinement_agent:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}}
+        confinement_claude_dirs=
+        if confinement_wt_real=$(cd "$WT" && pwd -P) \
+          && { [ -d "$confinement_claude_root" ] || mkdir -m 700 "$confinement_claude_root"; } \
+          && confinement_claude_mode=$(stat -f %Lp "$confinement_claude_root"); then
+          confinement_claude_dirs="session-env file-history tasks projects projects/${WT//[^A-Za-z0-9]/-} projects/${confinement_wt_real//[^A-Za-z0-9]/-}"
+        fi
+        [ -n "$confinement_claude_dirs" ] || { confinement_refuse false "cannot read the Claude config root $confinement_claude_root"; exit 1; }
+        for confinement_dir in $confinement_claude_dirs; do
+          [ -d "$confinement_claude_root/$confinement_dir" ] || mkdir -m "$confinement_claude_mode" "$confinement_claude_root/$confinement_dir" \
+            || { confinement_refuse false "cannot create $confinement_claude_root/$confinement_dir for this Claude session"; exit 1; }
+        done
+      fi
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-write-confinement allow --source-ok true \
         --elapsed-ms "$(((SECONDS - confinement_started) * 1000))" --session "$ID" --cleared-by proceed 2>/dev/null || true
       ;;

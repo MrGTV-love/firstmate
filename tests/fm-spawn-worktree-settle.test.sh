@@ -305,6 +305,32 @@ SH
   pass "non-measured harness launches unchanged and explicitly reports unconfined coverage"
 }
 
+# write_claude_session_probe <fakebin> installs a model-free stand-in for
+# Claude's own session writes: this session's session-env, file-history and
+# tasks entries and its transcript under the slug of its working directory, then the
+# same entries for a foreign session id.
+write_claude_session_probe() {
+  cat > "$1/claude-session-probe" <<'SH'
+#!/usr/bin/env bash
+root=$1 session=$2 other=$3
+slug=$(cd "$4" && pwd -P | sed 's/[^A-Za-z0-9]/-/g')
+own=created foreign=refused
+for id in "$session" "$other"; do
+  for entry in "session-env/$id/probe" "file-history/$id/probe" "tasks/$id/probe" "projects/$slug/$id.jsonl"; do
+    if { mkdir -p "$root/$(dirname "$entry")" && : >> "$root/$entry"; } 2>/dev/null; then written=1; else written=0; fi
+    if [ "$id" = "$session" ]; then
+      [ "$written" = 1 ] || own="refused:$entry"
+    else
+      [ "$written" = 0 ] || foreign="created:$entry"
+    fi
+  done
+done
+echo "own=$own"
+echo "other=$foreign"
+SH
+  chmod +x "$1/claude-session-probe"
+}
+
 # The launch fm-spawn delivers for a measured harness runs inside the generated
 # profile: a model-free stand-in for the harness records what it could do.
 test_measured_harness_launch_runs_confined() {
@@ -338,14 +364,13 @@ SH
     session_probe="$HOME_DIR/data/$id/claude-session-probe"
     other=99999999-8888-4777-8666-555555555555
     if [ "$harness" = claude ]; then
-      mkdir -p "$HOME_DIR/user-home/.claude/session-env"
+      write_claude_session_probe "$FAKEBIN_DIR"
       cat >> "$FAKEBIN_DIR/claude" <<SH
 session=
 while [ \$# -gt 0 ]; do [ "\$1" != --session-id ] || session=\$2; shift; done
 {
   echo "session-id=\$session"
-  if { mkdir -p '$HOME_DIR/user-home/.claude/session-env/'"\$session" && : > '$HOME_DIR/user-home/.claude/session-env/'"\$session/probe"; } 2>/dev/null; then echo own=created; else echo own=refused; fi
-  if { mkdir -p '$HOME_DIR/user-home/.claude/session-env/$other' && : > '$HOME_DIR/user-home/.claude/session-env/$other/probe'; } 2>/dev/null; then echo other=created; else echo other=refused; fi
+  claude-session-probe '$HOME_DIR/user-home/.claude' "\$session" '$other' '$WT_DIR'
 } > '$session_probe'
 SH
     fi
@@ -389,7 +414,8 @@ test_confined_raw_claude_launch_runs_through_teamclaude() {
   printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
   fm_test_fake_teamclaude "$FAKEBIN_DIR"
   raw_root="$(dirname "$HOME_DIR")/raw claude root"
-  mkdir -p "$raw_root/session-env"
+  mkdir -p "$raw_root"
+  write_claude_session_probe "$FAKEBIN_DIR"
   probe="$HOME_DIR/data/$id/probe"
   cat > "$FAKEBIN_DIR/claude" <<SH
 #!/usr/bin/env bash
@@ -402,8 +428,7 @@ session=
   echo "args=\${*:3}"
   echo "config=\$CLAUDE_CONFIG_DIR"
   echo "proxy=\${HTTPS_PROXY:+set}"
-  if { mkdir -p "\$CLAUDE_CONFIG_DIR/session-env/\$session" && : > "\$CLAUDE_CONFIG_DIR/session-env/\$session/probe"; } 2>/dev/null; then echo own=created; else echo own=refused; fi
-  if { mkdir -p "\$CLAUDE_CONFIG_DIR/session-env/$other" && : > "\$CLAUDE_CONFIG_DIR/session-env/$other/probe"; } 2>/dev/null; then echo other=created; else echo other=refused; fi
+  claude-session-probe "\$CLAUDE_CONFIG_DIR" "\$session" '$other' '$WT_DIR'
 } > '$probe'
 SH
   chmod +x "$FAKEBIN_DIR/claude"
