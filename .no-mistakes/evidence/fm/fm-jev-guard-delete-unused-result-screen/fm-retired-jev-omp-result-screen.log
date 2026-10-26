@@ -1,0 +1,11 @@
+✔ T1(a): the recorded omp background-job notice reaches the worker verbatim (0.436416ms)
+✔ T1(d): a worker session records only pre-tool work and sends no result to TypeSafe (0.424708ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2.831584
+ok - T1(a, d): flagged omp output reaches the worker unchanged; the session audits only pre-tool work, with no omp_replace row and no result provider call

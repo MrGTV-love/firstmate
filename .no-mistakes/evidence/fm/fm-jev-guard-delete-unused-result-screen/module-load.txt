@@ -1,0 +1,15 @@
+# Module load check on target 06287eba1
+node:1: command not found: _nvm_lazy_load
+load ok   bin/fm-jev-guard.ts exports=[installJevGuard]
+load ok   bin/ten-levels/extensions/report.ts exports=[GUARD_MODEL,GUARD_POLICY_VERSION,GuardUnavailableError,MAX_REQUEST_BYTES,OUTAGE_NOTICE,OUTAGE_POLICY,createGuardService,failureTiming,failureType,withDecisionBudget]
+load ok   bin/ten-levels/src/levels/level06/index.ts exports=[insideRepo]
+load ok   bin/ten-levels/src/levels/level06/write-gate.ts exports=[insideRepo]
+load ok   bin/ten-levels/src/levels/level05/index.ts exports=[agentQuestions,decideAgent,decideIntent,decideModel,modelQuestions,routeAgent,routeIntent,routeModel]
+load FAIL bin/ten-levels/src/levels/level06/result-screen.ts ERR_MODULE_NOT_FOUND Cannot find module 'bin/ten-levels/src/levels/level06/result-screen.ts' imported from /private/tmp/fm-modload.u75l/load.mjs
+load FAIL bin/ten-levels/src/levels/level06/bash-gate.ts ERR_MODULE_NOT_FOUND Cannot find module 'bin/ten-levels/src/levels/level06/bash-gate.ts' imported from /private/tmp/fm-modload.u75l/load.mjs
+
+# git grep for remaining references to the deleted files outside SOURCE history:
+(none)
+
+# SOURCE.md diff vs base (numstat added/removed):
+0	5	bin/ten-levels/SOURCE.md

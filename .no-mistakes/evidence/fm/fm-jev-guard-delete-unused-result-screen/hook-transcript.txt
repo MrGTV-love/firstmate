@@ -1,0 +1,34 @@
+# Live Claude PreToolUse hook transcript (base 790f0ec04 -> target 06287eba1), result-screen.ts and bash-gate.ts absent:
+index.ts
+write-gate.ts
+
+## Write inside worktree -> allowed
+exit=0
+stdout=<empty>
+stderr=
+
+## Write outside worktree (/etc) -> denied
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: /etc/fm-jev-guard-outside Refused path: \"/etc/fm-jev-guard-outside\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+stderr=
+
+## Edit outside worktree (/etc) -> denied
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: /etc/hosts Refused path: \"/etc/hosts\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+stderr=
+
+## Write via ../ escape -> denied
+exit=0
+stdout={"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[jev-guard] outside the repo: <lab>/wt/../../../../../etc/escape Refused path: \"<lab>/wt/../../../../../etc/escape\". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."}}
+stderr=
+
+## PostToolUse result with injection text -> no screen, no output
+exit=0
+stdout=<empty>
+stderr=
+
+## Malformed input -> blocking exit 2
+exit=2
+stdout=<empty>
+stderr=[jev-guard] Review required: RuntimeExecutionError (exit_status=2). REVIEW_ON_UNAVAILABLE_V1.
+

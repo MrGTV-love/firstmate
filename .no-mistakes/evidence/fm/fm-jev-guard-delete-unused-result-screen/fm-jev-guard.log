@@ -1,0 +1,39 @@
+ok - pure write boundaries
+✔ omp T2(a), B68: remove own smoke.py (36.127417ms)
+✔ omp T2(b), B69: four-file probe cleanup (40.821209ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (66.5385ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (83.811708ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (34.972167ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (101.345375ms)
+✔ claude T2(a), B68: remove own smoke.py (5.625875ms)
+✔ claude T2(b), B69: four-file probe cleanup (5.393333ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (35.878375ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (49.001ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (4.664667ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (72.783416ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.096917ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (274.761125ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (113.7045ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 930.567375
+ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
+ok - Claude pre-tool allowed write roots, credential insertion deferred to commit time, removals and deterministic device refusal
+ok - active writes need no provider, never-send check or model key and send nothing; inactive scopes send nothing and keep path checks
+ok - bounded service retries: a later answer succeeds, repeated outages stop after three tries, contract failures and answers are not retried; a failed ledger write denies
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - pre-tool credential tails and large writes send nothing, audit failure, inactive independence, provider-independent writes and refused write/edit path
+ok - node type stripping still enforces the Claude pre-tool deny
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+ok - actual stalled requests produce a typed service timeout inside the decision budget and before a host deadline
+ok - oversized, unplannable and never-send write content is admitted locally with no request, size refusal or friction event
+ok - private terminal audit keeps admissions, usage and cost certainty without payloads, answers or provider extensions
