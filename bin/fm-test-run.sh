@@ -301,9 +301,12 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # percent when the hints match the run: replaying the three 2026-10-26 refresh
 # runs' own per-script durations through the membership that ran reads 0.997 to
 # 1.030 times each recorded lane wall (run 40308410676: 1175963 ms and 834790 ms
-# modeled against 1141598 ms and 836218 ms recorded). So 1200000 ms bounds a real
-# lane near 20 minutes, and a new member or a slow path fails the coverage
-# guard instead of quietly stretching the workflow.
+# modeled against 1141598 ms and 836218 ms recorded). A later run of the same
+# inventory can still swing one script by a third and a whole lane by more, so
+# this bounds balanced packing rather than every future wall; run 40341624397
+# measured that spread and docs/fm-test-portable-shards.md records it. So
+# 1200000 ms bounds a real lane near 20 minutes, and a new member or a slow
+# path fails the coverage guard instead of quietly stretching the workflow.
 # Since the 2026-10-26 refresh every parallel hint is measured, including the
 # five the fm-lint split had apportioned. Lane 1 is fm-test-run, fm-lint,
 # fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,

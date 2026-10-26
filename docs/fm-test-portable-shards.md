@@ -300,6 +300,12 @@ Hinting them brings the serial sum to 24842598 ms and the same twenty-one shards
 `serial_unhinted` is now zero: every portable serial member has a measured hint.
 Replaying the three runs' own per-script durations through the new assignment puts the slowest real shard at 1168860, 1170381, and 1179209 ms, so the model reads 0.4 to 1.2 percent high, and that slowest shard falls from the 1370959 ms the previous hints and assignment produced.
 Per script the hints are conservative against every run separately: the ratio of hint to that run's sample is never below 1.000, with medians of 1.007, 1.022, and 1.030.
+
+The first run to carry the refreshed table measured it out of sample: [run 40341624397](https://github.com/MrGTV-love/firstmate/actions/runs/40341624397) on [#267](https://github.com/MrGTV-love/firstmate/pull/267) took 682320 ms and 830886 ms in the two parallel lanes against the 1030514 ms and 1030749 ms models, and its twenty-one serial shards ran 954050 to 1278930 ms against a modeled 1183250 ms.
+Each shard's recorded wall is 1.003 times the sum of that run's own script durations, so a shard wall tracks its contents exactly; what moves between runs of the same inventory is the per-script weight, which swung by up to 35 percent (`tests/fm-test-run.test.sh` 651089 ms in this run against 917462 to 925194 ms in the refresh runs, `tests/fm-public-followup.test.sh` 533790 ms against 443236 to 454243 ms).
+So the refreshed table reads 7 percent high in aggregate on that run, 24842598 ms modeled against 23202718 ms recorded, and its heaviest shard still ran 8 percent over the modeled maximum, because one sample per script cannot absorb a swing of that size.
+The 1200000 ms target therefore bounds the model, not the slowest real shard: it keeps the packing even and the workflow far inside the 60 minute job tier, and it does not claim that every shard finishes under 20 minutes.
+Bounding real shard walls instead would take the mean of several runs plus a variance term rather than the slowest sample, which is a change to the weight basis and not to this table.
 The seven-way concurrent evidence for the fm-lint groups in [fm-test-isolation-proof.md](fm-test-isolation-proof.md#fm-lint-split-re-check) still stands, and a full portable-pool isolation proof remains outstanding.
 
 ## Portable serial remainder
