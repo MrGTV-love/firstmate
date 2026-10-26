@@ -11,6 +11,9 @@
 # validation yet failed CI on info/warning findings such as SC2015, SC1007, and
 # SC2034. A second axis was tool-version skew: CI's ShellCheck floated with the
 # runner image and still emitted SC2015, which ShellCheck retired in 0.11.0.
+# The groups that source this file read globals and fixture constants it
+# assigns, so they read as "unused" here.
+# shellcheck disable=SC2034
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -534,6 +537,7 @@ fm_lint_run() {
   local requested_case test_case registered_case
   for requested_case in "$@"; do
     registered_case=false
+    # shellcheck disable=SC2154 # Each group assigns fm_lint_test_cases before calling this.
     for test_case in "${fm_lint_test_cases[@]}"; do
       if [ "$requested_case" = "$test_case" ]; then registered_case=true; break; fi
     done
