@@ -1,0 +1,4 @@
+base single-file ok lines: 73  not ok: 0
+split groups ok lines:     73  not ok: 0
+$ diff <(sort base ok lines) <(sort split ok lines)
+IDENTICAL

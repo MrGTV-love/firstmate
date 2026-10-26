@@ -1,0 +1,11 @@
+## guard extracted verbatim from tests/fm-test-run.test.sh, run against a copy of HEAD
+ok - the fm-lint groups are a duplicate-free 73-case cover, each case registered by the file that defines it
+exit=0
+
+## mutation 1: register test_clean_fixture_passes a second time in tests/fm-lint-slots.test.sh
+not ok - tests/fm-lint-slots.test.sh registers test_clean_fixture_passes but does not define it
+exit=1
+
+## mutation 2: drop test_clean_fixture_passes from the policy registration
+not ok - the fm-lint groups register 72 cases, not the 73-case inventory they partition
+exit=1

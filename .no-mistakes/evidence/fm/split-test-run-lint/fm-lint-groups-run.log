@@ -1,8 +1,8 @@
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5V55MK2P89DPK8SJGZ9XW98/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-policy.test.sh family=pure-contract-unit expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-report.test.sh family=pure-contract-unit expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
-FM_TEST_BEGIN 2026-10-26T04:05:10Z tests/fm-lint.test.sh family=pure-contract-unit expected_gate_skip=none
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/3824274165fa/01M5VA2490WWAKKD3TNGEAFGWG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-26T05:18:10Z tests/fm-lint-policy.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T05:18:10Z tests/fm-lint-report.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T05:18:10Z tests/fm-lint-slots.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-26T05:18:10Z tests/fm-lint.test.sh family=pure-contract-unit expected_gate_skip=none
 ok - fm-lint.sh rejects explicit --fast mode in CI
 ok - fm-lint.sh --fast catches an ordinary shell lint defect
 ok - fm-lint.sh pins an explicit ShellCheck version (0.11.0)
@@ -19,7 +19,7 @@ ok - fm-lint.sh rejects direct Beads CLI invocations in firstmate core
 ok - fm-lint.sh enforces backend purity for explicit core paths
 ok - fm-lint.sh ignores ambient ShellCheck options
 ok - fm-lint.sh passes a clean fixture
-FM_TEST_END 2026-10-26T04:05:38Z tests/fm-lint-policy.test.sh exit=0 duration_ms=28575 gate_skip=false
+FM_TEST_END 2026-10-26T05:18:36Z tests/fm-lint-policy.test.sh exit=0 duration_ms=25460 gate_skip=false
 ok - jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry
 ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
 ok - oversubscribed runs share the CPU-derived cap and every run finishes
@@ -44,7 +44,7 @@ ok - SKIP (host cannot enforce the bounded envelope): root deadline kill check
 ok - SKIP (host cannot enforce the bounded envelope): memory-limit death check
 ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
 ok - a cache-key wait longer than the root deadline preserves its memory retry budget
-FM_TEST_END 2026-10-26T04:06:45Z tests/fm-lint-slots.test.sh exit=0 duration_ms=95391 gate_skip=false
+FM_TEST_END 2026-10-26T05:19:49Z tests/fm-lint-slots.test.sh exit=0 duration_ms=98914 gate_skip=false
 ok - SKIP (host cannot enforce the bounded envelope): fallback deadline check
 ok - explicit memory evidence outranks findings and signal reasons (modes: 0)
 ok - OOM words in a source excerpt or a root path never classify a root as memory
@@ -62,7 +62,7 @@ ok - fm-lint.sh CI keeps source following without the local exclusion list
 ok - fm-lint.sh on main keeps source following without the local exclusion list
 ok - fm-lint.sh without a merge-base keeps source following without the local exclusion list
 ok - fm-lint.sh explicit paths keep source following
-FM_TEST_END 2026-10-26T04:07:22Z tests/fm-lint-report.test.sh exit=0 duration_ms=132478 gate_skip=false
+FM_TEST_END 2026-10-26T05:20:28Z tests/fm-lint-report.test.sh exit=0 duration_ms=137921 gate_skip=false
 ok - inert quoted programs, prose, comments, conditionals, and heredocs are not imports
 ok - child-shell positional imports and executable substitutions govern selection and cache inputs
 ok - executable stdin imports select direct and transitive callers and invalidate reusable closures
@@ -84,12 +84,13 @@ ok - shared cache single-flights identical misses and invalidates sources, binar
 ok - fm-lint.sh --list-files reports the complete shell inventory
 ok - three canonical lint partitions preserve complete source-aware coverage and reject weakened modes
 ok - canonical partitions balance measured analysis cost rather than equal direct bytes
-FM_TEST_END 2026-10-26T04:09:28Z tests/fm-lint.test.sh exit=0 duration_ms=258525 gate_skip=false
-FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=259133
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=4 duration_ms=514969 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-lint.test.sh duration_ms=258525
-FM_TEST_SLOWEST rank=2 script=tests/fm-lint-report.test.sh duration_ms=132478
-FM_TEST_SLOWEST rank=3 script=tests/fm-lint-slots.test.sh duration_ms=95391
-FM_TEST_SLOWEST rank=4 script=tests/fm-lint-policy.test.sh duration_ms=28575
-fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5V55MK2P89DPK8SJGZ9XW98/fm-lint-groups-run.json
+FM_TEST_END 2026-10-26T05:22:31Z tests/fm-lint.test.sh exit=0 duration_ms=261116 gate_skip=false
+FM_TEST_SUMMARY total=4 failed=0 skipped_gate=0 duration_ms=261726
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=4 duration_ms=523411 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-lint.test.sh duration_ms=261116
+FM_TEST_SLOWEST rank=2 script=tests/fm-lint-report.test.sh duration_ms=137921
+FM_TEST_SLOWEST rank=3 script=tests/fm-lint-slots.test.sh duration_ms=98914
+FM_TEST_SLOWEST rank=4 script=tests/fm-lint-policy.test.sh duration_ms=25460
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5VA2490WWAKKD3TNGEAFGWG/fm-lint-groups-run.json
+bin/fm-test-run.sh --jobs 4 --json "$E/fm-lint-groups-run.json"      340.26s user 159.74s system 190% cpu 4:22.19 total
 exit=0

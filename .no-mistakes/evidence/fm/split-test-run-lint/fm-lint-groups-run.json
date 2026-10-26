@@ -2,16 +2,16 @@
   "families": [
     {
       "count": 4,
-      "duration_ms": 514969,
+      "duration_ms": 523411,
       "failed": 0,
       "name": "pure-contract-unit"
     }
   ],
-  "finished_at": "2026-10-26T04:09:28Z",
-  "run_id": "fm-test-run-1792987509886-94613",
+  "finished_at": "2026-10-26T05:22:31Z",
+  "run_id": "fm-test-run-1792991890268-27206",
   "scripts": [
     {
-      "duration_ms": 28575,
+      "duration_ms": 25460,
       "exit": 0,
       "expected_gate_skip": "none",
       "family": "pure-contract-unit",
@@ -20,7 +20,7 @@
       "path": "tests/fm-lint-policy.test.sh"
     },
     {
-      "duration_ms": 95391,
+      "duration_ms": 98914,
       "exit": 0,
       "expected_gate_skip": "none",
       "family": "pure-contract-unit",
@@ -29,7 +29,7 @@
       "path": "tests/fm-lint-slots.test.sh"
     },
     {
-      "duration_ms": 132478,
+      "duration_ms": 137921,
       "exit": 0,
       "expected_gate_skip": "none",
       "family": "pure-contract-unit",
@@ -38,7 +38,7 @@
       "path": "tests/fm-lint-report.test.sh"
     },
     {
-      "duration_ms": 258525,
+      "duration_ms": 261116,
       "exit": 0,
       "expected_gate_skip": "none",
       "family": "pure-contract-unit",
@@ -48,9 +48,9 @@
     }
   ],
   "selection": "scripts;jobs=4",
-  "started_at": "2026-10-26T04:05:09Z",
+  "started_at": "2026-10-26T05:18:10Z",
   "summary": {
-    "duration_ms": 259133,
+    "duration_ms": 261726,
     "failed": 0,
     "skipped_gate": 0,
     "total": 4
