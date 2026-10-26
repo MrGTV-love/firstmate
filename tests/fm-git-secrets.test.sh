@@ -421,9 +421,9 @@ test_inspection_failures_escalate_and_keep_line_counts() {
   head=$(git -C "$repo" rev-parse HEAD)
   scan() {
     if [ "$mode" = pre-commit ]; then
-      (cd "$repo" && FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" pre-commit 2>&1)
+      (cd "$repo" && FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-commit 2>&1)
     else
-      (cd "$repo" && printf '%s\n' "$1" | FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" pre-push origin "$TMP_ROOT/none.git" 2>&1)
+      (cd "$repo" && printf '%s\n' "$1" | FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-push origin "$TMP_ROOT/none.git" 2>&1)
     fi
   }
   readable() {
@@ -457,7 +457,7 @@ test_each_decision_emits_one_event() {
   local repo status
   repo="$TMP_ROOT/telemetry"
   make_repo "$repo"
-  (cd "$repo" && printf 'not a ref update\n' | python3 "$ROOT/bin/fm-git-secrets.py" pre-push origin "$TMP_ROOT/none.git") >/dev/null 2>&1
+  (cd "$repo" && printf 'not a ref update\n' | python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-push origin "$TMP_ROOT/none.git") >/dev/null 2>&1
   status=$?
   expect_code 1 "$status" "unreadable pre-push input did not refuse"
   for guard in git-commit-credential-shapes git-push-credential-shapes; do
@@ -469,6 +469,36 @@ test_each_decision_emits_one_event() {
   [ "$(jq -s '[.[] | select(.guard == "git-push-credential-shapes" and .decision == "deny" and .source_ok == false)] | length' "$FM_GUARD_EVENT_LOG")" -eq 1 ] ||
     fail "the failed inspection did not record one unreadable-source deny"
   pass "commit and push decisions each record guard events, including a fail-closed unreadable source"
+}
+
+test_only_task_worktree_decisions_record_events() {
+  local task fixture hooks home out before
+  task="$TMP_ROOT/scope-task"
+  fixture="$TMP_ROOT/scope-fixture"
+  hooks="$TMP_ROOT/hooks-scope"
+  home="$TMP_ROOT/scope-home"
+  make_repo "$task"
+  make_repo "$fixture"
+  "$STRIP" install "$hooks" "$task" || fail "install failed"
+  in_pane() { (unset FM_GUARD_EVENT_LOG; FM_HOME=$home with_hooks_env "$hooks" "$@"); }
+  before=$(git -C "$fixture" rev-parse HEAD)
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$fixture/leak.txt"
+  git -C "$fixture" add leak.txt
+  out=$(in_pane git -C "$fixture" commit -qm 'fixture credential' 2>&1) &&
+    fail "R1: a fixture repository commit admitted a credential"
+  assert_contains "$out" leak.txt "R1: the fixture refusal did not name the file"
+  assert_equals "$before" "$(git -C "$fixture" rev-parse HEAD)" "R1: the refused fixture commit moved HEAD"
+  printf 'TOKEN=replace-me\n' >"$fixture/leak.txt"
+  git -C "$fixture" add leak.txt
+  in_pane git -C "$fixture" commit -qm 'fixture placeholder' || fail "R1: the fixture placeholder did not commit"
+  [ ! -e "$home/state/guard-events.jsonl" ] || fail "R1: a fixture repository commit wrote to the home guard log"
+  printf 'benign\n' >"$task/benign.txt"
+  git -C "$task" add benign.txt
+  in_pane git -C "$task" commit -qm 'task commit' || fail "R1: the task worktree commit failed"
+  assert_equals 'git-commit-credential-shapes:allow' \
+    "$(jq -rs '[.[] | "\(.guard):\(.decision)"] | join(" ")' "$home/state/guard-events.jsonl")" \
+    "R1: the task worktree commit did not record exactly its own event"
+  pass "fixture repositories in a task pane are still checked but record no event; the task worktree records its event"
 }
 
 test_abandoned_refusal_does_not_inflate_unrelated_attempts pre-commit
@@ -485,6 +515,7 @@ test_repeated_refusals_escalate_without_admitting
 test_inspection_failures_escalate_and_keep_line_counts pre-commit
 test_inspection_failures_escalate_and_keep_line_counts pre-push
 test_each_decision_emits_one_event
+test_only_task_worktree_decisions_record_events
 
 export T3_ROOT="$ROOT" T3_TMP="$TMP_ROOT"
 node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'T3 native write acceptance'

@@ -8,7 +8,8 @@
 #       Rewrites that file in place, then exits 0 so the commit proceeds.
 #   fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree> [<keep-trailers:0|1>]
 #       Recreate <hooks-dir> as a core.hooksPath for this launch: pre-commit and
-#       pre-push run the local fm-git-secrets.py scanner, commit-msg runs this
+#       pre-push run the local fm-git-secrets.py scanner, which records guard
+#       events only for <worktree> itself, commit-msg runs this
 #       strip unless keep-trailers=1, plus wrappers per client-side hook name
 #       git documents except reference-transaction and post-index-change,
 #       which are deliberately excluded (see FM_GIT_CLIENT_HOOKS below).
@@ -224,6 +225,7 @@ install_hooks() {
     echo "error: not a git worktree: $wt" >&2
     return 1
   }
+  wt=$(CDPATH='' cd -- "$wt" && pwd -P) || return 1
   chmod u+w "$hooks_dir" 2>/dev/null
   rm -rf "$hooks_dir"
   mkdir -p "$hooks_dir" || return 1
@@ -249,7 +251,7 @@ EOF
 (
 $(runtime_chain_body "$hooks_dir")
 ) || exit \$?
-python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") pre-commit || exit \$?
+python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-commit || exit \$?
 EOF
         ;;
       pre-push)
@@ -258,7 +260,7 @@ EOF
 push_input=\$(mktemp "\${TMPDIR:-/tmp}/fm-git-pre-push.XXXXXX") || exit 1
 trap 'rm -f "\$push_input"' EXIT
 cat >"\$push_input" || exit 1
-python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") pre-push "\$@" <"\$push_input" || exit \$?
+python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-push "\$@" <"\$push_input" || exit \$?
 exec <"\$push_input"
 rm -f "\$push_input"
 trap - EXIT

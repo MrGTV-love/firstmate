@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Check lines that staged or outgoing commits add, using conservative credential shapes.
 
-Usage: fm-git-secrets.py pre-commit
-       fm-git-secrets.py pre-push <remote-name> <remote-location>
+Usage: fm-git-secrets.py [--task-worktree <dir>] pre-commit
+       fm-git-secrets.py [--task-worktree <dir>] pre-push <remote-name> <remote-location>
 Only content new relative to every parent is inspected: the lines the staged
 index adds against HEAD and each MERGE_HEAD, and the lines each outgoing commit
 adds against all of its parents. Within one such diff, each removed copy of a
@@ -14,7 +14,9 @@ cherry-pick, revert or squash of a commit already on a remote makes a new
 commit, so its lines are inspected and can be falsely refused. Pre-push
 consumes Git's ref-update records on stdin; the hook wrapper preserves those
 bytes for the repository's own hook. No file content or match is printed, no
-provider is called, and no working-tree file is read. Each decision appends one event through fm-guard-event.sh carrying
+provider is called, and no working-tree file is read. Every repository is
+checked, but only a decision in the task worktree, whose top level is
+--task-worktree, appends one event through fm-guard-event.sh carrying
 the highest consecutive refusal count for the same credential-shaped line,
 identified by its content hash. Different content starts at one. A failed
 inspection is counted under the reserved inspection-failed key and keeps the
@@ -179,8 +181,20 @@ def record(guard, decision, source_ok, started, count):
         pass
 
 
+def in_task_worktree(task_worktree):
+    if task_worktree is None:
+        return False
+    try:
+        top = git("rev-parse", "--show-toplevel").rstrip(b"\n")
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return os.path.realpath(top) == os.path.realpath(os.fsencode(task_worktree))
+
+
 def main():
-    args = sys.argv[1:]
+    args, task_worktree = sys.argv[1:], None
+    if args[:1] == ["--task-worktree"] and len(args) > 1:
+        task_worktree, args = args[1], args[2:]
     if args in (["--help"], ["-h"]):
         print(__doc__)
         return 0
@@ -189,7 +203,7 @@ def main():
     elif len(args) == 3 and args[0] == "pre-push":
         inspections = outgoing_lines
     else:
-        print("error: expected pre-commit or pre-push <remote-name> <remote-location>")
+        print("error: expected [--task-worktree <dir>] pre-commit or pre-push <remote-name> <remote-location>")
         return 2
     guard, started = GUARDS[args[0]], time.monotonic()
     try:
@@ -203,7 +217,8 @@ def main():
         paths, fingerprints, source_ok = None, None, "false"
     denied = paths is None or bool(paths)
     count = repeat(guard, fingerprints)
-    record(guard, "deny" if denied else "allow", source_ok, started, count)
+    if in_task_worktree(task_worktree):
+        record(guard, "deny" if denied else "allow", source_ok, started, count)
     if not denied:
         return 0
     if paths is None:
