@@ -37,9 +37,11 @@
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
-#                   exit, duration, whether it gate-skipped, and the reason it
-#                   gave (empty when it ran), so a lane can say which harness or
-#                   tool this host could not exercise.
+#                   exit, duration, CPU (cpu_ms, null when unmeasured), whether
+#                   it gate-skipped, and the reason it gave (empty when it ran),
+#                   so a lane can say which harness or tool this host could not
+#                   exercise. docs/fm-test-portable-shards.md "Timing artifacts"
+#                   owns what cpu_ms does and does not show.
 #   --list          print selected script paths (one per line) and exit 0
 #   --list-scheduled
 #                   print selected paths longest-hint-first and exit 0.

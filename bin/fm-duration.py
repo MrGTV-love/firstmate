@@ -123,7 +123,8 @@ a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
 writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
 starts (0 when a slot was free at once), so that caller can leave the wait out of
-its sample. Slots are exclusive
+its sample. --cpu-file receives the command tree's CPU milliseconds after
+COMMAND exits; gate's docstring owns what that sample counts. Slots are exclusive
 non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
 $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
