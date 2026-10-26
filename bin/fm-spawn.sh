@@ -100,11 +100,14 @@
 #   kind and project or home come from the task's validated state/<id>.meta,
 #   so --backend, --scout, --secondmate, a project positional, and batch pairs
 #   are refused. Harness, model, and effort may change explicitly.
-#   Every launch appends its exact model (or default) as a newline-delimited
-#   entry to state/<id>.launch-models under the task metadata lock, before
-#   publishing replacement metadata. Relaunch also appends the prior meta model
-#   for legacy tasks. History is never truncated or unwound on launch failure:
-#   conservative extra authors fail closed in fm-review-record.py verification.
+#   Every launch appends its exact model (or default) as a tab-separated
+#   <spawn_gen> <prior spawn_gen> <model> line to state/<id>.launch-models under
+#   the task metadata lock, before publishing replacement metadata. A fresh
+#   spawn leaves the prior field empty; relaunch names the replaced spawn_gen and
+#   also appends the prior meta model under the new spawn_gen. History is never
+#   truncated or unwound on launch failure. fm-review-record.py counts only the
+#   lines reached from the current meta's spawn_gen through prior links, so a
+#   reused task id never inherits an earlier incarnation's authors.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
@@ -6999,11 +7002,16 @@ if [ -L "$SPAWN_MODEL_HISTORY" ] || { [ -e "$SPAWN_MODEL_HISTORY" ] && [ ! -f "$
   echo "error: launch-model history is not an ordinary file: $SPAWN_MODEL_HISTORY" >&2
   exit 1
 fi
+SPAWN_PRIOR_GEN=
+if [ "$RELAUNCH" -eq 1 ]; then
+  SPAWN_PRIOR_GEN=$(fm_meta_get "$RELAUNCH_META" spawn_gen)
+  SPAWN_PRIOR_MODEL=$(fm_meta_get "$RELAUNCH_META" model)
+fi
 {
   if [ "$RELAUNCH" -eq 1 ]; then
-    awk -F= '$1 == "model" { print substr($0, 7); found=1 } END { if (!found) print "unknown" }' "$RELAUNCH_META"
+    printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${SPAWN_PRIOR_MODEL:-unknown}"
   fi
-  printf '%s\n' "${MODEL:-default}"
+  printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${MODEL:-default}"
 } >> "$SPAWN_MODEL_HISTORY" || {
   echo "error: could not append launch-model history: $SPAWN_MODEL_HISTORY" >&2
   exit 1

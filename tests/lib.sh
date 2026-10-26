@@ -110,6 +110,11 @@ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
 # deadline. A case that verifies the override sets it itself.
 unset FM_ARM_CONFIRM_TIMEOUT
 
+# Clear the operator's no-mistakes home. An inherited NM_HOME outranks a
+# fixture's HOME, so author-evidence cases would read the operator's live
+# pipeline database instead of their own. A case that needs one sets it itself.
+unset NM_HOME
+
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
 # there (for example a beads backend at its live backlog), so a copy points the

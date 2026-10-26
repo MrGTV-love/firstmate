@@ -21,40 +21,45 @@ verify derives authors anew from the exact head's commits outside the merge base
 with replacement objects disabled. fm-pr-merge.sh supplies --base as the live
 forge's exact 40-hex base SHA, never a stale local target ref. verify requires
 --task selecting state/<task>.meta and --base; fetch the exact base and full head
-locally first. Non-pipeline commits form group ship, using every model from the
-append-only state/<task>.launch-models history, current meta, and any
-state/<task>.control-relaunch.meta-prior. fm-spawn.sh owns history publication.
-Legacy tasks without history use the available meta evidence; default stays
-unknown. Subjects starting exactly no-mistakes( form
-no-mistakes:<family> groups. Their models come from matching runs and
-agent_invocations in <NM_HOME>/state.sqlite (default ~/.no-mistakes), opened with
-SQLite mode=ro. A matching run must contain the pipeline commit in its recorded
-base-to-head/pushed range and name this PR or this task's repository and branch.
-All its invocation models are conservative author evidence. A recorded provider
+locally first. Non-pipeline commits form group ship, using the current meta,
+any state/<task>.control-relaunch.meta-prior, and every model in the
+append-only state/<task>.launch-models history reached from the current meta's
+spawn_gen through prior links, so a reused task id never inherits an earlier
+incarnation. fm-spawn.sh owns history publication. Legacy tasks without
+history use the available meta evidence; default stays unknown. Subjects
+starting exactly no-mistakes( form no-mistakes:<family> groups. Their models
+come from matching runs and agent_invocations in <NM_HOME>/state.sqlite
+(default ~/.no-mistakes), opened with SQLite mode=ro; a relative NM_HOME is
+never resolved and leaves the pipeline commits unknown. A matching run must
+contain the pipeline commit in its recorded base-to-head/pushed range and name
+this PR or this task's repository and branch. All its invocation models are conservative author evidence. A recorded provider
 can resolve an otherwise unknown model alias; conflicting provider/model families
 are unknown. Unattributed commits remain unknown: today's agent configuration
 cannot prove who authored an earlier commit. It never creates a database.
 review records only the reader's declaration, not an attribution snapshot;
 verify always rereads authoritative evidence, including for historical records.
-Typed unknown-family models stay unknown even when a run provider resolves a
-similarly named recorded model.
+A typed model id exactly matching a model derived for that same named group
+takes its derived family; any other typed unknown-family id, including one
+under all, stays unknown.
 --author-groups remains a required declaration of exact author models, not an
 authority to remove or relabel derived groups. Named declarations must include the
 derived family; an all declaration must include every derived family. Additional
 typed groups/families add constraints. --covered-groups is a JSON list naming only
 the groups the reader actually read, or ["all"]; omitted, author-groups keys name
-the covered groups. Historical records use those same keys. A PASS can cover a
-group only when it names that group or all, declares its derived authors, and its
-known reader family is outside that group's known author families. Unknown is
-never covered. Multiple exact-head PASS reads can collectively cover every group;
-one reader outside every family is no longer required. This tests the harm directly:
-every author's blind spots must receive an independent read, without forcing a
-third family for mixed-family work. Exact-head binding, report validation,
-captain-word/away rules and every live forge/hold check remain mandatory.
+the covered groups. Historical records use those same keys. A PASS covers one
+author family of a group only when it names that group or all, declares its
+derived authors, and its known reader family differs from that author family.
+Every author family of every group, ship and no-mistakes alike, needs at least
+one such exact-head PASS. Unknown is never covered. Multiple reads can
+collectively cover a group; one reader outside every family is not required.
+This tests the harm directly: every author's blind spots must receive an
+independent read, without forcing a third family for mixed-family work.
+Exact-head binding, report validation, captain-word/away rules and every live
+forge/hold check remain mandatory.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama); route prefixes ending in / are dropped. Stored typed family fields
-never decide independence. Uncovered-group refusals name its family and print a
+never decide independence. Uncovered-group refusals name each uncovered family and print a
 recording command; substitute the actual reader, local report and trigger answers.
 verify accepts the newest captain-word only at the exact live head, unless a FAIL
 at that head was appended after it. Any exact-head FAIL blocks regardless of later
@@ -308,7 +313,17 @@ def derived_authors(home, pr, head, task, base):
         prior = state / f"{task}.control-relaunch.meta-prior"
         try:
             if history.exists():
-                models.extend(history.read_text(encoding="utf-8").splitlines() or ["unknown"])
+                entries = [line.split("\t") for line in history.read_text(encoding="utf-8").splitlines()]
+                pending, seen = [meta.get("spawn_gen")], set()
+                while pending:
+                    gen = pending.pop()
+                    if not gen or gen in seen:
+                        continue
+                    seen.add(gen)
+                    for fields in entries:
+                        if len(fields) == 3 and fields[0] == gen:
+                            models.append(fields[2] or "unknown")
+                            pending.append(fields[1])
             if prior.exists():
                 fields = dict(line.split("=", 1) for line in prior.read_text(encoding="utf-8").splitlines() if "=" in line)
                 models.append(fields.get("model") or "unknown")
@@ -318,11 +333,11 @@ def derived_authors(home, pr, head, task, base):
     pipeline = [sha for sha, subject in commits if subject.startswith("no-mistakes(")]
     if pipeline:
         root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
-        if not root.is_absolute():
-            root = worktree / root
         models = []
         covered = set()
         try:
+            if not root.is_absolute():
+                raise OSError(f"relative NM_HOME {root} is not author evidence")
             with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
                 runs = db.execute("SELECT id, base_sha, head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
                                   "OR (branch = ? AND repo_id IN (SELECT id FROM repos WHERE working_path IN (?, ?)))",
@@ -382,15 +397,23 @@ def verify(records, rows, head, home, pr, task, base):
         raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
     if review["head"] != head:
         raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    task, groups = derived_authors(home, pr, head, task, base)
-    derived_families = {a["family"] for authors in groups.values() for a in authors}
+    task, derived = derived_authors(home, pr, head, task, base)
+    groups = {group: list(authors) for group, authors in derived.items()}
+    derived_families = {a["family"] for authors in derived.values() for a in authors}
+
+    def declared(group, authors):
+        # A typed id takes a family from evidence only by exactly matching a
+        # model derived for that same group; anything else is read from its id.
+        known = {a["model"]: a["family"] for a in derived.get(group, [])}
+        return [{"model": a["model"], "family": known[a["model"]] if a["model"] in known
+                 else model(a["model"], "author_groups model")} for a in authors]
 
     unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
     passes = [row for row in rows if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
     # Typed groups can only add author constraints, never erase the derived ones.
     for row in passes:
         for group, authors in row["author_groups"].items():
-            authors = [modelled(a["model"], "author_groups model") for a in authors]
+            authors = declared(group, authors)
             if group == "all":
                 extras = [a for a in authors if a["family"] not in derived_families]
                 if extras:
@@ -400,21 +423,22 @@ def verify(records, rows, head, home, pr, task, base):
                 target.extend(a for a in authors if a not in target)
     for group, authors in sorted(groups.items()):
         families = {a["family"] for a in authors}
-        covered = False
+        readers = set()
         for row in passes:
             named = row.get("covered_groups", list(row["author_groups"]))
-            declared = row["author_groups"].get(group, row["author_groups"].get("all", []))
-            declared_families = {modelled(a["model"], "author_groups model")["family"] for a in declared}
+            key = group if group in row["author_groups"] else "all"
+            declared_families = {a["family"] for a in declared(key, row["author_groups"].get(key, []))}
             reader = model(row["reader_model"], "reader_model")
             # An 'all' read is usable only when its typed evidence includes every
             # derived family; the old OpenAI-only declaration cannot hide Claude.
-            all_declared = {modelled(a["model"], "author_groups model")["family"] for a in row["author_groups"].get("all", [])}
+            extras = {a["family"] for a in declared("all", row["author_groups"].get("all", []))} - derived_families
             required = derived_families if "all" in row["author_groups"] else families
-            constraints = families | (all_declared - derived_families)
-            if (group in named or "all" in named) and required <= declared_families:
-                if reader != "unknown" and "unknown" not in constraints and reader not in constraints:
-                    covered = True
-        if not covered or unknown_reader:
+            if ((group in named or "all" in named) and required <= declared_families
+                    and reader != "unknown" and "unknown" not in extras and reader not in extras):
+                readers.add(reader)
+        # Every author family needs some reading PASS from a different family.
+        uncovered = sorted(f for f in families if f == "unknown" or not readers - {f})
+        if uncovered or unknown_reader:
             reason = f"model family unknown for {review['reader_model']}; " if unknown_reader else ""
             models = {key: sorted({a["model"] for a in values}) for key, values in groups.items()}
             command = shlex.join([str(BIN / "fm-review-record.py"), "review",
@@ -424,7 +448,7 @@ def verify(records, rows, head, home, pr, task, base):
                                   "--covered-groups", json.dumps([group]),
                                   "--loosens-deny-allow-list", "no", "--widens-guard", "no",
                                   "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
-            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(sorted(families))}; reader_family must be known and outside this group (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME={shlex.quote(str(home))} FM_STATE_OVERRIDE={shlex.quote(str(state_dir(home)))} {command}")
+            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered or sorted(families))}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME={shlex.quote(str(home))} FM_STATE_OVERRIDE={shlex.quote(str(state_dir(home)))} {command}")
     return "PASS"
 
 

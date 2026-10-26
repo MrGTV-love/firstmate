@@ -14,10 +14,10 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 
 test_derived_author_coverage() {
-  local scenario case_dir head base url rc before after groups expected
+  local scenario case_dir head base url rc before after groups expected command
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default typed-unknown; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused typed-unknown alias-command relative-nm-home; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -37,26 +37,45 @@ CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, base_sha TEXT, head_sha T
 CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);''')
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
-    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] == 'typed-unknown' else 'claude-sonnet-5-5', 'anthropic'))
+    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic'))
 PY
     case "$scenario" in
       unreadable|config-fallback|changed-config)
         printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
     esac
     case "$scenario" in
+      ship-history|ship-multi-read|ship-default|ship-reused)
+        printf 'spawn_gen=gen-current\n' >> "$case_dir/state/task-x1.meta" ;;
+    esac
+    case "$scenario" in
       config-fallback) printf 'agent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
       changed-config) printf 'agent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
       ship-history|ship-multi-read)
-        printf 'claude-opus-5-5\ngpt-5.1-codex\n' > "$case_dir/state/task-x1.launch-models" ;;
+        printf 'gen-first\t\tclaude-opus-5-5\ngen-current\tgen-first\tclaude-opus-5-5\ngen-current\tgen-first\tgpt-5.1-codex\n' \
+          > "$case_dir/state/task-x1.launch-models" ;;
       ship-prior)
         printf 'model=claude-opus-5-5\n' > "$case_dir/state/task-x1.control-relaunch.meta-prior" ;;
-      ship-default) printf 'default\n' > "$case_dir/state/task-x1.launch-models" ;;
+      ship-default) printf 'gen-current\t\tdefault\n' > "$case_dir/state/task-x1.launch-models" ;;
+      relative-nm-home)
+        # A worker-planted database under a relative NM_HOME is never evidence.
+        mkdir -p "$case_dir/wt/.no-mistakes"
+        cp "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt/.no-mistakes/state.sqlite" ;;
+      ship-reused)
+        # The same task id's earlier incarnation was Claude; its lines remain.
+        printf 'gen-old\t\tclaude-opus-5-5\ngen-current\t\tgpt-5.1-codex\n' > "$case_dir/state/task-x1.launch-models" ;;
     esac
     before=$(shasum -a 256 "$case_dir/user-home/.no-mistakes/state.sqlite")
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
-      ship-only|omitted-pipeline|ship-history|ship-prior|ship-default)
+      ship-only|omitted-pipeline|ship-prior|ship-default|ship-reused)
         record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
+      ship-history)
+        # Main instruction 006: a Claude read covers the OpenAI author and an
+        # OpenAI read covers the Claude author of one Claude-then-OpenAI ship group.
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' >/dev/null || fail 'record Claude read of both ship families'
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gpt-5.1-codex >/dev/null || fail 'record OpenAI read of both ship families' ;;
+      alias-command)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex"]}' >/dev/null || fail 'record Claude read of ship' ;;
       ship-multi-read)
         record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gemini-3-pro >/dev/null || fail 'record independent read of both ship families' ;;
       typed-unknown)
@@ -82,9 +101,26 @@ PY
       # Existing report evidence cannot authorize a different, unavailable head.
     fi
     rc=0
-    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$scenario" = relative-nm-home ]; then
+      (cd "$case_dir/wt" && NM_HOME=.no-mistakes run_pr_merge "$case_dir" task-x1 "$url") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    if [ "$scenario" = alias-command ]; then
+      expect_code 1 "$rc" "alias pipeline group must refuse before its read: $(cat "$case_dir/stderr")"
+      assert_grep 'uncovered commit group no-mistakes:anthropic, family anthropic' "$case_dir/stderr" 'alias group takes the recorded provider family'
+      command=$(sed -n 's/.*record it with: //p' "$case_dir/stderr")
+      command=${command%; inspect review-records.jsonl in the PR task home before retrying}
+      [ -n "$command" ] || fail "alias refusal printed no recording command: $(cat "$case_dir/stderr")"
+      printf 'VERDICT: PASS head=%s\nOpenAI read of the Claude pipeline commits.\n' "$head" > "$case_dir/alias-report.md"
+      command=${command//OUTSIDE_FAMILY_MODEL/gpt-5.1-codex}
+      command=${command//LOCAL_READER_REPORT/$case_dir/alias-report.md}
+      eval "$command" > "$case_dir/alias-record.out" 2>&1 || fail "the printed recording command failed: $(cat "$case_dir/alias-record.out")"
+      rc=0
+      run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|alias-command)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -93,8 +129,8 @@ PY
         case "$scenario" in
           exact-head-fail) expected='verdict is FAIL' ;;
           head-mismatch) expected='head mismatch' ;;
-          unreadable|config-fallback|changed-config) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
-          ship-history|ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
+          unreadable|config-fallback|changed-config|relative-nm-home) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;
           *) expected='uncovered commit group no-mistakes:anthropic, family anthropic' ;;
