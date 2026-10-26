@@ -1,0 +1,2 @@
+{"ts":"2026-10-26T03:04:41Z","guard":"jev-tool-coverage","version":"1","system":"firstmate","session":"native:websearch","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T03:04:41Z","guard":"jev-egress-grant","version":"1","system":"firstmate","session":"native:web","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

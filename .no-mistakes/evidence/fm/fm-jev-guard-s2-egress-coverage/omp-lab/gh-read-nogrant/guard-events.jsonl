@@ -1,0 +1,3 @@
+{"ts":"2026-10-26T03:03:19Z","guard":"jev-tool-coverage","version":"1","system":"firstmate","session":"native:github","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T03:03:19Z","guard":"jev-github-write-op","version":"1","system":"firstmate","session":"native:github-read","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T03:03:19Z","guard":"jev-egress-grant","version":"1","system":"firstmate","session":"native:remote-storage","decision":"deny","source_ok":false,"elapsed_ms":28,"cleared_by":"","repeat":1,"override":false}

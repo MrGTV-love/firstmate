@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "github",
+    "arguments": "{\"op\": \"pr_checkout\", \"pr\": \"12\", \"force\": true, \"i\": \"Checkout\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "[jev-guard] GitHub op \"pr_checkout\" refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made. Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read. REVIEW_ON_UNAVAILABLE_V1. Apart from the alternative this refusal names, do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."
+  }
+]

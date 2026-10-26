@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "write",
+    "arguments": "{\"path\": \"ok.txt\", \"content\": \"hello lab\", \"i\": \"Write\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "Successfully wrote 9 bytes to ok.txt"
+  }
+]

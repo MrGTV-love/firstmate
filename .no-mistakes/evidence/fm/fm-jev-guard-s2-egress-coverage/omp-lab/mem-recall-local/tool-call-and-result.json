@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "recall",
+    "arguments": "{\"query\": \"lab\", \"i\": \"Recall\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "No relevant memories found."
+  }
+]

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(?!(Bash|Monitor|PowerShell)$).*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/hook.sh'",
+            "timeout": 330
+          }
+        ]
+      }
+    ]
+  }
+}

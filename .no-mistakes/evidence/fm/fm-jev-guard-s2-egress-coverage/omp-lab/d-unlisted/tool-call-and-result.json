@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "fm_lab_unlisted",
+    "arguments": "{\"note\": \"x\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "[jev-guard] Unclassified host tool \"fm_lab_unlisted\": Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."
+  }
+]

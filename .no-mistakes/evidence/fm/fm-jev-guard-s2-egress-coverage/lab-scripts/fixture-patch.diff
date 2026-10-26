@@ -1,0 +1,4 @@
+64c64
+<             args = {'file_path': scenario['path']}
+---
+>             args = scenario.get('args') or {'file_path': scenario['path']}

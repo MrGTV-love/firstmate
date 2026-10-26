@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Records each hook call, then runs the real hook exactly as fm-spawn registers it.
+tee -a "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/hook-calls.jsonl" | "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5V29PD99JFK5BG4M7JKKY14/bin/fm-jev-guard-hook.sh" "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/home" "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/home/config" "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/home/state" native "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/worktree" "/Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/home/data" firstmate FIRSTMATE_JEV_GUARD_V1

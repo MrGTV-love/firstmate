@@ -1,0 +1,50 @@
+
+== cl-bash: claude exit=0
+hook calls: 0
+(Bash completed with no output)
+
+<system-reminder>
+<total_tokens>14999998 tokens left</total_tokens>
+</system-reminder>
+
+files: bash-ran.txt 
+
+== cl-websearch-grant: claude exit=0
+hook calls: 1
+{"tool":"websearch","decision":"allow","branch":"egress","destination_class":"web"}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:websearch","source_ok":true}
+{"guard":"jev-egress-grant","decision":"allow","session":"native:web","source_ok":true}
+Web search results for query: "fm lab query"
+
+native-context-consumed
+
+
+REMINDER: You MUST include the sources above in your response to the user using markdown hyperlinks.
+
+<system-reminder>
+<total_tokens>14999998 tokens left</total_tokens>
+</system-reminder>
+
+files: 
+
+== cl-websearch-nogrant: claude exit=0
+hook calls: 1
+{"tool":"websearch","decision":"block","branch":"egress","destination_class":"web"}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:websearch","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:web","source_ok":false}
+PreToolUse:WebSearch hook error: [jev-guard] Missing task egress grant: request Firstmate authorization for egress=["web"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+<system-reminde
+files: 
+
+== cl-write: claude exit=0
+hook calls: 1
+{"tool":"write","decision":"allow","branch":"policy","destination_class":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:write","source_ok":true}
+File created successfully at: /Users/charlesabrooker/tmp/fm-t4-lab.PtjvJJ/c/worktree/ok.txt (file state is current in your context — no need to Read it back)
+
+<system-reminder>
+<total_tokens>14999998 tokens left</total_tokens>
+</system-reminder>
+
+files: ok.txt 

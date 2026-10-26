@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "github",
+    "arguments": "{\"op\": \"repo_view\", \"repo\": \"octocat/hello-world\", \"i\": \"View\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "[jev-guard] Missing task egress grant: request Firstmate authorization for egress=[\"remote-storage\"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative."
+  }
+]

@@ -1,0 +1,126 @@
+
+== a-report-issue-allgrants: omp exit=0
+{"tool":"write","decision":"block","branch":"device","destination_class":null,"confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:write","source_ok":true}
+[jev-guard] Device "xd://report_issue" refused: Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead. Refused path: "xd://report_issue". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refu
+files: 
+
+== a-report-issue-nogrant: omp exit=0
+{"tool":"write","decision":"block","branch":"device","destination_class":null,"confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:write","source_ok":true}
+[jev-guard] Device "xd://report_issue" refused: Auto QA is off for firstmate workers (dev.autoqa: false in .omp/fm-worker-overlay.yml) because it uploads every pending grievance off the machine. Report the tool problem to Firstmate instead. Refused path: "xd://report_issue". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refu
+files: 
+
+== b-find-grant: omp exit=0
+{"tool":"find","decision":"allow","branch":"egress","destination_class":"semantic-search","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:find","source_ok":true}
+{"guard":"jev-egress-grant","decision":"allow","session":"native:semantic-search","source_ok":true}
+no hits for "guard" (τ 0.20)
+
+listed 0 · judged 0 · read 0 files (0B) · 0 requests · 0 tokens · $0.0000 · 1ms wall / 0ms api
+
+files: 
+
+== b-find-nogrant: omp exit=0
+{"tool":"find","decision":"block","branch":"egress","destination_class":"semantic-search","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:find","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:semantic-search","source_ok":false}
+[jev-guard] Missing task egress grant: request Firstmate authorization for egress=["semantic-search"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+files: 
+
+== b-find-wronggrant: omp exit=0
+{"tool":"find","decision":"block","branch":"egress","destination_class":"semantic-search","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:find","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:semantic-search","source_ok":true}
+[jev-guard] Missing task egress grant: request Firstmate authorization for egress=["semantic-search"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+files: 
+
+== c-eval: omp exit=0
+{"tool":"eval","decision":"allow","branch":"confinement","destination_class":null,"confinement_owner":"T5"}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:eval","source_ok":true}
+42
+
+files: eval-ran.txt 
+
+== d-unlisted: omp exit=0
+{"tool":"fm_lab_unlisted","decision":"block","branch":"coverage","destination_class":null,"confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"deny","session":"native:fm_lab_unlisted","source_ok":true}
+[jev-guard] Unclassified host tool "fm_lab_unlisted": Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to
+files: 
+
+== gh-read-grant: omp exit=0
+{"tool":"github","decision":"allow","branch":"egress","destination_class":"remote-storage","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:github","source_ok":true}
+{"guard":"jev-github-write-op","decision":"allow","session":"native:github-read","source_ok":true}
+{"guard":"jev-egress-grant","decision":"allow","session":"native:remote-storage","source_ok":true}
+GitHub CLI is not authenticated. Run `gh auth login`.
+
+files: 
+
+== gh-read-nogrant: omp exit=0
+{"tool":"github","decision":"block","branch":"egress","destination_class":"remote-storage","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:github","source_ok":true}
+{"guard":"jev-github-write-op","decision":"allow","session":"native:github-read","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:remote-storage","source_ok":false}
+[jev-guard] Missing task egress grant: request Firstmate authorization for egress=["remote-storage"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+files: 
+
+== gh-write-grant: omp exit=0
+{"tool":"github","decision":"block","branch":"github-write-op","destination_class":"remote-storage","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:github","source_ok":true}
+{"guard":"jev-github-write-op","decision":"deny","session":"native:github-write","source_ok":true}
+[jev-guard] GitHub op "pr_checkout" refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made. Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read. REVIEW_ON_UNAVAILABLE_V1. Apart from the alternative this refusal names, do not retry an equivalent action through
+files: 
+
+== gh-write-nogrant: omp exit=0
+{"tool":"github","decision":"block","branch":"github-write-op","destination_class":"remote-storage","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:github","source_ok":true}
+{"guard":"jev-github-write-op","decision":"deny","session":"native:github-write","source_ok":true}
+[jev-guard] GitHub op "pr_push" refused under every grant: only read ops can run, because every other op writes worktrees, branches, git config, refs or the remote. No call was made. Make the change with git and the no-mistakes pipeline, or use gh-axi through the shell for a read. REVIEW_ON_UNAVAILABLE_V1. Apart from the alternative this refusal names, do not retry an equivalent action through ano
+files: 
+
+== mem-recall-hindsight: omp exit=0
+{"tool":"recall","decision":"block","branch":"egress","destination_class":"provider","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:recall","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:provider","source_ok":false}
+[jev-guard] Missing task egress grant: memory operation "recall" makes a remote Hindsight memory call; request Firstmate authorization for egress=["provider"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correct
+files: 
+
+== mem-recall-local: omp exit=0
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:recall","source_ok":true}
+No relevant memories found.
+
+files: 
+
+== mem-retain-nogrant: omp exit=0
+{"tool":"retain","decision":"block","branch":"egress","destination_class":"provider","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:retain","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:provider","source_ok":false}
+[jev-guard] Missing task egress grant: memory operation "retain" makes a Mnemopi extraction model call (mnemopi.llmMode=smol); request Firstmate authorization for egress=["provider"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and reque
+files: 
+
+== web-search-nogrant: omp exit=0
+{"tool":"web_search","decision":"block","branch":"egress","destination_class":"web","confinement_owner":null}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:web_search","source_ok":true}
+{"guard":"jev-egress-grant","decision":"deny","session":"native:web","source_ok":false}
+[jev-guard] Missing task egress grant: request Firstmate authorization for egress=["web"] in state/<task>.meta. No outbound call was made. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.
+
+files: 
+
+
+== write-local: omp exit=0
+{"tool":"write","decision":"allow","branch":"policy","request_started":true}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:write","source_ok":true}
+Successfully wrote 9 bytes to ok.txt
+
+files: ok.txt 
+
+
+== write-secret-allgrants: omp exit=0
+{"tool":"write","decision":"block","branch":"policy","request_started":true}
+{"guard":"jev-tool-coverage","decision":"allow","session":"native:write","source_ok":true}
+[jev-guard] contains a credential (0.99): write it to an ignored .env or a secret store, not the repo Refused path: "cred.txt". REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request a
+files: 

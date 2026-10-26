@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "github",
+    "arguments": "{\"op\": \"repo_view\", \"repo\": \"octocat/hello-world\", \"i\": \"View\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "GitHub CLI is not authenticated. Run `gh auth login`."
+  }
+]

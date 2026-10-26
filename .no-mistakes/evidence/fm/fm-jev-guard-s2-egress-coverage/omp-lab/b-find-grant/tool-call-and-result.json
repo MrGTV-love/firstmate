@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "find",
+    "arguments": "{\"query\": \"guard\", \"grep_keywords\": [\"guard\"], \"i\": \"Search\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "no hits for \"guard\" (τ 0.20)\n\nlisted 0 · judged 0 · read 0 files (0B) · 0 requests · 0 tokens · $0.0000 · 1ms wall / 0ms api"
+  }
+]

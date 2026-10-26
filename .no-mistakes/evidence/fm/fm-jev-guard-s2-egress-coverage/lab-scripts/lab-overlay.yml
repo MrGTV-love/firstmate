@@ -1,0 +1,6 @@
+find:
+  enabled: "on"
+github:
+  enabled: true
+memory:
+  backend: mnemopi

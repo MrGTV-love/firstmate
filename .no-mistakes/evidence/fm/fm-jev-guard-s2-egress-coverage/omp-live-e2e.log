@@ -1,23 +1,22 @@
-ok - omp (omp/18.12.6): omp: normal/launch: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: normal/inbox: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: normal/copy: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: normal/changed: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: privacy/launch: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: privacy/inbox: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: privacy/copy: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: privacy/changed: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: credentials/launch: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: credentials/inbox: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: credentials/copy: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: credentials/changed: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: provider/launch: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: provider/inbox: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: provider/copy: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: provider/changed: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: audit/launch: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: audit/inbox: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: audit/copy: native read and next model context consumed
-ok - omp (omp/18.12.6): omp: audit/changed: native read and next model context consumed
+ok - omp (omp/18.12.6): omp: normal/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: normal/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: privacy/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: credentials/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: provider/changed: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/launch: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/inbox: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/copy: unchanged native read in next model context; no result request or audit row
+ok - omp (omp/18.12.6): omp: audit/changed: unchanged native read in next model context; no result request or audit row
 ok - omp (omp/18.12.6): worker overlay refuses ungranted URL read and grep paths and keeps ordinary file reads
 ok - omp (omp/18.12.6): pre-tool write judgment answered after 31 seconds decides the call under the worker overlay
-exit=0

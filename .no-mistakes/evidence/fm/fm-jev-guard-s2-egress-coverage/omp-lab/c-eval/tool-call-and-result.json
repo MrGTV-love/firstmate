@@ -1,0 +1,13 @@
+[
+  {
+    "type": "function_call",
+    "call_id": "call_native",
+    "name": "eval",
+    "arguments": "{\"language\": \"js\", \"code\": \"require(\\\"node:fs\\\").writeFileSync(\\\"eval-ran.txt\\\",\\\"x\\\"); 6*7\"}"
+  },
+  {
+    "type": "function_call_output",
+    "call_id": "call_native",
+    "output": "42"
+  }
+]

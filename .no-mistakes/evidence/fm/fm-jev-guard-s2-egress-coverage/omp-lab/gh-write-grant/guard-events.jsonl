@@ -1,0 +1,2 @@
+{"ts":"2026-10-26T03:03:18Z","guard":"jev-tool-coverage","version":"1","system":"firstmate","session":"native:github","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-26T03:03:18Z","guard":"jev-github-write-op","version":"1","system":"firstmate","session":"native:github-write","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
