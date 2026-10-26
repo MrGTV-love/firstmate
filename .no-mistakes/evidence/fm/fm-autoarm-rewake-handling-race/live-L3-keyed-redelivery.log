@@ -1,0 +1,44 @@
+01:19:03 ledger=epoch=4 owner_pid=28848 outcome=rewake updated_at=1792995537 session_pid=95901 recovery_generation=5242.1792995472.4aSVs5
+marker=announced:handling:5242.1792995472.4aSVs5 hold=37731 1792995539 4919
+failure receipt: no
+queue:
+1792995472	2	signal	demo.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.6hrcVj/state/demo.status
+1792995473	3	signal	demo.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.6hrcVj/state/demo.status
+host log tail:
+1792995474	pass-through	attended	main-only	signal: /Users/charlesabrooker/tmp/fm-lab.6hrcVj/state/demo.status
+1792995534	start	gen=host-29819-1792995534	primary=claude
+1792995534	take-over	arm=62761
+1792995536	pass-through	attended	main-only	check: rearm-resurface
+--- pane ---
+  What is open now:
+  1. Degraded ledger. This is the item I escalated earlier. It still needs you to restore the backlog source and the demo folder.
+  2. New decision needed for demo. The demo worker asks: "which export format?" You must answer this. The answer goes through bin/fm-send.sh <task> --resolve-key <key> '<answer>'. I need the export
+     format from you, or I can look at the demo status file first.
+  3. Wake not yet acknowledged. You told me not to acknowledge. The drain still expects this acknowledgement, so it will keep showing this wake until someone sends it.
+  Tell me the export format, and whether to send the acknowledgement once the decision is recorded.
+✻ Churned for 11s · done 1:18 AM
+⏺ Stop hook feedback
+  Ran 1 shell command
+⏺ I drained the wake again. I did not send the acknowledgement yet.
+  Why I did not acknowledge:
+  - You told me not to acknowledge anything.
+  - The wake is not handled yet. The demo worker still needs an answer to: "which export format?"
+  What is still open:
+  1. Export format for demo. Only you can answer this. Tell me the format, and I will send it with bin/fm-send.sh <task> --resolve-key <key> '<answer>'.
+  2. Degraded ledger. I escalated this earlier. It needs you to restore the backlog source and the demo folder.
+  3. Acknowledgement. Once the decision is recorded, I will run the acknowledgement, if you say so: bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 5242.1792995472.4aSVs5
+  The Stop hook will keep asking for this wake until it is acknowledged. Tell me the export format, and whether I should send the acknowledgement after I record it.
+✻ Worked for 6s · done 1:18 AM
+⏺ Stop hook feedback
+  Ran 1 shell command
+⏺ The drain shows the same open item as before. The Stop hook now labels it rearm-resurface, but the wake and the open decision are unchanged.
+  What is open:
+  1. Export format for demo. Still unanswered: "which export format?" Only you can answer this.
+  2. Degraded ledger. Still needs you to restore the backlog source and the demo folder.
+  3. Acknowledgement. Still not sent, because you told me not to acknowledge anything. The drain expects it, so the Stop hook will keep firing until it is sent.
+  I did not run bin/fm-watch-arm.sh. The hook said not to, and it is not needed for this wake.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 62k/1.0M main fm-labroot.AwCQLu:e5d3475f
+  ⏵⏵ auto mode on (shift+tab to cycle)

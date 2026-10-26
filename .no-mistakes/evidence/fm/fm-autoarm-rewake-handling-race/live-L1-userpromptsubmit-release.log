@@ -1,0 +1,20 @@
+# L1 UserPromptSubmit releases a hold left by a turn that ended with no Stop (Escape shape)
+session lock owner (claude pid): 95901 -> claude
+01:16:03 wrote hold token: 99999 1792995363 4242
+01:16:09 after 6s idle, hold present: yes
+01:16:09 prompt submitted
+01:16:10 hold gone after 0.3s; epoch ledger present yet: no
+01:16:30 epoch ledger after turn: epoch=1 owner_pid=53970 outcome=arming updated_at=1792995384
+--- pane ---
+ ▐▛███▛█   Claude Code v2.1.310
+▝▜██████▀  Haiku 5.5 · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-labroot.AwCQLu
+❯ Run the bash command: sleep 8 ; then reply with just OK.
+  Ran 1 shell command
+⏺ OK
+✻ Crunched for 14s · done 1:16 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 4% 47k/1.0M main fm-labroot.AwCQLu:e5d3475f
+  ⏵⏵ auto mode on (shift+tab to cycle)

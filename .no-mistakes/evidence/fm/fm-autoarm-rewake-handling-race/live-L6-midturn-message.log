@@ -1,0 +1,42 @@
+# TARGET aeb99bd, real Claude Code 2.1.310 (haiku) primary in a lab home; no fleet work, so Stop never arms or releases here
+## Case A: message typed while a turn is still streaming
+01:50:25 turn streaming; wrote hold: 11111 1792997425 1
+01:50:25 typed a message mid-turn
+01:50:26.1 hold present: NO; turn still open: no
+01:50:27.2 hold present: NO; turn still open: no
+01:50:27.3 hold present: NO; turn still open: no
+01:50:28.4 hold present: NO; turn still open: no
+01:50:29.5 hold present: NO; turn still open: no
+01:50:29.6 hold present: NO; turn still open: no
+01:50:30.7 hold present: NO; turn still open: no
+01:50:30.8 hold present: NO; turn still open: no
+    pane: ❯ Also say hello after.
+    pane:   ctrl+x ctrl+s to send now
+    pane: ✻ Osmosing… (8s · thinking)
+    pane: ❯ Press up to edit queued messages
+    pane:   Haiku 5.5 ░░░░░░░░░░ 0% 0/0 main fm-labroot.pMQ0xG:85db55e0
+    pane:   ⏵⏵ auto mode on (shift+tab to cycle)
+01:50:44 turn finished: hold present: NO
+    pane: ❯ Also say hello after.
+    pane: ⏺ Hello!
+    pane: ✻ Baked for 1s · done 1:50 AM
+    pane: ❯ 
+    pane:   Haiku 5.5 ░░░░░░░░░░ 5% 51k/1.0M main fm-labroot.pMQ0xG:85db55e0
+    pane:   ⏵⏵ auto mode on (shift+tab to cycle)
+## Case B: Escape mid-turn, then a new prompt
+01:51:02 turn open; wrote hold: 22222 1792997462 2
+    pane: ✽ Newspapering… (2s · thinking)
+01:51:03 pressed Escape
+01:51:07 4s after Escape: hold present: yes
+    pane: ⏺ Hello!
+    pane: ✻ Baked for 1s · done 1:50 AM
+    pane: ❯ Write a 900-word story about a mountain baker. Plain text only, no tools.
+    pane:   Haiku 5.5 ░░░░░░░░░░ 5% 51k/1.0M main fm-labroot.pMQ0xG:85db55e0
+    pane:   ⏵⏵ auto mode on (shift+tab to cycle)
+01:51:07 new prompt submitted
+01:51:07 after new prompt: hold present: NO (polled 2x0.1s)
+    pane: ❯ Write a 900-word story about a mountain baker. Plain text only, no tools.Just say hi.
+    pane: ✽ Photosynthesizing…
+    pane: ❯ 
+    pane:   Haiku 5.5 ░░░░░░░░░░ 5% 51k/1.0M main fm-labroot.pMQ0xG:85db55e0
+    pane:   ⏵⏵ auto mode on (shift+tab to cycle)

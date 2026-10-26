@@ -1,0 +1,47 @@
+# TARGET aeb99bd lab 1: rewake messages Claude received. Held close refused at 06:18:40Z (live-L2), redelivered once at the next Stop; later repeats are the pre-existing rearm-resurface path for rows the model never acknowledged (see live-L5 for the same loop on base).
+2026-10-26T06:16:42.185Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.j
+2026-10-26T06:18:47.757Z | firstmate watcher wake - queued wake rows were presented to a turn that ended without acknowledging them, so they need a handling turn now. | Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQ
+2026-10-26T06:18:57.272Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:06.422Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:13.168Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:22.087Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:28.009Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:33.435Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:39.444Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:44.154Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:49.239Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:19:58.286Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:02.953Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:07.494Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:12.029Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:16.577Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:20.936Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:25.494Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:30.133Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:36.992Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:42.182Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:46.765Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:52.218Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:20:56.782Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:01.355Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:05.692Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:10.044Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:14.481Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:18.801Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:27.198Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:31.707Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:35.993Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:40.305Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:44.562Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:48.929Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:53.869Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:21:58.388Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:02.771Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:07.090Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:11.500Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:15.909Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:20.231Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:24.786Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:29.158Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:33.542Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface
+2026-10-26T06:22:38.491Z | firstmate watcher wake - one supervision event needs a handling turn now. | check: rearm-resurface

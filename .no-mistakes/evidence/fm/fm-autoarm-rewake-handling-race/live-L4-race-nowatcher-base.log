@@ -1,0 +1,23 @@
+01:33:22 [base] code tree: /Users/charlesabrooker/tmp/fm-cf.mqIBzI/base
+01:33:22 lab claude=54323 parked Stop hook=22877 ledger=epoch=2 owner_pid=22877 outcome=arming updated_at=1792996392
+01:33:22 marker=acked:handling:65262.1792996348.DEDXZv
+01:33:22 SIGSTOP Stop hook 22877 (slow hook under load)
+01:33:22 appended needs-decision status for task demo
+01:34:02 host log tail:
+    1792996392	start	gen=host-23793-1792996392	primary=claude
+    1792996392	take-over	arm=81411
+    1792996440	pass-through	attended	main-only	signal: /Users/charlesabrooker/tmp/fm-lab.q3gD9Y/state/demo.status
+01:34:02 marker after host exit=announced:downtime:25412.1792996439.wQYMzs
+01:34:02 queue:
+    1792996439	2	signal	demo.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.q3gD9Y/state/demo.status
+    1792996439	3	signal	demo.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.q3gD9Y/state/demo.status
+01:34:02 prompt submitted: lab claude's open turn runs the real main drain
+01:34:07 drain ran inside the open turn: marker=announced:handling:25412.1792996439.wQYMzs hold=none presented=2 3 
+01:34:07 successor watcher procs: 71012 71058 
+01:34:07 kill -9 successor watcher (crash; no cleanup, marker untouched)
+01:34:08 marker=announced:handling:25412.1792996439.wQYMzs watch.lock pid=71058 alive=no
+01:34:08 SIGCONT Stop hook while the drained turn is still open
+01:34:08 hook exited: yes
+01:34:08 ledger=epoch=2 owner_pid=22877 outcome=failed updated_at=1792996448
+01:34:08 failure-notice receipt (.claude-autoarm-failure-notified): PRESENT: 
+01:34:08 marker=announced:handling:25412.1792996439.wQYMzs

@@ -1,0 +1,45 @@
+== base 3b3fb14 bin/ + target-commit test bodies ==
+FAIL test_host_handback_during_open_handling_commits_normally :: not ok - pending/absent: a valid actionable handback is not an auto-arm failure (unexpected: 'auto-arm FAILED')
+FAIL test_host_handback_after_main_presentation :: not ok - open/pending/absent: a main-presented handback is not an auto-arm failure (unexpected: 'auto-arm FAILED')
+FAIL test_host_refusal_before_hold_release_rewakes_at_the_next_stop :: not ok - fixture: the presenting turn's hold is missing
+FAIL test_host_handling_handback_lost_session_never_delivers :: not ok - a handling handback must not bypass session ownership via the failure path: expected exit 0, got 2
+FAIL test_host_actionable_failed_restoration_still_commits_normally :: not ok - handling phase is not an auto-arm failure (unexpected: 'auto-arm FAILED')
+== target aeb99bd bin/ + target-commit test bodies ==
+PASS test_host_handback_during_open_handling_commits_normally
+    ok - auto-arm: pending/absent host overlap commits once, stays durable, and is silent after acknowledgement
+    ok - auto-arm: pending/live host overlap commits once, stays durable, and is silent after acknowledgement
+    ok - auto-arm: announced/absent host overlap commits once, stays durable, and is silent after acknowledgement
+    ok - auto-arm: announced/live host overlap commits once, stays durable, and is silent after acknowledgement
+    ok - auto-arm: downtime/absent host overlap commits once, stays durable, and is silent after acknowledgement
+    ok - auto-arm: downtime/live host overlap commits once, stays durable, and is silent after acknowledgement
+PASS test_host_handback_after_main_presentation
+    ok - auto-arm: open/pending/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: open/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: open/announced/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: open/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: acked/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: acked/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: ended/pending/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: ended/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: ended/announced/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: ended/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: late-stop/pending/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: late-stop/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: late-stop/announced/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: late-stop/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: interrupted/pending/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: interrupted/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: interrupted/announced/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: interrupted/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: api-error/pending/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: api-error/pending/live host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: api-error/announced/absent host handback after a main presentation is delivered at most once, and once when unheld
+    ok - auto-arm: api-error/announced/live host handback after a main presentation is delivered at most once, and once when unheld
+PASS test_host_refusal_before_hold_release_rewakes_at_the_next_stop
+    ok - auto-arm: pending held close is redelivered once, never loops after missing or refused ack, and remains acknowledgeable
+    ok - auto-arm: announced held close is redelivered once, never loops after missing or refused ack, and remains acknowledgeable
+PASS test_host_handling_handback_lost_session_never_delivers
+    ok - auto-arm: a handling-phase host handback never delivers after session ownership changes
+PASS test_host_actionable_failed_restoration_still_commits_normally
+    ok - auto-arm: lost-handback delivers its host diagnostic through the normal rewake
+    ok - auto-arm: lost-announced-handback delivers its host diagnostic through the normal rewake

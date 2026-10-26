@@ -1,0 +1,18 @@
+# BASE 3b3fb14 lab: rows left unacknowledged on purpose (standing rule: drain only, never ack)
+01:46:09 appended needs-decision
+01:46:14 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:19 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:24 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:29 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:34 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:39 epoch=4 owner_pid=3307 outcome=arming updated_at=1792996471 queue=0 rearm-resurface_closes=1
+01:46:45 epoch=4 owner_pid=3307 outcome=rewake updated_at=1792997203  queue=2 rearm-resurface_closes=1
+01:46:50 epoch=5 owner_pid=62431 outcome=arming updated_at=1792997209 queue=2 rearm-resurface_closes=1
+01:46:55 epoch=5 owner_pid=62431 outcome=rewake updated_at=1792997212 queue=2 rearm-resurface_closes=2
+01:47:00 epoch=6 owner_pid=67926 outcome=arming updated_at=1792997218 queue=2 rearm-resurface_closes=3
+01:47:05 epoch=6 owner_pid=67926 outcome=rewake updated_at=1792997221 queue=2 rearm-resurface_closes=3
+01:47:10 epoch=7 owner_pid=73245 outcome=rewake updated_at=1792997228 queue=2 rearm-resurface_closes=4
+01:47:15 epoch=8 owner_pid=79405 outcome=arming updated_at=1792997233 queue=2 rearm-resurface_closes=4
+01:47:20 epoch=8 owner_pid=79405 outcome=rewake updated_at=1792997236 queue=2 rearm-resurface_closes=5
+01:47:25 epoch=9 owner_pid=85851 outcome=rewake updated_at=1792997245 queue=2 rearm-resurface_closes=6
+01:47:30 epoch=10 owner_pid=91374 outcome=arming updated_at=179299725 queue=2 rearm-resurface_closes=6
