@@ -6042,9 +6042,10 @@ claude*)
     spawn_trust_args=("$WT" "$PROJ_ABS")
   fi
   # The trust step creates a missing config root with the default umask, so a
-  # confined launch creates it owner-only first and leaves an existing one alone.
+  # confined launch creates it and any missing parents owner-only first and
+  # leaves existing folders alone.
   if [ "$KIND" != secondmate ] && [ "$HARNESS" = claude ] && [ "$(uname -s)" = Darwin ]; then
-    case ${CLAUDE_CONFIG_DIR:-} in /*) mkdir -m 700 "$CLAUDE_CONFIG_DIR" 2>/dev/null || true ;; esac
+    case ${CLAUDE_CONFIG_DIR:-} in /*) (umask 077 && mkdir -p "$CLAUDE_CONFIG_DIR") 2>/dev/null || true ;; esac
   fi
   if ! "$FM_ROOT/bin/fm-claude-trust.sh" "${spawn_trust_args[@]}" >/dev/null; then
     echo "error: could not pre-register Claude workspace trust for $WT; refusing to launch a claude worker that would wedge on the trust dialog" >&2
