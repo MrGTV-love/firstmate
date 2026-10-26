@@ -26,6 +26,9 @@ wait_for_capture_text() {  # <target> <text> [samples]
     esac
     out=$(fm_backend_tmux_capture "$target" 200 2>/dev/null || printf '%s' "$out")
     case "$pane_state" in
+      # tmux marks the pane dead when its output closes, before it reaps the
+      # exit status; poll again until the status or signal is recorded.
+      1::) : ;;
       1:*)
         status=${pane_state#*:}
         signal=${status#*:}
