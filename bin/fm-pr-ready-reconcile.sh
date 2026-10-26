@@ -79,7 +79,9 @@ reconcile_one() {  # <meta> <id>
     return 0
   fi
   # Tail the snapshot, never ask last_status_line to widen into the real log.
-  output=$(tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" "$SCRATCH")
+  # Pipe it: uutils 0.10.0 (Ubuntu 26.04) tail -n prints nothing for a seekable
+  # file of exactly 64 KiB, which is every snapshot of a large log.
+  output=$(cat -- "$SCRATCH" | tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES")
   while IFS= read -r line; do
     _fm_status_line_is_event "$line" "^[[:space:]]*(${FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" || continue
     fm_dod_should_gate_ship_done ship "$mode" "$line" || continue

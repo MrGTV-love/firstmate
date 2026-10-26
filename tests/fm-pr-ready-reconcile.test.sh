@@ -57,6 +57,12 @@ case "${@: -1}" in
     printf '%s\n' "$*" >> "$FM_READY_CASE/tail.calls"
     [ "$1" = -c ] && [ "$2" = 65536 ] || exit 90 ;;
 esac
+# Ubuntu 26.04's uutils 0.10.0 tail reads a seekable file backwards in 64 KiB
+# blocks and sizes the final block as size % 65536, so `-n` on a file of exactly
+# 64 KiB reads an empty block and prints nothing. Reproduce it on every host.
+if [ "$1" = -n ] && [ "$#" -eq 3 ] && [ -f "$3" ] && [ "$(wc -c < "$3")" -eq 65536 ]; then
+  exit 0
+fi
 exec "$REAL_TAIL" "$@"
 SH
   chmod +x "$FAKEBIN/gh" "$FAKEBIN/tail"
