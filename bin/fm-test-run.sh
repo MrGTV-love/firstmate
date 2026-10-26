@@ -302,7 +302,7 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # runs' own per-script durations through the membership that ran reads 0.997 to
 # 1.030 times each recorded lane wall (run 40308410676: 1175963 ms and 834790 ms
 # modeled against 1141598 ms and 836218 ms recorded). So 1200000 ms bounds a real
-# lane near 20.4 minutes, and a new member or a slow path fails the coverage
+# lane near 20 minutes, and a new member or a slow path fails the coverage
 # guard instead of quietly stretching the workflow.
 # Since the 2026-10-26 refresh every parallel hint is measured, including the
 # five the fm-lint split had apportioned. Lane 1 is fm-test-run, fm-lint,
