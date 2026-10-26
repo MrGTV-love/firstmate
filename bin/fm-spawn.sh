@@ -30,14 +30,17 @@
 #   classifier: other prose is accepted. Legacy briefs use marked captain words
 #   when present, otherwise their Task body. Relaunches and secondmate charters
 #   do not run this concrete-ask check; bin/fm-dod-lib.sh owns the helper.
-#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder;
-#   one refusal lists every leftover Task body and DoD token in a single pass,
+#   A fresh spawn also refuses a leftover `## Definition Of Done (task)` placeholder
+#   and a blank scaffolded `### Out of scope` list (write None when nothing is
+#   excluded); one refusal lists every leftover Task body and DoD token and the
+#   blank exclusion list in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
 #   escape. A
 #   fresh spawn of a brief with no such section warns once on stderr and
 #   proceeds. A relaunch re-checks only the Task bodies, because the Definition
-#   of Done was accepted at the fresh spawn; a secondmate charter never reaches
+#   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
+#   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract, the extracted captain
