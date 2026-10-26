@@ -1,0 +1,5 @@
+$ fm-review-record.py review ... --reader-model mistral-large --author-groups '{"all":["gpt-5.1-codex"]}'
+recorded: review
+$ fm-review-record.py verify ...
+error: model family unknown for newest reader mistral-large; uncovered commit group ship, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=$LAB/fm FM_STATE_OVERRIDE=$LAB/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/9 --head 62fa2da22757396038adbebb9b94a30c16901480 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+exit=1

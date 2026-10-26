@@ -1,0 +1,36 @@
+
+=== E1 completed claude row: OpenAI PASS covers no-mistakes:anthropic ===
+invocations: [('claude','claude-sonnet-5-5','anthropic','completed')]
+recorded: review
+reader: gpt-6.1-codex (openai) PASS
+review: PASS
+exit=0
+
+=== E2 cancelled claude row with empty model counts as anthropic, OpenAI PASS covers it ===
+invocations: [('claude','claude-sonnet-5-5','anthropic','completed'),('claude','',None,'cancelled')]
+recorded: review
+reader: gpt-6.1-codex (openai) PASS
+review: PASS
+exit=0
+
+=== E3 errored acp:omp row with empty model stays unknown and refuses ===
+invocations: [('claude','claude-sonnet-5-5','anthropic','completed'),('acp:omp','',None,'error')]
+recorded: review
+reader: gpt-6.1-codex (openai) PASS
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-edge.LwZcqR/fm FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-edge.LwZcqR/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/250 --head aba903d6a40163a2df1d70ddc5d870f8aae82eea --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+
+=== E4 no pipeline database: pipeline commits stay unknown and refuse ===
+invocations: MISSING
+recorded: review
+reader: gpt-6.1-codex (openai) PASS
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/Users/charlesabrooker/tmp/fm-edge.uD00uC/fm FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-edge.uD00uC/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/250 --head 4c37eadd1bb24b6fd0bb79e6a760d3f294d1692b --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+state.sqlite still absent after verify (never created)
+
+=== E5 pipeline row is openai: OpenAI reader cannot cover its own family ===
+invocations: [('codex','gpt-6.1-codex','openai','completed')]
+recorded: review
+reader: gpt-6.1-codex (openai) PASS
+error: uncovered commit group declared:all, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/Users/charlesabrooker/tmp/fm-edge.tUAHWZ/fm FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-edge.tUAHWZ/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/250 --head f4f288421186da92ffd075234771f40d60266447 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"no-mistakes:openai":["gpt-6.1-codex"],"declared:all":["claude-sonnet-5-5"]}' --covered-groups '["declared:all"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+exit=1

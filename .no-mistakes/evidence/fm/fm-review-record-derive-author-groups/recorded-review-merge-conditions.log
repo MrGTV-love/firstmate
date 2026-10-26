@@ -1,0 +1,5 @@
+ok - recorded review merge condition: stale
+ok - recorded review merge condition: same-family
+ok - recorded review merge condition: same-family-model
+ok - recorded review merge condition: cross-family-model
+not ok - unknown-reader refusal names field

@@ -1,0 +1,50 @@
+ok - a multi-PR task merges the named green PR after a sibling merged and lost its branch
+ok - a single-PR task whose copy HEAD exists only locally is still refused at merge
+ok - a multi-PR task whose named PR reports no forge head is still refused at merge
+ok - a multi-PR task's red PR head is still refused at merge
+ok - fm-pr-merge refuses a draft pull request and one with no boolean draft state
+ok - fm-pr-merge merges when a failed check run was replaced by a passing re-run
+ok - fm-pr-merge never lets a check run supersede a legacy status context
+ok - fm-pr-merge still refuses when a check's current run failed after an earlier pass
+ok - fm-pr-merge uses start order when the old success finishes last
+ok - fm-pr-merge supersedes an old cancellation that finishes last
+ok - fm-pr-merge keeps a check red while its re-run is still in flight
+ok - fm-pr-merge never lets one check's pass clear another check's failure
+ok - fm-pr-merge clears a failure only on a proven later pass of the same check
+ok - fm-pr-merge keeps --allow-red scoped to its named check beside a superseded failure
+ok - fm-pr-merge rechecks away presence before an attended red merge
+ok - fm-pr-merge keeps a quiet-mode home's merges attended, the named red-check waiver included
+ok - fm-pr-merge accepts exactly one separately named red-check waiver
+ok - while the away-posture record exists any green merge lands under away authority, yolo or not, and attended merges stay untagged
+ok - under the away-posture record the branch merges a green task, is refused on a red check with or without --allow-red, and is refused at the partition while attended
+ok - a branch merge refuses under the lock when the away record is archived during preflight
+ok - away posture permits immediate merges but refuses every asynchronous path
+ok - away merge proceeds on a plan-gated 403 because that repository cannot have a merge queue
+ok - the away record does not bypass red checks, and a recorded pr= must match the URL
+ok - an unreadable away-posture record refuses the merge instead of skipping the record
+ok - no away-record archive or replacement lands between the authority read and the merge
+ok - a record made unreadable before the merge's own authority read refuses the merge
+ok - a merge that cannot lock the away record refuses instead of merging unlocked
+ok - fm-pr-merge refuses --allow-red on GitLab
+ok - fm-pr-merge refuses when a required check from branch protection or a ruleset never reported
+ok - fm-pr-merge merges when every required check reported and is green
+ok - fm-pr-merge reports a red check and an unreported required check together with every other failure
+ok - fm-pr-merge refuses when the required checks cannot be read, and tells a plan without rules apart
+ok - fm-pr-merge --allow-missing waives only its named unreported check
+ok - fm-pr-merge --allow-missing is single use, attended-only, and GitHub-only like --allow-red
+ok - fm-pr-merge retries incomplete and transient rollups, then judges every check anew
+ok - fm-pr-merge refuses incomplete rollups as unreadable sources even with a missing-check waiver
+ok - fm-pr-merge judges required and red checks on later rollup pages
+ok - fm-pr-merge retries an incomplete producer list before merging the verified head
+ok - fm-pr-merge retries transient classic and ruleset required-source failures
+ok - fm-pr-merge never waives incomplete producer evidence
+ok - fm-pr-merge enforces required producer identity and named waivers
+ok - fm-pr-merge matches an app-bound required commit status by name
+ok - fm-pr-merge reports known missing checks and all independent read errors
+ok - fm-pr-merge refuses --allow-red on Forgejo
+ok - fm-pr-merge refuses --allow-missing on Forgejo
+ok - fm-pr-merge prints one green-head refusal naming each check, its requirement, its next action, and the exact repair
+ok - fm-pr-merge names the away posture and the attended waiver command when it refuses a waiver while away
+ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge
+ok - fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED

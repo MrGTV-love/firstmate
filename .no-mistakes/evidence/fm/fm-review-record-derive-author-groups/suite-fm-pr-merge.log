@@ -1,0 +1,66 @@
+ok - derived author coverage: claude-only
+ok - derived author coverage: two-readers
+ok - derived author coverage: ship-only
+ok - derived author coverage: omitted-pipeline
+ok - derived author coverage: unreadable
+ok - derived author coverage: named-ship-only
+ok - derived author coverage: exact-head-fail
+ok - derived author coverage: config-fallback
+ok - derived author coverage: changed-config
+ok - derived author coverage: head-mismatch
+ok - derived author coverage: ship-history
+ok - derived author coverage: ship-prior
+ok - derived author coverage: ship-multi-read
+ok - derived author coverage: ship-default
+ok - derived author coverage: ship-reused
+ok - derived author coverage: ship-all-extra
+ok - derived author coverage: typed-unknown
+ok - derived author coverage: alias-command
+ok - derived author coverage: relative-nm-home
+ok - derived author coverage: unknown-captain-word
+ok - derived author coverage: ship-unknown-reader
+ok - derived author coverage: mixed-unknown
+ok - derived author coverage: cancelled-claude
+ok - derived author coverage: errored-omp
+ok - author evidence accepts path-safe task id: _noncanonical
+ok - author evidence accepts path-safe task id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ok - author evidence accepts path-safe task id: Task_A.1
+ok - author verification requires explicit task and exact base commit
+ok - author verification names the exact fetch for an unfetched base
+ok - author verification accepts a 64-hex SHA-256 base
+ok - an unreadable GitHub base commit refuses with its reason
+ok - identical captain words at one timestamp retain append-order authority
+ok - yes-trigger review verification: independent
+ok - yes-trigger review verification: same-family
+ok - yes-trigger review verification: unknown-reader
+ok - yes-trigger review verification: unknown-author
+ok - yes-trigger review verification: wrong-head
+ok - yes-trigger review verification: fail
+ok - a loosens-deny-allow-list PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a widens-guard PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a customer-data-billing-spend PASS cannot clear FAIL; fresh exact-head captain words can
+ok - review recording refuses missing report with exit 2 and appends nothing
+ok - review recording refuses symlink report with exit 2 and appends nothing
+ok - review recording refuses verdict report with exit 2 and appends nothing
+ok - review recording refuses head report with exit 2 and appends nothing
+ok - review recording refuses directory report with exit 2 and appends nothing
+ok - review recording refuses unreadable report with exit 2 and appends nothing
+ok - review recording refuses trailing-space report with exit 2 and appends nothing
+ok - matching local reports record whole-file sha256 and a matching FAIL blocks verification
+ok - github refuses a FAIL appended after earlier verify and before the merge hold
+ok - gitlab refuses a FAIL appended after earlier verify and before the merge hold
+ok - forgejo refuses a FAIL appended after earlier verify and before the merge hold
+ok - github attended override cannot merge without recorded review evidence
+ok - gitlab attended override cannot merge without recorded review evidence
+ok - forgejo attended override cannot merge without recorded review evidence
+ok - missing review record refuses before forge merge
+ok - gitlab and forgejo refuse a missing review record before their forge merge
+ok - captain-word refuses under an away record, records under quiet or no record, and pre-away words stay valid
+ok - review helper validates fields, retains history, and returns newest canonical grouped evidence
+ok - review helper derives each family from the exact model id and records unknown otherwise
+ok - a family added after a row was stored leaves the row valid and verify derives the current family
+ok - recorded review merge condition: stale
+ok - recorded review merge condition: same-family
+ok - recorded review merge condition: same-family-model
+ok - recorded review merge condition: cross-family-model
+not ok - unknown-reader refusal names field

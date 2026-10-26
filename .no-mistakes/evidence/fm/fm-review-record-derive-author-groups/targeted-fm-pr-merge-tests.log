@@ -1,0 +1,35 @@
+ok - derived author coverage: claude-only
+ok - derived author coverage: two-readers
+ok - derived author coverage: ship-only
+ok - derived author coverage: omitted-pipeline
+ok - derived author coverage: unreadable
+ok - derived author coverage: named-ship-only
+ok - derived author coverage: exact-head-fail
+ok - derived author coverage: config-fallback
+ok - derived author coverage: changed-config
+ok - derived author coverage: head-mismatch
+ok - derived author coverage: ship-history
+ok - derived author coverage: ship-prior
+ok - derived author coverage: ship-multi-read
+ok - derived author coverage: ship-default
+ok - derived author coverage: ship-reused
+ok - derived author coverage: ship-all-extra
+ok - derived author coverage: typed-unknown
+ok - derived author coverage: alias-command
+ok - derived author coverage: relative-nm-home
+ok - derived author coverage: unknown-captain-word
+ok - derived author coverage: ship-unknown-reader
+ok - derived author coverage: mixed-unknown
+ok - derived author coverage: cancelled-claude
+ok - derived author coverage: errored-omp
+ok - author evidence accepts path-safe task id: _noncanonical
+ok - author evidence accepts path-safe task id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ok - author evidence accepts path-safe task id: Task_A.1
+ok - author verification requires explicit task and exact base commit
+ok - author verification names the exact fetch for an unfetched base
+ok - author verification accepts a 64-hex SHA-256 base
+ok - an unreadable GitHub base commit refuses with its reason
+ok - identical captain words at one timestamp retain append-order authority
+ok - a loosens-deny-allow-list PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a widens-guard PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a customer-data-billing-spend PASS cannot clear FAIL; fresh exact-head captain words can

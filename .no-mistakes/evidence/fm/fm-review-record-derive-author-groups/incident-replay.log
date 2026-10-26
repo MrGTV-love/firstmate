@@ -1,0 +1,47 @@
+
+=== S1 incident replay: Main types {"all":["openai-codex/gpt-6.1-sol"]}, only a Claude PASS exists ===
+commits:
+  a7019ad no-mistakes(test): fix finding two
+  3906204 no-mistakes(review): fix finding one
+  b21989a feat: ship implementation
+recorded: review
+--- OLD gate (base commit 4c4ffde9) verify:
+review: PASS
+exit=0
+--- NEW gate verify:
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/Users/charlesabrooker/tmp/fm-incident.ekfW0p/fm FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-incident.ekfW0p/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head a7019ad8f3c7a97476e5c032f714eeb94970cd9c --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+
+=== S2 adversarial: Main types only a ship group and claims covered-groups ["ship"] ===
+recorded: review
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/Users/charlesabrooker/tmp/fm-incident.ekfW0p/fm FM_STATE_OVERRIDE=/Users/charlesabrooker/tmp/fm-incident.ekfW0p/fm/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head a7019ad8f3c7a97476e5c032f714eeb94970cd9c --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+
+=== S3 fix route: an OpenAI PASS reads the derived no-mistakes:anthropic group ===
+recorded: review
+review: PASS
+exit=0
+
+=== S4 G2 read-only DB: database bytes unchanged and no journal/WAL files created ===
+sha256 before=dd1ecf4c569eb947f255948c6c3aeb91684f93328da9d1e8c62d4194e3706bbc after=dd1ecf4c569eb947f255948c6c3aeb91684f93328da9d1e8c62d4194e3706bbc
+total 32
+dr-xr-xr-x  3 charlesabrooker  staff     96 Oct 26 02:56 .
+drwx------  8 charlesabrooker  staff    256 Oct 26 02:56 ..
+-r--r--r--  1 charlesabrooker  staff  16384 Oct 26 02:56 state.sqlite
+
+=== S5 base must be full 40/64 hex: short base refused ===
+error: author evidence requires --base with the forge's exact full base commit SHA (40 or 64 hex)
+exit=2
+
+=== S6 sticky exact-head FAIL: a FAIL then a later PASS still refuses ===
+recorded: review
+recorded: review
+error: verdict is FAIL at live head a7019ad8f3c7a97476e5c032f714eeb94970cd9c (reader gemini-3-pro, report /Users/charlesabrooker/tmp/fm-incident.ekfW0p/r-gemini-3-pro19134.md); a PASS never clears an exact-head FAIL; record fresh captain words with fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head a7019ad8f3c7a97476e5c032f714eeb94970cd9c --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+exit=1
+--- fresh exact-head captain words, then verify:
+recorded: captain-word
+review: captain-word
+exit=0
+rm: /Users/charlesabrooker/tmp/fm-incident.ekfW0p/nm/state.sqlite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-incident.ekfW0p/nm: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-incident.ekfW0p: Directory not empty

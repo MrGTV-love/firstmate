@@ -1,0 +1,28 @@
+--- commits outside base:
+  fdef030 no-mistakes(review): pipeline fix
+  ff7834a ship implementation
+--- ship meta model: gpt-5.1-codex
+--- record the incident's only read: Claude PASS typed {"all":["openai-codex/gpt-6.1-sol"]}
+recorded: review
+--- $ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/197
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+verified: https://github.com/example/repo/pull/197 is open and mergeable, with every unwaived required check reported and every unwaived check green at head fdef030753182aeb14fe2f151e80ea0f511a9ebc
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=$CASE/home FM_STATE_OVERRIDE=$CASE/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VEYFFKQ4ZFD4A9383FRFRE/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head fdef030753182aeb14fe2f151e80ea0f511a9ebc --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+--- forge merge calls: 0
+--- add OpenAI read of pipeline group and Claude read of ship group
+recorded: review
+recorded: review
+--- $ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/197
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+verified: https://github.com/example/repo/pull/197 is open and mergeable, with every unwaived required check reported and every unwaived check green at head fdef030753182aeb14fe2f151e80ea0f511a9ebc
+review: PASS
+[exit 0]
+--- forge merge calls:
+pr merge 197 --repo example/repo --match-head-commit fdef030753182aeb14fe2f151e80ea0f511a9ebc --squash

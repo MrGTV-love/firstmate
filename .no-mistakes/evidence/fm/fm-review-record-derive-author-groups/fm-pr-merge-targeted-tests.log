@@ -1,0 +1,58 @@
+ok - derived author coverage: claude-only
+ok - derived author coverage: two-readers
+ok - derived author coverage: ship-only
+ok - derived author coverage: omitted-pipeline
+ok - derived author coverage: unreadable
+ok - derived author coverage: named-ship-only
+ok - derived author coverage: exact-head-fail
+ok - derived author coverage: config-fallback
+ok - derived author coverage: changed-config
+ok - derived author coverage: head-mismatch
+ok - derived author coverage: ship-history
+ok - derived author coverage: ship-prior
+ok - derived author coverage: ship-multi-read
+ok - derived author coverage: ship-default
+ok - derived author coverage: ship-reused
+ok - derived author coverage: ship-all-extra
+ok - derived author coverage: typed-unknown
+ok - derived author coverage: alias-command
+ok - derived author coverage: relative-nm-home
+ok - derived author coverage: unknown-captain-word
+ok - derived author coverage: ship-unknown-reader
+ok - derived author coverage: mixed-unknown
+ok - derived author coverage: cancelled-claude
+ok - derived author coverage: errored-omp
+ok - author verification requires explicit task and exact base commit
+ok - author verification names the exact fetch for an unfetched base
+ok - author verification accepts a 64-hex SHA-256 base
+ok - an unreadable GitHub base commit refuses with its reason
+ok - a loosens-deny-allow-list PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a widens-guard PASS cannot clear FAIL; fresh exact-head captain words can
+ok - a customer-data-billing-spend PASS cannot clear FAIL; fresh exact-head captain words can
+ok - review helper derives each family from the exact model id and records unknown otherwise
+ok - recorded review merge condition: stale
+ok - recorded review merge condition: same-family
+ok - recorded review merge condition: same-family-model
+ok - recorded review merge condition: cross-family-model
+ok - recorded review merge condition: unknown-reader
+ok - recorded review merge condition: unknown-author-captain
+ok - recorded review merge condition: fail
+ok - recorded review merge condition: trigger-list
+ok - recorded review merge condition: trigger-guard
+ok - recorded review merge condition: trigger-data
+ok - recorded review merge condition: other-pr
+ok - recorded review merge condition: stale-captain-word
+ok - recorded review merge condition: captain-word
+ok - recorded review merge condition: captain-only
+ok - recorded review merge condition: stale-captain-only
+ok - recorded review merge condition: valid
+ok - recorded review merge condition: newest-fail
+ok - recorded review merge condition: captain-then-fail
+ok - recorded review merge condition: captain-fail-stale-pass
+ok - recorded review merge condition: captain-fail-stale-fail
+ok - recorded review merge condition: captain-fail-unknown-pass
+ok - recorded review merge condition: captain-fail-same-family-pass
+ok - recorded review merge condition: fail-then-captain
+ok - recorded review merge condition: captain-fail-pass
+bash tests/fm-pr-merge.test.sh test_derived_author_coverage         51.91s user 74.41s system 75% cpu 2:46.59 total
+rc=0
