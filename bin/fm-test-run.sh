@@ -299,8 +299,8 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # with the modeled makespan, not with wall time. The hints are each script's
 # measured three-abreast wall, so the model tracks a real lane within a few
 # percent when the hints match the run: replaying the three 2026-10-26 refresh
-# runs' own per-script durations through the membership that ran models 0.971 to
-# 1.003 of each recorded lane wall (run 40308410676: 1175963 ms and 834790 ms
+# runs' own per-script durations through the membership that ran reads 0.997 to
+# 1.030 times each recorded lane wall (run 40308410676: 1175963 ms and 834790 ms
 # modeled against 1141598 ms and 836218 ms recorded). So 1200000 ms bounds a real
 # lane near 20.4 minutes, and a new member or a slow path fails the coverage
 # guard instead of quietly stretching the workflow.
