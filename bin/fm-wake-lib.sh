@@ -2410,7 +2410,8 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
 # Atomically publish this process as the owner of generation N+1.
 # Wait at most ten seconds for the queue lock before taking the ownership
 # micro-mutex, so claim publication cannot race a re-emit drain's mutations.
-# Returns 0 with FM_AUTOARM_MY_GEN set on success, 2 when a competing claimant
+# Returns 0 with FM_AUTOARM_MY_GEN and FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY
+# (the preceding held-close refusal's episode, if any) set on success, 2 when a competing claimant
 # won the race (the ledger holds an open claim), and 1 when the queue-lock wait
 # expires, the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
@@ -2420,6 +2421,7 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   epoch="$state/.claude-autoarm-epoch"
   queue_lock="$state/.wake-queue.lock"
   FM_AUTOARM_MY_GEN=
+  FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
   # identity of a process that exits immediately.
@@ -2435,6 +2437,13 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
     fm_lock_release "$lock"
     fm_lock_release "$queue_lock"
     return 2
+  fi
+  # claim_open read the predecessor under both locks. Only a held-close
+  # refusal carries its recovery generation; consuming that terminal entry
+  # bounds early redelivery to this refusal rather than every unacked Stop.
+  if [ "$FM_AUTOARM_OUTCOME" = refused ]; then
+    # shellcheck disable=SC2034 # Read by the Stop hook after claim publication.
+    FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=$FM_AUTOARM_RECOVERY
   fi
   gen=$(_fm_autoarm_epoch_field "$epoch" epoch 2>/dev/null || true)
   case "$gen" in

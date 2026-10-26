@@ -54,8 +54,8 @@
 #     that is unsafe or holds nothing for the branch) stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
-#     drops the handoff. A failed start is retried once; a second failure,
-#     or a successor still starting, republishes downtime before the close is
+#     drops the handoff. A failed start, or a successor still starting,
+#     republishes downtime before the close is
 #     printed, as every attended pass-through that leaves no proven successor
 #     does. It confirms no engine
 #     handling handoff, so the host
@@ -746,23 +746,15 @@ detach_successor() {
 # Start the same successor a handled wake starts and leave it running. It
 # confirms no handling handoff: main, not the engine, handles this close.
 # docs/watcher-continuity.md owns delivery eligibility if another drain changes
-# the shared recovery phase. A failed start is retried once; a second failure
-# returns 1, and the caller restores downtime (restore_downtime_without_watcher)
-# before it prints the close unchanged. A successor still starting is left
-# running too, and SUCCESSOR_NOTE carries the line saying so, but it is not yet a
+# the shared recovery phase. A failed start returns 1, and the caller restores
+# downtime (restore_downtime_without_watcher) before printing the close unchanged.
+# A successor still starting is left running too, and SUCCESSOR_NOTE carries the
+# line saying so, but it is not yet a
 # live successor, so it also returns 1 and the caller restores downtime.
 SUCCESSOR_NOTE=
 leave_successor_for_main() {
   local rc=0
   ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
-  if [ "$rc" -eq 1 ]; then
-    log_line "pass-through	successor-retry	$(printf '%s\n' "$REASON" | head -n 1)"
-    retire_arm "$SUCCESSOR_PID" "$SUCCESSOR_OUT"
-    SUCCESSOR_PID=
-    SUCCESSOR_OUT=
-    rc=0
-    ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
-  fi
   if [ "$rc" -eq 1 ]; then
     log_line "pass-through	successor-unverified	$(printf '%s\n' "$REASON" | head -n 1)"
     return 1

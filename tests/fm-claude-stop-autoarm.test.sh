@@ -1945,7 +1945,7 @@ SH
 # through Stop without acknowledging R. No arm re-presents a handling episode,
 # so that Stop firing must rewake main for R before it parks another host.
 test_host_refusal_before_hold_release_rewakes_at_the_next_stop() {
-  local phase dir out status pid identity drain generation cutoff
+  local phase dir out status pid identity drain generation cutoff turn ack
   for phase in pending announced; do
     dir=$(make_primary_dir "$TMP_ROOT/host-refused-first-$phase")
     rm -f "$dir/config/supervision-host-off"
@@ -1977,8 +1977,6 @@ SH
     [ "$(epoch_outcome "$dir")" = refused ] || fail "$phase: the held close was not refused: $(epoch_outcome "$dir")"
     assert_present "$dir/state/.main-eligible-rows.held" "fixture: the presenting turn's hold is missing"
     out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
     expect_code 2 "$status" "$phase: the turn end after a refused held close must rewake main for its row"
     [ "$(epoch_outcome "$dir")" = rewake ] || fail "$phase: the owed row did not commit a rewake: $(epoch_outcome "$dir")"
     assert_contains "$out" 'presented to a turn that ended without acknowledging them' "$phase: the rewake must say why the row is owed"
@@ -1990,10 +1988,31 @@ SH
     assert_contains "$drain" 'check: newer main-only host handback' "$phase: the rewoken turn must present the row again"
     generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
     cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+    for turn in unacknowledged ack-refused unacknowledged-again; do
+      if [ "$turn" = ack-refused ]; then
+        printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"home":"%s","complete":true,"rows":[{"id":"fixture-overdue","category":"coverage","subject":"fixture overdue obligation","owner":"firstmate","next_action":"record action","age_seconds":60,"limit_seconds":0,"overdue":true}]}\n' \
+          "$(date +%s)" "$dir" > "$dir/state/open-loops.json"
+        drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "could not present the overdue obligation: $drain"
+        ack=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" 2>&1); status=$?
+        expect_code 1 "$status" "$phase: the real overdue-action gate must refuse acknowledgement"
+        assert_contains "$ack" 'fixture-overdue' "the acknowledgement must name the unresolved obligation"
+      fi
+      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      expect_code 0 "$status" "$phase/$turn: a consumed held-close refusal must not cause repeated rewakes"
+      [ -z "$out" ] || fail "$phase/$turn: repeated Stop produced a wake: $out"
+      assert_present "$dir/state/host-parked-again" "$phase/$turn: the next cycle did not arm normally"
+      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 1 ] || fail "$phase/$turn: silence consumed the durable row"
+      drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "$phase/$turn: main could not drain the durable row: $drain"
+      assert_contains "$drain" 'check: newer main-only host handback' "$phase/$turn: the row must remain available"
+    done
+    FM_HOME="$dir" bash "$ROOT/bin/fm-open-loops.sh" action fixture-overdue escalated --evidence 'fixture escalation' >/dev/null \
+      || fail "$phase: the overdue action could not be recorded"
     FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
       || fail "$phase: the owed row could not be acknowledged"
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
     [ ! -s "$dir/state/.wake-queue" ] || fail "$phase: the acknowledgement left the owed row queued"
-    pass "auto-arm: $phase refused-first held close is redelivered at the next Stop and acknowledged"
+    pass "auto-arm: $phase held close is redelivered once, never loops after missing or refused ack, and remains acknowledgeable"
   done
 }
 
