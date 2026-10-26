@@ -118,7 +118,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 ### Friction ledger
 
-The pilot refusal instrument records teardown nested-copy/preservation predicates in the explicit owning `FM_HOME/state/friction.jsonl`.
+The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev guard pre-tool refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
@@ -165,7 +165,8 @@ A short/crashed append leaves its existing bytes intact; subsequent writes diagn
 A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
-The Jev guard writes no friction events; its mandatory audit's `AuditUnavailableError` behavior is unchanged.
+The Jev guard records each pre-tool refusal as a `blocked` event with `guard_id` `FM-JEV-GUARD` right after the refusal's own `state/jev-guard.jsonl` audit row is appended: `rule_id` is that row's typed `branch` value, `subject.kind` is its hook and tool, and the task and subject identities are the writer's digests.
+A refusal whose audit row could not be written is not mirrored, and the audit's `AuditUnavailableError` behavior is unchanged; a friction writer failure prints the writer's `fm-friction:` diagnostic and never changes the guard's allow or deny.
 [`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references

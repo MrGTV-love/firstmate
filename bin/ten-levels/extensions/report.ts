@@ -25,6 +25,9 @@ const DECISION_MS = 300_000;
 const BACKOFF_MS = 1_000;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
+/** The optional fm-friction.v1 writer (docs/configuration.md "Friction ledger"); every pre-tool refusal is mirrored under this guard id. */
+const FRICTION_WRITER = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py");
+export const FRICTION_GUARD_ID = "FM-JEV-GUARD";
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
@@ -242,6 +245,21 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
+      }
+      // Mirror every pre-tool refusal the audit row above recorded into the optional friction ledger,
+      // never raw inputs or a second judgment: the writer digests task and subject, and the rule is the
+      // row's own typed branch. This optional bridge must not acquire the mandatory audit's semantics;
+      // a writer failure prints the writer's payload-free diagnostic and the refusal stands unchanged.
+      if (terminal.enforcement === "pretool_deny") {
+        try {
+          execFileSync("python3", [FRICTION_WRITER, "refusal", FRICTION_GUARD_ID, terminal.branch, `${terminal.hook}-${terminal.tool}`,
+            `${context.task}:${terminal.hook}:${terminal.tool}`, "machine",
+            context.task, fileURLToPath(import.meta.url)], {
+            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
+          });
+        } catch {
+          console.error("fm-friction: refusal telemetry unavailable; guarded result unchanged; retry telemetry later with the same event identity");
+        }
       }
     },
   };

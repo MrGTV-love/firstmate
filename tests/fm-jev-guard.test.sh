@@ -808,6 +808,120 @@ JS
   pass "oversized, unplannable and never-send write content is admitted locally with no request, size refusal or friction event"
 }
 
+# Every pre-tool refusal the audit recorded is mirrored into the optional
+# fm-friction.v1 ledger through the single writer; allows write nothing, a
+# repeated event identity writes nothing, and a writer failure never changes
+# the refusal. Only digests and typed tokens reach the ledger.
+test_friction_refusal_ledger() {
+  local out ledger before line digest_task digest_subject digest_revision scratch
+  ledger="$HOME_DIR/state/friction.jsonl"
+  friction_lines() { if [ -f "$ledger" ]; then grep -c '' "$ledger"; else echo 0; fi; }
+  sha() { node -e 'const { createHash } = require("node:crypto"); const { readFileSync } = require("node:fs"); const [mode, value] = process.argv.slice(1); console.log("sha256:" + createHash("sha256").update(mode === "file" ? readFileSync(value) : value).digest("hex"));' "$@"; }
+  before=$(friction_lines)
+  claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-friction-path-canary","content":"friction-content-canary"}')"
+  denied "$out" || fail "the known deterministic write refusal was not denied"
+  [ "$(friction_lines)" -eq $((before + 1)) ] || fail "a Claude pre-tool deny did not write exactly one friction event"
+  claude_hook "$(pre Write "$(jq -cn --arg path "$WT/src/friction-allowed.ts" '{file_path:$path,content:"friction-content-canary"}')")"
+  [ -z "$out" ] || fail "the clean control write was denied"
+  claude_hook "$(pre Bash '{"command":"echo friction-control"}')"
+  [ -z "$out" ] || fail "the clean control shell call was denied"
+  [ "$(friction_lines)" -eq $((before + 1)) ] || fail "a clean allow wrote a friction event"
+  line=$(tail -n 1 "$ledger")
+  digest_task=$(sha text t1)
+  digest_subject=$(sha text "t1:tool_call:write")
+  digest_revision=$(sha file "$REPORT")
+  jq -e --arg task "$digest_task" --arg subject "$digest_subject" --arg revision "$digest_revision" '
+    .schema == "fm-friction.v1" and .guard_id == "FM-JEV-GUARD" and .rule_id == "deterministic" and .outcome == "blocked"
+    and .task_id == $task and .subject == {kind: "tool_call-write", identity: $subject, head: "unknown"}
+    and .guard_revision == $revision and .actor == "worker" and .execution_kind == "test"
+    and .exit_printed == true and .exit_kind == "machine" and .reason == "deterministic"
+    and .theater == "unknown" and .new_information == "unknown" and .adjudication == "unknown"
+    and .proof_digest == "unknown" and .elapsed_ms == null and .first_block_at == .at
+    and .attempt_id == .event_id and .operation_id == .event_id and .episode_id == .event_id' <<<"$line" >/dev/null \
+    || fail "the Jev refusal event does not carry the expected fm-friction.v1 fields: $line"
+  scratch="$TMP_ROOT/friction-validate"
+  mkdir -p "$scratch"
+  printf '%s\n' "$line" | FM_HOME="$scratch" python3 "$ROOT/bin/fm-friction-ledger.py" 2>"$scratch/err"
+  [ ! -s "$scratch/err" ] && [ "$(grep -c '' "$scratch/state/friction.jsonl")" -eq 1 ] || fail "the writer rejected the Jev refusal event as invalid: $(cat "$scratch/err")"
+  ! grep -F -q -e fm-jev-guard-friction-path-canary -e friction-content-canary -e "$WT" -e "$HOME_DIR" -e "$KEY" "$ledger" \
+    || fail "a raw path, content or credential reached the friction ledger"
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const ledger = `${home}/state/friction.jsonl`;
+const handlers = {};
+installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'friction', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+const ctx = { cwd: process.env.WT };
+const events = () => (existsSync(ledger) ? readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : []);
+const audit = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+// Every typed refusal branch is the event's rule, taken from the audit row itself.
+for (const [toolName, input] of [
+  ['write', { path: '/etc/fm-jev-guard-friction-branch', content: 'x' }],
+  ['write', { path: 'xd://report_issue', content: '{}' }],
+  ['fixture_unclassified_tool', { any: 'value' }],
+  ['write', { path: 'src/friction-outage.ts', content: 42 }],
+]) {
+  const before = events().length;
+  const refused = await handlers.tool_call({ toolName, input }, ctx);
+  assert.equal(refused?.block, true, `${toolName} must be refused`);
+  const row = audit();
+  assert.equal(row.enforcement, 'pretool_deny');
+  const added = events().slice(before);
+  assert.equal(added.length, 1, `${toolName} ${row.branch} refusal writes exactly one event`);
+  assert.equal(added[0].rule_id, row.branch, 'the rule is the audit row branch');
+  assert.equal(added[0].subject.kind, `tool_call-${toolName}`);
+  assert.equal(added[0].guard_id, 'FM-JEV-GUARD');
+}
+assert.ok(new Set(events().map(e => e.rule_id)).size >= 4, 'distinct branches were exercised');
+// A repeated event identity writes nothing more.
+process.env.FM_FRICTION_EVENT_ID = 'fixture-repeated-identity';
+let before = events().length;
+for (let repeat = 0; repeat < 2; repeat++) {
+  assert.equal((await handlers.tool_call({ toolName: 'write', input: { path: '/etc/fm-jev-guard-friction-dup', content: 'x' } }, ctx)).block, true);
+}
+delete process.env.FM_FRICTION_EVENT_ID;
+assert.equal(events().length, before + 1, 'a repeated event identity is written once');
+assert.equal(events().at(-1).event_id, 'fixture-repeated-identity');
+// A writer failure prints its own diagnostic and leaves the refusal unchanged.
+const expected = await handlers.tool_call({ toolName: 'write', input: { path: '/etc/fm-jev-guard-friction-fail', content: 'x' } }, ctx);
+before = events().length;
+renameSync(ledger, `${ledger}.saved`);
+mkdirSync(ledger);
+let failed;
+try {
+  failed = await handlers.tool_call({ toolName: 'write', input: { path: '/etc/fm-jev-guard-friction-fail', content: 'x' } }, ctx);
+} finally {
+  rmdirSync(ledger);
+  renameSync(`${ledger}.saved`, ledger);
+}
+assert.deepEqual(failed, expected, 'an unwritable ledger leaves the refusal unchanged');
+assert.equal(events().length, before, 'an unwritable ledger records nothing');
+// A missing writer runtime prints the guard-side diagnostic and leaves the refusal unchanged.
+const path = process.env.PATH;
+mkdirSync(`${home}/no-python`, { recursive: true });
+process.env.PATH = `${home}/no-python`;
+let missing;
+try {
+  missing = await handlers.tool_call({ toolName: 'write', input: { path: '/etc/fm-jev-guard-friction-fail', content: 'x' } }, ctx);
+} finally {
+  process.env.PATH = path;
+}
+assert.deepEqual(missing, expected, 'a missing writer leaves the refusal unchanged');
+assert.equal(events().length, before, 'a missing writer records nothing');
+assert.equal(await handlers.tool_call({ toolName: 'write', input: { path: 'src/friction-control.ts', content: 'x' } }, ctx), undefined);
+assert.equal(events().length, before, 'an allowed write records nothing');
+console.log('friction-ok');
+JS
+) || fail "friction refusal ledger: $out"
+  [ "${out##*$'\n'}" = friction-ok ] || fail "friction refusal ledger did not reach its final line: $out"
+  grep -q 'fm-friction: telemetry unavailable; preserve event identity and retry telemetry later; event_id=' <<<"$out" || fail "the writer's own diagnostic was not printed for an unwritable ledger: $out"
+  grep -q 'fm-friction: refusal telemetry unavailable; guarded result unchanged' <<<"$out" || fail "the guard-side diagnostic was not printed for a missing writer: $out"
+  pass "every pre-tool refusal mirrors one digest-only fm-friction.v1 event keyed by its audit branch; allows, repeated identities and writer failures write nothing and never change the refusal"
+}
+
 test_bash_without_judgment
 test_claude_effects
 test_outages_and_scope
@@ -822,4 +936,5 @@ test_omp_permissions
 test_omp_device_effects
 test_deadlines
 test_oversize_writes
+test_friction_refusal_ledger
 test_ledger_privacy
