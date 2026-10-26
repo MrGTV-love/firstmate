@@ -3041,7 +3041,8 @@ open_loops_surface() {
         and (.complete | type) == "boolean" and (.rows | type) == "array"
         and all(.rows[]; type == "object" and (.id | type) == "string"
           and (.id | length) > 0 and (.overdue | type) == "boolean")
-      then [.rows[] | select(.overdue) | .id] | sort | .[]
+      then [.rows[] | select(.overdue) | [.id, .category, .subject, .owner, .next_action, .evidence]]
+        | sort | .[] | @json
       else error("invalid open-loop ledger") end
   ' "$ledger" 2>/dev/null) || return 0
   if [ -f "$ledger" ] && [ ! -L "$ledger" ] \

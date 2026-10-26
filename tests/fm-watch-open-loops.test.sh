@@ -164,11 +164,15 @@ ack_stopped_cycle() {  # <state>
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  # The drain presented every overdue row; acknowledgement needs an action on each.
-  for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --report | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
-    FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" escalated --evidence 'test supervisor escalated' \
-      >/dev/null || return 1
-  done
+  # These isolated watcher fixtures defer newly presented work rather than inventing delivery proof.
+  if ! FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions >/dev/null; then
+    local recheck
+    recheck=$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc)+d.timedelta(hours=1)).isoformat())')
+    for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
+      FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" deferred --evidence 'isolated watcher fixture awaits its next cycle' \
+        --recheck "$recheck" >/dev/null || return 1
+    done
+  fi
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }
@@ -248,7 +252,14 @@ test_unchanged_overdue_set_stays_quiet_then_new_row_wakes() {
   publish_ledger "$state" lost-launcher forgotten-guard
   wait_watch_exit "$pid" 100 || { reap "$pid"; fail "a newly overdue row did not wake"; }
   grep -q '2 overdue' "$state/.wake-queue" || fail "new overdue row was not queued: $(cat "$state/.wake-queue")"
-  pass "an unchanged overdue set stays quiet and a new overdue row wakes again"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the new row wake"
+  jq '.rows[0].evidence = "worker resumed with a new status"' "$state/open-loops.json" > "$state/changed-ledger"
+  mv "$state/changed-ledger" "$state/open-loops.json"
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed evidence with the same row ids did not wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger
+  pass "unchanged evidence stays quiet; new rows and changed evidence wake immediately"
 }
 
 test_ledger_without_overdue_rows_is_silent() {

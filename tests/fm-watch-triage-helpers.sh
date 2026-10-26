@@ -60,11 +60,15 @@ ack_stopped_cycle() {  # <state>
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
-  # The drain presented every overdue row; acknowledgement needs an action on each.
-  for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --report | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
-    FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" escalated --evidence 'test supervisor escalated' \
-      >/dev/null || return 1
-  done
+  # These isolated watcher fixtures defer newly presented work rather than inventing delivery proof.
+  if ! FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions >/dev/null; then
+    local recheck
+    recheck=$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc)+d.timedelta(hours=1)).isoformat())')
+    for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --check-actions | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
+      FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" deferred --evidence 'isolated watcher fixture awaits its next cycle' \
+        --recheck "$recheck" >/dev/null || return 1
+    done
+  fi
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }

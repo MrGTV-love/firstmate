@@ -883,8 +883,8 @@ if [ "$REEMIT" = true ]; then
   fi
 fi
 # The same ledger receipt boundary applies to main, the supervision-host's
-# branch actor, and secondmate homes. Never consume a wake before its overdue
-# obligations have an action recorded after presentation.
+# branch actor, and secondmate homes. New or changed overdue obligations require
+# an action; unchanged evidence remains visible through the periodic digest.
 OVERDUE_SECTION=
 if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
   if [ -n "$ACK_THROUGH" ]; then
@@ -892,6 +892,13 @@ if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
   else
     OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
+    # Reuse the ledger's existing fixed resurfacing cadence, not every handling turn.
+    if [ -f "$FM_WAKE_QUEUE" ] && awk -F '\t' '
+      $3 == "check" && $4 == "open-loop-ledger" { found=1 }
+      END { exit !found }
+    ' "$FM_WAKE_QUEUE"; then
+      "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1
+    fi
   fi
 fi
 rotate_scratch_locked

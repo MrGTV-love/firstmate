@@ -566,12 +566,14 @@ class Collector:
             if task.get("project") and task.get("branch") else None
         active_step = self.pipeline_waits.get(pipeline_key)
         if active_step:
-            wait = f"pipeline step {str(active_step[0])[:100]}; step age {self.now - active_step[1]}s"
-        age = "unknown age" if since is None else f"{self.now - since}s without progress"
-        evidence = f"{wait or 'worker has not recorded its concrete wait'}; {age}"
+            wait = f"pipeline step {str(active_step[0])[:100]}; step started at {active_step[1]}"
+        # Elapsed time belongs in age_seconds, not in the evidence identity: time
+        # passing alone must not turn the same stalled obligation into changed work.
+        progress = "last progress unknown" if since is None else f"last progress at {since}"
+        evidence = f"{wait or 'worker has not recorded its concrete wait'}; {progress}"
         declared_at = re.search(r"\[at=([0-9]+)\]", declaration.split(":", 1)[0])
         if declaration and declared_at and int(declared_at[1]) <= self.now:
-            evidence += f"; declaration age {self.now - int(declared_at[1])}s"
+            evidence += f"; declaration at {declared_at[1]}"
         if signatures:
             evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
@@ -1428,20 +1430,21 @@ class WaitVerifier:
 
 
 def receipt_stands(action, row, now, waits=None):
-    """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
+    """An action covers unchanged evidence, not another presentation of the same obligation."""
     kind = action.get("kind")
-    if row.get("category") == "review_pass_not_merged":
+    if action.get("digest") != row_digest(row) or action.get("invalidated"):
         return False
     if kind == "waiting":
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "escalated" and row.get("owner") == "captain":
-        return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
     if kind == "escalated":
-        # A firstmate-owned row parked behind a live captain hold waits on the same single mover.
-        return waits is not None and waits.hold_stands(action, row)
-    return False
+        if not action.get("delivery"):
+            return False  # legacy prose-only escalations are not delivery evidence
+        if action.get("hold"):
+            return waits is not None and waits.hold_stands(action, row)
+        return True
+    return kind in ("steered", "merged")
 
 
 def steer_record_epoch(state, row, record):
@@ -1473,6 +1476,54 @@ def merge_recorded(state, row, url):
     expected = ["fm-pr-poll-merge-notified-v1", "github", "github.com", match[1], match[2]]
     return any(marker.is_file() and not marker.is_symlink() and marker.read_text().splitlines() == expected
                for marker in state.glob("*.pr-poll-merge-notified"))
+
+
+def escalation_delivery(evidence, row, controls, waits):
+    """Resolve evidence through a delivery owner, never through an operator's prose."""
+    if evidence.startswith("digest:"):
+        delivered = controls.get("digest_delivery", {})
+        if (evidence == "digest:" + delivered.get("id", "")
+                and delivered.get("rows", {}).get(row["id"]) == row_digest(row)):
+            return dict(kind="digest", id=delivered["id"], at_epoch=delivered["at_epoch"])
+    elif evidence.startswith("captain-hold:") and waits is not None:
+        task = evidence[len("captain-hold:"):]
+        record = waits.captain_hold(task, ("live", "aged", "dated"))
+        source = row.get("source") if isinstance(row.get("source"), dict) else {}
+        related = {source.get("task"), source.get("key"), row.get("subject", "").split(":", 1)[0]}
+        if task in related or f"open-loop-row: {row['id']}" in record.get("body_lines", []):
+            return dict(kind="captain-hold", task=task, marker=waits.hold_marker(task))
+    raise ValueError("escalated evidence must cite a delivered digest:<id> for this row's current evidence"
+                     " or a related captain-hold:<task-id> record")
+
+
+def deliver_digest(state, rows, controls, now):
+    """Use the existing away-supervisor transport; publish proof only after confirmed submission."""
+    body = render_digest(rows, controls)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix="fm-open-work-digest-") as payload:
+        payload.write(body)
+        payload.flush()
+        done = subprocess.run(["bash", "-c",
+                               '. "$1/fm-supervise-daemon.sh"; deliver_open_work_digest "$2" "$3"',
+                               "_", str(BIN), str(state), payload.name], text=True, capture_output=True)
+    if done.returncode:
+        raise ValueError("open-work digest delivery was not confirmed; acknowledgement remains gated: "
+                         + (done.stderr or done.stdout)[-240:])
+    delivered = dict(at_epoch=now, rows={row["id"]: row_digest(row) for row in rows})
+    delivered["id"] = fingerprint(delivered)[:24]
+    controls["digest_delivery"] = delivered
+    return "digest:" + delivered["id"]
+
+
+def render_digest(rows, controls):
+    """One list for the existing periodic ledger wake, with no per-row notification churn."""
+    fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "last_action"]
+    lines = ["WAITING OPEN WORK (captain-facing periodic digest):", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
+    for row in rows:
+        action = controls.get("actions", {}).get(row["id"], {})
+        last = {key: action.get(key) for key in ("kind", "evidence", "at_epoch")}
+        values = [row.get(field) for field in fields[:-1]] + [last]
+        lines.append("  " + ",".join(json.dumps(value, ensure_ascii=False) for value in values))
+    return "\n".join(lines)
 
 
 def render_overdue(rows):
@@ -1510,7 +1561,8 @@ def ledger_action(args, state, now):
     recorded = getattr(args, "kind", None)
     pending_waits = any(a.get("kind") == "waiting" or a.get("hold") for a in actions.values())
     parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id and parkable(by_id[args.row_id])
-    if recorded == "waiting" or pending_waits or parks:
+    hold_evidence = recorded == "escalated" and args.evidence.startswith("captain-hold:")
+    if recorded == "waiting" or pending_waits or parks or hold_evidence:
         try:
             waits = WaitVerifier(report, state, now)
         except SOURCE_ERRORS as error:
@@ -1523,6 +1575,15 @@ def ledger_action(args, state, now):
     for row in rows:
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
+    if args.digest:
+        standing = [row for row in rows if receipt_stands(actions.get(row["id"], {}), row, now, waits)]
+        print(render_digest(standing, controls))
+        return 0
+    if args.deliver_digest:
+        proof = deliver_digest(state, rows, controls, now)
+        write_ledger(state, report, receipt=True)
+        print(proof)
+        return 0
     if args.present_overdue:
         needing, standing = [], []
         for row in rows:
@@ -1541,19 +1602,15 @@ def ledger_action(args, state, now):
             if standing:
                 print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
-                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
+                  " --evidence <delivery-id|PR-URL|digest:id|captain-hold:task|reason> [--recheck <UTC-time>]"
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
                   " [--hold <captain-held-task-id>]")
         return 0
     if args.check_actions:
         missing = [row for ident, row in by_id.items()
-                   if (ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
-                       or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now)))
-                   or (actions.get(ident, {}).get("kind") == "waiting"
-                       and not receipt_stands(actions[ident], row, now, waits))]
+                   if not receipt_stands(actions.get(ident, {}), row, now, waits)]
         if missing:
-            print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
+            print("error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused")
             print(render_overdue(missing))
             return 1
         return 0
@@ -1607,6 +1664,7 @@ def ledger_action(args, state, now):
     if args.kind == "deferred":
         if old.get("deferrals", 0):
             old["captain_visible"] = True
+            old["invalidated"] = True
             actions[ident] = old
             for row in report["rows"]:
                 if row["id"] == ident:
@@ -1646,11 +1704,14 @@ def ledger_action(args, state, now):
             unverified = waits_error or "standing evidence unavailable"
     elif args.hold:
         raise ValueError("only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold")
+    delivery = escalation_delivery(args.evidence, by_id[ident], controls, waits) if args.kind == "escalated" else None
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
                          + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
                          digest=row_digest(by_id[ident]), cited=cited)
+    if delivery is not None:
+        actions[ident]["delivery"] = delivery
     if wait_history:
         actions[ident]["waits"] = wait_history
     if binding is not None:
@@ -1666,11 +1727,9 @@ def ledger_action(args, state, now):
             print("standing: captain hold " + hold["task"] + "; stands until this row changes"
                   " or that hold is answered or released")
         elif unverified:
-            print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
-                  " the turn it followed (record it again once the backlog is readable)")
+            print(f"standing: unchanged evidence; the captain hold could not be verified ({unverified}); no hold binding recorded")
         else:
-            print("standing: no; no task held for the captain was named, so this receipt answers only the turn it"
-                  " followed (name the hold with --hold TASK_ID)")
+            print("standing: unchanged evidence; no task held for the captain was named; no hold binding recorded")
     return 0
 
 
@@ -1689,11 +1748,13 @@ def main():
     modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
     modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
     modes.add_argument("--report", action="store_true", help="report all overdue rows with current ages without collecting")
+    modes.add_argument("--digest", action="store_true", help="list unchanged overdue work and its last action for the periodic captain digest")
+    modes.add_argument("--deliver-digest", action="store_true", help="deliver overdue work through the existing away-supervisor transport and print its proof id")
     commands = parser.add_subparsers(dest="command")
     action = commands.add_parser("action", help="record an action on a presented overdue row")
     action.add_argument("row_id")
     action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred", "waiting"))
-    action.add_argument("--evidence", required=True, help="delivery id, PR URL, escalation, deferral or dependency reason")
+    action.add_argument("--evidence", required=True, help="delivery id, PR URL, digest:id, captain-hold:task, deferral or dependency reason")
     action.add_argument("--recheck", help="future UTC ISO time (deferred or waiting)")
     action.add_argument("--hold", metavar="TASK_ID",
                         help="task held for the captain that this escalation waits on (escalated only)")
@@ -1701,8 +1762,8 @@ def main():
     dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
     dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
     args = parser.parse_args()
-    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report
-    if args.command == "action" and (args.present_overdue or args.check_actions or args.report):
+    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report or args.digest or args.deliver_digest
+    if args.command == "action" and (args.present_overdue or args.check_actions or args.report or args.digest or args.deliver_digest):
         parser.error("action cannot be combined with presentation, acknowledgement or report modes")
     if receipt_mode and (args.heartbeat or args.json or args.check_in):
         parser.error("receipt and report commands cannot collect or publish a heartbeat")

@@ -359,9 +359,8 @@ EOF
 }
 
 test_overdue_rows_escalate_before_away_acknowledgement() {
-  local dir state fakebin buffer kind wake
+  local dir state fakebin kind wake
   dir=$(make_supercase overdue-away-ack); state="$dir/state"; fakebin="$dir/daemon-bin"
-  buffer="$state/.subsuper-escalations"
   python3 - "$state/open-loops.json" "$(date +%s)" <<'PYROWS'
 import json, sys
 rows = [dict(id=f'away-row-{i}', category='stalled_worker', subject=f'slow-worker-{i}', owner=f'worker:slow-worker-{i}',
@@ -371,7 +370,10 @@ json.dump(dict(schema='fm-open-loops.v1', generated_epoch=int(sys.argv[2]), comp
           open(sys.argv[1], 'w'))
 PYROWS
   mkdir -p "$fakebin"
-  printf '#!/usr/bin/env bash\nexec "%s/bin/fm-open-loops.sh" "$@"\n' "$ROOT" > "$fakebin/fm-open-loops.sh"
+  cp "$ROOT/bin/fm_open_loops.py" "$ROOT/bin/fm-duration.py" "$fakebin/"
+  printf '#!/usr/bin/env bash\nexec python3 "%s/fm_open_loops.py" "$@"\n' "$fakebin" > "$fakebin/fm-open-loops.sh"
+  printf 'deliver_open_work_digest() { [ ! -e "$1/delivery-fails" ] || return 1; cat "$2" >> "$1/submitted-digests"; }\n' \
+    > "$fakebin/fm-supervise-daemon.sh"
   chmod +x "$fakebin/fm-open-loops.sh"
   cat > "$fakebin/fm-wake-drain.sh" <<EOF
 #!/usr/bin/env bash
@@ -384,12 +386,19 @@ printf '1\t1\tcheck\treport\tcheck: board report\n'
 printf 'WAKE_ACK_REQUIRED: run --ack-through 1 --recovery-generation gen\n' >&2
 EOF
   chmod +x "$fakebin/fm-wake-drain.sh"
+  touch "$state/delivery-fails"
+  if FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state"; then
+    fail "an unconfirmed digest delivery permitted away acknowledgement"
+  fi
+  [ ! -e "$dir/acked" ] || fail "failed digest delivery consumed the wake"
+  rm "$state/delivery-fails"
   FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
     handle_durable_wakes fallback "$state" || fail "an overdue row wedged the away acknowledgement"
   [ "$(cat "$dir/acked" 2>/dev/null)" = ack ] || fail "the away daemon did not acknowledge after escalating"
-  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "away-row-3","worker:slow-worker-3","slow-worker-3"' \
-    "the overdue row did not join the escalation digest"
-  assert_contains "$(cat "$buffer")" 'waiting for lint.full.whole' "the digest lost the overdue row's evidence"
+  assert_contains "$(cat "$state/submitted-digests")" '"away-row-3","worker:slow-worker-3","slow-worker-3"' \
+    "the overdue row did not reach the submitted digest"
+  assert_contains "$(cat "$state/submitted-digests")" 'waiting for lint.full.whole' "the digest lost the overdue row's evidence"
   kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row-3"]["kind"])' \
     "$state/open-loops.json")
   [ "$kind" = escalated ] || fail "the away escalation was not recorded as the row's receipt: $kind"
@@ -398,10 +407,29 @@ EOF
       handle_durable_wakes fallback "$state" || fail "wake $wake with the same overdue rows was not acknowledged"
   done
   [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 4 ] || fail "a repeated wake was not acknowledged once"
-  [ "$(grep -c '^overdue open work: ' "$buffer")" = 10 ] \
-    || fail "repeated wakes buffered an overdue row more than once before the digest flushed"
-  pass "away mode escalates each overdue row once per digest, records the receipt, and acknowledges"
+  [ "$(grep -c '^WAITING OPEN WORK' "$state/submitted-digests")" = 1 ] \
+    || fail "unchanged rows triggered another delivery outside the periodic wake"
+  pass "away mode requires confirmed digest delivery, records proof, and does not re-gate unchanged rows"
 }
+
+test_open_work_digest_retains_every_row() (
+  local dir state full submitted
+  dir=$(make_supercase open-work-digest-bounds); state="$dir/state"
+  submitted="$dir/submitted"
+  python3 - "$dir/digest" <<'PYDIGEST'
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_text('WAITING OPEN WORK\n' + ''.join(f'row-{i}: ' + 'evidence ' * 100 + '\n' for i in range(1000)))
+PYDIGEST
+  inject_msg() { printf '%s' "$1" > "$submitted"; }
+  deliver_open_work_digest "$state" "$dir/digest" || fail "bounded open-work digest was not delivered"
+  [ "$(wc -c < "$submitted" | tr -d ' ')" -lt 10000 ] || fail "open-work digest exceeded its transport budget"
+  full=$(find "$state/.subsuper-digests" -type f -print)
+  [ -f "$full" ] || fail "bounded digest lost its full-text record"
+  cmp -s "$dir/digest" "$full" || fail "full-text digest omitted an overdue row"
+  assert_contains "$(cat "$submitted")" "$full" "submitted digest did not link its full text"
+  pass "bounded open-work digest retains every overdue row in the existing full-text surface"
+)
 
 test_busy_inbox_escalation_reaches_supervision() {
   local variant=$1 mode=$2 dir state task=busy-inbox win gen pane reason detail buffer sent drain
@@ -3433,6 +3461,7 @@ test_status_read_failure_surfaces_without_advancing_seen
 test_catchall_advances_routine_then_surfaces_append
 test_escalation_buffer_failure_retains_wake_and_position
 test_overdue_rows_escalate_before_away_acknowledgement
+test_open_work_digest_retains_every_row
 test_busy_inbox_escalation_reaches_supervision stuck away
 test_busy_inbox_escalation_reaches_supervision stuck quiet
 test_busy_inbox_escalation_reaches_supervision write away
