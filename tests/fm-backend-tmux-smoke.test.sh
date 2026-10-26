@@ -131,12 +131,14 @@ pass "real tmux: passive readiness survives slow pre-interactive startup"
 # then showed "^Cprintf ..." followed by the shell running "rintf ...", so the
 # control key was taken by the terminal instead of the prompt and swallowed the
 # first byte of the command behind it. The message that used to fail here blamed
-# the shell dying, which that capture disproves. Submit a command and wait for
-# its output first - only the interactive loop can run a submitted line - so the
-# prompt owns the terminal before any control key is sent.
+# the shell dying, which that capture disproves. Submit a probe command, then
+# wait for its output followed by the redrawn prompt line. The probe output alone
+# only proves the command ran; bash prints it before it returns to readline.
+# readline draws the prompt only after it owns the terminal, so the prompt line
+# after the probe output proves readline owns the terminal before Ctrl-C is sent.
 fm_backend_tmux_send_text_line "$TARGET" "printf 'interactive-%s\\n' ready" \
   || fail "could not submit a probe command once the rc file acknowledged startup"
-wait_for_capture_text "$TARGET" "interactive-ready" \
+wait_for_capture_text "$TARGET" "interactive-ready"$'\n'"smoke\$" \
   || fail "the tmux task shell did not dispatch a submitted command after startup"
 tmux send-keys -t "$TARGET" C-c
 fm_backend_tmux_send_text_line "$TARGET" "printf 'after-interactive-%s\\n' interrupt" \
