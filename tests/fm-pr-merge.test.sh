@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -34,12 +34,16 @@ import sys
 with sqlite3.connect(sys.argv[1]) as db:
     db.executescript('''CREATE TABLE repos (id TEXT, working_path TEXT);
 CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, base_sha TEXT, head_sha TEXT, last_pushed_sha TEXT, pr_url TEXT);
-CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);''')
+CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT, status TEXT);''')
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
-    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic'))
+    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', None, None))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'acp:omp', None, None, 'completed'))
+    if sys.argv[6] == 'cancelled-claude':
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'claude', '', None, 'cancelled'))
+    if sys.argv[6] == 'errored-omp':
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'acp:omp', '', None, 'error'))
 PY
     case "$scenario" in
       unreadable|config-fallback|changed-config|unknown-captain-word)
@@ -162,7 +166,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -171,7 +175,7 @@ PY
         case "$scenario" in
           exact-head-fail) expected='verdict is FAIL' ;;
           head-mismatch) expected='head mismatch' ;;
-          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;

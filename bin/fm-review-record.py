@@ -32,10 +32,14 @@ come from matching runs and agent_invocations in <NM_HOME>/state.sqlite
 (default ~/.no-mistakes), opened with SQLite mode=ro; a relative NM_HOME is
 never resolved and leaves the pipeline commits unknown. A matching run must
 contain the pipeline commit in its recorded base-to-head/pushed range and name
-this PR or this task's repository and branch. All its invocation models are conservative author evidence. A recorded provider
-can resolve an otherwise unknown model alias; conflicting provider/model families
-are unknown. Unattributed commits remain unknown: today's agent configuration
-cannot prove who authored an earlier commit. It never creates a database.
+this PR or this task's repository and branch. All its invocation models are
+conservative author evidence. A recorded provider can resolve an otherwise
+unknown model alias; conflicting provider/model families are unknown. Every
+invocation counts, including cancelled and errored ones. An invocation with an
+empty model takes a family from its agent only when the agent is exactly claude
+(anthropic); any other agent, such as acp:omp, stays unknown. Unattributed
+commits remain unknown: today's agent configuration cannot prove who authored
+an earlier commit. It never creates a database.
 review records only the reader's declaration, not an attribution snapshot;
 verify always rereads authoritative evidence, including for historical records.
 A typed model id exactly matching a model derived for that same named group
@@ -368,7 +372,7 @@ def derived_authors(home, pr, head, task, base):
                         continue
                     covered.update(owned)
                     for agent, exact_model, provider in invocations:
-                        item = modelled(exact_model or "unknown", "pipeline model")
+                        item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
                         # declarations and historical family fields never do.
                         if provider in RECORDED_FAMILIES - {"unknown"}:
