@@ -976,7 +976,10 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None):
     With cpu_file, write the command tree's CPU milliseconds there after it
     exits. The sample is the same process-tree accounting the progress runner
     uses, taken once from this wrapper, so it includes descendants that were
-    already reaped into this process's waited-child time. It is measurement
+    already reaped into this process's waited-child time. A killed or orphaned
+    subtree is not counted, because nothing waits for it back up to this
+    wrapper, and work COMMAND leaves running past the sample is not counted
+    either. It is measurement
     evidence, not a busy-versus-idle verdict: a wrapper waiting on a lock while
     its command waits on I/O occupies no CPU either way. A cpu_file that cannot
     be written never changes COMMAND's exit status.

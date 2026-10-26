@@ -2483,9 +2483,7 @@ with open(records_file, encoding="utf-8") as fh:
         line = line.rstrip("\n")
         if not line:
             continue
-        fields = line.split("\t")
-        path, family, expected, exit_s, dur_s, gate, reason = fields[:7]
-        cpu_s = fields[7] if len(fields) > 7 else ""
+        path, family, expected, exit_s, dur_s, gate, reason, cpu_s = line.split("\t")
         scripts.append({
             "path": path,
             "family": family,
@@ -3063,10 +3061,14 @@ record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
   local base family expected gate_skip gate_reason fail_delta token timed_out=0 cpu_ms=
   # CPU comes from the slot gate's single process-tree sample, so it is present
-  # exactly when that wrapper ran and empty otherwise. See docs
-  # "Timing artifacts": this is measurement evidence, not a verdict on why a
-  # suite took as long as it did.
-  if [ -f "$out.cpu" ]; then
+  # when that wrapper ran and empty otherwise. See docs "Timing artifacts":
+  # this is measurement evidence, not a verdict on why a suite took as long as
+  # it did. When the per-script bound fired, its killed process group was
+  # reparented before anything waited for it, so that CPU never reached the
+  # wrapper and any value would understate exactly the suites profiling targets.
+  if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
+    :
+  elif [ -f "$out.cpu" ]; then
     cpu_ms=$(head -n 1 "$out.cpu" 2>/dev/null || true)
     case "$cpu_ms" in ''|*[!0-9]*) cpu_ms= ;; esac
   fi
