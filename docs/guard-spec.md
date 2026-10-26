@@ -46,6 +46,12 @@ An active guard added after the audit is named in the registry's
 `beyond_audit_retired`; both stay outside the audited inventory that
 `fm-guard-lint.sh --counts` balances against `audited`.
 
+`retirement_decision` is the recorded outcome of the data-driven pass for one
+guard: `keep` or `cut`, the date, and the reason. It appears only after
+`bin/fm-guard-metrics.sh` has nominated the guard, and recording it is what
+retires the nomination, so a guard that carries none is still waiting for
+judgment.
+
 `remedy` is rendered text, not a pointer. Every remedy contains at least one
 executable token: a repository path that exists, a `bin/` invocation, or a shell
 command. Placeholders are `<angle-bracketed>` and name what the caller supplies.
