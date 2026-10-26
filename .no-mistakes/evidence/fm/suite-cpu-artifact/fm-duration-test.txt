@@ -1,0 +1,13 @@
+ok - the test runner waits on a held per-key slot, names the holder, runs once the bounded wait ends, and leaves the wait out of the sample
+ok - empty home variables are unset and never resolve against the caller directory
+ok - a ledger or lock location inside a project work tree is refused without writing
+ok - a declared home that is a project work tree is refused without writing
+ok - the calibration scratch file never lands in a project work tree
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - repeated-timeout work routes to the registered project, else to firstmate
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, progress stops, pipeline imports and literal guard
+ok - a test.* key admits at most the configured copies, names its holders while waiting, frees a killed holder, reports its wait, keeps the log descriptor, never stops a command, and stays out of the sample
+ok - measured command behavior
+rc=0

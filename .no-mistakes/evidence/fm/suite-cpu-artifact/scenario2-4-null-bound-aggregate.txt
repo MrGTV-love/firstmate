@@ -1,0 +1,22 @@
+=== Scenario: slot gate off (FM_TEST_KEY_SLOTS=0) -> cpu_ms present but null ===
+runner rc=0
+sleep-suite.test.sh duration_ms=8407 cpu_ms=None exit=0
+
+=== Scenario: per-script bound kills a CPU-spinning suite -> exit 124, cpu_ms null ===
+runner rc=1
+FM_TEST_END 2026-10-26T21:40:42Z /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/hang-suite.test.sh exit=124 duration_ms=8550 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=8773
+hang-suite.test.sh duration_ms=8550 cpu_ms=None exit=124
+
+=== Scenario: aggregate carries cpu_ms through unchanged ===
+FM_TEST_AGGREGATE lanes=3 total=4 failed=1 skipped_gate=0 critical_path_duration_ms=17208
+aggregate rc=0
+sleep-suite.test.sh duration_ms=8829 cpu_ms=130
+hang-suite.test.sh duration_ms=8550 cpu_ms=None
+sleep-suite.test.sh duration_ms=8407 cpu_ms=None
+burn-suite.test.sh duration_ms=8026 cpu_ms=2110
+sleep-suite.test.sh duration_ms=8829 cpu_ms=130
+hang-suite.test.sh duration_ms=8550 cpu_ms=None
+sleep-suite.test.sh duration_ms=8407 cpu_ms=None
+burn-suite.test.sh duration_ms=8026 cpu_ms=2110
+top-level keys: ['kind', 'lanes', 'scripts', 'slowest', 'summary']

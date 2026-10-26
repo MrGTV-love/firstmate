@@ -1,0 +1,16 @@
+=== gate: unwritable --cpu-file keeps exit status ===
+ran
+fm-duration: cannot report the command CPU to /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms: [Errno 2] No such file or directory: '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms'
+command exit=0 gate rc=0
+ran
+fm-duration: cannot report the command CPU to /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms: [Errno 2] No such file or directory: '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms'
+command exit=3 gate rc=3
+ran
+fm-duration: cannot report the command CPU to /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms: [Errno 2] No such file or directory: '/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/no-such-dir/cpu.ms'
+command exit=42 gate rc=42
+
+=== gate: writable --cpu-file with nonzero exit still writes and keeps status ===
+gate rc=7 cpu_file=1070
+
+=== no stray spinner left from the bound-kill run ===
+none

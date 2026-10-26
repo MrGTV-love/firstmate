@@ -1,0 +1,2 @@
+ok - timing markers and JSON artifact are valid
+ok - --per-script-timeout-secs turns a hung script into a bounded failure

@@ -1,0 +1,151 @@
+{
+  "kind": "aggregate",
+  "lanes": [
+    {
+      "finished_at": "2026-10-26T21:40:12Z",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/gated.json",
+      "run_id": "fm-test-run-1793050795816-11687",
+      "selection": "scripts;jobs=1",
+      "started_at": "2026-10-26T21:39:55Z",
+      "summary": {
+        "duration_ms": 17208,
+        "failed": 0,
+        "skipped_gate": 0,
+        "total": 2
+      }
+    },
+    {
+      "finished_at": "2026-10-26T21:40:33Z",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/nogate.json",
+      "run_id": "fm-test-run-1793050825133-20423",
+      "selection": "scripts;jobs=1",
+      "started_at": "2026-10-26T21:40:25Z",
+      "summary": {
+        "duration_ms": 8623,
+        "failed": 0,
+        "skipped_gate": 0,
+        "total": 1
+      }
+    },
+    {
+      "finished_at": "2026-10-26T21:40:42Z",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/bound.json",
+      "run_id": "fm-test-run-1793050834044-24238",
+      "selection": "scripts;jobs=1",
+      "started_at": "2026-10-26T21:40:33Z",
+      "summary": {
+        "duration_ms": 8773,
+        "failed": 1,
+        "skipped_gate": 0,
+        "total": 1
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "cpu_ms": 130,
+      "duration_ms": 8829,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050795816-11687",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/sleep-suite.test.sh"
+    },
+    {
+      "cpu_ms": null,
+      "duration_ms": 8550,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050834044-24238",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/hang-suite.test.sh"
+    },
+    {
+      "cpu_ms": null,
+      "duration_ms": 8407,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050825133-20423",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/sleep-suite.test.sh"
+    },
+    {
+      "cpu_ms": 2110,
+      "duration_ms": 8026,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050795816-11687",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/burn-suite.test.sh"
+    }
+  ],
+  "slowest": [
+    {
+      "cpu_ms": 130,
+      "duration_ms": 8829,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050795816-11687",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/sleep-suite.test.sh"
+    },
+    {
+      "cpu_ms": null,
+      "duration_ms": 8550,
+      "exit": 124,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050834044-24238",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/hang-suite.test.sh"
+    },
+    {
+      "cpu_ms": null,
+      "duration_ms": 8407,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050825133-20423",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/sleep-suite.test.sh"
+    },
+    {
+      "cpu_ms": 2110,
+      "duration_ms": 8026,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "lane_run_id": "fm-test-run-1793050795816-11687",
+      "lane_selection": "scripts;jobs=1",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/burn-suite.test.sh"
+    }
+  ],
+  "summary": {
+    "critical_path_duration_ms": 17208,
+    "failed": 1,
+    "lanes": 3,
+    "skipped_gate": 0,
+    "total": 4
+  }
+}

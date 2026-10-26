@@ -1,0 +1,32 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 8407,
+      "failed": 0,
+      "name": "unclassified"
+    }
+  ],
+  "finished_at": "2026-10-26T21:40:33Z",
+  "run_id": "fm-test-run-1793050825133-20423",
+  "scripts": [
+    {
+      "cpu_ms": null,
+      "duration_ms": 8407,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.cyMUPgKeP9/sleep-suite.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-26T21:40:25Z",
+  "summary": {
+    "duration_ms": 8623,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 1
+  }
+}
