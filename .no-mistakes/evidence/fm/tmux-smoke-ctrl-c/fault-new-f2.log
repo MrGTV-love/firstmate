@@ -1,0 +1,10 @@
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+ok - real tmux: passive readiness survives slow pre-interactive startup
+tmux capture timed out: target=smoke:fm-smoke1 expected=interactive-ready
+smoke$
+last captured output:
+startup-waiting
+shell-ready
+printf 'interactive-%s\n' ready
+not ok - the tmux task shell did not dispatch a submitted command after startup

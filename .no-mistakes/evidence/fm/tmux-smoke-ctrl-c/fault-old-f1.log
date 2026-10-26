@@ -1,0 +1,13 @@
+@1
+ok - real tmux: fm_backend_tmux_create_task creates a window and refuses a duplicate
+ok - real tmux: passive readiness survives slow pre-interactive startup
+tmux capture timed out: target=smoke:fm-smoke1 expected=after-interactive-interrupt
+last captured output:
+startup-waiting
+shell-ready
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+smoke$ printf 'after-interactive-%s\n' interrupt
+not ok - Ctrl-C after the interactive rc file killed the shell
