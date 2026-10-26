@@ -1,0 +1,14 @@
+TOOL_USE: Skill {"skill": "firstmate-coding-guidelines"}
+TOOL_USE: Skill {"skill": "backlog-maintenance"}
+RESULT:
+Captain, I loaded both skills. I did no other work.
+
+**A) From firstmate-coding-guidelines:**
+
+> Firstmate's shared instruction surface reaches running homes only after it lands on the default branch and those homes fast-forward.
+> Only `AGENTS.md`, `bin/`, and `.agents/skills/` are loaded by a running firstmate; public `skills/` is an installer-facing surface.
+
+**B) From backlog-maintenance:**
+
+> An escalated open-work receipt marked `standing: no` because no captain-held task was named answers only the turn it followed.
+> Name the actual captain-held task with `--hold TASK_ID` rather than treating that receipt as a standing wait.

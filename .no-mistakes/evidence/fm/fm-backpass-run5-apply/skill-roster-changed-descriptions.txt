@@ -1,0 +1,20 @@
+roster entries: 38 not_judged: 0
+
+== agent-skill-trigger-index
+description: Load only when auditing or maintaining the complete agent-only skill trigger index.
+
+== backlog-maintenance
+description: Load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named.
+index mirror line : load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named.
+index mirror matches description word for word (case of first letter aside): True
+
+== firstmate-coding-guidelines
+description: Agent-only reference for changing firstmate's shared, tracked material per AGENTS.md section 1. Use before editing any of that material, whether working as firstmate directly or as a crewmate briefed on a firstmate-repo task. Covers the knowledge-placement decision tree, the one-owner rule for contracts, the inline-stub pattern for content moved into a skill, AGENTS.md size discipline, trigger hygiene for new skills, and repo style rules (one sentence per line, plain dash, no agent co-author, shellcheck-clean bin scripts, colocated tests, and maintainer-verification evidence).
+
+== stuck-crewmate-recovery
+description: Load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims.
+index mirror line : load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims.
+index mirror matches description word for word (case of first letter aside): True
+
+== validation-supervision
+description: Load before every no-mistakes retry or reattachment after a wait timeout (including repeated timeouts) or output-review refusal; for starting or active ship validation runs, mid-run requirement changes or findings, failed/aborted or passing-Gerrit custody return (`recover_custody` or `inspect_and_reconcile_manually`), and before any ask-user decision.

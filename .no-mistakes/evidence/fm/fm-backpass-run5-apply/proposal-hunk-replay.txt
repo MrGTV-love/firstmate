@@ -1,0 +1,17 @@
+e2/H3 AGENTS.md: find occurs 1x in base
+e2/H6 .agents/skills/firstmate-coding-guidelines/SKILL.md: find occurs 1x in base
+e3/H1 AGENTS.md: find occurs 1x in base
+e4/H4 .agents/skills/backlog-maintenance/SKILL.md: find occurs 1x in base
+e4/H5 .agents/skills/backlog-maintenance/SKILL.md: find occurs 1x in base
+e5/H7 .agents/skills/stuck-crewmate-recovery/SKILL.md: find occurs 1x in base
+e6/H8 .agents/skills/validation-supervision/SKILL.md: find occurs 1x in base
+AGENTS.md: root-cause line count in target: 1
+AGENTS.md: root-cause line inside section 1: True | section 1 header: ## 1. Identity and prime directives
+AGENTS.md: target == base + proposal hunks e2-e6 + root line: True
+.agents/skills/firstmate-coding-guidelines/SKILL.md: target == base + proposal hunks e2-e6: True
+.agents/skills/backlog-maintenance/SKILL.md: target == base + proposal hunks e2-e6: True
+.agents/skills/stuck-crewmate-recovery/SKILL.md: target == base + proposal hunks e2-e6: True
+.agents/skills/validation-supervision/SKILL.md: target == base + proposal hunks e2-e6: True
+e1/H2 find text still present unchanged in target AGENTS.md: True | count base 1 target 1
+e1 skill file absent in target: True
+ALL HUNKS EXACT: True

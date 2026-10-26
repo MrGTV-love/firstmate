@@ -1,0 +1,15 @@
+Captain, here are the four descriptions. I copied each one exactly from the skill list.
+
+A) backlog-maintenance:
+"Load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named."
+
+B) stuck-crewmate-recovery:
+"Load on every `stale:` wake before any verdict, especially repeated escalation or `demand-deep-inspection`, even for finished, deliberately paused, or idle workers; also for dead/missing endpoints, looping or unresponsive workers, repeated confusion, brief-answered questions, failed steering, moved-copy reconciliation, or live-worker pipeline-dead/timeout claims."
+
+C) validation-supervision:
+"Load before every no-mistakes retry or reattachment after a wait timeout (including repeated timeouts) or output-review refusal; for starting or active ship validation runs, mid-run requirement changes or findings, failed/aborted or passing-Gerrit custody return (`recover_custody` or `inspect_and_reconcile_manually`), and before any ask-user decision."
+
+D) firstmate-coding-guidelines:
+"Agent-only reference for changing firstmate's shared, tracked material per AGENTS.md section 1. Use before editing any of that material, whether working as firstmate directly or as a crewmate briefed on a firstmate-repo task. Covers the knowledge-placement decision tree, the one-owner rule for contracts, the inline-stub pattern for content moved into a skill, AGENTS.md size discipline, trigger hygiene for new skills, and repo style rules (one sentence per line, plain dash, no agent co-author, shellcheck-clean bin scripts, colocated tests, and maintainer-verification evidence)."
+
+All four skills are in the list.
