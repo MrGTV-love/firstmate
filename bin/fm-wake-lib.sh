@@ -1821,6 +1821,9 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     episodes="$episodes$key"$'\n'
     state=$(ps -o stat= -p "$pid" 2>/dev/null) || state=unknown
     read -r state <<< "$state"
+    if [ -n "$dead_pid" ]; then
+      case "$state" in ''|unknown) state=dead ;; esac
+    fi
     parent=$(ps -o ppid= -p "$pid" 2>/dev/null) || parent=unknown
     read -r parent <<< "$parent"
     # comm names the parent executable without copying prompts or credentials
@@ -1837,6 +1840,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
       fi
     done
     reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
+    [ -z "$dead_pid" ] || reason="$reason trigger=dead-owner"
     if [ -n "$settle" ] && ! "$settle"; then
       FM_LOCK_MONITOR_REASON=
       return 0

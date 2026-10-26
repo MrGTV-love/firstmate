@@ -2446,6 +2446,45 @@ test_pid_alive_reads_proc_state_without_ps() {
   pass "a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict"
 }
 
+test_dead_owner_alarm_names_its_trigger() {
+  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not name its proven verdict"
+import os, pathlib, signal, subprocess, sys, tempfile, time
+lib = sys.argv[1]
+reaped = subprocess.Popen(["true"]); reaped.wait()
+zombie = subprocess.Popen(["sleep", "300"]); zombie.send_signal(signal.SIGKILL)
+for _ in range(200):
+    if subprocess.run(["ps", "-o", "stat=", "-p", str(zombie.pid)], capture_output=True, text=True).stdout.strip().startswith("Z"): break
+    time.sleep(.05)
+else: raise AssertionError("killed child did not stay a zombie")
+check = '. "$1"; fm_lock_monitor_check'
+unreadable_ps = '. "$1"; ps() { return 1; }; fm_lock_monitor_check'
+def observe(name, pid, age, code):
+    with tempfile.TemporaryDirectory(prefix="fm-dead-owner-") as d:
+        lock = pathlib.Path(d, name); lock.mkdir()
+        (lock / "pid").write_text(f"{pid}\n")
+        old = time.time() - age
+        os.utime(lock / "pid", (old, old))
+        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_PROC_ROOT_OVERRIDE=os.path.join(d, "missing-proc"))
+        env.pop("FM_LOCK_ALARM_SECS", None)
+        subprocess.run(["bash", "-c", code, "_", lib], env=env, check=True, timeout=30)
+        queue = pathlib.Path(d, ".wake-queue")
+        return queue.read_text().splitlines() if queue.exists() else []
+try:
+    rows = observe(".control-task-3.lock", reaped.pid, 5, check)
+    assert len(rows) == 1 and f"owner={reaped.pid} state=dead " in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
+    rows = observe(".control-task-3.lock", zombie.pid, 5, check)
+    assert len(rows) == 1 and " state=Z" in rows[0] and rows[0].endswith(" trigger=dead-owner"), rows
+    # Unreadable ps keeps a live owner alive: no dead-owner verdict at all.
+    assert observe(".control-task-3.lock", os.getpid(), 5, unreadable_ps) == [], "unreadable ps reported a live owner dead"
+    # A measured lock past its age limit keeps its age text; ps failure stays unknown.
+    rows = observe(".fleet-ledger.lock", os.getpid(), 301, unreadable_ps)
+    assert len(rows) == 1 and " state=unknown " in rows[0] and "trigger=" not in rows[0], rows
+finally:
+    zombie.wait()
+PY
+  pass "dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death"
+}
+
 test_long_held_lock_alarm() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
@@ -2732,6 +2771,7 @@ test_alarm_observation_failure_keeps_waiting_append
 test_startup_queue_wait_alarm_releases_with_downtime
 test_lock_alarm_project_and_control_limits
 test_pid_alive_reads_proc_state_without_ps
+test_dead_owner_alarm_names_its_trigger
 test_long_held_lock_alarm
 test_lock_alarm_discovers_foreign_owners
 test_lock_monitor_prunes_finished_waiters
