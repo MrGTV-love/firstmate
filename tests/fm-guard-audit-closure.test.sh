@@ -95,7 +95,7 @@ assert_contains() {  # <file> <literal> <claim>
   pass "$3"
 }
 assert_contains bin/fm-spawn.sh 'bin/fm-control.sh' 'G-20 worktree isolation names the reassociation repair'
-assert_contains bin/fm-gate-refuse-lib.sh 'bin/fm-lab-home.sh create' 'G-22 gate containment names the permitted lab home'
+assert_contains bin/fm-gate-refuse-lib.sh 'bin/fm-lab-home.sh env' 'G-22 gate containment names the one-command lab home it permits'
 assert_contains bin/fm-role-lib.sh 'config/firstmate-role' 'G-21 publication role names where authority is granted'
 assert_contains bin/fm-send.sh 'FM_HOME=<home> bin/fm-send.sh' 'G-05 send names the working invocation'
 assert_contains bin/fm-kimi-turnend-hook.sh 'bin/fm-kimi-turnend-hook.sh install' 'G-06 kimi refusal names the install step'

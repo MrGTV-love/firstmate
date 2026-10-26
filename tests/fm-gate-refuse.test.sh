@@ -115,7 +115,7 @@ test_helper_env_marker_refuses() {
   out=$(run_guard_lib "$NORMAL_CWD" set); rc=$?
   expect_code 3 "$rc" "helper: env marker must exit 3"
   assert_contains "$out" "$ENV_MSG" "helper: env-marker refusal message"
-  assert_contains "$out" 'bin/fm-lab-home.sh create' "helper: env-marker refusal must name the lab-home escape"
+  assert_contains "$out" 'bin/fm-lab-home.sh env' "helper: env-marker refusal must name the lab-home escape"
   assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
     "helper: env-marker refusal must state the real home is unavailable"
   [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
@@ -139,7 +139,7 @@ test_helper_path_backstop_refuses() {
   expect_code 3 "$rc" "helper: gate worktree must exit 3 even with the marker unset"
   assert_contains "$out" "$PATH_MSG" "helper: path-backstop refusal message"
   assert_not_contains "$out" "$ENV_MSG" "helper: backstop must not be attributed to the env marker"
-  assert_contains "$out" 'bin/fm-lab-home.sh create' "helper: backstop refusal must name the lab-home escape"
+  assert_contains "$out" 'bin/fm-lab-home.sh env' "helper: backstop refusal must name the lab-home escape"
   assert_contains "$out" 'a real home is intentionally unavailable to a gate agent' \
     "helper: backstop refusal must state the real home is unavailable"
   [ "$(grep -c '"guard":"gate-agent-containment".*"decision":"deny"' "$EVENTS")" -eq 1 ] \
@@ -322,6 +322,31 @@ test_lab_home_helper() {
   [ "$rc" -ne 0 ] || fail "lab-home: create on a dir holding a newline-named entry must refuse"
   assert_absent "$newline/.fm-lab-home" "lab-home: newline-entry create must not write the marker"
   pass "fm-lab-home: create mints marked stock homes only on fresh empty dirs; anything else is refused"
+}
+
+# env is the one-command form the refusal names: it mints a marked lab home,
+# exports it with its private socket directory, and prints the teardown line,
+# so a gate agent never composes mktemp, create, and a tmux mkdir by hand.
+test_lab_home_env_provisions_the_gate_lab() {
+  local out lab socket rc
+  out=$(TMPDIR="$TMP" "$LABHOME" env 2>&1) || fail "lab-home: env must provision a lab: $out"
+  assert_contains "$out" 'export FM_HOME=' "lab-home: env must export FM_HOME"
+  assert_contains "$out" 'export TMUX_TMPDIR=' "lab-home: env must export TMUX_TMPDIR"
+  assert_contains "$out" 'teardown' "lab-home: env must print the teardown line"
+  printf '%s\n' "$out" > "$TMP/env.exports"
+  # shellcheck source=/dev/null
+  ( . "$TMP/env.exports"; printf '%s\n%s\n' "$FM_HOME" "$TMUX_TMPDIR" > "$TMP/env.paths" )
+  lab=$(sed -n '1p' "$TMP/env.paths")
+  socket=$(sed -n '2p' "$TMP/env.paths")
+  [ -f "$lab/.fm-lab-home" ] || fail "lab-home: env did not mint a marked lab home"
+  case "$lab" in "$TMP"/*) ;; *) fail "lab-home: env must mint under TMPDIR, got $lab" ;; esac
+  [ -d "$socket" ] || fail "lab-home: env did not create the private tmux socket directory"
+  out=$(run_guard_lib_home "$NORMAL_CWD" "$lab" NO_MISTAKES_GATE=1); rc=$?
+  expect_code 0 "$rc" "lab-home: the home env mints must be permitted by the gate boundary"
+  "$LABHOME" teardown "$lab" || fail "lab-home: teardown of the env lab failed"
+  [ ! -e "$socket" ] || fail "lab-home: teardown left the env socket directory behind"
+  rm -rf "$lab"
+  pass "fm-lab-home: env provisions the marked lab home the gate boundary admits"
 }
 
 test_lab_home_refuses_work_tree() {
@@ -607,6 +632,7 @@ test_helper_path_backstop_refuses
 test_helper_normal_is_noop
 test_helper_lab_home_admits
 test_lab_home_helper
+test_lab_home_env_provisions_the_gate_lab
 test_lab_home_refuses_work_tree
 test_lab_home_private_tmux_socket_survives_deep_paths
 test_spawn_refuses_and_admits
