@@ -230,7 +230,7 @@
       "layer": "runtime-block",
       "source": "NO_MISTAKES_GATE env, git-common-dir under .no-mistakes/repos, lab-home marker",
       "trigger": "the process is a gate agent and FM_HOME carries no lab marker",
-      "remedy": "LAB=$(mktemp -d \"${TMPDIR:-/tmp}/fm-lab.XXXXXX\"); bin/fm-lab-home.sh create \"$LAB\"; FM_HOME=$LAB <command> (a real home is intentionally unavailable to a gate agent)",
+      "remedy": "eval \"$(bin/fm-lab-home.sh env)\" to mint the permitted lab home and export FM_HOME, then re-run the call (a real home is intentionally unavailable to a gate agent)",
       "budget": 1,
       "test": "tests/fm-gate-refuse.test.sh",
       "tier": "C",
