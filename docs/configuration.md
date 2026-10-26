@@ -698,6 +698,10 @@ Because the merge is already verified, that check waives the finished-session sw
 The watcher starts `bin/fm-merge-prune.sh sweep` detached while a record exists (`FM_MERGE_PRUNE_INTERVAL`), so no model or person has to carry the retry.
 `FM_MERGE_PRUNE=0` stops new arming.
 
+Before teardown runs, each copy nested in the task's copy must pass the fallback's commit, stash and status proofs (below).
+A teardown that succeeds returns the slot with its nested copies still in it, or closes the task and holds the slot.
+So a nested copy with an unpushed commit, a stash or a changed file keeps the whole slot with one wake, and teardown does not run.
+
 A refusal that only means "not now" is retried on later ticks and says nothing.
 That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
 The retry waits 60 seconds, then doubles up to 3600 seconds.

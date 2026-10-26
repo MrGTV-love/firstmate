@@ -19,6 +19,12 @@
 # state/<id>.pr-poll-merge-notified marker for the PR recorded in it: only a
 # verified merge arms. Missing metadata or a different PR drops the record.
 #
+# Before teardown runs, every copy nested in the task's copy gets the commit,
+# stash and status proofs of the fallback (below). A teardown that succeeds
+# returns the slot with its nested copies in it, or closes the task and holds
+# the slot, so a nested copy with work of its own keeps the whole slot with one
+# wake and teardown does not run.
+#
 # Transient refusals retry on later sweeps with backoff (60s, doubling to 3600s)
 # and stay silent: the task lease or project lock is held by another actor
 # (FM_LEASE_REFUSE_EXIT, FM_PROJECT_LOCK_BUSY_EXIT), a teardown that outlasts its
@@ -533,12 +539,23 @@ prove_all() {  # <real-copy> <pr-number> [nofetch]
   fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   fm_mp_prove_git "$real" "$pr" "$mode" "$(proof_scope "$real" "$project")" || { record_verdict "$real"; return 1; }
   fm_mp_prove_ignored "$real" || { record_verdict "$real"; return 1; }
+  prove_nested_git "$mode" || { record_verdict "$real"; return 1; }
   if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
     for n in "${FM_MP_NESTED[@]}"; do
-      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }
       fm_mp_prove_ignored "$n" || { record_verdict "$real"; return 1; }
     done
   fi
+  return 0
+}
+
+# The commit, stash and status proofs of each nested copy that fm_mp_find_nested
+# found (FM_MP_NESTED); sets FM_MP_VERDICT/REASON on failure.
+prove_nested_git() {  # <fetch|nofetch>
+  local n project
+  project=$(fm_meta_get "$META" project)
+  for n in ${FM_MP_NESTED[@]+"${FM_MP_NESTED[@]}"}; do
+    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1
+  done
   return 0
 }
 
@@ -559,8 +576,25 @@ stop_worker() {
   FM_HOME="$FM_HOME" fm_run_timed "$(fm_mp_limit merge-prune.control-exit 120)" "$CONTROL_BIN" "$ID" exit </dev/null >/dev/null 2>&1 && WORKER_STOPPED=1
 }
 
+# A teardown that succeeds returns the slot with its nested copies in it, or
+# closes the task and holds the slot, so the commit, stash and status proofs of
+# every nested copy run before teardown: a nested copy with work of its own keeps
+# the whole slot with one wake, and teardown does not run.
+prove_nested_first() {
+  local wt real
+  wt=$(fm_meta_get "$META" worktree)
+  [ -n "$wt" ] && [ -d "$wt" ] || return 0
+  if ! real=$(fm_mp_real "$wt"); then
+    retain "$wt" "cannot resolve the pool copy $wt"
+    return 1
+  fi
+  fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
+  prove_nested_git fetch || { record_verdict "$real"; return 1; }
+}
+
 attempt() {
   local reason
+  prove_nested_first || return 0
   run_teardown
   if [ "$TD_RC" -eq 0 ]; then
     finish_reaped "teardown completed"

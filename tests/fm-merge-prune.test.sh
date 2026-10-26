@@ -591,6 +591,35 @@ scn_nested_unpushed_commit_keeps_the_slot() {
   return 0
 }
 
+# Teardown would succeed here and return the slot, nested copy and all, to the
+# pool, so the nested proof runs before teardown: an independent clone or a
+# linked worktree of the project with an unpushed commit keeps the whole slot
+# with one wake, and teardown never runs.
+scn_nested_unpushed_commit_keeps_the_slot_before_teardown() {  # <clone|worktree>
+  local n
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  n="$COPY/.claude/worktrees/n1"
+  case "$1" in
+    clone) make_nested .claude/worktrees/n1 ;;
+    worktree) git -C "$W/project" worktree add -q -b fm/n1 "$n" origin/main ;;
+  esac
+  printf 'orphan\n' > "$n/orphan.txt"
+  git -C "$n" add orphan.txt
+  git -C "$n" commit -q -m "unpushed in nested"
+  go
+  prune run t1 --now >/dev/null 2>&1
+  [ "$(stub_calls)" = 0 ] || why "teardown ran although a nested copy holds an unpushed commit" || return 1
+  [ -e "$n/orphan.txt" ] && [ -f "$STATE/t1.meta" ] && [ "$(destroy_calls)" = 0 ] || why "the slot or the task record did not stay" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although the nested copy holds unpushed work" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the record is not retained: $(rec_field t1 state)" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake over two attempts, got $(wake_count)" || return 1
+  grep -F "$n" "$STATE/.wake-queue" | grep -q 'commit(s) on no remote' || why "the wake does not name the nested copy: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown() { scn_nested_unpushed_commit_keeps_the_slot_before_teardown clone; }
+scn_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown() { scn_nested_unpushed_commit_keeps_the_slot_before_teardown worktree; }
+
 scn_clean_nested_copy_goes_with_the_slot() {
   make_world
   make_nested .claude/worktrees/n1
@@ -1755,6 +1784,8 @@ test_fallback_keeps_a_changed_submodule_that_git_config_hides() { assert_scenari
 test_fallback_keeps_a_stash() { assert_scenario scn_stash_is_kept "a stash entry keeps the copy"; }
 test_fallback_keeps_a_live_process() { assert_scenario scn_live_process_is_kept "a live process inside keeps the copy with exactly one wake"; }
 test_fallback_nested_unpushed_commit_keeps_the_slot() { assert_scenario scn_nested_unpushed_commit_keeps_the_slot "an unpushed commit in a NESTED copy keeps the whole slot"; }
+test_nested_clone_unpushed_commit_keeps_the_slot_before_teardown() { assert_scenario scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "an unpushed commit in a nested clone keeps the whole slot with one wake before a teardown that would return it"; }
+test_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown() { assert_scenario scn_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown "an unpushed commit in a nested linked worktree keeps the whole slot with one wake before a teardown that would close the task"; }
 test_fallback_removes_a_clean_nested_copy_with_the_slot() { assert_scenario scn_clean_nested_copy_goes_with_the_slot "a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved"; }
 test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot() { assert_scenario scn_unignored_nested_clone_goes_with_the_slot "a clean pushed nested clone that the project's .gitignore does not cover, and a clone inside it, go with the slot: the clones are not untracked files of the copy that holds them, and their own proofs ran"; }
 test_fallback_removes_an_unignored_clean_nested_worktree_with_the_slot() { assert_scenario scn_unignored_nested_worktree_goes_with_the_slot "a clean linked worktree of the project nested in the copy, which the project's .gitignore does not cover, is removed before the destroy so treehouse does not refuse the slot as dirty"; }
@@ -1875,10 +1906,11 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-process-check $lib "  out=\$(printf '%s\\n' \"\$out\" | sort -u | tr '\\n' ' ')" '  out=' scn_live_process_is_kept "live-process proof"
 
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
+  expect_caught no-nested-proof-before-teardown $orch '  prove_nested_first || return 0' '  :' scn_nested_clone_unpushed_commit_keeps_the_slot_before_teardown "nested-copy proof before teardown"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
   expect_caught opened-directory-children-unchecked $lib '          fm_mp_classify_entry "$copy" "$rel/$child" || return 1' '          fm_mp_classify_entry "$copy" "$rel/$child" || true' scn_wholly_ignored_tac_caches_are_the_named_exception "proof of each child of an opened ignored directory"
   expect_caught every-claude-untracked-line-skipped $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'grep -v -- "^?? .claude/"' scn_unignored_nested_clone_does_not_hide_an_untracked_file "skipping only a nested copy's own untracked line"
-  expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '      :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
+  expect_caught nested-clone-not-proved-once-its-line-is-skipped $orch '    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1' '    :' scn_unignored_nested_clone_with_unpushed_work_is_kept "own git proof of a nested clone whose untracked line is skipped"
   expect_caught conformance-manifest-by-path-suffix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    *scripts/hooks/_conformance_manifest.json) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact path of the conformance manifest"
   expect_caught conformance-manifest-by-name-prefix $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/_conformance_manifest.json*) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "exact name of the conformance manifest"
   expect_caught scratch-list-adds-a-name-teardown-lacks $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo|build) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
@@ -1922,7 +1954,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught non-github-guard-removed $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_enterprise_pr_keeps_the_copy "github.com-only guard"
   expect_caught non-github-guard-removed-forgejo $orch '  if [[ ! "$R_PR" =~ ^https://github[.]com/[^/]+/[^/]+/pull/[0-9]+$ ]]; then' '  if false; then' scn_forgejo_pr_keeps_the_copy "github.com-only guard (Forgejo)"
   expect_caught fetch-back-in-the-lock $orch '  if ! prove_all "$real" "$pr_number" nofetch; then' '  if ! prove_all "$real" "$pr_number"; then' scn_hung_remote_never_holds_the_project_lock "no-fetch re-proof under the locks"
-  expect_caught nested-fetch-back-in-the-lock $orch '      fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '      fm_mp_prove_git "$n" "" fetch "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
+  expect_caught nested-fetch-back-in-the-lock $orch '  prove_nested_git "$mode" || { record_verdict "$real"; return 1; }' '  prove_nested_git fetch || { record_verdict "$real"; return 1; }' scn_hung_remote_never_holds_the_project_lock "no-fetch nested re-proof under the locks"
   expect_caught bare-pane-shell-exempt $lib '      if (child) exit 1
       p = parent[p]
 ' '      if (child) exit 1
@@ -1975,7 +2007,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught probe-error-on-silent-exit-1 $lib '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' '  if [ -z "$out" ] && [ "$rc" -gt 0 ]; then' scn_failed_process_probe_keeps_the_copy "silent exit 1 means nothing is open"
   expect_caught every-claim-is-another-home fm-merge-prune.sh '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then' '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then' scn_scratch_copy_is_removed "own-home slot claim"
   expect_caught clone-under-claude-worktrees-kept $lib '      if [ -e "$copy/$rel/.git" ]; then' '      if false; then' scn_unique_data_under_claude_or_opencode_is_kept "clone under .claude/worktrees"
-  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$mode" "$(proof_scope "$n" "$project")" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
+  expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1' '    false || return 1' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
 }
 
@@ -2260,6 +2292,8 @@ ALL_TESTS=(
   test_fallback_keeps_a_stash
   test_fallback_keeps_a_live_process
   test_fallback_nested_unpushed_commit_keeps_the_slot
+  test_nested_clone_unpushed_commit_keeps_the_slot_before_teardown
+  test_nested_worktree_unpushed_commit_keeps_the_slot_before_teardown
   test_fallback_removes_a_clean_nested_copy_with_the_slot
   test_fallback_removes_an_unignored_clean_nested_clone_with_the_slot
   test_fallback_removes_an_unignored_clean_nested_worktree_with_the_slot
