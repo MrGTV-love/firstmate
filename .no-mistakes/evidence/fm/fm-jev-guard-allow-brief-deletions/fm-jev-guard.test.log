@@ -1,31 +1,54 @@
-ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
-ok - both hosts execute only listed HEAD-tracked literal file deletions, live updates/revocations and mandatory audit; all negative scopes and inconsistent lists retain refusal
-ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - pure write boundaries
+✔ omp T2(a), B68: remove own smoke.py (33.457542ms)
+✔ omp T2(b), B69: four-file probe cleanup (31.526625ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (62.572208ms)
+✔ omp: rm -f of HEAD-tracked files named in the brief passes without refusal (72.205417ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (113.959833ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (33.649291ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (102.192417ms)
+✔ claude T2(a), B68: remove own smoke.py (4.732542ms)
+✔ claude T2(b), B69: four-file probe cleanup (4.898916ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (36.000166ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (67.740125ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (4.954125ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (74.594916ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.121ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (284.577292ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (124.636125ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1056.364917
+ok - T2(a-f) shell pre-calls execute disposable cases on omp and Claude without model requests or a Claude guard hook; Claude Write and Edit still reach it
+ok - Claude pre-tool credential effects, allowed roots, removals and deterministic device refusal
 ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
 ok - bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried
 ok - missing runtime requires active pre-tool review without activating unrelated projects
 ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
 ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
 ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
-ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - pre-tool complete credential tails, audit failure, inactive independence, network TypeError retry and refused write/edit path
 ok - node type stripping still enforces the Claude pre-tool deny
-ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
 ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
-ok - actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline
-ok - task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible
-ok - bounded pieces preserve policy/outage decisions; uncoverable shell/results and never-send payloads send nothing, deadlines hold
+ok - local devices and workspace symbol search skip models; Auto QA is off for workers; report_issue and GitHub devices stay refused; unknown devices name their review remedy
+ok - actual stalled requests produce typed pre-tool denial before each documented host deadline
+ok - bounded pieces preserve policy/outage decisions; unplannable writes and never-send payloads send nothing
 ok - Claude hooks retain JSON/exit contracts and admit budget-limited benign writes
-hyphenated-scan-ok bytes=1048576 offline_loopback_ms=1418
-omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=885
+hyphenated-scan-ok bytes=1048576 offline_loopback_ms=1176
+omp: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=725
 omp: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
-omp: never-send file present; 396924-byte report admitted in 4659 ms
-omp: never-send file present; 1048576-byte write admitted in 4655 ms
-claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=918
+omp: never-send file present; 396924-byte report admitted in 3857 ms
+omp: never-send file present; 1048576-byte write admitted in 3902 ms
+claude: wrote and committed 396924 bytes; requests=16; model_screened_bytes=229977; local_only_bytes=166947; offline_loopback_ms=705
 claude: whole-text local credential refusal at start, middle and end for write and edit; zero provider requests
-claude: never-send file present; 396924-byte report admitted in 4681 ms
-claude: never-send file present; 1048576-byte write admitted in 4597 ms
+claude: never-send file present; 396924-byte report admitted in 3840 ms
+claude: never-send file present; 1048576-byte write admitted in 3966 ms
 punctuation-led URL credentials: both hosts refuse write/edit locally with zero provider requests
 large-write-budget-ok
 ok - 396924-byte reports write and commit through both guards; anchored credential shapes/roots refuse, never-send covers every model-sent piece without a size stall, and coverage is audited
 ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
-exit=0
+bash tests/fm-jev-guard.test.sh  37.87s user 41.68s system 20% cpu 6:34.95 total
