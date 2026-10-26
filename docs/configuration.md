@@ -900,45 +900,40 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
-`bin/fm-wake-drain.sh --ack-through` refuses acknowledgement for a new overdue row or one whose category, subject, owner, next action, or evidence differs from its last valid action; repeated presentation and increasing age alone do not require another action.
+Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows whose last action still covers them follow in a `STANDING` block, and a drain whose only overdue rows are covered prints neither block and opens no handling episode.
+`bin/fm-wake-drain.sh --ack-through` refuses acknowledgement for a new overdue row or one whose category, subject, owner, next action, or evidence differs from its last action; repeated presentation and increasing age alone do not require another action, except on a `review_pass_not_merged` row, a lapsed deferral, or a waiting receipt that no longer stands.
 This boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
-The existing `open-loop-ledger` wake resurfaces unchanged work every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600), and the drain includes one `WAITING OPEN WORK` digest listing every unchanged overdue row with its current age and last action's kind, evidence, and time.
-Firstmate delivers that list to the captain as one periodic update, not one new escalation per row.
-A row is always either actionable at the gate or included in that digest until it changes or fresh evidence resolves it; unpausing a lane requires no manual revert because new status, commit, or PR evidence changes its row.
+The existing `open-loop-ledger` wake resurfaces unchanged work every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600), and the drain includes one `WAITING OPEN WORK` list of every overdue row its last action still covers, with its current age, status, and last action's kind, evidence, and time; an escalation the captain has not answered has the status `escalated, waiting on the captain`.
+Firstmate sends that list to the captain as one periodic update, not one new escalation per row; printing or sending the list is not proof that an escalation reached the captain.
+A row is always either actionable at the gate or included in that list until it changes or fresh evidence resolves it; unpausing a lane requires no manual revert because new status, commit, or PR evidence changes its row.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
-The away-mode supervise daemon sends one overdue-work digest through its existing verified supervisor-submit path before recording any `escalated` receipts or acknowledging, and sends the unchanged-work list again on the periodic ledger wake.
-Buffered text or failed submission supplies no proof and leaves the wake unacknowledged.
-The latest confirmed digest's id, delivery time, and row digests live inside the existing ledger's `handling.digest_delivery`; each accepted escalation retains its verified delivery reference in `handling.actions`, with no new daemon or persistence store.
+The away-mode supervise daemon never records an action of its own: it adds every overdue row presented without an action to its escalation digest for firstmate, at most one buffered item per row id until the digest flushes, and leaves that wake unacknowledged until firstmate records an action; it adds the periodic `WAITING OPEN WORK` rows to the same digest.
 The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, and captain-hold binding (`hold`: the bound task and its hold marker).
 The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: first its `source.task` provenance (including PR rows whose subject is a URL), then its `worker:` owner or the task id leading its subject, with each candidate checked against the task-name pattern.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
-Escalation evidence must cite either a confirmed `digest:<id>` covering this row's current digest or a related canonical `captain-hold:<task-id>` entry; free text, unknown ids, and delivery records for old row evidence are refused.
-A captain-hold entry must still be held for the captain and identify this row's task or key, or carry its exact `open-loop-row: ROW_ID` body line.
-The hold entry is the durable captain-facing decision record, not an assertion that a chat message was sent.
-Pre-existing free-text escalation receipts need one verified action before they can permit acknowledgement.
-The script header owns digest command syntax and its existing away-supervisor delivery prerequisite.
+Escalation evidence is free text: no alarm channel, digest, or firstmate-pane injection has a read receipt, so none of them is proof that an escalation reached the captain.
+An escalation is accepted as the action on a new or changed row and covers it until the row changes, but it stands only on the captain's own recorded answer: the newest `bin/fm-captain-hold.sh` resolution record on its bound captain-held task, or on the captain-held task its keyed decision was transferred to, resolves that hold lifecycle with a `Captain decision:` block, and the task is no longer held.
+Until then the row is listed as `escalated, waiting on the captain`; a pending escalation never blocks an acknowledgement, and reconciliation evidence is not the captain's answer.
 A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
-Repeated presentation while an action is missing is idempotent; a valid action covers unchanged evidence across handling turns.
-A first deferral stands until its recheck time unless its row evidence changes.
-An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
-An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
-A row owned by a worker or a reviewer never takes a hold binding, but its verified action still covers unchanged evidence.
-A receipt binds exactly one captain-held backlog task, whether its hold is live, aged, or deferred to a date, so a hold the captain defers to a date keeps the receipt standing until that hold ends.
+Repeated presentation while an action is missing is idempotent; an action covers unchanged evidence across handling turns while it stands or, for an escalation, while it waits on the captain.
+A first deferral stands until its recheck time unless its row evidence changes, except on a `review_pass_not_merged` row.
+An escalation of a captain-owned row covers it until the row's category, subject, owner, next action, or evidence changes; the captain answering the hold ends that row.
+An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` binds one task still held for the captain and stands once the captain's recorded answer resolves that hold; an answered, released, blocked, re-held, or unreadable hold changes only that status, never the acknowledgement gate.
+A row owned by a worker or a reviewer never takes a hold binding, so its escalation covers unchanged evidence and never stands.
+A receipt binds exactly one captain-held backlog task, whether its hold is live, aged, or deferred to a date.
 The first of these that is currently held binds: the explicit `--hold TASK_ID`, the row's key used as a task id (a keyed question's captain-held task id is its key, the same order `bin/fm-captain-hold.sh` resolves an entry), the retired legacy `<task>-decision-<key>` task, and the row's own task.
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An escalation with verified delivery but no held task covers unchanged evidence without a hold binding, which the command reports.
-When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
-Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
-When the backlog or the home's ledger cannot be read, an escalation with verified digest delivery and without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
+An escalation that finds no held task covers unchanged evidence without a hold binding, which the command reports.
+When two candidates are held, only the first binds: only the captain's answer to the bound one makes the escalation stand.
+The captain-answer check reads only the local backlog and the row, so a quota-stale ledger does not change it, and a hold can be recorded while the ledger is stale.
+When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-A bound captain hold remains independently checked at presentation and acknowledgement, so an answered, released, blocked, re-held, or unreadable hold restores the action requirement even before another collection.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
@@ -956,7 +951,7 @@ Routed-task reconciliation selects `FM_CREW_STATE_NO_FORGE=1`; [`bin/fm-dod-lib.
 Waits on another waiting row are refused, preventing circular receipt cover, and the prerequisite's own independent action requirement remains intact.
 Rows collected before source identities existed require a normal refresh before a wait can be recorded; no live receipt migration or ownership rewrite is implied.
 If wait provenance cannot be read, an independently confirmed question, PR, or unlanded commit remains an obligation under the normal age limits without usable wait provenance; collection discloses the failed source and continues with later streams.
-A `review_pass_not_merged` row cannot take a dependency wait or captain-hold binding; like other overdue rows, a verified action covers unchanged evidence without resolving the unmerged PR.
+A `review_pass_not_merged` row has no standing receipt of any kind, escalated, deferred, or waiting: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
 The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
 Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
 An incomplete collection keeps a presented row it no longer sees as a stale informational row, marked `stale: true` with `last_seen` set to the epoch it was last observed: it is shown, never overdue, and needs no receipt; a complete collection drops it, and any collection drops it, with its receipts, 24 hours after it was last seen.

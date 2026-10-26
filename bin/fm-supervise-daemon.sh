@@ -1691,53 +1691,37 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
-# Use the existing byte-bounded digest renderer and full-text retention for ledger
-# delivery too. The caller owns receipt publication after this verified submit.
-deliver_open_work_digest() {  # <state> <digest-file>
-  local state=$1 file=$2 msg full=''
-  escalate_digest_body "$file"
-  msg=$ESCALATE_BODY
-  if [ "$ESCALATE_BOUNDED" -eq 1 ]; then
-    full=$(escalate_full_text_save "$state" "$file") || return 1
-    msg="$msg (digest bounded; full text of every overdue row: $full)"
-  fi
-  if inject_msg "$msg" "$state"; then
-    return 0
-  fi
-  if [ -n "$full" ] && [ "$INJECT_SUBMIT_ATTEMPTED" -eq 0 ]; then
-    rm -f -- "$full"
-  fi
-  return 1
-}
-
-# Away mode owns no follow-up of its own: every overdue open-loops row the drain
-# presented without a recorded action joins the escalation digest, and that
-# escalation is recorded as the row's receipt, so the acknowledgement gate
-# neither wedges these wakes nor lets them be consumed silently.
-escalate_overdue_rows() {  # <state>
-  local state=$1 report line id proof
+# Away mode records no ledger action of its own: only firstmate records one. Every
+# new or changed overdue row the drain presented without an action joins the
+# escalation digest for firstmate, at most one buffered item per row id until the
+# digest flushes, and its wake stays unacknowledged until firstmate records an
+# action. The drain's periodic WAITING OPEN WORK list joins the same digest.
+escalate_overdue_rows() {  # <state> <drain-output>
+  local state=$1 out=$2 report='' line id prefix refused=0
   [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
-  if report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
-    [ "${2:-0}" -eq 1 ] || return 0
-    "$FM_DAEMON_DIR/fm-open-loops.sh" --deliver-digest >/dev/null
-    return $?
+  if ! report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
+    case "$report" in
+      *'acknowledgement refused'*) refused=1 ;;
+      *) printf '%s\n' "$report" >&2; return 1 ;;
+    esac
   fi
-  case "$report" in
-    *'acknowledgement refused'*) ;;
-    *) printf '%s\n' "$report" >&2; return 1 ;;
-  esac
-  # Buffering is not delivery. The ledger uses the existing submit primitive and
-  # writes a digest proof only after it confirms delivery; failure keeps the wake.
-  proof=$("$FM_DAEMON_DIR/fm-open-loops.sh" --deliver-digest) || return 1
+  prefix='overdue open work: '
   while IFS= read -r line; do
-    case "$line" in '  "'*) ;; *) continue ;; esac
+    case "$line" in
+      'WAITING OPEN WORK'*) prefix='waiting open work: '; continue ;;
+      '  "'*) ;;
+      *) continue ;;
+    esac
     id=${line#  \"}
     id=${id%%\"*}
-    "$FM_DAEMON_DIR/fm-open-loops.sh" action "$id" escalated \
-      --evidence "$proof" > /dev/null || return 1
+    if ! grep -qF "$prefix\"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
+      escalate_add "$state" "$prefix${line#  }" || return 1
+    fi
   done <<EOF
 $report
+$(awk '/^WAITING OPEN WORK/ { on = 1; print; next } on && /^  "/ { print; next } on && !/^rows\[/ { on = 0 }' "$out")
 EOF
+  [ "$refused" -eq 0 ]
 }
 
 handle_durable_wakes() {  # <watcher-reason> <state>
@@ -1760,11 +1744,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     handled=$((handled + 1))
   done < "$out"
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi
-  if grep -q '^WAITING OPEN WORK' "$out"; then
-    escalate_overdue_rows "$state" 1 || failed=1
-  else
-    escalate_overdue_rows "$state" || failed=1
-  fi
+  escalate_overdue_rows "$state" "$out" || failed=1
 
   ack_through=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err" | tail -1)
   ack_generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err" | tail -1)

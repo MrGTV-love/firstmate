@@ -2,16 +2,13 @@
 # fm-open-loops.sh - reconcile assigned work against live delivery evidence.
 # Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
 #        fm-open-loops.sh --present-overdue | --check-actions | --report | --digest
-#        fm-open-loops.sh --deliver-digest
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
 #        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID]
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
-# --digest lists unchanged overdue rows, their current ages and last actions for the
-# existing periodic open-loop-ledger wake. --deliver-digest submits all overdue rows
-# through the existing away-supervisor inject_msg path (requires active away mode and
-# a verified supervisor target); only confirmed delivery writes handling.digest_delivery
-# in the existing ledger and prints digest:<id>, usable as escalation evidence.
+# --digest lists unchanged overdue rows, their current ages, status and last actions for the
+# existing periodic open-loop-ledger wake; an escalation the captain has not answered is
+# listed as "escalated, waiting on the captain". Printing the list delivers nothing.
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
@@ -22,14 +19,13 @@
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
-# requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+# requirements; rows whose last action still covers them are listed after them and print nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
-# the row's PR URL for merged, digest:<id> or captain-hold:<task-id> for escalated,
-# or free text for deferred. A digest proof must cover this row's current evidence;
-# a captain-hold record must be related to the row and still held for the captain.
+# the row's PR URL for merged, or free text for escalated/deferred. An escalation stands
+# only on the captain's own recorded answer to its bound captain hold.
 # --hold TASK_ID, valid only with escalated, names the one task held for the captain that a firstmate-owned
 # open_pr, unanswered_question or unlanded_commit row waits on; omitted, the documentation below owns which task binds.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.
