@@ -6,7 +6,9 @@
 # Pass case: shell commands the gate refused, sent while the judge would refuse
 # them, now pass on omp and on a Claude worker that still carries the old Bash
 # hook registration, with no judge request and no guard audit row.
-# Block case: a write the same judge refuses still reaches it and still denies.
+# Block case: the same active guard still denies a write outside its roots,
+# deterministically; write content has no judgment since the credential check
+# moved to commit and push.
 # Every case uses a loopback fixture judge; no provider is called.
 set -u
 # shellcheck source=tests/lib.sh
@@ -93,9 +95,9 @@ JS
 [ ! -e "$HOME_DIR/state/jev-guard.jsonl" ] || fail "a shell call wrote a guard audit row"
 pass "shell commands the gate refused pass on omp and an old-matcher Claude worker without a judge request or audit row"
 
-# --- block case: the same judge still refuses a write -------------------------
-run_hook "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"src/retired.txt",content:"sk-live-fixture"},tool_use_id:"retired-write"}')"
+# --- block case: the guard still refuses a write outside its roots -----------
+run_hook "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"/etc/fm-retired-shell-outside",content:"fixture"},tool_use_id:"retired-write"}')"
 [ "$status" -eq 0 ] || fail "write deny exited $status instead of the deny path's 0"
-jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$out" >/dev/null || fail "the refusing judge no longer denies a write: $out"
-[ "$(requests)" -eq 1 ] || fail "the write did not receive exactly one judgment"
-pass "a write the same judge refuses still reaches it and denies"
+jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$out" >/dev/null || fail "the active guard no longer denies an outside-root write: $out"
+[ "$(requests)" -eq 0 ] || fail "the deterministic write refusal reached the judge"
+pass "the active guard still denies an outside-root write without a judgment"

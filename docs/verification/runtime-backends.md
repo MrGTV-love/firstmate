@@ -27,6 +27,33 @@ The [architecture](../architecture.md) owns the shared allocation/publication bo
 
 ## Launch-scoped Git hook selection
 
+Credential-boundary and relaunch verification on 2026-10-24 used Darwin arm64, Node v26.4.0, Python 3.13.6 and Apple Git 2.54.0:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-git-secrets.test.sh
+bash bin/fm-test-run.sh tests/fm-git-strip-ai-trailers.test.sh
+```
+
+Both suites exited 0 with no gate skip; the private Bash/ksh tmux relaunch fixture preserved operator configuration and kept the credential hooks selected with either trailer posture.
+The credential suite observed:
+
+```text
+omp: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+claude: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed
+credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit
+```
+
+It exercises both production write adapters offline and real Git commit/push operations through installed task hooks, including project-hook staging and failure propagation, both trailer postures, intermediate outgoing commits, new branches, ref deletion and project-hook stdin preservation.
+It also covers the added-content scope: an unrelated edit beside the existing `tests/fm-voice-relay.test.sh` fixture commits, a conflicted merge bringing credential-shaped lines from main commits and pushes, pushes to a URL, a new remote and a remote with no tracking refs skip history already on origin, and each of those paths still refuses a newly added credential shape; each of those three cases failed against the previous whole-blob scanner.
+Renaming and splitting a file that holds an existing fixture commit and push while a new AKIA-shaped line inside the moved file still refuses, and repeated refusals record their `repeat` count and escalate past the budget without admitting the commit; both cases failed against the previous added-line scanner.
+The abandoned-attempt regression exercises both installed hooks without an intervening allowed decision and observes `deny:1 deny:2 deny:3 deny:1 deny:2`: unchanged credential-shaped lines retain their count through benign edits, but unrelated refused content starts a fresh episode; this regression failed against the worktree-only counter.
+The inspection-failure regression drives both scanners directly with an invalid merge parent or pre-push record and observes `deny:1:true deny:1:false deny:2:false deny:2:true` as `decision:repeat:source_ok`: repeated failed inspections escalate, and the refused line keeps its count across them; it failed against the scanner that cleared the counts on every failed inspection.
+It does not launch live model sessions or prove another backend's lifecycle behavior; Linux was not exercised.
+The [operator contract](../configuration.md#jev-guard) owns current behavior and residual limits.
+
+### Attribution-only selection evidence (historical)
+
+The records below predate the always-installed credential hooks and do not establish the current strip-to-keep routing.
 Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
 
 ```sh
@@ -711,9 +738,9 @@ ok - claude (2.1.310 (Claude Code)): claude: audit/changed: unchanged native rea
 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=389394
 ```
 
-### 2026-10-24 retained write pre-tool verification
+### 2026-10-24 write pre-tool verification (historical)
 
-On macOS arm64 with omp 18.12.4, `bash tests/fm-jev-guard-omp-live-e2e.test.sh` passed its 20 native read cases and its retained write-deadline case using only private scripted loopback providers.
+On macOS arm64 with omp 18.12.4, `bash tests/fm-jev-guard-omp-live-e2e.test.sh` passed its 20 native read cases and its then-retained write-deadline case using only private scripted loopback providers.
 The final output was:
 
 ```text
@@ -722,7 +749,8 @@ ok - omp (omp/18.12.4): pre-tool write judgment answered after 31 seconds decide
 
 The former shell judgment is no longer exercised because bash pre-calls have no model gate.
 That run used the ship T2 source, which still screened results, so its read cases are not evidence for the unchanged delivery recorded above.
-This is installed-host delivery evidence for the retained write policy, not live-provider accuracy or production activation.
+This was installed-host delivery evidence for the write policy, not live-provider accuracy or production activation.
+The write file-kind and credential questions it exercised are now retired, so this record does not describe current write admission.
 
 ### Pre-tool deadline verification (2026-10-17)
 
@@ -734,7 +762,7 @@ With the real guard extension and a synthetic judge that answered a benign shell
 The same guard without that overlay was cut off by the host at 30 seconds, wrote no guard row and did not run the command.
 Each case is one run with scripted local providers, so they establish the host mechanism and the overlay's effect, not judge latency or production activation.
 The shell-judgment observations above are historical: bash pre-calls no longer receive a model judgment.
-`tests/fm-jev-guard-omp-live-e2e.test.sh` now exercises the retained write judgment's 31-second overlay case through `fm_jev_native_omp_pretool`.
+Write/edit pre-calls no longer receive one either, so no current pre-tool handler waits on an answered judgment under this deadline.
 
 ### Native device verification (2026-10-12)
 

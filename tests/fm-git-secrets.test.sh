@@ -1,0 +1,621 @@
+#!/usr/bin/env bash
+# Offline T3 acceptance through installed task hooks and both write adapters.
+set -u
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_PARAMETERS
+unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND
+# shellcheck source=tests/lib.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+STRIP="$ROOT/bin/fm-git-strip-ai-trailers.sh"
+TMP_ROOT=$(fm_test_tmproot fm-git-secrets)
+export FM_GUARD_EVENT_LOG="$TMP_ROOT/guard-events.jsonl"
+fm_git_identity 'Credential Tests' 'fixture@example.invalid'
+with_hooks_env() {
+  local hooks=$1
+  shift
+  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=$hooks "$@"
+}
+make_repo() { fm_git_init_commit "$1"; }
+# Synthetic shapes assembled at runtime; never print a fixture value.
+aws_shape() { printf 'AKIA%s' ZZZZZZZZZZZZZZZZ; }
+github_shape() { printf 'ghp_%036d' 0; }
+
+test_credentials_are_checked_at_commit_and_push() {
+  local repo remote hooks out before keep=${1:-0}
+  repo="$TMP_ROOT/secrets-$keep"
+  remote="$TMP_ROOT/secrets-remote-$keep.git"
+  hooks="$TMP_ROOT/hooks-secrets-$keep"
+  make_repo "$repo"
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin HEAD:refs/heads/main
+  "$STRIP" install "$hooks" "$repo" "$keep" || fail "install failed"
+  before=$(git -C "$repo" rev-parse HEAD)
+  # Synthetic shape assembled at runtime; never print the fixture value.
+  printf 'ghp_%036d\n' 0 >"$repo/credential.txt"
+  git -C "$repo" add credential.txt
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'must refuse credential' 2>&1) &&
+    fail "T3(a): a staged GitHub token was committed"
+  assert_contains "$out" credential.txt "T3(a): refusal did not name the file"
+  assert_not_contains "$out" "ghp_" "credential value leaked in refusal"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "refused commit moved HEAD"
+  # The index, not the edited working copy, must be inspected.
+  printf 'replace-me\n' >"$repo/credential.txt"
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'must still refuse staged credential' 2>&1) &&
+    fail "scanner inspected the worktree rather than the index"
+  git -C "$repo" add credential.txt
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'placeholder' || fail "T3(c): placeholder did not commit"
+  assert_equals replace-me "$(git -C "$repo" show HEAD:credential.txt)" "placeholder missing from commit"
+  printf '.env\n' >"$repo/.gitignore"
+  git -C "$repo" add .gitignore
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'ignore local environment' || fail "ignore setup failed"
+  before=$(git -C "$repo" rev-parse HEAD)
+  printf 'ghp_%036d\n' 0 >"$repo/.env"
+  git -C "$repo" add -A
+  assert_equals '' "$(git -C "$repo" diff --cached --name-only)" "T3(b): ignored secret entered the index"
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'nothing staged' >/dev/null 2>&1 &&
+    fail "T3(b): ignored .env created a commit"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "T3(b): ignored write moved HEAD"
+  cat >"$repo/.git/hooks/pre-push" <<'SH'
+#!/usr/bin/env bash
+cat >.git/pre-push-input
+SH
+  chmod +x "$repo/.git/hooks/pre-push"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main || fail "placeholder push failed"
+  assert_contains "$(cat "$repo/.git/pre-push-input")" "HEAD $before refs/heads/main" "repository hook lost its original pre-push records"
+  git -C "$repo" add -f .env
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'force added local credential' 2>&1) &&
+    fail "force-adding an ignored secret escaped the commit check"
+  assert_contains "$out" .env "force-added ignored file was not named"
+  git -C "$repo" restore --staged .env
+  # A commit made outside the fleet hooks must still be caught at push, even
+  # when a later commit removes the secret and the staging area is empty.
+  printf 'ghp_%036d\n' 0 >"$repo/credential.txt"
+  git -C "$repo" add credential.txt
+  git -C "$repo" commit -qm 'unscanned credential'
+  printf 'replace-me\n' >"$repo/credential.txt"
+  git -C "$repo" add credential.txt
+  git -C "$repo" commit -qm 'remove credential at tip'
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main 2>&1) &&
+    fail "pre-push missed a credential in an outgoing ancestor"
+  assert_contains "$out" credential.txt "pre-push refusal did not name the file"
+  assert_not_contains "$out" "ghp_" "credential value leaked at push"
+  assert_equals "$before" "$(git -C "$remote" rev-parse refs/heads/main)" "refused push changed remote"
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/new-branch 2>&1) &&
+    fail "a new branch escaped outgoing-history inspection"
+  assert_contains "$out" credential.txt "new-branch refusal did not name the file"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin :refs/heads/main || fail "ref deletion was treated as new content"
+  pass "T3(a-c): staged credential refuses by filename, ignored .env commits nothing, placeholders commit and push; outgoing history is checked"
+}
+
+test_project_pre_commit_changes_are_scanned() {
+  local repo hooks before out status
+  repo="$TMP_ROOT/project-stages-secret"
+  hooks="$TMP_ROOT/hooks-project-stages-secret"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  before=$(git -C "$repo" rev-parse HEAD)
+  cat >"$repo/.git/hooks/pre-commit" <<'SH'
+#!/usr/bin/env bash
+printf 'ghp_%036d\n' 0 >hook-staged.txt
+git add hook-staged.txt
+SH
+  chmod +x "$repo/.git/hooks/pre-commit"
+  printf 'benign initial change\n' >>"$repo/README.md"
+  git -C "$repo" add README.md
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'project hook stages credential' 2>&1) &&
+    fail "a chained project pre-commit hook staged a credential after inspection"
+  assert_contains "$out" hook-staged.txt "post-project-hook credential refusal did not name the file"
+  assert_not_contains "$out" "ghp_" "post-project-hook refusal printed matching bytes"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "project hook credential reached a commit"
+  git -C "$repo" ls-files --error-unmatch hook-staged.txt >/dev/null || fail "project hook never staged its credential"
+  # A project-hook refusal must propagate before the scanner runs, even while
+  # the index still contains the synthetic credential from the first case.
+  printf '#!/usr/bin/env bash\nexit 17\n' >"$repo/.git/hooks/pre-commit"
+  (cd "$repo" && with_hooks_env "$hooks" "$hooks/pre-commit") >/dev/null 2>&1
+  status=$?
+  expect_code 17 "$status" "task wrapper lost the project hook failure status"
+  pass "project pre-commit staging is scanned before commit, and project-hook failure propagates"
+}
+
+test_existing_lines_are_not_rescanned_at_commit() {
+  local repo hooks out before
+  repo="$TMP_ROOT/existing-fixtures"
+  hooks="$TMP_ROOT/hooks-existing-fixtures"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  mkdir -p "$repo/tests"
+  cp "$ROOT/tests/fm-voice-relay.test.sh" "$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'add voice relay suite' 2>&1) &&
+    fail "precondition: tests/fm-voice-relay.test.sh no longer holds a credential-shaped fixture"
+  assert_contains "$out" tests/fm-voice-relay.test.sh "adding the fixture file did not name it"
+  # The fixture already exists in history; commit it as main did, without task hooks.
+  git -C "$repo" commit -qm 'existing voice relay suite'
+  awk 'NR == 2 { $0 = $0 " # unrelated edit" } { print }' "$repo/tests/fm-voice-relay.test.sh" >"$TMP_ROOT/voice-relay.edited"
+  cp "$TMP_ROOT/voice-relay.edited" "$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'edit an unrelated line' ||
+    fail "F2: an unrelated edit beside an existing fixture was refused"
+  before=$(git -C "$repo" rev-parse HEAD)
+  printf 'NEW_KEY=%s\n' "$(aws_shape)" >>"$repo/tests/fm-voice-relay.test.sh"
+  git -C "$repo" add tests/fm-voice-relay.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'add a new AWS key shape' 2>&1) &&
+    fail "F2: a newly added AKIA-shaped line was committed"
+  assert_contains "$out" tests/fm-voice-relay.test.sh "new AKIA refusal did not name the file"
+  assert_not_contains "$out" AKIA "new AKIA refusal printed the matching value"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "refused AKIA commit moved HEAD"
+  pass "an unrelated edit beside an existing fixture commits; a newly added AKIA-shaped line refuses"
+}
+
+test_merges_scan_only_lines_new_to_every_parent() {
+  local repo remote hooks out file=tests/fm-jev-guard.test.sh
+  repo="$TMP_ROOT/merge-fixtures"
+  remote="$TMP_ROOT/merge-fixtures.git"
+  hooks="$TMP_ROOT/hooks-merge-fixtures"
+  make_repo "$repo"
+  mkdir -p "$repo/tests"
+  printf 'shared line\n' >"$repo/$file"
+  git -C "$repo" add "$file"
+  git -C "$repo" commit -qm 'base suite'
+  git -C "$repo" branch topic
+  # Main's history carries credential-shaped fixtures, as the real suite once did.
+  { printf 'shared line from main\n'; printf 'TOKEN=%s\n' "$(github_shape)"; printf 'KEY=%s\n' "$(aws_shape)"
+    printf 'URL=postgres://fixture:%s@localhost/db\n' 000000000000; } >"$repo/$file"
+  git -C "$repo" commit -qam 'main fixtures'
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin main
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q topic
+  printf 'shared line from topic\n' >"$repo/$file"
+  git -C "$repo" add "$file"
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'topic edit' || fail "topic edit failed"
+  with_hooks_env "$hooks" git -C "$repo" merge -q main >/dev/null 2>&1 && fail "precondition: merge did not conflict"
+  { printf 'shared line merged\n'; git -C "$repo" show main:"$file" | sed 1d; printf 'NEW=%s\n' "$(aws_shape)"; } >"$repo/$file"
+  git -C "$repo" add "$file"
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'merge main with a new key' 2>&1) &&
+    fail "F2: a conflict resolution that adds a new AKIA-shaped line was committed"
+  assert_contains "$out" "$file" "merge refusal did not name the file"
+  { printf 'shared line merged\n'; git -C "$repo" show main:"$file" | sed 1d; } >"$repo/$file"
+  git -C "$repo" add "$file"
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'merge main' ||
+    fail "F2: a conflicted merge bringing main's fixture lines was refused"
+  assert_equals 2 "$(git -C "$repo" rev-list --parents -n 1 HEAD | wc -w | tr -d ' ' | awk '{print $1 - 1}')" "resolution did not create a merge commit"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic ||
+    fail "pre-push rescanned fixture lines a merge brought in from main"
+  pass "a conflicted merge bringing main's fixtures commits and pushes; a new line in its resolution refuses"
+}
+
+test_push_baseline_is_every_remote() {
+  local repo origin hooks url fresh gate target out
+  repo="$TMP_ROOT/push-baseline"
+  origin="$TMP_ROOT/push-baseline-origin.git"
+  hooks="$TMP_ROOT/hooks-push-baseline"
+  make_repo "$repo"
+  printf 'E2E_KEY=%s\n' "$(aws_shape)" >"$repo/fixture.sh"
+  git -C "$repo" add fixture.sh
+  git -C "$repo" commit -qm 'main fixture committed before the task hooks'
+  git init -q --bare "$origin"
+  git -C "$repo" remote add origin "$origin"
+  git -C "$repo" push -q origin main
+  url="$TMP_ROOT/push-baseline-url.git"
+  fresh="$TMP_ROOT/push-baseline-fresh.git"
+  gate="$TMP_ROOT/push-baseline-gate.git"
+  git init -q --bare "$url"
+  git init -q --bare "$fresh"
+  git clone -q --bare "$origin" "$gate"
+  git -C "$repo" remote add fresh "$fresh"
+  # A remote whose content exists but whose tracking refs were never fetched.
+  git -C "$repo" remote add gate "$gate"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  printf 'benign topic work\n' >>"$repo/README.md"
+  git -C "$repo" add README.md
+  with_hooks_env "$hooks" git -C "$repo" commit -qm 'topic work' || fail "topic commit failed"
+  for target in "file://$url" fresh gate; do
+    with_hooks_env "$hooks" git -C "$repo" push -q "$target" HEAD:refs/heads/topic ||
+      fail "F1: push to $target rescanned history already on origin"
+  done
+  printf 'NEW_TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  git -C "$repo" commit -qm 'credential committed outside the task hooks'
+  for target in "file://$url" fresh gate; do
+    out=$(with_hooks_env "$hooks" git -C "$repo" push -q "$target" HEAD:refs/heads/topic 2>&1) &&
+      fail "F1: push to $target sent a new credential"
+    assert_contains "$out" leak.txt "push refusal to $target did not name the file"
+    assert_not_contains "$out" fixture.sh "push refusal to $target named history already on origin"
+  done
+  pass "pushes to a URL, a new remote and a remote with no tracking refs skip origin's history and refuse a new credential"
+}
+
+test_remote_content_replays_name_the_likely_cause() {
+  local repo origin hooks out before
+  repo="$TMP_ROOT/remote-replay"
+  origin="$TMP_ROOT/remote-replay-origin.git"
+  hooks="$TMP_ROOT/hooks-remote-replay"
+  make_repo "$repo"
+  git init -q --bare "$origin"
+  git -C "$repo" remote add origin "$origin"
+  git -C "$repo" push -q origin main
+  git -C "$repo" checkout -q -b side
+  printf 'E2E_KEY=%s\n' "$(aws_shape)" >"$repo/fixture.sh"
+  git -C "$repo" add fixture.sh
+  git -C "$repo" commit -qm 'fixture already on a remote'
+  git -C "$repo" push -q origin side
+  git -C "$repo" checkout -q main
+  git -C "$repo" branch -q -D side
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  git -C "$repo" merge -q --squash origin/side >/dev/null
+  before=$(git -C "$repo" rev-parse HEAD)
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'squash of a commit already on origin' 2>&1) &&
+    fail "F2: a squash of remote content was committed by the check"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "F2: refused squash moved HEAD"
+  assert_contains "$out" fixture.sh "F2: squash refusal did not name the file"
+  assert_contains "$out" "cherry-pick, revert or squash of a commit already on a remote" "F2: squash refusal did not name the likely cause"
+  assert_contains "$out" "escalate to Firstmate naming the file and line" "F2: squash refusal did not name the next step"
+  assert_not_contains "$out" AKIA "F2: squash refusal printed the matching value"
+  git -C "$repo" reset -q --hard main
+  printf 'benign topic work\n' >>"$repo/README.md"
+  git -C "$repo" commit -qam 'topic moved on before the replay'
+  git -C "$repo" cherry-pick origin/side >/dev/null
+  [ "$(git -C "$repo" rev-parse HEAD)" != "$(git -C "$repo" rev-parse origin/side)" ] ||
+    fail "F2: the cherry-pick reproduced the remote commit instead of making a new one"
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic 2>&1) &&
+    fail "F2: a cherry-pick of remote content was pushed by the check"
+  assert_contains "$out" fixture.sh "F2: cherry-pick push refusal did not name the file"
+  assert_contains "$out" "cherry-pick, revert or squash of a commit already on a remote" "F2: cherry-pick push refusal did not name the likely cause"
+  assert_contains "$out" "escalate to Firstmate naming the file and line" "F2: cherry-pick push refusal did not name the next step"
+  assert_not_contains "$out" AKIA "F2: cherry-pick push refusal printed the matching value"
+  assert_equals '' "$(git -C "$origin" for-each-ref refs/heads/topic)" "F2: refused cherry-pick push reached the remote"
+  pass "squash and cherry-pick replays of remote content stay refused and name the likely cause and escalation"
+}
+
+test_moved_lines_are_not_rescanned() {
+  local repo remote hooks out before old=tests/fm-voice-relay.test.sh moved=tests/fm-voice-relay-e2e.test.sh lines
+  repo="$TMP_ROOT/moved-fixtures"
+  remote="$TMP_ROOT/moved-fixtures.git"
+  hooks="$TMP_ROOT/hooks-moved-fixtures"
+  make_repo "$repo"
+  mkdir -p "$repo/tests"
+  cp "$ROOT/$old" "$repo/$old"
+  git -C "$repo" add "$old"
+  git -C "$repo" commit -qm 'existing voice relay suite'
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin main
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  git -C "$repo" checkout -q -b topic
+  git -C "$repo" mv "$old" "$moved"
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'rename voice relay suite' 2>&1) ||
+    fail "R1: renaming a file that holds an existing fixture was refused: $out"
+  lines=$(wc -l <"$repo/$moved" | tr -d ' ')
+  head -n "$((lines / 2))" "$repo/$moved" >"$repo/tests/fm-voice-relay-a.test.sh"
+  tail -n "+$((lines / 2 + 1))" "$repo/$moved" >"$repo/tests/fm-voice-relay-b.test.sh"
+  git -C "$repo" rm -q "$moved"
+  git -C "$repo" add tests/fm-voice-relay-a.test.sh tests/fm-voice-relay-b.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'split voice relay suite' 2>&1) ||
+    fail "R1: splitting a file that holds an existing fixture was refused: $out"
+  with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic ||
+    fail "R1: pushing renamed and split fixture lines was refused"
+  before=$(git -C "$repo" rev-parse HEAD)
+  printf 'NEW_KEY=%s\n' "$(aws_shape)" >>"$repo/tests/fm-voice-relay-b.test.sh"
+  git -C "$repo" add tests/fm-voice-relay-b.test.sh
+  out=$(with_hooks_env "$hooks" git -C "$repo" commit -qm 'new key in moved suite' 2>&1) &&
+    fail "R1: a new AKIA-shaped line inside a moved file was committed"
+  assert_contains "$out" tests/fm-voice-relay-b.test.sh "moved-file refusal did not name the file"
+  assert_equals "$before" "$(git -C "$repo" rev-parse HEAD)" "refused moved-file commit moved HEAD"
+  git -C "$repo" commit -qm 'new key committed outside the task hooks'
+  out=$(with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/topic 2>&1) &&
+    fail "R1: a new AKIA-shaped line inside a moved file was pushed"
+  assert_contains "$out" tests/fm-voice-relay-b.test.sh "moved-file push refusal did not name the file"
+  pass "renamed and split files with existing fixtures commit and push; a new AKIA line inside a moved file refuses"
+}
+
+test_repeated_refusals_escalate_without_admitting() {
+  local repo hooks out log="$TMP_ROOT/repeat-events.jsonl"
+  repo="$TMP_ROOT/repeat"
+  hooks="$TMP_ROOT/hooks-repeat"
+  make_repo "$repo"
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm first 2>&1) && fail "first attempt committed"
+  assert_not_contains "$out" "escalate:" "the first refusal escalated inside its budget"
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm second 2>&1) && fail "repeated attempt committed"
+  assert_contains "$out" "escalate:" "a refusal past the budget did not escalate"
+  assert_contains "$out" leak.txt "the escalated refusal lost the file name"
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm third 2>&1) && fail "exhausted budget admitted a credential"
+  assert_contains "$out" "escalate:" "the third refusal did not escalate"
+  assert_equals 1 "$(git -C "$repo" rev-list --count HEAD)" "a refused attempt created a commit"
+  printf 'TOKEN=replace-me\n' >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm placeholder || fail "placeholder after refusals did not commit"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm again 2>&1) && fail "new credential committed after reset"
+  assert_not_contains "$out" "escalate:" "an allowed decision did not reset the refusal count"
+  assert_equals 'deny:1 deny:2 deny:3 allow:1 deny:1' \
+    "$(jq -rs '[.[] | select(.guard == "git-commit-credential-shapes") | "\(.decision):\(.repeat)"] | join(" ")' "$log")" \
+    "commit decisions did not record one event each with their repeat count"
+  pass "refusals past the budget escalate to a human decision, stay refused, and an allow resets the count"
+}
+
+test_abandoned_refusal_does_not_inflate_unrelated_attempts() {
+  local mode=$1 repo remote hooks base out attempt guard log
+  repo="$TMP_ROOT/abandoned-$mode"
+  remote="$TMP_ROOT/abandoned-$mode.git"
+  hooks="$TMP_ROOT/hooks-abandoned-$mode"
+  log="$TMP_ROOT/abandoned-$mode.jsonl"
+  guard="git-${mode#pre-}-credential-shapes"
+  make_repo "$repo"
+  git init -q --bare "$remote"
+  git -C "$repo" remote add origin "$remote"
+  git -C "$repo" push -q origin HEAD:refs/heads/main
+  base=$(git -C "$repo" rev-parse HEAD)
+  "$STRIP" install "$hooks" "$repo" || fail "install failed"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/first.txt"
+  git -C "$repo" add first.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned first fixture'
+  fi
+  for attempt in 1 2 3; do
+    if [ "$attempt" -eq 3 ]; then
+      # The refused line is unchanged even though other added content changes.
+      printf 'unrelated benign content\n' >"$repo/benign.txt"
+      git -C "$repo" add benign.txt
+      if [ "$mode" = pre-push ]; then
+        git -C "$repo" commit -qm 'unrelated benign edit'
+      fi
+    fi
+    if [ "$mode" = pre-commit ]; then
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm refused 2>&1) && fail "$mode admitted the first credential"
+    else
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main 2>&1) && fail "$mode admitted the first credential"
+    fi
+    if [ "$attempt" -eq 1 ]; then
+      assert_not_contains "$out" 'escalate:' "$mode escalated the first content refusal"
+    else
+      assert_contains "$out" 'escalate:' "$mode lost the repeated content refusal"
+    fi
+  done
+  # Abandon the refused content without an intervening allowed hook decision.
+  git -C "$repo" reset --hard -q "$base"
+  printf 'OTHER=%s\n' "$(aws_shape)" >"$repo/unrelated.txt"
+  git -C "$repo" add unrelated.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned unrelated fixture'
+  fi
+  for attempt in 1 2; do
+    if [ "$mode" = pre-commit ]; then
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" commit -qm refused 2>&1) && fail "$mode admitted the unrelated credential"
+    else
+      out=$(FM_GUARD_EVENT_LOG=$log with_hooks_env "$hooks" git -C "$repo" push -q origin HEAD:refs/heads/main 2>&1) && fail "$mode admitted the unrelated credential"
+    fi
+    assert_contains "$out" unrelated.txt "$mode lost the unrelated refusal's filename"
+    if [ "$attempt" -eq 1 ]; then
+      assert_not_contains "$out" 'escalate:' "$mode carried an abandoned refusal into unrelated content"
+    else
+      assert_contains "$out" 'escalate:' "$mode did not escalate the same unrelated content on retry"
+    fi
+  done
+  assert_equals 'deny:1 deny:2 deny:3 deny:1 deny:2' \
+    "$(jq -rs --arg g "$guard" '[.[] | select(.guard == $g) | "\(.decision):\(.repeat)"] | join(" ")' "$log")" \
+    "$mode did not key refusal episodes to the offending line"
+  assert_equals "$base" "$(git -C "$remote" rev-parse refs/heads/main)" "$mode changed the remote with refused content"
+  pass "$mode keys repeats to refused lines; benign edits preserve the count and abandoned content cannot inflate unrelated refusals"
+}
+
+test_inspection_failures_escalate_and_keep_line_counts() {
+  local mode=$1 repo log guard out head zero
+  repo="$TMP_ROOT/inspection-failed-$mode"
+  log="$TMP_ROOT/inspection-failed-$mode.jsonl"
+  guard="git-${mode#pre-}-credential-shapes"
+  zero=0000000000000000000000000000000000000000
+  make_repo "$repo"
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$repo/leak.txt"
+  git -C "$repo" add leak.txt
+  if [ "$mode" = pre-push ]; then
+    git -C "$repo" commit -qm 'unscanned leak fixture'
+  fi
+  head=$(git -C "$repo" rev-parse HEAD)
+  scan() {
+    if [ "$mode" = pre-commit ]; then
+      (cd "$repo" && FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-commit 2>&1)
+    else
+      (cd "$repo" && printf '%s\n' "$1" | FM_GUARD_EVENT_LOG=$log python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-push origin "$TMP_ROOT/none.git" 2>&1)
+    fi
+  }
+  readable() {
+    rm -f "$repo/.git/MERGE_HEAD"
+    scan "refs/heads/main $head refs/heads/main $zero"
+  }
+  unreadable() {
+    if [ "$mode" = pre-commit ]; then
+      printf 'not-a-commit\n' >"$repo/.git/MERGE_HEAD"
+    fi
+    scan 'not a ref update'
+  }
+  out=$(readable) && fail "$mode admitted the credential"
+  assert_not_contains "$out" 'escalate:' "$mode escalated the first content refusal"
+  out=$(unreadable) && fail "$mode admitted an unreadable inspection"
+  assert_contains "$out" 'credential inspection failed' "$mode did not report the failed inspection"
+  assert_not_contains "$out" 'escalate:' "$mode escalated the first inspection failure"
+  out=$(unreadable) && fail "$mode admitted a repeated unreadable inspection"
+  assert_contains "$out" 'escalate:' "$mode did not escalate repeated inspection failures"
+  out=$(readable) && fail "$mode admitted the credential after inspection failures"
+  assert_contains "$out" leak.txt "$mode lost the refused file name"
+  assert_contains "$out" 'escalate:' "$mode erased the refused line's count on an inspection failure"
+  assert_not_contains "$out" 'ghp_' "$mode printed the credential value"
+  assert_equals 'deny:1:true deny:1:false deny:2:false deny:2:true' \
+    "$(jq -rs --arg g "$guard" '[.[] | select(.guard == $g) | "\(.decision):\(.repeat):\(.source_ok)"] | join(" ")' "$log")" \
+    "$mode did not count inspection failures apart from the refused line"
+  pass "$mode escalates repeated inspection failures and keeps the refused line's count across them"
+}
+
+test_each_decision_emits_one_event() {
+  local repo status
+  repo="$TMP_ROOT/telemetry"
+  make_repo "$repo"
+  (cd "$repo" && printf 'not a ref update\n' | python3 "$ROOT/bin/fm-git-secrets.py" --task-worktree "$repo" pre-push origin "$TMP_ROOT/none.git") >/dev/null 2>&1
+  status=$?
+  expect_code 1 "$status" "unreadable pre-push input did not refuse"
+  for guard in git-commit-credential-shapes git-push-credential-shapes; do
+    for decision in allow deny; do
+      [ "$(jq -s --arg g "$guard" --arg d "$decision" '[.[] | select(.guard == $g and .decision == $d and .source_ok == true)] | length' "$FM_GUARD_EVENT_LOG")" -ge 1 ] ||
+        fail "no readable-source $decision event for $guard"
+    done
+  done
+  [ "$(jq -s '[.[] | select(.guard == "git-push-credential-shapes" and .decision == "deny" and .source_ok == false)] | length' "$FM_GUARD_EVENT_LOG")" -eq 1 ] ||
+    fail "the failed inspection did not record one unreadable-source deny"
+  pass "commit and push decisions each record guard events, including a fail-closed unreadable source"
+}
+
+test_only_task_worktree_decisions_record_events() {
+  local task fixture hooks home out before
+  task="$TMP_ROOT/scope-task"
+  fixture="$TMP_ROOT/scope-fixture"
+  hooks="$TMP_ROOT/hooks-scope"
+  home="$TMP_ROOT/scope-home"
+  make_repo "$task"
+  make_repo "$fixture"
+  "$STRIP" install "$hooks" "$task" || fail "install failed"
+  in_pane() { (unset FM_GUARD_EVENT_LOG; FM_HOME=$home with_hooks_env "$hooks" "$@"); }
+  before=$(git -C "$fixture" rev-parse HEAD)
+  printf 'TOKEN=%s\n' "$(github_shape)" >"$fixture/leak.txt"
+  git -C "$fixture" add leak.txt
+  out=$(in_pane git -C "$fixture" commit -qm 'fixture credential' 2>&1) &&
+    fail "R1: a fixture repository commit admitted a credential"
+  assert_contains "$out" leak.txt "R1: the fixture refusal did not name the file"
+  assert_equals "$before" "$(git -C "$fixture" rev-parse HEAD)" "R1: the refused fixture commit moved HEAD"
+  printf 'TOKEN=replace-me\n' >"$fixture/leak.txt"
+  git -C "$fixture" add leak.txt
+  in_pane git -C "$fixture" commit -qm 'fixture placeholder' || fail "R1: the fixture placeholder did not commit"
+  [ ! -e "$home/state/guard-events.jsonl" ] || fail "R1: a fixture repository commit wrote to the home guard log"
+  printf 'benign\n' >"$task/benign.txt"
+  git -C "$task" add benign.txt
+  in_pane git -C "$task" commit -qm 'task commit' || fail "R1: the task worktree commit failed"
+  assert_equals 'git-commit-credential-shapes:allow' \
+    "$(jq -rs '[.[] | "\(.guard):\(.decision)"] | join(" ")' "$home/state/guard-events.jsonl")" \
+    "R1: the task worktree commit did not record exactly its own event"
+  pass "fixture repositories in a task pane are still checked but record no event; the task worktree records its event"
+}
+
+test_abandoned_refusal_does_not_inflate_unrelated_attempts pre-commit
+test_abandoned_refusal_does_not_inflate_unrelated_attempts pre-push
+test_project_pre_commit_changes_are_scanned
+test_credentials_are_checked_at_commit_and_push 0
+test_credentials_are_checked_at_commit_and_push 1
+test_existing_lines_are_not_rescanned_at_commit
+test_merges_scan_only_lines_new_to_every_parent
+test_push_baseline_is_every_remote
+test_remote_content_replays_name_the_likely_cause
+test_moved_lines_are_not_rescanned
+test_repeated_refusals_escalate_without_admitting
+test_inspection_failures_escalate_and_keep_line_counts pre-commit
+test_inspection_failures_escalate_and_keep_line_counts pre-push
+test_each_decision_emits_one_event
+test_only_task_worktree_decisions_record_events
+
+export T3_ROOT="$ROOT" T3_TMP="$TMP_ROOT"
+node --experimental-strip-types --no-warnings --input-type=module <<'JS' || fail 'T3 native write acceptance'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const root = process.env.T3_ROOT;
+const home = `${process.env.T3_TMP}/native-home`;
+for (const dir of ['config', 'state', 'data']) mkdirSync(`${home}/${dir}`, { recursive: true });
+const { installJevGuard } = await import(pathToFileURL(`${root}/bin/fm-jev-guard.ts`));
+let requests = 0;
+globalThis.fetch = async () => { requests++; throw new Error('no provider permitted'); };
+const secret = 'ghp_' + '0'.repeat(36);
+const report = 'Measured observations in an ordinary report.\n'.repeat(10000).slice(0, 396924);
+assert.equal(Buffer.byteLength(report), 396924);
+for (const host of ['omp', 'claude']) {
+  const wt = `${home}/${host}`;
+  mkdirSync(wt);
+  const git = (...args) => execFileSync('git', ['-C', wt, ...args], { encoding: 'utf8' });
+  git('init', '-q');
+  writeFileSync(`${wt}/.gitignore`, '.env\n');
+  git('add', '.gitignore');
+  git('commit', '-qm', 'base');
+  const before = git('rev-parse', 'HEAD');
+  const context = { home, config: `${home}/config`, state: `${home}/state`, task: host,
+    data: `${home}/data`, worktree: wt, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
+  const handlers = {};
+  installJevGuard({ on(name, handler) { handlers[name] = handler; } }, context);
+  async function admit(path, content, tool = 'write') {
+    if (host === 'omp') {
+      assert.equal(await handlers.tool_call({ toolName: tool, input: { path, content, new_string: content } }, { cwd: wt }), undefined);
+    } else {
+      const out = execFileSync(`${root}/bin/fm-jev-guard-hook.sh`, [home, context.config, context.state, host,
+        wt, context.data, 'firstmate', context.policy], { encoding: 'utf8', input: JSON.stringify({
+          hook_event_name: 'PreToolUse', cwd: wt, tool_name: tool === 'write' ? 'Write' : 'Edit',
+          tool_input: { file_path: path, content, old_string: '', new_string: content },
+        }) });
+      assert.equal(out, '', 'native write/edit must not require model credentials');
+    }
+  }
+  await admit(`${wt}/.env`, secret);
+  writeFileSync(`${wt}/.env`, secret);
+  git('add', '-A');
+  assert.equal(git('diff', '--cached', '--name-only'), '', 'T3(b): ignored write stages nothing');
+  assert.equal(git('rev-parse', 'HEAD'), before);
+  await admit(`${wt}/report.md`, report);
+  writeFileSync(`${wt}/report.md`, report);
+  await admit(`${wt}/report.md`, report, 'edit');
+  // Privacy text cannot become egress when there is no write-content model call.
+  writeFileSync(`${home}/config/dispatch-never-send`, 'Measured observations\n');
+  await admit(`${wt}/report.md`, report);
+  const hooks = `${home}/${host}-hooks`;
+  execFileSync(`${root}/bin/fm-git-strip-ai-trailers.sh`, ['install', hooks, wt]);
+  git('add', 'report.md');
+  git('-c', `core.hooksPath=${hooks}`, 'commit', '-qm', 'report');
+  assert.equal(Buffer.byteLength(git('show', 'HEAD:report.md')), 396924, 'T3(d): complete report committed');
+  assert.equal(readFileSync(`${wt}/.env`, 'utf8'), secret);
+  console.log(`${host}: ignored .env write stages nothing; wrote and committed 396924-byte report; no provider needed`);
+}
+assert.equal(requests, 0, 'writes must not call a model provider');
+// Preserve the old conservative shape boundaries at their new commit boundary,
+// including binary blobs and names that cannot be parsed line by line.
+const wt = `${home}/shapes`;
+mkdirSync(wt);
+const hooks = `${home}/shapes-hooks`;
+const git = (...args) => execFileSync('git', ['-C', wt, ...args], { encoding: 'utf8' });
+git('init', '-q');
+execFileSync(`${root}/bin/fm-git-strip-ai-trailers.sh`, ['install', hooks, wt]);
+const { spawnSync } = await import('node:child_process');
+const values = [
+  '-----BEGIN ' + 'PRIVATE KEY-----', '-----BEGIN PGP ' + 'PRIVATE KEY BLOCK-----',
+  'ghp_' + '0'.repeat(36), 'github_pat_' + '0'.repeat(30),
+  'AKIA' + 'Z'.repeat(16), 'xoxb-' + '0'.repeat(24),
+  'postgres://fixture:' + '0'.repeat(12) + '@localhost/db',
+  'redis://:' + '0'.repeat(12) + '@localhost/db',
+];
+const filename = 'shape fixture\nwith newline.bin';
+for (const value of values) {
+  writeFileSync(`${wt}/${filename}`, Buffer.concat([Buffer.from([0]), Buffer.from(value)]));
+  git('add', filename);
+  const commit = spawnSync('git', ['-C', wt, '-c', `core.hooksPath=${hooks}`, 'commit', '-qm', 'shape'], { encoding: 'utf8' });
+  assert.equal(commit.status, 1, 'a retained credential shape must refuse at commit');
+  assert.ok((commit.stdout + commit.stderr).includes('shape fixture\\nwith newline.bin'));
+  assert.equal((commit.stdout + commit.stderr).includes(value), false, 'refusal cannot print matching bytes');
+}
+const benign = [
+  'ordinary-word-'.repeat(100000), 'prefix-ghp_' + '0'.repeat(36),
+  'http://localhost:3000?email=foo@bar.com',
+  '{"endpoint":"http://localhost:3000","owner":"alice@example.com"}',
+  'replace-me',
+].join('\n');
+writeFileSync(`${wt}/${filename}`, benign);
+git('add', filename);
+git('-c', `core.hooksPath=${hooks}`, 'commit', '-qm', 'benign prose');
+writeFileSync(`${wt}/${filename}`, benign + '\n---.+postgres://fixture:' + '0'.repeat(12) + '@localhost/db');
+git('add', filename);
+const punctuation = spawnSync('git', ['-C', wt, '-c', `core.hooksPath=${hooks}`, 'commit', '-qm', 'URL after punctuation'], { encoding: 'utf8' });
+assert.equal(punctuation.status, 1, 'punctuation-led credential URL must refuse after long hyphenated prose');
+console.log('credential shapes: added binary lines, newline names, anchored prefixes and URL boundaries checked at commit');
+JS
+pass 'T3(b,d): both native write adapters admit ignored credentials and the 396924-byte report without a provider'
+

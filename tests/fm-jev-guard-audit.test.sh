@@ -9,7 +9,7 @@ node --experimental-strip-types --experimental-test-module-mocks --no-warnings -
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const reportUrl = pathToFileURL(`${process.env.AUDIT_ROOT}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
@@ -17,99 +17,8 @@ const state = process.env.AUDIT_TMP;
 mkdirSync(`${state}/config`);
 const context = { home: state, config: `${state}/config`, state, task: 'audit', project: 'firstmate', worktree: state, data: state, policy: report.GUARD_POLICY_VERSION };
 const service = report.createGuardService(context);
-let parts;
-let next;
-const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
-  kind: { type: 'choice', choice: 'code', confidence: 1 }, contains_secret: { type: 'noul', noul },
-}, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });
-mock.module(reportUrl, { namedExports: { ...report, createGuardService: () => ({ ...service,
-  planWrite: state => ({ pieces: parts.map((_, i) => String(i)), model_screened_bytes: Buffer.byteLength(state.content), local_only_bytes: 0 }),
-  decide: async () => { const part = parts[next++]; if (part instanceof Error) throw part; return part; },
-}) } });
-const { installJevGuard } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-guard.ts`));
-const handlers = {};
-installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
-const row = () => JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-async function run(values) {
-  parts = values; next = 0;
-  await handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 'fixture' } }, { cwd: state });
-  return row();
-}
-const failed = (attempts, ms) => new report.GuardUnavailableError('TimeoutError', true, undefined, { attempts, elapsedMs: ms });
-await test('write: a fully answered estimated piece keeps its amount and source', async () => {
-  const estimated = answer();
-  estimated.meta.cost = { amount: 0.001, source: 'estimated' };
-  const r = await run([estimated]);
-  assert.equal(r.cost.amount, 0.001, 'an estimated charge must not be hidden');
-  assert.equal(r.cost.source, 'estimated');
-  assert.equal(r.cost.incomplete, false, 'a fully answered piece is not partial');
-});
-await test('write: a fully answered reported piece keeps its amount and source', async () => {
-  const r = await run([answer()]);
-  assert.equal(r.cost.amount, 0.001);
-  assert.equal(r.cost.source, 'reported');
-  assert.equal(r.cost.incomplete, false);
-  assert.equal(r.cost.reported_amount, 0.001);
-});
-await test('write: an answered piece with an unsent planned piece stays incomplete', async () => {
-  const r = await run([answer(), new report.GuardUnavailableError('CredentialUnavailableError')]);
-  assert.equal(r.planned_chunks, 2);
-  assert.equal(r.chunks, 1);
-  assert.equal(r.cost.amount, null);
-  assert.equal(r.cost.source, 'unknown');
-  assert.equal(r.cost.incomplete, true);
-  assert.equal(r.cost.reported_amount, 0.001, 'the partial reported charge stays visible');
-});
-for (const tool of ['write']) {
-  await test(`${tool}: every failed chunk survives settlement`, async () => {
-  const r = await run([answer(), failed(2, 40), failed(3, 90)]);
-  assert.equal(r.attempts, 6, 'every failed chunk contributes its attempts');
-  assert.equal(r.ms, 90, 'parallel elapsed time includes the slowest failure, not only the first');
-  assert.deepEqual(r.failures.map(f => [f.chunk, f.attempts, f.ms]), [[2, 2, 40], [3, 3, 90]], 'each failed chunk keeps its own timing');
-  assert.equal(r.chunks, 3);
-  });
-  await test(`${tool}: partial cost is incomplete and unsent chunks are not egress`, async () => {
-  let r = await run([answer(), failed(2, 40), failed(3, 90)]);
-  assert.equal(r.cost.source, 'unknown', 'an answered piece cannot certify unanswered charges');
-  assert.equal(r.cost.amount, null);
-  assert.equal(r.cost.incomplete, true);
-  assert.equal(r.cost.reported_amount, 0.001, 'the known partial reported charge is retained');
-
-  r = await run([new report.GuardUnavailableError('PrivacyWithheldError'), failed(2, 50)]);
-  assert.equal(r.request_started, true, 'an unsent first failure cannot hide later egress');
-  assert.equal(r.attempts, 2);
-  assert.equal(r.chunks, 1, 'planned but unsent pieces are not provider egress');
-  assert.equal(r.planned_chunks, 2);
-  assert.equal(r.cost.incomplete, true);
-
-  r = await run([answer(), new report.GuardUnavailableError('CredentialUnavailableError')]);
-  assert.equal(r.chunks, 1);
-  assert.equal(r.planned_chunks, 2);
-  assert.equal(r.cost.incomplete, true);
-  assert.equal(r.cost.reported_amount, 0.001);
-
-  });
-  await test(`${tool}: a planned payload with no request sent is not-called and not incomplete`, async () => {
-  const r = await run([new report.GuardUnavailableError('CredentialUnavailableError')]);
-  assert.equal(r.request_started, false);
-  assert.equal(r.planned_chunks, 1);
-  assert.equal(r.chunks, 0);
-  assert.equal(r.cost.source, 'not_called', 'nothing was sent, so nothing was billed');
-  assert.equal(r.cost.amount, null);
-  assert.equal(r.cost.incomplete, false);
-  assert.equal(r.cost.reported_amount, 0);
-  });
-  await test(`${tool}: complete runs retain full reported cost without failures`, async () => {
-  const r = await run([answer(), answer()]);
-  assert.equal(r.attempts, 2);
-  assert.deepEqual(r.failures, [], 'a complete run invents no failed attempts');
-  assert.equal(r.cost.amount, 0.002);
-  assert.equal(r.cost.source, 'reported');
-  assert.equal(r.cost.incomplete, false, 'a fully reported complete run is complete');
-  });
-}
 // A failure before any piece exists has no chunk to report: no piece failed, none was planned, none was sent.
-const rowCount = () => readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').length;
+const rowCount = () => existsSync(`${state}/jev-guard.jsonl`) ? readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').length : 0;
 async function fresh(act) {
   const before = rowCount();
   await act();
@@ -125,8 +34,22 @@ function assertNoPiece(r, errorType) {
   assert.equal(r.attempts, null);
   assert.equal(r.ms, null);
 }
+const { installJevGuard } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-guard.ts`));
+const handlers = {};
+installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
+const row = () => JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
+  fixture: { type: 'noul', noul },
+}, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });
+await test('write: deterministic admission records no request, piece or cost', async () => {
+  const r = await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 'fixture' } }, { cwd: state }));
+  assert.equal(r.decision, 'allow');
+  assert.equal(r.branch, 'deterministic');
+  assertNoPiece(r, null);
+  assert.equal(r.cost.source, 'not_called');
+  assert.equal(r.cost.incomplete, false);
+});
 await test('call: invalid tool input fails before planning and invents no piece', async () => {
-  parts = []; next = 0;
   assertNoPiece(await fresh(() => handlers.tool_call({ toolName: 'write', input: { path: 'file.ts', content: 42 } }, { cwd: state })), 'InvalidToolInputError');
 });
 // The guard adds no retry accounting of its own: a retried success is exactly what the client reported.
@@ -142,8 +65,8 @@ await test('real decide: a guard-retried success keeps the client result and a c
     return final;
   });
   try {
-    const { WRITE_QUESTIONS } = await import(new URL('../src/levels/level06/index.ts', reportUrl));
-    const result = await service.decide({ path: 'file.ts', content: 'ordinary fixture' }, WRITE_QUESTIONS);
+    const { noul } = await import(new URL('../src/core/helpers.ts', reportUrl));
+    const result = await service.decide({ path: 'file.ts', content: 'ordinary fixture' }, { fixture: noul('Is `content` an ordinary fixture?') });
     assert.equal(calls, 2, 'the real service retried the failed client call');
     assert.equal(result.meta.attempts, attempts, 'attempts stay the final client metadata');
     assert.equal(result.meta.elapsedMs, elapsedMs, 'elapsed time stays the final client metadata, without the retry backoff');
@@ -161,13 +84,6 @@ await test('real decide: a guard-retried success keeps the client result and a c
   } finally {
     client.mock.restore();
   }
-});
-// A policy verdict still outranks an outage, but must not discard its spend.
-await test('policy verdict precedence never discards failed spend', async () => {
-const blocked = await run([answer(0.95), failed(2, 40), failed(3, 90)]);
-assert.equal(blocked.decision, 'block');
-assert.equal(blocked.attempts, 6);
-assert.equal(blocked.cost.incomplete, true);
 });
 await test('T4(a): xd://report_issue and SendFeedback report uploads are refused under every grant and never log the report body', async () => {
   const all = '["semantic-search","web","browser","provider","remote-storage"]';
@@ -557,27 +473,25 @@ await test('worker brief shell commands are never refused for a missing egress g
     'git fetch origin', 'git pull --ff-only', 'npm install', 'pnpm install', 'bun install', 'uv sync', 'uv run pytest',
     'npx tsc --noEmit', 'chrome-devtools-axi open https://synthetic.invalid', 'git commit -m "Fixes https://synthetic.invalid/1"'];
   for (const command of commands) {
-    parts = []; next = 0;
     const before = rowCount();
     assert.equal(await handlers.tool_call({ toolName: 'bash', input: { command } }, { cwd: state }), undefined, command);
     assert.equal(rowCount(), before, `no egress or model decision row: ${command}`);
   }
 });
-await test('S2(d): local read and bash stay unjudged, write/edit keep credential screening', async () => {
+await test('S2(d): local read and bash stay unjudged, write/edit keep deterministic path checks', async () => {
   const before = rowCount();
   assert.equal(await handlers.tool_call({ toolName: 'read', input: { path: 'file.ts' } }, { cwd: state }), undefined);
   assert.equal(await handlers.tool_call({ toolName: 'bash', input: { command: 'ls' } }, { cwd: state }), undefined);
   assert.equal(rowCount(), before, 'a local read or shell call has no pre-tool model classification');
   for (const tool of ['write', 'edit']) {
-    parts = [answer()]; next = 0;
     // A plain filename matching a tool must remain a file write, not device dispatch.
     const input = { path: 'find', content: 'fixture', new_string: 'fixture' };
     let patch;
     const r = await fresh(async () => { patch = await handlers.tool_call({ toolName: tool, input }, { cwd: state }); });
     assert.equal(patch, undefined);
-    assert.equal(r.branch, 'policy');
+    assert.equal(r.branch, 'deterministic');
     assert.equal(r.decision, 'allow');
-    assert.equal(r.request_started, true);
+    assert.equal(r.request_started, false);
   }
 });
 JS

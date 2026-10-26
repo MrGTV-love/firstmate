@@ -96,7 +96,7 @@ JS
 [ "$NATIVE_OUT" = native-key-ok ] || fail "unexpected native key probe: $NATIVE_OUT"
 pass "native omp command credentials reach the primary privately for firstmate only and stay unavailable with no helpers"
 
-# The jev-guard hook is a separate process; it must reach the primary key too.
+# The jev-guard service runs in a separate hook process; it must reach the primary key too.
 cat > "$TMP_ROOT/fake-jev.mjs" <<'JS'
 import { createServer } from 'node:http';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -125,35 +125,48 @@ trap 'kill "$FAKE_JEV_PID" 2>/dev/null; fm_test_cleanup' EXIT
 for _ in $(seq 1 100); do [ -s "$TMP_ROOT/jev-port" ] && break; sleep 0.05; done
 [ -s "$TMP_ROOT/jev-port" ] || fail "fake Jev endpoint did not start"
 
-guard_decision() {
-  local home=$1 out err="$TMP_ROOT/hook.err" status
+# Write content has no judgment, so the hook resolves no key; the guard
+# service it installs still resolves the primary key when it is asked to decide.
+guard_service() {  # <home>
+  local home=$1 err="$TMP_ROOT/service.err"
   mkdir -p "$home/state" "$home/config" "$home/data/t1" "$TMP_ROOT/wt"
   : > "$TMP_ROOT/transport"
-  out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"sandbox.txt","content":"fixture"}}' \
-    | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
-        FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
-        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$err")
-  status=$?
-  [ "$status" -eq 0 ] || fail "hook exited $status for $home"
-  [ ! -s "$err" ] || fail "hook wrote stderr for $home: $(cat "$err")"
-  if [ -z "$out" ]; then
-    decision=allow
-  else
-    decision=$(jq -er .hookSpecificOutput.permissionDecision <<<"$out") || fail "hook returned no permission decision for $home"
-  fi
+  outcome=$(env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
+      FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
+      REPORT="$ROOT/bin/ten-levels/extensions/report.ts" GUARD_HOME="$home" \
+      node --experimental-strip-types --no-warnings --input-type=module 2>"$err" <<'JS'
+import { pathToFileURL } from 'node:url';
+const { createGuardService } = await import(pathToFileURL(process.env.REPORT));
+const { noul } = await import(new URL('../src/core/helpers.ts', pathToFileURL(process.env.REPORT)));
+const home = process.env.GUARD_HOME;
+const service = createGuardService({ home, config: `${home}/config`, state: `${home}/state`, task: 't1', project: 'firstmate' });
+try {
+  await service.decide({ content: 'fixture' }, { fixture: noul('Is `content` an ordinary fixture?') });
+  console.log('answered');
+} catch (error) {
+  console.log(`${error.errorType}:${error.requestStarted}`);
+}
+JS
+  ) || fail "guard service probe failed for $home: $(cat "$err")"
 }
 
-guard_decision "$LANE"
-[ "$decision" = deny ] || fail "jev-guard in a home without .env must reach the primary key"
-grep -qx 'Bearer primary-key' "$TMP_ROOT/transport" || fail "jev-guard did not send the primary key"
-guard_decision "$REMOTE"
-[ "$decision" = deny ] || fail "jev-guard without a remote-bound credential must require review"
-[ ! -s "$TMP_ROOT/transport" ] || fail "jev-guard in a remote-bound home must make no request"
-jq -se '.[-1].error_type == "CredentialUnavailableError" and .[-1].decision == "review" and .[-1].request_started == false' "$REMOTE/state/jev-guard.jsonl" >/dev/null \
-  || fail "remote-bound credential failure lost its named outage or attempted egress"
+guard_service "$LANE"
+[ "$outcome" = answered ] || fail "the jev-guard service in a home without .env must reach the primary key: $outcome"
+grep -qx 'Bearer primary-key' "$TMP_ROOT/transport" || fail "the jev-guard service did not send the primary key"
+guard_service "$REMOTE"
+[ "$outcome" = CredentialUnavailableError:false ] || fail "the jev-guard service without a remote-bound credential must refuse before egress: $outcome"
+[ ! -s "$TMP_ROOT/transport" ] || fail "the jev-guard service in a remote-bound home must make no request"
+: > "$TMP_ROOT/transport"
+out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"sandbox.txt","content":"fixture"}}' \
+  | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
+      FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
+      "$ROOT/bin/fm-jev-guard-hook.sh" "$REMOTE" "$REMOTE/config" "$REMOTE/state" t1 "$TMP_ROOT/wt" "$REMOTE/data/t1" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/hook.err") \
+  || fail "the jev-guard hook exited nonzero for an in-root write"
+[ -z "$out" ] || fail "the jev-guard hook refused an in-root write that needs no key: $out"
+[ ! -s "$TMP_ROOT/transport" ] || fail "the jev-guard hook sent write content to the provider"
 kill "$FAKE_JEV_PID" 2>/dev/null
 wait "$FAKE_JEV_PID" 2>/dev/null
-pass "the jev-guard resolves the primary key and denies unavailable remote-bound credentials without egress"
+pass "the jev-guard service resolves the primary key and refuses unavailable remote-bound credentials without egress; the hook admits writes with no key"
 
 # The jev-belay Stop-hook wrapper delivers the key to one process only.
 BELAY_ROOT="$PRIMARY/data/vendor/jev-belay"

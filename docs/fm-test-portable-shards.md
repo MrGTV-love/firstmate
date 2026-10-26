@@ -30,6 +30,7 @@ A stale table is what makes the packing guard pass while a real shard overruns, 
 The corpus grows from fifteen to eighteen serial shards, which packs the slowest shard at 23.9 minutes.
 The per-shard packing check below then refused eighteen and nineteen shards, because one shard packed 1282762 ms and 1202486 ms of several scripts behind a 898093 ms largest suite, so the corpus moves to twenty serial shards, the fewest that pass.
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
+On 2026-10-24 the four unhinted `tests/fm-retired-jev-write-*.test.sh` retirement suites, packed at the 45000 ms default weight because `bin/fm-guard-refcheck.sh` forbids their retired ids in the hint table, join main's twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=10 serial_max_ms=1155486`); the packing target and job timeout are unchanged.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
 So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
 `tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.

@@ -4,10 +4,9 @@
 # withhold output, so it reported protection it did not provide.
 # Pass case: PostToolUse and UserPromptSubmit payloads that once produced
 # advisory context or doorbell state now produce no guard output and exit 0.
-# Block case: a PreToolUse write whose content fails its credential threshold
-# still reaches the judge and still denies, at the same exit code.
-# The pass cases need no Jev service; the block case uses the same loopback
-# fixture style as tests/fm-jev-guard.test.sh.
+# Block case: a PreToolUse write outside the allowed roots still denies, at the
+# same exit code. Write content has no judgment since the credential check moved
+# to commit and push, so no case needs a Jev service.
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -17,6 +16,7 @@ unset FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FR
 export FM_FRICTION_EXECUTION_KIND=test
 TMP_ROOT=$(fm_test_tmproot fm-retired-jev-posttool)
 KEY=fm-retired-jev-posttool-test-key
+trap fm_test_cleanup EXIT
 HOME_DIR="$TMP_ROOT/home"
 WT="$TMP_ROOT/worktree"
 TASK_DATA="$HOME_DIR/data/t1"
@@ -62,47 +62,12 @@ fi
 [ ! -e "$HOME_DIR/state/jev-guard.jsonl" ] || fail "retired post-tool payload reached the guard audit"
 pass "retired PostToolUse shell/read results and UserPromptSubmit capture emit nothing, exit 0 and start no guard service"
 
-# --- block case: the pre-tool judge and deny are untouched -------------------
-cat > "$TMP_ROOT/fake.mjs" <<'JS'
-import { createServer } from 'node:http';
-import { appendFileSync, writeFileSync } from 'node:fs';
-const [log, portFile] = process.argv.slice(2);
-const server = createServer((req, res) => {
-  let body = '';
-  req.on('data', chunk => { body += chunk; });
-  req.on('end', () => {
-    appendFileSync(log, 'request\n');
-    const request = JSON.parse(body);
-    const risky = /sk-live-fixture/.test(JSON.stringify(request.state));
-    const answers = {};
-    for (const [id, q] of Object.entries(request.questions)) {
-      if (q.type === 'noul') { answers[id] = { type: 'noul', noul: risky ? 0.95 : 0.05 }; continue; }
-      const keys = Object.keys(q.criteria);
-      const pick = keys[0];
-      answers[id] = { type: 'choice', choice: pick, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === pick ? 1 : 0])) };
-    }
-    res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ model: 'jev-fake', answers, usage: { input_tokens: 3, output_tokens: 1 } }));
-  });
-});
-server.listen(0, '127.0.0.1', () => writeFileSync(portFile, String(server.address().port)));
-JS
-REQUESTS="$TMP_ROOT/requests.log"
-: > "$REQUESTS"
-node "$TMP_ROOT/fake.mjs" "$REQUESTS" "$TMP_ROOT/port" &
-FAKE_PID=$!
-trap 'kill "$FAKE_PID" 2>/dev/null; fm_test_cleanup' EXIT
-for _ in $(seq 1 100); do [ -s "$TMP_ROOT/port" ] && break; sleep 0.05; done
-[ -s "$TMP_ROOT/port" ] || fail "fake TypeSafe endpoint did not start"
-FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/port")/v1/systemone"
-export FM_JEV_GUARD_BASE_URL
-
-pre_payload=$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"src/retired.txt",content:"sk-live-fixture"},tool_use_id:"retired-call"}')
+# --- block case: the pre-tool deny is untouched -----------------------------
+pre_payload=$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"/etc/fm-retired-posttool-outside",content:"fixture"},tool_use_id:"retired-call"}')
 run_hook "$pre_payload"
 [ "$status" -eq 0 ] || fail "pre-tool deny exited $status instead of the deny path's 0"
 [ ! -s "$err" ] || fail "pre-tool deny wrote stderr: $(cat "$err")"
-denied "$out" || fail "pre-tool credential write no longer denies"
+denied "$out" || fail "pre-tool outside-root write no longer denies"
 reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
 [[ "$reason" == *"Do not retry"* ]] || fail "pre-tool deny lost its existing guidance: $reason"
-[ "$(wc -l < "$REQUESTS" | tr -d ' ')" -eq 1 ] || fail "pre-tool deny did not receive exactly one judgment"
-pass "a PreToolUse write failing its credential threshold still reaches the judge and denies at exit 0"
+pass "a PreToolUse write outside the allowed roots still denies at exit 0 with its guidance"

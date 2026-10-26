@@ -1757,6 +1757,26 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
   pass "direct and TeamClaude raw nested launches exclude supervisor memory and preserve caller settings"
 }
 
+# keep-ai-trailers turns off only the commit-msg strip: the task hooks still
+# refuse a staged credential, and a kept trailer survives commit-msg.
+assert_kept_trailers_with_credential_hooks() {
+  local hooks=$1 wt=$2 label=$3 msg status
+  [ -x "$hooks/commit-msg" ] && [ -x "$hooks/pre-commit" ] \
+    || fail "$label: keep-ai-trailers launch did not install the task credential hooks"
+  msg="$CASE_DIR/$label-commit-msg"
+  printf 'subject\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n' > "$msg"
+  (cd "$wt" && "$hooks/commit-msg" "$msg") >/dev/null 2>&1 || fail "$label: commit-msg hook failed"
+  grep -Fqx 'Co-Authored-By: Claude <noreply@anthropic.com>' "$msg" \
+    || fail "$label: keep-ai-trailers launch still stripped AI trailers"
+  printf 'ghp_%036d\n' 0 > "$wt/keep-trailers-credential.txt"
+  git -C "$wt" add keep-trailers-credential.txt
+  (cd "$wt" && FM_GUARD_EVENT_LOG="$CASE_DIR/$label-guard-events.jsonl" "$hooks/pre-commit") >/dev/null 2>&1
+  status=$?
+  git -C "$wt" rm -q --cached keep-trailers-credential.txt
+  rm -f "$wt/keep-trailers-credential.txt"
+  expect_code 1 "$status" "$label: keep-ai-trailers launch admitted a staged credential"
+}
+
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   local rec id out status launch
   id=profile-claude-keep-attribution-z25
@@ -1769,9 +1789,8 @@ test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   expect_code 0 "$status" "claude spawn with keep-ai-trailers should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "opted-in claude"
-  [ ! -e "$HOME_DIR/state/$id.git-hooks" ] \
-    || fail "opted-in launch installed AI trailer strip hooks"
-  pass "keep-ai-trailers omits Claude attribution settings and the pane strip hooks"
+  assert_kept_trailers_with_credential_hooks "$HOME_DIR/state/$id.git-hooks" "$WT_DIR" opted-in-claude
+  pass "keep-ai-trailers omits Claude attribution settings and the trailer strip, and keeps credential hooks"
 }
 
 test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches() {
@@ -1799,8 +1818,7 @@ test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches() {
   expect_code 0 "$status" "secondmate crew spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "secondmate crew claude"
-  [ ! -e "$HOME_DIR/state/$crew_id.git-hooks" ] \
-    || fail "secondmate crew launch installed AI trailer strip hooks"
+  assert_kept_trailers_with_credential_hooks "$HOME_DIR/state/$crew_id.git-hooks" "$WT_DIR" secondmate-crew
   pass "a secondmate's home-local keep-ai-trailers choice survives spawn and applies to its crew"
 }
 

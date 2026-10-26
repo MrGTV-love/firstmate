@@ -7,7 +7,8 @@
 # Pass case: commands both admissions refused (unproven, forged marker, marker
 # split by an override) now pass with no credentials on omp and on a Claude
 # worker that still carries the old Bash hook registration, writing no audit row.
-# Block case: a write in a valid lab home whose judgment cannot run still denies.
+# Block case: a write outside the allowed roots in a valid lab home still
+# denies; the marker grants no write admission.
 # No case starts a provider.
 set -u
 # shellcheck source=tests/lib.sh
@@ -63,8 +64,8 @@ FM_STATE_OVERRIDE="$TMP_ROOT/elsewhere" shell_passes "lab marker split by an ove
 [ ! -e "$HOME_DIR/state/jev-guard.jsonl" ] || fail "a shell call wrote a guard audit row"
 pass "shell commands both outage admissions refused pass on omp and an old-matcher Claude worker without an audit row"
 
-# --- block case: the lab marker still admits no write --------------------------
-run_hook "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"src/lab.txt",content:"plain write"},tool_use_id:"retired-write"}')"
-[ "$status" -eq 0 ] || fail "lab write review exited $status instead of the deny path's 0"
-jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$out" >/dev/null || fail "a lab-home write without a judgment was admitted: $out"
-pass "a write in a lab home whose judgment cannot run still denies"
+# --- block case: the lab marker still admits no write outside the roots ------
+run_hook "$(jq -cn --arg cwd "$WT" '{hook_event_name:"PreToolUse",cwd:$cwd,tool_name:"Write",tool_input:{file_path:"/etc/fm-retired-lab-outside",content:"plain write"},tool_use_id:"retired-write"}')"
+[ "$status" -eq 0 ] || fail "lab write refusal exited $status instead of the deny path's 0"
+jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<<"$out" >/dev/null || fail "a lab-home write outside the roots was admitted: $out"
+pass "a lab-home write outside the allowed roots still denies"

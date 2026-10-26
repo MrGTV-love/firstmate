@@ -483,16 +483,9 @@ const server = createServer((req, res) => {
   let body = "";
   req.on("data", chunk => { body += chunk; });
   req.on("end", () => {
-    requests.push({ path: req.url, state: JSON.parse(body).state });
-    const answers = {};
-    for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
-      const keys = Object.keys(q.criteria ?? {});
-      const choice = keys[0];
-      answers[id] = q.type === "noul" ? { type: "noul", noul: 0.95 }
-        : { type: "choice", choice, confidence: 1, probabilities: Object.fromEntries(keys.map(k => [k, k === choice ? 1 : 0])) };
-    }
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ model: "jev-fake", answers, usage: { input_tokens: 3, output_tokens: 1 } }));
+    requests.push({ path: req.url, body });
+    res.statusCode = 500;
+    res.end();
   });
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -505,16 +498,10 @@ try {
   assert.deepEqual(providers.map(row => [row.name, row.baseUrl]), [["typesafe", "https://api.typesafe.ai"]]);
   const credential = () => execFileSync("/bin/sh", ["-c", providers[0].apiKey.slice(1)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const result = await handlers.tool_call({ toolName: "write", input: { path: "customer-record.txt", content: "fixture" } }, { cwd: process.env.WT });
-  if (process.env.PROJECT === "firstmate") {
-    assert.equal(credential(), "omp-scope-key");
-    assert.equal(result?.block, true);
-    assert.deepEqual(requests.map(row => row.path), ["/direct"]);
-    assert.ok(requests.every(row => row.state.path === "customer-record.txt"));
-  } else {
-    assert.throws(credential, "a non-firstmate worker must have no native judge credential");
-    assert.equal(result, undefined);
-    assert.deepEqual(requests, []);
-  }
+  assert.equal(result, undefined, "a worktree write is admitted without a judgment");
+  assert.deepEqual(requests, [], "no write sends a guard request");
+  if (process.env.PROJECT === "firstmate") assert.equal(credential(), "omp-scope-key");
+  else assert.throws(credential, "a non-firstmate worker must have no native judge credential");
 } finally {
   await new Promise(resolve => server.close(resolve));
 }
@@ -523,7 +510,7 @@ JS
 )
     [ "$out" = scope-ok ] || fail "generated omp extension lost $scope egress scope: $out"
   done
-  pass "real omp spawns give firstmate alone, without no-helpers, native find, a judge credential and guard egress"
+  pass "real omp spawns give firstmate alone, without no-helpers, native find, and a judge credential, and no write sends a guard request"
 }
 
 test_spawn_retains_pooled_capacity_and_declared_stand_ins() {

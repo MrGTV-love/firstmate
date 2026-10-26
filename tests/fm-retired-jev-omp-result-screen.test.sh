@@ -6,7 +6,7 @@
 # Pass cases (T1 a, d): output the fixture judge flags reaches the worker
 # unchanged, the installed extension registers no result handler, and a worker
 # session audits only its pre-tool write, with no omp_replace row and no
-# result-side model call.
+# model call for the write or any result.
 # Every judgment comes from an offline fixture; nothing reaches a provider.
 set -u
 # shellcheck source=tests/lib.sh
@@ -30,7 +30,7 @@ await test('T1(d): a worker session records only pre-tool work and sends no resu
   ]) await deliver(event);
   assert.deepEqual(rows().map(row => row.hook), ['tool_call']);
   assert.ok(rows().every(row => row.enforcement !== 'omp_replace'), 'no audit row records a replaced result');
-  assert.deepEqual(requests, [{ path: 'notes.txt', content: 'ordinary worker file' }]);
+  assert.deepEqual(requests, [], 'neither the pre-tool write nor any result reached TypeSafe');
   assert.equal(readFileSync(`${context.worktree}/notes.txt`, 'utf8'), 'ordinary worker file');
 });
 JS

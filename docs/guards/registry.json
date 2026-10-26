@@ -8,7 +8,9 @@
     "jev-egress-grant",
     "jev-github-write-op",
     "omp-worker-url-reads-off",
-    "spawn-brief-out-of-scope"
+    "spawn-brief-out-of-scope",
+    "git-commit-credential-shapes",
+    "git-push-credential-shapes"
   ],
   "guards": [
     {
@@ -614,11 +616,11 @@
       "version": "1",
       "id": "jev-pretool-deny",
       "owner": "bin/fm-jev-guard-hook.sh",
-      "invariant": "a write or edit action whose required judgment fails never runs",
+      "invariant": "a write or edit action whose input cannot be validated or whose terminal audit record cannot be written never runs",
       "layer": "runtime-block",
-      "source": "Jev answers plus Level 6 thresholds, with the output retained",
-      "trigger": "the Jev judgment for this action fails its threshold",
-      "remedy": "replay the refusal with bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> <project> FIRSTMATE_JEV_GUARD_V1 < <payload> (prints the failing judgment); the deny line already names the refused path",
+      "source": "the write/edit tool input schema and the append to state/jev-guard.jsonl; write/edit content receives no Jev judgment",
+      "trigger": "write or edit content is not a string, or the terminal audit row cannot be appended",
+      "remedy": "replay the refusal with bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> <project> FIRSTMATE_JEV_GUARD_V1 < <payload> (prints the review reason and error type); the deny line already names the refused path",
       "budget": 1,
       "test": "tests/fm-jev-guard.test.sh",
       "tier": "B",
@@ -821,6 +823,56 @@
       "remedy_verified": "fixture",
       "fail_direction_note": "bin/fm-spawn.sh refuses an omp worker launch when .omp/fm-worker-overlay.yml is missing",
       "telemetry_note": "not instrumented: this decision is omp's, not Firstmate's, and is visible only in the worker transcript; docs/guard-spec.md Rule 8 applies to Firstmate decision points"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "git-commit-credential-shapes",
+      "owner": "bin/fm-git-secrets.py",
+      "invariant": "a task commit never adds a line holding a known credential shape",
+      "layer": "runtime-block",
+      "source": "lines git diff --cached adds against HEAD and every MERGE_HEAD parent, after the repository pre-commit hook, net of lines the same diff removes, matched against the anchored shapes in bin/fm-git-secrets.py",
+      "trigger": "an added staged line holds a private-key header, a GitHub, AWS access key or Slack token prefix shape, or a connection URL with an embedded password of 8 or more characters",
+      "remedy": "remove the credential from the named files, restage them with git add <file>, and rerun git commit; python3 bin/fm-git-secrets.py pre-commit replays the check against the index",
+      "budget": 1,
+      "test": "tests/fm-git-secrets.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": true,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "git-push-credential-shapes",
+      "owner": "bin/fm-git-secrets.py",
+      "invariant": "a task push never sends a commit that adds a line holding a known credential shape",
+      "layer": "runtime-block",
+      "source": "lines each outgoing commit adds against all of its parents, where outgoing means reachable from a pushed tip but from no advertised old tip and no remote-tracking ref, net of lines the same diff removes, matched against the anchored shapes in bin/fm-git-secrets.py",
+      "trigger": "an outgoing commit adds a line holding a private-key header, a GitHub, AWS access key or Slack token prefix shape, or a connection URL with an embedded password of 8 or more characters",
+      "remedy": "squash the outgoing commits that add the credential without it: git reset --soft <upstream>, remove the credential from the named files, restage them with git add <file>, git commit, then rerun git push; git log -p <upstream>..HEAD -- <file> shows the adding commits",
+      "budget": 1,
+      "test": "tests/fm-git-secrets.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "remedy_verified": "fixture",
+      "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
     }
   ],
   "excluded": [
@@ -869,7 +921,27 @@
     {
       "point": "D9 Size refusal, result half",
       "evidence": "data/fm-jev-guard-e2e/report.md",
-      "reason": "never registered: the result half of the size refusal, which served only the omp result screen while the pre-tool size refusal stays, so its retirement record adds to the audited population"
+      "reason": "never registered: the result half of the size refusal, which served only the omp result screen, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D2 Write kind Choice (Q3)",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "a write decision inside the audited jev-pretool-deny guard, which stays active for write/edit input and audit failures, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D2 Write credential Noul (Q4)",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "a write decision inside the audited jev-pretool-deny guard, which stays active for write/edit input and audit failures, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "D3 Write remainder shapes",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "never registered: a local shape check that served only the write-time size path, so its retirement record adds to the audited population"
+    },
+    {
+      "point": "Write judgment outage denial",
+      "evidence": "data/fm-jev-guard-e2e/report.md",
+      "reason": "a write decision inside the audited jev-pretool-deny guard, which stays active for write/edit input and audit failures, so its retirement record adds to the audited population"
     }
   ]
 }
