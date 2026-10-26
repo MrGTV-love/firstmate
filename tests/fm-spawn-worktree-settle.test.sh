@@ -409,8 +409,8 @@ SH
   chmod +x "$FAKEBIN_DIR/claude"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
   export FM_COMPAT_LAUNCH_LOG
-  out=$(run_settle_spawn "$id" --harness 'claude --print $(claude --help)')
-  if [ "$?" = 0 ]; then fail "raw Claude spawn silently accepted command substitution: $out"; fi
+  # shellcheck disable=SC2016 # the literal substitution is the refused raw launch text
+  if out=$(run_settle_spawn "$id" --harness 'claude --print $(claude --help)'); then fail "raw Claude spawn silently accepted command substitution: $out"; fi
   case "$out" in *'command substitution'*'named harness'*) ;; *) fail "raw Claude refusal omitted construct or remedy: $out" ;; esac
   assert_absent "$FM_COMPAT_LAUNCH_LOG" "a refused raw Claude command must not reach the worker"
   out=$(run_settle_spawn "$id" --harness "CLAUDE_CONFIG_DIR='$raw_root' claude --resume $other --model opus")
@@ -452,6 +452,7 @@ SH
   chmod +x "$FAKEBIN_DIR/claude"
   FM_COMPAT_LAUNCH_LOG="$HOME_DIR/delivered-launch"
   export FM_COMPAT_LAUNCH_LOG
+  # shellcheck disable=SC2016 # the literal constructs are the raw launch text under test
   out=$(run_settle_spawn "$id" --harness 'claude --print "$(printf hi)" --model "${RAW_MODEL:-opus}"')
   expect_code 0 "$?" "unconfined raw claude spawn refused a shell construct: $out"
   assert_grep 'write_confinement=unconfined-linux' "$HOME_DIR/state/$id.meta" "unconfined raw claude coverage absent from metadata"
