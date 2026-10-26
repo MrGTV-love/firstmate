@@ -1446,10 +1446,11 @@ def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
     An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
-    A row whose age clock restarted after the action (a new PR head, push, status or hold) is changed work too.
+    A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
+    including between that ledger's generation and the record time, is changed work too.
     """
     age = row.get("age_seconds")
-    if age is not None and now - age > action.get("at_epoch", now):
+    if age is not None and now - age > action.get("clock_start", action.get("at_epoch", now)):
         return False
     if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
             and action.get("digest") == row_digest(row) and not action.get("invalidated") \
@@ -1690,7 +1691,9 @@ def ledger_action(args, state, now):
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
                          + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
-                         digest=row_digest(by_id[ident]), cited=cited)
+                         digest=row_digest(by_id[ident]), cited=cited, ledger_epoch=report["generated_epoch"])
+    if by_id[ident].get("age_seconds") is not None:
+        actions[ident]["clock_start"] = now - by_id[ident]["age_seconds"]
     if wait_history:
         actions[ident]["waits"] = wait_history
     if binding is not None:

@@ -2055,6 +2055,38 @@ restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
 assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
 clock['now'] = now
+# The unpause case: a new head is pushed after the presented ledger was generated (G) but before the action (T).
+home, ledger, row, call, ok, drain, ack = case('restart-before-record')
+_, boundary = drain()
+clock['now'] = now + 300
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+recorded = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert recorded['clock_start'] == now - 7200 and recorded['ledger_epoch'] == now, recorded
+assert ack(boundary).returncode == 0
+pushed = now + 100
+clock['now'] = pushed + 7200
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = pushed + 7200
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a head pushed between G and T stayed covered', restarted)
+home, ledger, row, call, ok, drain, ack = case('unchanged-clock')
+_, boundary = drain()
+clock['now'] = now + 300
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 9000
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+record['rows'][0]['age_seconds'] = 7200 + 8000
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a republished unchanged clock stays covered'
+# An action recorded before the clock start was stored keeps comparing against its action time.
+record = json.loads(ledger.read_text())
+del record['handling']['actions'][row['id']]['clock_start']
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a legacy action lost its cover'
+clock['now'] = now
 
 # A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.
 home, ledger, row, call, ok, drain, ack = case('resurface-reserved')
