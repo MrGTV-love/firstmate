@@ -1,0 +1,132 @@
+
+### Install task hooks exactly as fm-spawn does (keep-ai-trailers=0)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5VK6SAWKYEXR9PCRJW2Q9MB/bin/fm-git-strip-ai-trailers.sh install /Users/charlesabrooker/tmp/fm-lab.vNHYo0/state/t3-lab.git-hooks /Users/charlesabrooker/tmp/fm-lab.vNHYo0/projects/demo 0
+[exit 0]
+applypatch-msg commit-msg post-applypatch post-checkout post-commit post-merge post-rewrite pre-applypatch pre-auto-gc pre-commit pre-merge-commit pre-push pre-rebase prepare-commit-msg sendemail-validate 
+
+### T3(a): commit a ghp_ token of 36 characters -> refused, file named, value not printed
+
+$ pane git commit -m add token
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "secrets.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+[exit 1]
+HEAD unchanged: yes
+
+### Other retained shapes also refuse at commit (AKIA, private key header, URL password)
+
+$ pane git commit -m more shapes
+error: credential-shaped content in lines that staged or outgoing commits add
+files[4]: "aws.cfg", "pem.cfg", "secrets.txt", "url.cfg"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate for a human decision. The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.
+[exit 1]
+
+### T3(c): placeholder replace-me commits
+
+$ pane git commit -m placeholder
+[main 38e7394] placeholder
+ 1 file changed, 1 insertion(+)
+ create mode 100644 secrets.txt
+[exit 0]
+38e7394 placeholder
+
+### T3(b): write the token to ignored .env -> write succeeds, nothing is committed
+.env exists: yes ; git check-ignore: .env
+staged files: []
+
+$ pane git commit -m try env
+On branch main
+nothing to commit, working tree clean
+[exit 1]
+HEAD unchanged: yes
+
+### Adversarial: force-add the ignored .env -> refused
+
+$ pane git commit -m force env
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: ".env"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+[exit 1]
+
+### Adversarial: commit a token with --no-verify (skips pre-commit), then push -> pre-push refuses, remote unchanged
+
+$ pane git commit -q --no-verify -m sneaky
+[exit 0]
+
+$ pane git commit -q -m hide it at tip
+[exit 0]
+
+$ pane git push origin main
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "sneaky.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+error: failed to push some refs to '/Users/charlesabrooker/tmp/fm-lab.vNHYo0/remote.git'
+[exit 1]
+remote main unchanged: yes
+
+$ pane git push origin HEAD:refs/heads/other-branch
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "sneaky.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+escalate: this check refused 2 times in a row, past its budget of 1; stop retrying and report the refusal to Firstmate for a human decision. The commit or push stays refused until inspection succeeds and finds no new credential-shaped line.
+error: failed to push some refs to '/Users/charlesabrooker/tmp/fm-lab.vNHYo0/remote.git'
+[exit 1]
+remote other-branch exists: no
+
+### Placeholder history pushes cleanly
+
+$ pane git push -q origin main
+[exit 0]
+remote main == local: yes
+
+### T3(d): 396,924-byte report write through the real Claude PreToolUse adapter (bin/fm-jev-guard-hook.sh), then commit
+adapter exit=0 stdout_bytes=0 seconds=0 (exit 0 and empty stdout = allowed)
+report.md bytes: 396924
+
+$ pane git commit -q -m report
+[exit 0]
+committed bytes: 396924
+
+### Same adapter: a Write of the token into ignored .env is also admitted (no write-time credential judgment)
+adapter exit=0 stdout_bytes=0
+
+### Telemetry scope (R1): fixture repo commit from the pane is refused but logs no event; task commit logs one
+
+$ pane git -C /Users/charlesabrooker/tmp/t3-scratch.6zHhzj/fixture-repo commit -q -m leak
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "leak.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+[exit 1]
+home guard log after fixture commit: absent
+
+$ pane git commit -q -m benign
+[exit 0]
+home guard log events: {"guard":"git-commit-credential-shapes","decision":"allow","source_ok":true} 
+
+### keep-ai-trailers=1: trailer kept, credential still refused
+
+$ pane git commit -q -m keep mode token
+error: credential-shaped content in lines that staged or outgoing commits add
+files[1]: "again.txt"
+help: Remove credentials from the added lines; keep local secrets in ignored files or a secret store.
+cause: if a named line came from a cherry-pick, revert or squash of a commit already on a remote, this refusal is false: only commits reachable from a remote-tracking ref are skipped, not content.
+next: in that case, escalate to Firstmate naming the file and line; Firstmate can confirm the line is already on origin.
+[exit 1]
+trailer in HEAD message: 1
+
+### keep-ai-trailers=0: trailer stripped
+trailer in HEAD message: 0

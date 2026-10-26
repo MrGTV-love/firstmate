@@ -1,0 +1,3 @@
+ok - keep-ai-trailers omits Claude attribution settings and the trailer strip, and keeps credential hooks
+ok - a secondmate's home-local keep-ai-trailers choice survives spawn and applies to its crew
+# selected keep-ai-trailers spawn tests passed
