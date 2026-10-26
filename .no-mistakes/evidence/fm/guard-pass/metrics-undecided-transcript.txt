@@ -1,0 +1,21 @@
+### Scenario A: metrics reader --undecided against a lab home log written by the real writer
+$ FM_HOME=<lab> : write 104 allow events for spawn-brief-dod-placeholders via bin/fm-guard-event.sh (sessions s1..s8)
+log rows:      150 (+ a torn final line)
+
+$ fm-guard-metrics.sh (full report, shipped registry)
+METRIC merge-green-head opportunities=40 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRIC spawn-brief-dod-placeholders opportunities=104 denies=0 warns=0 override_rate=0 median_clear_attempts=0 recurrences=0 verdict=cut
+METRIC teardown-unlanded opportunities=6 denies=5 warns=0 override_rate=0 median_clear_attempts=5 recurrences=0 verdict=unmeasured
+METRICS_SUMMARY guards=3 measured=2 cut=2 unmeasured=1
+
+$ fm-guard-metrics.sh --undecided   (shipped registry: decision recorded on spawn-brief-dod-placeholders)
+exit=0 output=[merge-green-head]
+
+$ registry with retirement_decision removed (disposable copy)
+exit=0 output=[merge-green-head
+spawn-brief-dod-placeholders]
+
+### Scenario D: --undecided on a home with no guard-events.jsonl
+--undecided exit=0 output=[]
+--undecided --json exit=0 output=[]
+plain exit=0 output=[METRICS_SUMMARY guards=0 measured=0 cut=0 unmeasured=0 log_absent=true]

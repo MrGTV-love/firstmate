@@ -1,0 +1,35 @@
+### Scenario B: default and --json output unchanged versus base commit 5d1a7ebf (verdict rule kept)
+log=clean mode=text: IDENTICAL (4 lines)
+log=clean mode=--json: IDENTICAL (45 lines)
+log=big mode=text: IDENTICAL (9 lines)
+log=big mode=--json: IDENTICAL (100 lines)
+
+new output on big log (700104 bytes, 3086 rows):
+METRIC jev-pretool-deny opportunities=368 denies=35 warns=37 override_rate=0.25 median_clear_attempts=1 recurrences=20 verdict=cut
+METRIC lavish-reply-notice opportunities=404 denies=42 warns=34 override_rate=0.355 median_clear_attempts=1 recurrences=36 verdict=cut
+METRIC merge-green-head opportunities=373 denies=43 warns=41 override_rate=0.155 median_clear_attempts=1 recurrences=30 verdict=cut
+METRIC persistent-cd-guard opportunities=369 denies=44 warns=38 override_rate=0.366 median_clear_attempts=1 recurrences=39 verdict=cut
+METRIC queued-wakes-warning opportunities=372 denies=41 warns=38 override_rate=0.266 median_clear_attempts=1 recurrences=29 verdict=cut
+METRIC spawn-brief-dod-placeholders opportunities=392 denies=51 warns=44 override_rate=0.2 median_clear_attempts=1 recurrences=46 verdict=cut
+METRIC teardown-unlanded opportunities=388 denies=61 warns=39 override_rate=0.12 median_clear_attempts=1 recurrences=45 verdict=cut
+METRIC watcher-arm-pretool opportunities=420 denies=43 warns=38 override_rate=0.173 median_clear_attempts=1 recurrences=38 verdict=cut
+METRICS_SUMMARY guards=8 measured=8 cut=8 unmeasured=0
+
+### Scenario C: one log pass - wall time on the ~700 KB log
+base: 0.56s
+new: 0.81s
+new --undecided: 0.82s
+
+### Torn final line: base vs new on the lab log with a half-written last row
+base:
+METRIC teardown-unlanded opportunities=6 denies=5 warns=0 override_rate=0 median_clear_attempts=5 recurrences=0 verdict=unmeasured
+METRICS_SUMMARY guards=3 measured=2 cut=2 unmeasured=1
+new:
+METRIC teardown-unlanded opportunities=6 denies=5 warns=0 override_rate=0 median_clear_attempts=5 recurrences=0 verdict=unmeasured
+METRICS_SUMMARY guards=3 measured=2 cut=2 unmeasured=1
+### Scenario C (cont): ~700 KB log spread over every registry guard (35 ids)
+base: wall 2.23s
+base: jq processes given the log path: 36
+new: wall 2.61s
+new: jq processes given the log path: 1
+base and new reports IDENTICAL (36 lines)

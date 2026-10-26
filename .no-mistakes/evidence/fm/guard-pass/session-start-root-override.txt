@@ -1,0 +1,5 @@
+### G: session start resolves its home from FM_ROOT_OVERRIDE (FM_HOME unset); the guard log lives only in that home
+override home: /Users/charlesabrooker/tmp/fm-gp-ovr.iW3eQO (state/guard-events.jsonl = 104 dod allow rows); code copy has no state/guard-events.jsonl: absent
+exit=0
+GUARD PASS: spawn-brief-dod-placeholders nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json
+stamp written in override home: yes

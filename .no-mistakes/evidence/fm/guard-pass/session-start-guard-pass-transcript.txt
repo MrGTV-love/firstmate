@@ -1,0 +1,38 @@
+Lab home: /Users/charlesabrooker/tmp/fm-lab.xzMUbC (minted by bin/fm-lab-home.sh env); code: git archive of 5f8ab198
+Lab log: 104 allow rows for spawn-brief-dod-placeholders written by bin/fm-guard-event.sh (0 denies, 0 warns)
+
+### E1: registry copy WITHOUT retirement_decision, no stamp -> first session start of the day
+  exit ok; digest lines: 171
+  GUARD PASS lines in digest: 1
+  > GUARD PASS: spawn-brief-dod-placeholders nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json
+  stamp now: GUARD PASS: spawn-brief-dod-placeholders nominated for retirement with no record...
+
+### E2: second session start minutes later (stamp fresh, registry unchanged). Log deleted to prove the reader is NOT re-run
+  exit ok; digest lines: 171
+  GUARD PASS lines in digest: 1
+  > GUARD PASS: spawn-brief-dod-placeholders nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json
+
+### E3: captain records the decision (shipped registry with retirement_decision, now newer than the stamp) -> next session start
+  recorded: keep 2026-10-26: 0 denies and 0 warns across 104 opportunities is the designed state for a...
+  exit ok; digest lines: 170
+  GUARD PASS lines in digest: 0
+  stamp now holds: []
+
+### E4: next session again (cached empty answer) -> still silent
+  exit ok; digest lines: 170
+  GUARD PASS lines in digest: 0
+
+### E5: stale stamp (>24h old) with shipped registry -> reader runs again, still silent because the live nomination is decided
+  exit ok; digest lines: 170
+  GUARD PASS lines in digest: 0
+  stamp mtime refreshed: Oct 26 09:43:54 2026
+
+### E6: stale stamp, decision removed again -> line returns after 24h
+  exit ok; digest lines: 171
+  GUARD PASS lines in digest: 1
+  > GUARD PASS: spawn-brief-dod-placeholders nominated for retirement with no recorded decision; run bin/fm-guard-metrics.sh, judge it, and record keep or cut under retirement_decision in docs/guards/registry.json
+
+### F: a fresh home with no guard-events.jsonl and the undecided registry -> silent (no METRICS_SUMMARY leak)
+  exit ok; digest lines: 167
+  GUARD PASS lines in digest: 0
+  fresh stamp holds: []
