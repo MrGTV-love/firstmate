@@ -359,7 +359,7 @@ EOF
 }
 
 test_overdue_rows_escalate_before_away_acknowledgement() {
-  local dir state fakebin buffer delivered cycle
+  local dir state fakebin buffer delivered cycle now
   dir=$(make_supercase overdue-away-ack); state="$dir/state"; fakebin="$dir/daemon-bin"
   buffer="$state/.subsuper-escalations"; delivered="$dir/delivered"
   python3 - "$state/open-loops.json" "$(date +%s)" <<'PYROWS'
@@ -415,7 +415,20 @@ PYCHANGE
     handle_durable_wakes fallback "$state" || fail "the resurfaced row retained the check wake"
   [ "$(grep -c '^overdue open work: "away-row",' "$buffer")" = 1 ] \
     || fail "the unchanged overdue row was not forwarded again after its resurface interval"
-  pass "away mode acknowledges handled wakes past one new overdue row, forwards it once per change or resurface, and writes no receipt"
+  rm -f "$buffer"
+  now=$(date +%s)
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$now" "$ROOT/bin/fm-open-loops.sh" action away-row deferred \
+    --evidence 'waiting on the lint run' \
+    --recheck "$(python3 -c 'import datetime as d, sys; print(d.datetime.fromtimestamp(int(sys.argv[1]) + 600, d.timezone.utc).isoformat())' "$now")" \
+    > /dev/null || fail "firstmate could not defer the overdue row"
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$now" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the covered row retained the check wake"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" || fail "a covered row was forwarded"
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$((now + 700))" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the lapsed deferral retained the check wake"
+  [ "$(grep -c '^overdue open work: "away-row",' "$buffer" 2>/dev/null)" = 1 ] \
+    || fail "a row that returned to the gate with unchanged evidence was not forwarded again"
+  pass "away mode acknowledges handled wakes past one new overdue row, forwards it once per change, return to the gate or resurface, and writes no receipt"
 }
 
 test_busy_inbox_escalation_reaches_supervision() {

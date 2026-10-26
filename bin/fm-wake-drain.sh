@@ -897,14 +897,6 @@ if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
   else
     OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
-    # Only the periodic resurface wake carries the full waiting list; a change wake
-    # presents just the new or changed rows above.
-    if [ -f "$FM_WAKE_QUEUE" ] && awk -F '\t' '
-      $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
-      END { exit !found }
-    ' "$FM_WAKE_QUEUE"; then
-      "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1
-    fi
   fi
 fi
 rotate_scratch_locked
@@ -1138,6 +1130,14 @@ case "${FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
 esac
 if [ -n "$RAW_ROWS" ]; then
   printf '%s\n' "$RAW_ROWS" || exit "$?"
+fi
+# Only a periodic resurface wake this actor owns carries the full waiting list;
+# a change wake presents just the new or changed OVERDUE rows.
+if printf '%s\n' "$RAW_ROWS" | awk -F '\t' '
+  $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
+  END { exit !found }
+'; then
+  "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1
 fi
 fm_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
 RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN

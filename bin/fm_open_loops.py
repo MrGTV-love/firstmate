@@ -553,12 +553,12 @@ class Collector:
         since = max((s for s in stamps if s is not None and s <= self.now), default=None)
         if since is not None and self.now - since < self.ages["stalled_worker"]:
             return
-        pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
-        signatures = [line.strip() for line in pane.splitlines() if SIGNATURE.search(line)]
+        pane = [re.sub(r"[0-9]+", "#", line.strip())
+                for line in self.run([BIN / "fm-peek.sh", task["id"], "80"]).splitlines()]
+        signatures = [line for line in pane if SIGNATURE.search(line)]
         declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
                                 self.state / (task["id"] + ".status")).strip()
-        waits = [line.strip() for line in pane.splitlines()
-                 if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
+        waits = [line for line in pane if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
         wait = (waits[-1] if waits else declaration)[:150]
         if re.fullmatch(r"(?:harness |agent )?busy[.!]?", declaration.split(":", 1)[-1].strip(), re.I) and not waits:
             wait = ""
@@ -1446,7 +1446,11 @@ def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
     An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
+    A row whose age clock restarted after the action (a new PR head, push, status or hold) is changed work too.
     """
+    age = row.get("age_seconds")
+    if age is not None and now - age > action.get("at_epoch", now):
+        return False
     if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
             and action.get("digest") == row_digest(row) and not action.get("invalidated") \
             and not action.get("unverified"):
@@ -1548,7 +1552,8 @@ def ledger_action(args, state, now):
     pending = controls["presentations"].setdefault(actor, {})
     if args.digest:
         covered = [row for row in rows if receipt_covers(actions.get(row["id"], {}), row, now, waits)]
-        print(render_digest(covered, actions))
+        if covered:
+            print(render_digest(covered, actions))
         return 0
     if args.present_overdue:
         needing, standing = [], []

@@ -1695,35 +1695,43 @@ handle_wake() {  # <reason> <state>
 # waits on the ledger gate: firstmate's own --ack-through keeps that gate. Each
 # new or changed overdue row joins the escalation digest for firstmate once per
 # row id and evidence identity, and again only after FM_OPEN_LOOPS_RESURFACE
-# seconds (default 21600), as state/.subsuper-open-work-forwarded records. The
+# seconds (default 21600), as state/.subsuper-open-work-forwarded records for the
+# rows still needing an action; a row that becomes covered or leaves the ledger
+# loses its entry, so it is forwarded again when it returns to the gate. The
 # drain's periodic WAITING OPEN WORK list joins the same digest.
 forward_overdue_rows() {  # <state> <drain-output>
-  local state=$1 out=$2 report='' line id identity seen now
+  local state=$1 out=$2 report='' line id identity seen now readable=1
   local marker="$state/.subsuper-open-work-forwarded" resurface=${FM_OPEN_LOOPS_RESURFACE:-21600}
   [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
   if ! report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
     case "$report" in
       *'acknowledgement refused'*) ;;
-      *) printf '%s\n' "$report" >&2; report= ;;
+      *) printf '%s\n' "$report" >&2; readable=0 ;;
     esac
   fi
-  now=$(_now)
-  while IFS= read -r line; do
-    case "$line" in '  "'*) ;; *) continue ;; esac
-    id=${line#  \"}
-    id=${id%%\"*}
-    identity=$(jq -r --arg id "$id" '.rows[] | select(.id == $id)
-      | [.category, .subject, .owner, .next_action, .evidence] | @json' "$state/open-loops.json" | cksum) || return 1
-    identity=${identity// /:}
-    seen=$(awk -F '\t' -v id="$id" -v identity="$identity" '$1 == id && $2 == identity { print $3 }' \
-      "$marker" 2>/dev/null)
-    if [ -n "$seen" ] && [ $((now - seen)) -lt "$resurface" ]; then continue; fi
-    escalate_add "$state" "overdue open work: ${line#  }" || return 1
-    { awk -F '\t' -v id="$id" '$1 != id' "$marker" 2>/dev/null; printf '%s\t%s\t%s\n' "$id" "$identity" "$now"; } \
-      > "$marker.tmp" && mv -f "$marker.tmp" "$marker" || return 1
-  done <<EOF
+  if [ "$readable" -eq 1 ]; then
+    now=$(_now)
+    : > "$marker.tmp" || return 1
+    while IFS= read -r line; do
+      case "$line" in '  "'*) ;; *) continue ;; esac
+      id=${line#  \"}
+      id=${id%%\"*}
+      identity=$(jq -r --arg id "$id" '.rows[] | select(.id == $id)
+        | [.category, .subject, .owner, .next_action, .evidence] | @json' "$state/open-loops.json" | cksum) \
+        || { rm -f "$marker.tmp"; return 1; }
+      identity=${identity// /:}
+      seen=$(awk -F '\t' -v id="$id" -v identity="$identity" '$1 == id && $2 == identity { print $3; exit }' \
+        "$marker" 2>/dev/null)
+      if [ -z "$seen" ] || [ $((now - seen)) -ge "$resurface" ]; then
+        escalate_add "$state" "overdue open work: ${line#  }" || { rm -f "$marker.tmp"; return 1; }
+        seen=$now
+      fi
+      printf '%s\t%s\t%s\n' "$id" "$identity" "$seen" >> "$marker.tmp" || { rm -f "$marker.tmp"; return 1; }
+    done <<EOF
 $report
 EOF
+    mv -f "$marker.tmp" "$marker" || return 1
+  fi
   while IFS= read -r line; do
     case "$line" in '  "'*) ;; *) continue ;; esac
     id=${line#  \"}

@@ -852,6 +852,10 @@ for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: 
     assert last_error in evidence and 'usage limit earlier' not in evidence, diagnosed
     human = out([code / 'bin/fm-open-loops.sh'])
     assert last_error in human, human
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint step; retrying in 37 seconds (attempt 3/10)\\n"\n')
+counted = rows(ledger(), 'stalled_worker')['stalled']['evidence']
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint step; retrying in 12 seconds (attempt 4/10)\\n"\n')
+assert rows(ledger(), 'stalled_worker')['stalled']['evidence'] == counted and 'attempt #/#' in counted, counted
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint.full.whole\\n"\n')
 wait_row = rows(ledger(), 'stalled_worker')['stalled']
 assert 'lint.full.whole' in wait_row['evidence'] and wait_row['age_seconds'] == 5 * 3600, wait_row
@@ -2003,6 +2007,7 @@ def case(name, actor='main', empty=False, **fields):
 home, ledger, row, call, ok, drain, ack = case('change-gating')
 _, boundary = drain()
 assert ack(boundary).returncode == 1
+assert ok(code / 'bin/fm-open-loops.sh', '--digest').stdout == '', 'an empty waiting list printed a header'
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
 assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger "check: open-loop-ledger (1 overdue)"',
@@ -2035,6 +2040,39 @@ assert missing.returncode == 1 and 'new-row' in missing.stdout
 assert row['id'] in digest.stdout and 'new-row' not in digest.stdout
 clock['now'] = now
 print('PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage')
+
+# A row whose age clock restarted after its action is changed work, even when its text returns to the old value.
+home, ledger, row, call, ok, drain, ack = case('clock-restart')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+clock['now'] = now + 8000
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'an unchanged clock stays covered'
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
+assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
+clock['now'] = now
+
+# A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.
+home, ledger, row, call, ok, drain, ack = case('resurface-reserved')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"'
+   ' && fm_wake_append check report "check: main work"', '_', code / 'bin/fm-wake-lib.sh')
+resurface_seq = next(line.split('\t')[1] for line in (home / 'state/.wake-queue').read_text().splitlines()
+                     if line.split('\t')[3] == 'open-loop-ledger-resurface')
+(home / 'config/supervision-host').write_text('claude\n')
+ok(code / 'bin/fm-wake-grant.sh', 'activate', os.getpid(), 'engine-turn')
+ok(code / 'bin/fm-wake-grant.sh', 'publish', 'engine-turn', resurface_seq)
+main_view = ok(code / 'bin/fm-wake-drain.sh')
+assert 'check: main work' in main_view.stdout and 'WAITING OPEN WORK' not in main_view.stdout, main_view.stdout
+branch_view = ok('env', 'FM_SUPERVISION_ACTOR=branch', code / 'bin/fm-wake-drain.sh')
+assert 'WAITING OPEN WORK' in branch_view.stdout and row['id'] in branch_view.stdout, branch_view.stdout
+ok(code / 'bin/fm-wake-grant.sh', 'deactivate', os.getpid(), 'engine-turn')
 
 # The away supervise daemon acknowledges the wakes it handled without the ledger gate; firstmate's own acknowledgement stays gated.
 home, ledger, row, call, ok, drain, ack = case('away-daemon-ack')
