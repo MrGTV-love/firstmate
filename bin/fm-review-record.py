@@ -60,7 +60,8 @@ forge/hold check remain mandatory.
 Model families are rederived from ids into anthropic, openai, google, deepseek,
 xai, moonshot, meta (aliases claude, gpt, chatgpt, codex, oN, gemini, gemma, grok,
 kimi, llama); route prefixes ending in / are dropped. Stored typed family fields
-never decide independence. Uncovered-group refusals name each uncovered family.
+never decide independence. Uncovered-group refusals name each uncovered family,
+reporting any group with an unknown author family before known-family groups.
 For known families they print a review recording command; substitute the actual
 reader, local report and trigger answers. A PASS never covers unknown, so an
 unknown-family refusal instead asks for repaired author evidence or prints the
@@ -440,7 +441,7 @@ def verify(records, rows, head, home, pr, task, base):
                            "--loosens-deny-allow-list", "no", "--widens-guard", "no",
                            "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
 
-    for group, authors in sorted(groups.items()):
+    for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
         families = {a["family"] for a in authors}
         readers = set()
         for row in passes:

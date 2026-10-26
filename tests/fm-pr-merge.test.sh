@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -38,6 +38,8 @@ CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provi
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
     db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic'))
+    if sys.argv[6] == 'mixed-unknown':
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', None, None))
 PY
     case "$scenario" in
       unreadable|config-fallback|changed-config|unknown-captain-word)
@@ -95,7 +97,7 @@ PY
         record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","unknown"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown pipeline read' ;;
       *)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail "record Claude read for $scenario"
-        if [ "$scenario" != claude-only ]; then
+        if [ "$scenario" != claude-only ] && [ "$scenario" != mixed-unknown ]; then
           record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gpt-5.1-codex >/dev/null || fail "record OpenAI read for $scenario"
         fi ;;
     esac
@@ -126,6 +128,12 @@ PY
       eval "$command" > "$case_dir/alias-record.out" 2>&1 || fail "the printed recording command failed: $(cat "$case_dir/alias-record.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    if [ "$scenario" = mixed-unknown ]; then
+      expect_code 1 "$rc" "a mixed known and unknown pipeline must refuse: $(cat "$case_dir/stderr")"
+      assert_grep 'uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS' "$case_dir/stderr" 'the un-coverable unknown group is reported first'
+      assert_grep 'captain-word --pr' "$case_dir/stderr" 'the unknown group names the captain-word route'
+      assert_no_grep 'OUTSIDE_FAMILY_MODEL' "$case_dir/stderr" 'no known-family read is requested ahead of the unknown group'
     fi
     if [ "$scenario" = unknown-captain-word ]; then
       expect_code 1 "$rc" "an unknown pipeline family must refuse every PASS: $(cat "$case_dir/stderr")"
@@ -163,7 +171,7 @@ PY
         case "$scenario" in
           exact-head-fail) expected='verdict is FAIL' ;;
           head-mismatch) expected='head mismatch' ;;
-          unreadable|config-fallback|changed-config|relative-nm-home) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;
