@@ -547,6 +547,10 @@ for label, source in bodies:
     assert args == ["--session-id", session] + old_args, label
     assert stdin == old_stdin, label
     print("ok - raw Claude shell data byte fidelity:", label)
+for source in ("[ -d src ] && cd src; claude --print hi", "[[ -f x ]] && claude --print hi"):
+    rendered = subprocess.run([sys.executable, helper, "render-claude", source, session, ""], check=True, capture_output=True, text=True).stdout
+    assert rendered == source.replace("claude", "claude" + marker, 1), source
+    print("ok - raw Claude accepts a test bracket command:", source)
 forks = [
     ["--resume", "old-session"], ["-r", "old-session"], ["--continue"], ["-c"],
     ["--resume=old-session"], ["-rold-session"], ["-pc"], ["-p", "-cr"],
@@ -593,6 +597,7 @@ refusals = [
     ("shell expansion", "claude --model claude-sonnet-5-5[1m]"),
     ("shell expansion", "claude --print *.md"),
     ("shell expansion", "claude {--resume,old-id}"),
+    ("shell expansion", "claude --x=[ab]"),
 ]
 for construct, source in refusals:
     for extra in ([session, ""], ["", ""]):

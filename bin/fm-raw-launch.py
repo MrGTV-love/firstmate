@@ -12,8 +12,8 @@ quoted data, comments and here-document bodies. Here-documents support literal,
 single/double-quoted delimiters and <<- tab stripping, including multiple bodies.
 Command/process substitutions, here-strings and shell control structures refuse
 with a remedy rather than guessing; unterminated quotes/documents also refuse.
-A claude argument that needs shell expansion ($, unquoted glob or brace
-characters) or that sets its own --session-id refuses too.
+A claude argument that needs shell expansion ($, unquoted *, ?, a closed
+[...] bracket pattern or brace characters) or that sets its own --session-id refuses too.
 
 root prints the absolute path a single leading NAME=value assignment of the
 first command sets, with its quotes removed and a relative value resolved
@@ -70,7 +70,7 @@ def refuse(construct):
 
 def word(text, i):
     """Read one literal/expanded word, without executing shell text."""
-    start, value, expands, pattern = i, [], False, False
+    start, value, expands, pattern, bracket = i, [], False, False, False
     n = len(text)
     while i < n and text[i] not in " \t\n;&|()<>":
         char = text[i]
@@ -112,7 +112,9 @@ def word(text, i):
             i += 2
         else:
             expands = expands or char == "$"
-            pattern = pattern or char in "*?[{"
+            # A bracket is a pattern only when a later unquoted ] closes it.
+            pattern = pattern or char in "*?{" or (bracket and char == "]")
+            bracket = bracket or char == "["
             value.append(char)
             i += 1
     # Assignments are not glob- or brace-expanded; every other word is.
