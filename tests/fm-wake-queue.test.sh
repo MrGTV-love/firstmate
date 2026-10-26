@@ -3755,10 +3755,6 @@ cmd=${FM_FAKE_TMUX_CURRENT_COMMAND:-zsh}
 [ ! -f "$probe.spawned" ] || cmd=claude
 case "${1:-}" in
   display-message)
-    if [ -n "${FM_FAKE_TMUX_PROBE_HOLD:-}" ] && [ ! -e "$FM_FAKE_TMUX_PROBE_HOLD" ]; then
-      : > "$FM_FAKE_TMUX_PROBE_HOLD"
-      sleep 2
-    fi
     for a in "$@"; do
       case "$a" in
         *pane_current_command*) printf '%s\n' "$cmd"; exit 0 ;;
@@ -3946,27 +3942,6 @@ test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
       || fail "$id's relaunch did not queue its own check row: $(cat "$state/.wake-queue")"
   done
   pass "watch liveness: one tick relaunches every dead mate, queues a row each, and wakes once"
-}
-
-test_secondmate_liveness_lock_released_when_watcher_stops() {
-  local dir state pid i
-  dir=$(make_secondmate_liveness_case liveness-stop)
-  state="$dir/state"
-  run_liveness_leg "$dir" stop FM_FAKE_TMUX_CURRENT_COMMAND=claude FM_FAKE_TMUX_PROBE_HOLD="$dir/probe.held"
-  pid=$LIVENESS_PID
-  i=0
-  while [ "$i" -lt 200 ] && [ ! -e "$dir/probe.held" ]; do
-    sleep 0.05
-    i=$((i + 1))
-  done
-  [ -e "$dir/probe.held" ] || { kill_liveness_leg "$pid"; fail "the liveness tick never probed: $(cat "$dir/watch-stop.err")"; }
-  [ "$(cat "$state/.secondmate-liveness-sm1.lock/pid" 2>/dev/null)" = "$pid" ] \
-    || { kill_liveness_leg "$pid"; fail "the watcher did not hold the liveness lock while probing"; }
-  kill_liveness_leg "$pid"
-  is_live_non_zombie "$pid" && fail "the watcher outlived its stop"
-  [ ! -e "$state/.secondmate-liveness-sm1.lock" ] && [ ! -L "$state/.secondmate-liveness-sm1.lock" ] \
-    || fail "a stopped watcher left its liveness lock to a dead owner"
-  pass "watch liveness: stopping the watcher mid-probe releases the per-mate liveness lock"
 }
 
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
@@ -4351,7 +4326,6 @@ test_secondmate_liveness_tick_relaunches_dead_endpoint_once
 test_secondmate_liveness_tick_launch_policy_preserves_recovery_records
 test_secondmate_liveness_tick_relaunches_missing_endpoint
 test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking
-test_secondmate_liveness_lock_released_when_watcher_stops
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched
 test_secondmate_liveness_tick_cadence_gates_the_probe
 test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive

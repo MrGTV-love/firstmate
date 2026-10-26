@@ -84,7 +84,8 @@
 #                          a fleet-ledger, watcher-down or wake-queue hold
 #                          exceeded FM_LOCK_ALARM_SECS; or, with
 #                          trigger=dead-owner, any other lock's owner is a
-#                          zombie (state Z) or gone (state=dead), at any age
+#                          zombie (state Z) or gone (state=dead) while a live
+#                          waiter is still blocked on it, at any age
 #                          (fm_lock_monitor_check);
 #                          once per ownership episode, observation only
 #                          (bin/fm-wake-lib.sh owns the diagnostic receipts)
@@ -1167,7 +1168,6 @@ EOF
 # budget. The per-mate liveness lock serializes this tick against a concurrent
 # session-start sweep, so neither side can kill or re-probe an endpoint the
 # other is mid-relaunch on.
-SECONDMATE_LIVENESS_HELD=
 secondmate_liveness_tick() {
   local tick_marker="$STATE/.secondmate-liveness-tick"
   [ "$(age_of "$tick_marker")" -ge "$SECONDMATE_LIVENESS_SECS" ] || return 0
@@ -1182,8 +1182,7 @@ secondmate_liveness_tick() {
     id=${meta##*/}
     id=${id%.meta}
     case "$id" in ''|*[!A-Za-z0-9._-]*) continue ;; esac
-    SECONDMATE_LIVENESS_HELD=$id
-    fm_secondmate_liveness_lock "$id" || { SECONDMATE_LIVENESS_HELD=; continue; }
+    fm_secondmate_liveness_lock "$id" || continue
     fm_secondmate_liveness_probe "$meta" "$id" poll
     bound_marker="$STATE/.secondmate-relaunch-bound-$id"
     reason='' notify_key='' err=''
@@ -1237,7 +1236,6 @@ secondmate_liveness_tick() {
       fi
     fi
     fm_secondmate_liveness_unlock "$id"
-    SECONDMATE_LIVENESS_HELD=
     if [ -n "$err" ]; then
       echo "watcher: secondmate $id liveness: $err" >&2
       triage_log "secondmate $id liveness error: $err" || true
@@ -3061,7 +3059,6 @@ watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
-  [ -z "$SECONDMATE_LIVENESS_HELD" ] || fm_secondmate_liveness_unlock "$SECONDMATE_LIVENESS_HELD"
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
     owns_lock=1
     if [ "${WATCHER_RECOVERY_PENDING:-0}" -eq 1 ] \

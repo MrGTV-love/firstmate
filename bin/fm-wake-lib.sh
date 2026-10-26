@@ -8,7 +8,8 @@
 # FM_LOCK_ALARM_SECS (positive seconds, default 300; an invalid or zero value
 # warns once and uses 300) is the age limit for the measured fleet-ledger,
 # watcher-down and wake-queue locks; every other lock reports only a dead or
-# zombie owner (fm_lock_monitor_check). Each ownership episode reports once
+# zombie owner that still blocks a live waiter (fm_lock_monitor_check). Each
+# ownership episode reports once
 # through a check wake. The observing watcher's own locks and the
 # process-lifetime singletons state/.watch.lock and state/.supervise-daemon.lock
 # are not reported; a dead or zombie owner of those is still reclaimed.
@@ -1713,8 +1714,10 @@ _fm_lock_monitor_adopt() {  # <lock>
 #   222.593ms for fleet-ledger, 137.998ms for watcher-down, and 447.383ms for
 #   wake-queue. The 300s threshold leaves over 600x the largest measured hold,
 #   not a claim that all callers finish that fast.
-# - every other lock: owner liveness only, a dead or zombie owner at any age,
-#   never hold age. No measured or computable bound covers them: the primary
+# - every other lock: a dead or zombie owner that still blocks a live
+#   registered waiter, at any age, never hold age. A dead owner with no live
+#   waiter is not reported: the next acquire reclaims it (decision 011 in the
+#   task report). No measured or computable bound covers them: the primary
 #   home's state/.treehouse-project-*.lock.holds records (2026-10-13..26) reach
 #   2246s; control locks (state/.control-<id>.lock, taken by fm-pr-merge,
 #   fm-teardown, fm-spawn, fm-promote, fm-tasks-axi, fm-captain-hold,
@@ -1840,7 +1843,14 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
       fi
     done
     reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
-    [ -z "$dead_pid" ] || reason="$reason trigger=dead-owner"
+    if [ -n "$dead_pid" ]; then
+      [ "$waiters" -gt 0 ] || continue
+      pid=''
+      IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
+      [ "$pid" = "$dead_pid" ] || continue
+      [ "$owner" = "$lock" ] || fm_lock_points_to_owner "$lock" "$owner" || continue
+      reason="$reason trigger=dead-owner"
+    fi
     if [ -n "$settle" ] && ! "$settle"; then
       FM_LOCK_MONITOR_REASON=
       return 0
