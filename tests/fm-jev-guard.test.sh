@@ -858,7 +858,8 @@ installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: 
 const ctx = { cwd: process.env.WT };
 const events = () => (existsSync(ledger) ? readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : []);
 const audit = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-// Every typed refusal branch is the event's rule, taken from the audit row itself.
+// Every typed refusal branch becomes the event rule, taken from the audit row itself.
+// (No apostrophes in this block: stock Bash 3.2 balances quotes inside a heredoc under $(...).)
 for (const [toolName, input] of [
   ['write', { path: '/etc/fm-jev-guard-friction-branch', content: 'x' }],
   ['write', { path: 'xd://report_issue', content: '{}' }],
