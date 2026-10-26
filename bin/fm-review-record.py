@@ -31,10 +31,13 @@ base-to-head/pushed range and name this PR or this task's repository and branch.
 All its invocation models are conservative author evidence. A recorded provider
 can resolve an otherwise unknown model alias; conflicting provider/model families
 are unknown. Unattributed commits fall back to the configured agent, never to the
-ship model. The fallback recognizes simple scalar/inline-list agent settings in
-config.yaml and the worktree's .no-mistakes.yaml, and only native claude/codex/grok
-identities without model/argument/custom-route overrides; unsupported or unreadable
-configuration and unresolved agents remain unknown. It never creates a database.
+ship model. The fallback safely parses agent strings/lists in config.yaml and the worktree's
+.no-mistakes.yaml with Ruby/Psych, with no object classes or aliases permitted.
+Malformed YAML, duplicate keys, extra documents, parser/dependency failures and
+unreadable files remain unknown; quote stripping never supplies author evidence.
+Only native claude/codex/grok identities without model/argument/custom-route
+overrides resolve; other agents remain unknown. Ruby/Psych is needed only for
+this fallback, not for readable run evidence. It never creates a database.
 review optionally accepts --task TASK --base BRANCH to record an author snapshot;
 verify always rereads authoritative evidence, including for historical records.
 --author-groups remains a required declaration of exact author models, not an
@@ -295,30 +298,62 @@ def task_metadata(home, pr, task):
 
 
 def configured_pipeline_models(root, worktree):
-    # Recognize only unambiguous native agents in the simple YAML agent setting.
-    # ACP/auto/custom routes and model/argument overrides cannot prove a family.
-    # Unsupported YAML is unknown, never guessed from an executable's name.
-    value = None
+    unknown = [modelled("unknown", "pipeline agent")]
+    documents = []
     for path in (root / "config.yaml", worktree / ".no-mistakes.yaml"):
         try:
-            lines = path.read_text().splitlines()
+            documents.append(path.read_text(encoding="utf-8"))
         except FileNotFoundError:
             continue
-        except OSError:
-            return [modelled("unknown", "pipeline agent")]
-        if any(re.match(r"^(agent_config|agent_args_override|acp_registry_overrides):", line) for line in lines):
-            return [modelled("unknown", "pipeline agent")]
-        settings = [line.split(":", 1)[1].split("#", 1)[0].strip()
-                    for line in lines if re.match(r"^agent:", line)]
-        if settings:
-            if len(settings) != 1:
-                return [modelled("unknown", "pipeline agent")]
-            value = settings[0]
-    if value is None:
-        return [modelled("unknown", "pipeline agent")]
-    agents = value[1:-1].split(",") if value.startswith("[") and value.endswith("]") else [value]
+        except (OSError, UnicodeError):
+            return unknown
+    if not documents:
+        return unknown
+    # Psych is a safe, real YAML parser, not a quote-stripping approximation.
+    # A missing Ruby/Psych dependency is unavailable evidence, never permission
+    # to guess a family. Reject duplicate keys and extra documents as ambiguous.
+    try:
+        parsed = subprocess.run(["ruby", "-rjson", "-ryaml", "-e", '''
+def check_keys(node)
+  if node.is_a?(Psych::Nodes::Mapping)
+    keys = node.children.each_slice(2).map do |key, _|
+      unless key.is_a?(Psych::Nodes::Scalar) && (key.tag.nil? || key.tag == "tag:yaml.org,2002:str")
+        raise "complex or type-tagged config key"
+      end
+      key.value
+    end
+    raise "duplicate config key" unless keys.uniq.length == keys.length
+  end
+  node.children.to_a.each { |child| check_keys(child) }
+end
+configs = JSON.parse(STDIN.read).map do |text|
+  stream = Psych.parse_stream(text)
+  raise "multiple config documents" if stream.children.length > 1
+  check_keys(stream)
+  config = YAML.safe_load(text, permitted_classes: [], permitted_symbols: [], aliases: false, fallback: nil)
+  raise "config must be a mapping" unless config.nil? || config.is_a?(Hash)
+  config || {}
+end
+STDOUT.write(JSON.generate(configs))
+'''], input=json.dumps(documents), capture_output=True, text=True, check=False)
+        if parsed.returncode:
+            return unknown
+        configs = json.loads(parsed.stdout)
+    except (OSError, UnicodeError, ValueError):
+        return unknown
+    if not isinstance(configs, list) or len(configs) != len(documents):
+        return unknown
+    value = None
+    for config in configs:
+        if not isinstance(config, dict) or any(key in config for key in ("agent_config", "agent_args_override", "acp_registry_overrides")):
+            return unknown
+        if "agent" in config:
+            value = config["agent"]
+    agents = value if isinstance(value, list) else [value]
+    if not agents or any(not isinstance(agent, str) for agent in agents):
+        return unknown
     native = {"claude": "claude", "codex": "codex", "grok": "grok"}
-    return [modelled(native.get(agent.strip().strip("\"'"), "unknown"), "pipeline agent") for agent in agents]
+    return [modelled(native.get(agent, "unknown"), "pipeline agent") for agent in agents]
 
 
 def derived_authors(home, pr, head, task, base):

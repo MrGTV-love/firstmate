@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback missing-object; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback missing-object malformed-config duplicate-config tagged-config extra-document parser-unavailable quoted-config; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -38,16 +38,28 @@ CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provi
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
     db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?)', ('run', 'claude', 'claude-sonnet-5-5', 'anthropic'))
 PY
-    if [ "$scenario" = unreadable ] || [ "$scenario" = config-fallback ]; then
-      printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite"
-    fi
+    case "$scenario" in
+      unreadable|config-fallback|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable|quoted-config)
+        printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
+    esac
     if [ "$scenario" = config-fallback ]; then
       printf 'agent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml"
     fi
+    case "$scenario" in
+      malformed-config) printf 'agent: "codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      duplicate-config) printf 'agent: claude\nagent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      tagged-config) printf 'agent: claude\n!!binary YWdlbnQ=: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      extra-document) printf 'agent: codex\n---\nagent: claude\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+      parser-unavailable)
+        printf 'agent: codex\n' > "$case_dir/user-home/.no-mistakes/config.yaml"
+        printf '#!/bin/sh\nexit 127\n' > "$case_dir/fakebin/ruby"
+        chmod +x "$case_dir/fakebin/ruby" ;;
+      quoted-config) printf 'agent: "codex"\n' > "$case_dir/user-home/.no-mistakes/config.yaml" ;;
+    esac
     before=$(shasum -a 256 "$case_dir/user-home/.no-mistakes/state.sqlite")
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
-      ship-only|omitted-pipeline) record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
+      ship-only|omitted-pipeline|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable|quoted-config) record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
@@ -71,7 +83,7 @@ PY
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      two-readers|ship-only|config-fallback)
+      two-readers|ship-only|config-fallback|quoted-config)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -80,7 +92,7 @@ PY
         case "$scenario" in
           exact-head-fail) expected='verdict is FAIL' ;;
           missing-object) expected='head mismatch' ;;
-          unreadable) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          unreadable|malformed-config|duplicate-config|tagged-config|extra-document|parser-unavailable) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           *) expected='uncovered commit group no-mistakes:anthropic, family anthropic' ;;
         esac
         assert_grep "$expected" "$case_dir/stderr" "$scenario identifies missing independent read"
