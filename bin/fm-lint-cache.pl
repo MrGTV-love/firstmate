@@ -207,13 +207,14 @@ if (($ARGV[0] // '') eq 'gate') {
 # Private resident-memory watch. Usage: perl fm-lint-cache.pl rsswatch <limit-kib> <rss-file> -- <command...>
 # Hosts that cannot apply ulimit -v (native macOS) have no other memory bound
 # on a root, so this runs the command in a process group of its own and samples
-# the resident size of that command's whole process tree four times a second.
+# once a second the resident size of that command's process tree within that
+# group, reading only the group's own processes and never the whole host's.
 # Crossing the limit ends the group with KILL, records the peak sampled as
 # max_rss_kib=<KiB> in <rss-file> (the file /usr/bin/time would have written),
 # names the bound on stderr, and exits 98, which fm-lint.sh reports as a memory
 # failure so the root takes its narrower retry. Any other end passes the
 # command's own status straight through. A signal to the watch, or the loss of
-# its parent, ends the group within a quarter second (the watch itself sits in a
+# its parent, ends the group within a second (the watch itself sits in a
 # group of its own, out of reach of its owner's group sweep), so no analysis
 # process outlives the lint that started it. A host where no sampler works warns once and runs the command
 # unwatched rather than failing lint.
@@ -232,28 +233,33 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     POSIX::setpgid(0, 0);
     my $ps_works = 1;
     my $page_kib = -d '/proc/self' ? POSIX::sysconf(POSIX::_SC_PAGESIZE()) / 1024 : 0;
-    # Resident KiB of <pid> and its live descendants, or undef when unreadable.
+    # Resident KiB of the group leader <pid> and its live descendants in its
+    # group, or undef when unreadable.
     my $tree_rss = sub {
         my ($root_pid) = @_;
         my (%parent, %rss);
         if ($page_kib) {
-            opendir(my $proc, '/proc') or return undef;
-            for my $pid (grep { /\A[0-9]+\z/ } readdir $proc) {
+            my @queue = ($root_pid);
+            while (defined(my $pid = shift @queue)) {
                 open(my $stat, '<', "/proc/$pid/stat") or next;
                 my $line = <$stat>;
                 close $stat;
-                next unless defined $line && $line =~ /\A[0-9]+ \(.*\) \S ([0-9]+) /s;
+                next unless defined $line && $line =~ /\A[0-9]+ \(.*\) \S ([0-9]+) ([0-9]+) /s && $2 == $root_pid;
                 $parent{$pid} = $1;
                 open(my $statm, '<', "/proc/$pid/statm") or next;
                 my @fields = split ' ', (<$statm> // '');
                 close $statm;
                 $rss{$pid} = $fields[1] * $page_kib if @fields > 1;
+                for my $children (glob "/proc/$pid/task/*/children") {
+                    open(my $list, '<', $children) or next;
+                    push @queue, split ' ', (<$list> // '');
+                    close $list;
+                }
             }
-            closedir $proc;
         } else {
             if ($ps_works) {
                 no warnings 'exec';
-                if (open(my $ps, '-|', 'ps', '-A', '-o', 'pid=,ppid=,rss=')) {
+                if (open(my $ps, '-|', 'ps', '-o', 'pid=,ppid=,rss=', '-g', $root_pid)) {
                     while (my $line = <$ps>) {
                         next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
                         ($parent{$1}, $rss{$1}) = ($2, $3);
@@ -336,7 +342,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     }
     POSIX::setpgid($child, $child);
     kill 'TERM', -$child if $caught;
-    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0.25, 0.25);
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
     my $reaped = waitpid($child, 0);
     Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
     kill 'KILL', -$child if $over || $caught;

@@ -1541,6 +1541,58 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
   pass "the resident-memory watch ends its command when the owner dies"
 }
 
+test_resident_watch_reads_only_its_own_tree() {
+  local tmp shims real_ps real_python refuse rc decoy_pid count
+  tmp=$(fm_test_tmproot fm-lint-rss-narrow)
+  real_ps=$(command -v ps)
+  real_python=$(command -v python3)
+  shims="$tmp/shims"
+  mkdir -p "$shims"
+  # The ps shim logs how many processes each call listed, or refuses as a
+  # sandbox does under FM_TEST_PS_REFUSE=1; the python3 shim logs each call.
+  cat > "$shims/ps" <<'SH'
+#!/usr/bin/env bash
+[ "$FM_TEST_PS_REFUSE" = 0 ] || exit 1
+out=$("$FM_TEST_REAL_PS" "$@") || exit
+printf '%s\n' "$out" | grep -c . >> "$FM_TEST_PS_LOG"
+printf '%s\n' "$out"
+SH
+  cat > "$shims/python3" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
+exec "$FM_TEST_REAL_PYTHON" "$@"
+SH
+  chmod +x "$shims/ps" "$shims/python3"
+  for refuse in 0 1; do
+    : > "$tmp/ps.log"
+    : > "$tmp/py.log"
+    rm -f "$tmp/rss" "$tmp/decoy.pid"
+    # The watched command starts a decoy that leaves the command's process
+    # group and holds 160 MiB, over the 100 MiB bound, while the command lives.
+    rc=0
+    PATH="$shims:$PATH" FM_TEST_PS_REFUSE=$refuse FM_TEST_REAL_PS="$real_ps" \
+      FM_TEST_REAL_PYTHON="$real_python" FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
+      perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
+      bash -c 'perl -MPOSIX -e "POSIX::setpgid(0, 0); my \$held = q(x) x (160 * 1024 * 1024); sleep 30" & echo $! > "$1"; sleep 3' \
+      _ "$tmp/decoy.pid" > /dev/null 2>&1 || rc=$?
+    decoy_pid=$(cat "$tmp/decoy.pid" 2>/dev/null || true)
+    [ -z "$decoy_pid" ] || kill -KILL "$decoy_pid" 2>/dev/null || true
+    [ -n "$decoy_pid" ] || fail "the decoy did not start"
+    [ "$rc" -eq 0 ] && [ ! -e "$tmp/rss" ] \
+      || fail "the watch counted a process outside its command's tree (exit $rc, ps refused=$refuse)"
+    [ -d /proc/self ] && break
+    if [ "$refuse" = 0 ]; then
+      [ -s "$tmp/ps.log" ] || fail "the watch never sampled through ps"
+      while read -r count; do
+        [ "$count" -le 5 ] || fail "a ps sample listed $count processes, not only the watched tree"
+      done < "$tmp/ps.log"
+    else
+      grep -q 'rss-tree' "$tmp/py.log" || fail "the watch did not fall back to the libproc reader when ps was refused"
+    fi
+  done
+  pass "the resident-memory watch samples only its command's own tree"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -1563,6 +1615,7 @@ test_memory_failure_retries_without_external_sources
 test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
 test_unbounded_root_under_resident_bound_is_untouched
 test_resident_watch_ends_its_command_when_its_owner_dies
+test_resident_watch_reads_only_its_own_tree
 test_cache_key_wait_preserves_root_retry_budget
 )
 fm_lint_run "$@"

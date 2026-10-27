@@ -20,8 +20,9 @@ macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
 else S) and E for a process that is exiting. cpu-tree prints the
 whole centiseconds of CPU used by PID and its live descendants, including their
 reaped children, as macOS `ps -S` counts them. rss-tree prints the whole KiB of
-resident memory held right now by PID and its live descendants, summed from
-libproc's ri_resident_size. Facts come from sysctl KERN_PROC
+resident memory held right now by PID and its live descendants in PID's
+process group, reading only that group's processes, summed from libproc's
+ri_resident_size. Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU and resident size from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
@@ -32,7 +33,7 @@ import sys
 import time
 
 CTL_KERN, KERN_PROC, KERN_PROCARGS2 = 1, 14, 49
-KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_RUID = 0, 1, 6
+KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_PGRP, KERN_PROC_RUID = 0, 1, 2, 6
 # struct kinfo_proc on 64-bit Darwin: kp_proc.p_pid, kp_proc.p_comm,
 # kp_proc.p_flag, kp_proc.p_stat, kp_eproc.e_ppid and kp_eproc.e_pgid.
 KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40, 243, 32, 36, 560, 564
@@ -104,14 +105,14 @@ def argv(pid):
     return [shown(word) for word in words]
 
 
-def kinfos():
-    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_ALL)
+def kinfos(*selector):
+    data = sysctl(CTL_KERN, KERN_PROC, *(selector or (KERN_PROC_ALL,)))
     for offset in range(0, len(data) - KINFO_SIZE + 1, KINFO_SIZE):
         yield data[offset:offset + KINFO_SIZE]
 
 
-def processes():
-    for record in kinfos():
+def processes(*selector):
+    for record in kinfos(*selector):
         yield struct.unpack_from("i", record, P_PID)[0], struct.unpack_from("i", record, E_PPID)[0]
 
 
@@ -178,8 +179,9 @@ def rss_kib(pid):
 
 
 def rss_tree(root):
+    group = struct.unpack_from("i", kinfo(root), E_PGID)[0]
     children = {}
-    for pid, ppid in processes():
+    for pid, ppid in processes(KERN_PROC_PGRP, group):
         children.setdefault(ppid, []).append(pid)
     total, queue = rss_kib(root), list(children.get(root, []))
     while queue:
