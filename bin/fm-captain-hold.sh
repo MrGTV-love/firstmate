@@ -2308,7 +2308,7 @@ key_opening_line() {  # <status-file> <key>
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
         ;;
     esac
-  done < <(fm_status_cat "$f" 0)
+  done < <(fm_status_cat "$f")
   while IFS= read -r row; do
     case "$row" in
       "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;
@@ -2671,7 +2671,7 @@ open_task_ids() {
 # what actually decides what the stream says about a key. The log is read through the
 # byte read limit (bin/fm-status-cap-lib.sh), so a log past it yields no tokens.
 status_log_key_tokens() {  # <status-file>
-  fm_status_cat "$1" 0 2>/dev/null | grep -o '\[key=[A-Za-z0-9._-]*\]' |
+  fm_status_cat "$1" 2>/dev/null | grep -o '\[key=[A-Za-z0-9._-]*\]' |
     sed 's/^\[key=//; s/\]$//' | LC_ALL=C sort -u
 }
 

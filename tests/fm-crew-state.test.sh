@@ -3049,7 +3049,7 @@ test_status_log_past_the_read_limits_reads_unknown() {
   FM_FAKE_AXI_STATUS=""
   FM_FAKE_BUSY=0
   arm_idle_record "$d/state" feat-big
-  out=$(run_crew_state "$d" feat-big)
+  out=$(FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 run_crew_state "$d" feat-big)
   assert_contains "$out" "state: unknown" "an unreadable status log reads unknown"
   assert_contains "$out" "source: status-log" "the unknown names the status log as its source"
   assert_contains "$out" "feat-big.status is past the status read limits" "the unknown does not name the refused log"

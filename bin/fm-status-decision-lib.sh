@@ -459,7 +459,7 @@ status_open_decisions() {  # <status-file> [<kind>] [<out-var>] [<tick-command>]
   fi
   if [ "$seeded" -eq 1 ]; then
     [ "$offset" -lt "$_FM_ODC_SIZE" ] || { _fm_emit_value "$out" "$open"; return 0; }
-    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 2>/dev/null); then
+    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 0 2>/dev/null); then
       while IFS= read -r line || [ -n "$line" ]; do
         [ -z "$tick" ] || "$tick"
         status_line_verb "$line" verb

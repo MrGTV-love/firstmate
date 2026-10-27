@@ -222,16 +222,17 @@ _fm_status_read_span() {  # <status-file> <start-offset> <byte-length> [<max-lin
 }
 
 # Whole-file readers use this instead of redirecting a status log: it prints the log
-# exactly when it is within the read limits and refuses it, loudly, when it is not.
-# <max-lines> works as for _fm_status_read_span. Callers loop over it with process
-# substitution.
-fm_status_cat() {  # <status-file> [<max-lines>]
+# exactly when it is within the byte limit and refuses it, loudly, when it is not. It
+# takes the byte limit alone, never the line limit, because a history reader keeps no
+# checkpoint and rereads from byte 0: a line limit would refuse a healthy log far below
+# the cap on every call, and the harm a runaway does is its size in bytes.
+fm_status_cat() {  # <status-file>
   local f=$1 __fm_wc_size
   _fm_status_file_size "$f" __fm_wc_size || return 1
   __fm_wc_size=${__fm_wc_size//[[:space:]]/}
   case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac
   [ "$__fm_wc_size" -gt 0 ] || return 0
-  fm_status_read_exact "$f" 0 "$__fm_wc_size" "${2-}"
+  fm_status_read_exact "$f" 0 "$__fm_wc_size" 0
 }
 
 # 0 when a status sidecar (a fold cursor, the home-appends ledger) is small enough

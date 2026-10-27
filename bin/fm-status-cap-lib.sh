@@ -34,11 +34,14 @@
 # healthy fleet on 2026-10-18 was 3,230,479 bytes (state/vernant-d7-steward.status,
 # 5,338 lines). The cap is 32 MiB, about ten times that, so only a runaway reaches
 # it. The window is 4 MiB, 1.3 times that log, so a healthy log is read whole by a
-# tail reader too. The line limit is 32768, 6.1 times that log's 5,338 lines, so a
-# healthy log is read whole by a line-by-line reader with room to grow. It exists
-# because a shell loop costs about 2.7 ms per line in the watcher's span classifier
-# (measured 2026-10-18): a flood of tiny lines under the byte limit would otherwise
-# hold the watcher for hours, and the watcher is what raises the over-cap wake.
+# tail reader too. The line limit is 32768, 6.1 times that log's 5,338 lines. It
+# bounds only an unread span that a shell loop walks from a saved position (the
+# watcher's span classifier, the drain's unread spans), because a shell loop costs
+# about 2.7 ms per line in the watcher's span classifier (measured 2026-10-18): a flood
+# of tiny lines under the byte limit would otherwise hold the watcher for hours, and
+# the watcher is what raises the over-cap wake. A history reader of the whole log and
+# an open-decisions fold take the byte limit alone (fm_status_cat): the harm a runaway
+# does is its size in bytes, and a line limit would refuse a healthy log on every call.
 # The cap and the reserve can be overridden by the environment (FM_STATUS_CAP_BYTES,
 # FM_STATUS_CAP_RESERVE_BYTES) for a test or a deliberate site choice, and a value
 # that is not a positive integer falls back to the default. The window and the line

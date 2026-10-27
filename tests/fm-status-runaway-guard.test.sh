@@ -1020,22 +1020,69 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
   grep -q 'refused to read huge.status' "$dir/recorded.err" || fail "the retry check refusal does not name the file: $(cat "$dir/recorded.err")"
   [ "$(file_size "$status")" -eq 2147483648 ] || fail "a reader changed the size of the log"
 
-  # The line limit works the same way: a span with more lines than a shell loop should
-  # walk is refused, not clipped, unless the caller asks for the byte limit alone; the
-  # largest healthy log (5,338 lines) is read whole.
+  # The line limit bounds only an unread span a shell loop walks: such a span with more
+  # lines is refused, not clipped, while a whole-log history read of the same log, far
+  # below the byte limit, is read whole.
   status="$state/dense.status"
   perl -e 'print "x\n" x 40000' > "$status"
   rc=0
-  out=$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2"' _ "$ROOT/bin" "$status" 2>"$dir/lines.err") || rc=$?
-  [ "$rc" -ne 0 ] && [ -z "$out" ] || fail "a 40000 line log was read by a line-by-line reader (rc=$rc, ${#out} bytes)"
-  [ "$rc" -eq 2 ] || fail "a line-limit refusal is not exit status 2 (rc=$rc)"
+  out=$(bash -c '. "$1/fm-status-io-lib.sh"; _fm_status_read_span "$2" 0 80000' _ "$ROOT/bin" "$status" 2>"$dir/lines.err") || rc=$?
+  [ "$rc" -eq 2 ] && [ -z "$out" ] || fail "a 40000 line unread span was not refused with exit status 2 (rc=$rc, ${#out} bytes)"
   grep -q 'refused to read dense.status: a span of more than 32768 lines' "$dir/lines.err" || fail "the line refusal does not name the file and limit: $(cat "$dir/lines.err")"
-  [ "$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" 0 | wc -c' _ "$ROOT/bin" "$status" | tr -d ' ')" -eq 80000 ] \
-    || fail "the byte-limit-alone read of the 40000 line log did not return all of it"
-  perl -e 'print "working: step $_\n" for 1 .. 5338' > "$status"
-  [ "$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" | wc -l' _ "$ROOT/bin" "$status" | tr -d ' ')" -eq 5338 ] \
-    || fail "a log of the largest healthy line count was not read whole"
-  pass "a history reader refuses a 2 GiB log and a log of too many lines, names it, and reads nothing; a short span from it is exact"
+  [ "$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" | wc -c' _ "$ROOT/bin" "$status" | tr -d ' ')" -eq 80000 ] \
+    || fail "a whole-log history read of the 40000 line log did not return all of it"
+  pass "a history reader refuses a 2 GiB log, names it, and reads nothing; a short span from it is exact; only an unread span is bounded by lines"
+}
+
+# A healthy long-lived lane: 40000 lines of about 80 bytes, about 3.2 MB, the size of the
+# largest healthy log the cap was measured from and far below the byte limit. Every
+# whole-log history reader and open-decisions fold reads it and answers from it: the
+# read limit judges bytes, so no line count refuses a log under the cap.
+test_history_readers_read_a_healthy_log_of_many_lines() {
+  local dir state status cursor out prev size
+  dir=$(make_case healthy-long); state="$dir/state"; status="$state/h.status"; cursor="$state/.h.open-decisions-cursor"
+  {
+    printf 'needs-decision [at=1790000000] [key=q1]: an early question that is still open for the captain\n'
+    perl -e 'printf "working [at=%d]: routine progress line number %05d with some padding text\n", 1790000000 + $_, $_ for 1 .. 40000'
+    printf 'resolved [key=other]: closed\n'
+  } > "$status"
+  size=$(file_size "$status")
+  [ "$size" -gt 3000000 ] && [ "$(wc -l < "$status" | tr -d ' ')" -gt 40000 ] || fail "the fixture is not a 3 MB log of more than 40000 lines"
+
+  [ "$(bash -c '. "$1/fm-status-io-lib.sh"; fm_status_cat "$2" | wc -c' _ "$ROOT/bin" "$status" | tr -d ' ')" -eq "$size" ] \
+    || fail "fm_status_cat did not read the healthy log whole"
+  out=$(run_classify status_open_decisions "$status") || fail "status_open_decisions refused the healthy log"
+  case "$out" in q1$'\t'needs-decision$'\t'*) ;; *) fail "status_open_decisions lost q1 in the healthy log: '$out'" ;; esac
+  out=$(run_classify status_open_decisions_dated "$status") || fail "status_open_decisions_dated refused the healthy log"
+  case "$out" in q1$'\t'needs-decision$'\t'1790000000$'\t'*) ;; *) fail "status_open_decisions_dated lost q1 in the healthy log: '$out'" ;; esac
+  [ ! -e "$cursor" ] || fail "a pure reader wrote a fold cursor"
+  out=$(run_classify status_open_decisions_incremental "$status") || fail "the cold incremental fold refused the healthy log"
+  case "$out" in q1$'\t'needs-decision$'\t'*) ;; *) fail "the cold incremental fold lost q1 in the healthy log: '$out'" ;; esac
+  grep -q "^offset=$size\$" "$cursor" || fail "the cold incremental fold of the healthy log wrote no cursor at its end: $(cat "$cursor" 2>/dev/null)"
+  out=$(bash -c '. "$1/fm-classify-lib.sh"; last_status_line "$2" previous >/dev/null || exit; printf "%s|%s" "$previous" "$(last_status_line "$2")"' _ "$ROOT/bin" "$status") \
+    || fail "last_status_line with a previous event refused the healthy log"
+  prev='working [at=1790040000]: routine progress line number 40000 with some padding text'
+  [ "$out" = "$prev|resolved [key=other]: closed" ] || fail "last_status_line did not name the previous event of the healthy log: '$out'"
+
+  # A wait declared before 40000 lines of build output and more resolved lines than the
+  # tail window holds: the declared-wait read widens to the whole log and finds it.
+  status="$state/w.status"
+  {
+    printf 'paused [key=ext]: waiting on the vendor release before the next build step\n'
+    perl -e 'printf "  build output line %05d with some padding text to make the line about eighty\n", $_ for 1 .. 40000'
+    perl -e 'printf "resolved [key=other-%03d]: closed the unrelated question number %03d here\n", $_, $_ for 1 .. 201'
+  } > "$status"
+  out=$(run_classify status_declared_wait_line "$status")
+  [ "$out" = 'paused [key=ext]: waiting on the vendor release before the next build step' ] \
+    || fail "the declared-wait whole-log read did not find the wait in the healthy log: '$out'"
+
+  # The activity fold walks every line in the shell, so its 40000 lines are blank padding
+  # that the fold skips; what is under test is that the read is not refused.
+  status="$state/a.status"
+  { printf 'paused [key=ext]: waiting on the vendor release\n'; perl -e 'print " " x 79, "\n" for 1 .. 40000'; } > "$status"
+  out=$(run_classify status_open_activities "$status") || fail "status_open_activities refused a 40000 line log under the byte limit"
+  [ "$out" = "$(printf 'ext\tpaused\twaiting on the vendor release')" ] || fail "status_open_activities lost the open pause: '$out'"
+  pass "every whole-log history reader and open-decisions fold reads a healthy 3 MB log of more than 40000 lines and answers from it"
 }
 
 test_a_saved_cursor_never_advances_past_bytes_that_were_not_read() {
@@ -1095,9 +1142,11 @@ assert_seeded_refusal() {  # <status> <cursor> <err-file> <key-the-checkpoint-ho
 
 test_a_refused_read_is_unknown_never_an_empty_open_set() {
   local dir state status out rc err
+  local FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000
+  export FM_STATUS_CAP_BYTES FM_STATUS_CAP_RESERVE_BYTES
   dir=$(make_case refused-open-set); state="$dir/state"; status="$state/r.status"; err="$dir/refused.err"
-  # A log with an open decision and then 40000 routine lines: past the 32768 line limit
-  # at 200 KB, far below the cap, so no over-cap wake explains the refusal.
+  # A log with an open decision and then 40000 routine lines: 200 KB, past the 5000 byte
+  # read limit this test sets.
   { printf 'needs-decision [key=q1]: an early question that is still open\n'; perl -e 'print "text\n" x 40000'; } > "$status"
 
   # No checkpoint: every pure reader refuses with status 2 and says so, and prints no set.
@@ -1105,7 +1154,7 @@ test_a_refused_read_is_unknown_never_an_empty_open_set() {
     rc=0
     # shellcheck disable=SC2086
     out=$(run_classify $reader 2>"$err") || rc=$?
-    [ "$rc" -eq 2 ] || fail "${reader%% *} did not refuse with exit status 2 on a log past the line limit (rc=$rc, output '$out')"
+    [ "$rc" -eq 2 ] || fail "${reader%% *} did not refuse with exit status 2 on a log past the read limit (rc=$rc, output '$out')"
     [ -z "$out" ] || fail "${reader%% *} printed '$out' for a log it refused"
     grep -q 'refused to read r.status' "$err" || fail "${reader%% *} did not name the refused log: $(cat "$err")"
   done
@@ -1146,9 +1195,11 @@ test_a_refused_read_is_unknown_never_an_empty_open_set() {
 
 test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown() {
   local dir state status cursor err out rc
+  local FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000
+  export FM_STATUS_CAP_BYTES FM_STATUS_CAP_RESERVE_BYTES
   dir=$(make_case empty-seed-new-decision); state="$dir/state"; status="$state/e.status"; cursor="$state/.e.open-decisions-cursor"; err="$dir/e.err"
   # The reviewer's shape: a checkpoint at byte 23 over an EMPTY open set, then 40000 short
-  # lines (past the line limit, far below the byte cap) and a new, distinct decision.
+  # lines (past the 5000 byte read limit this test sets) and a new, distinct decision.
   printf 'working: initial event\n' > "$status"
   out=$(run_classify status_open_decisions_incremental "$status") || fail "the seed fold failed"
   [ -z "$out" ] || fail "the seed fixture is not an empty open set: $out"
@@ -1292,12 +1343,12 @@ test_without_the_read_limit_the_same_reader_takes_the_whole_log() {
   make_two_gib_log "$status" || fail "could not build the sparse 2 GiB fixture"
   bytes=$(FM_STATUS_CAP_BYTES=4294967296 fm_run_timed 120 bash -c '
     . "$1/fm-status-io-lib.sh"
-    fm_status_cat "$2" 0 2>/dev/null | wc -c
+    fm_status_cat "$2" 2>/dev/null | wc -c
   ' _ "$ROOT/bin" "$status" | tr -d ' ')
   [ "$bytes" -ge 2147483000 ] || fail "mutation check: with the limit raised past the log the reader took only $bytes bytes; the refusal test above proves nothing"
   bytes=$(fm_run_timed 120 bash -c '
     . "$1/fm-status-io-lib.sh"
-    fm_status_cat "$2" 0 2>/dev/null | wc -c
+    fm_status_cat "$2" 2>/dev/null | wc -c
   ' _ "$ROOT/bin" "$status" | tr -d ' ')
   [ "$bytes" -eq 0 ] || fail "the default read limit let a reader take $bytes bytes of a 2 GiB log"
   pass "mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing"
@@ -1397,6 +1448,7 @@ tests=(
   test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
   test_readers_stay_bounded_on_a_two_gib_log
   test_history_readers_refuse_a_log_past_the_limit_and_name_it
+  test_history_readers_read_a_healthy_log_of_many_lines
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
   test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown

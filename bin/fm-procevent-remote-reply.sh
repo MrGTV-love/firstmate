@@ -467,7 +467,7 @@ normalize_payload() { # <source> <destination>
 # instead, because delivery state can change between replays.
 # Returns 0 appended, 1 already present, 2 the write itself failed.
 append_status_once() { # <status-file> <line>
-  fm_status_cat "$1" 0 2>/dev/null | grep -Fx -- "$2" >/dev/null && return 1
+  fm_status_cat "$1" 2>/dev/null | grep -Fx -- "$2" >/dev/null && return 1
   fm_status_append_line "$1" "$2" || return 2
   return 0
 }
@@ -485,7 +485,7 @@ stage_mirror_lines() { # <source> <rewritten> <source-record> <status> <status-a
   # the set is then empty and the source record, which is the authoritative duplicate
   # check, decides alone.
   bounded=$(mktemp "${TMPDIR:-/tmp}/fm-mirror-window.XXXXXX") || return 1
-  fm_status_cat "$4" 0 > "$bounded" 2>/dev/null || : > "$bounded"
+  fm_status_cat "$4" > "$bounded" 2>/dev/null || : > "$bounded"
   LC_ALL=C awk \
     -v rewritten_file="$2" \
     -v source_record="$3" \

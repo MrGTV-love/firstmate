@@ -359,7 +359,7 @@ test_log_past_the_read_limits_is_unknown_not_already_closed() {
   { printf 'needs-decision [key=real-key]: choose\n'; perl -e 'print "text\n" x 40000'; } > "$home/state/t5.status"
 
   : > "$log"
-  env PATH="$fb:$PATH" \
+  env PATH="$fb:$PATH" FM_STATUS_CAP_BYTES=4000 FM_STATUS_CAP_RESERVE_BYTES=1000 \
     FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
     "$SEND" t5 --resolve-key real-key "the answer" >/dev/null 2>"$err"; rc=$?
   [ "$rc" -ne 0 ] || fail "a send whose decision ledger cannot be read should refuse"

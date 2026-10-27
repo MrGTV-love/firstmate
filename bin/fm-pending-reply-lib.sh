@@ -614,8 +614,8 @@ _fm_pending_reply_corr_candidates() {  # <status-file> <corr_id>
   local status_file=$1 corr=$2
   case "$corr" in
     '') return 0 ;;
-    *[!A-Za-z0-9_]*) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -na '' ;;
-    *) fm_status_cat "$status_file" 0 2>/dev/null | LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" ;;
+    *[!A-Za-z0-9_]*) fm_status_cat "$status_file" 2>/dev/null | LC_ALL=C grep -na '' ;;
+    *) fm_status_cat "$status_file" 2>/dev/null | LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" ;;
   esac
   return 0
 }

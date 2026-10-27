@@ -171,9 +171,9 @@ status_key_closing_verb() {  # <status-file> <key>
   kind=$(_fm_status_kind "$f")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  candidates=$(fm_status_cat "$f" 0 2>/dev/null | grep -a -E \
+  candidates=$(fm_status_cat "$f" 2>/dev/null | grep -a -E \
     "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]") \
-    || [ "$?" -eq 1 ] || candidates=$(fm_status_cat "$f" 0 2>/dev/null)
+    || [ "$?" -eq 1 ] || candidates=$(fm_status_cat "$f" 2>/dev/null)
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" event
     case "$event:$kind" in
@@ -357,9 +357,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
     # count that a command substitution would otherwise trim.
     if [ "$cold" -eq 1 ]; then
-      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" && printf x) || read_rc=$?
+      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 0 && printf x) || read_rc=$?
     else
-      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) || read_rc=$?
+      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 0 2>/dev/null && printf x) || read_rc=$?
     fi
     if [ "$read_rc" -ne 0 ]; then
       if [ "$read_rc" -eq 2 ]; then

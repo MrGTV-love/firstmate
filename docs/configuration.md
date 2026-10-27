@@ -1217,13 +1217,14 @@ The other three are constants.
 The read limit is the cap plus the reserve: 34,603,008 bytes with the defaults.
 It is the most the sanctioned writer can make, so it is the most a reader that needs a log's history takes.
 The tail window is 4,194,304 bytes (4 MiB), the most a reader that needs only a log's latest events takes from its end.
-The line limit is 32,768 lines, the most a reader that loops over a log line by line in the shell takes in one pass; a span with more lines is refused, not clipped.
+The line limit is 32,768 lines, the most a reader that walks an unread span line by line in the shell takes in one pass; such a span with more lines is refused, not clipped.
+A history reader of the whole log and an open-decisions fold take the byte limit alone, so a log under the read limit is always read, however many lines it has.
 
 The cap is chosen from measurement, not from a formula.
 The largest status log in a healthy fleet on 2026-10-18 was 3,230,479 bytes (`state/vernant-d7-steward.status`, 5,338 lines).
 The cap is about ten times that, so no healthy log reaches it and any runaway does.
 The tail window is 1.3 times that log in bytes, so a healthy log is read whole by a tail reader too.
-The line limit is 6.1 times that log's line count, so a healthy log is read whole by a line-by-line reader with room to grow.
+The line limit is 6.1 times that log's line count.
 It exists because a shell loop costs about 2.7 ms per line in the watcher's span classifier, measured on 2026-10-18: a flood of tiny lines under the byte limit would otherwise hold the watcher for hours, and the watcher is what raises the over-cap wake.
 The reserve is a judgement: enough for the `done:` or `blocked:` a worker must always be able to send.
 
@@ -1286,13 +1287,14 @@ The marker clears when the file is replaced or falls under the cap.
 
 A reader takes a log in one of two ways.
 A reader that needs a log's history reads it exactly, up to the read limit, and refuses a log past it: one line on stderr names the file and the limit, and nothing is read.
-A reader that walks the log line by line in the shell is refused the same way when the span has more lines than the line limit.
-A reader that only filters with `grep` or `awk`, or that must return an exact position, asks for the byte limit alone.
+A reader that walks an unread span from a saved position line by line in the shell (the watcher's span classifier and the drain's unread spans) is refused the same way when the span has more lines than the line limit.
+Every whole-log history reader (`fm_status_cat`) and every open-decisions fold, with or without a checkpoint, takes the byte limit alone: it keeps no checkpoint or rereads from one, so a line limit would refuse a healthy log far below the cap on every call, and the harm a runaway does is its size in bytes.
+A reader that only filters with `grep` or `awk`, or that must return an exact position, asks for the byte limit alone too.
 It never takes a clipped copy, so no position it returns (an endpoint, a line number, a saved cursor offset) is relative to a copy, and a span that cannot be read leaves the saved cursor where it was.
 A reader that runs on every poll discards that line, because its failure status is its signal; the watcher's over-cap wake names the file instead.
 A reader that needs only the latest events takes a bounded tail of the log: at most the last 4 MiB for the status-event library's last-event and declared-wait reads, at most the last 256 KiB for the session-start tail, and at most the last 64 KiB for the inbox, teardown and inactive-reconcile summaries.
 Each tail is cut to exactly that many bytes, so a log that is still growing cannot make a tail read chase its writer; the fleet ledger's capture is cut to exactly the bytes it counted for the same reason.
-A log under the line limit is read line by line, as before the cap existed.
+A log under the read limit is read line by line by a history reader, as before the cap existed.
 
 A refusal is exit status 2 and no other failure uses it, so a caller can tell a log that cannot be read from a log with nothing in it.
 The pure readers (`status_open_decisions`, its dated variant, `status_own_open_decisions`, `status_current_line`, `status_open_activities`) print nothing, return 2 and say so on stderr; a fold that has a trusted checkpoint and only has its tail refused keeps the checkpoint on disk but does not answer with its open set: it prints nothing, names the refused suffix on stderr and returns 2, as the incremental fold does, so a caller never takes the old set for a complete one.
