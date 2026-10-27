@@ -1,0 +1,27 @@
+## snapshot pr for task 'replaced'
+{"url":"https://github.com/example/repo/pull/2","source":"status_event"}
+## open-work ledger (fm-open-loops.sh --json)
+exit=0
+{
+  "complete": true,
+  "rows": [
+    {
+      "category": "coverage",
+      "subject": "no forge coverage: replaced-wt",
+      "evidence": "/Users/charlesabrooker/tmp/fm-lab.cv5d2o/projects/replaced-wt: local origin /Users/charlesabrooker/tmp/fm-fake-forge.M7nnMu/origin.git"
+    },
+    {
+      "category": "missing_worker",
+      "subject": "replaced",
+      "evidence": ""
+    },
+    {
+      "category": "unlanded_commit",
+      "subject": "replaced",
+      "evidence": "1 commit(s) not on refs/remotes/origin/main; PR head abc is not in this copy, so PR coverage was not applied; newest: replacement work"
+    }
+  ]
+}
+## forge PR reads the ledger made
+repos/example/repo/pulls/2
+## stderr

@@ -1,0 +1,13 @@
+status log lines:   200002
+open-decision fold checkpointed (as production drains do)
+## with pr= in record (baseline, no log search)
+{"id":"large","pr":"https://github.com/example/repo/pull/16","source":"meta"}
+  wall: 2.78s
+{"id":"large","pr":"https://github.com/example/repo/pull/16","source":"meta"}
+  wall: 2.73s
+## without pr= (log search)
+{"id":"large","pr":"https://github.com/example/repo/pull/15","source":"status_event"}
+  wall: 2.93s
+{"id":"large","pr":"https://github.com/example/repo/pull/15","source":"status_event"}
+  wall: 2.69s
+## host load: load averages: 9.23 11.70 11.50

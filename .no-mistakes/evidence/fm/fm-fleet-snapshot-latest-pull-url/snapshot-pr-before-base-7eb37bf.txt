@@ -1,0 +1,33 @@
+## snapshot --json, LC_ALL=C.UTF-8, shell=/bin/bash
+crlf                https://github.com/example/repo/pull/20  status_event
+decision-replaced   https://github.com/example/repo/pull/1   status_event
+explicit            https://github.com/example/repo/pull/8   meta
+incidental          https://github.com/example/repo/pull/5   status_event
+invalid-bytes       https://github.com/example/repo/pull/10  status_event
+none                null                                     absent
+nul-byte            https://github.com/example/repo/pull/12  status_event
+same-line           https://github.com/example/repo/pull/2   status_event
+single              https://github.com/example/repo/pull/4   status_event
+withdrawn-replaced  https://github.com/example/repo/pull/1   status_event
+## snapshot --json, LC_ALL=en_US.UTF-8, shell=/bin/bash
+crlf                https://github.com/example/repo/pull/20  status_event
+decision-replaced   https://github.com/example/repo/pull/1   status_event
+explicit            https://github.com/example/repo/pull/8   meta
+incidental          https://github.com/example/repo/pull/5   status_event
+invalid-bytes       https://github.com/example/repo/pull/10  status_event
+none                null                                     absent
+nul-byte            https://github.com/example/repo/pull/12  status_event
+same-line           https://github.com/example/repo/pull/2   status_event
+single              https://github.com/example/repo/pull/4   status_event
+withdrawn-replaced  https://github.com/example/repo/pull/1   status_event
+## snapshot --json, LC_ALL=C, shell=/bin/bash
+crlf                https://github.com/example/repo/pull/20  status_event
+decision-replaced   https://github.com/example/repo/pull/1   status_event
+explicit            https://github.com/example/repo/pull/8   meta
+incidental          https://github.com/example/repo/pull/5   status_event
+invalid-bytes       https://github.com/example/repo/pull/10  status_event
+none                null                                     absent
+nul-byte            https://github.com/example/repo/pull/12  status_event
+same-line           https://github.com/example/repo/pull/2   status_event
+single              https://github.com/example/repo/pull/4   status_event
+withdrawn-replaced  https://github.com/example/repo/pull/1   status_event

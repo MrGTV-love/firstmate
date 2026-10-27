@@ -1,0 +1,32 @@
+## snapshot pr for task 'replaced'
+{"url":"https://github.com/example/repo/pull/1","source":"status_event"}
+## open-work ledger (fm-open-loops.sh --json)
+exit=0
+{
+  "complete": false,
+  "rows": [
+    {
+      "category": "coverage",
+      "subject": "ledger degraded",
+      "evidence": "PR state https://github.com/example/repo/pull/1: gh: Not Found (HTTP 404)"
+    },
+    {
+      "category": "coverage",
+      "subject": "no forge coverage: replaced-wt",
+      "evidence": "/Users/charlesabrooker/tmp/fm-lab.ZgdZyg/projects/replaced-wt: local origin /Users/charlesabrooker/tmp/fm-fake-forge.koss0B/origin.git"
+    },
+    {
+      "category": "missing_worker",
+      "subject": "replaced",
+      "evidence": ""
+    },
+    {
+      "category": "unlanded_commit",
+      "subject": "replaced",
+      "evidence": "1 commit(s) not on refs/remotes/origin/main; newest: replacement work"
+    }
+  ]
+}
+## forge PR reads the ledger made
+repos/example/repo/pulls/1
+## stderr
