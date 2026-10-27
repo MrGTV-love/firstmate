@@ -3,9 +3,10 @@
 # Usage: fm-pr-ready-reconcile.sh
 # Every pass walks all task records. Only kind=ship with mode=no-mistakes or
 # direct-PR and no pr= is eligible; no other home is walked.
-# Read at most the final 64 KiB / 200 lines of each eligible status log. Status
-# verbs and readiness use fm-status-event-lib.sh and fm-dod-lib.sh, not a second
-# status grammar, and the PR is the one the ready note declares as `PR <url>`.
+# Read at most the final 64 KiB / 200 lines of each eligible status log. The
+# window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
+# not a second status grammar, and the PR is the one the ready note declares as
+# `PR <url>`.
 # The newest ready declaration in that window wins, even when subsequent
 # resolution notes follow it. A missing ready declaration is a no-op.
 # A refusal is printed and retained per task for ten minutes, during which the
