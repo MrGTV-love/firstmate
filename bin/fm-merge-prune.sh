@@ -139,15 +139,18 @@
 # task's record or for foreign copies, or no treehouse-state.json lies beside it,
 # so it is not a pool slot) is never removed: the outcome is the log line
 # "reaped: teardown completed; teardown kept the copy", with no wake and no
-# record. A read that cannot tell (the lease state unreadable or ambiguous, the
-# pool-slot test unable to run, no project recorded, the project lock path
-# unresolved) is a quiet retry that keeps the record and the copy, and raises
-# the one wake when the retries run out. Before the removal the slot's owner claim must be
+# record. A read that cannot tell (the copy path unresolved, the lease state
+# unreadable or ambiguous, the pool-slot test not proving it a slot of the
+# project, no project recorded, the project lock path unresolved) is a quiet
+# retry that keeps the record and the copy, and raises the one wake when the
+# retries run out. Before the removal the slot's owner claim must be
 # this task's or absent, nothing may be inside it (a search indexer excepted),
 # each nested copy is proved on its own, the copy and each nested copy hold only
 # scratch or preserved ignored files, and the preserve-list files are copied to
 # data/<id>/merge-prune-preserved/ with SHA-256 checksums, as for the fallback.
-# The prune record is cleared only once the copy path is gone. A removal that is
+# The prune record is cleared only once the copy path is gone, except for a
+# returned slot another task's launch has claimed since, which is left alone with
+# one log line and no wake. A removal that is
 # refused keeps the record and the copy and raises the one wake; the retry needs
 # only the record, which keeps the copy and the project.
 #

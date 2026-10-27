@@ -700,10 +700,10 @@ A teardown that succeeds and returns the slot to the pool leaves it reset in pla
 The prune removes that copy only when it really was returned: it is a pool slot of the task's project, and Treehouse state records it as not leased, read again under the project lock and again when a retry resumes.
 A copy that the read proves teardown kept on purpose is never removed: a slot whose lease is still held, for another task's record or for foreign copies, and a copy with no `treehouse-state.json` beside it, which is not a pool slot.
 Its outcome is the log line `reaped: teardown completed; teardown kept the copy`, with no wake and no record.
-A read that cannot tell is never taken as "kept": a lease state that cannot be read or is ambiguous, a pool-slot test that cannot run, no project recorded, or a project lock path that cannot be resolved keeps the record and the copy and retries quietly with the usual backoff, and raises the one wake when the retries run out.
+A read that cannot tell is never taken as "kept": a copy path that cannot be resolved, a lease state that cannot be read or is ambiguous, a pool-slot test that does not prove the copy a slot of the project, no project recorded, or a project lock path that cannot be resolved keeps the record and the copy and retries quietly with the usual backoff, and raises the one wake when the retries run out.
 The prune removes a returned copy itself, under the project lock, with `treehouse destroy <copy> --include-leased --yes` (never forced), after it proves the slot's owner claim is still this task's or absent, that no process is inside it (a search indexer excepted), that each nested copy holds no work of its own, and that the copy and each nested copy hold only scratch or preserve-list ignored files.
 The preserve-list files are copied with checksums first, the same as for the fallback (below), so a returned copy with unique ignored files stays with one wake.
-It clears the prune record only once the copy path is gone.
+It clears the prune record only once the copy path is gone, except for a returned slot that another task's launch has claimed since: that slot is the other task's and is left alone, with one log line and no wake.
 A removal that is refused keeps the record and the copy and raises the one wake; the retry needs only the record, because the task's own record is already gone.
 `FM_MERGE_PRUNE=0` stops new arming.
 
