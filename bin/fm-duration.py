@@ -1131,7 +1131,7 @@ def run(key, command, calibration_file, *, inactivity=None):
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
                 sample, runnable = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
-                blind = sample is None and inactivity is not None  # Missing evidence cannot prove a stall.
+                blind = sample is None  # Missing evidence cannot prove a stall.
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()
