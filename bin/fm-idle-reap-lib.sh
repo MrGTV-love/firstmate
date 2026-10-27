@@ -11,6 +11,10 @@ FM_IDLE_REAP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FM_IDLE_REAP_LIB_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$FM_IDLE_REAP_LIB_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-merge-prune-lib.sh
+. "$FM_IDLE_REAP_LIB_DIR/fm-merge-prune-lib.sh"
 
 fm_idle_reap_terminal_age() {
   local line=$1 evidence=$2 now=$3 at m newest
@@ -42,21 +46,18 @@ fm_idle_reap_refusal_stands() {
 # FM_IDLE_REAP_MERGE_PRUNE=1 is set by bin/fm-merge-prune.sh, which asks about a
 # task the moment its merge is verified: the grace period is waived and an old
 # refusal memo is ignored (the prune keeps its own backoff). Every other gate
-# stands. The prune stops the finished worker with `fm-control.sh exit`, which
-# retires its busy record and leaves state/<id>.control-exit; in this mode that
-# worker reads as stopped, not as unknown. Only a marker written at or after
-# FM_IDLE_REAP_MERGE_PRUNE_SINCE (the prune record's armed_at) counts: an older
-# one is left from an earlier stop, before a relaunch. A worker that reads busy
-# is never accepted. Its last event must still be `done`, which the checks after
-# the busy gate require.
+# stands. A worker stopped with `fm-control.sh exit` (by the prune, or before the
+# merge) has no busy record and leaves state/<id>.control-exit; in this mode that
+# worker reads as stopped, not as unknown, only when its terminal pane positively
+# shows no live agent (fm_mp_pane_agent_gone: only shells are left in it). A pane
+# that cannot be read proves nothing. A worker that reads busy is never accepted.
+# Its last event must still be `done`, which the checks after the busy gate
+# require.
 fm_idle_reap_exited_by_control() {  # <state> <id>
-  local since=${FM_IDLE_REAP_MERGE_PRUNE_SINCE:-} at
+  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1
   [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1
   [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ] || return 1
-  case "$since" in ''|0|*[!0-9]*) return 1 ;; esac
-  at=$(fm_path_mtime "$1/$2.control-exit") || return 1
-  case "$at" in ''|*[!0-9]*) return 1 ;; esac
-  [ "$at" -ge "$since" ]
+  fm_mp_pane_agent_gone "$1/$2.meta"
 }
 
 fm_idle_reap_classify() {

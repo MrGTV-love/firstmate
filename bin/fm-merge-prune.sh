@@ -114,8 +114,9 @@
 # No step uses --force, --include-unlanded or --include-in-use. In this
 # mode the admission check of that second teardown (bin/fm-idle-reap-lib.sh)
 # accepts the worker the exit verb stopped: its busy record is gone,
-# state/<id>.control-exit was written at or after the record's armed_at and its
-# last status event is `done`.
+# state/<id>.control-exit is present, its terminal pane positively shows no live
+# agent (only shells are left in it) and its last status event is `done`. The
+# same holds for a worker stopped that way before the merge.
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six
@@ -303,7 +304,7 @@ TD_OUT=
 TD_RC=0
 run_teardown() {
   TD_RC=0
-  TD_OUT=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 FM_IDLE_REAP_MERGE_PRUNE=1 FM_IDLE_REAP_MERGE_PRUNE_SINCE="$R_ARMED" \
+  TD_OUT=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 FM_IDLE_REAP_MERGE_PRUNE=1 \
     fm_run_timed "$(fm_mp_limit merge-prune.teardown 600)" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
 }
 
@@ -364,7 +365,7 @@ retain() {  # <copy> <reason>
 # worker that was steered or became busy since backs off and nothing is
 # stopped, signalled or destroyed.
 reapable() {
-  FM_IDLE_REAP_MERGE_PRUNE=1 FM_IDLE_REAP_MERGE_PRUNE_SINCE="$R_ARMED" fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
+  FM_IDLE_REAP_MERGE_PRUNE=1 fm_idle_reap_classify "$FM_HOME" "$STATE" "$DATA" "$ID"
   [ "$IDLE_REAP_CLASS" != reap ] || return 0
   backoff "automatic reap ineligible: $IDLE_REAP_CLASS: $IDLE_REAP_DETAIL"
   return 1

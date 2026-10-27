@@ -440,29 +440,14 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
 # The finished worker's agent is teardown's to stop. No pane pid (any backend
 # but tmux and herdr, or a pane that cannot be read) checks nothing here.
 fm_mp_prove_pane_idle() {  # <real-copy> <pane-pid>
-  local copy=$1 pane=${2:-} tree p n comm args cwd agents=' ' worker=' ' kept=
+  local copy=$1 pane=${2:-} p n comm args cwd agents=' ' worker=' ' kept=
   FM_MP_TREE_PIDS=()
   FM_MP_TREE_PARENTS=()
   [ -n "$pane" ] || return 0
-  if ! tree=$(ps -axo pid=,ppid= 2>/dev/null | awk -v root="$pane" '
-    { parent[$1] = $2; kids[$2] = kids[$2] " " $1 }
-    END {
-      if (!(root in parent)) exit 0
-      q[1] = root; n = 1
-      for (i = 1; i <= n; i++) {
-        print q[i], parent[q[i]]
-        c = split(kids[q[i]], k, " ")
-        for (j = 1; j <= c; j++) q[++n] = k[j]
-      }
-    }'); then
+  if ! fm_mp_read_pane_tree "$pane"; then
     fm_mp_verdict transient "process check of the task's terminal pane failed"
     return 1
   fi
-  while read -r p n; do
-    [ -z "$p" ] || { FM_MP_TREE_PIDS+=("$p"); FM_MP_TREE_PARENTS+=("$n"); }
-  done <<EOF
-$tree
-EOF
   [ "${#FM_MP_TREE_PIDS[@]}" -gt 0 ] || return 0
   for p in "${FM_MP_TREE_PIDS[@]}"; do
     comm=$(ps -o comm= -p "$p" 2>/dev/null) || continue
@@ -498,6 +483,48 @@ EOF
     return 1
   fi
   return 0
+}
+
+# The process tree under <pane-pid> (the pane's shell and every descendant),
+# read into FM_MP_TREE_PIDS and FM_MP_TREE_PARENTS; empty when that process is
+# gone. Returns 1 when the process table cannot be read.
+fm_mp_read_pane_tree() {  # <pane-pid>
+  local tree p n
+  FM_MP_TREE_PIDS=()
+  FM_MP_TREE_PARENTS=()
+  tree=$(ps -axo pid=,ppid= 2>/dev/null | awk -v root="$1" '
+    { parent[$1] = $2; kids[$2] = kids[$2] " " $1 }
+    END {
+      if (!(root in parent)) exit 0
+      q[1] = root; n = 1
+      for (i = 1; i <= n; i++) {
+        print q[i], parent[q[i]]
+        c = split(kids[q[i]], k, " ")
+        for (j = 1; j <= c; j++) q[++n] = k[j]
+      }
+    }') || return 1
+  while read -r p n; do
+    [ -z "$p" ] || { FM_MP_TREE_PIDS+=("$p"); FM_MP_TREE_PARENTS+=("$n"); }
+  done <<EOF
+$tree
+EOF
+}
+
+# Whether the task's terminal pane positively shows no live agent: its shell
+# pid is read (fm_mp_pane_pid, tmux and herdr) and every process in its tree is
+# a shell (fm_agent_process_classify). An agent, any other process, a pane that
+# cannot be read, a gone pane or a process that cannot be read proves nothing.
+fm_mp_pane_agent_gone() {  # <meta-file>
+  local pane p comm args
+  pane=$(fm_mp_pane_pid "$1")
+  [ -n "$pane" ] || return 1
+  fm_mp_read_pane_tree "$pane" || return 1
+  [ "${#FM_MP_TREE_PIDS[@]}" -gt 0 ] || return 1
+  for p in "${FM_MP_TREE_PIDS[@]}"; do
+    comm=$(ps -o comm= -p "$p" 2>/dev/null) || return 1
+    args=$(ps -o args= -p "$p" 2>/dev/null) || return 1
+    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" = shell ] || return 1
+  done
 }
 
 # The parent of <pid> in the pane's process tree that fm_mp_prove_pane_idle read;
