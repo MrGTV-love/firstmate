@@ -86,3 +86,21 @@ echo "pane subshell still alive: $(pgrep -P "$PANE" >/dev/null && echo yes || ec
 echo "===== no forbidden treehouse flags in any call:"
 grep -E -- '--include-unlanded|--include-in-use' "$LAB/treehouse-calls.log" | sed "s#$LAB#\$LAB#g" || echo "(none)"
 echo "all treehouse destroy/return calls:"; grep -E '^(destroy|return)' "$LAB/treehouse-calls.log" | sed "s#$LAB#\$LAB#g"
+
+echo "===== S6x (this run): same closeout refusal, but the worker was stopped with the exit verb BEFORE the merge (busy record retired, state/<id>.control-exit present): the first teardown is admitted only via the pane check (real treehouse get + idle shell), the fallback destroys, and the SECOND teardown is admitted via the pane check again"
+new_task t6x 35; C=$COPY; : > "$LAB/refuse-t6x"
+mkdir -p "$C/node_modules/x"; printf 'x\n' > "$C/node_modules/x/i.js"
+gen=$(cat "$STATE/t6x.busy-gen"); printf 'gen=%s\n' "$gen" > "$STATE/t6x.control-exit"
+"$WT/bin/fm-busy-event.sh" retire "$STATE" t6x --gen "$gen" >/dev/null 2>&1
+echo "busy record: $([ -e "$STATE/t6x.busy-state" ] && echo present || echo gone); marker: $(cat "$STATE/t6x.control-exit")"
+echo "pane tree before:"; ps -o pid=,comm=,args= -p "$PANE"; for c in $(pgrep -P "$PANE"); do ps -o pid=,comm=,args= -p "$c"; pgrep -P "$c" | while read -r g; do ps -o pid=,comm=,args= -p "$g"; done; done
+before=$(grep -c '^destroy' "$LAB/treehouse-calls.log" 2>/dev/null || echo 0)
+prune arm t6x >/dev/null 2>&1
+FM_MERGE_PRUNE_EXIT_WAIT=5 prune run t6x --now >/dev/null 2>&1
+if grep -q '^state=pending' "$STATE/t6x.merge-prune" 2>/dev/null; then
+  echo "first attempt backed off: $(sed -n 's/^reason=//p' "$STATE/t6x.merge-prune"); one retry after clearing the backoff"
+  sed -i.bak 's/^next_at=.*/next_at=0/' "$STATE/t6x.merge-prune"; FM_MERGE_PRUNE_EXIT_WAIT=5 prune run t6x >/dev/null 2>&1
+fi
+show t6x; echo "teardown calls:"; td t6x
+echo "copy dir exists after: $([ -e "$C" ] && echo yes || echo no); new destroy calls: $(( $(grep -c '^destroy' "$LAB/treehouse-calls.log" 2>/dev/null || echo 0) - before )); slot: $(slot_line "$C")"
+echo "pane tree after:"; ps -o pid=,comm=,args= -p "$PANE"; for c in $(pgrep -P "$PANE"); do ps -o pid=,comm=,args= -p "$c"; done

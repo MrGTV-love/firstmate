@@ -1,0 +1,120 @@
+########## agent: live-run-agent.sh (target c3fb4843a)
+===== A: worker stopped (exit-verb state) BEFORE the merge arm, pane = real treehouse get + idle shell: pruned, no wake
+pane tree with the live agent:
+  81660 -zsh -zsh
+  81696 treehouse treehouse get
+  81916 /bin/zsh /bin/zsh -i -l
+  83619 /Users/charlesab $LAB/agentbin/claude 900
+after exit: busy record gone; control-exit marker: gen=g1.1.1
+pane tree after the exit (what the prune must accept):
+  81660 -zsh -zsh
+  81696 treehouse treehouse get
+  81916 /bin/zsh /bin/zsh -i -l
+--- data/tA/merge-prune.log
+2026-10-27T07:05:57Z armed for https://github.com/acme/widget/pull/71
+2026-10-27T07:06:04Z reaped: teardown completed
+--- state/tA.merge-prune
+(absent)
+--- merge-prune wakes for tA: 0
+--- state/tA.meta present: no
+real teardown said:
+=== teardown tA rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+🌳 Leased worktree 1 at $LAB/th/.treehouse/widget-cbc43f/1/widget. Run 'treehouse return $LAB/th/.treehouse/widget-cbc43f/1/widget' to release it.
+$LAB/th/.treehouse/widget-cbc43f/1/widget
+teardown: reaping leaked worktree process(es) for tA: 81916
+teardown: force-killing leaked worktree process(es) for tA: 81916
+
+🌳 Worktree returned to pool.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+widget: synced f757a7a..c4c7304
+slot after: 1     available    $LAB/th/.treehouse/widget-cbc43f/1/widget  (detached)
+===== A0 (before/after): the same case A driven with bin/ of the parent commit cce119f49 (before the treehouse-get fix)
+pane tree:
+  98398 -zsh -zsh
+  98406 treehouse treehouse get
+  98465 /bin/zsh /bin/zsh -i -l
+OLD code result:
+--- data/tA0/merge-prune.log
+2026-10-27T07:06:08Z armed for https://github.com/acme/widget/pull/70
+2026-10-27T07:06:09Z retry in 60s (attempt 1): REFUSED: automatic reap ineligible: active: busy state unknown missing
+--- state/tA0.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/70
+attempts=1
+next_at=1793084828
+state=pending
+reason=REFUSED: automatic reap ineligible: active: busy state unknown missing
+wake_sent=0
+copy=
+armed_at=1793084768
+--- merge-prune wakes for tA0: 0
+--- state/tA0.meta present: yes
+slot: 1     in-use       $LAB/th/.treehouse/widget-cbc43f/1/widget  [fm/tA0]
+NEW code, same copy, next attempt:
+--- data/tA0/merge-prune.log
+2026-10-27T07:06:08Z armed for https://github.com/acme/widget/pull/70
+2026-10-27T07:06:09Z retry in 60s (attempt 1): REFUSED: automatic reap ineligible: active: busy state unknown missing
+2026-10-27T07:06:16Z reaped: teardown completed
+--- state/tA0.merge-prune
+(absent)
+--- merge-prune wakes for tA0: 0
+--- state/tA0.meta present: no
+slot: 1     available    $LAB/th/.treehouse/widget-cbc43f/1/widget  (detached)
+===== B: worker relaunched after an earlier exit (old marker present, busy record gone, agent alive): not closed, copy kept
+relaunched; busy record gone; marker: gen=g1.1.1
+pane tree with the relaunched agent:
+   6772 -zsh -zsh
+   6815 treehouse treehouse get
+   7462 /bin/zsh /bin/zsh -i -l
+  10779 /Users/charlesab $LAB/agentbin/claude 900
+--- data/tB/merge-prune.log
+2026-10-27T07:06:21Z armed for https://github.com/acme/widget/pull/72
+2026-10-27T07:06:22Z retry in 60s (attempt 1): REFUSED: automatic reap ineligible: active: busy state unknown missing
+--- state/tB.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/72
+attempts=1
+next_at=1793084841
+state=pending
+reason=REFUSED: automatic reap ineligible: active: busy state unknown missing
+wake_sent=0
+copy=
+armed_at=1793084780
+--- merge-prune wakes for tB: 0
+--- state/tB.meta present: yes
+teardown calls for tB: 1
+=== teardown tB rc=1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: automatic reap ineligible: active: busy state unknown missing
+agent pids before prune: 10779  after: 10779 
+copy exists: yes; slot: 1     in-use       $LAB/th/.treehouse/widget-cbc43f/1/widget  [fm/tB]
+===== B2: a second treehouse get in the pane (not the one launcher) after an exit: not accepted, copy kept
+pane tree:
+  14276 -zsh -zsh
+  14309 treehouse treehouse get
+  14712 /bin/zsh /bin/zsh -i -l
+  17997 treehouse treehouse get
+  18277 /bin/zsh /bin/zsh -i -l
+--- data/tB2/merge-prune.log
+2026-10-27T07:06:29Z armed for https://github.com/acme/widget/pull/74
+2026-10-27T07:06:30Z retained $LAB/th/.treehouse/widget-cbc43f/2/widget: process(es) inside $LAB/th/.treehouse/widget-cbc43f/2/widget running in the task's terminal pane: 17997
+--- state/tB2.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/74
+attempts=1
+next_at=1793106389
+state=retained
+reason=process(es) inside $LAB/th/.treehouse/widget-cbc43f/2/widget running in the task's terminal pane: 17997
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-cbc43f/2/widget
+armed_at=1793084789
+--- merge-prune wakes for tB2: 1
+1793084789	5	check	merge-prune:tB2	check: merge-prune kept $LAB/th/.treehouse/widget-cbc43f/2/widget for tB2: process(es) inside $LAB/th/.treehouse/widget-cbc43f/2/widget running in the task's terminal pane: 17997
+--- state/tB2.meta present: yes
+slot: 2     in-use       $LAB/th/.treehouse/widget-cbc43f/2/widget  [fm/tB2]
+===== forbidden flags anywhere in lab logs? (none expected)
+(end)
+########## agent: lab removed: yes

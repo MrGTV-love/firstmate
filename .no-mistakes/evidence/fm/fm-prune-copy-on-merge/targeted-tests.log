@@ -1,0 +1,8 @@
+ok - a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done
+ok - a worker with no busy record whose pane reads busy is not reapable by the prune, even with state/<id>.control-exit left from an earlier stop
+ok - a worker whose busy record is gone and whose old state/<id>.control-exit is still present is not closed while its agent is alive in the pane: the prune backs off and the copy stays
+ok - end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, and the log says reaped
+ok - end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only its treehouse get and idle shell, is pruned through the real teardown with no human step
+ok - end to end: a squash-merged copy with ignored files that teardown refuses is removed by the fallback, preserved records first, and teardown then closes the task
+ok - end to end: a changed file, an unpushed commit and an unpushed NESTED commit each keep the copy, force nothing, and raise exactly one wake
+ok - end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps

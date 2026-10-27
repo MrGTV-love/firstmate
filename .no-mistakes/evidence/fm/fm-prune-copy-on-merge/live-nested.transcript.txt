@@ -1,0 +1,59 @@
+########## nested: live-run-7.sh (target c3fb4843a)
+===== S11: clean, pushed nested copies (a linked worktree n1 and an independent clone n2) do not block: the copy is pruned
+--- data/t11/merge-prune.log
+2026-10-27T07:05:32Z armed for https://github.com/acme/widget/pull/61
+2026-10-27T07:05:41Z reaped: teardown completed
+--- state/t11.merge-prune
+(absent)
+--- merge-prune wakes for t11: 0
+--- state/t11.meta present: no
+real teardown said:
+=== teardown t11 rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at $LAB/th/.treehouse/widget-b5338f/1/widget. Run 'treehouse return $LAB/th/.treehouse/widget-b5338f/1/widget' to release it.
+$LAB/th/.treehouse/widget-b5338f/1/widget
+slot: 1     available    $LAB/th/.treehouse/widget-b5338f/1/widget  (detached)
+===== S12: a nested clone with an uncommitted file keeps the whole slot with one wake; teardown never runs
+--- data/t12/merge-prune.log
+2026-10-27T07:05:43Z armed for https://github.com/acme/widget/pull/62
+2026-10-27T07:05:43Z retained $LAB/th/.treehouse/widget-b5338f/1/widget: $LAB/th/.treehouse/widget-b5338f/1/widget/.claude/worktrees/n2 has changed or untracked files (1 entries, first: ?? draft.txt)
+--- state/t12.merge-prune
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/62
+attempts=2
+next_at=1793106343
+state=retained
+reason=$LAB/th/.treehouse/widget-b5338f/1/widget/.claude/worktrees/n2 has changed or untracked files (1 entries, first: ?? draft.txt)
+wake_sent=1
+copy=$LAB/th/.treehouse/widget-b5338f/1/widget
+armed_at=1793084743
+--- merge-prune wakes for t12: 1
+1793084743	3	check	merge-prune:t12	check: merge-prune kept $LAB/th/.treehouse/widget-b5338f/1/widget for t12: $LAB/th/.treehouse/widget-b5338f/1/widget/.claude/worktrees/n2 has changed or untracked files (1 entries, first: ?? draft.txt)
+--- state/t12.meta present: yes
+teardown calls for t12: 0
+0
+draft still there: yes; slot: 1     in-use       $LAB/th/.treehouse/widget-b5338f/1/widget  [fm/t12]
+===== S7t: a unique ignored file (notes.local) in a copy the real teardown accepts: where does it go
+--- data/t7t/merge-prune.log
+2026-10-27T07:05:45Z armed for https://github.com/acme/widget/pull/63
+2026-10-27T07:05:52Z reaped: teardown completed
+--- state/t7t.merge-prune
+(absent)
+--- merge-prune wakes for t7t: 0
+--- state/t7t.meta present: no
+real teardown said:
+=== teardown t7t rc=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+🌳 Leased worktree 2 at $LAB/th/.treehouse/widget-b5338f/2/widget. Run 'treehouse return $LAB/th/.treehouse/widget-b5338f/2/widget' to release it.
+$LAB/th/.treehouse/widget-b5338f/2/widget
+slot: 2     available    $LAB/th/.treehouse/widget-b5338f/2/widget  (detached); notes.local left in returned slot: yes
+copies of notes.local under the lab home (outside the pool):
+########## nested: lab removed: yes
