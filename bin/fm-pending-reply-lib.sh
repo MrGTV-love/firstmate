@@ -1180,7 +1180,8 @@ fm_pending_reply_escalation_line() {  # <status-file> <record-path> <corr_id>
   [ -f "$status_file" ] || return 0
   [ "$(fm_pending_reply_get "$rec" corr_id)" = "$corr" ] || return 0
   own_key=$(fm_pending_reply_escalation_key "$corr")
-  text=$(fm_status_cat "$status_file") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  text=$(fm_status_cat "$status_file" | _fm_status_lines_with blocked; exit "${PIPESTATUS[0]}") \
+    || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     [ "$(status_line_verb "$line")" = blocked ] || continue
     _fm_status_untimed "$line" untimed

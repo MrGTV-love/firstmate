@@ -235,6 +235,16 @@ fm_status_cat() {  # <status-file>
   fm_status_read_exact "$f" 0 "$__fm_wc_size" 0
 }
 
+# The status lines on stdin that hold any of <word>s anywhere, in order. A fold runs this
+# one grep pass before its shell loop, so the loop walks only the lines whose verb can be
+# one of those words: a log of other lines, however many, costs the loop nothing.
+_fm_status_lines_with() {  # <word>...
+  local __fm_lw_word
+  local -a __fm_lw_args=()
+  for __fm_lw_word in "$@"; do __fm_lw_args+=(-e "$__fm_lw_word"); done
+  LC_ALL=C grep -aF "${__fm_lw_args[@]}" || [ "$?" -eq 1 ]
+}
+
 # 0 when a status sidecar (a fold cursor, the home-appends ledger) is small enough
 # to read whole: no larger than one tail window. A sidecar past that is abnormal, and
 # the readers answer it in two ways. The fold checkpoint parse

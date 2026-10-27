@@ -803,7 +803,7 @@ class Collector:
                 continue
             if path.is_symlink():
                 raise ValueError("review lane status must not be a symbolic link")
-            events = self.bash('. "$1"; text=$(fm_status_cat "$2") || exit 1; '
+            events = self.bash('. "$1"; text=$(fm_status_cat "$2" | _fm_status_event_candidates; exit "${PIPESTATUS[0]}") || exit 1; '
                                'while IFS= read -r line || [ -n "$line" ]; do '
                                'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
                                'then printf "%s\\n" "$line"; fi; done <<< "$text"',

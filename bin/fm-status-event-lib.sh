@@ -52,8 +52,9 @@ FM_STATUS_FALLBACK_NOTICE='model-matrix fallback served '
 # (empty if missing/blank), and with <previous-event-var> the event before it.
 # The optional previous event is what this reader returned before the latest one
 # was appended, so a consumer can name the head it is superseding; asking for it
-# always reads the whole log, since a bounded window cannot bound two events; a log
-# past the read limit (bin/fm-status-cap-lib.sh) is refused and nothing is read.
+# always reads the log's history (_fm_status_event_history), since a bounded window
+# cannot bound two events; a log past the read limit (bin/fm-status-cap-lib.sh) is
+# refused and nothing is read.
 # A whole-log read that is refused leaves both events empty and returns 2, which a
 # caller reads as unknown, never as a log with no event.
 # This is an event read; status_current_line in bin/fm-classify-lib.sh reconciles open decisions.
@@ -61,10 +62,58 @@ last_status_line() {  # <status-file> [<previous-event-var>]
   local f=$1 scan='' rc=0
   [ -f "$f" ] && [ -r "$f" ] || return 0
   if [ "$#" -gt 1 ] || ! scan=$(fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" | _fm_status_event_scan); then
-    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan; [ "${PIPESTATUS[0]}" -ne 2 ] || exit 2) || rc=$?
+    scan=$(_fm_status_event_history "$f" 2>/dev/null | _fm_status_event_scan; [ "${PIPESTATUS[0]}" -ne 2 ] || exit 2) || rc=$?
   fi
   [ "$#" -lt 2 ] || printf -v "$2" '%s' "${scan%%$'\n'*}"
   printf '%s\n' "${scan##*$'\n'}"
+  return "$rc"
+}
+
+# The lines on stdin a whole-log event scan must look at, in order: every line that holds
+# a colon or the captain tokens (FM_CAPTAIN_RE) anywhere, in any case, which covers every
+# line _fm_status_line_is_event can accept, and then the last nonblank line when it is
+# not one of them, so a scan's no-event answer is the line it always was. One awk pass:
+# the shell loop after it walks only these, so non-event lines cost it nothing. With
+# `numbered` each line is `<line number>\t<line>` and the last nonblank line is not added.
+_fm_status_event_candidates() {  # [numbered]
+  FM_STATUS_EVENT_CANDIDATE_RE="(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" LC_ALL=C awk -v numbered="${1:+1}" '
+    BEGIN { re = tolower(ENVIRON["FM_STATUS_EVENT_CANDIDATE_RE"]) }
+    { cand = index($0, ":") > 0 || tolower($0) ~ re }
+    cand { if (numbered) print NR "\t" $0; else print }
+    /[^[:space:]]/ { last = $0; last_cand = cand }
+    END { if (!numbered && last != "" && !last_cand) print last }'
+}
+
+# The byte where a whole-log event scan of a log of <endpoint> bytes starts, into
+# <out-var>: 0, the whole log. The watcher sets FM_STATUS_EVENT_SCAN_TAIL=1, because it
+# runs these scans for every window on every poll: there a scan starts no earlier than
+# one tail window (bin/fm-status-cap-lib.sh) before the end, and the caller drops the
+# partial first line. A healthy log fits in that window whole.
+_fm_status_event_scan_start() {  # <endpoint> <out-var>
+  local __fm_es_window
+  printf -v "$2" '%s' 0
+  [ "${FM_STATUS_EVENT_SCAN_TAIL:-0}" = 1 ] || return 0
+  fm_status_window_bytes __fm_es_window
+  [ "$1" -le "$__fm_es_window" ] || printf -v "$2" '%s' "$(($1 - __fm_es_window))"
+}
+
+# The candidate event lines (_fm_status_event_candidates) of a status log's history:
+# the whole log, read exactly up to the read limit (fm_status_cat), or in the watcher
+# its last tail window (_fm_status_event_scan_start). The status is the read's, so a
+# refusal is 2.
+_fm_status_event_history() {  # <status-file>
+  local size start rc
+  _fm_status_file_size "$1" size || return 1
+  size=${size//[[:space:]]/}
+  case "$size" in ''|*[!0-9]*) return 1 ;; esac
+  _fm_status_event_scan_start "$size" start
+  if [ "$start" -eq 0 ]; then
+    fm_status_cat "$1" | _fm_status_event_candidates
+    rc=${PIPESTATUS[0]}
+  else
+    _fm_status_read_span "$1" "$start" "$((size - start))" 0 | tail -n +2 | _fm_status_event_candidates
+    rc=${PIPESTATUS[0]}
+  fi
   return "$rc"
 }
 
@@ -263,7 +312,7 @@ status_is_paused_or_captain_held() {  # <status-line>
 # activity fold's key, where a keyless line is its own phase) retracts it, as
 # does any other later event. A captain-held line counts only while it is the
 # latest event. Bounded like last_status_line: only a tail window made wholly of
-# resolved events widens the read to the whole file.
+# resolved events widens the read to the log's history (_fm_status_event_history).
 status_declared_wait_line() {  # <status-file>
   local f=$1 last verb resolve legacy_re
   last=$(last_status_line "$f")
@@ -277,7 +326,7 @@ status_declared_wait_line() {  # <status-file>
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
   fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" \
     | _fm_status_declared_wait_scan "$resolve" "$legacy_re" \
-    || fm_status_cat "$f" 2>/dev/null | _fm_status_declared_wait_scan "$resolve" "$legacy_re" || :
+    || _fm_status_event_history "$f" 2>/dev/null | _fm_status_declared_wait_scan "$resolve" "$legacy_re" || :
 }
 
 # Walk the status lines on stdin back from the newest event past resolved lines
@@ -328,49 +377,51 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # position, so two identical lines in different episodes stay distinct.
 # Declaration, line count, and episode position all come from one captured byte
 # endpoint, so an append during the read cannot change the episode's position.
-# The tail scan widens to that same snapshot's whole file when it finds no opener
-# or the episode remains open at the window's start.
+# The episode is walked over the snapshot's numbered candidate event lines
+# (_fm_status_event_candidates), so a line keeps its true line number and non-event
+# lines cost the walk nothing; the walk takes the last window of them first and widens
+# to all of them when it finds no opener or the episode remains open at the window's
+# start. In the watcher the snapshot is the log's last tail window
+# (_fm_status_event_scan_start), and the line number counts from there.
 status_declared_wait_identity() {  # <status-file>
-  local f=$1 declared verb key resolve legacy_re total window rec idx text endpoint snapshot
+  local f=$1 declared verb key resolve legacy_re rec idx text endpoint snapshot start numbered
   [ -f "$f" ] && [ -r "$f" ] || return 1
   endpoint=$(_fm_status_file_size "$f") || return 1
   endpoint=${endpoint//[[:space:]]/}
+  _fm_status_event_scan_start "$endpoint" start
   snapshot="$(_fm_status_span_scratch "$f").wait"
-  _fm_status_read_span "$f" 0 "$endpoint" 0 > "$snapshot" 2>/dev/null \
-    || { rm -f "$snapshot"; return 1; }
+  _fm_status_read_span "$f" "$start" "$((endpoint - start))" 0 2>/dev/null | tail -n "+$((start > 0 ? 2 : 1))" > "$snapshot"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { rm -f "$snapshot"; return 1; }
   declared=$(status_declared_wait_line "$snapshot")
   [ -n "$declared" ] || { rm -f "$snapshot"; return 1; }
   status_line_verb "$declared" verb
   key=$(_fm_decision_key "$declared" '') || key=
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
-  total=$(grep -c '' "$snapshot" 2>/dev/null) || { rm -f "$snapshot"; return 1; }
-  window=$FM_CLASSIFY_EVENT_WINDOW_LINES
-  [ "$window" -le "$total" ] || window=$total
-  rec=$(tail -n "$window" "$snapshot" 2>/dev/null \
+  numbered=$(_fm_status_event_candidates numbered < "$snapshot") || { rm -f "$snapshot"; return 1; }
+  rm -f "$snapshot"
+  rec=$(printf '%s\n' "$numbered" | tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" \
     | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || rec=
   if [ -z "$rec" ] || [ "${rec%%$'\t'*}" = open ]; then
-    rec=$(_fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key" < "$snapshot") \
-      || { rm -f "$snapshot"; return 1; }
-    window=$total
+    rec=$(printf '%s\n' "$numbered" | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || return 1
   fi
-  rm -f "$snapshot"
   rec=${rec#*$'\t'}
   idx=${rec%%$'\t'*}
   text=${rec#*$'\t'}
-  printf '%s:%s:%s' "${key:--}" "$(printf '%s' "$text" | cksum | cut -d' ' -f1)" "$(( total - window + idx ))"
+  printf '%s:%s:%s' "${key:--}" "$(printf '%s' "$text" | cksum | cut -d' ' -f1)" "$idx"
 }
 
-# Walk the status lines on stdin back from the newest event to the first line of
-# the declared wait's episode and print `<state>\t<1-based line index>\t<line>`,
-# where <state> is `open` when the episode reached the end of the input without a
-# closing event, so a caller reading a bounded window must widen it, and `closed`
-# otherwise. Returns 1 when the stream holds no declared wait.
+# Walk the numbered status lines on stdin (`<line number>\t<line>`) back from the newest
+# event to the first line of the declared wait's episode and print
+# `<state>\t<line number>\t<line>`, where <state> is `open` when the episode reached the
+# start of the input without a closing event, so a caller reading a bounded window must
+# widen it, and `closed` otherwise. Returns 1 when the stream holds no declared wait.
 _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
   local resolve=$1 legacy_re=$2 want_verb=$3 want_key=$4 line verb key i=0 first='' first_line='' state=open
-  local -a _fm_wait_scan_lines=()
+  local -a _fm_wait_scan_lines=() _fm_wait_scan_numbers=()
   while IFS= read -r line || [ -n "$line" ]; do
-    _fm_wait_scan_lines[i]=$line
+    _fm_wait_scan_numbers[i]=${line%%$'\t'*}
+    _fm_wait_scan_lines[i]=${line#*$'\t'}
     i=$((i + 1))
   done
   while [ "$i" -gt 0 ]; do
@@ -383,7 +434,7 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
     if [ -z "$first" ]; then
       [ "$verb" != "$resolve" ] || continue
       [ "$verb" = "$want_verb" ] || return 1
-      first=$((i + 1)); first_line=$line
+      first=${_fm_wait_scan_numbers[i]}; first_line=$line
       [ -n "$want_key" ] || { state=closed; break; }
       continue
     fi
@@ -392,7 +443,7 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
       continue
     fi
     if [ "$verb" = "$want_verb" ] && [ "$key" = "$want_key" ]; then
-      first=$((i + 1)); first_line=$line
+      first=${_fm_wait_scan_numbers[i]}; first_line=$line
       continue
     fi
     state=closed

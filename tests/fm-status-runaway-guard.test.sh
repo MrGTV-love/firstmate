@@ -740,10 +740,11 @@ test_the_inbox_steer_fold_checks_the_cap() {
 test_the_open_decisions_fold_calls_its_tick_for_every_line() {
   local dir status ticks out
   dir=$(make_case fold-tick); status="$dir/state/fold.status"; ticks="$dir/ticks"
-  # 40 routine lines and one open decision: a fold from the start walks 41 lines. Then a checkpoint
-  # is saved and 20 more lines land, so the next fold starts from the checkpoint and walks only them.
+  # 40 resolved lines and one open decision, all lines the fold walks: a fold from the start walks
+  # 41 lines. Then a checkpoint is saved and 20 more land, so the next fold starts from the
+  # checkpoint and walks only them.
   {
-    perl -e 'print "working: step $_\n" for 1 .. 40'
+    perl -e 'print "resolved [key=s$_]: step $_\n" for 1 .. 40'
     printf 'needs-decision [key=q1]: which option?\n'
   } > "$status"
   : > "$ticks"
@@ -755,7 +756,7 @@ test_the_open_decisions_fold_calls_its_tick_for_every_line() {
     status_own_open_decisions "$2" whole count_tick || exit 1
     whole_ticks=$(wc -l < "$ticks" | tr -d " ")
     status_open_decisions_incremental "$2" >/dev/null
-    perl -e "print qq{working: later step \$_\\n} for 1 .. 20" >> "$2"
+    perl -e "print qq{resolved [key=t\$_]: later step \$_\\n} for 1 .. 20" >> "$2"
     : > "$ticks"
     status_own_open_decisions "$2" tail count_tick || exit 1
     tail_ticks=$(wc -l < "$ticks" | tr -d " ")
@@ -1038,6 +1039,66 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
 # largest healthy log the cap was measured from and far below the byte limit. Every
 # whole-log history reader and open-decisions fold reads it and answers from it: the
 # read limit judges bytes, so no line count refuses a log under the cap.
+# A runaway of tiny non-event lines (the 2026-10-18 `text` shape) holds a log at the read
+# limit, so the history readers read it. That must cost no walk of its lines in the shell:
+# each reader answers inside TINY_LINE_BOUND_SECS, and a watcher that reads the lane on
+# every poll keeps its cap check, so another lane that passes the cap is still stopped and
+# woken for within that bound.
+TINY_LINE_BOUND_SECS=20
+test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
+  local dir state status other limit n reader out want line watch_pid
+  local FM_STATUS_CAP_BYTES=4194304 FM_STATUS_CAP_RESERVE_BYTES=1048576
+  local -a env=()
+  export FM_STATUS_CAP_BYTES FM_STATUS_CAP_RESERVE_BYTES
+  dir=$(make_case tiny-at-limit); state="$dir/state"; status="$state/a.status"; other="$state/b.status"
+  limit=$((FM_STATUS_CAP_BYTES + FM_STATUS_CAP_RESERVE_BYTES))
+  printf 'needs-decision [key=q1]: an early question\npaused [key=ext]: waiting on the vendor\n' > "$status"
+  n=$(( (limit - $(file_size "$status")) / 5 ))
+  perl -e 'print "text\n" x $ARGV[0]' "$n" >> "$status"
+  [ "$(file_size "$status")" -le "$limit" ] && [ "$(file_size "$status")" -gt $((limit - 5)) ] \
+    || fail "the fixture is $(file_size "$status") bytes, not at the $limit byte read limit"
+
+  for reader in last_status_line status_declared_wait_line status_open_decisions status_open_decisions_incremental status_declared_wait_identity; do
+    out=$(fm_run_timed "$TINY_LINE_BOUND_SECS" bash -c '. "$1/fm-classify-lib.sh"; "$2" "$3"' _ "$ROOT/bin" "$reader" "$status") \
+      || fail "$reader did not answer within ${TINY_LINE_BOUND_SECS}s on a log at the read limit of tiny lines"
+    case "$reader" in
+      last_status_line|status_declared_wait_line) want='paused [key=ext]: waiting on the vendor' ;;
+      status_open_decisions*) want=$'q1\tneeds-decision\tan early question' ;;
+      *) want="ext:$(printf 'paused [key=ext]: waiting on the vendor' | cksum | cut -d' ' -f1):2" ;;
+    esac
+    [ "$out" = "$want" ] || fail "$reader answered '$out' on the log at the read limit, not '$want'"
+  done
+  out=$(fm_run_timed "$TINY_LINE_BOUND_SECS" bash -c '. "$1/fm-classify-lib.sh"; last_status_line "$2" previous >/dev/null || exit; printf "%s" "$previous"' _ "$ROOT/bin" "$status") \
+    || fail "last_status_line with a previous event did not answer within ${TINY_LINE_BOUND_SECS}s"
+  [ "$out" = 'needs-decision [key=q1]: an early question' ] || fail "last_status_line named '$out' as the previous event"
+  [ -z "$(big_files_in "$state")" ] || fail "a reader left a file over 1 MB: $(big_files_in "$state")"
+
+  # The watcher reads this lane's declared wait on every poll. The lane is over the cap, so
+  # a first run wakes for it once; a second run must still check the cap while it reads the
+  # lane, so the healthy lane b that passes the cap during that run is woken for.
+  printf 'window=test:fm-a\nkind=secondmate\n' > "$state/a.meta"
+  printf 'idle' > "$dir/pane.txt"
+  printf 'working: a healthy lane\n' > "$other"
+  prime_status_seen "$state" "$status" && prime_status_seen "$state" "$other" || fail "could not record the logs as already seen"
+  while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" a)
+  watch_cap "$state" "$dir/first.out" FM_STATUS_CAP_BYTES="$FM_STATUS_CAP_BYTES" "${env[@]}"
+  watch_pid=$!
+  wait_for_exit "$watch_pid" $((TINY_LINE_BOUND_SECS * 10)) || fail "the first watcher run did not wake for the lane over the cap: $(cat "$dir/first.out" "$dir/first.out.err")"
+  grep -q 'status-log-over-cap: file=a.status' "$dir/first.out" || fail "the first run did not name the lane over the cap: $(cat "$dir/first.out")"
+  ack_cycle "$state" || fail "could not acknowledge the first wake"
+  rm -f "$state/.last-watcher-beat"
+  watch_cap "$state" "$dir/second.out" FM_STATUS_CAP_BYTES="$FM_STATUS_CAP_BYTES" "${env[@]}"
+  watch_pid=$!
+  n=0
+  while [ ! -e "$state/.last-watcher-beat" ] && [ "$n" -lt 300 ]; do sleep 0.1; n=$((n + 1)); done
+  sleep 2
+  perl -e 'print "y" x $ARGV[0], "\n"' "$FM_STATUS_CAP_BYTES" >> "$other"
+  wait_for_exit "$watch_pid" $((TINY_LINE_BOUND_SECS * 10)) \
+    || fail "the watcher reading a lane at the read limit did not wake within ${TINY_LINE_BOUND_SECS}s for another lane over the cap"
+  grep -q 'status-log-over-cap: file=b.status' "$dir/second.out" || fail "the second run did not name the other lane over the cap: $(cat "$dir/second.out")"
+  pass "a log at the read limit of tiny lines is read by every history reader within ${TINY_LINE_BOUND_SECS}s, and a watcher reading it every poll still wakes for another lane over the cap"
+}
+
 test_history_readers_read_a_healthy_log_of_many_lines() {
   local dir state status cursor out prev size
   dir=$(make_case healthy-long); state="$dir/state"; status="$state/h.status"; cursor="$state/.h.open-decisions-cursor"
@@ -1449,6 +1510,7 @@ tests=(
   test_readers_stay_bounded_on_a_two_gib_log
   test_history_readers_refuse_a_log_past_the_limit_and_name_it
   test_history_readers_read_a_healthy_log_of_many_lines
+  test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
   test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown

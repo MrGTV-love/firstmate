@@ -2847,6 +2847,13 @@ status_cap_span_tick() {
 }
 # shellcheck disable=SC2034 # Consumed by handle_push_transition in the separately linted transition owner.
 FM_STATUS_SPAN_TICK=status_cap_span_tick
+# The stale loop and the declared-wait checks read a lane's latest event and declared
+# wait for every window on every poll. When the tail of a log holds no event, those
+# reads widen to the log's history; here that is never more than the last tail window
+# (_fm_status_event_scan_start, bin/fm-status-event-lib.sh), so a log held at the cap
+# cannot make one poll read it whole.
+# shellcheck disable=SC2034 # Read by the status-event library sourced above.
+FM_STATUS_EVENT_SCAN_TAIL=1
 
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here

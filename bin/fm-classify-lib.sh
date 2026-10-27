@@ -382,6 +382,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       && printf '%s\t%s\n' "$f" "$chunk_size" >> "$FM_OPEN_DECISIONS_READ_PROBE"
     resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
     held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+    # The shell loop walks only the lines that hold a decision verb, so routine and
+    # non-event lines cost it nothing.
+    chunk=$(printf '%s' "$chunk" | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held")
     while IFS= read -r line || [ -n "$line" ]; do
       status_line_verb "$line" verb
       case "$verb" in
@@ -856,7 +859,10 @@ status_open_activities() {  # <status-file-or-dash>
     return 0
   fi
   [ -f "$f" ] || return 0
-  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  text=$(fm_status_cat "$f" | _fm_status_lines_with working "${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT}" \
+    'done' failed needs-decision blocked "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
+    "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"; exit "${PIPESTATUS[0]}") \
+    || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   _fm_status_open_activities_stream <<EOF
 $text
 EOF

@@ -1219,13 +1219,15 @@ It is the most the sanctioned writer can make, so it is the most a reader that n
 The tail window is 4,194,304 bytes (4 MiB), the most a reader that needs only a log's latest events takes from its end.
 The line limit is 32,768 lines, the most a reader that walks an unread span line by line in the shell takes in one pass; such a span with more lines is refused, not clipped.
 A history reader of the whole log and an open-decisions fold take the byte limit alone, so a log under the read limit is always read, however many lines it has.
+Such a reader does not walk every line in the shell: one `grep` or `awk` pass first keeps only the lines its loop can act on, so a log of non-event lines, however many, costs the loop nothing.
 
 The cap is chosen from measurement, not from a formula.
 The largest status log in a healthy fleet on 2026-10-18 was 3,230,479 bytes (`state/vernant-d7-steward.status`, 5,338 lines).
 The cap is about ten times that, so no healthy log reaches it and any runaway does.
 The tail window is 1.3 times that log in bytes, so a healthy log is read whole by a tail reader too.
 The line limit is 6.1 times that log's line count.
-It exists because a shell loop costs about 2.7 ms per line in the watcher's span classifier, measured on 2026-10-18: a flood of tiny lines under the byte limit would otherwise hold the watcher for hours, and the watcher is what raises the over-cap wake.
+It exists because a shell loop costs about 2.7 ms per line in the watcher's span classifier, measured on 2026-10-18: a flood of tiny lines under the byte limit would otherwise hold the watcher for hours on an unread span, and the watcher is what raises the over-cap wake.
+It bounds only those unread spans; the whole-log readers are bounded by the filter described under Reading.
 The reserve is a judgement: enough for the `done:` or `blocked:` a worker must always be able to send.
 
 ### Writing
@@ -1290,6 +1292,9 @@ A reader that needs a log's history reads it exactly, up to the read limit, and 
 A reader that walks an unread span from a saved position line by line in the shell (the watcher's span classifier and the drain's unread spans) is refused the same way when the span has more lines than the line limit.
 Every whole-log history reader (`fm_status_cat`) and every open-decisions fold, with or without a checkpoint, takes the byte limit alone: it keeps no checkpoint or rereads from one, so a line limit would refuse a healthy log far below the cap on every call, and the harm a runaway does is its size in bytes.
 A reader that only filters with `grep` or `awk`, or that must return an exact position, asks for the byte limit alone too.
+A whole-log reader that loops in the shell walks only the lines one `grep` or `awk` pass keeps for it: the open-decisions folds (whole-log, checkpointed and incremental) keep the lines that hold a decision verb, `status_open_activities` the lines that hold an activity verb, the pending-reply escalation scan the lines that hold `blocked`, and the latest-event, declared-wait and open-loops review-lane scans the lines that hold a colon or a captain token, plus the log's last nonblank line.
+A log of lines with none of those, such as the 2026-10-18 `text` lines, therefore costs those loops nothing however many lines it has; a runaway of lines that each hold a colon or a decision verb without being events is still walked line by line.
+The watcher makes the latest-event and declared-wait reads, and takes the declared-wait identity, for every window on every poll, so when it widens them past the last 200 lines it reads no further than the last tail window (4 MiB), never the whole log; a healthy log fits in that window whole, and in a longer log the identity's line position counts from the window's start.
 It never takes a clipped copy, so no position it returns (an endpoint, a line number, a saved cursor offset) is relative to a copy, and a span that cannot be read leaves the saved cursor where it was.
 A reader that runs on every poll discards that line, because its failure status is its signal; the watcher's over-cap wake names the file instead.
 A reader that needs only the latest events takes a bounded tail of the log: at most the last 4 MiB for the status-event library's last-event and declared-wait reads, at most the last 256 KiB for the session-start tail, and at most the last 64 KiB for the inbox, teardown and inactive-reconcile summaries.

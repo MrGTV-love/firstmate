@@ -442,6 +442,8 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # with one line on stderr naming the refused suffix, as the incremental fold does,
 # never the seeded set as if it were complete; a whole-log read past the limits returns status 2 with one line on
 # stderr, never an empty set. No pure read repairs the checkpoint.
+# Both reads walk only the lines that hold a decision verb (_fm_status_lines_with), so
+# routine and non-event lines cost the fold nothing.
 # With <out-var> the set is assigned instead of printed, and <tick-command> is called
 # once per line folded, so a caller in the watcher's own shell can check the status
 # size cap during a long fold (status_cap_span_tick in bin/fm-watch.sh).
@@ -459,7 +461,8 @@ status_open_decisions() {  # <status-file> [<kind>] [<out-var>] [<tick-command>]
   fi
   if [ "$seeded" -eq 1 ]; then
     [ "$offset" -lt "$_FM_ODC_SIZE" ] || { _fm_emit_value "$out" "$open"; return 0; }
-    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 0 2>/dev/null); then
+    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 0 2>/dev/null \
+      | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"; exit "${PIPESTATUS[0]}"); then
       while IFS= read -r line || [ -n "$line" ]; do
         [ -z "$tick" ] || "$tick"
         status_line_verb "$line" verb
@@ -491,7 +494,8 @@ EOF
   # A whole-log fold reads the log exactly, up to the read limits
   # (bin/fm-status-cap-lib.sh). A log past them is refused with status 2 and one line on
   # stderr, never folded from a clipped copy and never answered as an empty set.
-  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  text=$(fm_status_cat "$f" | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"; exit "${PIPESTATUS[0]}") \
+    || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     [ -z "$tick" ] || "$tick"
     status_line_verb "$line" verb
@@ -550,7 +554,8 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
   _fm_status_kind "$f" "${2:-}" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  text=$(fm_status_cat "$f") || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
+  text=$(fm_status_cat "$f" | _fm_status_lines_with needs-decision blocked 'done' failed "$resolve" "$held"; exit "${PIPESTATUS[0]}") \
+    || { rc=$?; [ "$rc" -ne 2 ] || return 2; text=''; }
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
