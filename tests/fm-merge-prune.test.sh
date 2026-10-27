@@ -1347,9 +1347,6 @@ scn_returned_copy_leased_again_before_the_retry_is_left() {
   return 0
 }
 
-# Teardown's reset of a returned slot keeps its ignored files. A unique ignored
-# file keeps the returned copy with one wake, as it keeps a copy the fallback
-# would destroy.
 # A lease read that fails after a completed teardown proves nothing: the copy and
 # the prune record stay, the retry is quiet, the one wake comes when the retries
 # run out, and a retry that can read the lease again removes the returned copy.
@@ -1377,6 +1374,9 @@ scn_unread_lease_after_teardown_retries_quietly() {
   return 0
 }
 
+# Teardown's reset of a returned slot keeps its ignored files. A unique ignored
+# file keeps the returned copy with one wake, as it keeps a copy the fallback
+# would destroy.
 scn_returned_copy_with_unique_ignored_file_is_kept() {
   make_world
   printf 'ok\n' > "$W/stub.mode"
