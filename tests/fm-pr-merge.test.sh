@@ -1323,6 +1323,55 @@ test_github_merged_outcome_is_verified() {
   pass "fm-pr-merge verifies a genuinely merged GitHub pull request"
 }
 
+# A verified merge arms the pool-copy prune and starts one detached attempt
+# (bin/fm-merge-prune.sh owns the contract; tests/fm-merge-prune.test.sh covers
+# its behavior). Teardown is a recording stand-in here.
+test_verified_merge_arms_the_pool_copy_prune() {
+  local case_dir rc stub
+  case_dir=$(make_case github-merge-prunes-the-copy)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" 1212121212121212121212121212121212121212
+  : > "$case_dir/gh-axi.log"
+  stub="$case_dir/teardown-stub"
+  # shellcheck disable=SC2016 # The stub's own text is single-quoted on purpose: it expands when the stub runs.
+  printf '#!/usr/bin/env bash\nprintf "%%s|admission=%%s\\n" "$*" "${FM_IDLE_REAP_ADMISSION:-}" >> "%s"\nexit 0\n' "$case_dir/teardown-calls" > "$stub"
+  chmod +x "$stub"
+
+  set +e
+  FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_TEARDOWN_BIN="$stub" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/51 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "github-merge-prune: the merge itself must still succeed"
+  fm_test_wait_until 100 test -s "$case_dir/teardown-calls" \
+    || fail "github-merge-prune: the verified merge never started a teardown attempt: $(cat "$case_dir/stderr")"
+  [ "$(cat "$case_dir/teardown-calls")" = "task-x1|admission=1" ] \
+    || fail "github-merge-prune: teardown was not asked plainly for the task: $(cat "$case_dir/teardown-calls")"
+  fm_test_wait_until 100 grep -q reaped "$case_dir/home/data/task-x1/merge-prune.log" \
+    || fail "github-merge-prune: the prune log does not say reaped"
+  pass "fm-pr-merge arms the pool-copy prune after a verified merge and the detached attempt reaps it, unforced"
+}
+
+test_unverified_merge_never_arms_the_pool_copy_prune() {
+  local case_dir rc
+  case_dir=$(make_case github-unverified-merge-no-prune)
+  mkdir -p "$case_dir/wt"
+  add_gh_mocks "$case_dir" 1313131313131313131313131313131313131313
+  printf '%s\n' 'state=OPEN' 'merged=false' 'queued=false' 'base=main' > "$case_dir/github-outcome"
+  : > "$case_dir/gh-axi.log"
+
+  set +e
+  FM_MERGE_PRUNE=1 run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/52 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  [ "$rc" -ne 0 ] || fail "github-unverified-no-prune: an open PR should not read as merged"
+  assert_absent "$case_dir/state/task-x1.merge-prune" "github-unverified-no-prune: a merge that was not verified armed a prune"
+  pass "fm-pr-merge never arms the prune for a merge it could not verify"
+}
+
 test_github_verified_merge_requires_poll_recording() {
   local case_dir rc
   case_dir=$(make_case github-poll-recording-fails)
@@ -1576,6 +1625,8 @@ test_github_failed_merge_names_an_observed_landed_state
 test_github_without_gh_still_uses_gh_axi_merge
 test_github_without_gh_failed_read_keeps_bookkeeping
 test_github_merged_outcome_is_verified
+test_verified_merge_arms_the_pool_copy_prune
+test_unverified_merge_never_arms_the_pool_copy_prune
 test_github_verified_merge_requires_poll_recording
 test_github_queued_outcome_is_verified
 test_github_queue_required_refusal_names_retry_flags

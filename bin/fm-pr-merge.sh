@@ -1994,3 +1994,10 @@ case "$outcome_rc" in
     printf 'actionable: merged %s but could not record the outcome for supervision\n' "$URL" >&2
     ;;
 esac
+
+# The merge is verified and its outcome recorded: arm the prune of the task's
+# pool copy and start one detached attempt. Teardown stays the authority and the
+# watcher's sweep retries; a failure here never changes the merge result
+# (bin/fm-merge-prune.sh header owns the contract).
+FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  "$SCRIPT_DIR/fm-merge-prune.sh" arm "$ID" --run </dev/null >/dev/null 2>&1 || true
