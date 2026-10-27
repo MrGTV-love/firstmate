@@ -1,0 +1,2 @@
+BEFORE (base 7971cec91 fm-duration.py): not ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle: unreadable native root was treated as idle: 124 no_progress: "pid=100 no CPU or watched-file progress for 2.0s"
+AFTER (target 395c80150): ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle

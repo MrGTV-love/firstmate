@@ -1,0 +1,13 @@
+host: Darwin 27.0.0 arm64 user=charlesabrooker date=2026-10-27T04:40:37Z
+native proc_pid_rusage(361) as non-root user:
+  read_cpu(361) = None
+=== base-7971cec91: progress-check <fresh record> 361 1 (pid 361 = root-owned /usr/libexec/IOMFB_bics_daemon, ps TIME   0:00.01) ===
+sample 1: exit=0 record_exists=yes stderr=<none>
+sample 2: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 1.5s"
+sample 3: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 3.0s"
+sample 4: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 4.4s"
+=== target-395c80150: progress-check <fresh record> 361 1 (pid 361 = root-owned /usr/libexec/IOMFB_bics_daemon, ps TIME   0:00.01) ===
+sample 1: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+sample 2: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+sample 3: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+sample 4: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"

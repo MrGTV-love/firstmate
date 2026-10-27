@@ -1,0 +1,5 @@
+host: Darwin 27.0.0 arm64 target=395c80150 root=bash pid 69441 (user-owned): sleeps 2s, runs a 0.6s CPU python child that is reaped, then idles in sleep 20
+t=0.5 baseline before CPU child: exit=0 ps_TIME(root)=0:00.00 stderr=<none>
+t=4.0 after CPU child was reaped between samples: exit=0 ps_TIME(root)=0:00.00 stderr=<none>
+t=4.6 idle 0.6s (< 1s interval): exit=0 ps_TIME(root)=0:00.00 stderr=<none>
+t=5.6 idle 1.6s (>= 1s interval): exit=124 ps_TIME(root)=0:00.00 stderr=no_progress: "pid=69441 no CPU or watched-file progress for 2.0s"
