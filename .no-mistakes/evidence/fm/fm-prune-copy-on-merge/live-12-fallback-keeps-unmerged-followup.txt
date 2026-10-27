@@ -1,0 +1,45 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.1QuifR
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.H95XDD/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project
+
+=== scenario: fallback_keeps_unmerged_followup
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ FM_MERGE_PRUNE_TEARDOWN_BIN=teardown-closeout FM_MERGE_PRUNE_EXIT_WAIT=5 bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:22:38Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:22:39Z retained /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project: /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project has commits that are not in the merged pull request: its HEAD 5ccb1f38f4a9 is not in the pull request's head and the default branch does not carry its content
+--- state/t1.merge-prune (prune record):
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793121758
+state=retained
+reason=/private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project has commits that are not in the merged pull request: its HEAD 5ccb1f38f4a9 is not in the pull request's head and the default branch does not carry its content
+wake_sent=1
+copy=/private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project
+armed_at=1793100158
+project=/private/tmp/fmpx.H95XDD/project
+returned=0
+--- merge-prune wakes in state/.wake-queue: 1
+1793100159	1	check	merge-prune:t1	check: merge-prune kept /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project for t1: /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project has commits that are not in the merged pull request: its HEAD 5ccb1f38f4a9 is not in the pull request's head and the default branch does not carry its content
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.H95XDD/th/.treehouse/project-ebde02/1/project  [fm/t1]
+                   zsh (9691)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+ 9602  9350 treehouse        treehouse get
+ 9691  9602 /bin/zsh         /bin/zsh -i -l
+ 9350  9340 -zsh             -zsh
+--- copy branch: fm/t1
+
+RESULT: PASS

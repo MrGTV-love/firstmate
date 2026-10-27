@@ -1,0 +1,47 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.kJFjlm
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.CbOCm1/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.CbOCm1/th/.treehouse/project-c3ced8/1/project
+
+=== scenario: busy_worker_not_closed
+--- processes in the task pane (pid ppid comm args):
+88812 88687 treehouse        treehouse get
+88918 88812 /bin/zsh         /bin/zsh -i -l
+88687 88681 -zsh             -zsh
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:22:00Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:22:01Z retry in 60s (attempt 1): REFUSED: automatic reap ineligible: active: busy state busy claude-hook
+--- state/t1.merge-prune (prune record):
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793100180
+state=pending
+reason=REFUSED: automatic reap ineligible: active: busy state busy claude-hook
+wake_sent=0
+copy=
+armed_at=1793100120
+project=/private/tmp/fmpx.CbOCm1/project
+returned=0
+--- merge-prune wakes in state/.wake-queue: 0
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.CbOCm1/th/.treehouse/project-c3ced8/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.CbOCm1/th/.treehouse/project-c3ced8/1/project  [fm/t1]
+                   zsh (88918)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+88812 88687 treehouse        treehouse get
+88918 88812 /bin/zsh         /bin/zsh -i -l
+88687 88681 -zsh             -zsh
+
+RESULT: PASS

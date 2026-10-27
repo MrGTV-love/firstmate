@@ -1,0 +1,26 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.eEx5Gt
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.sM0cuO/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.sM0cuO/th/.treehouse/project-ecef53/1/project
+
+=== scenario: unverified_merge_not_armed
+$ bin/fm-merge-prune.sh arm t1 --run
+[exit 0]
+--- data/t1/merge-prune.log:
+(none)
+--- state/t1.merge-prune (prune record):
+(none: record cleared)
+--- merge-prune wakes in state/.wake-queue: 0
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.sM0cuO/th/.treehouse/project-ecef53/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.sM0cuO/th/.treehouse/project-ecef53/1/project  [fm/t1]
+                   zsh (96763)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+
+RESULT: PASS

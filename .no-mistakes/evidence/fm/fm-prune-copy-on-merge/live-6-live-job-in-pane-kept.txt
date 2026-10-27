@@ -1,0 +1,56 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.R3FdTz
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.CKQxvb/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project
+
+=== scenario: live_job_in_pane_kept
+--- processes in the task pane (pid ppid comm args):
+87509 87464 /bin/zsh         /bin/zsh -i -l
+87464 87320 treehouse        treehouse get
+87643 87509 sleep            sleep 900
+87320 87315 -zsh             -zsh
+job pid: 87643
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- two more attempts (must raise no second wake):
+$ bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+$ bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:21:55Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:21:55Z retained /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project: process(es) inside /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project running in the task's terminal pane: 87643
+--- state/t1.merge-prune (prune record):
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1793121716
+state=retained
+reason=process(es) inside /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project running in the task's terminal pane: 87643
+wake_sent=1
+copy=/private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project
+armed_at=1793100115
+project=/private/tmp/fmpx.CKQxvb/project
+returned=0
+--- merge-prune wakes in state/.wake-queue: 1
+1793100115	1	check	merge-prune:t1	check: merge-prune kept /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project for t1: process(es) inside /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project running in the task's terminal pane: 87643
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.CKQxvb/th/.treehouse/project-b2088c/1/project  [fm/t1]
+                   zsh (87509), sleep (87643)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+87509 87464 /bin/zsh         /bin/zsh -i -l
+87464 87320 treehouse        treehouse get
+87643 87509 sleep            sleep 900
+87320 87315 -zsh             -zsh
+
+RESULT: PASS

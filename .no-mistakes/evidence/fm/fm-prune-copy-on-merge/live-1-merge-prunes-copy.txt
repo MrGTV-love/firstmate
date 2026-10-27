@@ -1,0 +1,31 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.e4JJ5j
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.Z1u3zw/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.Z1u3zw/th/.treehouse/project-8a95a1/1/project
+
+=== scenario: merge_prunes_copy
+--- processes in the task pane (pid ppid comm args):
+50915 50815 /bin/zsh         /bin/zsh -i -l
+50513 50509 -zsh             -zsh
+50815 50513 treehouse        treehouse get
+$ bin/fm-merge-prune.sh arm t1 --run
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:19:36Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:19:42Z removed the returned copy /private/tmp/fmpx.Z1u3zw/th/.treehouse/project-8a95a1/1/project (head 68d1bc5); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.e4JJ5j/data/t1/merge-prune-preserved/1793099976
+2026-10-27T11:19:42Z reaped: teardown completed; removed the returned copy
+--- state/t1.merge-prune (prune record):
+(none: record cleared)
+--- merge-prune wakes in state/.wake-queue: 0
+--- task record state/t1.meta: gone
+--- task copy /private/tmp/fmpx.Z1u3zw/th/.treehouse/project-8a95a1/1/project on disk: GONE
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- tmux windows on the lab server:
+no server running on /private/tmp/fml.7S7jRj/tmux-501/fm-lab
+(lab tmux server gone)
+
+RESULT: PASS

@@ -1,0 +1,38 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.O79nIo
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.DUANTA/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.DUANTA/th/.treehouse/project-c21302/1/project
+
+=== scenario: fallback_removes_scratch_copy
+--- processes in the task pane (pid ppid comm args):
+98112 98107 -zsh             -zsh
+98225 98112 treehouse        treehouse get
+98320 98225 /bin/zsh         /bin/zsh -i -l
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ FM_MERGE_PRUNE_TEARDOWN_BIN=teardown-closeout FM_MERGE_PRUNE_EXIT_WAIT=5 bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:22:22Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:22:27Z fallback destroyed /private/tmp/fmpx.DUANTA/th/.treehouse/project-c21302/1/project (head 02556d4); preserved records, if any, are in /Users/charlesabrooker/tmp/fm-lab.O79nIo/data/t1/merge-prune-preserved/1793100142
+2026-10-27T11:22:28Z reaped: removed by fallback, teardown completed
+--- state/t1.merge-prune (prune record):
+(none: record cleared)
+--- merge-prune wakes in state/.wake-queue: 0
+--- task record state/t1.meta: gone
+--- task copy /private/tmp/fmpx.DUANTA/th/.treehouse/project-c21302/1/project on disk: GONE
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+🌳 No worktrees in pool.
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+--- preserved records:
+/Users/charlesabrooker/tmp/fm-lab.O79nIo/data/t1/merge-prune-preserved/1793100142/root/.claude/bug-evidence/slot.json
+closeout
+/Users/charlesabrooker/tmp/fm-lab.O79nIo/data/t1/merge-prune-preserved/1793100142/root/SHA256SUMS
+61e7f5f2a62a18e1f105fc8b700842462cf7a0af3a6c38a5dbca757de84bc1aa  .claude/bug-evidence/slot.json
+
+RESULT: PASS

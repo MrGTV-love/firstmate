@@ -1,0 +1,3 @@
+ok - fm-pr-merge arms the pool-copy prune after a verified merge and the detached attempt reaps it, unforced
+ok - fm-pr-merge never arms the prune for a merge it could not verify
+exit 0

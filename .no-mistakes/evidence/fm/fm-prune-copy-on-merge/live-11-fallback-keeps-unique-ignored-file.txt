@@ -1,0 +1,49 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.oCqRTw
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.L2kiFG/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project
+
+=== scenario: fallback_keeps_unique_ignored_file
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ FM_MERGE_PRUNE_TEARDOWN_BIN=teardown-closeout FM_MERGE_PRUNE_EXIT_WAIT=5 bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- two more attempts:
+$ FM_MERGE_PRUNE_TEARDOWN_BIN=teardown-closeout FM_MERGE_PRUNE_EXIT_WAIT=5 bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+$ FM_MERGE_PRUNE_TEARDOWN_BIN=teardown-closeout FM_MERGE_PRUNE_EXIT_WAIT=5 bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:22:31Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:22:32Z retained /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project: /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project holds an ignored file that is neither scratch nor on the preserve list: .env.local
+--- state/t1.merge-prune (prune record):
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=3
+next_at=1793121753
+state=retained
+reason=/private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project holds an ignored file that is neither scratch nor on the preserve list: .env.local
+wake_sent=1
+copy=/private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project
+armed_at=1793100151
+project=/private/tmp/fmpx.L2kiFG/project
+returned=0
+--- merge-prune wakes in state/.wake-queue: 1
+1793100152	1	check	merge-prune:t1	check: merge-prune kept /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project for t1: /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project holds an ignored file that is neither scratch nor on the preserve list: .env.local
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.L2kiFG/th/.treehouse/project-a94487/1/project  [fm/t1]
+                   zsh (6346)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+ 6265  6015 treehouse        treehouse get
+ 6346  6265 /bin/zsh         /bin/zsh -i -l
+ 6015  6003 -zsh             -zsh
+
+RESULT: PASS

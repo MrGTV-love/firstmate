@@ -1,0 +1,50 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.42qxfk
+throwaway pool (TREEHOUSE_ROOT): /private/tmp/fmpx.eCxNVZ/th
+task copy acquired by a real 'treehouse get' in tmux pane firstmate:fm-t1: /private/tmp/fmpx.eCxNVZ/th/.treehouse/project-4b15b2/1/project
+
+=== scenario: relaunched_agent_with_old_marker_not_closed
+busy record: retired; old control-exit marker: gen=g1793100193.16624.31892; live agent pid: 16791
+--- processes in the task pane (pid ppid comm args):
+16121 15916 /bin/zsh         /bin/zsh -i -l
+15265 15250 -zsh             -zsh
+15916 15265 treehouse        treehouse get
+16791 16121 /private/tmp/fmp /private/tmp/fmpx.eCxNVZ/agent/claude
+$ bin/fm-merge-prune.sh arm t1
+[exit 0]
+$ bin/fm-merge-prune.sh run t1 --now
+[exit 0]
+--- data/t1/merge-prune.log:
+2026-10-27T11:23:15Z armed for https://github.com/acme/widget/pull/7
+2026-10-27T11:23:16Z retry in 60s (attempt 1): REFUSED: automatic reap ineligible: active: busy state unknown missing
+--- state/t1.merge-prune (prune record):
+version=fm-merge-prune-v1
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793100255
+state=pending
+reason=REFUSED: automatic reap ineligible: active: busy state unknown missing
+wake_sent=0
+copy=
+armed_at=1793100195
+project=/private/tmp/fmpx.eCxNVZ/project
+returned=0
+--- merge-prune wakes in state/.wake-queue: 0
+--- task record state/t1.meta: present
+--- task copy /private/tmp/fmpx.eCxNVZ/th/.treehouse/project-4b15b2/1/project on disk: PRESENT
+--- real treehouse status (throwaway pool):
+A new version of treehouse is available: v3.1.4 → v3.1.6
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       /private/tmp/fmpx.eCxNVZ/th/.treehouse/project-4b15b2/1/project  [fm/t1]
+                   zsh (16121), claude (16791)
+--- tmux windows on the lab server:
+firstmate:0: fleet* (1 panes) [200x50] 
+firstmate:1: fm-t1 (1 panes) [200x50] 
+--- processes in the task pane (pid ppid comm args):
+16121 15916 /bin/zsh         /bin/zsh -i -l
+15265 15250 -zsh             -zsh
+15916 15265 treehouse        treehouse get
+16791 16121 /private/tmp/fmp /private/tmp/fmpx.eCxNVZ/agent/claude
+
+RESULT: PASS
