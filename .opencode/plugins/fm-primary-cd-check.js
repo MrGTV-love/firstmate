@@ -2,9 +2,11 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 
-// PreToolUse seatbelt for OpenCode: block a stray persistent top-level `cd` in
-// the primary firstmate checkout before the agent's bash tool relocates the
-// shell out of the home (see bin/fm-cd-pretool-check.sh and docs/cd-guard.md).
+// PreToolUse seatbelt for OpenCode: in FM_CD_GUARD_MODE=deny, block a stray
+// persistent top-level `cd` in the primary firstmate checkout before the
+// agent's bash tool relocates the shell out of the home (see
+// bin/fm-cd-pretool-check.sh and docs/cd-guard.md). The default warn mode exits
+// 0, so this plugin does nothing for it.
 // This mirrors fm-primary-pretool-check.js, calling the cd-guard owner instead
 // of the watcher-arm one. tool.execute.before can block by throwing (verified
 // 2026-07-09 against OpenCode 1.17.15 for the watcher-arm plugin; the same
