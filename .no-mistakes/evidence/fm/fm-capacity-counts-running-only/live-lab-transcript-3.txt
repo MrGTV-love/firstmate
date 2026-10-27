@@ -1,0 +1,20 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.VSFSI0
+=== pass 1 (first refusal)
+pr-ready: z-refused: registration refused: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━; ●  WATCHER DOWN - SUPERVISION IS OFF; ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).; ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.; ●  This is a supervision warning only; the guarded operation WILL still run.; ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.; ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━; error: named head 2863e132746b727b86287eaa3422a5d8d340fd76 is unreachable outside the worker copy
+(exit 0)
+[1] gh pr-view calls: 2; wakes: 1; pr= lines: 0
+=== pass 2 (fresh refusal, 0s old)
+(exit 0)
+[2] gh pr-view calls: 0; wakes: 1; pr= lines: 0
+=== pass 3 (refusal 9 minutes old)
+(exit 0)
+[3] gh pr-view calls: 0; wakes: 1; pr= lines: 0
+=== pass 4 (refusal 11 minutes old)
+pr-ready: z-refused: registration refused: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.; WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.; error: named head 2863e132746b727b86287eaa3422a5d8d340fd76 is unreachable outside the worker copy
+(exit 0)
+[4] gh pr-view calls: 2; wakes: 2; pr= lines: 0
+--- wake text
+check: pr-ready z-refused: registration of https://github.com/MrGTV-love/firstmate/pull/195 refused: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━; ●  WATCHER DOWN - SUPERVISION IS OFF; ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).; ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.; ●  This is a supervision warning only; the guarded operation WILL still run.; ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.; ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━; error: named head 2863e132746b727b86287eaa3422a5d8d340fd76 is unreachable outside the worker copy
+check: pr-ready z-refused: registration of https://github.com/MrGTV-love/firstmate/pull/195 refused: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.; WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.; error: named head 2863e132746b727b86287eaa3422a5d8d340fd76 is unreachable outside the worker copy
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.VSFSI0 && rm -rf /Users/charlesabrooker/tmp/fm-lab.VSFSI0
+lab removed: /Users/charlesabrooker/tmp/fm-lab.VSFSI0

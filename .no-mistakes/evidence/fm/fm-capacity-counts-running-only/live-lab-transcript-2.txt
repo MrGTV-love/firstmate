@@ -1,0 +1,64 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.jyPGsc
+s05.status lines:   200000 bytes:  14999992
+=== pass A (11 eligible, cap 8)
+pr-ready: s01: registered https://github.com/MrGTV-love/firstmate/pull/279
+pr-ready: s02: registered https://github.com/MrGTV-love/firstmate/pull/274
+pr-ready: s03: registered https://github.com/MrGTV-love/firstmate/pull/266
+pr-ready: s04: registered https://github.com/MrGTV-love/firstmate/pull/265
+pr-ready: s05: registered https://github.com/MrGTV-love/firstmate/pull/264
+pr-ready: s06: registered https://github.com/MrGTV-love/firstmate/pull/263
+pr-ready: s07: registered https://github.com/MrGTV-love/firstmate/pull/240
+pr-ready: s08: registered https://github.com/MrGTV-love/firstmate/pull/212
+(exit 0)
+[A] took 19s; cursor=s08; gh pr-view calls this pass: 16
+[A] registered: s01 s02 s03 s04 s05 s06 s07 s08 
+=== pass B (rotation)
+pr-ready: s09: registered https://github.com/MrGTV-love/firstmate/pull/209
+pr-ready: s10: registered https://github.com/MrGTV-love/firstmate/pull/202
+pr-ready: z-refused: registration refused: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.; error: named head bc749bdc5a8bb44ec96ae081992f0babf18350bd is unreachable outside the worker copy
+(exit 0)
+[B] took 6s; cursor=s05; gh pr-view calls this pass: 6
+[B] registered: s01 s02 s03 s04 s05 s06 s07 s08 s09 s10 
+--- s05 (200k-line log) meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.jyPGsc/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.jyPGsc/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/264
+pr_head=54f81edb0f6eca6557bd9a11e1b0a2630702c14b
+=== pass C (fresh refusal: no forge call)
+(exit 0)
+[C] took 0s; cursor=s02; gh pr-view calls this pass: 0
+[C] registered: s01 s02 s03 s04 s05 s06 s07 s08 s09 s10 
+--- refusal wakes: 1
+=== pass D (refusal aged 11 minutes: retried at the forge)
+(exit 0)
+[D] took 1s; cursor=s10; gh pr-view calls this pass: 0
+[D] registered: s01 s02 s03 s04 s05 s06 s07 s08 s09 s10 
+--- refusal wakes after retry with same reason: 1
+--- all gh calls
+1793134338 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json isDraft
+1793134339 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json headRefOid -q .headRefOid
+1793134340 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json isDraft
+1793134341 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json headRefOid -q .headRefOid
+1793134343 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json isDraft
+1793134343 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json headRefOid -q .headRefOid
+1793134345 pr view https://github.com/MrGTV-love/firstmate/pull/265 --json isDraft
+1793134346 pr view https://github.com/MrGTV-love/firstmate/pull/265 --json headRefOid -q .headRefOid
+1793134348 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json isDraft
+1793134348 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json headRefOid -q .headRefOid
+1793134350 pr view https://github.com/MrGTV-love/firstmate/pull/263 --json isDraft
+1793134350 pr view https://github.com/MrGTV-love/firstmate/pull/263 --json headRefOid -q .headRefOid
+1793134352 pr view https://github.com/MrGTV-love/firstmate/pull/240 --json isDraft
+1793134352 pr view https://github.com/MrGTV-love/firstmate/pull/240 --json headRefOid -q .headRefOid
+1793134354 pr view https://github.com/MrGTV-love/firstmate/pull/212 --json isDraft
+1793134355 pr view https://github.com/MrGTV-love/firstmate/pull/212 --json headRefOid -q .headRefOid
+1793134356 pr view https://github.com/MrGTV-love/firstmate/pull/209 --json isDraft
+1793134357 pr view https://github.com/MrGTV-love/firstmate/pull/209 --json headRefOid -q .headRefOid
+1793134359 pr view https://github.com/MrGTV-love/firstmate/pull/202 --json isDraft
+1793134359 pr view https://github.com/MrGTV-love/firstmate/pull/202 --json headRefOid -q .headRefOid
+1793134361 pr view https://github.com/MrGTV-love/firstmate/pull/195 --json isDraft
+1793134361 pr view https://github.com/MrGTV-love/firstmate/pull/195 --json headRefOid -q .headRefOid
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.jyPGsc && rm -rf /Users/charlesabrooker/tmp/fm-lab.jyPGsc
+lab removed: /Users/charlesabrooker/tmp/fm-lab.jyPGsc

@@ -1,0 +1,37 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.BTKWzk
+=== pass 1 (first refusal)
+pr-ready: z-refused: registration refused: error: named head 3f896891ab6df293bd388bae4caba662a4cc185c is unreachable outside the worker copy
+(exit 0)
+[1] gh pr-view calls: 2; wakes: 1; pr= lines: 0
+=== pass 2 (fresh refusal, 0s old)
+(exit 0)
+[2] gh pr-view calls: 0; wakes: 1; pr= lines: 0
+=== pass 3 (refusal 9 minutes old)
+(exit 0)
+[3] gh pr-view calls: 0; wakes: 1; pr= lines: 0
+=== pass 4 (refusal 11 minutes old)
+pr-ready: z-refused: registration refused: error: named head 3f896891ab6df293bd388bae4caba662a4cc185c is unreachable outside the worker copy
+(exit 0)
+[4] gh pr-view calls: 2; wakes: 1; pr= lines: 0
+--- stored refusal reason
+error: named head 3f896891ab6df293bd388bae4caba662a4cc185c is unreachable outside the worker copy
+--- wake lines containing guard banner text: 0
+--- wake text
+check: pr-ready z-refused: registration of https://github.com/MrGTV-love/firstmate/pull/195 refused: error: named head 3f896891ab6df293bd388bae4caba662a4cc185c is unreachable outside the worker copy
+=== pass 5 (cause repaired: head pushed to an origin; refusal aged 11 minutes)
+pr-ready: z-refused: registered https://github.com/MrGTV-love/firstmate/pull/195
+(exit 0)
+[5] gh pr-view calls: 2; wakes: 1; pr= lines: 1
+--- z-refused meta after pass 5
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.BTKWzk/projects/unpushed
+worktree=/Users/charlesabrooker/tmp/fm-lab.BTKWzk/projects/unpushed
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/195
+pr_head=cb724808b83cb24b381d8c05872587a7683f8b8b
+/Users/charlesabrooker/tmp/fm-lab.BTKWzk/state/z-refused.check.sh
+--- all wake text after pass 5
+check: pr-ready z-refused: registration of https://github.com/MrGTV-love/firstmate/pull/195 refused: error: named head 3f896891ab6df293bd388bae4caba662a4cc185c is unreachable outside the worker copy
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.BTKWzk && rm -rf /Users/charlesabrooker/tmp/fm-lab.BTKWzk
+lab removed: /Users/charlesabrooker/tmp/fm-lab.BTKWzk

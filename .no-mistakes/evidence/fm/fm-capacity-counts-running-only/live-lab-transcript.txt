@@ -1,0 +1,163 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.6ABvlp
+--- before
+== t-direct.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+== t-green.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+== t-had.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/212
+== t-local.meta
+kind=ship
+mode=local-only
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+== t-ready.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+== t-refused.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/unpushed
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/unpushed
+branch=main
+== t-scout.meta
+kind=scout
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+occupancy(proj) before: 5
+watcher pass1-1 ran 5s
+--- watcher pass1-1 output (stdout+stderr)
+pr-ready: t-direct: registered https://github.com/MrGTV-love/firstmate/pull/274
+signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+watcher pass1-2 ran 1s
+--- watcher pass1-2 output (stdout+stderr)
+check: rearm-resurface
+watcher pass1-3 ran 15s
+--- watcher pass1-3 output (stdout+stderr)
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+watcher pass1-4 ran 1s
+--- watcher pass1-4 output (stdout+stderr)
+check: rearm-resurface
+elapsed to registration: 25s
+--- after pass 1
+== t-direct.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/274
+pr_head=7beead756771011d37ef319d5a4e01453ca39f93
+== t-green.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/266
+pr_head=786cfb0e14a517190b6f7440b3e558c792189bce
+== t-had.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/212
+== t-local.meta
+kind=ship
+mode=local-only
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+== t-ready.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/279
+pr_head=9a20c729efbf514f424f7f946fec7f5ebd05f163
+== t-refused.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/unpushed
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/unpushed
+branch=main
+== t-scout.meta
+kind=scout
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.6ABvlp/projects/proj
+branch=main
+-rwx------  1 charlesabrooker  staff   338 Oct 27 15:51 /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/contributions.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 15:51 /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 15:51 /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-green.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 15:51 /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.check.sh
+occupancy(proj) after: 2
+--- refusal marker
+total 16
+drwx------   4 charlesabrooker  staff   128 Oct 27 15:51 .
+drwxr-xr-x  58 charlesabrooker  staff  1856 Oct 27 15:51 ..
+-rw-------   1 charlesabrooker  staff     8 Oct 27 15:51 cursor
+-rw-------   1 charlesabrooker  staff   189 Oct 27 15:51 t-refused.refused
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: named head 322af6dde0ed443eee861ec8789acb9d2977daf8 is unreachable outside the worker copy
+--- wake queue
+1793134271	1	signal	t-direct.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134271	2	signal	t-had.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134271	3	signal	t-local.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134272	4	signal	t-ready.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134272	5	signal	t-refused.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134272	6	signal	t-scout.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134272	7	signal	t-direct.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134272	8	signal	t-had.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134273	9	signal	t-local.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134273	10	signal	t-ready.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134273	11	signal	t-refused.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134273	12	signal	t-scout.status	signal: /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.6ABvlp/state/t-scout.status
+1793134291	13	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793134293	14	check	pr-ready-refused:t-refused	check: pr-ready t-refused: registration of https://github.com/MrGTV-love/firstmate/pull/264 refused: WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.; error: named head 322af6dde0ed443eee861ec8789acb9d2977daf8 is unreachable outside the worker copy
+--- gh calls pass 1
+1793134270 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json isDraft
+1793134271 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json headRefOid -q .headRefOid
+1793134272 api -i repos/MrGTV-love/firstmate/pulls?state=open&per_page=100
+1793134274 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json isDraft
+1793134278 api -i repos/MrGTV-love/firstmate/pulls/212
+1793134283 api -i repos/MrGTV-love/firstmate/pulls/274
+1793134285 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json headRefOid -q .headRefOid
+1793134289 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json state -q .state
+1793134289 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json isDraft
+1793134290 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json headRefOid -q .headRefOid
+1793134291 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json isDraft
+1793134292 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json headRefOid -q .headRefOid
+watcher pass2 ran 3s
+--- watcher pass2 output (stdout+stderr)
+check: rearm-resurface
+--- gh calls added in pass 2
+--- t-had meta unchanged?
+t-had unchanged
+--- status logs unchanged?
+status logs unchanged
+--- refusal wakes for t-refused: 1
+occupancy(proj) final: 2
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.6ABvlp && rm -rf /Users/charlesabrooker/tmp/fm-lab.6ABvlp
+lab removed: /Users/charlesabrooker/tmp/fm-lab.6ABvlp

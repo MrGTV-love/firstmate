@@ -1,0 +1,20 @@
+ok - persistent early forge hang cannot starve a later healthy ship across bounded passes
+ok - refusal queues one check wake per reason, skips the forge for ten minutes, then registers once the cause healed at the same head
+ok - a changing fm-guard.sh banner neither re-wakes the same refusal nor enters its reason
+ok - a green no-mistakes run with no done line registers from its fm-crew-state.sh PR; a busy run and a direct-PR lane do not
+ok - a green run whose marker is 60 base-advance lines back still registers through the real crew-state reading
+ok - a hung run reading is cut at its own bound and the later ready ship registers in the same pass
+ok - ready PR records pr/head, arms merge poll, releases exactly one place; second pass changes nothing
+ok - direct-PR ready ship registers; scouts, secondmates, local-only, progress and draft waits are skipped
+ok - newest ready signal wins over an older PR and survives later resolution notes
+ok - the declared PR registers even when the note names another PR after it
+ok - a note that does not open with PR <url> registers no PR, least of all an unrelated leading one
+ok - draft is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreachable is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreadable-forge is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - 200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s
+ok - eight-record admission cap rotates fairly so later candidates register on the next pass
+ok - unreadable task record and log each report once without stopping the pass
+ok - real watcher registers ready PR before notification exit, without supervisor action or status edits
+ok - hung forge call is killed at the pass limit and the next watcher tick registers the ready ship
+bash tests/fm-pr-ready-reconcile.test.sh  14.56s user 29.85s system 48% cpu 1:31.29 total

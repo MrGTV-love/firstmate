@@ -1,0 +1,185 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.VYmm4u
+--- before
+== t-direct.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+== t-green.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+== t-had.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/212
+== t-local.meta
+kind=ship
+mode=local-only
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+== t-ready.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+== t-refused.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/unpushed
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/unpushed
+branch=main
+== t-scout.meta
+kind=scout
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+occupancy(proj) before: 5
+watcher pass1-1 ran 5s
+--- watcher pass1-1 output (stdout+stderr)
+pr-ready: t-direct: registered https://github.com/MrGTV-love/firstmate/pull/274
+signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+watcher pass1-2 ran 2s
+--- watcher pass1-2 output (stdout+stderr)
+check: rearm-resurface
+watcher pass1-3 ran 13s
+--- watcher pass1-3 output (stdout+stderr)
+check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+elapsed to registration: 22s
+--- after pass 1
+== t-direct.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/274
+pr_head=7beead756771011d37ef319d5a4e01453ca39f93
+== t-green.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/266
+pr_head=786cfb0e14a517190b6f7440b3e558c792189bce
+== t-had.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/212
+== t-local.meta
+kind=ship
+mode=local-only
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+== t-ready.meta
+kind=ship
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+pr=https://github.com/MrGTV-love/firstmate/pull/279
+pr_head=9a20c729efbf514f424f7f946fec7f5ebd05f163
+== t-refused.meta
+kind=ship
+mode=direct-PR
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/unpushed
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/unpushed
+branch=main
+== t-scout.meta
+kind=scout
+mode=no-mistakes
+project=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+worktree=/Users/charlesabrooker/tmp/fm-lab.VYmm4u/projects/proj
+branch=main
+-rwx------  1 charlesabrooker  staff   338 Oct 27 16:00 /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/contributions.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 16:00 /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 16:00 /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-green.check.sh
+-rw-------  1 charlesabrooker  staff  9851 Oct 27 16:00 /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.check.sh
+occupancy(proj) after: 2
+--- refusal marker
+total 16
+drwx------   4 charlesabrooker  staff   128 Oct 27 16:00 .
+drwxr-xr-x  60 charlesabrooker  staff  1920 Oct 27 16:00 ..
+-rw-------   1 charlesabrooker  staff     8 Oct 27 16:00 cursor
+-rw-------   1 charlesabrooker  staff    98 Oct 27 16:00 t-refused.refused
+error: named head 43131e7ba3c721554b1415a5cfd78ad82bc8bb3a is unreachable outside the worker copy
+--- wake queue
+1793134801	1	signal	t-direct.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134801	2	signal	t-had.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134801	3	signal	t-local.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134802	4	signal	t-ready.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134802	5	signal	t-refused.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134802	6	signal	t-scout.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134802	7	signal	t-direct.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134802	8	signal	t-had.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134803	9	signal	t-local.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134803	10	signal	t-ready.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134803	11	signal	t-refused.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134803	12	signal	t-scout.status	signal: /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-direct.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-had.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-local.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-ready.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-refused.status /Users/charlesabrooker/tmp/fm-lab.VYmm4u/state/t-scout.status
+1793134810	13	check	pr-ready-refused:t-refused	check: pr-ready t-refused: registration of https://github.com/MrGTV-love/firstmate/pull/264 refused: error: named head 43131e7ba3c721554b1415a5cfd78ad82bc8bb3a is unreachable outside the worker copy
+1793134821	14	check	open-loop-ledger	check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+--- gh calls pass 1
+1793134800 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json isDraft
+1793134801 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json headRefOid -q .headRefOid
+1793134802 api -i repos/MrGTV-love/firstmate/pulls?state=open&per_page=100
+1793134803 api -i repos/MrGTV-love/firstmate/commits/9a20c729efbf514f424f7f946fec7f5ebd05f163/check-runs?per_page=100
+1793134804 api -i repos/MrGTV-love/firstmate/commits/9a20c729efbf514f424f7f946fec7f5ebd05f163/statuses?per_page=100
+1793134804 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json isDraft
+1793134804 api -i repos/MrGTV-love/firstmate/commits/7beead756771011d37ef319d5a4e01453ca39f93/check-runs?per_page=100
+1793134805 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json headRefOid -q .headRefOid
+1793134806 api -i repos/MrGTV-love/firstmate/commits/7beead756771011d37ef319d5a4e01453ca39f93/statuses?per_page=100
+1793134806 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json isDraft
+1793134807 api -i repos/MrGTV-love/firstmate/commits/54f81edb0f6eca6557bd9a11e1b0a2630702c14b/check-runs?per_page=100
+1793134807 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json headRefOid -q .headRefOid
+1793134808 api -i repos/MrGTV-love/firstmate/commits/54f81edb0f6eca6557bd9a11e1b0a2630702c14b/statuses?per_page=100
+1793134809 api -i repos/MrGTV-love/firstmate/commits/709f583406072169cde540de64e1cdd0ba18dc2a/check-runs?per_page=100
+1793134809 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json isDraft
+1793134810 api -i repos/MrGTV-love/firstmate/commits/709f583406072169cde540de64e1cdd0ba18dc2a/statuses?per_page=100
+1793134810 pr view https://github.com/MrGTV-love/firstmate/pull/264 --json headRefOid -q .headRefOid
+1793134810 api -i repos/MrGTV-love/firstmate/pulls/212
+1793134810 api -i repos/MrGTV-love/firstmate/commits/5719f5ee5f8a1d46352237dee5405d3e2e5361f7/check-runs?per_page=100
+1793134811 api -i repos/MrGTV-love/firstmate/commits/5719f5ee5f8a1d46352237dee5405d3e2e5361f7/check-runs?filter=all&per_page=100
+1793134811 api -i repos/MrGTV-love/firstmate/pulls/212/comments?per_page=100
+1793134811 api -i repos/MrGTV-love/firstmate/issues/212/comments?per_page=100
+1793134811 api -i repos/MrGTV-love/firstmate/pulls/212/reviews?per_page=100
+1793134811 api -i repos/MrGTV-love/firstmate
+1793134811 api -i repos/MrGTV-love/firstmate/commits/5719f5ee5f8a1d46352237dee5405d3e2e5361f7/statuses?per_page=100
+1793134812 api -i repos/MrGTV-love/firstmate/commits/5719f5ee5f8a1d46352237dee5405d3e2e5361f7/statuses?per_page=100
+1793134813 pr view https://github.com/MrGTV-love/firstmate/pull/212 --json headRefOid,reviewDecision
+1793134813 api -i repos/MrGTV-love/firstmate/pulls/266
+1793134814 api -i repos/MrGTV-love/firstmate/pulls/266/reviews?per_page=100
+1793134814 api -i repos/MrGTV-love/firstmate/issues/266/comments?per_page=100
+1793134814 api -i repos/MrGTV-love/firstmate/commits/786cfb0e14a517190b6f7440b3e558c792189bce/check-runs?filter=all&per_page=100
+1793134814 api -i repos/MrGTV-love/firstmate/pulls/266/comments?per_page=100
+1793134814 api -i repos/MrGTV-love/firstmate/commits/786cfb0e14a517190b6f7440b3e558c792189bce/statuses?per_page=100
+1793134814 api -i -H If-None-Match: W/"f3cc69878c83ad0e37c0a70b75931fabdaaf928a4f95fb51f46d31c3b2ea269f" repos/MrGTV-love/firstmate
+1793134816 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json headRefOid,reviewDecision
+1793134817 pr view https://github.com/MrGTV-love/firstmate/pull/274 --json state -q .state
+1793134818 pr view https://github.com/MrGTV-love/firstmate/pull/266 --json state -q .state
+1793134818 pr view https://github.com/MrGTV-love/firstmate/pull/279 --json state -q .state
+watcher pass2 ran 2s
+--- watcher pass2 output (stdout+stderr)
+check: rearm-resurface
+--- gh calls added in pass 2
+--- t-had meta unchanged?
+t-had unchanged
+--- status logs unchanged?
+status logs unchanged
+--- refusal wakes for t-refused: 1
+occupancy(proj) final: 2
+teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5ZAE6YBSFRTH8GNJKYKXSX4/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.VYmm4u && rm -rf /Users/charlesabrooker/tmp/fm-lab.VYmm4u
+lab removed: /Users/charlesabrooker/tmp/fm-lab.VYmm4u
