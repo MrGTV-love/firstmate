@@ -1039,7 +1039,7 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
 }
 
 test_a_saved_cursor_never_advances_past_bytes_that_were_not_read() {
-  local dir state status cursor out size
+  local dir state status cursor out size rc
   dir=$(make_case cursor-refusal); state="$dir/state"; status="$state/c.status"; cursor="$state/.c.open-decisions-cursor"
   {
     printf 'needs-decision [key=early-q]: an early question that is still open\n'
@@ -1060,18 +1060,37 @@ test_a_saved_cursor_never_advances_past_bytes_that_were_not_read() {
   case "$out" in *early-q*) ;; *) fail "the early decision was not found: $out" ;; esac
   grep -q "^offset=$size\$" "$cursor" || fail "the cursor is not at the end of what was read: $(cat "$cursor")"
 
-  # A later growth past the limit is refused too: the cursor stays where it was and the
-  # decision it holds is not lost.
+  # A later growth past the limit is refused too: the cursor stays where it was, the
+  # fold answers status 2 instead of the old set as if it were whole, and the decision
+  # the cursor holds is still there for the next fold that can read the span.
   perl -e 'print "working [at=$_]: later step $_ padding padding padding padding\n" for 1 .. 4000' >> "$status"
+  rc=0
   out=$(FM_STATUS_CAP_BYTES=65536 FM_STATUS_CAP_RESERVE_BYTES=65536 bash -c '. "$1"; status_open_decisions_incremental "$2"' \
-    _ "$ROOT/bin/fm-classify-lib.sh" "$status")
-  case "$out" in *early-q*) ;; *) fail "a refused span dropped the decision the cursor held: $out" ;; esac
+    _ "$ROOT/bin/fm-classify-lib.sh" "$status" 2>"$dir/refused.err") || rc=$?
+  [ "$rc" -eq 2 ] || fail "a refused span was answered with status $rc, not 2 (output '$out')"
+  [ -z "$out" ] || fail "a refused span printed an open set as if it were complete: $out"
+  grep -q 'unread suffix' "$dir/refused.err" || fail "a refused span did not name the refused suffix: $(cat "$dir/refused.err")"
   grep -q "^offset=$size\$" "$cursor" || fail "a refused span moved the cursor: $(cat "$cursor")"
-  pass "a fold that cannot read its span leaves the saved cursor and its open decision where they were"
+  grep -q 'early-q' "$cursor" || fail "a refused span dropped the decision the cursor held: $(cat "$cursor")"
+  pass "a fold that cannot read its span leaves the saved cursor and its open decision where they were and answers status 2"
 }
 
 run_classify() {  # <function> <args...>: one status-library function in a fresh shell
   bash -c '. "$1/fm-classify-lib.sh"; shift; "$@"' _ "$ROOT/bin" "$@"
+}
+
+assert_seeded_refusal() {  # <status> <cursor> <err-file> <key-the-checkpoint-holds-or-empty>
+  local status=$1 cursor=$2 err=$3 key=$4 before reader rc out
+  before=$(cat "$cursor")
+  for reader in status_open_decisions status_open_decisions_incremental; do
+    rc=0
+    out=$(run_classify "$reader" "$status" 2>"$err") || rc=$?
+    [ "$rc" -eq 2 ] || fail "$reader answered a refused unread suffix with status $rc, not 2 (output '$out')"
+    [ -z "$out" ] || fail "$reader printed '$out' for a refused unread suffix, as if the checkpoint's set were complete"
+    grep -q 'unread suffix' "$err" || fail "$reader did not name the refused suffix: $(cat "$err")"
+    [ "$(cat "$cursor")" = "$before" ] || fail "$reader moved or rewrote the checkpoint it could not extend"
+  done
+  [ -z "$key" ] || grep -q "$key" "$cursor" || fail "the checkpoint lost its open decision $key"
 }
 
 test_a_refused_read_is_unknown_never_an_empty_open_set() {
@@ -1113,17 +1132,36 @@ test_a_refused_read_is_unknown_never_an_empty_open_set() {
   [ "$rc" -eq 2 ] || fail "last_status_line with a previous event did not refuse with exit status 2 (rc=$rc, output '$out')"
   [ "$out" = $'\nprevious=' ] || fail "last_status_line printed events for a log it refused: '$out'"
 
-  # With a trusted checkpoint the open set survives a refused tail, as the incremental fold does.
-  status="$state/seeded.status"
+  # With a trusted checkpoint a refused tail keeps the checkpoint but is still unknown:
+  # both folds answer status 2 and name the refused suffix, and neither prints the
+  # checkpoint's set as if it were the whole answer.
+  status="$state/seeded.status"; cursor="$state/.seeded.open-decisions-cursor"
   printf 'needs-decision [key=q1]: an early question that is still open\n' > "$status"
   out=$(run_classify status_open_decisions_incremental "$status")
   case "$out" in *q1*) ;; *) fail "the checkpoint fixture did not fold q1: $out" ;; esac
   perl -e 'print "text\n" x 40000' >> "$status"
-  out=$(run_classify status_open_decisions "$status" 2>/dev/null) || fail "the seeded pure fold failed after 40000 lines"
-  case "$out" in *q1*) ;; *) fail "the seeded pure fold lost the checkpoint's open decision: '$out'" ;; esac
-  out=$(run_classify status_open_decisions_incremental "$status" 2>/dev/null) || fail "the incremental fold failed after 40000 lines"
-  case "$out" in *q1*) ;; *) fail "the incremental fold lost the checkpoint's open decision: '$out'" ;; esac
-  pass "a log the read limits refuse reads as unknown (status 2), never as no open decision, while a checkpointed fold keeps its open set"
+  assert_seeded_refusal "$status" "$cursor" "$err" q1
+  pass "a log the read limits refuse reads as unknown (status 2), never as no open decision, with or without a checkpointed open set"
+}
+
+test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown() {
+  local dir state status cursor err out rc
+  dir=$(make_case empty-seed-new-decision); state="$dir/state"; status="$state/e.status"; cursor="$state/.e.open-decisions-cursor"; err="$dir/e.err"
+  # The reviewer's shape: a checkpoint at byte 23 over an EMPTY open set, then 40000 short
+  # lines (past the line limit, far below the byte cap) and a new, distinct decision.
+  printf 'working: initial event\n' > "$status"
+  out=$(run_classify status_open_decisions_incremental "$status") || fail "the seed fold failed"
+  [ -z "$out" ] || fail "the seed fixture is not an empty open set: $out"
+  grep -q '^offset=23$' "$cursor" || fail "the checkpoint is not at byte 23: $(cat "$cursor")"
+  { perl -e 'print "text\n" x 40000'; printf 'needs-decision [key=new-call]: choose a route\n'; } >> "$status"
+  [ "$(file_size "$status")" -gt 200000 ] || fail "the fixture is smaller than the 200 KB the reviewer used"
+  assert_seeded_refusal "$status" "$cursor" "$err" ''
+  rc=0
+  out=$(run_classify scan_open_decisions_incremental "$state" 2>"$err") || rc=$?
+  [ "$rc" -eq 0 ] || fail "the fleet open-decision scan failed on one refused suffix (rc=$rc)"
+  [ -z "$out" ] || fail "the fleet open-decision scan printed '$out'"
+  grep -q 'e.status is past the read limits' "$err" || fail "the fleet scan did not name the lane whose open set is unknown: $(cat "$err")"
+  pass "a checkpointed empty open set whose unread suffix is refused is unknown (status 2), never a complete empty set that hides new-call"
 }
 
 test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain() {
@@ -1280,9 +1318,49 @@ test_a_killed_drain_leaves_no_large_cursor_file() {
     wait "$pid" 2>/dev/null
   done
   [ -z "$(big_files_in "$state")" ] || fail "a killed drain left a file over 1 MB: $(big_files_in "$state")"
-  [ -z "$(find "$state" -name '*.unread.*' -o -name '*.span.*' -o -name '*cursor.read.*' 2>/dev/null)" ] \
-    || fail "a killed drain left a scratch file: $(find "$state" -name '*.unread.*' -o -name '*.span.*' -o -name '*cursor.read.*')"
-  pass "a drain killed with SIGKILL mid-run leaves no scratch or cursor file"
+  # A bounded scratch file may survive SIGKILL between its creation and its cleanup (the
+  # latest-event reader's span scratch is at most 64 KiB), so the requirement is a size
+  # bound on whatever a kill leaves, which the 1 MB check above already holds for every
+  # file; only the unbounded cursor-read copies must not survive at all.
+  [ -z "$(find "$state" -name '*.span.*' -size +64k 2>/dev/null)" ] \
+    || fail "a killed drain left a span scratch file past its 64 KiB bound: $(find "$state" -name '*.span.*' -size +64k)"
+  [ -z "$(find "$state" -name '*.unread.*' -o -name '*cursor.read.*' 2>/dev/null)" ] \
+    || fail "a killed drain left a cursor copy: $(find "$state" -name '*.unread.*' -o -name '*cursor.read.*')"
+  pass "a drain killed with SIGKILL mid-run leaves no cursor file above 1 MB and no cursor copy"
+}
+
+test_the_snapshot_copy_stops_at_the_size_it_checked_when_the_log_grows() {
+  local dir src dst fn mtime_epoch out rc
+  dir=$(make_case snapshot-growing); src="$dir/g.status"; dst="$dir/g.copy"; fn="$dir/capture.sh"
+  printf 'working: first event\n' > "$src"
+  touch -t 202001010000 "$src"
+  mtime_epoch=$(if [ "$(uname)" = Darwin ]; then stat -f %m "$src"; else stat -c %Y "$src"; fi)
+  # The snapshot's own copy function, taken from the script verbatim.
+  sed -n '/^snapshot_capture_status() {/,/^}/p' "$ROOT/bin/fm-fleet-snapshot.sh" > "$fn"
+  [ -s "$fn" ] || fail "could not extract snapshot_capture_status from bin/fm-fleet-snapshot.sh"
+  # A writer that appends 64 KiB right after the size allowance and before the copy reads:
+  # the copy must hold the bytes that were checked and no more. The ulimit keeps a broken
+  # copy from writing more than a few MiB.
+  rc=0
+  out=$(FM_STATUS_CAP_BYTES=1024 FM_STATUS_CAP_RESERVE_BYTES=1024 bash -c '
+    ulimit -f 4096
+    . "$1/fm-status-io-lib.sh"
+    . "$2"
+    grow_target=$3
+    eval "$(declare -f fm_status_read_allowed | sed "1s/fm_status_read_allowed/orig_read_allowed/")"
+    fm_status_read_allowed() {
+      orig_read_allowed "$@" || return
+      perl -e "print qq(x) x 65535, qq(\\n)" >> "$grow_target"
+    }
+    snapshot_capture_status "$3" "$4"
+  ' _ "$ROOT/bin" "$fn" "$src" "$dst" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "the snapshot copy failed on a growing log (rc=$rc): $out"
+  [ "$(file_size "$src")" -gt 65000 ] || fail "the writer did not grow the log, so this case proves nothing"
+  [ "$(file_size "$dst")" -eq 21 ] || fail "the snapshot copy took $(file_size "$dst") bytes, not the 21 it had checked"
+  [ "$(cat "$dst")" = "working: first event" ] || fail "the snapshot copy is not the checked bytes: $(head -c 100 "$dst")"
+  [ "$(if [ "$(uname)" = Darwin ]; then stat -f %m "$dst"; else stat -c %Y "$dst"; fi)" = "$mtime_epoch" ] \
+    || fail "the snapshot copy did not keep the source mtime read before the copy"
+  pass "the snapshot copy of a log that grows after its size check holds only the checked bytes and keeps the source mtime"
 }
 
 wait_for_file_nonempty() {  # <path>
@@ -1321,11 +1399,13 @@ tests=(
   test_history_readers_refuse_a_log_past_the_limit_and_name_it
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
+  test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown
   test_a_refused_lane_does_not_hide_the_other_lanes_from_the_drain
   test_the_drain_annotation_never_reads_a_log_past_the_limit
   test_latest_event_endpoint_is_a_position_in_the_whole_log
   test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log
   test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log
+  test_the_snapshot_copy_stops_at_the_size_it_checked_when_the_log_grows
   test_without_the_read_limit_the_same_reader_takes_the_whole_log
   test_a_killed_drain_leaves_no_large_cursor_file
 )

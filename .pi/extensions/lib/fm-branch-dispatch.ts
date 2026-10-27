@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runCommandAsync } from "./fm-async-exec.ts";
 
@@ -293,6 +293,29 @@ function statusReadLimitBytes(): number {
   return statusBound(process.env.FM_STATUS_CAP_BYTES, 33554432) + statusBound(process.env.FM_STATUS_CAP_RESERVE_BYTES, 1048576);
 }
 
+// Read a status log whole only when it is within the read limit, and never more than the
+// size that was checked: the size comes from the open descriptor and the read stops at it,
+// so a writer that appends afterwards cannot make this allocate or read past the bound.
+// Returns the bytes up to that endpoint; throws, as the callers' catch expects, when the
+// log is past the limit.
+function readStatusBounded(path: string): Buffer {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const size = fstatSync(fd).size;
+    if (size > statusReadLimitBytes()) throw new Error("status log is past the read limit");
+    const buffer = Buffer.alloc(size);
+    let filled = 0;
+    while (filled < size) {
+      const read = readSync(fd, buffer, filled, size - filled, filled);
+      if (read === 0) break;
+      filled += read;
+    }
+    return buffer.subarray(0, filled);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function openDecisions(
   lines: readonly string[],
   resolveVerb: string,
@@ -513,8 +536,7 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
             let contents: Buffer;
             let spanOffset = 0;
             try {
-              if (lstatSync(statusPath).size > statusReadLimitBytes()) return UNSAFE_SCOPE;
-              contents = readFileSync(statusPath);
+              contents = readStatusBounded(statusPath);
               if (cursor && cursor.offset <= contents.length) {
                 try {
                   if (cursor.ident === statusFileIdentity(statusPath)) spanOffset = cursor.offset;

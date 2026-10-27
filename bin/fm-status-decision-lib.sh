@@ -438,8 +438,9 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # newline, because a checkpoint taken mid-append folded a partial line the
 # whole-file fold would have read whole.
 # A failed tail read also falls back to byte 0, except a tail refused by the read
-# limits (bin/fm-status-cap-lib.sh), which keeps the seeded set as the incremental
-# fold does; a whole-log read past the limits returns status 2 with one line on
+# limits (bin/fm-status-cap-lib.sh), which keeps the checkpoint but answers status 2
+# with one line on stderr naming the refused suffix, as the incremental fold does,
+# never the seeded set as if it were complete; a whole-log read past the limits returns status 2 with one line on
 # stderr, never an empty set. No pure read repairs the checkpoint.
 # With <out-var> the set is assigned instead of printed, and <tick-command> is called
 # once per line folded, so a caller in the watcher's own shell can check the status
@@ -475,9 +476,16 @@ EOF
     else
       rc=$?
     fi
-    # A refused tail keeps the seeded set, exactly as the incremental fold does; any
-    # other failed tail read falls back to the whole log below.
-    if [ "$rc" -eq 2 ]; then _fm_emit_value "$out" "$open"; return 0; fi
+    # A refused tail leaves the checkpoint as it was but is not a complete answer: the
+    # seeded set cannot hold a decision in the refused bytes, so it is neither printed
+    # nor taken for the open set. One line on stderr names the refused suffix and the
+    # status is 2, as for a whole-log refusal. Any other failed tail read falls back to
+    # the whole log below.
+    if [ "$rc" -eq 2 ]; then
+      printf 'fm-status: %s: unread suffix bytes %s..%s is past the read limits; the open set is incomplete (checkpoint at byte %s kept)\n' \
+        "$f" "$offset" "$_FM_ODC_SIZE" "$offset" >&2
+      return 2
+    fi
     open=''
   fi
   # A whole-log fold reads the log exactly, up to the read limits

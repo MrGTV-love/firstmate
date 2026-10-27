@@ -283,9 +283,10 @@ EOF
 # failure this reports the already-trusted persisted set unchanged rather than
 # risking a silent invalidation that would wipe it - never a bare "empty" as if
 # nothing were open. A span the read limits refuse (status 2,
-# bin/fm-status-cap-lib.sh) keeps a trusted checkpoint's set the same way; with no
-# trusted checkpoint the fold from byte 0 is refused, so nothing is printed, the
-# refusal line stays on stderr, the cursor is left as it was, and the status is 2.
+# bin/fm-status-cap-lib.sh) is not an I/O error and is never answered with the trusted
+# set: the set cannot hold a decision in the refused bytes. Nothing is printed, one
+# line on stderr names the refused suffix, the cursor is left as it was (a trusted
+# checkpoint is kept) and the status is 2, with or without a trusted checkpoint.
 #
 # Not a pure status-file read: this writes/rewrites the sibling cursor file as a
 # side effect (state/.<task>.open-decisions-cursor), the library's second
@@ -361,7 +362,13 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) || read_rc=$?
     fi
     if [ "$read_rc" -ne 0 ]; then
-      [ "$read_rc" -ne 2 ] || [ "$cold" -eq 0 ] || return 2
+      if [ "$read_rc" -eq 2 ]; then
+        # The checkpoint stays as it was, but the trusted set cannot hold a decision in
+        # the refused suffix, so it is not printed as the open set: status 2.
+        [ "$cold" -eq 1 ] || printf 'fm-status: %s: unread suffix bytes %s..%s is past the read limits; the open set is incomplete (checkpoint at byte %s kept)\n' \
+          "$f" "$offset" "$size" "$offset" >&2
+        return 2
+      fi
       printf '%s' "$trusted_open"
       return 0
     fi

@@ -689,18 +689,6 @@ snapshot_wait_current_read_slot() {
   done
 }
 
-snapshot_capture_optional() {  # <source> <destination>
-  local source=$1 destination=$2
-  [ -f "$source" ] || return 0
-  cp -p -- "$source" "$destination" && return 0
-  # Teardown may remove an optional observation after the existence check.
-  if [ ! -e "$source" ]; then
-    rm -f -- "$destination"
-    return 0
-  fi
-  return 1
-}
-
 snapshot_mark_optional_present() {  # <source> <destination>
   local source=$1 destination=$2
   [ -f "$source" ] || return 0
@@ -728,18 +716,50 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
 # (bin/fm-status-cap-lib.sh) is refused, named on stderr, and not copied: the task is
 # then observed without a status log, its <destination>.refused marker says why so the
 # task record reports its open decisions as unreadable rather than as none, and one
-# runaway log neither fills the disk a second time nor fails the whole snapshot. Any
-# other log is copied whole with its mtime, exactly as before.
+# runaway log neither fills the disk a second time nor fails the whole snapshot.
+# A log within the limit is copied up to ONE endpoint, the size that was checked, and
+# never past it: a writer that appends after the check grows the source but not the
+# copy, so the check bounds the bytes written, not just the bytes seen. The copy takes
+# the source's mtime as read with that size, before the copy, as cp -p would have.
 snapshot_capture_status() {  # <source> <destination>
-  local source=$1 size
-  if size=$(_fm_status_file_size "$source" 2>/dev/null); then
-    size=${size//[[:space:]]/}
-    case "$size" in
-      ''|*[!0-9]*) ;;
-      *) fm_status_read_allowed "$source" "$size" || { : > "$2.refused"; return 0; } ;;
+  local source=$1 destination=$2 size mtime endpoint limit copied
+  [ -f "$source" ] || return 0
+  size=$(_fm_status_file_size "$source" 2>/dev/null) || size=''
+  size=${size//[[:space:]]/}
+  mtime=$(_fm_status_file_mtime "$source" 2>/dev/null) || mtime=''
+  mtime=${mtime//[[:space:]]/}
+  fm_status_read_limit_bytes limit
+  case "$size" in
+    ''|*[!0-9]*)
+      # No size to check: the copy is still bounded, by one byte past the read limit.
+      size=''
+      endpoint=$((limit + 1))
+      ;;
+    *)
+      fm_status_read_allowed "$source" "$size" || { : > "$destination.refused"; return 0; }
+      endpoint=$size
+      ;;
+  esac
+  if head -c "$endpoint" -- "$source" > "$destination" 2>/dev/null; then
+    if [ -z "$size" ]; then
+      copied=$(LC_ALL=C wc -c < "$destination") || copied=0
+      copied=${copied//[[:space:]]/}
+      if ! fm_status_read_allowed "$source" "$copied"; then
+        rm -f -- "$destination"
+        : > "$destination.refused"
+        return 0
+      fi
+    fi
+    case "$mtime" in
+      ''|*[!0-9]*) touch -r "$source" "$destination" 2>/dev/null || true ;;
+      *) perl -e 'utime($ARGV[0], $ARGV[0], $ARGV[1])' "$mtime" "$destination" 2>/dev/null || true ;;
     esac
+    return 0
   fi
-  snapshot_capture_optional "$@"
+  # Teardown may remove an optional observation after the existence check.
+  rm -f -- "$destination"
+  [ -e "$source" ] || return 0
+  return 1
 }
 
 prefetch_task_observations() {  # <meta> <id>
