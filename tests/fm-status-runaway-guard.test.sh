@@ -967,7 +967,7 @@ test_readers_stay_bounded_on_a_two_gib_log() {
   secs=$(timed open-decisions fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; status_open_decisions "$2"; true' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
     || fail "status_open_decisions did not finish in ${READER_BOUND_SECS}s on a 2 GiB log"
   record_timing "open-decisions fold" "$secs"
-  secs=$(timed last-line fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; last_status_line "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
+  secs=$(timed last-line fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; last_status_line "$2"; true' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \
     || fail "last_status_line did not finish in ${READER_BOUND_SECS}s on a 2 GiB log"
   record_timing "status-event library (last_status_line)" "$secs"
   secs=$(timed wait-line fm_run_timed "$READER_BOUND_SECS" bash -c '. "$1"; status_declared_wait_line "$2"' _ "$ROOT/bin/fm-classify-lib.sh" "$status") \

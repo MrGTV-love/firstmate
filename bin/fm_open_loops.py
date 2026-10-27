@@ -558,7 +558,7 @@ class Collector:
             return
         pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
         signatures = [line.strip() for line in pane.splitlines() if SIGNATURE.search(line)]
-        declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
+        declaration = self.bash('. "$1"; last_status_line "$2" || :', BIN / "fm-status-event-lib.sh",
                                 self.state / (task["id"] + ".status")).strip()
         waits = [line.strip() for line in pane.splitlines()
                  if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
@@ -1349,7 +1349,8 @@ class WaitVerifier:
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
             status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                            'if crew_is_provably_working "$3"; then last_status_line "$2" || '
+                            '{ echo "prerequisite status is past the read limits and cannot be verified" >&2; exit 2; }; fi',
                             BIN, path, task).strip()
             if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")

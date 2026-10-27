@@ -301,7 +301,7 @@ EOF
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version boundary_rc verb read_rc cold=0 read_err=/dev/null
+  local target_cursor kind fold_version boundary_rc verb read_rc=0 cold=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" '' kind
   _fm_open_decisions_fold_signature "$kind" fold_version
@@ -349,19 +349,22 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     trusted_open=''
     cursor_dirty=1
     cold=1
-    read_err=/dev/stderr
   fi
 
   if [ "$offset" -lt "$size" ]; then
     # In memory rather than a scratch file beside the cursor, so a drain killed
     # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
     # count that a command substitution would otherwise trim.
-    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>"$read_err" && printf x) || {
-      read_rc=$?
+    if [ "$cold" -eq 1 ]; then
+      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" && printf x) || read_rc=$?
+    else
+      chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) || read_rc=$?
+    fi
+    if [ "$read_rc" -ne 0 ]; then
       [ "$read_rc" -ne 2 ] || [ "$cold" -eq 0 ] || return 2
       printf '%s' "$trusted_open"
       return 0
-    }
+    fi
     chunk=${chunk%x}
     chunk_size=$(LC_ALL=C; printf '%s' "${#chunk}")
     # Test-only observability seam (off by default, no production behavior
