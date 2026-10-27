@@ -135,10 +135,14 @@
 # force. It removes it only when the copy really was returned: a pool slot of
 # the project that Treehouse state records as not leased, read again under the
 # project lock and again when a retry resumes from the prune record. A copy that
-# teardown kept on purpose (a slot another task's record still leases, a slot
-# held for foreign copies, a copy that is not a pool slot) is never removed: the
-# outcome is the log line "reaped: teardown completed; teardown kept the copy",
-# with no wake and no record. Before the removal the slot's owner claim must be
+# the read proves teardown kept on purpose (its lease is still held, for another
+# task's record or for foreign copies, or no treehouse-state.json lies beside it,
+# so it is not a pool slot) is never removed: the outcome is the log line
+# "reaped: teardown completed; teardown kept the copy", with no wake and no
+# record. A read that cannot tell (the lease state unreadable or ambiguous, the
+# pool-slot test unable to run, no project recorded, the project lock path
+# unresolved) is a quiet retry that keeps the record and the copy, and raises
+# the one wake when the retries run out. Before the removal the slot's owner claim must be
 # this task's or absent, nothing may be inside it (a search indexer excepted),
 # each nested copy is proved on its own, the copy and each nested copy hold only
 # scratch or preserved ignored files, and the preserve-list files are copied to
@@ -653,25 +657,53 @@ prove_nested_first() {
 # Treehouse state records as not leased, read fresh. Teardown keeps a slot that
 # another task's record still names, or that holds foreign copies, under a
 # durable lease, and a copy that is not a pool slot is never returned. Sets
-# RETURNED_REAL to the physical path, or RETURNED_WHY when it was not returned.
+# RETURNED_REAL to the physical path; when it was not returned, RETURNED_WHY,
+# and RETURNED_STATE to kept only when the read proved teardown kept it (the
+# lease is held, or no treehouse-state.json lies beside it), else to unread.
 RETURNED_REAL=
 RETURNED_WHY=
+RETURNED_STATE=
 returned_slot() {  # <copy> <project>
+  local state
   RETURNED_WHY=
+  RETURNED_STATE=unread
   if ! RETURNED_REAL=$(fm_mp_real "$1"); then
     RETURNED_WHY="$1 cannot be resolved"
     return 1
   fi
+  state="${RETURNED_REAL%/*/*}/treehouse-state.json"
+  if [ ! -e "$state" ] && [ ! -L "$state" ]; then
+    RETURNED_STATE=kept
+    RETURNED_WHY="$RETURNED_REAL is not a Treehouse pool slot: no $state beside it"
+    return 1
+  fi
   if ! fm_treehouse_pool_slot "$2" "$RETURNED_REAL"; then
-    RETURNED_WHY="$RETURNED_REAL is not a Treehouse pool slot of the project ${2:-<no project recorded>}"
+    RETURNED_WHY="$RETURNED_REAL cannot be proved a Treehouse pool slot of the project ${2:-<no project recorded>}"
     return 1
   fi
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_task_copy_pool_slot_held "$RETURNED_REAL" || true
-  [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] || return 0
-  RETURNED_WHY="the pool slot $RETURNED_REAL reads $FM_TASK_COPY_SLOT_STATE in Treehouse state, not returned"
+  case "$FM_TASK_COPY_SLOT_STATE" in
+    unleased) return 0 ;;
+    held)
+      RETURNED_STATE=kept
+      RETURNED_WHY="the pool slot $RETURNED_REAL is still leased in Treehouse state"
+      ;;
+    *) RETURNED_WHY="the lease of the pool slot $RETURNED_REAL cannot be read ($FM_TASK_COPY_SLOT_STATE${FM_TASK_COPY_SLOT_REASON:+: $FM_TASK_COPY_SLOT_REASON})" ;;
+  esac
   return 1
+}
+
+# A copy teardown positively kept ends silently. A read that could not tell is a
+# quiet retry from the prune record, which keeps the copy and the project; it
+# raises the one wake when the retries run out.
+not_returned() {  # <copy> <detail>
+  if [ "$RETURNED_STATE" = kept ]; then
+    finish_kept "$2" "$RETURNED_WHY"
+  else
+    backoff "cannot tell whether teardown returned $1: $RETURNED_WHY"
+  fi
 }
 
 # Teardown succeeded. A slot it returned to the pool is reset in place and stays
@@ -685,13 +717,14 @@ settle_copy() {  # <copy> <project> <detail>
     finish_reaped "$detail"
     return 0
   fi
+  R_RETURNED=1
+  R_COPY=$copy
+  R_PROJECT=$project
   if ! returned_slot "$copy" "$project"; then
-    finish_kept "$detail" "$RETURNED_WHY"
+    not_returned "$copy" "$detail"
     return 0
   fi
-  R_RETURNED=1
   R_COPY=$RETURNED_REAL
-  R_PROJECT=$project
   rec_save "$ID" || log_line "cannot record the returned copy $RETURNED_REAL; removing it now"
   remove_returned "$RETURNED_REAL" "$project" "$detail" || true
 }
@@ -705,7 +738,7 @@ settle_copy() {  # <copy> <project> <detail>
 remove_returned() {  # <copy> <project> <detail>
   local copy=$1 project=$2 detail=$3 plock rc=0
   if ! plock=$(fm_treehouse_project_lock_path "$project"); then
-    retain "$copy" "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
+    backoff "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
     return 1
   fi
   if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then
@@ -715,7 +748,7 @@ remove_returned() {  # <copy> <project> <detail>
   if returned_slot "$copy" "$project"; then
     remove_returned_locked "$RETURNED_REAL" "$detail" || rc=$?
   else
-    finish_kept "$detail" "$RETURNED_WHY"
+    not_returned "$copy" "$detail"
   fi
   fm_project_lock_release "$plock" || true
   return "$rc"
