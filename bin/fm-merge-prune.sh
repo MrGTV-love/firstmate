@@ -115,8 +115,13 @@
 # mode the admission check of that second teardown (bin/fm-idle-reap-lib.sh)
 # accepts the worker the exit verb stopped: its busy record is gone,
 # state/<id>.control-exit is present, its terminal pane positively shows no live
-# agent (only shells are left in it) and its last status event is `done`. The
-# same holds for a worker stopped that way before the merge.
+# agent (only shells are left in it, and at most the one `treehouse get` that
+# opened the slot's subshell) and its last status event is `done`. The same
+# holds for a worker stopped that way before the merge, at the first teardown.
+# A `treehouse get` that has not exited after its idle shell is ended, or that
+# waits at a prompt, still passes; if anything else is then left in the pane,
+# that second teardown refuses, the prune backs off and retries it, and only
+# when the retries run out does it raise its one wake.
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason (recorded as sent only once the queue took it). A retained copy is retried silently every six

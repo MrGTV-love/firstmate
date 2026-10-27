@@ -49,8 +49,9 @@ fm_idle_reap_refusal_stands() {
 # stands. A worker stopped with `fm-control.sh exit` (by the prune, or before the
 # merge) has no busy record and leaves state/<id>.control-exit; in this mode that
 # worker reads as stopped, not as unknown, only when its terminal pane positively
-# shows no live agent (fm_mp_pane_agent_gone: only shells are left in it). A pane
-# that cannot be read proves nothing. A worker that reads busy is never accepted.
+# shows no live agent (fm_mp_pane_agent_gone: only shells are left in it, and at
+# most the one `treehouse get` that opened the slot's subshell). A pane that
+# cannot be read proves nothing. A worker that reads busy is never accepted.
 # Its last event must still be `done`, which the checks after the busy gate
 # require.
 fm_idle_reap_exited_by_control() {  # <state> <id>

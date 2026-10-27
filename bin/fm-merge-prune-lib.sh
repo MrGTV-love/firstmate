@@ -512,10 +512,13 @@ EOF
 
 # Whether the task's terminal pane positively shows no live agent: its shell
 # pid is read (fm_mp_pane_pid, tmux and herdr) and every process in its tree is
-# a shell (fm_agent_process_classify). An agent, any other process, a pane that
-# cannot be read, a gone pane or a process that cannot be read proves nothing.
+# a shell (fm_agent_process_classify), except at most one `treehouse get`, the
+# launcher that opened the slot's subshell (named treehouse, matched the way
+# bin/fm-spawn.sh spawn_get_state matches it). An agent, any other process, a
+# second launcher, a pane that cannot be read, a gone pane or a process that
+# cannot be read proves nothing.
 fm_mp_pane_agent_gone() {  # <meta-file>
-  local pane p comm args
+  local pane p comm args launcher=0 get='(^|[/[:space:]])treehouse[[:space:]]+get([[:space:]]|$)'
   pane=$(fm_mp_pane_pid "$1")
   [ -n "$pane" ] || return 1
   fm_mp_read_pane_tree "$pane" || return 1
@@ -523,7 +526,13 @@ fm_mp_pane_agent_gone() {  # <meta-file>
   for p in "${FM_MP_TREE_PIDS[@]}"; do
     comm=$(ps -o comm= -p "$p" 2>/dev/null) || return 1
     args=$(ps -o args= -p "$p" 2>/dev/null) || return 1
-    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" = shell ] || return 1
+    [ "$(fm_agent_process_classify "$comm" "${args%% *}" "$args" "$p")" != shell ] || continue
+    comm=$(printf '%s' "$comm" | tr -d '[:space:]')
+    if [ "$launcher" = 0 ] && [ "${comm##*/}" = treehouse ] && [[ "$args" =~ $get ]]; then
+      launcher=1
+      continue
+    fi
+    return 1
   done
 }
 

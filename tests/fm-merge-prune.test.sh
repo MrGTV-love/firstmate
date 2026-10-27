@@ -364,22 +364,32 @@ start_inside() {  # <dir> <pidfile-or-empty>
   [ -z "$2" ] || printf '%s\n' "$pid" > "$2"
 }
 
-# A stand-in terminal pane whose agent has exited: the pane process starts
-# <command...> with <dir> as its working directory, as the pane started the
-# `treehouse get` subshell, and the command is its child (PANE_CHILD). The pane
-# process id is what tmux and herdr report as the pane's shell, and the pane
-# stays open, an idle shell, when its child ends.
+# A stand-in terminal pane whose agent has exited, shaped like a real one: the
+# pane's shell runs `treehouse get` (a stand-in named treehouse, working outside
+# the copy), which starts <command...> with <dir> as its working directory, as
+# the real one opens the slot's subshell, and stays its parent (PANE_CHILD). The
+# pane process id is what tmux and herdr report as the pane's shell; the
+# launcher ends when its child ends, and the pane stays open, an idle shell.
 PANE_CHILD=
 start_pane() {  # <dir> <command...>
-  local dir=$1 pid
+  local dir=$1 pid launcher
   shift
-  bash -c '(cd "$1" && shift && exec "$@") & wait; read -r _ < "$0"' "$W/hold" "$dir" "$@" 2>/dev/null &
+  if [ ! -e "$W/th/get" ]; then
+    mkdir -p "$W/th"
+    ln -s "$(command -v bash)" "$W/th/treehouse"
+    # shellcheck disable=SC2016 # The single-quoted lines are the stand-in's own source.
+    printf '%s\n' '# Stand-in for `treehouse get`: opens <command...> in <dir> and stays its parent.' \
+      'dir=$1; shift' '(cd "$dir" && exec "$@") &' 'wait' > "$W/th/get"
+  fi
+  PATH="$W/th:$PATH" bash -c 'cd "$1" || exit 1; shift; treehouse get "$@"; read -r _ < "$0"' "$W/hold" "$W/th" "$dir" "$@" 2>/dev/null &
   pid=$!
   WORKER_PIDS+=("$pid")
   printf '%s\n' "$pid" > "$W/pane.pid"
   # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
-  fm_test_wait_until 10 sh -c '[ -n "$(pgrep -P "$1")" ]' _ "$pid" || true
-  PANE_CHILD=$(pgrep -P "$pid" | sed -n 1p)
+  fm_test_wait_until 10 sh -c 'l=$(pgrep -P "$1" | sed -n 1p); [ -n "$l" ] && [ -n "$(pgrep -P "$l")" ]' _ "$pid" || true
+  launcher=$(pgrep -P "$pid" | sed -n 1p)
+  PANE_CHILD=$(pgrep -P "$launcher" | sed -n 1p)
+  WORKER_PIDS+=("$launcher" "$PANE_CHILD")
   wait_inside "$dir"
 }
 
@@ -1269,6 +1279,7 @@ scan_reap() {  # [VAR=value ...]: 0 when the scan lists t1 as reapable
 }
 
 scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
+  local pane
   make_world
   scan_reap || why "the world's finished idle worker is not reapable at all" || return 1
   FM_STATE_OVERRIDE="$STATE" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" STEAL_FILE="$W/steal" \
@@ -1276,9 +1287,13 @@ scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
     "$W/bin/control-stub" t1 exit || why "the stand-in exit verb failed" || return 1
   [ ! -e "$STATE/t1.busy-state" ] && [ -f "$STATE/t1.control-exit" ] || why "the exit verb did not retire the busy record and mark the exit" || return 1
   ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a stopped worker whose terminal pane it cannot read" || return 1
-  start_pane "$W" bash "$W/bin/pane-idle" "$W/hold"
+  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
   ! scan_reap || why "the ordinary sweep accepted a worker with no busy record" || return 1
-  scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune did not accept the worker that its exit verb stopped" || return 1
+  scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune did not accept the worker that its exit verb stopped, with only the pane's treehouse get and its idle shell left" || return 1
+  pane=$(cat "$W/pane.pid")
+  start_pane "$COPY" "$W/th/treehouse" get "$COPY" bash "$W/bin/pane-idle" "$W/hold"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a pane holding a second treehouse get" || return 1
+  printf '%s\n' "$pane" > "$W/pane.pid"
   mv "$STATE/t1.control-exit" "$W/control-exit.kept"
   ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker with no record of a deliberate exit" || return 1
   ln -s "$W/control-exit.kept" "$STATE/t1.control-exit"
@@ -1304,7 +1319,7 @@ scn_busy_worker_with_an_old_exit_marker_is_not_reapable() {
   sed -i.bak 's/^harness=.*/harness=grok/' "$STATE/t1.meta"
   rm -f "$STATE/t1.busy-state" "$STATE/t1.busy-gen"
   printf 'gen=-\n' > "$STATE/t1.control-exit"
-  start_pane "$W" bash "$W/bin/pane-idle" "$W/hold"
+  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
   : > "$W/pane-tail"
   scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 PANE_TAIL_FILE="$W/pane-tail" || why "the prune did not accept the idle grok worker of the fixture" || return 1
   printf 'Working... Ctrl+c:cancel\n' > "$W/pane-tail"
@@ -2075,6 +2090,14 @@ test_unsafe_mutations_are_caught() {
   expect_caught exit-accepted-with-a-busy-record $reap '  [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "retired-busy-record rule"
   expect_caught exit-marker-lifts-a-busy-verdict $reap '    && { [ "${busy%% *}" = busy ] || ! fm_idle_reap_exited_by_control "$state" "$id"; }; then' '    && ! fm_idle_reap_exited_by_control "$state" "$id"; then' scn_busy_worker_with_an_old_exit_marker_is_not_reapable "never lifting a positive busy verdict"
   expect_caught exit-accepted-with-a-live-pane-agent $reap '  fm_mp_pane_agent_gone "$1/$2.meta"' '  :' scn_relaunched_agent_with_an_old_exit_marker_is_kept "positive proof that no agent is left in the pane"
+  expect_caught pane-accepts-any-process $lib '      launcher=1
+      continue
+    fi
+    return 1' '      launcher=1
+      continue
+    fi
+    continue' scn_relaunched_agent_with_an_old_exit_marker_is_kept "accepting only shells and one treehouse get in the pane"
+  expect_caught pane-accepts-a-second-launcher $lib '    if [ "$launcher" = 0 ] && [ "${comm##*/}" = treehouse ]' '    if [ "${comm##*/}" = treehouse ]' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "accepting at most one treehouse get"
   expect_caught exit-accepted-with-an-unreadable-pane $lib '  pane=$(fm_mp_pane_pid "$1")
   [ -n "$pane" ] || return 1' '  pane=$(fm_mp_pane_pid "$1")
   [ -n "$pane" ] || return 0' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "failing closed on a pane that cannot be read"
@@ -2088,6 +2111,7 @@ test_unsafe_mutations_are_caught() {
 test_over_strict_mutations_are_caught() {
   local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
+  expect_caught pane-launcher-never-accepted $lib '    if [ "$launcher" = 0 ] && [ "${comm##*/}" = treehouse ]' '    if false && [ "${comm##*/}" = treehouse ]' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "accepting the pane's one treehouse get"
   expect_caught no-claude-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .opencode/plugins/fm-busy-state.js) return 0 ;;' scn_scratch_copy_is_removed ".claude hook-file rule"
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
   expect_caught nested-clone-line-counts $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'cat' scn_unignored_nested_clone_goes_with_the_slot "skipping a nested copy's untracked directory"
@@ -2295,8 +2319,8 @@ test_e2e_transient_contention_retries_then_succeeds() {
 
 # A worker stopped with `fm-control.sh exit` before its PR merged: its busy
 # record is gone and its exit marker is older than the arm. Its terminal pane
-# holds only an idle shell, so the first, real teardown accepts it and the copy
-# is pruned with no human step.
+# holds only its `treehouse get` and the idle shell that opened in the copy, so
+# the first, real teardown accepts it and the copy is pruned with no human step.
 test_e2e_worker_exited_before_the_merge_is_pruned() {
   make_e2e_world
   FM_STATE_OVERRIDE="$STATE" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" STEAL_FILE="$W/steal" \
@@ -2304,7 +2328,7 @@ test_e2e_worker_exited_before_the_merge_is_pruned() {
     "$W/bin/control-stub" t1 exit || fail "the stand-in exit verb failed"
   [ ! -e "$STATE/t1.busy-state" ] && [ -f "$STATE/t1.control-exit" ] || fail "the exit verb did not retire the busy record and mark the exit"
   fm_touch_epoch "$OLD" "$STATE/t1.control-exit"
-  start_pane "$W" bash "$W/bin/pane-idle" "$W/hold"
+  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
   prune_real arm t1
   prune_real run t1 --now >/dev/null 2>&1
   [ ! -e "$STATE/t1.meta" ] || fail "a worker stopped before the merge kept its task: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null) $(cat "$STATE/t1.merge-prune" 2>/dev/null)"
@@ -2312,7 +2336,7 @@ test_e2e_worker_exited_before_the_merge_is_pruned() {
   assert_slot_returned
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
   assert_nothing_forced "e2e exited before the merge"
-  pass "end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only an idle shell, is pruned through the real teardown with no human step"
+  pass "end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only its treehouse get and idle shell, is pruned through the real teardown with no human step"
 }
 
 # Real teardown refuses a squash-merged copy with ignored scratch files (the
