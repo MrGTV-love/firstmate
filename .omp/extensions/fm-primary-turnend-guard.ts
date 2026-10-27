@@ -1,4 +1,4 @@
-// Firstmate turn-end guard, pre-tool seatbelts, and native session-start
+// Firstmate turn-end guard, watcher-arm pre-tool seatbelt, and native session-start
 // delivery for the omp (Oh My Pi) primary.
 //
 // A port of .pi/extensions/fm-primary-turnend-guard.ts with the turn-end
