@@ -2797,43 +2797,76 @@ case "$POLL" in
   ''|*[!0-9]*) ;;
   *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
 esac
-# The scan record a contained-only tick hands to the watcher's own next tick: one small
-# file per watcher process, removed when that tick reads it and when the watcher exits.
+# The growth rate a contained-only tick hands to the watcher's own next tick: one small
+# file per watcher process, holding at most one `<identity>\t<path>\t<rate>\t<time>` line
+# per file over the cap, replaced (never appended to), removed when that tick reads it
+# and when the watcher exits.
 status_cap_handoff_path() {
   printf '%s/.status-cap-handoff.%s' "$STATE" "${WATCHER_PID:-$$}"
 }
 
+# Merge the due rows (R), the held rates (H) and a scan's records (N), each on stdin with
+# its tag. <mode> hold prints the handoff lines; splice prints the scan's records with the
+# held rate in place of the scan's own. Only due files are kept. Of a held rate and a
+# newer one for the same file, the higher measured rate wins: a later scan of a writer
+# that was already stopped measures about zero, so the higher is the pre-stop rate.
+status_cap_handoff_merge() {  # <hold|splice> <time>
+  awk -F'\t' -v OFS='\t' -v mode="$1" -v now="$2" '
+    function grown(text) { return match(text, /growth=[^ ]* bytes\/s/) ? substr(text, RSTART + 7, RLENGTH - 15) : "" }
+    function higher(a, b) { return a ~ /^[0-9]+$/ && (b !~ /^[0-9]+$/ || a + 0 > b + 0) }
+    $1 == "R" { due[$3 SUBSEP $4] = 1; next }
+    $1 == "H" && ($2 SUBSEP $3) in due { rate[$2 SUBSEP $3] = $4; at[$2 SUBSEP $3] = $5; next }
+    $1 == "N" && $3 != "" {
+      k = $2 SUBSEP $3; r = grown($5)
+      if (mode == "hold") {
+        if (!(k in rate) || higher(r, rate[k])) { rate[k] = r; at[k] = now }
+        next
+      }
+      text = $5
+      if ((k in rate) && higher(rate[k], r)) sub(/growth=[^ ]* bytes\/s/, "growth=" rate[k] " bytes/s (measured at " at[k] ")", text)
+      print $2, $3, $4, text
+    }
+    END {
+      if (mode != "hold") exit
+      for (k in rate) { split(k, p, SUBSEP); print p[1], p[2], rate[k], at[k] }
+    }'
+}
+
 status_cap_tick() {
-  local rows records reason='' ident path size text keys='' key handoff
+  local rows records reason='' ident path size text keys='' key handoff held=''
   STATUS_CAP_TICK_AT=$SECONDS
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
-  [ -n "$rows" ] || return 0
   handoff=$(status_cap_handoff_path)
+  # The watcher's own tick reads and clears the handoff first, so a held rate never
+  # outlives its file's place in the due list.
+  if [ "$BASH_SUBSHELL" -eq 0 ] && [ -f "$handoff" ]; then
+    held=$(cat "$handoff")
+    rm -f "$handoff"
+  fi
+  [ -n "$rows" ] || return 0
   records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
   [ -n "$records" ] || return 0
   # In a subshell (a status read the watcher captures with $(...)) a wake would print
   # into the capture and end only that subshell. There the tick only contains: the
-  # scan stops an omp writer over the cap, nothing is queued or marked, and its record
-  # (the growth rate measured before the stop, the writer and the action) goes to the
-  # handoff file, one record per file and the first one kept, because a later scan
-  # measures a stopped writer. The watcher's own next tick scans the file again, takes
-  # the handed-off record in place of its own, queues it and wakes.
+  # scan stops an omp writer over the cap, nothing is queued or marked, and the growth
+  # rate it measured before the stop goes to the handoff file. The watcher's own next
+  # tick scans the file again, keeps its own writer and action, puts the held rate in
+  # place of the near-zero one a stopped writer now shows, queues it and wakes.
   if [ "$BASH_SUBSHELL" -ne 0 ]; then
     {
-      [ ! -f "$handoff" ] || cat "$handoff"
-      while IFS=$'\t' read -r ident path size text; do
-        [ -n "$path" ] || continue
-        [ ! -f "$handoff" ] || ! awk -F'\t' -v p="$path" '$2 == p { found = 1 } END { exit !found }' "$handoff" || continue
-        printf '%s\t%s\t%s\t%s (measured at %s)\n' "$ident" "$path" "$size" "$text" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-      done <<EOF
-$records
-EOF
-    } > "$handoff.tmp" && mv -f "$handoff.tmp" "$handoff" || rm -f "$handoff.tmp"
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      [ ! -f "$handoff" ] || awk '{ print "H\t" $0 }' "$handoff"
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge hold "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$handoff.tmp" \
+      && mv -f "$handoff.tmp" "$handoff" || rm -f "$handoff.tmp"
     return 0
   fi
-  if [ -f "$handoff" ]; then
-    records=$(printf '%s\n' "$records" | awk -F'\t' -v OFS='\t' 'NR == FNR { held[$1 SUBSEP $2] = $4; next } ($1 SUBSEP $2) in held { $4 = held[$1 SUBSEP $2] } { print }' "$handoff" -)
-    rm -f "$handoff"
+  if [ -n "$held" ]; then
+    records=$({
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      printf '%s\n' "$held" | awk '{ print "H\t" $0 }'
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge splice '')
   fi
   while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
@@ -2869,7 +2902,7 @@ EOF
 # runaway writer that starts during it would otherwise run unchecked until the loop ends.
 # It looks at the size cap when a poll has passed since the last look. In the watcher's own
 # shell a stop here exits the watcher with the over-cap wake; in a command substitution
-# (the status-event library's scans) it only stops the writer and hands its record on, and
+# (the status-event library's scans) it only stops the writer and hands its growth rate on, and
 # the wake follows at the watcher's next tick (status_cap_tick). The stale loop ticks in
 # its own shell at each window, so a captured read ticks only when it alone outlasts a poll.
 # It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),

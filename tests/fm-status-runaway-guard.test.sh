@@ -779,6 +779,77 @@ test_a_tick_in_a_captured_read_hands_the_measured_rate_to_the_wake() {
   pass "a writer stopped by a tick in a captured read is woken for with the growth rate measured before the stop ($rate bytes/s), and the handoff is removed"
 }
 
+# The handoff carries only the growth rate. A captured tick that found no writer (lsof
+# answered nothing) hands on the rate it measured; the watcher's own tick then finds the
+# omp writer and stops it, and its wake must name that pid and stop, with the carried rate.
+test_a_handed_rate_keeps_the_watchers_own_writer_and_stop() {
+  local dir state status wakes wpid rate
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case handoff-writer); state="$dir/state"; status="$state/runaway.status"; wakes="$dir/wakes"
+  : > "$wakes"
+  head -c 70000 /dev/zero | tr '\0' 'x' > "$status"
+  # An omp writer that appends until the gate file appears and then idles with the log open.
+  (
+    ulimit -f "$HARD_LIMIT_BLOCKS"
+    "$(make_named_shell "$dir" omp)" -c '
+      printf -v unit "text\n%.0s" {1..100}
+      exec 9>>"$1"
+      for ((i = 0; i < 6000; i++)); do [ ! -e "$2" ] || break; printf "%s" "$unit" >&9; sleep 0.01 9>&-; done
+      sleep 60 9>&-
+    ' _ "$status" "$dir/idle" &
+    printf '%s\n' "$!" > "$dir/writer.pid"
+    wait "$!" 2>/dev/null
+  ) &
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  sleep 0.3
+  FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=1 FM_STATUS_CAP_BYTES=65536 bash -c '
+    wakes=$2
+    # shellcheck source=/dev/null
+    . "$1/bin/fm-watch.sh"
+    wake() { printf "%s\n" "$1" >> "$wakes"; }
+    captured=$(FM_STATUS_CAP_LSOF=/usr/bin/false status_cap_tick)
+    [ -z "$captured" ] || printf "the captured tick printed: %s\n" "$captured" >&2
+    : > "$3"
+    sleep 1
+    status_cap_tick
+  ' _ "$ROOT" "$wakes" "$dir/idle" > "$dir/tick.out" 2>&1 || { kill -9 "$wpid" 2>/dev/null; fail "the ticks failed: $(tail -c 600 "$dir/tick.out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the watcher's own tick did not stop the omp writer"; }
+  kill -9 "$wpid" 2>/dev/null
+  [ ! -s "$dir/tick.out" ] || fail "the ticks wrote output: $(cat "$dir/tick.out")"
+  grep -q "writer=pid $wpid omp" "$wakes" || fail "the wake does not name the writer the watcher's own scan found: $(cat "$wakes")"
+  grep -q "stopped pid $wpid (omp) with SIGSTOP; resume it with kill -CONT $wpid" "$wakes" || fail "the wake does not report the stop: $(cat "$wakes")"
+  rate=$(sed -n 's/.*growth=\([0-9][0-9]*\) bytes\/s (measured at .*/\1/p' "$wakes" | head -1)
+  [ -n "$rate" ] && [ "$rate" -gt 0 ] || fail "the wake does not carry the rate measured before the stop: $(cat "$wakes")"
+  pass "a handed-on growth rate ($rate bytes/s) joins the watcher's own writer and stop in the wake, never replaces them"
+}
+
+# A held rate lives only while its file is due an alert: once the file leaves the due list
+# the watcher's next tick deletes it, and a later alert for the same file measures afresh.
+test_a_held_rate_does_not_outlive_its_due_alert() {
+  local dir state status wakes
+  dir=$(make_case handoff-expiry); state="$dir/state"; status="$state/runaway.status"; wakes="$dir/wakes"
+  : > "$wakes"
+  head -c 70000 /dev/zero | tr '\0' 'x' > "$status"
+  FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=1 FM_STATUS_CAP_BYTES=65536 FM_STATUS_CAP_LSOF=/usr/bin/false bash -c '
+    wakes=$2; status=$3
+    # shellcheck source=/dev/null
+    . "$1/bin/fm-watch.sh"
+    wake() { printf "%s\n" "$1" >> "$wakes"; }
+    captured=$(status_cap_tick)
+    [ -f "$(status_cap_handoff_path)" ] || { echo "the captured tick held no rate"; exit 1; }
+    IFS=$'"'"'\t'"'"' read -r size ident path <<< "$(fm_status_cap_unalerted "$STATE")"
+    "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || exit 1
+    status_cap_tick
+    [ ! -e "$(status_cap_handoff_path)" ] || { echo "a rate outlived its file in the due list"; exit 1; }
+    head -c 70000 /dev/zero | tr "\0" y >> "$status"
+    status_cap_tick
+  ' _ "$ROOT" "$wakes" "$status" > "$dir/tick.out" 2>&1 || fail "the ticks failed: $(tail -c 600 "$dir/tick.out")"
+  grep -q "check: status-log-over-cap: file=runaway.status" "$wakes" || fail "the later alert raised no wake: $(cat "$wakes")"
+  ! grep -q "measured at" "$wakes" || fail "the later alert reused the expired held rate: $(cat "$wakes")"
+  pass "a held rate is deleted once its file leaves the due list, and a later alert for the same file measures afresh"
+}
+
 test_the_open_decisions_fold_calls_its_tick_for_every_line() {
   local dir status ticks out
   dir=$(make_case fold-tick); status="$dir/state/fold.status"; ticks="$dir/ticks"
@@ -1605,6 +1676,8 @@ tests=(
   test_the_push_transition_walk_checks_the_cap
   test_the_inbox_steer_fold_checks_the_cap
   test_a_tick_in_a_captured_read_hands_the_measured_rate_to_the_wake
+  test_a_handed_rate_keeps_the_watchers_own_writer_and_stop
+  test_a_held_rate_does_not_outlive_its_due_alert
   test_the_open_decisions_fold_calls_its_tick_for_every_line
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
