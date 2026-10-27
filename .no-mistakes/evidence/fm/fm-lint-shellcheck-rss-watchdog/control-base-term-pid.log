@@ -1,0 +1,10 @@
+lint process group: 2590
+t=-0 before SIGTERM (pid pgid rss_kib cmd):
+ 3842  3638  70128 /usr/bin/perl
+ 4675  3638   9904 /usr/bin/perl
+ 4745  3638   1280 /usr/bin/time
+ 4753  3638 631552 /Users/charlesabrooker/.local/bin/shellcheck
+3842 3638 70128 /usr/bin/perl check
+4675 3638 9904 /usr/bin/perl gate
+t=+1.0 (0 procs):
+lint exit status: 143

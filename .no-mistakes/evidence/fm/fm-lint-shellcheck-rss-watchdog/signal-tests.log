@@ -1,0 +1,2 @@
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+ok - jobs=1 and jobs=2 stop complete worker trees with and without telemetry

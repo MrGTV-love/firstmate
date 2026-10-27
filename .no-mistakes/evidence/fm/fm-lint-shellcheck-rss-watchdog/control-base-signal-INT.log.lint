@@ -1,0 +1,5 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+time: command terminated abnormally
+time: signal: Invalid argument
+ledger: "/private/tmp/fm-rss-base.YUhf2d/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

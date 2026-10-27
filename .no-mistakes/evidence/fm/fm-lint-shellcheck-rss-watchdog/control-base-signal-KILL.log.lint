@@ -1,0 +1,4 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+/private/tmp/fm-rss-base.YUhf2d/bin/fm-lint.sh: line 336: 76909 Killed: 9               ( FM_EXEC_TIMED_OWNER_PID=$$ exec "${check_command[@]}" ) > "$root_out" 2> "$root_err"
+fm-lint: end tests/fm-spawn-acquisition-cleanup.test.sh reason=signal:KILL rc=137 duration_ms=29536 rss_kib=unavailable

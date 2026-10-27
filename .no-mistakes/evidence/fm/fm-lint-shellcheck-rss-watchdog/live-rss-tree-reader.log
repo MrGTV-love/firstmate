@@ -1,0 +1,7 @@
+process table (pid ppid pgid rss_kib) for the leader 73457 and its children:
+73457 73447 73457 601424
+73776 73457 73457 247776
+73783 73457 73783 616608
+ps -g sum (leader group only): 849200 KiB
+python3 bin/fm-proc-info.py rss-tree 73457 -> 849200 KiB (exit 0)
+python3 bin/fm-proc-info.py rss-tree 999999 -> [] exit 1

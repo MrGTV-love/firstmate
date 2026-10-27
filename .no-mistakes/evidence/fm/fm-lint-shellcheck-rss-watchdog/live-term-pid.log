@@ -1,0 +1,12 @@
+lint process group: 77337
+t=-0 before SIGTERM (pid pgid rss_kib cmd):
+78330 78205  70192 /usr/bin/perl
+79076 78205  10032 /usr/bin/perl
+79168 79168  10048 /usr/bin/perl
+79243 79243   1280 /usr/bin/time
+79254 79243 638832 /Users/charlesabrooker/.local/bin/shellcheck
+78330 78205 70192 /usr/bin/perl check
+79076 78205 10032 /usr/bin/perl gate
+79168 79168 10048 /usr/bin/perl rsswatch
+t=+1.1 (0 procs):
+lint exit status: 143

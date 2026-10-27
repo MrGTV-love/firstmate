@@ -1,0 +1,220 @@
+lint process group: 57336
+t=-0 before SIGKILL (pid pgid rss_kib cmd):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 624544 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+1.6 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 1820576 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+3.0 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539424 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+4.2 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+5.8 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+7.2 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+8.6 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+9.9 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+11.5 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+12.8 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+14.2 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+15.6 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+17.0 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+18.5 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 2539600 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+19.9 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 3241040 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+21.3 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 3241040 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+22.8 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 3241040 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+24.4 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 3241040 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+25.9 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4048976 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+27.4 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4048976 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+28.9 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4048976 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+30.5 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4048976 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+32.1 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4048976 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+t=+33.7 (8 procs):
+57858 57760  69888 /usr/bin/perl
+58355 57760  10176 /usr/bin/perl
+58416 58416  10080 /usr/bin/perl
+58467 58467   1280 /usr/bin/time
+58477 58467 4978768 /Users/charlesabrooker/.local/bin/shellcheck
+57858 57760 69888 /usr/bin/perl check
+58355 57760 10176 /usr/bin/perl gate
+58416 58416 10080 /usr/bin/perl rsswatch
+SAFETY KILL 58477 4978768
+t=+35.0 (0 procs):
+lint exit status: 137

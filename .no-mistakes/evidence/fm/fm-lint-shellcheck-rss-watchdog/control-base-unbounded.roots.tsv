@@ -1,0 +1,19 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-spawn-acquisition-cleanup.test.sh	0	full	1793135068402
+end	1	tests/fm-spawn-acquisition-cleanup.test.sh	0	full	1793135068402	1793135089955	21553	1	findings	3340336	1	1	14.33	11.74
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	1

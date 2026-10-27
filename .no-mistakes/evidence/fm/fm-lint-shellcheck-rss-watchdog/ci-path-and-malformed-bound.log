@@ -1,0 +1,22 @@
+== /tmp/fm-rss-live.varskc: FM_LINT_REQUIRE_BOUNDS=1 bin/fm-lint.sh bin/fm-proc-budget.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+rc=2
+== /tmp/fm-rss-live.varskc: FM_LINT_ROOT_RSS_KIB=0x bin/fm-lint.sh bin/fm-proc-budget.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 0x.
+rc=2
+== /tmp/fm-rss-base.JTbwJs: FM_LINT_REQUIRE_BOUNDS=1 bin/fm-lint.sh bin/fm-proc-budget.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+rc=2
+== /tmp/fm-rss-base.JTbwJs: FM_LINT_ROOT_RSS_KIB=0x bin/fm-lint.sh bin/fm-proc-budget.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-proc-budget.sh
+rc=0

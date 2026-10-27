@@ -1,0 +1,7 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/private/tmp/fm-rss-live.varskc/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+lint rc=0 elapsed=24s bound=default
+max RSS of this run's shellcheck seen by outside monitor (KiB): 2018544
+this run's shellcheck processes left alive: 0
+shellcheck processes with cwd in this scratch: 0

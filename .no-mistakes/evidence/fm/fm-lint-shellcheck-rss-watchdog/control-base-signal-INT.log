@@ -1,0 +1,66 @@
+lint process group: 82079
+t=-0 before SIGINT (pid pgid rss_kib cmd):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 1594816 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+1.4 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527120 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+2.8 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+4.4 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+6.0 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+7.3 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+8.8 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+10.3 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+t=+11.8 (6 procs):
+82567 82526  69904 /usr/bin/perl
+82958 82526   9664 /usr/bin/perl
+83037 82526   1280 /usr/bin/time
+83041 82526 2527280 /Users/charlesabrooker/.local/bin/shellcheck
+82567 82526 69904 /usr/bin/perl check
+82958 82526 9664 /usr/bin/perl gate
+SAFETY KILL 83041 4225072
+lint exit status: 1

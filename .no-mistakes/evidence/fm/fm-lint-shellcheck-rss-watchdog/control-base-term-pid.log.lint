@@ -1,0 +1,3 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/private/tmp/fm-rss-base.JTbwJs/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

@@ -1,0 +1,202 @@
+lint process group: 62970
+t=-0 before SIGINT (pid pgid rss_kib cmd):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 1009520 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+1.5 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2107248 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+3.0 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+4.7 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+6.2 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+7.8 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+9.4 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+10.9 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+12.6 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2525216 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+14.1 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2533408 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+15.7 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2533408 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+17.1 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2533408 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+18.6 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 2809888 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+20.1 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 3297312 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+21.6 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 3297312 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+23.1 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 3297312 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+24.6 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4108320 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+26.1 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4108320 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+27.5 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4108320 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+29.2 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4108320 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+30.7 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4108320 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+t=+32.2 (8 procs):
+63965 63821  70032 /usr/bin/perl
+64637 63821   9936 /usr/bin/perl
+64700 64700  10000 /usr/bin/perl
+64754 64754   1280 /usr/bin/time
+64761 64754 4670496 /Users/charlesabrooker/.local/bin/shellcheck
+63965 63821 70032 /usr/bin/perl check
+64637 63821 9936 /usr/bin/perl gate
+64700 64700 10000 /usr/bin/perl rsswatch
+SAFETY KILL 64761 5108768
+t=+33.4 (0 procs):
+lint exit status: 1

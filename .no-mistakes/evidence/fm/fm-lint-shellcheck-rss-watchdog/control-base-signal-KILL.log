@@ -1,0 +1,65 @@
+lint process group: 76394
+t=-0 before SIGKILL (pid pgid rss_kib cmd):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 716704 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+1.5 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 1789856 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+2.8 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628512 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+4.2 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+5.6 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+7.1 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+8.4 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+9.8 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+t=+11.3 (6 procs):
+76909 76830  69984 /usr/bin/perl
+77387 76830  10176 /usr/bin/perl
+77469 76830   1280 /usr/bin/time
+77483 76830 2628672 /Users/charlesabrooker/.local/bin/shellcheck
+76909 76830 69984 /usr/bin/perl check
+77387 76830 10176 /usr/bin/perl gate
+lint exit status: 137

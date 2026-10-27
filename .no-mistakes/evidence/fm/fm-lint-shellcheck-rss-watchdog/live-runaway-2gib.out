@@ -1,0 +1,7 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: tests/fm-spawn-acquisition-cleanup.test.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+ledger: "/private/tmp/fm-rss-live.varskc/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+lint rc=0 elapsed=10s bound=2097152
+max shellcheck RSS seen by outside monitor (KiB): 2526064
+leftover shellcheck processes:        0

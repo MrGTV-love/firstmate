@@ -1,0 +1,7 @@
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - the resident-memory watch ends its command when the owner dies
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+bin/fm-proc-budget.sh 400 -- bash tests/fm-lint-slots.test.sh        6.95s user 6.58s system 47% cpu 28.528 total
