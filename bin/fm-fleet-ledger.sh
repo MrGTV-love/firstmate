@@ -240,7 +240,7 @@ append_status() { # <task> <status-line>
 CAPTURE_MAX_LINES=256
 
 capture_task() { # <task>; caller holds the lock
-  local task=$1 log offset data size complete tail line saved window window_lines skipped clamped=0 head lines drop
+  local task=$1 log offset data size complete tail line saved window window_lines skipped clamped=0 head lines drop start
   log="$STATE/$task.status"
   saved=$(offset_path "$task")
   [ -f "$log" ] && [ ! -L "$log" ] || return 0
@@ -266,13 +266,16 @@ capture_task() { # <task>; caller holds the lock
   fi
   # Exactly the counted bytes, so a log that is still growing cannot make the read chase
   # its writer. The trailing x keeps a final newline that command substitution would strip.
-  data=$(tail -c "+$((offset + 1))" "$log" | head -c "$((size - offset))"; printf x) || return 1
+  # A clamped read starts one byte before the window, already counted as skipped.
+  start=$((offset - clamped))
+  data=$(tail -c "+$((start + 1))" "$log" | head -c "$((size - start))"; printf x) || return 1
   data=${data%x}
   if [ "$clamped" = 1 ]; then
-    # The window starts mid-line unless the byte before it ended one: drop the partial line.
+    # The window starts mid-line unless the byte before it ended one: drop the partial line,
+    # which is empty when that byte is a newline.
     case "$data" in
-      *$'\n'*) head=${data%%$'\n'*}; data=${data#*$'\n'}; skipped=$((skipped + ${#head} + 1)); offset=$((offset + ${#head} + 1)) ;;
-      *) skipped=$((skipped + ${#data})); offset=$((offset + ${#data})); data='' ;;
+      *$'\n'*) head=${data%%$'\n'*}; data=${data#*$'\n'}; skipped=$((skipped + ${#head})); offset=$((offset + ${#head})) ;;
+      *) skipped=$((skipped + ${#data} - 1)); offset=$((offset + ${#data} - 1)); data='' ;;
     esac
   fi
   tail=${data##*$'\n'}

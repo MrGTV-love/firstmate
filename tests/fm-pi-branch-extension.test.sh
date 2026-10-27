@@ -4604,12 +4604,12 @@ import { pathToFileURL } from "node:url";
 import { syncBuiltinESMExports } from "node:module";
 import fs, { readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 
-const originalReadFileSync = fs.readFileSync;
+const originalOpenSync = fs.openSync;
 let countedStatusPath = "";
 let countedStatusReads = 0;
-fs.readFileSync = function(path, ...args) {
+fs.openSync = function(path, ...args) {
   if (String(path) === countedStatusPath) countedStatusReads += 1;
-  return originalReadFileSync.call(this, path, ...args);
+  return originalOpenSync.call(this, path, ...args);
 };
 syncBuiltinESMExports();
 
@@ -4921,12 +4921,23 @@ import { pathToFileURL } from "node:url";
 import { syncBuiltinESMExports } from "node:module";
 import fs, { writeFileSync } from "node:fs";
 
-const originalReadFileSync = fs.readFileSync;
+const originalOpenSync = fs.openSync;
+const originalReadSync = fs.readSync;
 let countedStatusPath = "";
 let countedStatusReads = 0;
-fs.readFileSync = function(path, ...args) {
-  if (String(path) === countedStatusPath) countedStatusReads += 1;
-  return originalReadFileSync.call(this, path, ...args);
+let countedStatusByteReads = 0;
+const countedStatusFds = new Set();
+fs.openSync = function(path, ...args) {
+  const fd = originalOpenSync.call(this, path, ...args);
+  if (String(path) === countedStatusPath) {
+    countedStatusReads += 1;
+    countedStatusFds.add(fd);
+  }
+  return fd;
+};
+fs.readSync = function(fd, ...args) {
+  if (countedStatusFds.has(fd)) countedStatusByteReads += 1;
+  return originalReadSync.call(this, fd, ...args);
 };
 syncBuiltinESMExports();
 
@@ -4945,18 +4956,24 @@ if (inside.corrupted || countedStatusReads !== 1 || inside.needsDecisionKeys.joi
 }
 
 countedStatusReads = 0;
+countedStatusByteReads = 0;
+countedStatusFds.clear();
 writeFileSync(statusPath, `captain-held [key=route]: awaiting the captain\n${"working: padding\n".repeat(120)}`);
 if (fs.statSync(statusPath).size <= 1500) throw new Error("the fixture log is not past the read limit");
 const past = scopeForUnreadWake(state, false);
 if (past.status !== "unsafe" || !past.corrupted || past.eligible || past.eligibleSeqs.length !== 0) {
   throw new Error(`a log past the read limit was not an unsafe scope: ${JSON.stringify(past)}`);
 }
-if (countedStatusReads !== 0) throw new Error(`a log past the read limit was read ${countedStatusReads} time(s)`);
+if (countedStatusReads !== 1 || countedStatusByteReads !== 0) {
+  throw new Error(`a log past the read limit was opened ${countedStatusReads} time(s) and read ${countedStatusByteReads} time(s)`);
+}
 
 // The limit is the cap plus the reserve: the same log is read again once the cap allows it.
 process.env.FM_STATUS_CAP_BYTES = "100000";
+countedStatusReads = 0;
+countedStatusByteReads = 0;
 const allowed = scopeForUnreadWake(state, false);
-if (allowed.corrupted || countedStatusReads !== 1) {
+if (allowed.corrupted || countedStatusReads !== 1 || countedStatusByteReads === 0) {
   throw new Error(`a log inside a raised limit was still refused: reads=${countedStatusReads} ${JSON.stringify(allowed)}`);
 }
 process.exit(0);
