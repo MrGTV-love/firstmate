@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Automatic PR handoff: real registration, capacity release, bounded status
-# reads, rotating eight-record admission, ten-minute refusal age-out, and a
-# hard pass time limit in an isolated home.
+# reads, rotating eight-record admission, checks-green crew-state readings,
+# refusal wakes, ten-minute refusal age-out, and a hard pass time limit in an
+# isolated home.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -71,7 +72,13 @@ if [ "$1" = -n ] && [ "$#" -eq 3 ] && [ -f "$3" ] && [ "$(wc -c < "$3")" -eq 655
 fi
 exec "$REAL_TAIL" "$@"
 SH
-  chmod +x "$FAKEBIN/gh" "$FAKEBIN/tail"
+  cat > "$FAKEBIN/fm-crew-state" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_READY_CASE/crew-state.calls"
+if [ -f "$FM_READY_CASE/crew-state.$1" ]; then cat "$FM_READY_CASE/crew-state.$1";
+else printf 'state: working · source: run-step · validating (running) · run: 01RUN\n'; fi
+SH
+  chmod +x "$FAKEBIN/gh" "$FAKEBIN/tail" "$FAKEBIN/fm-crew-state"
   : > "$CASE/gh.calls"
 }
 
@@ -86,7 +93,14 @@ write_ship() {  # <id> [kind] [mode]
 run_pass() {
   FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
     FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
+    FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
     PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" 2>&1
+}
+
+refusal_wakes() {  # <id>
+  [ -f "$CASE/home/state/.wake-queue" ] || { echo 0; return; }
+  awk -F '\t' -v key="pr-ready-refused:$1" '$3 == "check" && $4 == key' \
+    "$CASE/home/state/.wake-queue" | wc -l | tr -d ' '
 }
 
 start_watcher() {  # [VAR=value...]
@@ -165,6 +179,13 @@ printf 'done: PR %s checks green\n' "$URL" > "$CASE/home/state/ready.status"
 out=$(run_pass)
 assert_unregistered ready
 [ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail 'initial refusal missing'
+[ "$(refusal_wakes ready)" -eq 1 ] || fail 'refusal did not queue exactly one check wake'
+awk -F '\t' '$4 == "pr-ready-refused:ready"' "$CASE/home/state/.wake-queue" | grep -q "registration of $URL refused: .*draft" \
+  || fail 'refusal wake does not name the PR and the draft reason'
+age_refusal ready 660
+out=$(run_pass)
+[ "$(printf '%s\n' "$out" | grep -c 'registration refused:')" -eq 1 ] || fail 'aged refusal was not retried'
+[ "$(refusal_wakes ready)" -eq 1 ] || fail 'the same refusal reason queued a second wake'
 # The worker marks the PR ready without moving the copy: the head is unchanged.
 rm "$CASE/draft"
 calls_before=$(wc -l < "$CASE/gh.calls")
@@ -177,7 +198,35 @@ out=$(run_pass)
 [ "$HEAD" = "$(git -C "$CASE/project" rev-parse HEAD)" ] || fail 'fixture moved worker HEAD'
 assert_registered ready
 [ ! -e "$CASE/home/state/.pr-ready-reconcile/ready.refused" ] || fail 'registered task kept its refusal marker'
-pass 'refusal skips the task before any forge call for ten minutes, then registers once the cause healed at the same head'
+pass 'refusal queues one check wake per reason, skips the forge for ten minutes, then registers once the cause healed at the same head'
+
+# The 2026-10-20 shape: the run is green and names its PR, but the worker never
+# wrote a done line, so only fm-crew-state.sh's reading says the PR is ready.
+make_case crew-state-green
+write_ship ready
+write_ship nolog
+write_ship busy
+write_ship direct ship direct-PR
+for id in ready busy direct; do
+  printf 'working [at=1792479210]: validating with /no-mistakes\n' > "$CASE/home/state/$id.status"
+done
+rm "$CASE/home/state/nolog.status"
+for pair in ready:180 nolog:181 direct:187; do
+  printf 'state: done · source: run-step · checks green: PR ready for review (still monitoring for merge/close): https://github.com/example/project/pull/%s · run: 01RUN\n' \
+    "${pair#*:}" > "$CASE/crew-state.${pair%%:*}"
+done
+before=$(occupancy)
+out=$(run_pass)
+assert_registered ready https://github.com/example/project/pull/180
+assert_registered nolog https://github.com/example/project/pull/181
+assert_unregistered busy
+assert_unregistered direct
+[ "$before" -eq "$(($(occupancy) + 2))" ] || fail 'checks-green registration did not release one place per ship'
+! grep -qx direct "$CASE/crew-state.calls" || fail 'direct-PR ship consulted the no-mistakes run reading'
+calls_before=$(wc -l < "$CASE/crew-state.calls")
+out=$(run_pass)
+[ "$calls_before" -eq "$(($(wc -l < "$CASE/crew-state.calls") - 1))" ] || fail 'second pass did not re-read only the unready ship'
+pass 'a green no-mistakes run with no done line registers from its fm-crew-state.sh PR; a busy run and a direct-PR lane do not'
 
 make_case registration
 write_ship ready

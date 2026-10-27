@@ -2010,7 +2010,7 @@ my-project 2
 ```
 
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns declaration syntax, clone-name matching, same-origin occupancy, and the concurrency invariant.
-A PR-ready handoff is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; use `bin/fm-pr-check.sh <id> <PR url>` by hand only after a registration refusal or for a lane without the ready signal; local-only ships and scouts retain theirs until cleanup.
+A PR-ready handoff, or a no-mistakes run that `bin/fm-crew-state.sh` reads as checks green naming its PR, is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason and is retried after ten minutes, and `bin/fm-pr-check.sh <id> <PR url>` by hand remains for a fixed refusal or a lane with neither reading; local-only ships and scouts retain theirs until cleanup.
 The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
