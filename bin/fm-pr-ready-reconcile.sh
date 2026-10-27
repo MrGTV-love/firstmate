@@ -11,8 +11,9 @@
 # resolution notes follow it. A no-mistakes ship with no ready declaration is
 # registered when fm-crew-state.sh reads its run as `checks green: PR ready for
 # review` naming the run's PR; otherwise a missing declaration is a no-op. That
-# read uses no-mistakes' bounded ci log tail and its own ten-second limit; a read
-# past it is printed and skipped for this pass so later records still run.
+# read searches the run's full ci log for its newest checks marker, so a green
+# PR stays green however often main advances, under its own ten-second limit; a
+# read past it is printed and skipped for this pass so later records still run.
 # A refusal is printed, queued as one check wake per distinct reason, and
 # retained per task for ten minutes, during which the task is skipped before any
 # forge call; after that it is retried, so a repaired
@@ -65,7 +66,7 @@ CREW_STATE_READ_SECS=10
 crew_state_ready_url() {  # <id>
   local line component rc=0
   line=$(fm_run_timed "$CREW_STATE_READ_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_CI_LOG_TAIL=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_READ_SECS" \
+    FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_READ_SECS" \
     "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
   ! fm_timed_out "$rc" || return 124
   [ "$rc" -eq 0 ] || return 1

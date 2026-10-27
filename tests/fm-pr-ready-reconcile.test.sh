@@ -232,6 +232,55 @@ out=$(run_pass)
 [ "$calls_before" -eq "$(($(wc -l < "$CASE/crew-state.calls") - 1))" ] || fail 'second pass did not re-read only the unready ship'
 pass 'a green no-mistakes run with no done line registers from its fm-crew-state.sh PR; a busy run and a direct-PR lane do not'
 
+# The real fm-crew-state.sh reading: CI turned green once, then main advanced
+# far more often than no-mistakes' 40-line log tail holds. The green marker is
+# only in the full log, and the ship must still register.
+make_case crew-state-green-rearmed
+write_ship ready
+rm "$CASE/home/state/ready.status"
+cat > "$FAKEBIN/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+case "$1 ${2:-}" in
+  'axi '|'axi status') cat "$FM_READY_CASE/nm-status" ;;
+  'axi logs')
+    case " $* " in
+      *' --full '*) cat "$FM_READY_CASE/nm-ci.log" ;;
+      *) "$REAL_TAIL" -n 40 "$FM_READY_CASE/nm-ci.log" ;;
+    esac ;;
+  'daemon '*) printf 'daemon running (pid 4242)\n' ;;
+esac
+exit 0
+SH
+chmod +x "$FAKEBIN/no-mistakes"
+cat > "$CASE/nm-status" <<EOF
+run:
+  id: "01RUN"
+  branch: main
+  status: running
+  head: "$HEAD"
+  pr: "https://github.com/example/project/pull/192"
+  findings: none
+  steps[4]{step,status,findings,duration_ms}:
+    intent,completed,0,0
+    review,completed,0,0
+    push,completed,0,0
+    ci,running,0,0
+EOF
+{
+  printf 'monitoring CI for PR #192 (timeout: 4h0m0s)...\n'
+  printf 'all CI checks passed - still monitoring until merged or closed\n'
+  for i in $(seq 1 60); do
+    printf 'base branch advanced (%07d..%07d), re-arming CI monitor timeout\n' "$i" "$((i + 1))"
+  done
+} > "$CASE/nm-ci.log"
+before=$(occupancy)
+out=$(FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
+  FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
+  PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" 2>&1)
+assert_registered ready https://github.com/example/project/pull/192
+[ "$before" -eq "$(($(occupancy) + 1))" ] || fail 'green run past the log tail did not release its place'
+pass 'a green run whose marker is 60 base-advance lines back still registers through the real crew-state reading'
+
 # A run reading that never answers is cut at its own bound and skipped, so the
 # ready ship after it still registers in the same pass.
 make_case crew-state-hang
