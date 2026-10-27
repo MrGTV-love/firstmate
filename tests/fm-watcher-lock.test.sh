@@ -2206,28 +2206,6 @@ PY
   pass "spilled rows wait for a held queue lock, then replay in order ahead of newer rows"
 }
 
-test_lock_alarm_threshold_normalizes() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "alarm threshold normalization failed"
-import os, pathlib, subprocess, sys, tempfile, time
-lib = sys.argv[1]
-check = '. "$1"; fm_lock_monitor_check || exit $?; fm_lock_monitor_check || exit $?'
-for value, age, alarms in (("5m", 301, True), ("5m", 200, False), ("0", 200, False), ("00", 200, False), ("010", 20, True), ("", 200, False)):
-    with tempfile.TemporaryDirectory(prefix="fm-lock-threshold-") as d:
-        lock = pathlib.Path(d, ".fleet-ledger.lock"); lock.mkdir()
-        (lock / "pid").write_text(f"{os.getpid()}\n")
-        old = time.time() - age
-        os.utime(lock / "pid", (old, old))
-        env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_LOCK_ALARM_SECS=value)
-        run = subprocess.run(["bash", "-c", check, "_", lib], env=env, capture_output=True, text=True, timeout=30)
-        assert run.returncode == 0, (value, run)
-        warned = run.stderr.count("invalid FM_LOCK_ALARM_SECS")
-        assert warned == (1 if value in ("5m", "0", "00") else 0), (value, run.stderr)
-        queued = pathlib.Path(d, ".wake-queue")
-        assert (queued.exists() and "long-held" in queued.read_text()) == alarms, (value, age)
-PY
-  pass "invalid or zero alarm thresholds warn once and use 300s without stopping observation"
-}
-
 test_alarm_freed_queue_keeps_producer_order() {
   local dir
   dir=$(make_case lock-alarm-freed-order)
@@ -2403,7 +2381,6 @@ try:
             old = time.time() - age
             os.utime(lock / "pid", (old, old))
             env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d)
-            env.pop("FM_LOCK_ALARM_SECS", None)
             with (blocked_waiter(lock, lib, env) if alarms else contextlib.nullcontext()):
                 subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check && fm_lock_monitor_check', "_", lib], env=env, check=True, timeout=30)
             queue = pathlib.Path(d, ".wake-queue")
@@ -2459,7 +2436,6 @@ def observe(name, pid, age, code, waiter=False):
         old = time.time() - age
         os.utime(lock / "pid", (old, old))
         env = dict(os.environ, FM_HOME=d, FM_STATE_OVERRIDE=d, FM_PROC_ROOT_OVERRIDE=os.path.join(d, "missing-proc"))
-        env.pop("FM_LOCK_ALARM_SECS", None)
         with (blocked_waiter(lock, lib, env) if waiter else contextlib.nullcontext()):
             for _ in range(2 if waiter else 1):
                 subprocess.run(["bash", "-c", code, "_", lib, str(pid)], env=env, check=True, timeout=30)
@@ -2824,7 +2800,7 @@ with tempfile.TemporaryDirectory(prefix="fm-lock-alarm-") as d:
     (queue_lock / "pid").write_text(str(dead.pid) + "\n")
     os.utime(queue_lock / "pid", (old, old))
     output = subprocess.check_output(emergency, env=env, text=True, timeout=30)
-    assert f"owner={dead.pid}" in output, output
+    assert f"owner={dead.pid} state=dead " in output, output
     assert (queue_lock / "pid").read_text().strip() == str(dead.pid), "alarm reclaimed a dead owner"
     assert len(queue.read_text().splitlines()) == 2, "emergency bypass altered the blocked queue"
 PY
@@ -3048,7 +3024,6 @@ test_lock_alarm_while_queue_append_waits
 test_alarm_spills_consumed_append_for_next_watcher
 test_alarm_after_queue_frees_appends_before_after_output
 test_wake_spill_replay_waits_for_held_queue
-test_lock_alarm_threshold_normalizes
 test_alarm_freed_queue_keeps_producer_order
 test_alarm_observation_failure_keeps_waiting_append
 test_alarm_runs_during_watcher_down_waits

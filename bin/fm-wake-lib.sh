@@ -5,8 +5,7 @@
 # Shared-helper locks publish diagnostic receipts in STATE/.lock-monitor;
 # successful release retires them. The watcher checks those receipts and adopts
 # pre-upgrade locks in this home's state tree, without following directory links.
-# FM_LOCK_ALARM_SECS (positive seconds, default 300; an invalid or zero value
-# warns once and uses 300) is the age limit for the measured fleet-ledger,
+# A fixed 300s is the age limit for the measured fleet-ledger,
 # watcher-down and wake-queue locks; every other lock reports only a dead or
 # zombie owner that still blocks a live waiter on two consecutive checks
 # (fm_lock_monitor_check). Each ownership episode reports once through a check
@@ -1712,8 +1711,8 @@ _fm_lock_monitor_adopt() {  # <lock>
 # symlinks, without following directory symlinks into another home. The check
 # only reports.
 # Each lock class has its own basis:
-# - fleet-ledger, watcher-down, wake-queue: hold age past FM_LOCK_ALARM_SECS
-#   (default 300s). measured: 25 releases per lock on 2026-10-26 gave p99/max
+# - fleet-ledger, watcher-down, wake-queue: hold age past a fixed 300s.
+#   measured: 25 releases per lock on 2026-10-26 gave p99/max
 #   222.593ms for fleet-ledger, 137.998ms for watcher-down, and 447.383ms for
 #   wake-queue. The 300s threshold leaves over 600x the largest measured hold,
 #   not a claim that all callers finish that fast.
@@ -1732,19 +1731,12 @@ _fm_lock_monitor_adopt() {  # <lock>
 # process-lifetime singletons and the observer's own holds are skipped.
 fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
   local settle=${1:-} record lock owner pid mtime now age state parent command reason key old identity
-  local waiter waiter_pid waiter_lock waiters first='' limit=${FM_LOCK_ALARM_SECS:-300}
+  local waiter waiter_pid waiter_lock waiters first='' limit=300
   local episodes=$'\n' episodes_loaded=0 marker state_abs='' dead_pid
   local candidates="$STATE/.lock-monitor/dead-owner-candidates" seen=$'\n' observed=$'\n'
   # shellcheck disable=SC2034 # Read by the watcher after this check returns.
   FM_LOCK_MONITOR_UNQUEUED=0
   FM_LOCK_MONITOR_PENDING=''
-  case "$limit" in ''|*[!0-9]*) limit=0 ;; *) limit=$((10#$limit)) ;; esac
-  if [ "$limit" -le 0 ]; then
-    [ -n "${_FM_LOCK_ALARM_WARNED:-}" ] \
-      || printf 'fm-lock: invalid FM_LOCK_ALARM_SECS=%s; using 300\n' "$FM_LOCK_ALARM_SECS" >&2
-    _FM_LOCK_ALARM_WARNED=1
-    limit=300
-  fi
   [ -d "$STATE/.lock-monitor" ] || mkdir "$STATE/.lock-monitor" || return 1
   # Dead-owner candidates from the previous completed check only: an
   # interrupted or failed check leaves none, so it never counts as a poll.
@@ -1853,9 +1845,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     fi
     state=$(ps -o stat= -p "$pid" 2>/dev/null) || state=unknown
     read -r state <<< "$state"
-    if [ -n "$dead_pid" ]; then
-      case "$state" in ''|unknown) state=dead ;; esac
-    fi
+    case "$state" in ''|unknown) fm_pid_alive "$pid" || state=dead ;; esac
     parent=$(ps -o ppid= -p "$pid" 2>/dev/null) || parent=unknown
     read -r parent <<< "$parent"
     # comm names the parent executable without copying prompts or credentials

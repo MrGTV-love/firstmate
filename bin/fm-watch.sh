@@ -82,7 +82,7 @@
 #                          parent_command=<command> age=<seconds>s waiters=<n>
 #                          [trigger=dead-owner]
 #                          a fleet-ledger, watcher-down or wake-queue hold
-#                          exceeded FM_LOCK_ALARM_SECS; or, with
+#                          exceeded 300s; or, with
 #                          trigger=dead-owner, any other lock's owner is a
 #                          zombie (state Z) or gone (state=dead) while a live
 #                          waiter stays blocked on it across two consecutive
