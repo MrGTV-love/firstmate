@@ -150,9 +150,13 @@ _fm_status_unstamped() {  # <status-line> <out-var> -> line with its stamp remov
 # its cursor) appends nothing. A caller that owns evidence of a new episode
 # decides that itself, as bin/fm-pending-reply-lib.sh's escalation does.
 status_event_recorded() {  # <status-file> <new-status-line>
-  local wanted line untimed size
+  local wanted line untimed size needle
   [ -f "$1" ] || return 1
   _fm_status_untimed "$2" wanted
+  # A line whose untimed form is <wanted> holds <wanted>'s text from its first colon on,
+  # byte for byte (the time tag sits before that colon), or is <wanted> itself. One grep
+  # pass keeps only those lines, so the loop never walks the rest of the log.
+  case "$wanted" in *:*) needle=":${wanted#*:}" ;; *) needle=$wanted ;; esac
   # The whole log is read, exactly, up to the read limit (bin/fm-status-cap-lib.sh): a
   # match stays recorded for the life of the file, so no earlier part may be skipped.
   # A log past the limit is refused and named, and the event then reads as not
@@ -165,6 +169,6 @@ status_event_recorded() {  # <status-file> <new-status-line>
   while IFS= read -r line || [ -n "$line" ]; do
     _fm_status_untimed "$line" untimed
     [ "$untimed" != "$wanted" ] || return 0
-  done < <(fm_status_read_exact "$1" 0 "$size" 0)
+  done < <(fm_status_read_exact "$1" 0 "$size" 0 | LC_ALL=C grep -aF -e "$needle")
   return 1
 }

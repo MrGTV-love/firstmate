@@ -1039,11 +1039,12 @@ test_history_readers_refuse_a_log_past_the_limit_and_name_it() {
 # largest healthy log the cap was measured from and far below the byte limit. Every
 # whole-log history reader and open-decisions fold reads it and answers from it: the
 # read limit judges bytes, so no line count refuses a log under the cap.
-# A runaway of tiny non-event lines (the 2026-10-18 `text` shape) holds a log at the read
-# limit, so the history readers read it. That must cost no walk of its lines in the shell:
-# each reader answers inside TINY_LINE_BOUND_SECS, and a watcher that reads the lane on
-# every poll keeps its cap check, so another lane that passes the cap is still stopped and
-# woken for within that bound.
+# A runaway of tiny non-event lines holds a log at the read limit, so the history readers
+# read it: the 2026-10-18 `text` shape, a counter (`1793124970: text`) and a label
+# (`Reason: retrying`), the last two holding a colon. That must cost no walk of its lines
+# in the shell: each reader answers inside TINY_LINE_BOUND_SECS, and a watcher that reads
+# the lane on every poll keeps its cap check, so another lane that passes the cap is still
+# stopped and woken for within that bound.
 TINY_LINE_BOUND_SECS=20
 test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
   local dir state status other limit n reader out want line watch_pid
@@ -1053,9 +1054,9 @@ test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
   dir=$(make_case tiny-at-limit); state="$dir/state"; status="$state/a.status"; other="$state/b.status"
   limit=$((FM_STATUS_CAP_BYTES + FM_STATUS_CAP_RESERVE_BYTES))
   printf 'needs-decision [key=q1]: an early question\npaused [key=ext]: waiting on the vendor\n' > "$status"
-  n=$(( (limit - $(file_size "$status")) / 5 ))
-  perl -e 'print "text\n" x $ARGV[0]' "$n" >> "$status"
-  [ "$(file_size "$status")" -le "$limit" ] && [ "$(file_size "$status")" -gt $((limit - 5)) ] \
+  n=$(( (limit - $(file_size "$status")) / 39 ))
+  perl -e 'print "text\n1793124970: text\nReason: retrying\n" x $ARGV[0]' "$n" >> "$status"
+  [ "$(file_size "$status")" -le "$limit" ] && [ "$(file_size "$status")" -gt $((limit - 39)) ] \
     || fail "the fixture is $(file_size "$status") bytes, not at the $limit byte read limit"
 
   for reader in last_status_line status_declared_wait_line status_open_decisions status_open_decisions_incremental status_declared_wait_identity; do
@@ -1064,7 +1065,7 @@ test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
     case "$reader" in
       last_status_line|status_declared_wait_line) want='paused [key=ext]: waiting on the vendor' ;;
       status_open_decisions*) want=$'q1\tneeds-decision\tan early question' ;;
-      *) want="ext:$(printf 'paused [key=ext]: waiting on the vendor' | cksum | cut -d' ' -f1):2" ;;
+      *) want="ext:$(printf 'paused [key=ext]: waiting on the vendor' | cksum | cut -d' ' -f1):43" ;;
     esac
     [ "$out" = "$want" ] || fail "$reader answered '$out' on the log at the read limit, not '$want'"
   done
@@ -1097,6 +1098,50 @@ test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
     || fail "the watcher reading a lane at the read limit did not wake within ${TINY_LINE_BOUND_SECS}s for another lane over the cap"
   grep -q 'status-log-over-cap: file=b.status' "$dir/second.out" || fail "the second run did not name the other lane over the cap: $(cat "$dir/second.out")"
   pass "a log at the read limit of tiny lines is read by every history reader within ${TINY_LINE_BOUND_SECS}s, and a watcher reading it every poll still wakes for another lane over the cap"
+}
+
+# The watcher reads a log past one tail window (4 MiB) from that window only, so the
+# declared-wait identity must not count from the window's start: it is the byte offset
+# of the episode's first line in the log, the same in the watcher and outside it, kept by
+# a restated wait and by an unrelated line, and changed by a replacement wait.
+test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window() {
+  local dir status want tail_id whole_id
+  dir=$(make_case identity-offset); status="$dir/state/w.status"
+  perl -e 'print "text\n" x 1100000' > "$status"
+  want=$(file_size "$status")
+  printf 'paused [key=ext]: waiting on the vendor\n' >> "$status"
+  tail_id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the wait no identity"
+  whole_id=$(wait_identity_in 0 "$status") || fail "the whole-log read gave the wait no identity"
+  [ "$tail_id" = "$whole_id" ] || fail "the watcher and whole-log identities differ: $tail_id vs $whole_id"
+  case "$tail_id" in "ext:"*":$want") ;; *) fail "the identity is not at the pause's byte offset $want: $tail_id" ;; esac
+  printf 'paused [key=ext]: waiting on the vendor\n' >> "$status"
+  [ "$(wait_identity_in 1 "$status")" = "$tail_id" ] || fail "restating the wait moved its identity: $(wait_identity_in 1 "$status") vs $tail_id"
+  printf '  still waiting, nothing new\n' >> "$status"
+  [ "$(wait_identity_in 1 "$status")" = "$tail_id" ] || fail "an unrelated line moved the wait's identity: $(wait_identity_in 1 "$status") vs $tail_id"
+  printf 'paused [key=other]: a different wait\n' >> "$status"
+  [ "$(wait_identity_in 1 "$status")" != "$tail_id" ] || fail "a replacement wait kept the earlier identity"
+  [ "$(wait_identity_in 1 "$status")" = "$(wait_identity_in 0 "$status")" ] || fail "the replacement's watcher and whole-log identities differ"
+  pass "past the tail window the declared-wait identity is the episode's byte offset in the log: kept by a restatement and an unrelated line, changed by a replacement, the same in the watcher"
+}
+
+wait_identity_in() {  # <tail-mode 0|1> <status-file>
+  FM_STATUS_EVENT_SCAN_TAIL=$1 bash -c '. "$1/fm-classify-lib.sh"; status_declared_wait_identity "$2"' _ "$ROOT/bin" "$2"
+}
+
+# The watcher's window read starts one tail window before the end. When the byte before
+# that start ends a line, the window's first line is whole, and it can be the only event
+# in the window: the read keeps it.
+test_the_watcher_window_keeps_a_whole_first_line() {
+  local dir status event out
+  dir=$(make_case window-first-line); status="$dir/state/f.status"
+  event='paused [key=ext]: waiting on the vendor'
+  perl -e 'print "working [at=1]: older step\n" x 1000' > "$status"
+  perl -e 'my ($event, $window) = @ARGV; my $rest = $window - length($event) - 1; print "$event\n", "text\n" x int($rest / 5); print "x" x ($rest % 5 - 1), "\n" if $rest % 5' \
+    "$event" 4194304 >> "$status"
+  out=$(FM_STATUS_EVENT_SCAN_TAIL=1 bash -c '. "$1/fm-classify-lib.sh"; last_status_line "$2"' _ "$ROOT/bin" "$status")
+  [ "$out" = "$event" ] || fail "the watcher read dropped the whole first line of its window: '$out'"
+  [ "$(wait_identity_in 1 "$status")" = "$(wait_identity_in 0 "$status")" ] || fail "the watcher identity of the window's first line differs from the whole-log one"
+  pass "the watcher's window read keeps a whole first line that starts exactly at the window"
 }
 
 test_history_readers_read_a_healthy_log_of_many_lines() {
@@ -1340,9 +1385,11 @@ test_latest_event_endpoint_is_a_position_in_the_whole_log() {
 }
 
 test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log() {
-  local dir state status first second third
+  local dir state status first second third offset
   dir=$(make_case wait-identity); state="$dir/state"; status="$state/w.status"
-  { perl -e 'print "working [at=$_]: step $_\n" for 1 .. 5000'; printf 'paused: waiting for CI\n'; } > "$status"
+  perl -e 'print "working [at=$_]: step $_\n" for 1 .. 5000' > "$status"
+  offset=$(file_size "$status")
+  printf 'paused: waiting for CI\n' >> "$status"
   first=$(bash -c '. "$1/fm-classify-lib.sh"; status_declared_wait_identity "$2"' _ "$ROOT/bin" "$status") \
     || fail "the declared wait of the 5001 line log has no identity"
   printf '  still waiting, nothing new\n' >> "$status"
@@ -1353,8 +1400,8 @@ test_declared_wait_identity_is_stable_across_continuation_lines_in_a_long_log() 
     || fail "the declared wait lost its identity after two continuation lines"
   [ "$first" = "$second" ] && [ "$second" = "$third" ] \
     || fail "the identity drifted with continuation lines: $first / $second / $third"
-  case "$first" in *:5001) ;; *) fail "the identity position is not the pause's true line, 5001: $first" ;; esac
-  pass "a long log's declared wait keeps one identity at its true line position however many continuation lines follow"
+  case "$first" in *:"$offset") ;; *) fail "the identity position is not the pause's byte offset, $offset: $first" ;; esac
+  pass "a long log's declared wait keeps one identity at its true byte position however many continuation lines follow"
 }
 
 test_the_fleet_snapshot_script_stays_bounded_on_a_two_gib_log() {
@@ -1511,6 +1558,8 @@ tests=(
   test_history_readers_refuse_a_log_past_the_limit_and_name_it
   test_history_readers_read_a_healthy_log_of_many_lines
   test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk
+  test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window
+  test_the_watcher_window_keeps_a_whole_first_line
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
   test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown

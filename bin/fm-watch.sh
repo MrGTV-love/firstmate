@@ -2802,6 +2802,14 @@ status_cap_tick() {
   STATUS_CAP_TICK_AT=$SECONDS
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
   [ -n "$rows" ] || return 0
+  # In a subshell (a status read the watcher captures with $(...)) a wake would print
+  # into the capture and end only that subshell. There the tick only contains: the
+  # scan stops an omp writer over the cap and nothing is queued or marked, so the
+  # watcher's own next tick scans the file again, queues it and wakes.
+  if [ "$BASH_SUBSHELL" -ne 0 ]; then
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan >/dev/null 2>&1 || :
+    return 0
+  fi
   records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
   [ -n "$records" ] || return 0
   while IFS=$'\t' read -r ident path size text; do
@@ -2836,8 +2844,10 @@ EOF
 # The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
 # this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
 # runaway writer that starts during it would otherwise run unchecked until the loop ends.
-# It looks at the size cap when a poll has passed since the last look. The caller must run
-# in the watcher's own shell, not in a command substitution: a stop here exits the watcher.
+# It looks at the size cap when a poll has passed since the last look. In the watcher's own
+# shell a stop here exits the watcher with the over-cap wake; in a command substitution
+# (the status-event library's scans) it only stops the writer, and the wake follows at
+# the watcher's next tick (status_cap_tick).
 # It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
 # because the stop appends a row under that same lock.
 status_cap_span_tick() {

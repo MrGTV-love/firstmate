@@ -645,12 +645,14 @@ test_status_declared_wait_identity() {
 }
 
 test_wait_identity_concurrent_append_uses_one_snapshot() {
-  local dir f one two i
+  local dir f one two i offset
   dir=$(make_case wait-identity-concurrent); f="$dir/t.status"
   for i in $(seq 1 298); do printf 'Continuation prose.\n'; done > "$f"
-  printf 'working: resumed\npaused [key=k]: original wait\n' >> "$f"
+  printf 'working: resumed\n' >> "$f"
+  offset=$(wc -c < "$f" | tr -d ' ')
+  printf 'paused [key=k]: original wait\n' >> "$f"
   one=$(status_declared_wait_identity "$f")
-  [ "${one##*:}" = 300 ] || fail "initial wait identity had the wrong line position: $one"
+  [ "${one##*:}" = "$offset" ] || fail "initial wait identity had the wrong byte position: $one"
   # The append lands once the endpoint is captured and the span is read, through the
   # span-reader seam; the fixture never counts or matches the reader's internal calls.
   # shellcheck disable=SC2329 # Invoked indirectly through FM_STATUS_SPAN_READER.

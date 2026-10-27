@@ -69,26 +69,55 @@ last_status_line() {  # <status-file> [<previous-event-var>]
   return "$rc"
 }
 
-# The lines on stdin a whole-log event scan must look at, in order: every line that holds
-# a colon or the captain tokens (FM_CAPTAIN_RE) anywhere, in any case, which covers every
-# line _fm_status_line_is_event can accept, and then the last nonblank line when it is
-# not one of them, so a scan's no-event answer is the line it always was. One awk pass:
-# the shell loop after it walks only these, so non-event lines cost it nothing. With
-# `numbered` each line is `<line number>\t<line>` and the last nonblank line is not added.
-_fm_status_event_candidates() {  # [numbered]
-  FM_STATUS_EVENT_CANDIDATE_RE="(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" LC_ALL=C awk -v numbered="${1:+1}" '
-    BEGIN { re = tolower(ENVIRON["FM_STATUS_EVENT_CANDIDATE_RE"]) }
-    { cand = index($0, ":") > 0 || tolower($0) ~ re }
-    cand { if (numbered) print NR "\t" $0; else print }
-    /[^[:space:]]/ { last = $0; last_cand = cand }
+# The lines on stdin a whole-log event scan must look at, in order: the event-shaped
+# lines, a superset of every line _fm_status_line_is_event can accept, and then the last
+# nonblank line when it is not one of them, so a scan's no-event answer is the line it
+# always was. A line is event-shaped when it holds a colon and its head (the text before
+# the first colon or bracket) is a recognized verb or holds a `corr` token; when, with
+# its bracket tags removed, a single word that starts with no capital, digit or
+# punctuation, or a head holding `corr`, comes before a first colon that a space or the
+# end of the line follows; or when a captain token (FM_CAPTAIN_RE) starts it, in any case.
+# One awk pass: the shell loop after it walks only these, so prose, counters, labels and
+# URLs cost it nothing. With `numbered <base>` each line is `<byte offset>\t<line>`, the
+# offset counted from <base>, the log byte where stdin starts, and the last nonblank line
+# is not added.
+_fm_status_event_candidates() {  # [numbered <base>]
+  FM_STATUS_EVENT_CANDIDATE_RE="(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" \
+    FM_STATUS_EVENT_CANDIDATE_VERBS="working needs-decision blocked done failed note ${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT} ${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT} ${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}" \
+    LC_ALL=C awk -v numbered="${1:+1}" -v base="${2:-0}" '
+    BEGIN {
+      re = "^[[:space:]]*" tolower(ENVIRON["FM_STATUS_EVENT_CANDIDATE_RE"])
+      n = split(ENVIRON["FM_STATUS_EVENT_CANDIDATE_VERBS"], v, " ")
+      for (i = 1; i <= n; i++) verbs[v[i]] = 1
+    }
+    {
+      cand = 0
+      if (index($0, ":") > 0) {
+        head = $0; sub(/[:[].*$/, "", head); sub(/^[[:space:]]+/, "", head); sub(/[[:space:]]+$/, "", head)
+        cand = (head in verbs) || index(head, "corr") > 0
+      }
+      if (!cand) {
+        t = $0; gsub(/\[[^]]*\]/, "", t); sub(/^[[:space:]]+/, "", t)
+        c = index(t, ":")
+        if (c > 0 && (c == length(t) || substr(t, c + 1, 1) ~ /[[:space:]]/)) {
+          head = substr(t, 1, c - 1); sub(/[[:space:]]+$/, "", head)
+          cand = index(head, "corr") > 0 || (head !~ /[[:space:]]/ && head ~ /^[^A-Z0-9[:punct:]]/)
+        }
+        if (!cand) cand = tolower(t) ~ re || tolower($0) ~ re
+      }
+      if (cand) { if (numbered) print base + pos "\t" $0; else print }
+      if ($0 ~ /[^[:space:]]/) { last = $0; last_cand = cand }
+      pos += length($0) + 1
+    }
     END { if (!numbered && last != "" && !last_cand) print last }'
 }
 
 # The byte where a whole-log event scan of a log of <endpoint> bytes starts, into
 # <out-var>: 0, the whole log. The watcher sets FM_STATUS_EVENT_SCAN_TAIL=1, because it
 # runs these scans for every window on every poll: there a scan starts no earlier than
-# one tail window (bin/fm-status-cap-lib.sh) before the end, and the caller drops the
-# partial first line. A healthy log fits in that window whole.
+# one tail window (bin/fm-status-cap-lib.sh) before the end. The caller reads from one
+# byte before that start and drops the first line, so it drops a partial first line and
+# keeps a whole one. A healthy log fits in that window whole.
 _fm_status_event_scan_start() {  # <endpoint> <out-var>
   local __fm_es_window
   printf -v "$2" '%s' 0
@@ -111,7 +140,7 @@ _fm_status_event_history() {  # <status-file>
     fm_status_cat "$1" | _fm_status_event_candidates
     rc=${PIPESTATUS[0]}
   else
-    _fm_status_read_span "$1" "$start" "$((size - start))" 0 | tail -n +2 | _fm_status_event_candidates
+    _fm_status_read_span "$1" "$((start - 1))" "$((size - start + 1))" 0 | tail -n +2 | _fm_status_event_candidates
     rc=${PIPESTATUS[0]}
   fi
   return "$rc"
@@ -193,6 +222,7 @@ _fm_status_event_scan() {
   local line last='' prev='' fallback='' legacy_re
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
   while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "${FM_STATUS_SPAN_TICK:-}" ] || "$FM_STATUS_SPAN_TICK"
     case "$line" in *[![:space:]]*) fallback=$line ;; *) continue ;; esac
     _fm_status_line_is_event "$line" "$legacy_re" && { prev=$last; last=$line; }
   done
@@ -341,6 +371,7 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
     i=$((i + 1))
   done
   while [ "$i" -gt 0 ]; do
+    [ -z "${FM_STATUS_SPAN_TICK:-}" ] || "$FM_STATUS_SPAN_TICK"
     i=$((i - 1))
     line=${_fm_wait_scan_lines[i]}
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac
@@ -365,7 +396,7 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 
 # The identity of the declared wait status_declared_wait_line names, for a
 # consumer that must tell a RESTATED wait from a REPLACEMENT one. Prints
-# `<key>:<cksum>:<line>` and returns 0 while a wait is declared; returns 1 when
+# `<key>:<cksum>:<offset>` and returns 0 while a wait is declared; returns 1 when
 # none is declared or the read fails. declared_wait_scope in bin/fm-watch.sh owns
 # the fail-open fallback. The identity is the FIRST line of the contiguous episode:
 # the declared line plus earlier lines of the same verb and key, reaching back past
@@ -373,32 +404,40 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # line for this key. A key re-declared after its own resolved line is therefore a
 # new episode even when both landed between two polls. A keyless line has no key
 # to compare, so it is its own episode (key `-`) and any new keyless text is a
-# replacement. <cksum> and <line> bind the identity to that first line's text and
-# position, so two identical lines in different episodes stay distinct.
+# replacement. <cksum> and <offset> bind the identity to that first line's text and
+# position, the byte offset where it starts in the log, so two identical lines in
+# different episodes stay distinct.
 # Declaration, line count, and episode position all come from one captured byte
 # endpoint, so an append during the read cannot change the episode's position.
 # The episode is walked over the snapshot's numbered candidate event lines
-# (_fm_status_event_candidates), so a line keeps its true line number and non-event
-# lines cost the walk nothing; the walk takes the last window of them first and widens
-# to all of them when it finds no opener or the episode remains open at the window's
-# start. In the watcher the snapshot is the log's last tail window
-# (_fm_status_event_scan_start), and the line number counts from there.
+# (_fm_status_event_candidates), so non-event lines cost the walk nothing; the walk
+# takes the last window of them first and widens to all of them when it finds no opener
+# or the episode remains open at the window's start. In the watcher the snapshot is the
+# log's last tail window (_fm_status_event_scan_start); the offset is still counted from
+# the start of the log, so the identity is the same in both modes and does not move as
+# the window does.
 status_declared_wait_identity() {  # <status-file>
-  local f=$1 declared verb key resolve legacy_re rec idx text endpoint snapshot start numbered
+  local f=$1 declared verb key resolve legacy_re rec idx text endpoint snapshot start numbered taken
   [ -f "$f" ] && [ -r "$f" ] || return 1
   endpoint=$(_fm_status_file_size "$f") || return 1
   endpoint=${endpoint//[[:space:]]/}
   _fm_status_event_scan_start "$endpoint" start
   snapshot="$(_fm_status_span_scratch "$f").wait"
-  _fm_status_read_span "$f" "$start" "$((endpoint - start))" 0 2>/dev/null | tail -n "+$((start > 0 ? 2 : 1))" > "$snapshot"
-  [ "${PIPESTATUS[0]}" -eq 0 ] || { rm -f "$snapshot"; return 1; }
+  if [ "$start" -eq 0 ]; then
+    _fm_status_read_span "$f" 0 "$endpoint" 0 > "$snapshot" 2>/dev/null || { rm -f "$snapshot"; return 1; }
+  else
+    _fm_status_read_span "$f" "$((start - 1))" "$((endpoint - start + 1))" 0 2>/dev/null | tail -n +2 > "$snapshot"
+    [ "${PIPESTATUS[0]}" -eq 0 ] || { rm -f "$snapshot"; return 1; }
+  fi
+  _fm_status_file_size "$snapshot" taken || { rm -f "$snapshot"; return 1; }
+  taken=${taken//[[:space:]]/}
   declared=$(status_declared_wait_line "$snapshot")
   [ -n "$declared" ] || { rm -f "$snapshot"; return 1; }
   status_line_verb "$declared" verb
   key=$(_fm_decision_key "$declared" '') || key=
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
-  numbered=$(_fm_status_event_candidates numbered < "$snapshot") || { rm -f "$snapshot"; return 1; }
+  numbered=$(_fm_status_event_candidates numbered "$((endpoint - taken))" < "$snapshot") || { rm -f "$snapshot"; return 1; }
   rm -f "$snapshot"
   rec=$(printf '%s\n' "$numbered" | tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" \
     | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || rec=
@@ -411,9 +450,9 @@ status_declared_wait_identity() {  # <status-file>
   printf '%s:%s:%s' "${key:--}" "$(printf '%s' "$text" | cksum | cut -d' ' -f1)" "$idx"
 }
 
-# Walk the numbered status lines on stdin (`<line number>\t<line>`) back from the newest
+# Walk the numbered status lines on stdin (`<byte offset>\t<line>`) back from the newest
 # event to the first line of the declared wait's episode and print
-# `<state>\t<line number>\t<line>`, where <state> is `open` when the episode reached the
+# `<state>\t<byte offset>\t<line>`, where <state> is `open` when the episode reached the
 # start of the input without a closing event, so a caller reading a bounded window must
 # widen it, and `closed` otherwise. Returns 1 when the stream holds no declared wait.
 _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
@@ -425,6 +464,7 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
     i=$((i + 1))
   done
   while [ "$i" -gt 0 ]; do
+    [ -z "${FM_STATUS_SPAN_TICK:-}" ] || "$FM_STATUS_SPAN_TICK"
     i=$((i - 1))
     line=${_fm_wait_scan_lines[i]}
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac

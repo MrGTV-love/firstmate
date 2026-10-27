@@ -2300,15 +2300,18 @@ key_opening_line() {  # <status-file> <key>
   _fm_status_kind "$f" '' kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  # grep -n keeps each line's number and only the lines that hold a decision verb, so the
+  # fold walks those alone.
   while IFS= read -r line || [ -n "$line" ]; do
-    n=$((n + 1))
+    n=${line%%:*}
+    line=${line#*:}
     status_line_verb "$line" verb
     case "$verb" in
       needs-decision|blocked|done|failed|"$resolve"|"$held")
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
         ;;
     esac
-  done < <(fm_status_cat "$f")
+  done < <(fm_status_cat "$f" | LC_ALL=C grep -naF -e needs-decision -e blocked -e 'done' -e failed -e "$resolve" -e "$held")
   while IFS= read -r row; do
     case "$row" in
       "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;

@@ -42,10 +42,12 @@
 # a span, and the watcher is what raises the over-cap wake. A history reader of the whole
 # log and an open-decisions fold take the byte limit alone (fm_status_cat): the harm a
 # runaway does is its size in bytes, and a line limit would refuse a healthy log on every
-# call. Their shell loops are bounded instead by one grep or awk pass that keeps only the
-# lines the loop can act on (_fm_status_lines_with, _fm_status_event_candidates), and the
-# watcher reads a log's event history no further than one tail window
-# (_fm_status_event_scan_start), because it reads it for every window on every poll.
+# call. Their shell loops walk only the lines one grep or awk pass keeps for them
+# (_fm_status_lines_with, _fm_status_event_candidates), so prose, counters, labels and
+# URLs cost them nothing; a line the pass keeps without being an event is still walked.
+# The watcher reads a log's event history no further than one tail window
+# (_fm_status_event_scan_start), because it reads it for every window on every poll, and
+# its event scans call the cap tick on every line they walk.
 # The cap and the reserve can be overridden by the environment (FM_STATUS_CAP_BYTES,
 # FM_STATUS_CAP_RESERVE_BYTES) for a test or a deliberate site choice, and a value
 # that is not a positive integer falls back to the default. The window and the line
