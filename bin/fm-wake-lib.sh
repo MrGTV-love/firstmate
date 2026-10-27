@@ -1730,7 +1730,7 @@ _fm_lock_monitor_adopt() {  # <lock>
 # Age is evidence to inspect, not a verdict that the owner is stuck; healthy
 # process-lifetime singletons and the observer's own holds are skipped.
 fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
-  local settle=${1:-} record lock owner pid mtime now age state parent command reason key old identity
+  local settle=${1:-} record lock owner pid mtime now age state parent parent_command reason key old identity
   local waiter waiter_pid waiter_lock waiters first='' limit=300
   local episodes=$'\n' episodes_loaded=0 marker state_abs='' dead_pid
   local candidates="$STATE/.lock-monitor/dead-owner-candidates" seen=$'\n' observed=$'\n'
@@ -1850,8 +1850,8 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     read -r parent <<< "$parent"
     # comm names the parent executable without copying prompts or credentials
     # from an arbitrarily large argv into the durable wake queue.
-    command=$(ps -o comm= -p "${parent:-0}" 2>/dev/null) || command=unknown
-    reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${command:-unknown} age=${age}s waiters=$waiters"
+    parent_command=$(ps -o comm= -p "${parent:-0}" 2>/dev/null) || parent_command=unknown
+    reason="check: long-held lock: lock=$lock owner=$pid state=${state:-unknown} parent=${parent:-unknown} parent_command=${parent_command:-unknown} age=${age}s waiters=$waiters"
     if [ -n "$dead_pid" ]; then
       pid=''
       IFS= read -r pid 2>/dev/null < "$owner/pid" || [ -n "$pid" ] || continue
