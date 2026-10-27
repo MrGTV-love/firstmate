@@ -44,13 +44,19 @@ fm_idle_reap_refusal_stands() {
 # refusal memo is ignored (the prune keeps its own backoff). Every other gate
 # stands. The prune stops the finished worker with `fm-control.sh exit`, which
 # retires its busy record and leaves state/<id>.control-exit; in this mode that
-# worker reads as stopped, not as unknown. A worker that reads busy is never
-# accepted. Its last event must still be `done`, which the checks after the busy
-# gate require.
+# worker reads as stopped, not as unknown. Only a marker written at or after
+# FM_IDLE_REAP_MERGE_PRUNE_SINCE (the prune record's armed_at) counts: an older
+# one is left from an earlier stop, before a relaunch. A worker that reads busy
+# is never accepted. Its last event must still be `done`, which the checks after
+# the busy gate require.
 fm_idle_reap_exited_by_control() {  # <state> <id>
-  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1
+  local since=${FM_IDLE_REAP_MERGE_PRUNE_SINCE:-} at
   [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1
-  [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ]
+  [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ] || return 1
+  case "$since" in ''|0|*[!0-9]*) return 1 ;; esac
+  at=$(fm_path_mtime "$1/$2.control-exit") || return 1
+  case "$at" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$at" -ge "$since" ]
 }
 
 fm_idle_reap_classify() {

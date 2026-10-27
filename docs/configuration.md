@@ -756,7 +756,8 @@ The slot's owner claim is read again right before the signal: a slot that anothe
 Then each nested copy that the project's `.gitignore` does not cover, already proved on its own, is removed: `treehouse destroy` counts its untracked directory as dirt and refuses the slot, and the pane's `treehouse get` would stop at its "uncommitted changes" prompt when its idle shell ends.
 An independent clone goes with its directory and a linked worktree with a plain `git worktree remove`, never forced; a linked worktree that git refuses to remove, such as a locked one, or any nested copy that does not go, keeps the copy with one wake.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
-That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, and its last status event is `done`.
+That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` was written at or after the prune record's `armed_at`, and its last status event is `done`.
+An older marker is left from an earlier stop, before a relaunch, and does not count.
 The ordinary finished-session sweep keeps its classification unchanged.
 No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
