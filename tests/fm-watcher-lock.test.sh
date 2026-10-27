@@ -1890,7 +1890,7 @@ try:
         # Before the fix, the real capture registers a waiting acquisition.
         # After the fix, refusal leaves the observer advancing through polls.
         waiting = False
-        for receipt in (state / ".lock-monitor").glob("wait.*"):
+        for receipt in state.glob(".lock-monitor.wait.*"):
             try: fields = receipt.read_text().splitlines()
             except FileNotFoundError: continue
             waiting |= len(fields) >= 2 and fields[1] == str(lock)
@@ -2024,7 +2024,7 @@ try:
     (state / ".afk").write_text("away\n")
     for _ in range(600):
         waiting = False
-        for receipt in (state / ".lock-monitor").glob("wait.*"):
+        for receipt in state.glob(".lock-monitor.wait.*"):
             try: fields = receipt.read_text().splitlines()
             except FileNotFoundError: continue
             waiting |= len(fields) >= 2 and fields[0] == str(watcher.pid) and fields[1] == str(state.resolve() / lock.name)
@@ -2320,7 +2320,7 @@ try:
     # Startup recovery waits on the fresh queue owner before the poll loop.
     for _ in range(600):
         waiting = False
-        for receipt in (state / ".lock-monitor").glob("wait.*"):
+        for receipt in state.glob(".lock-monitor.wait.*"):
             try: fields = receipt.read_text().splitlines()
             except FileNotFoundError: continue
             waiting |= len(fields) >= 2 and fields[0] == str(watcher.pid) and fields[1] == str(state.resolve() / lock.name)
@@ -2512,7 +2512,7 @@ with tempfile.TemporaryDirectory(prefix="fm-two-checks-") as d:
     waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; echo got; exec sleep 300', "_", lib, str(lock)], env=env, stdout=subprocess.PIPE, text=True)
     try:
         for _ in range(400):
-            if any(r.read_text().splitlines()[:1] == [str(waiter.pid)] for r in pathlib.Path(d, ".lock-monitor").glob("wait.*") if r.exists()): break
+            if any(r.read_text().splitlines()[:1] == [str(waiter.pid)] for r in pathlib.Path(d).glob(".lock-monitor.wait.*") if r.exists()): break
             time.sleep(.05)
         else: raise AssertionError("waiter never registered")
         owner.kill(); owner.wait()
@@ -2620,7 +2620,7 @@ def hold(lock):
 def blocked_on(pid, lock, timeout=60):
     target = str(state.resolve() / lock.name)
     for _ in range(timeout * 10):
-        for receipt in (state / ".lock-monitor").glob("wait.*"):
+        for receipt in state.glob(".lock-monitor.wait.*"):
             try: fields = receipt.read_text().splitlines()
             except FileNotFoundError: continue
             if len(fields) >= 2 and fields[0] == str(pid) and fields[1] == target: return
@@ -2656,7 +2656,7 @@ finally:
     if watcher is not None and watcher.poll() is None:
         os.killpg(watcher.pid, signal.SIGTERM); watcher.wait(timeout=30)
 subprocess.run(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" && fm_lock_release "$2"', "_", str(lib), str(queue_lock)], env=env, check=True, timeout=30)
-for f in state.glob(".lock-monitor/hold.*"): f.unlink()
+for f in state.glob(".lock-monitor.hold.*"): f.unlink()
 # Append: the watcher's own append holds the queue lock and waits on the
 # marker lock with its row in flight; the alarm spills that row, keeps it out
 # of the queue, and the next append queues it first, exactly once.
@@ -2723,7 +2723,7 @@ try:
     os.killpg(watcher.pid, signal.SIGCONT)
     target = str(state.resolve() / marker.name)
     for _ in range(600):
-        if any(p.read_text().splitlines()[:2] == [str(watcher.pid), target] for p in (state / ".lock-monitor").glob("wait.*") if p.exists()): break
+        if any(p.read_text().splitlines()[:2] == [str(watcher.pid), target] for p in state.glob(".lock-monitor.wait.*") if p.exists()): break
         assert watcher.poll() is None, (home / "watch.err").read_text()
         time.sleep(.05)
     else: raise AssertionError("exit cleanup never waited on the recovery marker")
@@ -2765,7 +2765,7 @@ with tempfile.TemporaryDirectory(prefix="fm-lock-alarm-") as d:
     waiters = [subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"; fm_lock_release "$2"', "_", lib, str(lock)], env=env) for _ in range(2)]
     try:
         for _ in range(200):
-            receipts = list((state / ".lock-monitor").glob("wait.*"))
+            receipts = list(state.glob(".lock-monitor.wait.*"))
             if len(receipts) == 2 and all(len(p.read_text().splitlines()) == 3 for p in receipts): break
             time.sleep(.05)
         else: raise AssertionError("waiters did not register")
@@ -2827,13 +2827,13 @@ for scenario in ("foreign-index", "external-waiter"):
             if scenario == "external-waiter":
                 waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2" || exit 1; trap \'fm_lock_release "$2"\' EXIT', "waiter-b", lib, str(lock)], env=env_b)
                 for _ in range(300):
-                    if list((b / ".lock-monitor").glob("wait.*")): break
+                    if list(b.glob(".lock-monitor.wait.*")): break
                     time.sleep(.05)
                 else: raise AssertionError("external waiter did not register")
             check = '. "$1"; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"'
             fresh = subprocess.run(["bash", "-c", check, "observer-b", lib], env=env_b, text=True, capture_output=True, check=True)
             assert not fresh.stdout.strip() and not (b / ".wake-queue").exists(), fresh
-            foreign_index = {p.name: p.read_bytes() for p in (a / ".lock-monitor").iterdir() if p.is_file()}
+            foreign_index = {p.name: p.read_bytes() for p in a.glob(".lock-monitor*") if p.is_file()}
             owner_record = (lock / "monitor-record").read_bytes()
             old = time.time() - 301
             os.utime(lock / "pid", (old, old))
@@ -2846,7 +2846,7 @@ for scenario in ("foreign-index", "external-waiter"):
             assert len((b / ".wake-queue").read_text().splitlines()) == 1, "duplicate episode wake"
             assert owner.poll() is None and (lock / "pid").read_text().strip() == str(owner.pid), "observer changed ownership"
             assert (lock / "monitor-record").read_bytes() == owner_record, "observer rewrote foreign owner metadata"
-            assert {p.name: p.read_bytes() for p in (a / ".lock-monitor").iterdir() if p.is_file()} == foreign_index, "observer changed the foreign index"
+            assert {p.name: p.read_bytes() for p in a.glob(".lock-monitor*") if p.is_file()} == foreign_index, "observer changed the foreign index"
             assert waiter is None or waiter.poll() is None, "observer acquired a live held lock"
         finally:
             if owner.poll() is None:
@@ -2873,7 +2873,7 @@ with tempfile.TemporaryDirectory(prefix="fm-finished-waiter-") as d:
         assert refused.returncode == 124, refused
         checked = subprocess.run(["bash", "-c", '. "$1"; fm_lock_monitor_check; printf "%s\\n" "$FM_LOCK_MONITOR_REASON"', "observer", lib], env=env, text=True, capture_output=True, check=True)
         assert not checked.stdout.strip(), checked
-        leftovers = list((state / ".lock-monitor").glob("wait.*"))
+        leftovers = list(state.glob(".lock-monitor.wait.*"))
         assert not leftovers, f"finished waiters retained: {leftovers}"
         assert owner.poll() is None and (lock / "pid").read_text().strip() == str(owner.pid)
         owner.stdin.write("release\n"); owner.stdin.flush()
@@ -2897,7 +2897,7 @@ with tempfile.TemporaryDirectory(prefix="fm-lock-receipts-") as d:
     receipt = pathlib.Path(subprocess.check_output(["bash", "-c", held, "_", lib, lock], env=env, text=True, timeout=30).strip())
     assert receipt.read_text().splitlines()[0] == str(pathlib.Path(d).resolve() / ".fixture.lock"), receipt.read_text()
     subprocess.run(["bash", "-c", '. "$1"; fm_lock_try_acquire "$2" && fm_lock_release "$2"; [ ! -e "$2" ]', "_", lib, lock], env=env, check=True, timeout=30)
-    assert not list(pathlib.Path(d, ".lock-monitor").glob("hold.*")), "released receipt leaked"
+    assert not list(pathlib.Path(d).glob(".lock-monitor.hold.*")), "released receipt leaked"
     # Away-contract acquisition has function-local STATE; its EXIT release
     # happens after that scope ends. The receipt must still retire.
     scoped = '''
@@ -2917,7 +2917,7 @@ fm_lock_acquire_wait "$2/.after-scope.lock" || exit 3
     assert holder.wait(timeout=30) == 0, "receipt bookkeeping depended on expired STATE scope"
     assert not pathlib.Path(d, ".scoped.lock").is_symlink()
     assert not list(pathlib.Path(d).glob(".scoped.lock.owner.*")), "scoped owner metadata leaked"
-    assert not list(pathlib.Path(d, ".lock-monitor").glob("hold.*")), "scoped diagnostic receipt leaked"
+    assert not list(pathlib.Path(d).glob(".lock-monitor.hold.*")), "scoped diagnostic receipt leaked"
 PY
   pass "released locks retire their diagnostic receipts across scoped owners without hold telemetry"
 }

@@ -12,10 +12,10 @@ def blocked_waiter(lock, lib, env):
         assert holder.stdout.readline().strip() == "ready", "steal mutex holder did not acquire"
         waiter = subprocess.Popen(["bash", "-c", '. "$1"; fm_lock_acquire_wait "$2"', "_", str(lib), str(lock)], env=env)
         target = str(lock.parent.resolve() / lock.name)
-        monitor = pathlib.Path(env["FM_STATE_OVERRIDE"], ".lock-monitor")
+        monitor = pathlib.Path(env["FM_STATE_OVERRIDE"])
         for _ in range(400):
             found = False
-            for receipt in monitor.glob("wait.*"):
+            for receipt in monitor.glob(".lock-monitor.wait.*"):
                 try: fields = receipt.read_text().splitlines()
                 except FileNotFoundError: continue
                 found |= len(fields) >= 2 and fields[0] == str(waiter.pid) and fields[1] == target

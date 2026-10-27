@@ -2,8 +2,9 @@
 # Shared durable wake queue and portable lock helpers.
 # docs/watcher-continuity.md owns the recovery-episode state contract.
 #
-# Shared-helper locks publish diagnostic receipts in STATE/.lock-monitor;
-# successful release retires them. The watcher checks those receipts and adopts
+# Shared-helper locks publish diagnostic receipts as STATE/.lock-monitor.hold.*
+# and .lock-monitor.wait.* files; successful release retires them, leaving the
+# state tree as it found it. The watcher checks those receipts and adopts
 # pre-upgrade locks in this home's state tree, without following directory links.
 # A fixed 300s is the age limit for the measured fleet-ledger,
 # watcher-down and wake-queue locks; every other lock reports only a dead or
@@ -584,8 +585,7 @@ fm_lock_monitor_register() {  # <lock> <owner-directory>
   local state lock receipt
   _fm_lock_monitor_state_to state
   lock=$(fm_lock_abs_path "$1") || return 1
-  [ -d "$state/.lock-monitor" ] || mkdir "$state/.lock-monitor" 2>/dev/null || true
-  receipt=$(mktemp "$state/.lock-monitor/hold.XXXXXX" 2>/dev/null) || return 1
+  receipt=$(mktemp "$state/.lock-monitor.hold.XXXXXX" 2>/dev/null) || return 1
   if ! printf '%s\n%s\n' "$lock" "$2" > "$receipt" \
     || ! printf '%s\n' "$receipt" > "$2/monitor-record"; then
     rm -f "$receipt"
@@ -601,10 +601,10 @@ fm_lock_clean_known_files() {
   if [ -f "$lockdir/monitor-record" ]; then
     IFS= read -r record 2>/dev/null < "$lockdir/monitor-record" || true
     if [ -z "$state" ]; then
-      case "$record" in */.lock-monitor/hold.*) state=${record%/.lock-monitor/hold.*} ;; esac
+      case "$record" in */.lock-monitor.hold.*) state=${record%/.lock-monitor.hold.*} ;; esac
     fi
     case "$record" in
-      "$state"/.lock-monitor/hold.*) set -- "$@" "$record" "$record.alerted" "$record.pending" ;;
+      "$state"/.lock-monitor.hold.*) set -- "$@" "$record" "$record.alerted" "$record.pending" ;;
     esac
   fi
   rm -f -- "$@" 2>/dev/null || true
@@ -1502,10 +1502,8 @@ fm_lock_acquire_wait() {
         fm_epoch_seconds_to since
         absolute=$(fm_lock_abs_path "$lockdir") || absolute=$lockdir
         _fm_lock_monitor_state_to monitor_state
-        if [ -d "$monitor_state/.lock-monitor" ] || mkdir "$monitor_state/.lock-monitor" 2>/dev/null; then
-          record=$(mktemp "$monitor_state/.lock-monitor/wait.XXXXXX") || record=''
-          [ -z "$record" ] || printf '%s\n%s\n%s\n' "$current" "$absolute" "$since" > "$record"
-        fi
+        record=$(mktemp "$monitor_state/.lock-monitor.wait.XXXXXX" 2>/dev/null) || record=''
+        [ -z "$record" ] || printf '%s\n%s\n%s\n' "$current" "$absolute" "$since" > "$record"
       fi
     elif [ -z "$gone_since" ]; then
       gone_since=$SECONDS
@@ -1536,7 +1534,7 @@ fm_lock_acquire_wait() {
     sleep 0.1
   done
   [ -z "$record" ] || rm -f "$record"
-  return "$rc"
+  [ "$rc" -eq 0 ] || return 1
 }
 
 # Bounded in-process variant of fm_lock_acquire_wait for the watcher's EXIT
@@ -1684,7 +1682,7 @@ _fm_lock_monitor_adopt() {  # <lock>
   [ -f "$lock/pid" ] || return 0
   IFS= read -r referenced 2>/dev/null < "$lock/monitor-record" || true
   case "$referenced" in
-    "$STATE"/.lock-monitor/hold.*) [ ! -f "$referenced" ] || return 0 ;;
+    "$STATE"/.lock-monitor.hold.*) [ ! -f "$referenced" ] || return 0 ;;
   esac
   lock=$(fm_lock_abs_path "$lock") || return 0
   if [ -L "$lock" ]; then
@@ -1694,13 +1692,13 @@ _fm_lock_monitor_adopt() {  # <lock>
   else
     return 0
   fi
-  for record in "$STATE"/.lock-monitor/hold.*; do
+  for record in "$STATE"/.lock-monitor.hold.*; do
     [ -f "$record" ] || continue
     case "$record" in *.alerted|*.pending) continue ;; esac
     { IFS= read -r indexed_lock; IFS= read -r indexed_owner; } < "$record" || continue
     [ "$indexed_lock" != "$lock" ] || [ "$indexed_owner" != "$owner" ] || return 0
   done
-  record=$(mktemp "$STATE/.lock-monitor/hold.XXXXXX") || return 1
+  record=$(mktemp "$STATE/.lock-monitor.hold.XXXXXX") || return 1
   printf '%s\n%s\n' "$lock" "$owner" > "$record"
 }
 
@@ -1755,7 +1753,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
   # never owned. Its registered reference is sufficient to observe that lock;
   # do not enumerate another home's state or follow its diagnostic index.
   set --
-  for waiter in "$STATE"/.lock-monitor/wait.*; do
+  for waiter in "$STATE"/.lock-monitor.wait.*; do
     [ -f "$waiter" ] || continue
     { IFS= read -r waiter_pid; IFS= read -r lock; } < "$waiter" || continue
     case "$waiter_pid" in ''|*[!0-9]*|0) continue ;; esac
@@ -1770,7 +1768,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
   done
   [ "$#" -eq 0 ] || rm -f -- "$@" 2>/dev/null || true
   fm_epoch_seconds_to now
-  for record in "$STATE"/.lock-monitor/hold.*; do
+  for record in "$STATE"/.lock-monitor.hold.*; do
     [ -f "$record" ] || continue
     case "$record" in *.alerted|*.pending) continue ;; esac
     { IFS= read -r lock; IFS= read -r owner; } < "$record" || continue
@@ -1816,7 +1814,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     # ownership episode across all references, including within this poll and
     # across later polls. Load delivered keys only when a hold is actually old.
     if [ "$episodes_loaded" -eq 0 ]; then
-      for marker in "$STATE"/.lock-monitor/hold.*.alerted; do
+      for marker in "$STATE"/.lock-monitor.hold.*.alerted; do
         [ -f "$marker" ] || continue
         old=''
         IFS= read -r old < "$marker" || true
@@ -1827,7 +1825,7 @@ fm_lock_monitor_check() {  # [settle-command]: run before the first alarm row
     case "$episodes" in *$'\n'"$key"$'\n'*) continue ;; esac
     episodes="$episodes$key"$'\n'
     waiters=0
-    for waiter in "$STATE"/.lock-monitor/wait.*; do
+    for waiter in "$STATE"/.lock-monitor.wait.*; do
       [ -f "$waiter" ] || continue
       { IFS= read -r waiter_pid; IFS= read -r waiter_lock; } < "$waiter" || continue
       if ! fm_pid_alive "$waiter_pid"; then
