@@ -887,6 +887,144 @@ test_scout_base_branch_refused_on_gerrit_forge() {
   pass "a based scout on a forge=gerrit project is refused at spawn"
 }
 
+# Exercise the final assigned-copy revision, not just its classification before
+# the ordinary freshness reset. Each public-path attempt owns a fresh task ID.
+write_refusing_slot_owner() { # <repository>
+  mkdir -p "$1/scripts/git-stability"
+  cat > "$1/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import json
+import os
+from pathlib import Path
+
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text("invoked\n", encoding="utf-8")
+print(json.dumps({"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}))
+raise SystemExit(2)
+PY
+}
+
+run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> <ship|scout>
+  local shape=$1 kind=$2 id case_dir home project origin pool publisher fakebin before advanced out status=0 token temp staging
+  local args=()
+  fm_git_identity
+  id="pool-owner-$shape-$kind-$(date +%s)-$$"
+  case_dir="$TMP_ROOT/$id"
+  [ ! -e "$case_dir" ] && [ ! -L "$case_dir" ] || fail 'governance fixture case already exists'
+  home="$case_dir/home" project="$case_dir/project" origin="$case_dir/origin.git"
+  pool="$case_dir/pool" publisher="$case_dir/publisher"
+  fakebin=$(make_spawn_fakebin "$case_dir/fake" codex)
+  fm_test_fake_no_mistakes "$fakebin"
+  fm_test_fake_gh "$fakebin"
+  fm_test_fake_gh_axi "$fakebin"
+  fm_test_spawn_home "$home" codex
+  printf 'manual\n' > "$home/config/backlog-backend"
+  fm_test_spawn_brief "$home" "$id"
+  fm_git_init_commit "$project"
+  if [ "$shape" = present ] || [ "$shape" = removed ]; then
+    write_refusing_slot_owner "$project"
+    git -C "$project" add scripts
+    git -C "$project" commit -qm 'initial governed copy'
+  fi
+  fm_git_add_origin "$project" "$origin"
+  git -C "$project" worktree add --quiet --detach "$pool" HEAD
+  before=$(git -C "$pool" rev-parse HEAD)
+  if [ "$shape" = present ] || [ "$shape" = removed ]; then
+    git -C "$pool" checkout --quiet -b previous-owner
+  fi
+  if [ "$shape" = removed ]; then
+    # Only the acquired copy initially requires governance; afterward neither does.
+    git -C "$project" checkout --quiet --detach HEAD^
+  fi
+  git clone --quiet "file://$origin" "$publisher"
+  case "$shape" in
+    introduced|missing-scope) write_refusing_slot_owner "$publisher" ;;
+    removed) git -C "$publisher" rm -q scripts/git-stability/provision_existing_slot.py ;;
+  esac
+  printf 'advanced local origin\n' > "$publisher/advanced.txt"
+  git -C "$publisher" add .
+  git -C "$publisher" commit -qm 'advance owner fixture'
+  git -C "$publisher" push --quiet origin main
+  advanced=$(git -C "$publisher" rev-parse HEAD)
+  if [ "$kind" = scout ]; then args+=(--scout); else args+=(--mode local-only --yolo off); fi
+  [ "$shape" = missing-scope ] || [ "$shape" = absent ] || args+=(--owned-path scripts)
+  temp="/tmp/fm-$id"
+  token=$(printf '%s' "$home" | shasum -a 256 | awk '{print $1}')
+  staging="$temp+$token"
+  [ ! -e "$temp" ] && [ ! -L "$temp" ] || fail "task temp already exists: $temp"
+  [ ! -e "$staging" ] && [ ! -L "$staging" ] || fail "staging already exists: $staging"
+  printf 'case=%s kind=%s task=%s root=%s before=%s advanced=%s temp=%s staging=%s\n' \
+    "$shape" "$kind" "$id" "$case_dir" "$before" "$advanced" "$temp" "$staging"
+  out=$(FM_FAKE_LAUNCH_LOG="$case_dir/launch.log" FM_TEST_PROVISION_CALLED="$case_dir/provisioner.called" \
+    fm_test_run_spawn "$home" "$pool" "$fakebin" "$id" "$project" --backend tmux "${args[@]}" 2>&1) || status=$?
+  printf '%s\n' "$out" > "$case_dir/spawn.out"
+  printf 'spawn_exit=%s after=%s\n%s\n' "$status" "$(git -C "$pool" rev-parse HEAD)" "$out"
+  case "$shape" in
+    absent)
+      expect_code 0 "$status" "genuinely ungoverned copy should launch: $out"
+      [ -s "$case_dir/launch.log" ] || fail 'ungoverned launch was not recorded'
+      [ ! -e "$case_dir/provisioner.called" ] || fail 'ungoverned copy invoked an owner'
+      [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'ungoverned copy was not freshened'
+      ;;
+    *)
+      [ "$status" -ne 0 ] || fail "final governed revision admitted a worker: $shape $kind"
+      [ ! -s "$case_dir/launch.log" ] || fail 'governed refusal launched a harness'
+      assert_grep 'recovery=slot-provision-refused' "$home/state/$id.meta" 'governed refusal lost recovery metadata'
+      assert_grep 'jev_guard_policy=FIRSTMATE_JEV_GUARD_V1' "$home/state/$id.meta" 'governed refusal lost guard policy'
+      case "$shape" in
+        missing-scope)
+          assert_contains "$out" '--owned-path must be a nonempty single-line tracked path' 'freshly governed copy did not require explicit scope'
+          [ ! -e "$case_dir/provisioner.called" ] || fail 'missing scope invoked the owner'
+          assert_no_grep '^slot_owned_path=' "$home/state/$id.meta" 'missing scope was silently widened'
+          ;;
+        removed)
+          assert_contains "$out" 'slot provisioner is missing' 'removed owner silently downgraded governance'
+          [ ! -e "$case_dir/provisioner.called" ] || fail 'removed owner was invoked'
+          [ "$(git -C "$pool" rev-parse HEAD)" = "$before" ] || fail 'early governed refusal lost original checkout'
+          ;;
+        *)
+          [ -f "$case_dir/provisioner.called" ] || fail 'required project owner was not invoked'
+          assert_contains "$out" fixture_provisioner_must_refuse 'governed refusal lost owner reason'
+          assert_grep 'slot_owned_path=scripts' "$home/state/$id.meta" 'explicit scope was not retained'
+          assert_grep "slot_prepared_head=$advanced" "$home/state/$id.meta" 'prepared revision was not retained'
+          ;;
+      esac
+      if [ "$shape" = introduced ] || [ "$shape" = missing-scope ]; then
+        [ "$(git -C "$pool" rev-parse HEAD)" = "$advanced" ] || fail 'freshness did not introduce the owner'
+        [ -f "$pool/scripts/git-stability/provision_existing_slot.py" ] || fail 'final revision lacks introduced owner'
+      fi
+      ;;
+  esac
+  if [ "$shape" = present ] || [ "$shape" = removed ]; then
+    [ "$(git -C "$pool" rev-parse refs/heads/previous-owner)" = "$before" ] || fail 'freshness moved the previous owner branch'
+    [ "$(git -C "$pool" branch --show-current)" = previous-owner ] || fail 'refusal did not restore the previous checkout'
+  fi
+  [ ! -d "$pool/.claude/worktrees" ] || fail 'governance created nested isolation'
+  pass "final revision governance: $shape $kind"
+}
+
+test_freshness_introduces_slot_owner() { run_freshness_slot_case introduced ship; }
+test_freshness_introduces_scout_slot_owner() { run_freshness_slot_case introduced scout; }
+test_freshness_slot_owner_requires_scope() { run_freshness_slot_case missing-scope ship; }
+test_freshness_present_slot_owner_refuses() { run_freshness_slot_case present ship; }
+test_freshness_absent_slot_owner_launches() { run_freshness_slot_case absent ship; }
+test_freshness_removed_slot_owner_refuses() { run_freshness_slot_case removed ship; }
+
+# Explicit selection keeps focused acquisition regressions independently runnable.
+if [ "$#" -gt 0 ]; then
+  for selected_test in "$@"; do
+    case "$selected_test" in
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses) "$selected_test" ;;
+      *) fail "unknown selected acquisition test: $selected_test" ;;
+    esac
+  done
+  exit 0
+fi
+
+test_freshness_introduces_slot_owner
+test_freshness_introduces_scout_slot_owner
+test_freshness_slot_owner_requires_scope
+test_freshness_present_slot_owner_refuses
+test_freshness_absent_slot_owner_launches
+test_freshness_removed_slot_owner_refuses
 test_remote_seeded_home_spawns_from_treehouse_pool
 test_pool_slot_claim_follows_the_spawn_outcome
 test_linked_spawning_home_rejects_primary_before_refresh
