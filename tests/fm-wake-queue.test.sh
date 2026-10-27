@@ -3409,6 +3409,14 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   append_wake "$state" signal task.status "signal: $status" \
     || fail "could not seed the presentation-deadline wake"
 
+  control=$(make_case presentation-lock-deadline-queue-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || fail "could not seed the queue control drain"
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || fail "queue control drain failed"
+  control_ms=$DRAIN_ELAPSED_MS
+
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
     fm_lock_acquire_wait "$2"
@@ -3424,13 +3432,6 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/queue.ready" ] \
     || { kill "$queue_holder" 2>/dev/null || true; fail "queue holder never acquired its lock"; }
 
-  control=$(make_case presentation-lock-deadline-queue-control)
-  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
-  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
-    || { kill "$queue_holder" 2>/dev/null || true; fail "could not seed the queue control drain"; }
-  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
-    || { kill "$queue_holder" 2>/dev/null || true; fail "queue control drain failed"; }
-  control_ms=$DRAIN_ELAPSED_MS
   drain_elapsed_ms "$state" "$queue_out" "$queue_err" \
     || { kill "$queue_holder" 2>/dev/null || true; fail "bounded queue presentation drain failed"; }
   held_ms=$DRAIN_ELAPSED_MS
@@ -3456,6 +3457,14 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
 
   kill "$queue_holder" 2>/dev/null || true
   wait "$queue_holder" 2>/dev/null || true
+
+  control=$(make_case presentation-lock-deadline-presentation-control)
+  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
+  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
+    || fail "could not seed the presentation control drain"
+  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
+    || fail "presentation control drain failed"
+  control_ms=$DRAIN_ELAPSED_MS
 
   FM_STATE_OVERRIDE="$state" bash -c '
     . "$1"
@@ -3491,13 +3500,6 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ ! -s "$dir/presentation-helper.err" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline leaked helper-process diagnostics"; }
 
-  control=$(make_case presentation-lock-deadline-presentation-control)
-  printf 'needs-decision [key=fixture]: presentation remains retriable\n' > "$control/state/task.status"
-  append_wake "$control/state" signal task.status "signal: $control/state/task.status" \
-    || { kill "$presentation_holder" 2>/dev/null || true; fail "could not seed the presentation control drain"; }
-  drain_elapsed_ms "$control/state" "$control/drain.out" "$control/drain.err" \
-    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation control drain failed"; }
-  control_ms=$DRAIN_ELAPSED_MS
   drain_elapsed_ms "$state" "$first_out" "$first_err" \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation drain failed"; }
   held_ms=$DRAIN_ELAPSED_MS

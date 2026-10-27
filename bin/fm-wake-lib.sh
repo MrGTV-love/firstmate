@@ -1707,9 +1707,10 @@ _fm_lock_monitor_adopt() {  # <lock>
 
 # fm_lock_monitor_check: one durable check wake per observed ownership episode.
 # The watcher calls this on its ordinary poll. All shared-helper acquisitions
-# register receipts, including locks outside state/. A startup scan also finds
-# pre-upgrade lock directories and symlinks in this home's state tree, without
-# following directory symlinks into another home. The check only reports.
+# register receipts, including locks outside state/. Each check also scans this
+# home's state tree for pre-upgrade and foreign-owned lock directories and
+# symlinks, without following directory symlinks into another home. The check
+# only reports.
 # Each lock class has its own basis:
 # - fleet-ledger, watcher-down, wake-queue: hold age past FM_LOCK_ALARM_SECS
 #   (default 300s). measured: 25 releases per lock on 2026-10-26 gave p99/max
