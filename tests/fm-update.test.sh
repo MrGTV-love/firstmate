@@ -268,6 +268,7 @@ case "${rargs[1]:-}" in
   update)
     if [ -n "${FM_TEST_UPDATE_REPLY:-}" ]; then cat "$FM_TEST_UPDATE_REPLY";
     else printf 'synced: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'; fi
+    [ -z "${FM_TEST_UPDATE_HOST_STDERR:-}" ] || printf '%s\n' "$FM_TEST_UPDATE_HOST_STDERR" >&2
     ;;
   state) printf 'alive\n' ;;
   *) exit 91 ;;
@@ -308,10 +309,26 @@ EOF
     "the captured current result must retain the restart action"
   pass "T3e captured gtt-cb scratch update is accepted without inventing an incident reproduction"
 
+  # The host entrypoint replays the job's stderr after its stdout, so a host
+  # stderr line lands after the result. Only stdout is the update result.
+  local err
+  err="$w/update-stderr"
+  out=$(FM_TEST_UPDATE_STDERR="$err" FM_TEST_UPDATE_HOST_STDERR=$'warning: host note\033[31m' \
+    FM_TEST_UPDATE_REPLY="$ROOT/tests/fixtures/gtt-cb-fm-mini-scratch-update.reply" \
+    FM_TEST_SSH_BIN="$fake_ssh" run_update "$w")
+  assert_contains "$out" 'remote secondmate sm1: already current on remote-mac (93e65be73ad6289be95a8c02ee636dc19f2afd41)' \
+    "a trailing host stderr line turned a current result into a malformed one"
+  assert_contains "$out" 'restart-secondmates: fm-sm1' \
+    "a trailing host stderr line must not drop the restart action"
+  assert_not_contains "$(cat "$err")" "malformed update result" \
+    "a trailing host stderr line was judged as the update result"
+  assert_contains "$(cat "$err")" "remote secondmate sm1: host stderr: warning: host note?[31m" \
+    "the host stderr was not kept as printable diagnostics"
+  pass "T3e a trailing host stderr line does not hide a current remote update result"
+
   # A rejected reply must say what was received: the line count and a bounded,
   # printable copy of the last line the parser judged, never the whole stream.
-  local err long
-  err="$w/update-stderr"
+  local long
   long=$(printf 'x%.0s' $(seq 1 300))
   printf 'warning: earlier line\nsecond line\nbad\033[31m%s\n' "$long" > "$w/malformed-reply.txt"
   out=$(FM_TEST_UPDATE_STDERR="$err" FM_TEST_UPDATE_REPLY="$w/malformed-reply.txt" \

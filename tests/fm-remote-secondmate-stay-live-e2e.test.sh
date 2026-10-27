@@ -9,6 +9,7 @@ unset HERDR_ENV HERDR_PANE_ID HERDR_TAB_ID HERDR_WORKSPACE_ID HERDR_SOCKET_PATH 
 unset FM_BACKEND_HERDR_BIN FM_BACKEND_HERDR_CLIENT_SESSION
 
 LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
+"$ROOT/bin/fm-teamclaude-launch.sh" --check || fail "TeamClaude is unavailable; the live picker test launches Claude only through it"
 ORIGINAL_PATH=$PATH
 SESSION=$("$LAB_HELPER" name remote-stay-live)
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-remote-stay-live.XXXXXX")
@@ -102,8 +103,8 @@ printf -- '- %s - isolated lab (host: isolated-lab; root: %s; home: %s; scope: t
 PROMPT="Use Bash to run sleep 600 with run_in_background=true. Then reply BACKGROUND_READY and wait. When you receive a Firstmate instruction waiting doorbell, read exactly its named file, carry out its instruction and move it to the handled directory beside it. Do not stop the background shell. Do not edit any other file."
 SETTINGS=$(jq -cn --arg command "touch '$TMP_ROOT/turn-finished'" \
   '{hooks:{Stop:[{hooks:[{type:"command",command:$command}]}]}}')
-printf -v LAUNCH 'FM_TASK_ID=%q FM_TASK_INBOX=%q FM_SPAWN_GEN=%q CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false claude --dangerously-skip-permissions --setting-sources project,local --settings %q %q' \
-  "$ID" "$REMOTE_HOME/state/parent-route/$ID.inbox" "$GEN" "$SETTINGS" "$PROMPT"
+printf -v LAUNCH 'FM_TASK_ID=%q FM_TASK_INBOX=%q FM_SPAWN_GEN=%q CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false %q --dangerously-skip-permissions --setting-sources project,local --settings %q %q' \
+  "$ID" "$REMOTE_HOME/state/parent-route/$ID.inbox" "$GEN" "$ROOT/bin/fm-teamclaude-launch.sh" "$SETTINGS" "$PROMPT"
 lab pane run "$PANE" "$LAUNCH" >/dev/null
 export PATH="$FAKEBIN:$ORIGINAL_PATH"
 export FM_CONTROL_POLL=0.2 FM_CONTROL_EXIT_WAIT=5 FM_SPAWN_NO_GUARD=1

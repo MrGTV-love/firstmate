@@ -190,7 +190,14 @@ if [ -f "$SECONDMATES_MD" ]; then
     id=$SECONDMATE_REGISTRY_ID
     home=$SECONDMATE_REGISTRY_HOME
     if [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ]; then
-      if remote_out=$("$SCRIPT_DIR/fm-on.sh" "$id" fm-remote-secondmate-control.sh update "$id" < /dev/null 2>&1); then
+      remote_err_file=$(mktemp "${TMPDIR:-/tmp}/fm-update-remote.XXXXXX")
+      remote_rc=0
+      remote_out=$("$SCRIPT_DIR/fm-on.sh" "$id" fm-remote-secondmate-control.sh update "$id" < /dev/null 2>"$remote_err_file") || remote_rc=$?
+      remote_err=$(cat "$remote_err_file")
+      rm -f -- "$remote_err_file"
+      if [ "$remote_rc" -eq 0 ]; then
+        [ -z "$remote_err" ] || printf '%s\n' "$remote_err" | LC_ALL=C tr -c '[:print:]\n' '?' \
+          | sed "s/^/remote secondmate $id: host stderr: /" >&2
         remote_result=$(printf '%s\n' "$remote_out" | tail -1)
         case "$remote_result" in
           synced:*)
@@ -231,6 +238,7 @@ if [ -f "$SECONDMATES_MD" ]; then
             ;;
         esac
       else
+        remote_out=${remote_out:-$remote_err}
         echo "remote secondmate $id: skipped on $SECONDMATE_REGISTRY_HOST: ${remote_out%%$'\n'*}" >&2
       fi
     else
