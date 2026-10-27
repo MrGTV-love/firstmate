@@ -252,9 +252,11 @@ exit 0
 SH
   cat > "$W/bin/tmux" <<'SH'
 #!/usr/bin/env bash
-# Stand-in for tmux: answers only the question for the pane's shell pid.
+# Stand-in for tmux: answers the question for the pane's shell pid, and a
+# capture with the content of PANE_TAIL_FILE.
 case "$*" in
   *'#{pane_pid}'*) [ -s "$PANE_PID_FILE" ] && cat "$PANE_PID_FILE" ;;
+  capture-pane*) [ -s "${PANE_TAIL_FILE:-}" ] && cat "$PANE_TAIL_FILE" ;;
 esac
 exit 0
 SH
@@ -1284,6 +1286,23 @@ scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
   printf 'g2.1.1\n' > "$STATE/t1.busy-gen"
   printf 'v1 gen=g2.1.1 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=%s\n' "$NOW" > "$STATE/t1.busy-state"
   ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker that reads busy again" || return 1
+  printf 'v1 gen=g9.9.9 seq=3 state=idle source=claude-hook event=Stop ts=%s\n' "$NOW" > "$STATE/t1.busy-state"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker whose busy record is present but unreadable" || return 1
+  return 0
+}
+
+# A harness with no busy record (grok here) reads busy from its pane. An exit
+# marker left from an earlier stop never lifts that busy verdict.
+scn_busy_worker_with_an_old_exit_marker_is_not_reapable() {
+  make_world
+  use_pane_backend tmux
+  sed -i.bak 's/^harness=.*/harness=grok/' "$STATE/t1.meta"
+  rm -f "$STATE/t1.busy-state" "$STATE/t1.busy-gen"
+  printf 'gen=-\n' > "$STATE/t1.control-exit"
+  : > "$W/pane-tail"
+  scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 PANE_TAIL_FILE="$W/pane-tail" || why "the prune did not accept the idle grok worker of the fixture" || return 1
+  printf 'Working... Ctrl+c:cancel\n' > "$W/pane-tail"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 PANE_TAIL_FILE="$W/pane-tail" || why "the prune accepted a worker that reads busy because an old exit marker is present" || return 1
   return 0
 }
 
@@ -1906,6 +1925,7 @@ test_fallback_keeps_a_pane_shell_that_works_elsewhere() { assert_scenario scn_pa
 test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup() { assert_scenario scn_stubborn_pane_shell_keeps_the_copy "a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced"; }
 test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped() { assert_scenario scn_unconfirmed_stop_leaves_the_pane_shell "an exit verb that does not confirm the agent stopped leaves the pane shell alone and keeps the copy"; }
 test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() { assert_scenario scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done"; }
+test_busy_worker_with_an_old_exit_marker_is_not_reapable() { assert_scenario scn_busy_worker_with_an_old_exit_marker_is_not_reapable "a worker with no busy record whose pane reads busy is not reapable by the prune, even with state/<id>.control-exit left from an earlier stop"; }
 test_fallback_keeps_a_bare_pane_shell() { assert_scenario scn_bare_pane_shell_keeps_the_copy "a shell that is the pane's own shell keeps the copy with one wake and is left alone, so the pane stays open"; }
 test_fallback_never_holds_the_project_lock_on_a_hung_remote() { assert_scenario scn_hung_remote_never_holds_the_project_lock "a remote that never answers is never waited on while the project lock is held, and the attempt still finishes"; }
 test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_keeps_the_copy "an idle shell that is not the task's pane shell keeps the copy with exactly one wake"; }
@@ -2029,6 +2049,7 @@ test_unsafe_mutations_are_caught() {
   expect_caught exit-accepted-outside-the-prune $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "merge-prune-only rule"
   expect_caught exit-accepted-without-marker $reap '  [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ]' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "deliberate-exit marker rule"
   expect_caught exit-accepted-with-a-busy-record $reap '  [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "retired-busy-record rule"
+  expect_caught exit-marker-lifts-a-busy-verdict $reap '    && { [ "${busy%% *}" = busy ] || ! fm_idle_reap_exited_by_control "$state" "$id"; }; then' '    && ! fm_idle_reap_exited_by_control "$state" "$id"; then' scn_busy_worker_with_an_old_exit_marker_is_not_reapable "never lifting a positive busy verdict"
   expect_caught no-slot-owner-check $orch '    mine|absent) ;;' '    mine|absent|other) ;;' scn_reassigned_slot_is_never_destroyed "slot-owner re-read"
   expect_caught no-project-lock $orch '  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?' '  :' scn_project_lock_busy_backs_off "project lock"
   expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
@@ -2043,7 +2064,7 @@ test_over_strict_mutations_are_caught() {
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
   expect_caught nested-clone-line-counts $lib 'grep -Fxv -- "?? ${nested#"$copy"/}/"' 'cat' scn_unignored_nested_clone_goes_with_the_slot "skipping a nested copy's untracked directory"
   expect_caught unignored-nested-clone-left-for-the-destroy $orch '  if ! fm_mp_remove_unignored_nested "$real"; then' '  if false; then' scn_unignored_nested_clone_goes_with_the_slot "removing an unignored nested clone before the destroy"
-  expect_caught unignored-nested-worktree-left-for-the-destroy $lib '      git --git-dir="$common" worktree remove --force "$n" >/dev/null 2>&1' '      :' scn_unignored_nested_worktree_goes_with_the_slot "removing an unignored nested linked worktree before the destroy"
+  expect_caught unignored-nested-worktree-left-for-the-destroy $lib '      git --git-dir="$common" worktree remove "$n" >/dev/null 2>&1' '      :' scn_unignored_nested_worktree_goes_with_the_slot "removing an unignored nested linked worktree before the destroy"
   expect_caught no-conformance-manifest-scratch $lib '    scripts/hooks/_conformance_manifest.json) return 0 ;;' '    scripts/hooks/NEVER) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "conformance manifest rule"
   expect_caught scratch-list-drops-a-name-teardown-has $lib '    .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' '    graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;' scn_ignored_entries_get_teardowns_verdict "scratch list kept equal to teardown's"
   expect_caught wholly-ignored-tac-not-opened $lib '    .claude|.opencode|.claude/worktrees|.opencode/plugins|.tac)' '    .claude|.opencode|.claude/worktrees|.opencode/plugins)' scn_wholly_ignored_tac_caches_are_the_named_exception "opening a wholly ignored .tac/ one level at a time"
@@ -2417,6 +2438,7 @@ ALL_TESTS=(
   test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup
   test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped
   test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune
+  test_busy_worker_with_an_old_exit_marker_is_not_reapable
   test_fallback_exempts_nothing_when_the_pane_is_unreadable
   test_fallback_never_destroys_a_reassigned_slot
   test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit

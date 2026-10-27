@@ -44,8 +44,9 @@ fm_idle_reap_refusal_stands() {
 # refusal memo is ignored (the prune keeps its own backoff). Every other gate
 # stands. The prune stops the finished worker with `fm-control.sh exit`, which
 # retires its busy record and leaves state/<id>.control-exit; in this mode that
-# worker reads as stopped, not as unknown. Its last event must still be `done`,
-# which the checks after the busy gate require.
+# worker reads as stopped, not as unknown. A worker that reads busy is never
+# accepted. Its last event must still be `done`, which the checks after the busy
+# gate require.
 fm_idle_reap_exited_by_control() {  # <state> <id>
   [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1
   [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1
@@ -118,7 +119,8 @@ fm_idle_reap_classify() {
       IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="$verb: $note"; return 0 ;;
   esac
   busy=$(fm_busy_classify_meta "$meta" "$id" "$state")
-  if [ "${busy%% *}" != idle ] && ! fm_idle_reap_exited_by_control "$state" "$id"; then
+  if [ "${busy%% *}" != idle ] \
+    && { [ "${busy%% *}" = busy ] || ! fm_idle_reap_exited_by_control "$state" "$id"; }; then
     IDLE_REAP_DETAIL="busy state $busy"
     return 0
   fi

@@ -252,9 +252,9 @@ fm_mp_prove_git() {  # <real-copy> [<pr-number>] [nofetch] [<own|all>]
 # pane's `treehouse get` stops at its "uncommitted changes" prompt when its idle
 # shell ends. So each such nested copy of <real-copy> (FM_MP_NESTED, already
 # proved) is removed first: an independent clone with its directory, a linked
-# worktree with `git worktree remove --force` (proved clean, the way teardown
-# removes its own proved nested copies; a locked one is still refused). A clone
-# inside it goes with it. One that cannot be removed keeps the copy.
+# worktree with a plain `git worktree remove`, never forced. A clone inside an
+# independent clone goes with it. One that git refuses to remove, or that cannot
+# be removed, keeps the copy.
 fm_mp_remove_unignored_nested() {  # <real-copy>
   local copy=$1 n status common
   if ! status=$(git -C "$copy" status --porcelain --untracked-files=all 2>/dev/null); then
@@ -266,7 +266,7 @@ fm_mp_remove_unignored_nested() {  # <real-copy>
     if [ -d "$n/.git" ]; then
       rm -rf -- "$n" 2>/dev/null
     elif common=$(git -C "$n" rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
-      git --git-dir="$common" worktree remove --force "$n" >/dev/null 2>&1
+      git --git-dir="$common" worktree remove "$n" >/dev/null 2>&1
     fi
     if [ -e "$n" ]; then
       fm_mp_verdict keep "could not remove the nested copy $n, which the status of $copy shows as an untracked directory"

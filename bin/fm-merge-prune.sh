@@ -106,10 +106,12 @@
 # this task id by another home, is left alone. Then each nested copy whose
 # untracked directory shows in the copy's status (the project's .gitignore does
 # not cover it) is removed, because treehouse counts that directory as dirt
-# (fm_mp_remove_unignored_nested). Then
+# (fm_mp_remove_unignored_nested): an independent clone with its directory, a
+# linked worktree with a plain `git worktree remove`; one that git refuses to
+# remove keeps the copy with one wake. Then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
-# call the reaper makes; --include-unlanded, --include-in-use and --force are
-# never used), and teardown runs again to finish the task's records. In this
+# call the reaper makes), and teardown runs again to finish the task's records.
+# No step uses --force, --include-unlanded or --include-in-use. In this
 # mode the admission check of that second teardown (bin/fm-idle-reap-lib.sh)
 # accepts the worker the exit verb stopped: its busy record is gone,
 # state/<id>.control-exit is present and its last status event is `done`.
