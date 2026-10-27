@@ -14,21 +14,28 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 
 test_derived_author_coverage() {
-  local scenario case_dir head base url rc before after groups expected command
+  local scenario case_dir head base url rc before after groups expected command rewritten
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp null-base rebased-openai; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
     base=$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/main)
+    rewritten=
+    if [ "$scenario" = rebased-openai ]; then
+      # Run A's OpenAI commit; run B's rebase rewrites it to the current SHA.
+      git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): OpenAI run draft'
+      rewritten=$(git -C "$case_dir/wt" rev-parse HEAD)
+      git -C "$case_dir/wt" reset -q --hard HEAD~1
+    fi
     case "$scenario" in
       ship-*) ;;
       *) git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): repair consumer behavior' ;;
     esac
     head=$(git -C "$case_dir/wt" rev-parse HEAD)
     mkdir -p "$case_dir/user-home/.no-mistakes"
-    python3 - "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt" "$base" "$head" "$url" "$scenario" <<'PY'
+    python3 - "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/wt" "$base" "$head" "$url" "$scenario" "$rewritten" <<'PY'
 import sqlite3
 import sys
 with sqlite3.connect(sys.argv[1]) as db:
@@ -36,7 +43,11 @@ with sqlite3.connect(sys.argv[1]) as db:
 CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, base_sha TEXT, head_sha TEXT, last_pushed_sha TEXT, pr_url TEXT);
 CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT, status TEXT);''')
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
-    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', sys.argv[3], sys.argv[4], sys.argv[4], sys.argv[5]))
+    run_base = '0' * 40 if sys.argv[6] == 'null-base' else sys.argv[3]
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', run_base, sys.argv[4], sys.argv[4], sys.argv[5]))
+    if sys.argv[6] == 'rebased-openai':
+        db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run-a', 'repo', 'fm/fixture', sys.argv[3], sys.argv[7], sys.argv[7], sys.argv[5]))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run-a', 'acp:omp', 'gpt-5.1-codex', 'openai', 'completed'))
     db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'acp:omp', None, None, 'completed'))
@@ -94,6 +105,10 @@ PY
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
+      rebased-openai)
+        # The OpenAI-only PASS covers the Claude pipeline family, never run A's OpenAI one.
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record Claude read of ship'
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gpt-5.1-codex >/dev/null || fail 'record OpenAI-only read' ;;
       ship-unknown-reader)
         record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record covering Claude read'
         record_review "$case_dir" "$url" "$head" --reader-model mistral-large >/dev/null || fail 'record newest unknown-family read' ;;
@@ -166,7 +181,7 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|null-base)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -179,6 +194,7 @@ PY
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;
+          rebased-openai) expected='uncovered commit group no-mistakes:openai, family openai' ;;
           *) expected='uncovered commit group no-mistakes:anthropic, family anthropic' ;;
         esac
         assert_grep "$expected" "$case_dir/stderr" "$scenario identifies missing independent read"

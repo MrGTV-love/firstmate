@@ -30,10 +30,14 @@ history use the available meta evidence; default stays unknown. Subjects
 starting exactly no-mistakes( form no-mistakes:<family> groups. Their models
 come from matching runs and agent_invocations in <NM_HOME>/state.sqlite
 (default ~/.no-mistakes), opened with SQLite mode=ro; a relative NM_HOME is
-never resolved and leaves the pipeline commits unknown. A matching run must
-contain the pipeline commit in its recorded base-to-head/pushed range and name
-this PR or this task's repository and branch. All its invocation models are
-conservative author evidence. A recorded provider can resolve an otherwise
+never resolved and leaves the pipeline commits unknown. A matching run names
+this PR or this task's repository and branch. A pipeline commit is attributed
+only when some matching run with invocations contains it in its recorded
+base-to-head or base-to-pushed range; a missing or all-zero recorded base (a
+new-branch push) is bounded by the PR merge base instead. Attribution is
+conservative: every invocation model of every matching run is author evidence
+for every pipeline commit, so a rebase that rewrites an earlier run's commits
+never drops that run's author family. A recorded provider can resolve an otherwise
 unknown model alias; conflicting provider/model families are unknown. Every
 invocation counts, including cancelled and errored ones. An invocation with an
 empty model takes a family from its agent only when the agent is exactly claude
@@ -356,21 +360,17 @@ def derived_authors(home, pr, head, task, base):
                                   "OR (branch = ? AND repo_id IN (SELECT id FROM repos WHERE working_path IN (?, ?)))",
                                   (pr, meta.get("branch", ""), str(worktree), meta.get("project", ""))).fetchall()
                 for run_id, run_base, run_head, pushed in runs:
-                    run_commits = set()
-                    for tip in (run_head, pushed):
-                        if not tip or not run_base:
-                            continue
-                        try:
-                            run_commits.update(git(worktree, "rev-list", f"{run_base}..{tip}").splitlines())
-                        except RecordError:
-                            continue
-                    owned = set(pipeline) & run_commits
-                    if not owned:
-                        continue
                     invocations = db.execute("SELECT agent, model, model_provider FROM agent_invocations WHERE run_id = ?", (run_id,)).fetchall()
                     if not invocations:
                         continue
-                    covered.update(owned)
+                    lower = base_sha if not run_base or set(run_base) == {"0"} else run_base
+                    for tip in (run_head, pushed):
+                        if not tip:
+                            continue
+                        try:
+                            covered.update(set(pipeline) & set(git(worktree, "rev-list", f"{lower}..{tip}").splitlines()))
+                        except RecordError:
+                            continue
                     for agent, exact_model, provider in invocations:
                         item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
                         # Only fresh database evidence supplies a provider; typed
