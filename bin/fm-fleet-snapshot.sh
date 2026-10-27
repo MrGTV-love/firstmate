@@ -62,6 +62,9 @@
 #     fm-status-record-lib.sh owns the optional emission-time field, and only the
 #     age derived from it is published here. A future event time leaves that age
 #     unknown rather than clamped to zero.
+#     pr prefers metadata unchanged; absent metadata, use the first pull URL
+#     on the last log line carrying one, regardless of event verb. Status lines
+#     name the current PR first by convention; incidental mentions can win.
 #     hints.open_decisions is the keyed open-decision set returned by
 #     fm-status-decision-lib.sh's authoritative status_open_decisions fold and reconciled
 #     against current_state; hints.pending_decision and hints.blocked_event are
@@ -443,23 +446,22 @@ status_event_json() {  # <observed-status-log> [<contract-path>]
     '{path:$path,present:$present,kind:"event_history",last_event:{state:$verb,note:$note,raw:$raw,age_seconds:$age}}'
 }
 
-first_pr_url_in_file() {  # <file>
-  [ -f "$1" ] || return 1
-  grep -Eo 'https?://[^[:space:])"]+/pull/[0-9]+' "$1" 2>/dev/null | head -1
-}
-
-# first_pr_url_in_file without a pipeline: the first pull URL in file order.
-first_pr_url_in_file_to() {  # <file> <out-var>
-  local line found='' pattern='https?://[^[:space:])"]+/pull/[0-9]+'
+# Which URL counts as current is the `pr` rule in this file's header. Stream
+# matching lines through a one-line tail so memory stays bounded by one line,
+# not the log. LC_ALL=C and `-a` keep both greps byte-wise: a log holding bytes
+# invalid in the caller's locale, or a NUL byte, would otherwise stop the match
+# early or print "Binary file ... matches" in place of the line.
+# Assign in the caller's shell.
+current_pr_url_in_file_to() {  # <file> <out-var>
+  local selected=''
+  local pattern='https?://[^[:space:])"]+/pull/[0-9]+'
   if [ -f "$1" ]; then
-    while IFS= read -r line || [ -n "$line" ]; do
-      if [[ $line =~ $pattern ]]; then
-        found=${BASH_REMATCH[0]}
-        break
-      fi
-    done < "$1" 2>/dev/null || true
+    IFS= read -r selected < <(
+      LC_ALL=C grep -aE "$pattern" "$1" 2>/dev/null | tail -n 1 |
+        LC_ALL=C grep -aoE "$pattern" 2>/dev/null | head -n 1
+    ) || :
   fi
-  printf -v "$2" '%s' "$found"
+  printf -v "$2" '%s' "$selected"
 }
 
 backlog_json() (  # [<backlog-path>] - defaults to this home's $BACKLOG
@@ -880,7 +882,7 @@ task_json_one() {  # <captured-meta> - prints one task record
   meta_value_to "$meta" pr_head pr_head
   pr_source=meta
   if [ -z "$pr" ]; then
-    first_pr_url_in_file_to "$status_log" pr_from_status
+    current_pr_url_in_file_to "$status_log" pr_from_status
     pr=$pr_from_status
     pr_source=status_event
   fi
