@@ -108,7 +108,7 @@ A broken hook must never deny every shell tool call.
 
 The warn shape departs from the original work order, which specified an `allow` object on stderr with stdout empty.
 A successful exit does not deliver stderr, and a `permissionDecision` of `allow` would auto-approve the `cd`, so warn prints `systemMessage` and `additionalContext` on stdout with no permission decision.
-Delivery of the warning to the model or the user is not proven live in any harness.
+Warning delivery to the model is proven for Claude by the live-session evidence in [the warning-mode PR](https://github.com/MrGTV-love/firstmate/pull/189); delivery in other harnesses remains unproven.
 The OpenCode, Pi, pi-signed, and omp adapters act only on exit 2 and never read the checker's stdout on exit 0, so they do not forward the warning.
 
 ## Shared classifier ownership
@@ -139,7 +139,8 @@ Every shell variable reference in the Grok hook command carries an inline defaul
 
 `tests/fm-cd-pretool-check.test.sh` owns the acceptance matrix.
 Every classified and silent-allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, Pi-shaped CLI, and Cursor-shaped stdin entry forms with the mode unset and with `deny`; an explicit `warn` is spot-checked on `cd projects/foo` for each entry form, because it takes the same path as the unset default.
-Every `deny` response is compared byte for byte with golden captures of the original stderr deny object and Cursor's stdout deny object, so any change to the deny reason, escaping, or trailing newline fails the suite.
+The original Claude-shaped stderr deny object and Cursor's stdout deny object are compared byte for byte with golden captures, including escaping and the trailing newline.
+The Grok-shaped stdout deny object is checked for decoded JSON equality, not byte equality.
 The suite also proves the end-to-end cwd-leak regression in `deny` mode (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
 
 Run:
