@@ -309,15 +309,16 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # measured that spread and docs/fm-test-portable-shards.md records it. So
 # 1200000 ms bounds a real lane near 20 minutes, and a new member or a slow
 # path fails the coverage guard instead of quietly stretching the workflow.
-# Since the 2026-10-26 refresh every parallel hint is measured, including the
-# five the fm-lint split had apportioned. Lane 1 is fm-test-run, fm-lint,
-# fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
+# The 2026-10-26 refresh measured every parallel hint, including the five the
+# fm-lint split had apportioned; the fm-cd-pretool-check hint has since become a
+# scaled estimate that docs/fm-test-portable-shards.md records. Lane 1 is
+# fm-test-run, fm-lint, fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
 # fm-backend-herdr, fm-arm-pretool-check, fm-brief, fm-grok-harness,
 # fm-send-strict, fm-pi-primary-types, and fm-supervision-instructions;
 # fm-pi-primary-types stays in lane 1 because that is the job that installs the
 # Pi package and the TypeScript compiler it typechecks with. Lane 2 holds the
-# other twenty. Their three-bin packings model at 1030514 ms and 1030749 ms, so
-# the reported parallel_makespan_ms is 1030749 ms, and replaying each run's own
+# other twenty. Their three-bin packings model at 1030514 ms and 1043313 ms, so
+# the reported parallel_makespan_ms is 1043313 ms, and replaying each run's own
 # durations through that membership puts a real lane between 958965 ms and
 # 1027567 ms. Like the serial target this is packing arithmetic, not an
 # execution timeout.
@@ -769,9 +770,9 @@ tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-lint-report.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-lint-slots.test.sh
+tests/fm-cd-pretool-check.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-lint-policy.test.sh
 tests/fm-send-popup-settle.test.sh
 tests/fm-review-diff.test.sh
