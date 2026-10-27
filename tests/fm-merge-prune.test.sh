@@ -362,16 +362,9 @@ set_rec() {  # <id> <key> <value>
   sed "s/^$2=.*/$2=$3/" "$STATE/$1.merge-prune" > "$tmp" && mv -f "$tmp" "$STATE/$1.merge-prune"
 }
 
-# Wakes that say a copy stays; a reaped outcome is a wake of its own (reaped_wake_count).
 wake_count() {
   local n
-  n=$(grep 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null | grep -vc ' reaped ') || n=0
-  printf '%s' "$n"
-}
-
-reaped_wake_count() {
-  local n
-  n=$(grep 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null | grep -c ' reaped ') || n=0
+  n=$(grep -c 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null) || n=0
   printf '%s' "$n"
 }
 
@@ -1287,7 +1280,7 @@ scn_project_lock_busy_backs_off_for_the_returned_copy() {
   prune run t1 >/dev/null 2>&1
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the retry after the lock cleared did not remove the returned copy: $(rec_field t1 reason)" || return 1
   [ ! -e "$STATE/t1.merge-prune" ] || why "the record outlived the removal: $(cat "$STATE/t1.merge-prune")" || return 1
-  [ "$(reaped_wake_count)" = 1 ] || why "want one reaped outcome, got $(reaped_wake_count)" || return 1
+  [ "$(wake_count)" = 0 ] || why "the removal of the returned copy raised a wake: $(cat "$STATE/.wake-queue")" || return 1
   [ "$(stub_calls)" = 1 ] || why "the retry asked teardown again" || return 1
   return 0
 }
@@ -1309,7 +1302,7 @@ scn_slot_teardown_keeps_leased_is_left_alone() {
     go
     [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a slot teardown kept leased for $holder was destroyed" || return 1
     [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed for a copy teardown kept: $(cat "$STATE/t1.merge-prune")" || return 1
-    [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a copy teardown kept raised a wake: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+    [ "$(wake_count)" = 0 ] || why "a copy teardown kept raised a wake: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
     grep -q 'reaped: teardown completed; teardown kept the copy' "$DATA/t1/merge-prune.log" || why "the log does not say teardown kept the copy" || return 1
   done
   return 0
@@ -1324,7 +1317,7 @@ scn_copy_that_is_not_a_pool_slot_is_left_after_teardown() {
   go
   [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a copy that is not a pool slot was destroyed" || return 1
   [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed for a copy that can never be returned: $(cat "$STATE/t1.merge-prune")" || return 1
-  [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a copy that is not a pool slot raised a wake" || return 1
+  [ "$(wake_count)" = 0 ] || why "a copy that is not a pool slot raised a wake" || return 1
   grep -q 'reaped: teardown completed; teardown kept the copy' "$DATA/t1/merge-prune.log" || why "the log does not say teardown kept the copy" || return 1
   return 0
 }
@@ -1350,7 +1343,7 @@ scn_returned_copy_leased_again_before_the_retry_is_left() {
   prune run t1 >/dev/null 2>&1
   [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the retry destroyed a slot a new launch had leased" || return 1
   [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed: $(cat "$STATE/t1.merge-prune")" || return 1
-  [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a slot leased again raised a wake" || return 1
+  [ "$(wake_count)" = 0 ] || why "a slot leased again raised a wake" || return 1
   return 0
 }
 
@@ -2193,7 +2186,7 @@ test_fallback_never_holds_the_project_lock_on_a_hung_remote() { assert_scenario 
 test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_keeps_the_copy "an idle shell that is not the task's pane shell keeps the copy with exactly one wake"; }
 test_fallback_exempts_nothing_when_the_pane_is_unreadable() { assert_scenario scn_unreadable_pane_exempts_nothing "a pane that cannot be read exempts no shell"; }
 test_fallback_never_destroys_a_reassigned_slot() { assert_scenario scn_reassigned_slot_is_never_destroyed "a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed"; }
-test_returned_copy_removal_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off_for_the_returned_copy "removing the copy teardown returned takes the project lock; a busy lock is a silent retry from the prune record alone, then the copy is removed and reported"; }
+test_returned_copy_removal_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off_for_the_returned_copy "removing the copy teardown returned takes the project lock; a busy lock is a silent retry from the prune record alone, then the copy is removed with no wake"; }
 test_teardown_kept_leased_slot_is_left_alone() { assert_scenario scn_slot_teardown_keeps_leased_is_left_alone "a slot teardown kept leased, for another task's record or held for foreign copies, is never removed and raises no wake"; }
 test_copy_that_is_not_a_pool_slot_is_left_after_teardown() { assert_scenario scn_copy_that_is_not_a_pool_slot_is_left_after_teardown "a copy that is not a pool slot is left after teardown, with no wake and no record"; }
 test_returned_copy_leased_again_before_the_retry_is_left() { assert_scenario scn_returned_copy_leased_again_before_the_retry_is_left "the retry reads the lease again and leaves a returned slot that a new launch leased"; }
@@ -2522,13 +2515,12 @@ test_e2e_merge_prunes_the_copy_with_the_real_teardown() {
   fm_test_wait_until 60 grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
   [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
   assert_copy_removed
-  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there: real teardown did not complete"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
   grep -q '^return ' "$W/th.log" || fail "teardown did not return the slot through treehouse"
   assert_nothing_forced "e2e merge"
-  pass "end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, the copy is gone, and the log and one wake say reaped"
+  pass "end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, the copy is gone, and the log says reaped with no wake"
 }
 
 test_e2e_transient_contention_retries_then_succeeds() {
@@ -2557,7 +2549,6 @@ test_e2e_transient_contention_retries_then_succeeds() {
   [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the contention cleared did not reap: $(cat "$DATA/t1/merge-prune.log")"
   [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
   assert_copy_removed
-  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   grep -q 'retry in' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
@@ -2577,7 +2568,6 @@ test_e2e_removal_refused_after_teardown_keeps_the_record_and_wakes_once() {
   [ -e "$STATE/t1.merge-prune" ] || fail "the prune record was cleared while the copy is still on disk"
   [ "$(rec_field t1 state)" = retained ] || fail "the refused removal is not retained: $(cat "$STATE/t1.merge-prune")"
   [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake for the refused removal, got $(wake_count_real)"
-  [ "$(reaped_wake_count)" = 0 ] || fail "a copy that stays was reported reaped"
   grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'treehouse destroy refused' || fail "the wake does not name the copy and the refusal: $(cat "$STATE/.wake-queue")"
   assert_nothing_forced "e2e refused removal"
   : > "$W/th.fail"
@@ -2585,9 +2575,9 @@ test_e2e_removal_refused_after_teardown_keeps_the_record_and_wakes_once() {
   prune_real run t1 >/dev/null 2>&1
   [ ! -e "$COPY" ] || fail "the retry did not remove the returned copy"
   [ ! -e "$STATE/t1.merge-prune" ] || fail "the prune record outlived the removal"
-  [ "$(wake_count_real)" = 1 ] && [ "$(reaped_wake_count)" = 1 ] || fail "want the one kept wake and one reaped outcome, got $(wake_count_real) and $(reaped_wake_count)"
+  [ "$(wake_count_real)" = 1 ] || fail "want only the one kept wake, got $(wake_count_real)"
   assert_nothing_forced "e2e refused removal, retried"
-  pass "end to end: a refused removal of the returned copy keeps the copy and the prune record with one wake, and the retry removes it and reports reaped"
+  pass "end to end: a refused removal of the returned copy keeps the copy and the prune record with one wake, and the retry removes it and logs reaped with no further wake"
 }
 
 # A worker stopped with `fm-control.sh exit` before its PR merged: its busy
@@ -2608,7 +2598,6 @@ test_e2e_worker_exited_before_the_merge_is_pruned() {
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
   [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
   assert_copy_removed
-  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
   assert_nothing_forced "e2e exited before the merge"
   pass "end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only its treehouse get and idle shell, is pruned through the real teardown with no human step"

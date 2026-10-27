@@ -151,10 +151,9 @@
 # rows first or not: a process table (ps) or open-file listing (lsof) that exits
 # with an error or a message is a probe that failed, and keeps the copy.
 #
-# Outcomes are one line each in data/<id>/merge-prune.log, and the same outcome
-# is one wake of the queue that a kept copy uses: "check: merge-prune reaped
-# <copy> for <id>: ..." for a pruned copy, "check: merge-prune kept <copy> for
-# <id>: <reason>" for a copy that stays. The task's status file is never written.
+# Outcomes are one line each in data/<id>/merge-prune.log. A pruned copy raises
+# no wake; only a copy that stays raises its one wake ("check: merge-prune kept
+# <copy> for <id>: <reason>"). The task's status file is never written.
 #
 # FM_MERGE_PRUNE=0 turns arming off. Test seams: FM_MERGE_PRUNE_TEARDOWN_BIN and
 # FM_MERGE_PRUNE_CONTROL_BIN replace bin/fm-teardown.sh and bin/fm-control.sh;
@@ -340,12 +339,9 @@ run_teardown() {
     fm_run_timed "$(fm_mp_limit merge-prune.teardown 600)" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
 }
 
-# The outcome of a pruned copy: one log line and one wake, the same queue as the
-# wake of a copy that stays, so Main sees it without reading the data folder.
-finish_reaped() {  # <detail> [<copy>]
+# The outcome of a pruned copy: one log line and no wake.
+finish_reaped() {  # <detail>
   rm -f -- "$STATE/$ID.merge-prune"
-  fm_wake_append check "merge-prune:$ID" "check: merge-prune reaped ${2:-the copy} for $ID: $(clean_detail "$1")" \
-    || log_line "the reaped outcome could not be appended to the wake queue"
   log_line "reaped: $1"
 }
 
@@ -686,7 +682,7 @@ returned_slot() {  # <copy> <project>
 settle_copy() {  # <copy> <project> <detail>
   local copy=$1 project=$2 detail=$3
   if [ -z "$copy" ] || [ ! -e "$copy" ]; then
-    finish_reaped "$detail" "$copy"
+    finish_reaped "$detail"
     return 0
   fi
   if ! returned_slot "$copy" "$project"; then
@@ -738,7 +734,7 @@ remove_returned_locked() {  # <real-copy> <detail>
     absent) ;;
     other)
       # The returned slot went to another task's launch: it is theirs, not ours to remove.
-      finish_reaped "$detail; the returned slot was taken by task $FM_TREEHOUSE_SLOT_OWNER_ID and was left alone" "$real"
+      finish_reaped "$detail; the returned slot was taken by task $FM_TREEHOUSE_SLOT_OWNER_ID and was left alone"
       return 0
       ;;
     *)
@@ -775,7 +771,7 @@ remove_returned_locked() {  # <real-copy> <detail>
     return 1
   fi
   log_line "removed the returned copy $real (head ${head:-unknown}); preserved records, if any, are in $dest"
-  finish_reaped "$detail; removed the returned copy" "$real"
+  finish_reaped "$detail; removed the returned copy"
   return 0
 }
 
@@ -893,7 +889,7 @@ cmd_run() {  # <task-id> [--now]
     if [ -e "$R_COPY" ]; then
       remove_returned "$R_COPY" "$R_PROJECT" "teardown completed"
     else
-      finish_reaped "teardown completed; the returned copy is gone" "$R_COPY"
+      finish_reaped "teardown completed; the returned copy is gone"
     fi
     exit 0
   fi

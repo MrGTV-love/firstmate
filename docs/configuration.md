@@ -779,7 +779,7 @@ Anything else stays: an unpushed commit, a changed or untracked file, unique ign
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
-Each outcome is one line in `data/<id>/merge-prune.log`, and the same outcome is one wake on the wake queue, the queue a kept copy uses: `check: merge-prune reaped <copy> for <id>: ...` for a pruned copy and `check: merge-prune kept <copy> for <id>: <reason>` for a copy that stays; the prune never writes to the task's status file.
+Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
 The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
 
