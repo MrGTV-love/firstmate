@@ -1094,6 +1094,25 @@ test_a_refused_read_is_unknown_never_an_empty_open_set() {
   run_classify status_has_open_needs_decision "$status" 2>/dev/null || rc=$?
   [ "$rc" -eq 1 ] || fail "a refused log answered the needs-decision question with $rc, not the safe no"
 
+  # The drain's incremental fold has no checkpoint here either: it refuses the same way,
+  # writes no cursor, and the fleet scan names the log instead of showing an empty set.
+  rc=0
+  out=$(run_classify status_open_decisions_incremental "$status" 2>"$err") || rc=$?
+  [ "$rc" -eq 2 ] || fail "the incremental fold with no checkpoint did not refuse with exit status 2 (rc=$rc, output '$out')"
+  [ -z "$out" ] || fail "the incremental fold printed '$out' for a log it refused"
+  grep -q 'refused to read r.status' "$err" || fail "the incremental fold did not name the refused log: $(cat "$err")"
+  [ -z "$(find "$state" -name '.r.open-decisions-cursor*' -print)" ] || fail "the refused incremental fold wrote a cursor"
+  out=$(run_classify scan_open_decisions_incremental "$state" 2>"$err") || fail "the fleet open-decision scan failed on one refused log"
+  [ -z "$out" ] || fail "the fleet open-decision scan printed '$out' for a refused log"
+  grep -q 'r.status is past the read limits' "$err" || fail "the fleet open-decision scan did not name the refused log: $(cat "$err")"
+
+  # The latest-event reader refuses too when it must read the whole log for the previous event.
+  rc=0
+  out=$(bash -c '. "$1/fm-classify-lib.sh"; last_status_line "$2" previous; rc=$?; printf "previous=%s\n" "$previous"; exit "$rc"' \
+    _ "$ROOT/bin" "$status" 2>/dev/null) || rc=$?
+  [ "$rc" -eq 2 ] || fail "last_status_line with a previous event did not refuse with exit status 2 (rc=$rc, output '$out')"
+  [ "$out" = $'\nprevious=' ] || fail "last_status_line printed events for a log it refused: '$out'"
+
   # With a trusted checkpoint the open set survives a refused tail, as the incremental fold does.
   status="$state/seeded.status"
   printf 'needs-decision [key=q1]: an early question that is still open\n' > "$status"

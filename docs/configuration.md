@@ -1297,7 +1297,9 @@ A log under the line limit is read line by line, as before the cap existed.
 A refusal is exit status 2 and no other failure uses it, so a caller can tell a log that cannot be read from a log with nothing in it.
 The pure readers (`status_open_decisions`, its dated variant, `status_own_open_decisions`, `status_current_line`, `status_open_activities`) print nothing, return 2 and say so on stderr; a fold that has a trusted checkpoint and only has its tail refused keeps the checkpoint's open set, as the incremental fold does.
 Their callers read that as unknown, never as an empty set: `bin/fm-send.sh --resolve-key` refuses to send, and says the close could not be verified after a send, the captain-hold close and attestation commands refuse, the idle-reap classifier calls the lane ineligible, the pending-reply recovery and escalation leave the record alone, the watcher's retry ring leaves the mate alone, the AFK return brief names the lane and stays gated, `bin/fm-crew-state.sh` reports the lane `unknown`, and the fleet snapshot sets `hints.open_decisions_unreadable` on that task.
-The wake drain skips only the refused lane's unread span: it names the log on stderr, keeps that lane's presentation cursor where it was, and still presents every other lane.
+The incremental fold that the wake drain uses for OPEN DECISIONS does the same when it has no trusted checkpoint: it prints nothing, returns 2, keeps the refusal line on stderr and leaves its cursor alone.
+`last_status_line` returns 2 with no event when its whole-log read is refused; with no known previous event, the ledger path of `bin/fm-inactive-reconcile.sh` claims no earlier fallback delivery.
+The wake drain skips only the refused lane's unread span and open decisions: it names the log on stderr, keeps that lane's presentation cursor where it was, and still presents every other lane.
 A `signal:` row for a refused log prints no `wake annotation:` lines for it, for the same reason.
 The watcher's span classifier is not covered: it cannot classify a span of more than 32,768 unread lines, and reports the lane unreadable on every poll until the span is cleared; that is a follow-up.
 

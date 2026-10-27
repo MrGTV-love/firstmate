@@ -207,7 +207,7 @@ _fm_status_span_scratch() {  # <status-file>
 # Take exactly <byte-length> bytes of a status log from <start-offset>
 # (fm_status_read_exact, bin/fm-status-cap-lib.sh), or refuse: a span past the read
 # limit is refused, one line on stderr names the file, nothing is printed, and the
-# status is 1. The reader never prints a clipped copy, so a caller that turns the bytes
+# status is 2. The reader never prints a clipped copy, so a caller that turns the bytes
 # into a position (an endpoint, a line number, a cursor) always measures it against the
 # span it asked for, and a caller that fails on a read error leaves its saved position
 # where it was. The optional fourth argument is the line limit: the default refuses a

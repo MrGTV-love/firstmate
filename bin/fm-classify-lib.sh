@@ -102,7 +102,7 @@ status_current_line() {  # <status-file> <kind>
 $open
 EOF
   [ -n "$current" ] || current=$(status_declared_wait_line "$1")
-  [ -n "$current" ] || current=$(last_status_line "$1")
+  [ -n "$current" ] || current=$(last_status_line "$1") || return 2
   printf '%s\n' "$current"
 }
 
@@ -282,7 +282,10 @@ EOF
 # error), not a malformed writer: every such read here is checked, and on
 # failure this reports the already-trusted persisted set unchanged rather than
 # risking a silent invalidation that would wipe it - never a bare "empty" as if
-# nothing were open.
+# nothing were open. A span the read limits refuse (status 2,
+# bin/fm-status-cap-lib.sh) keeps a trusted checkpoint's set the same way; with no
+# trusted checkpoint the fold from byte 0 is refused, so nothing is printed, the
+# refusal line stays on stderr, the cursor is left as it was, and the status is 2.
 #
 # Not a pure status-file read: this writes/rewrites the sibling cursor file as a
 # side effect (state/.<task>.open-decisions-cursor), the library's second
@@ -298,7 +301,7 @@ EOF
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
   local version='' size actual_size cur_ident resolve held chunk chunk_size line cursor_dirty=0
-  local target_cursor kind fold_version boundary_rc verb
+  local target_cursor kind fold_version boundary_rc verb read_rc cold=0 read_err=/dev/null
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" '' kind
   _fm_open_decisions_fold_signature "$kind" fold_version
@@ -345,14 +348,20 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
     open=''
     trusted_open=''
     cursor_dirty=1
+    cold=1
+    read_err=/dev/stderr
   fi
 
   if [ "$offset" -lt "$size" ]; then
     # In memory rather than a scratch file beside the cursor, so a drain killed
     # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
     # count that a command substitution would otherwise trim.
-    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null && printf x) \
-      || { printf '%s' "$trusted_open"; return 0; }
+    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>"$read_err" && printf x) || {
+      read_rc=$?
+      [ "$read_rc" -ne 2 ] || [ "$cold" -eq 0 ] || return 2
+      printf '%s' "$trusted_open"
+      return 0
+    }
     chunk=${chunk%x}
     chunk_size=$(LC_ALL=C; printf '%s' "${#chunk}")
     # Test-only observability seam (off by default, no production behavior
@@ -436,7 +445,11 @@ scan_open_decisions_incremental() {  # <state>
     [ -e "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
     task=${f##*/}; task="${task%.status}"
-    open=$(status_open_decisions_incremental "$f") || continue
+    open=$(status_open_decisions_incremental "$f") || {
+      [ "$?" -eq 2 ] || continue
+      echo "fm-status: $task.status is past the read limits; its open decisions cannot be shown and it is skipped" >&2
+      continue
+    }
     [ -n "$open" ] || continue
     while IFS= read -r line; do
       [ -n "$line" ] || continue
@@ -679,7 +692,11 @@ scan_open_decisions_snapshot() {  # <state> <task-and-endpoint-snapshot>
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     f="$state/$task.status"
-    open=$(status_open_decisions_incremental "$f" "$endpoint") || return 1
+    open=$(status_open_decisions_incremental "$f" "$endpoint") || {
+      [ "$?" -eq 2 ] || return 1
+      echo "fm-status: $task.status is past the read limits; its open decisions cannot be shown and it is skipped" >&2
+      continue
+    }
     [ -n "$open" ] || continue
     while IFS= read -r line; do
       [ -n "$line" ] || continue

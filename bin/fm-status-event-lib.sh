@@ -54,17 +54,18 @@ FM_STATUS_FALLBACK_NOTICE='model-matrix fallback served '
 # was appended, so a consumer can name the head it is superseding; asking for it
 # always reads the whole log, since a bounded window cannot bound two events; a log
 # past the read limit (bin/fm-status-cap-lib.sh) is refused and nothing is read.
+# A whole-log read that is refused leaves both events empty and returns 2, which a
+# caller reads as unknown, never as a log with no event.
 # This is an event read; status_current_line in bin/fm-classify-lib.sh reconciles open decisions.
 last_status_line() {  # <status-file> [<previous-event-var>]
-  local f=$1 scan=''
+  local f=$1 scan='' rc=0
   [ -f "$f" ] && [ -r "$f" ] || return 0
-  if [ "$#" -gt 1 ]; then
-    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
-  elif ! scan=$(fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" | _fm_status_event_scan); then
-    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan) || :
+  if [ "$#" -gt 1 ] || ! scan=$(fm_status_tail_lines "$f" "$FM_CLASSIFY_EVENT_WINDOW_LINES" | _fm_status_event_scan); then
+    scan=$(fm_status_cat "$f" 2>/dev/null | _fm_status_event_scan; [ "${PIPESTATUS[0]}" -ne 2 ] || exit 2) || rc=$?
   fi
   [ "$#" -lt 2 ] || printf -v "$2" '%s' "${scan%%$'\n'*}"
   printf '%s\n' "${scan##*$'\n'}"
+  return "$rc"
 }
 
 # 0 when <verb> is exactly one recognized status verb, with no leftover token.
