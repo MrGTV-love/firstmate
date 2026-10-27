@@ -204,6 +204,28 @@ assert_registered ready
 [ ! -e "$CASE/home/state/.pr-ready-reconcile/ready.refused" ] || fail 'registered task kept its refusal marker'
 pass 'refusal queues one check wake per reason, skips the forge for ten minutes, then registers once the cause healed at the same head'
 
+# fm-pr-check.sh runs fm-guard.sh before its gate, and the guard's banner
+# changes from pass to pass; only the registrar's own refusal is the reason.
+make_case guard-banner
+write_ship ready ship direct-PR
+git -C "$CASE/project" commit -q --allow-empty -m unpublished
+cat > "$CASE/root/bin/fm-guard.sh" <<'SH'
+#!/usr/bin/env bash
+n=$(($(cat "$FM_READY_CASE/guard.count" 2>/dev/null || echo 0) + 1))
+printf '%s\n' "$n" > "$FM_READY_CASE/guard.count"
+printf 'WARNING: watcher still down (banner %s)\n' "$n" >&2
+SH
+out=$(run_pass)
+assert_unregistered ready
+[ "$(refusal_wakes ready)" -eq 1 ] || fail 'unreachable head did not queue exactly one check wake'
+age_refusal ready 660
+out=$(run_pass)
+[ "$(cat "$CASE/guard.count")" -eq 2 ] || fail 'aged refusal did not reach the registrar again'
+[ "$(refusal_wakes ready)" -eq 1 ] || fail "a changed guard banner queued a second wake for the same refusal: $out"
+! grep -q 'banner' "$CASE/home/state/.wake-queue" || fail 'guard banner leaked into the refusal wake'
+printf '%s\n' "$out" | grep -q 'registration refused: error: ' || fail "refusal line does not carry the registrar error: $out"
+pass 'a changing fm-guard.sh banner neither re-wakes the same refusal nor enters its reason'
+
 # The 2026-10-20 shape: the run is green and names its PR, but the worker never
 # wrote a done line, so only fm-crew-state.sh's reading says the PR is ready.
 make_case crew-state-green

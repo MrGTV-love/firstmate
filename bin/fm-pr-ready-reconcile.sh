@@ -14,7 +14,8 @@
 # read searches the run's full ci log for its newest checks marker, so a green
 # PR stays green however often main advances, under its own ten-second limit; a
 # read past it is printed and skipped for this pass so later records still run.
-# A refusal is printed, queued as one check wake per distinct reason, and
+# A refusal is printed with fm-pr-check.sh's error lines as its reason, queued as
+# one check wake per distinct reason, and
 # retained per task for ten minutes, during which the task is skipped before any
 # forge call; after that it is retried, so a repaired
 # draft, restored tool, transient forge failure or finished pipeline registers
@@ -135,7 +136,10 @@ reconcile_one() {  # <meta> <id>
     "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
     printf 'pr-ready: %s: registered %s\n' "$id" "$url"
   else
-    [ -n "$output" ] || output='fm-pr-check.sh failed without output'
+    # Only the registrar's own error lines are the reason: the fm-guard.sh
+    # banner it also prints changes from pass to pass.
+    output=$(printf '%s\n' "$output" | grep '^error: ') || output=
+    [ -n "$output" ] || output='fm-pr-check.sh failed without an error line'
     printf 'pr-ready: %s: registration refused: %s\n' "$id" "${output//$'\n'/; }"
     if [ "$output" = "$previous" ] \
       || fm_wake_append check "pr-ready-refused:$id" \
