@@ -412,6 +412,17 @@ PYCHANGE
   [ "$(grep -c '^overdue open work: "away-row",' "$buffer")" = 1 ] || fail "the changed overdue row was not forwarded again"
   rm -f "$buffer"
   FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 FM_OPEN_LOOPS_RESURFACE=0 \
+    handle_durable_wakes fallback "$state" || fail "the zero-interval cycle retained the check wake"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" \
+    || fail "a zero resurface interval did not fall back to its default"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 FM_OPEN_LOOPS_RESURFACE=6h \
+    handle_durable_wakes fallback "$state" 2> "$dir/resurface.err" || fail "the invalid-interval cycle retained the check wake"
+  [ ! -s "$dir/resurface.err" ] || fail "an invalid resurface interval was not normalized: $(cat "$dir/resurface.err")"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" \
+    || fail "an invalid resurface interval did not fall back to its default"
+  awk -F '\t' 'BEGIN { OFS = "\t" } { $3 = $3 - 21600; print }' "$state/.subsuper-open-work-forwarded" \
+    > "$dir/forwarded" && mv -f "$dir/forwarded" "$state/.subsuper-open-work-forwarded"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
     handle_durable_wakes fallback "$state" || fail "the resurfaced row retained the check wake"
   [ "$(grep -c '^overdue open work: "away-row",' "$buffer")" = 1 ] \
     || fail "the unchanged overdue row was not forwarded again after its resurface interval"

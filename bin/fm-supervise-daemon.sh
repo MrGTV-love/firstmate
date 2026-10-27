@@ -1702,6 +1702,11 @@ handle_wake() {  # <reason> <state>
 forward_overdue_rows() {  # <state> <drain-output>
   local state=$1 out=$2 report='' line id identity seen now readable=1
   local marker="$state/.subsuper-open-work-forwarded" resurface=${FM_OPEN_LOOPS_RESURFACE:-21600}
+  case "$resurface" in
+    ''|*[!0-9]*) resurface=21600 ;;
+    *) resurface=$((10#$resurface)) ;;
+  esac
+  [ "$resurface" -gt 0 ] || resurface=21600
   [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
   if ! report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
     case "$report" in

@@ -906,7 +906,7 @@ Drain presents `OVERDUE` before other sections, with the id, owner, next action,
 A row first published after the drain is not gated by that acknowledgement: the change wake the watcher queues for it presents it at the next drain, where it is gated as usual.
 This boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake, whose drain still presents and gates every overdue row.
 Only when the rows this drain presents for its actor include an `open-loop-ledger-resurface` wake does the drain include one `WAITING OPEN WORK` list of every overdue row its last action still covers, with its current age, status, and last action's kind, evidence, and time; an escalation the captain has not answered has the status `escalated, waiting on the captain`, and with no such row the drain prints no list at all.
-A change wake presents only the new or changed rows in `OVERDUE`, never the full list.
+A change wake presents in `OVERDUE` every row that still needs an action (new, changed, or no longer covered), never the full list.
 Firstmate sends that list to the captain as one periodic update on the resurface wake only, not one new escalation per row; printing or sending the list is not proof that an escalation reached the captain.
 A row is always either actionable at the gate or included in that list until it changes or fresh evidence resolves it; unpausing a lane requires no manual revert because new status, commit, or PR evidence changes its row.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.

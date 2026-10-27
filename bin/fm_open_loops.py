@@ -1429,19 +1429,6 @@ class WaitVerifier:
             return False  # unreadable or changed evidence never buys standing acknowledgement
 
 
-def receipt_stands(action, row, now, waits=None):
-    """A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one."""
-    kind = action.get("kind")
-    if row.get("category") == "review_pass_not_merged" or action.get("digest") != row_digest(row) \
-            or action.get("invalidated"):
-        return False
-    if kind == "waiting":
-        return waits is not None and waits.stands(action, row, now)
-    if kind == "deferred":
-        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    return kind in ("steered", "merged")
-
-
 def same_work(action, row, now):
     """The action was recorded against this row's current evidence and age clock."""
     age = row.get("age_seconds")
@@ -1452,16 +1439,23 @@ def same_work(action, row, now):
 def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
+    A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
     An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
     including between that ledger's generation and the record time, is changed work too.
     """
-    if not same_work(action, row, now):
+    if not same_work(action, row, now) or row.get("category") == "review_pass_not_merged" \
+            or action.get("invalidated"):
         return False
-    if action.get("kind") == "escalated" and row.get("category") != "review_pass_not_merged" \
-            and not action.get("invalidated") and not action.get("unverified"):
-        return not action.get("hold") or (waits is not None and waits.hold_stands(action, row))
-    return receipt_stands(action, row, now, waits)
+    kind = action.get("kind")
+    if kind == "escalated":
+        return not action.get("unverified") and (
+            not action.get("hold") or (waits is not None and waits.hold_stands(action, row)))
+    if kind == "waiting":
+        return waits is not None and waits.stands(action, row, now)
+    if kind == "deferred":
+        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
+    return kind in ("steered", "merged")
 
 
 def steer_record_epoch(state, row, record):
