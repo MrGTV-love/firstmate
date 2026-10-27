@@ -1,0 +1,30 @@
+ ▐▛███▛█   Claude Code v2.1.311
+▝▜██████▀  Opus 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   /private/tmp/fmcd-live.qppD/target
+❯ This is a test of a hook. Run exactly this one Bash command and nothing else: cd projects/demo && pwd . Then quote verbatim, in full, any hook message, system message, or additional context you
+  received about that command. Do not run any other command.
+  Ran 1 shell command
+  ⎿  PreToolUse:Bash says: [persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later
+     firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or
+     an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).
+⏺ Captain, I ran the command. It worked.
+  Output:
+  /tmp/fmcd-live.qppD/target/projects/demo
+  Hook message, word for word. It was labeled PreToolUse:Bash hook additional context:
+  ▎ [persistent-cd] a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs
+  ▎ inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the
+  ▎ command itself - or scope the cd to a subshell like (cd <dir> && ...).
+  System message, word for word:
+  ▎ Environment update
+  ▎
+  ▎ - Primary working directory: /private/tmp/fmcd-live.qppD/target/projects/demo (was /private/tmp/fmcd-live.qppD/target)
+  I got nothing else about this command.
+  Two things to note:
+  1. The label says "PreToolUse", but I got the message after the command ran. The text also says the change "already ran". So the hook warned me. It did not block the command.
+  2. The shell is still in projects/demo. You told me to run only one command, so I did not cd back. I must go back to /private/tmp/fmcd-live.qppD/target before I run any firstmate command.
+✻ Sautéed for 12s · done 1:56 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ cd back to the firstmate home
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 4% 47k/1.0M demo:26d21aad
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent

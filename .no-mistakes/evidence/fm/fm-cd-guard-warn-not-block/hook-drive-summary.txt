@@ -1,0 +1,44 @@
+Real bin/fm-cd-pretool-check.sh in disposable plain clones: base=7eb37bf8 (pre-edit), target=da493b7b. Command: cd projects/demo
+base-unset.claude          rc=2 stdout=0B stderr=465B
+base-unset.cli             rc=2 stdout=396B stderr=465B
+base-unset.codex           rc=2 stdout=396B stderr=465B
+base-unset.cursor          rc=0 stdout=404B stderr=0B
+base-unset.grok            rc=2 stdout=396B stderr=465B
+tgt-deny.claude            rc=2 stdout=0B stderr=465B
+tgt-deny.cli               rc=2 stdout=396B stderr=465B
+tgt-deny.codex             rc=2 stdout=396B stderr=465B
+tgt-deny.cursor            rc=0 stdout=404B stderr=0B
+tgt-deny.grok              rc=2 stdout=396B stderr=465B
+tgt-unset.claude           rc=0 stdout=1000B stderr=0B
+tgt-unset.cli              rc=0 stdout=1000B stderr=0B
+tgt-unset.codex            rc=0 stdout=1000B stderr=0B
+tgt-unset.cursor           rc=0 stdout=493B stderr=0B
+tgt-unset.grok             rc=0 stdout=1000B stderr=0B
+tgt-upperDENY.claude       rc=0 stdout=1000B stderr=0B
+tgt-upperDENY.cli          rc=0 stdout=1000B stderr=0B
+tgt-upperDENY.codex        rc=0 stdout=1000B stderr=0B
+tgt-upperDENY.cursor       rc=0 stdout=493B stderr=0B
+tgt-upperDENY.grok         rc=0 stdout=1000B stderr=0B
+tgt-warn.claude            rc=0 stdout=1000B stderr=0B
+tgt-warn.cli               rc=0 stdout=1000B stderr=0B
+tgt-warn.codex             rc=0 stdout=1000B stderr=0B
+tgt-warn.cursor            rc=0 stdout=493B stderr=0B
+tgt-warn.grok              rc=0 stdout=1000B stderr=0B
+== cmp base-unset (pre-edit) vs tgt-deny ==
+claude.out IDENTICAL
+claude.err IDENTICAL
+claude.rc IDENTICAL
+codex.out IDENTICAL
+codex.err IDENTICAL
+codex.rc IDENTICAL
+grok.out IDENTICAL
+grok.err IDENTICAL
+grok.rc IDENTICAL
+cursor.out IDENTICAL
+cursor.err IDENTICAL
+cursor.rc IDENTICAL
+cli.out IDENTICAL
+cli.err IDENTICAL
+cli.rc IDENTICAL
+== OpenCode adapter ==
+default: command allowed to run (no throw); FM_CD_GUARD_MODE=deny: command BLOCKED (throw)

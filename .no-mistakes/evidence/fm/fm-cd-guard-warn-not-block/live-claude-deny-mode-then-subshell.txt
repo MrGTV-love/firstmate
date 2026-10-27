@@ -1,0 +1,30 @@
+  Ran 1 shell command
+⏺ Captain, the command did not run. A hook blocked it before it started.
+  I ran one command only: cd projects/demo && pwd
+  This is the full hook message, word for word:
+  PreToolUse:Bash hook error: [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-cd-pretool-check.sh --claude]:
+  {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is
+  blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on
+  the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+  What this means:
+  1. The hook is bin/fm-cd-pretool-check.sh --claude. It is a PreToolUse hook, which means it checks a command before the command runs.
+  2. It sent permissionDecision: "deny", so the shell did not run the command.
+  3. pwd did not run, so there is no directory output.
+  4. I got no other system message or error about this command.
+  On the hook prefix: the [[ ... ] || exit 0 part looks like it has a typo. It opens with [[ but closes with only ]. The hook still fired and denied the command, so the check ran. You might want to
+  look at that prefix.
+✻ Crunched for 12s · done 1:57 PM
+❯ Now run exactly this one Bash command and nothing else: (cd projects/demo && pwd) . Quote verbatim any hook message, system message, or error you received about it, or say there was none.
+  Ran 1 shell command
+⏺ Captain, the command ran. The hook did not block it.
+  I ran one command only: (cd projects/demo && pwd)
+  It printed this:
+  /tmp/fmcd-live.qppD/target/projects/demo
+  I got no hook message, no system message, and no error about this command.
+  So the hook did what its earlier message said. It blocks a plain cd, but it lets a cd inside a subshell run. A subshell is a short-lived child shell, so its cd does not move the main shell.
+✻ Sautéed for 9s · done 1:58 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ Now run exactly: git -C projects/demo status
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 4% 48k/1.0M target:cbad7af5
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent
