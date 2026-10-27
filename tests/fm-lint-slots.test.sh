@@ -1416,6 +1416,131 @@ PL
   pass "a cache-key wait longer than the root deadline preserves its memory retry budget"
 }
 
+# A ShellCheck stand-in whose source-following run grows resident memory by
+# 8 MiB every 50 ms for FM_TEST_GROW_STEPS steps, then sleeps up to 20 s
+# (FM_TEST_GROW_HOLD=<seconds> holds the memory that long and exits 0 instead).
+# The run without --external-sources exits 0 at once.
+# FM_TEST_FLAGS_LOG gets one yes/no line per attempt and FM_TEST_PID_FILE the growing process id.
+fm_lint_write_growing_shellcheck() {  # <fakebin>
+  cat > "$1/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+follow=no
+for arg in "$@"; do
+  [ "$arg" != --external-sources ] || follow=yes
+done
+printf '%s\n' "$follow" >> "$FM_TEST_FLAGS_LOG"
+[ "$follow" = yes ] || exit 0
+printf '%s\n' "$$" > "$FM_TEST_PID_FILE"
+exec perl -e '
+  my $held = "";
+  for (1 .. $ARGV[0]) {
+    $held .= "x" x (8 * 1024 * 1024);
+    select(undef, undef, undef, 0.05);
+  }
+  if ($ARGV[1]) { select(undef, undef, undef, $ARGV[1]); exit 0; }
+  sleep 20;' "$FM_TEST_GROW_STEPS" "${FM_TEST_GROW_HOLD:-0}"
+SH
+  chmod +x "$1/shellcheck"
+}
+
+test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower() {
+  local tmp fakebin fixture out rc roots_log flags_log pid_file pid rss_kib started
+  tmp=$(fm_test_tmproot fm-lint-rss-bound)
+  fakebin=$(fm_fakebin "$tmp")
+  fixture="$tmp/grower.sh"
+  flags_log="$tmp/flags.log"
+  pid_file="$tmp/grower.pid"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+  fm_lint_write_growing_shellcheck "$fakebin"
+  : > "$flags_log"
+  rc=0
+  started=$SECONDS
+  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
+    FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$pid_file" FM_TEST_GROW_STEPS=40 \
+    "$LINT" --telemetry "$tmp/pass.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a root over the resident bound did not pass its narrower retry (exit $rc)"$'\n'"$out"
+  [ "$((SECONDS - started))" -lt 15 ] \
+    || fail "the root was not ended at the bound: lint waited out the growing process"
+  [ "$(cat "$flags_log")" = "$(printf 'yes\nno')" ] \
+    || fail "the resident-bound root was not retried once without external sources"$'\n'"$(cat "$flags_log")"
+  assert_contains "$out" "hit the memory ceiling with --external-sources (reason=memory rc=98)" \
+    "the resident-bound end was not identified in the output"
+  assert_contains "$out" "fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)" \
+    "the narrower retry result was not disclosed"
+  roots_log="$tmp/pass.roots.tsv"
+  awk -F '\t' '$1 == "end" && $3 ~ /grower\.sh$/ && $9 == 0 && $10 == "memory-fallback" && $12 == 0 { found=1 } END { exit !found }' \
+    "$roots_log" || fail "the roots log did not mark the resident-bound retry as a memory fallback"
+  rss_kib=$(awk -F '\t' '$1 == "end" && $3 ~ /grower\.sh$/ { print $11 }' "$roots_log")
+  case "$rss_kib" in ''|*[!0-9]*) fail "the roots log lost the peak resident size: $rss_kib" ;; esac
+  [ "$rss_kib" -gt 102400 ] || fail "the roots log peak $rss_kib KiB is not above the 102400 KiB bound"
+  pid=$(cat "$pid_file")
+  ! kill -0 "$pid" 2>/dev/null || { kill -KILL "$pid" 2>/dev/null; fail "the over-bound process $pid outlived the lint"; }
+  pass "a root over the resident-memory bound is ended and retried narrower with the roots log marking it"
+}
+
+test_unbounded_root_under_resident_bound_is_untouched() {
+  local tmp fakebin fixture out rc roots_log flags_log
+  tmp=$(fm_test_tmproot fm-lint-rss-normal)
+  fakebin=$(fm_fakebin "$tmp")
+  fixture="$tmp/normal.sh"
+  flags_log="$tmp/flags.log"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+  fm_lint_write_growing_shellcheck "$fakebin"
+  : > "$flags_log"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
+    FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$tmp/normal.pid" FM_TEST_GROW_STEPS=3 FM_TEST_GROW_HOLD=1.5 \
+    "$LINT" --telemetry "$tmp/pass.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a root under the resident bound did not pass (exit $rc)"$'\n'"$out"
+  [ "$(cat "$flags_log")" = yes ] || fail "a root under the resident bound was not left to one attempt"$'\n'"$(cat "$flags_log")"
+  assert_not_contains "$out" "memory ceiling" "a root under the resident bound was reported as a memory failure"
+  roots_log="$tmp/pass.roots.tsv"
+  awk -F '\t' '$1 == "end" && $3 ~ /normal\.sh$/ && $9 == 0 && $10 == "ok" && $12 == 1 { found=1 } END { exit !found }' \
+    "$roots_log" || fail "the normal root was not recorded as an ordinary pass"
+  rc=0
+  FM_LINT_ROOT_RSS_KIB=0x "$LINT" "$fixture" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -eq 2 ] || fail "a malformed FM_LINT_ROOT_RSS_KIB was not refused (exit $rc)"
+  if fm_lint_bounds_supported; then
+    # The enforced ulimit envelope keeps its own behavior: the resident watch
+    # does not apply, so a root that crosses the number is not ended.
+    : > "$flags_log"
+    rc=0
+    out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=1 FM_LINT_ROOT_RSS_KIB=102400 \
+      FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$tmp/bounded.pid" FM_TEST_GROW_STEPS=40 FM_TEST_GROW_HOLD=1.5 \
+      "$LINT" "$fixture" 2>&1) || rc=$?
+    [ "$rc" -eq 0 ] || fail "the enforced envelope run did not pass (exit $rc)"$'\n'"$out"
+    [ "$(cat "$flags_log")" = yes ] || fail "the resident watch ended a root inside the enforced envelope"$'\n'"$(cat "$flags_log")"
+  fi
+  pass "a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before"
+}
+
+test_resident_watch_ends_its_command_when_its_owner_dies() {
+  local tmp owner_pid command_pid i
+  tmp=$(fm_test_tmproot fm-lint-rss-owner)
+  # The owner is killed outright, so no signal reaches the watch: it must see the
+  # lost parent and end the command's own process group.
+  bash -c 'perl "$1" rsswatch 8388608 "$2" -- bash -c "echo \$\$ > \"\$1\"; exec sleep 30" _ "$3" & wait' \
+    _ "$ROOT/bin/fm-lint-cache.pl" "$tmp/rss" "$tmp/command.pid" > /dev/null 2>&1 &
+  owner_pid=$!
+  i=0
+  while [ "$i" -lt 500 ] && [ ! -s "$tmp/command.pid" ]; do sleep 0.01; i=$((i + 1)); done
+  [ -s "$tmp/command.pid" ] || { kill -KILL "$owner_pid" 2>/dev/null || true; fail "the watched command did not start"; }
+  command_pid=$(cat "$tmp/command.pid")
+  kill -KILL "$owner_pid" 2>/dev/null || true
+  wait "$owner_pid" 2>/dev/null || true
+  i=0
+  while [ "$i" -lt 300 ] && kill -0 "$command_pid" 2>/dev/null; do sleep 0.01; i=$((i + 1)); done
+  if kill -0 "$command_pid" 2>/dev/null; then
+    kill -KILL "$command_pid" 2>/dev/null || true
+    fail "the watched command $command_pid outlived its killed owner"
+  fi
+  pass "the resident-memory watch ends its command when the owner dies"
+}
+
 fm_lint_test_cases=(
 test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
@@ -1435,6 +1560,9 @@ test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death
 test_memory_failure_retries_without_external_sources
+test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
+test_unbounded_root_under_resident_bound_is_untouched
+test_resident_watch_ends_its_command_when_its_owner_dies
 test_cache_key_wait_preserves_root_retry_budget
 )
 fm_lint_run "$@"

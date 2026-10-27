@@ -191,6 +191,8 @@ SH
   chmod +x "$FAKEBIN/herdr"
 fi
 load_acquisition_herdr() {
+  # Following the adapter makes ShellCheck exceed 4 GiB on this test, so it is not followed.
+  # shellcheck source=/dev/null
   . "$ROOT/bin/backends/herdr.sh"
 }
 

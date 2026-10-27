@@ -81,8 +81,13 @@
 # or lint exits 2, even with the pool off. The cap is the only host-wide bound:
 # a lone default two-worker run keeps both workers unless an explicit cap of one
 # is selected. The CPU-derived default keeps the memory protection of the
-# original pool (some ShellChecks reach several GB); the per-root memory limit
-# is enforced only where ulimit -v works, and native macOS cannot enforce it.
+# original pool (some ShellChecks reach several GB); the per-root address-space
+# limit is enforced only where ulimit -v works, and native macOS cannot enforce it.
+# Where the enforced envelope below does not apply, each root's process tree is
+# instead watched for resident memory (FM_LINT_ROOT_RSS_KIB, default 8388608 =
+# 8 GiB, a positive decimal integer or lint exits 2). A root that crosses it is
+# ended and takes the memory retry described below. Linux and CI runs under
+# FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope and are not watched.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
 # Slot directory, file, or locking failures warn and run ungated rather than failing lint.
@@ -113,10 +118,12 @@
 # named error, so a required-bounds run never lints uncapped. Without
 # FM_LINT_REQUIRE_BOUNDS (a local developer lint, where hosts like macOS
 # cannot apply the address-space limit at all) each root still runs in its
-# own ShellCheck process with identical diagnostics and no deadline or memory
-# limit; the host-wide concurrency pool remains enabled unless disabled above.
+# own ShellCheck process with identical diagnostics, no deadline and no
+# address-space limit, under the resident-memory watch above; the host-wide
+# concurrency pool remains enabled unless disabled above.
 #
-# If a source-following root exits with a memory failure, it is retried once
+# If a source-following root exits with a memory failure, including a resident
+# bound crossing (status 98, named on stderr), it is retried once
 # without --external-sources under the same memory limit and only the time
 # left in that root's original deadline; with under a second left, the
 # memory failure stands without a retry. A clean retry passes
@@ -239,8 +246,9 @@ fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
 # Map a root's exit status onto the reported reason vocabulary without
 # pretending every signal or nonzero exit is a memory kill: only process-level
 # memory-failure evidence earns the memory reason - GHC's heap-exhaustion
-# status 251, or a complete runtime memory-error line on the root's stderr,
-# including the cache wrapper's Perl "Out of memory!" exit 1 - and that
+# status 251, the resident-memory watch's own status 98, or a complete runtime
+# memory-error line on the root's stderr, including the cache wrapper's Perl
+# "Out of memory!" exit 1 - and that
 # evidence is checked before a generic findings or signal reason.
 # Diagnostics and their echoed source excerpts are on stdout and never count,
 # and each stderr form is matched whole to its line end, so a root path that
@@ -250,7 +258,7 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
   case "$rc" in
     0) printf 'ok\n'; return 0 ;;
     97) printf 'limit-unavailable\n'; return 0 ;;
-    251) printf 'memory\n'; return 0 ;;
+    251|98) printf 'memory\n'; return 0 ;;
   esac
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && [ "$rc" = 124 ]; then
     printf 'timeout\n'; return 0
@@ -299,6 +307,13 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     else
       analysis_command=(/usr/bin/time -f 'max_rss_kib=%M' -o "$rss_file" "${analysis_command[@]}")
     fi
+  fi
+  # Without the enforced envelope no ulimit -v bounds the root (native macOS
+  # cannot apply it), so the resident-memory watch sits outside /usr/bin/time
+  # and ends the root's process group when its tree crosses the bound.
+  if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -n "${FM_LINT_INTERNAL_RSS_KIB:-}" ]; then
+    analysis_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" rsswatch \
+      "$FM_LINT_INTERNAL_RSS_KIB" "$rss_file" -- "${analysis_command[@]}")
   fi
   # The host-wide slot gate sits outside the watchdog and /usr/bin/time, so
   # queue time counts toward neither the root deadline nor its peak RSS.
@@ -1673,10 +1688,18 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # under its cap. The roots sidecar records peak RSS even without bounds; roots
 # peaking above about 3 GiB resident remain source-graph reduction candidates.
 ROOT_MEMORY_KIB=${FM_LINT_ROOT_MEMORY_KIB:-12582912}
+# 8 GiB of resident memory per analysis tree where no enforced envelope applies.
+# Native macOS has no ulimit -v, so a source-following root there could grow
+# without bound (tests/fm-spawn-acquisition-cleanup.test.sh reached 65 GB);
+# the resident-memory watch ends such a root and takes the memory retry.
+# The bound equals the ~8 GiB usable heap the 12 GiB address-space cap above
+# leaves a root, so it admits every root the enforced envelope admits.
+ROOT_RSS_KIB=${FM_LINT_ROOT_RSS_KIB:-8388608}
 for bound_pair in \
   "FM_LINT_ROOT_SECONDS=$ROOT_SECONDS" \
   "FM_LINT_ROOT_GRACE=$ROOT_GRACE" \
-  "FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB"; do
+  "FM_LINT_ROOT_MEMORY_KIB=$ROOT_MEMORY_KIB" \
+  "FM_LINT_ROOT_RSS_KIB=$ROOT_RSS_KIB"; do
   case "${bound_pair#*=}" in
     ''|0*|*[!0-9]*)
       printf 'fm-lint.sh: %s must be a positive integer, got %s.\n' \
@@ -1916,6 +1939,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_FAST="$FAST"
     FM_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
     FM_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
+    FM_LINT_INTERNAL_RSS_KIB="$ROOT_RSS_KIB"
     FM_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"

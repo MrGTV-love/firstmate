@@ -2,7 +2,7 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | table FIELDS
+       lstart PID | identity PID | cpu-tree PID | rss-tree PID | table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -19,8 +19,10 @@ lstart and command, like `ps -axo <field>=,...`; stat carries the state letters
 macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
 else S) and E for a process that is exiting. cpu-tree prints the
 whole centiseconds of CPU used by PID and its live descendants, including their
-reaped children, as macOS `ps -S` counts them. Facts come from sysctl KERN_PROC
-and KERN_PROCARGS2, and CPU from libproc's proc_pid_rusage. A process or fact
+reaped children, as macOS `ps -S` counts them. rss-tree prints the whole KiB of
+resident memory held right now by PID and its live descendants, summed from
+libproc's ri_resident_size. Facts come from sysctl KERN_PROC
+and KERN_PROCARGS2, and CPU and resident size from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
 """
@@ -168,6 +170,28 @@ def cpu_tree(root):
     return round(total * timebase.numer / timebase.denom / 1e7)
 
 
+def rss_kib(pid):
+    usage = RusageInfoV2()
+    if libc.proc_pid_rusage(pid, RUSAGE_INFO_V2, ctypes.byref(usage)):
+        raise LookupError(pid)
+    return usage.ri_resident_size // 1024
+
+
+def rss_tree(root):
+    children = {}
+    for pid, ppid in processes():
+        children.setdefault(ppid, []).append(pid)
+    total, queue = rss_kib(root), list(children.get(root, []))
+    while queue:
+        pid = queue.pop()
+        queue.extend(children.get(pid, []))
+        try:
+            total += rss_kib(pid)
+        except LookupError:
+            continue
+    return total
+
+
 def main(argv_):
     fields = argv_[2].split(",") if len(argv_) == 3 and argv_[1] == "table" else []
     if len(argv_) != 3 or (fields and not set(fields) <= set(TABLE_FIELDS)) or (not fields and not argv_[2].isdigit()):
@@ -199,6 +223,8 @@ def main(argv_):
             value = " ".join(argv(number))
         elif command == "cpu-tree":
             value = cpu_tree(number)
+        elif command == "rss-tree":
+            value = rss_tree(number)
         else:
             return 2
     except (OSError, LookupError, struct.error, IndexError):
