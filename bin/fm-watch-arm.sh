@@ -714,7 +714,7 @@ fi
 child=
 child_out=
 cleanup_child() {
-  if [ -n "$child" ] && fm_pid_alive "$child"; then
+  if [ -n "$child" ] && kill -0 "$child" 2>/dev/null; then
     kill -TERM "$child" 2>/dev/null || true
   fi
   if [ -n "$child_out" ]; then
@@ -726,13 +726,13 @@ cleanup_child() {
 handle_arm_signal() {
   local signal=$1 rc=$2
   trap - HUP TERM INT
-  if [ -n "$child" ] && fm_pid_alive "$child"; then
+  if [ -n "$child" ] && kill -0 "$child" 2>/dev/null; then
     # The watcher installs its own cleanup traps only after acquiring and
     # publishing the home-bound lock identity. Do not TERM it in the middle of
     # stale-lock acquisition: that can abandon the steal mutex. Let startup
     # reach that cleanup-ready point (or exit naturally) before forwarding TERM,
     # but never past the startup confirmation deadline.
-    while fm_pid_alive "$child"; do
+    while kill -0 "$child" 2>/dev/null; do
       if fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$child" "$FM_HOME" \
         || [ "$(date +%s)" -ge "$deadline" ]; then
         kill -TERM "$child" 2>/dev/null || true
@@ -866,7 +866,7 @@ while :; do
     owned_child_finished "$rc"
     exit $?
   fi
-  if [ "$child_done" -eq 0 ] && ! fm_pid_alive "$child"; then
+  if [ "$child_done" -eq 0 ] && ! kill -0 "$child" 2>/dev/null; then
     wait "$child"
     rc=$?
     child_done=1

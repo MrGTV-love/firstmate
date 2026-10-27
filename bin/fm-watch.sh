@@ -78,6 +78,18 @@
 #   stale: <window> (steering-inbox busy bookkeeping unwritable: ...)
 #                          steering-inbox recovery; bin/fm-task-inbox-lib.sh owns
 #                          delivery-attempt, busy-deferral, and unavailable-endpoint policy
+#   check: long-held lock: lock=<path> owner=<pid> state=<stat> parent=<pid>
+#                          parent_command=<command> age=<seconds>s waiters=<n>
+#                          [trigger=dead-owner]
+#                          a fleet-ledger, watcher-down or wake-queue hold
+#                          exceeded 300s; or, with
+#                          trigger=dead-owner, any other lock's owner is a
+#                          zombie (state Z) or gone (state=dead) while a live
+#                          waiter stays blocked on it across two consecutive
+#                          checks, at any age
+#                          (fm_lock_monitor_check);
+#                          once per ownership episode, observation only
+#                          (bin/fm-wake-lib.sh owns the diagnostic receipts)
 #   check: <script>: <out> authenticated check output, always actionable
 #   check: process-event result captured: <keys>
 #                          a durably captured process-to-event result is queued
@@ -2603,6 +2615,44 @@ event_wait_or_sleep() {
   esac
 }
 
+lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures keep waiting
+  if ! fm_lock_monitor_check "$@"; then
+    echo "watcher: long-held lock observation failed" >&2
+    [ "$#" -eq 0 ] || return 0
+    exit 1
+  fi
+  [ -n "$FM_LOCK_MONITOR_REASON" ] || return 0
+  if [ "$FM_LOCK_MONITOR_UNQUEUED" = 1 ]; then
+    # A jammed queue must not prevent reporting the jam. Preserve the
+    # independent receipt until output succeeds, without signal-phase work
+    # that itself needs the queue lock.
+    FM_WAKE_BEFORE_OUTPUT_ACTION='' FM_WAKE_AFTER_OUTPUT_ACTION='' \
+      FM_WAKE_POST_OUTPUT_ACTION=fm_lock_monitor_delivered wake "$FM_LOCK_MONITOR_REASON"
+  else
+    wake "$FM_LOCK_MONITOR_REASON"
+  fi
+}
+
+# FM_LOCK_WAIT_TICK hook: while this watcher process waits on any lock (the
+# wake queue, the recovery marker, or any other), run the long-held lock alarm
+# once per poll interval and keep waiting; it never re-enters itself. Before any
+# alarm row is published, a pending append is made durable (appended now, or
+# spilled for the next locked append to replay first, never reclaiming a queue
+# lock this watcher already holds); if neither succeeds, or observation fails,
+# the wait goes on. Both EXIT cleanups clear the hook first, so their bounded
+# waits never deliver a second wake.
+WATCH_LOCK_WAIT_TICKED=0
+WATCH_LOCK_WAIT_TICKING=0
+watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+  [ "$3" = "$$" ] && [ "$WATCH_LOCK_WAIT_TICKING" = 0 ] || return 0
+  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_LOCK_WAIT_TICKED)) -ge "$POLL" ] || return 0
+  WATCH_LOCK_WAIT_TICKED=$SECONDS
+  WATCH_LOCK_WAIT_TICKING=1
+  lock_alarm_tick fm_wake_pending_settle
+  WATCH_LOCK_WAIT_TICKING=0
+  return 0
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -2692,6 +2742,13 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
   fi
   exit 0
 done
+# Startup alarms precede recovery's own queue locks, so an already aged queue
+# owner can be reported without first waiting behind that same owner. Until
+# watcher_cleanup is installed, only a delivered wake closes like an ordinary
+# watcher; startup failures retain the lock as stale evidence for the next arm.
+trap 'FM_LOCK_WAIT_TICK=; [ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
+lock_alarm_tick
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
 if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
 fi
@@ -2714,6 +2771,10 @@ if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   WATCHER_RECOVERY_PENDING=0
 elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
+fi
+if ! fm_wake_spill_replay; then
+  echo "watcher: spilled wakes could not be replayed; retaining them and stale lock evidence" >&2
+  exit 1
 fi
 # Side-band ledger publication, detached from the poll loop.
 #
@@ -3003,6 +3064,7 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
@@ -3643,8 +3705,9 @@ while :; do
   fi
 
   watcher_beat force
+  lock_alarm_tick
 
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture --try-lock || true
   watcher_beat
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached
