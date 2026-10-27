@@ -1,0 +1,11 @@
+writer pid=51051 name=omp ; bystander omp pid=51048 ; cap=1048576
+watcher run 1 exited rc=0 after 3s: signal: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/victim2.status
+watcher run 2 exited rc=0 after 25s: check: status-log-over-cap: file=victim2.status size=2688000 bytes (cap 1048576) growth=0 bytes/s writer=pid 51051 omp; stopped pid 51051 (omp) with SIGSTOP; resume it with kill -CONT 51051; nothing was deleted, truncated or rewritten
+writer ps state: T (T = stopped)
+bystander ps state: S
+log exists: yes size now 2688000, 2 s later 2688000
+over-cap rows in .wake-queue: 1
+1793109324	10	check	status-log-over-cap-2871593629	check: status-log-over-cap: file=victim2.status size=2688000 bytes (cap 1048576) growth=0 bytes/s writer=pid 51051 omp; stopped pid 51051 (omp) with SIGSTOP; resume it with kill -CONT 51051; nothing was deleted, truncated or rewritten
+marker: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.loop.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.past.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.victim2.status

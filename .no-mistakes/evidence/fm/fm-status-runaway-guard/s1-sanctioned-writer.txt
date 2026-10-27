@@ -1,22 +1,19 @@
-## S1: a runaway loop through the sanctioned writer, default cap (33554432) and reserve (1048576)
-$ while :; do bin/fm-status-append.sh state/s1-loop.status "working: <65000-byte line> $i"; done   (hard stop 1000 iterations, ulimit -f 200 MiB)
-iteration 517: exit 75
-stderr of the refusal: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/s1-loop.status is 33547116 bytes and this line would pass the limit of 33554432 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
-size after loop: 33547116 bytes; lines:      516
-$ bin/fm-status-append.sh state/s1-loop.status 'working: one more'
-exit 0
-$ bin/fm-status-append.sh state/s1-loop.status 'done: finished despite the loop'
-exit 0
-last line: done: finished despite the loop
-size now: 33547166 bytes
-every earlier line intact (distinct numbered lines 1..N present in order): 516 lines, no gap
+## S1 sanctioned writer loop at the DEFAULT cap (no FM_STATUS_CAP_BYTES set)
+FM_STATUS_CAP_BYTES=<unset>
+after 3000 distinct lines:     3000 lines, 114786 bytes
+loop refused at iteration 515 rc=75
+stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/loop.status is 33529926 bytes and this line would pass the limit of 33554432 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+size after loop: 33529926 bytes (cap 33554432, cap+reserve 34603008)
+PASS: size <= cap
+distinct lines kept: 3000 of 3000
+-- a 'working' line at cap:
+rc=0
+-- a 'done:' line at cap uses the reserve:
+rc=0
+xxxxxx
+working: one more
+done: finished
 
-## S1b: a log already past cap+reserve (like the incident logs left in place) refuses every line, terminal ones too
-size: 41943040 bytes
-$ bin/fm-status-append.sh state/s1-incident.status 'done: final'
-fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.CjzcWV/state/s1-incident.status is 41943040 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
-exit 75
-size after: 41943040 bytes
-
-## S1c: the raw printf loop from the incident WITHOUT the helper keeps going past the cap (control)
-raw log size: 20971520 bytes - this control loop stopped only at the test's own hard file limit (ulimit -f 40960 blocks of 512 bytes = 20 MiB); a raw >> loop has no bound of its own, which is why the watcher guard (S2) exists
+-- a log already past cap+reserve refuses even done:
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/past.status is 34603102 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+rc=75 size=34603102

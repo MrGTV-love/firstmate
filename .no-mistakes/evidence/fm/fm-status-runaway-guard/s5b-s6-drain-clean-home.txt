@@ -1,0 +1,25 @@
+## S5b wake drain on a clean lab home: one 2 GiB sparse log + one healthy lane
+| wake drain (cold) | 0.89 s | rc=0 |
+| wake drain (warm) | 0.69 s | rc=0 |
+-- drain stdout (OPEN DECISIONS for the healthy lane must still appear):
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+ok [key=q-ok] needs-decision: healthy lane question
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+-- drain stderr:
+fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: huge.status is past the read limits; its open decisions cannot be shown and it is skipped
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+files over 1 MB in state/ other than *.status:
+(end of list)
+## S6 killed drain: SIGKILL 3 drains mid-run on a 4000-event log
+killed drain 31776 (exit 137)
+killed drain 32038 (exit 137)
+killed drain 32477 (exit 137)
+largest non-status files in state/:
+2872 /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.big.open-decisions-cursor
+165 /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.status-presentation-cursor
+159 /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.lock-monitor.hold.apQq6r
+150 /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.ok.open-decisions-cursor
+114 /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/huge.meta
+files over 1 MB: []

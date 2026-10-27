@@ -1,0 +1,11 @@
+## S8 a generated worker brief tells the worker to use the capped helper, and the rendered command works and is capped
+fm-brief rc=0 
+-- status lines in the brief that mention the helper:
+38:   `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5YQBESGST5YFX8W69Z6G85K/bin/fm-status-append.sh' '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/brieflive.status' "{state} [at=<epoch>]: {one short line}" && { [ ! -e '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5YQBESGST5YFX8W69Z6G85K/bin/fm-
+-- raw '>> ...status' appends left in the brief: [0]
+-- rendered command: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5YQBESGST5YFX8W69Z6G85K/bin/fm-status-append.sh' '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/brieflive.status' "working [at=1793109634]: live brief check" && { [ ! -e '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5YQBESGST5YFX8W69Z6G85K/bin/fm-fleet-ledger.sh' appended '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/config' '/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/brieflive.status' >/dev/null 2>&1 || true; }
+rc=0
+status log: working [at=1793109634]: live brief check
+-- same rendered command with the log at the cap (FM_STATUS_CAP_BYTES=64):
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/brieflive.status is 42 bytes and this line would pass the limit of 64 bytes (cap 64, reserve 8 for decision and terminal lines)
+rc=75

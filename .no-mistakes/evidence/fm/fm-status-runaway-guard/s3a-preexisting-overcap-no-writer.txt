@@ -1,0 +1,9 @@
+writer pid=29722 name=omp ; bystander omp pid=29720 ; cap=1048576
+watcher run 1 exited rc=0 after 6s: check: status-log-over-cap: file=loop.status size=33529959 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=past.status size=34603102 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+writer ps state: S (T = stopped)
+bystander ps state: S
+log exists: yes size now 832000, 2 s later 1024000
+over-cap rows in .wake-queue: 1
+1793109277	1	check	status-log-over-cap-1290422667	check: status-log-over-cap: file=loop.status size=33529959 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=past.status size=34603102 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+marker: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.loop.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.past.status

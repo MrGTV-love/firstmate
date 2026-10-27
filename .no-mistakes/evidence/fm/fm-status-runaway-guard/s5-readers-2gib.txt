@@ -1,0 +1,12 @@
+## S5 readers on a 2 GiB sparse status log (apparent size 2147483648, real blocks 4896 KiB)
+| reader | wall time | exit | stderr (first 220 bytes) |
+| status_open_decisions | 0.03 s | rc=2 | fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down  |
+| last_status_line | 0.17 s | rc=2 |  |
+| status_declared_wait_line | 0.17 s | rc=0 |  |
+| wake drain (cold) | 15.09 s | rc=0 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 23 --recovery-generation 51064.1793109302.POWFhX fm-status: huge.status has unread status past the read limits; its presentation cursor s |
+| wake drain (warm) | 12.77 s | rc=0 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 23 --recovery-generation 51064.1793109302.POWFhX fm-status: huge.status has unread status past the read limits; its presentation cursor s |
+| fleet snapshot --secondmate-home-summary | 0.46 s | rc=0 | fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down  |
+snapshot stdout bytes:     1350
+log size after readers: 2147483648
+files over 1 MB in state/ other than *.status:
+(end of list)

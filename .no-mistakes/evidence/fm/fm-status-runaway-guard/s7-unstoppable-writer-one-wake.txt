@@ -1,0 +1,11 @@
+## S7 unstoppable (non-omp) writer growing far faster than a 2048-byte cap: watcher must exit with one over-cap row
+writer pid=38943 name=runner ; bystander runner pid=38942 ; cap=2048
+watcher run 1 exited rc=0 after 30s: check: status-log-over-cap: file=big.status size=245106 bytes (cap 2048) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=fast.status size=184000 bytes (cap 2048) growth=101265 bytes/s writer=pid 38943 runner, pid 39980 bash; stopped nothing: pid 38943 (runner) is not an omp process, pid 39980 (bash) is not an omp process; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=.big.open-decisions-cursor size=2872 bytes (cap 2048) growth=0 bytes/s wri
+writer ps state: S (T = stopped)
+bystander ps state: S
+log exists: yes size now 3332000, 2 s later 3432000
+over-cap rows in .wake-queue: 1
+1793109575	1	check	status-log-over-cap-2063897900	check: status-log-over-cap: file=big.status size=245106 bytes (cap 2048) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=fast.status size=184000 bytes (cap 2048) growth=101265 bytes/s writer=pid 38943 runner, pid 39980 bash; stopped nothing: pid 38943 (runner) is not an omp process, pid 39980 (bash) is not an omp process; nothing was deleted, truncated or rewritten ; status-log-over-cap: file=.big.open-decisions-cursor size=2872 bytes (cap 2048) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+marker: /Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.status-cap-alerted..big.open-decisions-cursor
+/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.status-cap-alerted.big.status
+/Users/charlesabrooker/tmp/fm-lab.EwWJYQ/state/.status-cap-alerted.fast.status

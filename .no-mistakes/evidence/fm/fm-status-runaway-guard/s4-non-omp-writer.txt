@@ -1,0 +1,16 @@
+writer pid=88953 name=pyagent ; bystander pyagent pid=88952 ; cap=1048576
+watcher run 1 exited rc=0 after 0s: signal: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/steady.status
+watcher run 2 exited rc=0 after 18s: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+watcher run 3 exited rc=0 after 37s: check: status-log-over-cap: file=other.status size=2020000 bytes (cap 1048576) growth=149068 bytes/s writer=pid 88953 pyagent; stopped nothing: pid 88953 (pyagent) is not an omp process; nothing was deleted, truncated or rewritten
+writer ps state: S (T = stopped)
+bystander ps state: S
+log exists: yes size now 2524000, 2 s later 2620000
+over-cap rows in .wake-queue: 3
+1793109324	10	check	status-log-over-cap-2871593629	check: status-log-over-cap: file=victim2.status size=2688000 bytes (cap 1048576) growth=0 bytes/s writer=pid 51051 omp; stopped pid 51051 (omp) with SIGSTOP; resume it with kill -CONT 51051; nothing was deleted, truncated or rewritten
+1793109386	15	check	status-log-over-cap-2101977936	check: status-log-over-cap: file=steady.status size=1148000 bytes (cap 1048576) growth=77419 bytes/s writer=pid 75890 omp; stopped pid 75890 (omp) with SIGSTOP; resume it with kill -CONT 75890; nothing was deleted, truncated or rewritten
+1793109450	21	check	status-log-over-cap-2831025922	check: status-log-over-cap: file=other.status size=2020000 bytes (cap 1048576) growth=149068 bytes/s writer=pid 88953 pyagent; stopped nothing: pid 88953 (pyagent) is not an omp process; nothing was deleted, truncated or rewritten
+marker: /Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.loop.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.other.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.past.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.steady.status
+/Users/charlesabrooker/tmp/fm-lab.eGBR7x/state/.status-cap-alerted.victim2.status
