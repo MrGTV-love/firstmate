@@ -1,0 +1,25 @@
+HEAD=4b123aed4641e1e5e0d47188a4e6b9637e0e30b7
+== STEP 1: forge reports PR as draft; real watcher runs 8 ticks (1s poll)
+pr-ready lines:
+pr-ready: ready-ship: registration refused: error: https://github.com/MrGTV-love/firstmate/pull/266 is a draft pull request; a draft cannot be merged, so merge monitoring would wait for an event that cannot occur - mark it ready for review and arm again, or declare a wait instead of done if the draft is deliberate
+refusal lines printed: 1
+isDraft forge reads over 8 ticks: 1
+record unchanged: yes
+refusal marker present: yes
+
+== STEP 2: worker marks the PR ready at the same head; marker aged to 540s (inside the 10-minute window)
+new pr-ready lines: 0
+new isDraft forge reads: 0
+registered: no (still inside window)
+
+== STEP 3: marker aged to 660s (past ten minutes); real watcher retries with no supervisor action
+registered: yes
+pr-ready: ready-ship: registered https://github.com/MrGTV-love/firstmate/pull/266
+kind=ship
+mode=no-mistakes
+project=<lab>/projects/firstmate
+worktree=<lab>/projects/firstmate
+branch=fm/ready-ship
+pr=https://github.com/MrGTV-love/firstmate/pull/266
+pr_head=786cfb0e14a517190b6f7440b3e558c792189bce
+refusal marker: removed

@@ -1,0 +1,45 @@
+HEAD=4b123aed4641e1e5e0d47188a4e6b9637e0e30b7
+bad-log.status bad-meta.status newest-wins.status notes-after.status unrelated-url.status 
+== status logs:
+-- notes-after.status
+working: x
+done [at=1793117401]: PR https://github.com/MrGTV-love/firstmate/pull/265 checks green
+note [at=1793117401]: model-matrix fallback served claude after codex failed
+note: captain asked a follow-up; nothing to do
+-- unrelated-url.status
+done: follows up https://github.com/MrGTV-love/firstmate/pull/180 - PR https://github.com/MrGTV-love/firstmate/pull/266 checks green
+-- newest-wins.status
+done: PR https://github.com/MrGTV-love/firstmate/pull/259 checks green
+working: one more fix
+done: PR https://github.com/MrGTV-love/firstmate/pull/274 checks green
+-- bad-meta.status
+done: PR https://github.com/MrGTV-love/firstmate/pull/265 checks green
+-- bad-log.status is a directory; bad-meta.meta is a symlink
+
+== BEFORE: fm-spawn.sh admission for a new firstmate ship (capacity 4)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+deferred: project firstmate admits 4 worker(s) at once on this machine (<lab>/config/project-capacity) and 4 already hold a place (bad-log, newest-wins, notes-after, unrelated-url); task new-item was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up
+
+== ONE PASS of bin/fm-pr-ready-reconcile.sh (no supervisor command)
+exit=0
+pr-ready: bad-log: unreadable status log; skipped
+pr-ready: bad-meta: unreadable task record; skipped
+pr-ready: newest-wins: registered https://github.com/MrGTV-love/firstmate/pull/274
+pr-ready: notes-after: registered https://github.com/MrGTV-love/firstmate/pull/265
+
+== registered records:
+notes-after    pr=https://github.com/MrGTV-love/firstmate/pull/265 pr_head=527e894cce8a6afd778f0d223d9f2e869040fb9c 
+unrelated-url  
+newest-wins    pr=https://github.com/MrGTV-love/firstmate/pull/274 pr_head=7beead756771011d37ef319d5a4e01453ca39f93 
+bad-log        
+bad-meta       (none)
+== gh forge reads by PR number:
+   2 pull/265
+   2 pull/274
+== status logs before: a7b1bd4720231375 after:
+a7b1bd4720231375
+
+== AFTER: fm-spawn.sh admission for the same new ship
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task new-item has no brief at inaccessible data path <lab>/data/new-item/brief.md

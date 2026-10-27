@@ -1,0 +1,15 @@
+HEAD=4b123aed4641e1e5e0d47188a4e6b9637e0e30b7
+== STEP 1: real watcher with FM_PR_READY_RECONCILE_TIMEOUT=5; the first forge isDraft read hangs (sleep 600)
+hung forge call started (pid recorded) at +1s
+hung forge call: killed at +6s
+watcher re-arms after it exited on a wake: 3
+next tick registered the ship: yes at +34s
+pr-ready: ready-ship: registered https://github.com/MrGTV-love/firstmate/pull/274
+kind=ship
+mode=no-mistakes
+project=<lab>/projects/firstmate
+worktree=<lab>/projects/firstmate
+branch=fm/ready-ship
+pr=https://github.com/MrGTV-love/firstmate/pull/274
+pr_head=7beead756771011d37ef319d5a4e01453ca39f93
+isDraft forge reads in total: 2

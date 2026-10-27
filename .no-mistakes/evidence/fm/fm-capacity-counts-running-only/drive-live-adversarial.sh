@@ -6,7 +6,7 @@
 # Usage: drive-live-adversarial.sh <worktree> <draft|hang>
 set -u
 WT=$1 CASE=$2
-URL="https://github.com/MrGTV-love/firstmate/pull/261"
+URL="https://github.com/MrGTV-love/firstmate/pull/${PRN:-261}"
 cd "$WT"
 LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX")
 bin/fm-lab-home.sh create "$LAB" >/dev/null
