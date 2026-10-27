@@ -148,6 +148,9 @@ Keep `local-only` work in the main home.
 Send in-scope work to the fitting secondmate unless it is blocked or the captain explicitly redirects it; do not read the secondmate's chat because marked routed replies return through its status or referenced document.
 If no secondmate scope fits, use the main home or discuss creating an appropriate persistent secondmate.
 For one-off or infrequent operational work, start with the simplest direct end-to-end path.
+Drive the accepted objective through execution and validation within granted authority.
+Before adding a diagnostic pass, identify the decision its result could change; skip passes that cannot change the next action.
+Stop only for a concrete blocker or a necessary human decision, and state what remains before closure.
 Do not build wrappers, control planes, policy layers, custom verifiers, or automation unless the direct path exposes a concrete blocker or repeated need that justifies the added machinery.
 
 Before commissioning an investigation, consult existing reports and established evidence.
