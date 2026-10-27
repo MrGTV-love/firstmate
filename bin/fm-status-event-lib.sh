@@ -74,9 +74,11 @@ last_status_line() {  # <status-file> [<previous-event-var>]
 # nonblank line when it is not one of them, so a scan's no-event answer is the line it
 # always was. A line is event-shaped when it holds a colon and its head (the text before
 # the first colon or bracket) is a recognized verb or holds a `corr` token; when, with
-# its bracket tags removed, a single word that starts with no capital, digit or
-# punctuation, or a head holding `corr`, comes before a first colon that a space or the
-# end of the line follows; or when a captain token (FM_CAPTAIN_RE) starts it, in any case.
+# its `[at=...]` stamps removed as _fm_status_unstamped removes them, its first colon (even
+# one inside a bracket tag) is followed by a space or ends the line, and the text before
+# the first bracket or that colon is one word that starts with no capital, digit or
+# punctuation, or the text before that colon holds `corr`; or when a captain token
+# (FM_CAPTAIN_RE) starts it, in any case.
 # One awk pass: the shell loop after it walks only these, so prose, counters, labels and
 # URLs cost it nothing. With `numbered <base>` each line is `<byte offset>\t<line>`, the
 # offset counted from <base>, the log byte where stdin starts, and the last nonblank line
@@ -97,11 +99,11 @@ _fm_status_event_candidates() {  # [numbered <base>]
         cand = (head in verbs) || index(head, "corr") > 0
       }
       if (!cand) {
-        t = $0; gsub(/\[[^]]*\]/, "", t); sub(/^[[:space:]]+/, "", t)
+        t = $0; gsub(/ ?\[at=[^]]*\]/, "", t); sub(/^[[:space:]]+/, "", t)
         c = index(t, ":")
         if (c > 0 && (c == length(t) || substr(t, c + 1, 1) ~ /[[:space:]]/)) {
-          head = substr(t, 1, c - 1); sub(/[[:space:]]+$/, "", head)
-          cand = index(head, "corr") > 0 || (head !~ /[[:space:]]/ && head ~ /^[^A-Z0-9[:punct:]]/)
+          head = substr(t, 1, c - 1); word = head; sub(/\[.*$/, "", word); sub(/[[:space:]]+$/, "", word)
+          cand = index(head, "corr") > 0 || (word !~ /[[:space:]]/ && word ~ /^[^A-Z0-9[:punct:]]/)
         }
         if (!cand) cand = tolower(t) ~ re || tolower($0) ~ re
       }

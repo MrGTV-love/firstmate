@@ -737,6 +737,48 @@ test_the_inbox_steer_fold_checks_the_cap() {
   pass "the inbox-steer retry checks the cap while it folds the lane's open decisions"
 }
 
+test_a_tick_in_a_captured_read_hands_the_measured_rate_to_the_wake() {
+  local dir state status wakes wpid rate
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case captured-tick); state="$dir/state"; status="$state/runaway.status"; wakes="$dir/wakes"
+  : > "$wakes"
+  head -c 70000 /dev/zero | tr '\0' 'x' > "$status"
+  # An omp writer that keeps appending, so a scan measures a real growth rate before it stops it.
+  (
+    ulimit -f "$HARD_LIMIT_BLOCKS"
+    "$(make_named_shell "$dir" omp)" -c '
+      printf -v unit "text\n%.0s" {1..100}
+      exec 9>>"$1"
+      for ((i = 0; i < 6000; i++)); do printf "%s" "$unit" >&9; sleep 0.01 9>&-; done
+    ' _ "$status" &
+    printf '%s\n' "$!" > "$dir/writer.pid"
+    wait "$!" 2>/dev/null
+  ) &
+  wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
+  wpid=$(cat "$dir/writer.pid")
+  sleep 0.5
+  # A status read the watcher captures ticks first: it stops the writer but cannot wake.
+  # The watcher's own next tick then wakes, and must report the rate measured before the
+  # stop, not the zero a stopped writer shows. The watcher is sourced, so wake records.
+  FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_POLL=1 FM_STATUS_CAP_BYTES=65536 bash -c '
+    wakes=$2
+    # shellcheck source=/dev/null
+    . "$1/bin/fm-watch.sh"
+    wake() { printf "%s\n" "$1" >> "$wakes"; }
+    captured=$(status_cap_tick)
+    [ -z "$captured" ] || printf "the captured tick printed: %s\n" "$captured" >&2
+    status_cap_tick
+  ' _ "$ROOT" "$wakes" > "$dir/tick.out" 2>&1 || { kill -9 "$wpid" 2>/dev/null; fail "the ticks failed: $(tail -c 600 "$dir/tick.out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the captured tick did not stop the omp writer"; }
+  kill -9 "$wpid" 2>/dev/null
+  [ ! -s "$dir/tick.out" ] || fail "the ticks wrote output: $(cat "$dir/tick.out")"
+  grep -q "check: status-log-over-cap: file=runaway.status" "$wakes" || fail "no over-cap wake followed the captured stop: $(cat "$wakes")"
+  rate=$(sed -n 's/.*growth=\([0-9][0-9]*\) bytes\/s.*/\1/p' "$wakes" | head -1)
+  [ -n "$rate" ] && [ "$rate" -gt 0 ] || fail "the wake reports the stopped writer's rate, not the rate before the stop: $(cat "$wakes")"
+  [ -z "$(find "$state" -name '.status-cap-handoff.*')" ] || fail "the handoff record was left behind: $(find "$state" -name '.status-cap-handoff.*')"
+  pass "a writer stopped by a tick in a captured read is woken for with the growth rate measured before the stop ($rate bytes/s), and the handoff is removed"
+}
+
 test_the_open_decisions_fold_calls_its_tick_for_every_line() {
   local dir status ticks out
   dir=$(make_case fold-tick); status="$dir/state/fold.status"; ticks="$dir/ticks"
@@ -1144,6 +1186,19 @@ test_the_watcher_window_keeps_a_whole_first_line() {
   pass "the watcher's window read keeps a whole first line that starts exactly at the window"
 }
 
+# An unknown-verb declaration whose first colon sits inside a bracket tag is an event, so
+# when the last 200 lines hold no event the widened read must still find it.
+test_a_declaration_with_a_colon_in_its_tag_is_found_past_the_tail() {
+  local dir status line out
+  dir=$(make_case bracket-colon); status="$dir/state/b.status"
+  for line in 'parked [reason: CI] waiting' 'holding [key: x'; do
+    { printf 'working: older step\n%s\n' "$line"; perl -e 'print "text\n" x 300'; } > "$status"
+    out=$(bash -c '. "$1/fm-classify-lib.sh"; last_status_line "$2"' _ "$ROOT/bin" "$status")
+    [ "$out" = "$line" ] || fail "the widened read skipped the declaration '$line' and answered '$out'"
+  done
+  pass "a declaration whose first colon is inside a bracket tag is found by the widened latest-event read"
+}
+
 test_history_readers_read_a_healthy_log_of_many_lines() {
   local dir state status cursor out prev size
   dir=$(make_case healthy-long); state="$dir/state"; status="$state/h.status"; cursor="$state/.h.open-decisions-cursor"
@@ -1549,6 +1604,7 @@ tests=(
   test_a_cap_crossing_during_a_short_heartbeat_scan_is_stopped_before_the_heartbeat_wake_exits
   test_the_push_transition_walk_checks_the_cap
   test_the_inbox_steer_fold_checks_the_cap
+  test_a_tick_in_a_captured_read_hands_the_measured_rate_to_the_wake
   test_the_open_decisions_fold_calls_its_tick_for_every_line
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
@@ -1560,6 +1616,7 @@ tests=(
   test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk
   test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window
   test_the_watcher_window_keeps_a_whole_first_line
+  test_a_declaration_with_a_colon_in_its_tag_is_found_past_the_tail
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read
   test_a_refused_read_is_unknown_never_an_empty_open_set
   test_a_checkpointed_empty_set_with_a_refused_new_decision_is_unknown

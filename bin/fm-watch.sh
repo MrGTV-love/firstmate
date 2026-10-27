@@ -2797,21 +2797,44 @@ case "$POLL" in
   ''|*[!0-9]*) ;;
   *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
 esac
+# The scan record a contained-only tick hands to the watcher's own next tick: one small
+# file per watcher process, removed when that tick reads it and when the watcher exits.
+status_cap_handoff_path() {
+  printf '%s/.status-cap-handoff.%s' "$STATE" "${WATCHER_PID:-$$}"
+}
+
 status_cap_tick() {
-  local rows records reason='' ident path size text keys='' key
+  local rows records reason='' ident path size text keys='' key handoff
   STATUS_CAP_TICK_AT=$SECONDS
   rows=$(fm_status_cap_unalerted "$STATE") || return 0
   [ -n "$rows" ] || return 0
-  # In a subshell (a status read the watcher captures with $(...)) a wake would print
-  # into the capture and end only that subshell. There the tick only contains: the
-  # scan stops an omp writer over the cap and nothing is queued or marked, so the
-  # watcher's own next tick scans the file again, queues it and wakes.
-  if [ "$BASH_SUBSHELL" -ne 0 ]; then
-    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan >/dev/null 2>&1 || :
-    return 0
-  fi
+  handoff=$(status_cap_handoff_path)
   records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
   [ -n "$records" ] || return 0
+  # In a subshell (a status read the watcher captures with $(...)) a wake would print
+  # into the capture and end only that subshell. There the tick only contains: the
+  # scan stops an omp writer over the cap, nothing is queued or marked, and its record
+  # (the growth rate measured before the stop, the writer and the action) goes to the
+  # handoff file, one record per file and the first one kept, because a later scan
+  # measures a stopped writer. The watcher's own next tick scans the file again, takes
+  # the handed-off record in place of its own, queues it and wakes.
+  if [ "$BASH_SUBSHELL" -ne 0 ]; then
+    {
+      [ ! -f "$handoff" ] || cat "$handoff"
+      while IFS=$'\t' read -r ident path size text; do
+        [ -n "$path" ] || continue
+        [ ! -f "$handoff" ] || ! awk -F'\t' -v p="$path" '$2 == p { found = 1 } END { exit !found }' "$handoff" || continue
+        printf '%s\t%s\t%s\t%s (measured at %s)\n' "$ident" "$path" "$size" "$text" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      done <<EOF
+$records
+EOF
+    } > "$handoff.tmp" && mv -f "$handoff.tmp" "$handoff" || rm -f "$handoff.tmp"
+    return 0
+  fi
+  if [ -f "$handoff" ]; then
+    records=$(printf '%s\n' "$records" | awk -F'\t' -v OFS='\t' 'NR == FNR { held[$1 SUBSEP $2] = $4; next } ($1 SUBSEP $2) in held { $4 = held[$1 SUBSEP $2] } { print }' "$handoff" -)
+    rm -f "$handoff"
+  fi
   while IFS=$'\t' read -r ident path size text; do
     [ -n "$path" ] || continue
     reason="${reason:+$reason ; }${text#check: }"
@@ -2846,8 +2869,9 @@ EOF
 # runaway writer that starts during it would otherwise run unchecked until the loop ends.
 # It looks at the size cap when a poll has passed since the last look. In the watcher's own
 # shell a stop here exits the watcher with the over-cap wake; in a command substitution
-# (the status-event library's scans) it only stops the writer, and the wake follows at
-# the watcher's next tick (status_cap_tick).
+# (the status-event library's scans) it only stops the writer and hands its record on, and
+# the wake follows at the watcher's next tick (status_cap_tick). The stale loop ticks in
+# its own shell at each window, so a captured read ticks only when it alone outlasts a poll.
 # It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
 # because the stop appends a row under that same lock.
 status_cap_span_tick() {
@@ -3316,6 +3340,7 @@ watcher_cleanup() {
   fm_capture_output_cleanup
   watcher_status_span_cleanup
   fm_custom_check_snapshot_cleanup
+  rm -f "$(status_cap_handoff_path)" "$(status_cap_handoff_path).tmp"
   if [ "$owns_lock" -eq 1 ] \
     && ! fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
       downtime "$CLEANUP_LOCK_BOUND"; then
@@ -4028,6 +4053,7 @@ while :; do
   # crossed turn bound already handed to the away-mode daemon).
   while IFS= read -r w; do
     watcher_beat
+    status_cap_span_tick
     kind=$(window_kind "$w")
     task=$(window_to_task "$w" "$STATE")
     # Steering-inbox loss detection runs before the secondmate stale
