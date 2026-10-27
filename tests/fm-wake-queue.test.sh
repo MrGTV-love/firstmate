@@ -3978,12 +3978,17 @@ test_secondmate_liveness_tick_relaunches_every_dead_mate_before_waking() {
 }
 
 test_secondmate_liveness_tick_leaves_alive_and_inconclusive_untouched() {
-  local dir state pid
+  local dir state pid i
   dir=$(make_secondmate_liveness_case liveness-quiet)
   state="$dir/state"
 
   # A live endpoint probes every cadence and never acts.
   run_liveness_leg "$dir" alive FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
+  i=0
+  while [ "$i" -lt 300 ] && [ ! -e "$state/.secondmate-liveness-tick" ] && is_live_non_zombie "$pid"; do
+    sleep 0.1
+    i=$((i + 1))
+  done
   sleep 4
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against an alive secondmate: $(cat "$dir/watch-alive.out" "$dir/watch-alive.err")"
