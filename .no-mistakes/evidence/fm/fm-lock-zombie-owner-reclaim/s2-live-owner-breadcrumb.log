@@ -1,0 +1,11 @@
+[00:11:43] live holder pid=60022 stat=S owns lock
+[00:11:43] real waiter pid=60076 started: fm-fleet-ledger.sh dispatched breadcrumb-t1 ...
+[00:12:14] t=30.7s waiter running, owner unchanged, stderr lines=0
+[00:12:45] t=61.1s first stderr line: fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=60022 state=S since=1793077904
+[00:12:59] t=75.9s waiter running, owner unchanged, stderr lines=1
+[00:13:23] t=99.3s waiter running, owner unchanged, stderr lines=1
+[00:13:34] at t=110.5s stderr line count=1 (expect 1); first at 61.1s (expect >=60)
+[00:13:34] holder released the lock
+[00:13:34] waiter exit=0 at t=110.9s; new rows=['{"v":1,"ts":1793078014,"event":"task.dispatched","task":"breadcrumb-t1","kind":"ship","project":"sample","harness":"claude","model":"opus"}']
+[00:13:34] final stderr: ['fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=60022 state=S since=1793077904']
+[00:13:34] RESULT PASS

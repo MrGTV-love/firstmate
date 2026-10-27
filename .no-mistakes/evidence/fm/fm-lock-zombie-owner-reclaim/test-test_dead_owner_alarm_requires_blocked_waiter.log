@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms

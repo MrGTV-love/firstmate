@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - failed and empty ps results retain live lock ownership

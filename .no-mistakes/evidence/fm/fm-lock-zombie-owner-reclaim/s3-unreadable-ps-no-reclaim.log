@@ -1,0 +1,7 @@
+[fail-prints-Z] live holder pid=4704; waiter's ps prints 'Z' rc=1
+[fail-prints-Z] real waiter still waiting at the 8s observer bound after 8.1s; lock owner now 4704 -> NOT reclaimed; rows written while held=0
+[fail-prints-Z] after release: waiter rc=0, rows=1
+[empty-exit-0] live holder pid=7695; waiter's ps prints '' rc=0
+[empty-exit-0] real waiter still waiting at the 8s observer bound after 8.0s; lock owner now 7695 -> NOT reclaimed; rows written while held=0
+[empty-exit-0] after release: waiter rc=0, rows=1
+RESULT PASS

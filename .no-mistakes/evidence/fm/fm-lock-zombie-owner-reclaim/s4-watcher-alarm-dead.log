@@ -1,0 +1,6 @@
+[dead 00:18:05] owner pid=78883 ps stat now=(gone); this parent pid=78722
+[dead 00:18:05] backdated the owner's pid file 301s (hold age past the fixed 300s limit)
+[dead 00:18:07] watcher exit=0; alarm line(s): ['check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=78883 state=dead parent=unknown parent_command=unknown age=302s waiters=0']
+[dead 00:18:07] alarm left the dead owner's lock for the next acquirer: True
+[dead 00:18:07] unrelated wakes drained+acked by the Main loop: []
+[dead 00:18:07] RESULT PASS

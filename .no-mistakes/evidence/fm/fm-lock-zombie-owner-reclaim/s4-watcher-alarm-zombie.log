@@ -1,0 +1,8 @@
+[zombie 00:18:18] owner pid=83153 ps stat now=Z; this parent pid=83070
+[zombie 00:18:18] backdated the owner's pid file 301s (hold age past the fixed 300s limit)
+[zombie 00:18:19] watcher exit=0; alarm line(s): ['check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=83153 state=Z parent=83070 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=301s waiters=0']
+[zombie 00:18:19] alarm did not reclaim or reap: lock owner still 83153, still zombie: True
+[zombie 00:18:19] next real waiter fm-fleet-ledger.sh dispatched exit=0; lock released
+[zombie 00:18:19] ledger row written by that waiter: True; zombie still unreaped: Z
+[zombie 00:18:19] unrelated wakes drained+acked by the Main loop: []
+[zombie 00:18:19] RESULT PASS

@@ -1,0 +1,10 @@
+[live 00:17:19] live owner pid=62803 stat=S; real waiter pid=62829 registered
+[live 00:17:22] fresh hold, watcher made 4 polls: alarm present? False
+[live 00:17:22] backdated the owner's pid file 301s (hold age past the fixed 300s limit)
+[live 00:17:25] watcher exit=0; alarm line(s): ['check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=62803 state=S parent=62754 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=303s waiters=1']
+[live 00:17:25] after alarm: owner unchanged and alive, waiter still waiting: True
+[live 00:17:33] re-armed watcher, 12 beats on the same episode: repeated alarm? False
+[live 00:17:33] durable queue long-held rows: 1
+[live 00:17:33] waiter after owner release: exit=0
+[live 00:17:33] unrelated wakes drained+acked by the Main loop: ['check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)']
+[live 00:17:33] RESULT PASS

@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent

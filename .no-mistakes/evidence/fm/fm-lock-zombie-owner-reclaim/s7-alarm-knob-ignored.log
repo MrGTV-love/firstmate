@@ -1,0 +1,3 @@
+FM_LOCK_ALARM_SECS=1, live owner pid=11722 hold age 120s, watcher beats observed=16, watcher outputs=['check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)', 'check: rearm-resurface', 'check: rearm-resurface', 'check: rearm-resurface', 'check: rearm-resurface', 'check: rearm-resurface']
+long-held alarm raised: False
+RESULT PASS

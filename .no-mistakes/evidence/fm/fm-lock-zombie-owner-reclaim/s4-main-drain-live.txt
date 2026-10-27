@@ -1,0 +1,16 @@
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a82f0445cfcfa9fb56f7197c","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793078241	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 62865.1793078241.XH3JJb
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+=====
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a82f0445cfcfa9fb56f7197c","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: backlog is unavailable",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793078241	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793078244	2	check	long-held-lock-/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock.owner.wkRXob:62803:1793077941:16777232:901524571	check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock owner=62803 state=S parent=62754 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=303s waiters=1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 62865.1793078241.XH3JJb
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.

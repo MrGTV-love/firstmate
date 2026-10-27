@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - waiter warns after 60s once per owner and continues to acquire

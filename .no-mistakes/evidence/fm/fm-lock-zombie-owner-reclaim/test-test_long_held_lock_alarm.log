@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue

@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter

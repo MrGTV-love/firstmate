@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture

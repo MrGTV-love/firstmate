@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock

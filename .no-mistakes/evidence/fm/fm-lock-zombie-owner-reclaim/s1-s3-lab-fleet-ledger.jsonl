@@ -1,0 +1,6 @@
+{"v":1,"ts":1793077833,"event":"task.dispatched","task":"probe-t1","kind":"ship","project":"sample","harness":"claude","model":"opus"}
+{"v":1,"ts":1793077862,"event":"task.dispatched","task":"incident-head","kind":"ship","project":"sample","harness":"claude","model":"opus"}
+{"v":1,"ts":1793078014,"event":"task.dispatched","task":"breadcrumb-t1","kind":"ship","project":"sample","harness":"claude","model":"opus"}
+{"v":1,"ts":1793078055,"event":"task.dispatched","task":"psfail-fail-prints-Z","kind":"ship","project":"sample","harness":"claude","model":"opus"}
+{"v":1,"ts":1793078063,"event":"task.dispatched","task":"psfail-empty-exit-0","kind":"ship","project":"sample","harness":"claude","model":"opus"}
+{"v":1,"ts":1793078106,"event":"task.dispatched","task":"alarm-t1","kind":"ship","project":"sample","harness":"claude","model":"opus"}
