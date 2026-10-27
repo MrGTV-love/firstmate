@@ -108,7 +108,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
-- The ready-PR registration pass's single-flight lock and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused`, owned by `bin/fm-pr-ready-reconcile.sh` and removed with the task by `bin/fm-teardown.sh`; deleting a marker only makes the next pass retry that task.
+- The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
@@ -2010,7 +2010,7 @@ my-project 2
 ```
 
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns declaration syntax, clone-name matching, same-origin occupancy, and the concurrency invariant.
-A PR-ready handoff is registered automatically by the watcher's bounded housekeeping pass and frees a place; use `bin/fm-pr-check.sh <id> <PR url>` by hand only after a registration refusal or for a lane without the ready signal; local-only ships and scouts retain theirs until cleanup.
+A PR-ready handoff is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; use `bin/fm-pr-check.sh <id> <PR url>` by hand only after a registration refusal or for a lane without the ready signal; local-only ships and scouts retain theirs until cleanup.
 The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.

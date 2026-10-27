@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Register this home's unrecorded ready ship PRs through fm-pr-check.sh.
 # Usage: fm-pr-ready-reconcile.sh
-# Every pass walks all task records. Only kind=ship with mode=no-mistakes or
-# direct-PR and no pr= is eligible; no other home is walked.
+# Every pass admits at most eight task records, rotating after the last admitted
+# record. Only kind=ship with mode=no-mistakes or direct-PR and no pr= is eligible.
 # Read at most the final 64 KiB / 200 lines of each eligible status log. The
 # window comes from fm-status-event-lib.sh and the ready gate from fm-dod-lib.sh,
 # not a second status grammar, and the PR is the one the ready note declares as
@@ -14,10 +14,10 @@
 # draft, restored tool, transient forge failure or finished pipeline registers
 # without manual action. fm-pr-check.sh keeps its own authority for the named
 # head. fm-teardown.sh removes the task's marker.
-# The watcher runs this single-flight pass detached from its housekeeping tick
-# under a hard time limit, so a hung forge call cannot stop supervision or hold
-# every later registration behind it. This script never merges, steers, or
-# writes a status log, and fm-pr-check.sh remains the only pr= writer.
+# The watcher runs this single-flight pass detached under a hard time limit.
+# Persist the cursor before each admission, so even a permanently hung forge
+# call cannot keep later records behind it on the next pass. This script never
+# merges, steers, or writes a status log; fm-pr-check.sh is the only pr= writer.
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -104,9 +104,31 @@ reconcile_one() {  # <meta> <id>
   fi
 }
 
+# The record cap bounds local reads and forge attempts; the watcher deadline
+# bounds their duration. Advance before calling the registrar, not after it:
+# a timeout must preserve progress even when no refusal can be recorded.
+CURSOR="$CACHE/cursor"
+cursor=
+if [ -f "$CURSOR" ] && [ ! -L "$CURSOR" ]; then
+  IFS= read -r cursor < "$CURSOR" || cursor=
+  fm_pr_task_id_valid "$cursor" || cursor=
+fi
+count=0
 shopt -s nullglob
-for meta in "$STATE"/*.meta; do
-  id=${meta##*/}; id=${id%.meta}
-  fm_pr_task_id_valid "$id" || continue
-  reconcile_one "$meta" "$id"
+for half in after before; do
+  for meta in "$STATE"/*.meta; do
+    id=${meta##*/}; id=${id%.meta}
+    fm_pr_task_id_valid "$id" || continue
+    if [ "$half" = after ]; then
+      [[ "$id" > "$cursor" ]] || continue
+    else
+      [[ "$id" > "$cursor" ]] && continue
+    fi
+    [ "$count" -lt 8 ] || break 2
+    printf '%s\n' "$id" > "$SCRATCH"
+    mv -f -- "$SCRATCH" "$CURSOR"
+    SCRATCH=$(mktemp "$CACHE/pass.XXXXXX")
+    count=$((count + 1))
+    reconcile_one "$meta" "$id"
+  done
 done

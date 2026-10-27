@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Automatic PR handoff: real registration, capacity release, bounded status
-# reads, whole-fleet admission, ten-minute refusal age-out, and a hard pass time
-# limit in an isolated home.
+# reads, rotating eight-record admission, ten-minute refusal age-out, and a
+# hard pass time limit in an isolated home.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -13,6 +13,8 @@ set -eu
 . "$ROOT/bin/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-project-capacity-lib.sh
 . "$ROOT/bin/fm-project-capacity-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$ROOT/bin/fm-timeout-lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-pr-ready-reconcile)
 fm_git_identity fmtest fmtest@example.invalid
@@ -37,6 +39,10 @@ printf '%s\n' "$*" >> "$FM_READY_CASE/gh.calls"
 [ ! -f "$FM_READY_CASE/unreadable-forge" ] || exit 1
 case "$*" in
   *'--json isDraft'*)
+    if [ -f "$FM_READY_CASE/hang-always" ] && [[ "$*" = *'/pull/42 '* ]]; then
+      printf '%s\n' "$$" >> "$FM_READY_CASE/persistent-hung.pids"
+      exec sleep 600
+    fi
     if [ -f "$FM_READY_CASE/hang-once" ]; then
       rm -f "$FM_READY_CASE/hang-once"
       printf '%s\n' "$$" > "$FM_READY_CASE/hung.pid"
@@ -126,6 +132,31 @@ assert_unregistered() {
   ! grep -q '^pr=' "$CASE/home/state/$1.meta" || fail "$1 unexpectedly registered"
   [ ! -e "$CASE/home/state/$1.check.sh" ] || fail "$1 unexpectedly armed"
 }
+
+# Use the same hard-bound runner as watcher housekeeping, with a forge that
+# hangs on every attempt for the first ship, not just once.
+make_case persistent-hang
+write_ship a-hung
+write_ship b-ready
+printf 'done: PR https://github.com/example/project/pull/43 checks green\n' \
+  > "$CASE/home/state/b-ready.status"
+: > "$CASE/hang-always"
+for attempt in 1 2; do
+  rc=0
+  fm_run_timed 10 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
+    FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+    FM_CONFIG_OVERRIDE="$CASE/home/config" PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass-$attempt.out" 2>&1 || rc=$?
+  fm_timed_out "$rc" || fail "persistent hang pass $attempt did not hit its bound: $rc"
+done
+out=$(cat "$CASE/pass-2.out")
+[ "$(wc -l < "$CASE/persistent-hung.pids")" -eq 2 ] || fail 'forge did not persistently hang in both passes'
+while IFS= read -r hung_pid; do
+  ! kill -0 "$hung_pid" 2>/dev/null || fail 'persistent forge process survived pass timeout'
+done < "$CASE/persistent-hung.pids"
+assert_unregistered a-hung
+assert_registered b-ready https://github.com/example/project/pull/43
+pass 'persistent early forge hang cannot starve a later healthy ship across bounded passes'
 
 make_case age-out
 write_ship ready
@@ -252,13 +283,18 @@ assert_registered huge
 [ "$((SECONDS - started))" -lt 60 ] || fail 'large-log ready registration exceeded 60-second fixture bound'
 pass '200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s'
 
-make_case all-candidates
+make_case capped-candidates
 for id in a b c d e f g h i j k; do write_ship "$id"; done
 before=$(occupancy)
 out=$(run_pass)
+for id in a b c d e f g h; do assert_registered "$id"; done
+for id in i j k; do assert_unregistered "$id"; done
+[ "$(wc -l < "$CASE/tail.calls")" -eq 8 ] || fail 'pass read more than eight status logs'
+[ "$before" -eq "$(($(occupancy) + 8))" ] || fail 'first pass did not release exactly eight places'
+out=$(run_pass)
 for id in a b c d e f g h i j k; do assert_registered "$id"; done
 [ "$before" -eq "$(($(occupancy) + 11))" ] || fail 'capacity did not fall by one per ship'
-pass 'one pass registers every ready ship however many task records exist'
+pass 'eight-record admission cap rotates fairly so later candidates register on the next pass'
 
 make_case unreadable
 write_ship a-record
