@@ -128,12 +128,21 @@
 # hours in case the cause cleared. The hourly `treehouse prune --all --yes`
 # safety net is not duplicated.
 #
-# A teardown that succeeds returns the slot to the pool, reset in place, and the
-# copy is still on disk with the task's record gone. The prune then removes that
-# copy itself (remove_returned), under the project lock, with the same call and
-# the same proofs as the fallback's destroy, and without any force: the slot's
-# owner claim must still be this task's or absent, nothing may be inside it
-# (a search indexer excepted), and a nested copy is proved on its own first.
+# A teardown that succeeds and returns the slot to the pool leaves it reset in
+# place, so the copy is still on disk with the task's record gone. The prune
+# then removes that copy itself (remove_returned), under the project lock, with
+# the same call and the same proofs as the fallback's destroy, and without any
+# force. It removes it only when the copy really was returned: a pool slot of
+# the project that Treehouse state records as not leased, read again under the
+# project lock and again when a retry resumes from the prune record. A copy that
+# teardown kept on purpose (a slot another task's record still leases, a slot
+# held for foreign copies, a copy that is not a pool slot) is never removed: the
+# outcome is the log line "reaped: teardown completed; teardown kept the copy",
+# with no wake and no record. Before the removal the slot's owner claim must be
+# this task's or absent, nothing may be inside it (a search indexer excepted),
+# each nested copy is proved on its own, the copy and each nested copy hold only
+# scratch or preserved ignored files, and the preserve-list files are copied to
+# data/<id>/merge-prune-preserved/ with SHA-256 checksums, as for the fallback.
 # The prune record is cleared only once the copy path is gone. A removal that is
 # refused keeps the record and the copy and raises the one wake; the retry needs
 # only the record, which keeps the copy and the project.
@@ -340,6 +349,13 @@ finish_reaped() {  # <detail> [<copy>]
   log_line "reaped: $1"
 }
 
+# Teardown completed and kept the copy on purpose: nothing of it is the prune's
+# to remove, so the record goes with one log line and no wake.
+finish_kept() {  # <detail> <why>
+  rm -f -- "$STATE/$ID.merge-prune"
+  log_line "reaped: $1; teardown kept the copy: $2"
+}
+
 backoff() {  # <detail>: a transient outcome, silent until the attempt limit
   local delay=$BACKOFF_START i=1
   R_ATTEMPTS=$((R_ATTEMPTS + 1))
@@ -444,7 +460,7 @@ fallback() {
 # Stop the finished worker, prove the copy once more, preserve, and destroy it.
 # The project lock is held by the caller.
 fallback_remove() {  # <real-copy> <pr-number>
-  local real=$1 pr_number=$2 n label copies=() tags=() i dest waited=0 out rc=0 head pane reason
+  local real=$1 pr_number=$2 dest waited=0 out rc=0 head pane reason
   stop_worker
   # The control lock keeps a teardown, relaunch or spawn from racing the removal.
   if ! fm_lock_try_acquire "$LOCK_CONTROL"; then
@@ -474,25 +490,10 @@ fallback_remove() {  # <real-copy> <pr-number>
     return 1
   done
   dest="$DATA/$ID/merge-prune-preserved/$NOW"
-  copies=("$real")
-  tags=(root)
-  if [ "${#FM_MP_NESTED[@]}" -gt 0 ]; then
-    for n in "${FM_MP_NESTED[@]}"; do
-      label=${n#"$real"/}
-      copies+=("$n")
-      tags+=("nested-${label//\//__}")
-    done
+  if ! preserve_all "$real" "$dest"; then
+    fm_lock_release "$LOCK_CONTROL" || true
+    return 1
   fi
-  for i in "${!copies[@]}"; do
-    fm_mp_prove_ignored "${copies[$i]}" || { fm_lock_release "$LOCK_CONTROL" || true; record_verdict "$real"; return 1; }
-    for n in ${FM_MP_PRESERVE[@]+"${FM_MP_PRESERVE[@]}"}; do
-      if ! fm_mp_preserve_one "${copies[$i]}" "$n" "$dest/${tags[$i]}"; then
-        fm_lock_release "$LOCK_CONTROL" || true
-        retain "$real" "could not copy and checksum preserved record $n from ${copies[$i]}"
-        return 1
-      fi
-    done
-  done
   fm_treehouse_slot_owner_state "$real" "$ID"
   # A claim that names this task id is this task's only when it also names this
   # home: the same id can belong to a task of another home, and a claim with no
@@ -547,6 +548,28 @@ fallback_remove() {  # <real-copy> <pr-number>
     return 1
   fi
   log_line "fallback destroyed $real (head ${head:-unknown}); preserved records, if any, are in $dest"
+  return 0
+}
+
+# The ignored files of <real-copy> and of each nested copy (FM_MP_NESTED) must be
+# scratch or on the preserve list, and the preserve-list files of each are copied
+# to <dest> with checksums. Records the outcome and returns 1 when the copy stays.
+preserve_all() {  # <real-copy> <dest>
+  local real=$1 dest=$2 n label copies=("$1") tags=(root) i
+  for n in ${FM_MP_NESTED[@]+"${FM_MP_NESTED[@]}"}; do
+    label=${n#"$real"/}
+    copies+=("$n")
+    tags+=("nested-${label//\//__}")
+  done
+  for i in "${!copies[@]}"; do
+    fm_mp_prove_ignored "${copies[$i]}" || { record_verdict "$real"; return 1; }
+    for n in ${FM_MP_PRESERVE[@]+"${FM_MP_PRESERVE[@]}"}; do
+      if ! fm_mp_preserve_one "${copies[$i]}" "$n" "$dest/${tags[$i]}"; then
+        retain "$real" "could not copy and checksum preserved record $n from ${copies[$i]}"
+        return 1
+      fi
+    done
+  done
   return 0
 }
 
@@ -630,50 +653,80 @@ prove_nested_first() {
   fm_mp_prove_pane_idle "$real" "$(fm_mp_pane_pid "$META")" || { record_verdict "$real"; return 1; }
 }
 
-# Teardown succeeded. For a real pool slot it returns the slot to the pool, reset
-# in place, and the copy stays on disk with the task's record gone, so the
-# copy is removed here with the reaper's call (remove_returned). The prune
-# record is cleared only once the copy path is gone; the record keeps the copy
-# and the project, so a retry needs no task record.
+# Whether teardown returned <copy> to the pool: a pool slot of <project> that
+# Treehouse state records as not leased, read fresh. Teardown keeps a slot that
+# another task's record still names, or that holds foreign copies, under a
+# durable lease, and a copy that is not a pool slot is never returned. Sets
+# RETURNED_REAL to the physical path, or RETURNED_WHY when it was not returned.
+RETURNED_REAL=
+RETURNED_WHY=
+returned_slot() {  # <copy> <project>
+  RETURNED_WHY=
+  if ! RETURNED_REAL=$(fm_mp_real "$1"); then
+    RETURNED_WHY="$1 cannot be resolved"
+    return 1
+  fi
+  if ! fm_treehouse_pool_slot "$2" "$RETURNED_REAL"; then
+    RETURNED_WHY="$RETURNED_REAL is not a Treehouse pool slot of the project ${2:-<no project recorded>}"
+    return 1
+  fi
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$RETURNED_REAL" || true
+  [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] || return 0
+  RETURNED_WHY="the pool slot $RETURNED_REAL reads $FM_TASK_COPY_SLOT_STATE in Treehouse state, not returned"
+  return 1
+}
+
+# Teardown succeeded. A slot it returned to the pool is reset in place and stays
+# on disk with the task's record gone, so it is removed here with the reaper's
+# call (remove_returned). The prune record is cleared only once the copy path is
+# gone; the record keeps the copy and the project, so a retry needs no task
+# record. A copy teardown kept is left as it is.
 settle_copy() {  # <copy> <project> <detail>
   local copy=$1 project=$2 detail=$3
   if [ -z "$copy" ] || [ ! -e "$copy" ]; then
     finish_reaped "$detail" "$copy"
     return 0
   fi
+  if ! returned_slot "$copy" "$project"; then
+    finish_kept "$detail" "$RETURNED_WHY"
+    return 0
+  fi
   R_RETURNED=1
-  R_COPY=$copy
+  R_COPY=$RETURNED_REAL
   R_PROJECT=$project
-  rec_save "$ID" || log_line "cannot record the returned copy $copy; removing it now"
-  remove_returned "$copy" "$project" "$detail" || true
+  rec_save "$ID" || log_line "cannot record the returned copy $RETURNED_REAL; removing it now"
+  remove_returned "$RETURNED_REAL" "$project" "$detail" || true
 }
 
 # Remove the slot that teardown returned, under the project lock that every slot
-# allocation takes. Nothing is forced: `treehouse destroy <copy> --include-leased
-# --yes` is the call of the fallback and the reaper. A copy that cannot be
-# removed stays with the prune record and one wake; the retry resumes from the
-# record alone (cmd_run).
+# allocation takes, once the lease read under that lock still shows it returned.
+# Nothing is forced: `treehouse destroy <copy> --include-leased --yes` is the
+# call of the fallback and the reaper. A copy that cannot be removed stays with
+# the prune record and one wake; the retry resumes from the record alone
+# (cmd_run).
 remove_returned() {  # <copy> <project> <detail>
-  local copy=$1 project=$2 detail=$3 real plock rc=0
-  if ! real=$(fm_mp_real "$copy") || ! fm_treehouse_pool_slot "$project" "$real"; then
-    retain "$copy" "the returned copy is not a Treehouse pool slot of the project ${project:-<no project recorded>}"
-    return 1
-  fi
+  local copy=$1 project=$2 detail=$3 plock rc=0
   if ! plock=$(fm_treehouse_project_lock_path "$project"); then
-    retain "$real" "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
+    retain "$copy" "cannot resolve the Treehouse project lock for ${project:-<no project recorded>}"
     return 1
   fi
   if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then
     backoff "another operation holds or is queued for the task's project lock"
     return 1
   fi
-  remove_returned_locked "$real" "$detail" || rc=$?
+  if returned_slot "$copy" "$project"; then
+    remove_returned_locked "$RETURNED_REAL" "$detail" || rc=$?
+  else
+    finish_kept "$detail" "$RETURNED_WHY"
+  fi
   fm_project_lock_release "$plock" || true
   return "$rc"
 }
 
 remove_returned_locked() {  # <real-copy> <detail>
-  local real=$1 detail=$2 n out rc=0 waited=0 head
+  local real=$1 detail=$2 out rc=0 waited=0 head dest
   fm_treehouse_slot_owner_state "$real" "$ID"
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     mine)
@@ -695,9 +748,6 @@ remove_returned_locked() {  # <real-copy> <detail>
   esac
   fm_mp_find_nested "$real" || { record_verdict "$real"; return 1; }
   prove_nested_git nofetch || { record_verdict "$real"; return 1; }
-  for n in ${FM_MP_NESTED[@]+"${FM_MP_NESTED[@]}"}; do
-    fm_mp_prove_ignored "$n" || { record_verdict "$real"; return 1; }
-  done
   until fm_mp_prove_unused "$real" ""; do
     case "$FM_MP_REASON" in
       "process(es) inside"*)
@@ -711,6 +761,8 @@ remove_returned_locked() {  # <real-copy> <detail>
     record_verdict "$real"
     return 1
   done
+  dest="$DATA/$ID/merge-prune-preserved/$NOW"
+  preserve_all "$real" "$dest" || return 1
   fm_mp_remove_unignored_nested "$real" || { record_verdict "$real"; return 1; }
   head=$(git -C "$real" rev-parse --short HEAD 2>/dev/null || true)
   out=$(fm_run_timed "$(fm_mp_limit merge-prune.destroy 300)" treehouse destroy "$real" --include-leased --yes </dev/null 2>&1) || rc=$?
@@ -722,7 +774,7 @@ remove_returned_locked() {  # <real-copy> <detail>
     retain "$real" "treehouse destroy returned success but the copy is still present"
     return 1
   fi
-  log_line "removed the returned copy $real (head ${head:-unknown})"
+  log_line "removed the returned copy $real (head ${head:-unknown}); preserved records, if any, are in $dest"
   finish_reaped "$detail; removed the returned copy" "$real"
   return 0
 }

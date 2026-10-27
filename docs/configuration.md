@@ -696,8 +696,12 @@ A merged task's pool copy is pruned right after its pull request merges, with no
 Arming writes `state/<id>.merge-prune`, and a detached attempt then runs `bin/fm-teardown.sh <id>` without `--force`, under the automatic-reap admission check, so a worker that is still busy, steered, or held for the captain is left alone.
 Because the merge is already verified, that check waives the finished-session sweep's grace wait and ignores its refusal memo, and every other gate stands (`bin/fm-idle-reap-lib.sh` owns this mode).
 The watcher starts `bin/fm-merge-prune.sh sweep` detached while a record exists (`FM_MERGE_PRUNE_INTERVAL`), so no model or person has to carry the retry.
-A teardown that succeeds returns the slot to the pool, reset in place, so the copy is still on disk.
-The prune then removes that copy itself, under the project lock, with `treehouse destroy <copy> --include-leased --yes` (never forced), after it proves the slot's owner claim is still this task's or absent, that no process is inside it (a search indexer excepted), and that each nested copy holds no work of its own.
+A teardown that succeeds and returns the slot to the pool leaves it reset in place, so the copy is still on disk.
+The prune removes that copy only when it really was returned: it is a pool slot of the task's project, and Treehouse state records it as not leased, read again under the project lock and again when a retry resumes.
+A copy that teardown keeps on purpose is never removed: a slot that another task's record still leases, a slot held for foreign copies, and a copy that is not a pool slot.
+Its outcome is the log line `reaped: teardown completed; teardown kept the copy`, with no wake and no record.
+The prune removes a returned copy itself, under the project lock, with `treehouse destroy <copy> --include-leased --yes` (never forced), after it proves the slot's owner claim is still this task's or absent, that no process is inside it (a search indexer excepted), that each nested copy holds no work of its own, and that the copy and each nested copy hold only scratch or preserve-list ignored files.
+The preserve-list files are copied with checksums first, the same as for the fallback (below), so a returned copy with unique ignored files stays with one wake.
 It clears the prune record only once the copy path is gone.
 A removal that is refused keeps the record and the copy and raises the one wake; the retry needs only the record, because the task's own record is already gone.
 `FM_MERGE_PRUNE=0` stops new arming.
@@ -750,7 +754,7 @@ The pane's own shell is never ended, so a bare pane shell inside the copy keeps 
 On any other backend nothing is ignored.
 The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
 Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
-A process check that fails, by an error exit or a message with no process listed, proves nothing: the copy stays and the attempt is retried.
+A process check that fails, by an error exit or a message, proves nothing: the copy stays and the attempt is retried.
 The silent exit 1 that `lsof` gives for a copy nothing holds open is not a failure.
 The task's Treehouse project lock is held from the worker stop to the destroy.
 The finished-session check is asked again once that lock is held, right before the worker is stopped.
@@ -776,7 +780,7 @@ It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
 Each outcome is one line in `data/<id>/merge-prune.log`, and the same outcome is one wake on the wake queue, the queue a kept copy uses: `check: merge-prune reaped <copy> for <id>: ...` for a pruned copy and `check: merge-prune kept <copy> for <id>: <reason>` for a copy that stays; the prune never writes to the task's status file.
-The hourly `treehouse prune --all --yes` safety net is unchanged, and the fallback does not alter what teardown itself preserves or refuses: it acts only after teardown has refused.
+The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
 `bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
 
 ## Waiting worker spends no turns (config/wait-no-turns)

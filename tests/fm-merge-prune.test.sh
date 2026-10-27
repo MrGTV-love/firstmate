@@ -176,9 +176,18 @@ SH
 printf 'args=%s|admission=%s|prune=%s\n' "$*" "${FM_IDLE_REAP_ADMISSION:-}" "${FM_IDLE_REAP_MERGE_PRUNE:-}" >> "$STUB_LOG"
 mode=$(cat "$STUB_MODE" 2>/dev/null || echo ok)
 copy=$(sed -n 's/^worktree=//p' "$FM_STATE_OVERRIDE/$1.meta" 2>/dev/null)
-done_ok() { rm -f "$FM_STATE_OVERRIDE/$1.meta"; exit 0; }
+# A completed teardown returns the slot the way `treehouse return` does: it
+# releases the slot's lease in the pool's treehouse-state.json. A teardown that
+# keeps the slot (shared with another task, or held for foreign copies) leaves
+# the lease as it is (ok-keeps-lease).
+release_lease() {
+  local st="${copy%/*/*}/treehouse-state.json" tmp
+  [ -n "$copy" ] && [ -f "$st" ] || return 0
+  tmp=$(mktemp "$st.XXXXXX") && jq --arg p "$copy" '.worktrees |= map(if .path == $p then (.leased = false | del(.lease_holder)) else . end)' "$st" > "$tmp" && mv -f "$tmp" "$st"
+}
+done_ok() { [ "$mode" = ok-keeps-lease ] || release_lease; rm -f "$FM_STATE_OVERRIDE/$1.meta"; exit 0; }
 case "$mode" in
-  ok) rm -f "$FM_STATE_OVERRIDE/$1.status"; done_ok "$1" ;;
+  ok|ok-keeps-lease) rm -f "$FM_STATE_OVERRIDE/$1.status"; done_ok "$1" ;;
   flaky)
     n=$(cat "$STUB_COUNT" 2>/dev/null || echo 0)
     printf '%s\n' $((n + 1)) > "$STUB_COUNT"
@@ -1283,6 +1292,100 @@ scn_project_lock_busy_backs_off_for_the_returned_copy() {
   return 0
 }
 
+# A teardown that completes but keeps the slot leased has not returned it: a
+# slot another task's record still names stays durably leased for that task
+# (the shared-slot route), and a slot holding foreign copies stays leased for
+# this task (the held-close route). Neither copy is the prune's to remove: the
+# record goes with "teardown kept the copy", and nothing is destroyed or woken.
+scn_slot_teardown_keeps_leased_is_left_alone() {
+  local holder
+  for holder in t2 t1; do
+    make_world
+    printf 'ok-keeps-lease\n' > "$W/stub.mode"
+    if [ "$holder" = t2 ]; then
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"t2"}]}\n' "$COPY" > "$POOL/pool1/treehouse-state.json"
+      mk_task t2 "$COPY"
+    fi
+    go
+    [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a slot teardown kept leased for $holder was destroyed" || return 1
+    [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed for a copy teardown kept: $(cat "$STATE/t1.merge-prune")" || return 1
+    [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a copy teardown kept raised a wake: $(cat "$STATE/.wake-queue" 2>/dev/null)" || return 1
+    grep -q 'reaped: teardown completed; teardown kept the copy' "$DATA/t1/merge-prune.log" || why "the log does not say teardown kept the copy" || return 1
+  done
+  return 0
+}
+
+# A copy that is not a Treehouse pool slot was never returned to a pool: teardown
+# leaves it as it is, and so does the prune, with no wake and no record.
+scn_copy_that_is_not_a_pool_slot_is_left_after_teardown() {
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  rm -f "$POOL/pool1/treehouse-state.json"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a copy that is not a pool slot was destroyed" || return 1
+  [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed for a copy that can never be returned: $(cat "$STATE/t1.merge-prune")" || return 1
+  [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a copy that is not a pool slot raised a wake" || return 1
+  grep -q 'reaped: teardown completed; teardown kept the copy' "$DATA/t1/merge-prune.log" || why "the log does not say teardown kept the copy" || return 1
+  return 0
+}
+
+# The retry from the prune record reads the lease again under the project lock: a
+# returned slot that a new launch leased meanwhile is that launch's, and stays.
+scn_returned_copy_leased_again_before_the_retry_is_left() {
+  local lock holder
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  lock=$(project_lock_path)
+  sleep 120 &
+  holder=$!
+  WORKER_PIDS+=("$holder")
+  mkdir "$lock"
+  printf '%s\n' "$holder" > "$lock/pid"
+  go
+  [ "$(rec_field t1 returned)" = 1 ] || why "the returned copy was not recorded for the retry: $(cat "$STATE/t1.merge-prune" 2>/dev/null)" || return 1
+  kill "$holder" 2>/dev/null || true
+  rm -rf "$lock"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"t9"}]}\n' "$COPY" > "$POOL/pool1/treehouse-state.json"
+  set_rec t1 next_at 0
+  prune run t1 >/dev/null 2>&1
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the retry destroyed a slot a new launch had leased" || return 1
+  [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed: $(cat "$STATE/t1.merge-prune")" || return 1
+  [ "$(wake_count)" = 0 ] && [ "$(reaped_wake_count)" = 0 ] || why "a slot leased again raised a wake" || return 1
+  return 0
+}
+
+# Teardown's reset of a returned slot keeps its ignored files. A unique ignored
+# file keeps the returned copy with one wake, as it keeps a copy the fallback
+# would destroy.
+scn_returned_copy_with_unique_ignored_file_is_kept() {
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  printf 'secret\n' > "$COPY/.env.local"
+  go
+  [ -e "$COPY/.env.local" ] && [ "$(destroy_calls)" = 0 ] || why "a returned copy with a unique ignored file was destroyed" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the returned copy with unique data is not retained: $(cat "$STATE/t1.merge-prune" 2>/dev/null)" || return 1
+  [ "$(wake_count)" = 1 ] || why "want one wake for the unique ignored file, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q '.env.local' || why "the wake does not name the copy and the file: $(cat "$STATE/.wake-queue")" || return 1
+  return 0
+}
+
+# The preserve-list records of a returned copy are copied with checksums before
+# the copy is removed.
+scn_returned_copy_preserves_bug_evidence_first() {
+  local sums
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  mkdir -p "$COPY/.claude/bug-evidence"
+  printf 'closeout record\n' > "$COPY/.claude/bug-evidence/r1.md"
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the returned copy was not removed: $(rec_field t1 reason)" || return 1
+  sums=$(find "$DATA/t1/merge-prune-preserved" -path '*/root/SHA256SUMS' 2>/dev/null | sed -n 1p)
+  [ -n "$sums" ] || why "no checksummed copy of the preserve list was made" || return 1
+  [ "$(cat "${sums%/SHA256SUMS}/.claude/bug-evidence/r1.md")" = "closeout record" ] || why "the preserved record differs" || return 1
+  grep -q 'bug-evidence/r1.md' "$sums" || why "the record has no checksum: $(cat "$sums")" || return 1
+  return 0
+}
+
 scn_project_lock_busy_backs_off() {
   local lock holder
   make_world
@@ -2091,6 +2194,11 @@ test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_
 test_fallback_exempts_nothing_when_the_pane_is_unreadable() { assert_scenario scn_unreadable_pane_exempts_nothing "a pane that cannot be read exempts no shell"; }
 test_fallback_never_destroys_a_reassigned_slot() { assert_scenario scn_reassigned_slot_is_never_destroyed "a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed"; }
 test_returned_copy_removal_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off_for_the_returned_copy "removing the copy teardown returned takes the project lock; a busy lock is a silent retry from the prune record alone, then the copy is removed and reported"; }
+test_teardown_kept_leased_slot_is_left_alone() { assert_scenario scn_slot_teardown_keeps_leased_is_left_alone "a slot teardown kept leased, for another task's record or held for foreign copies, is never removed and raises no wake"; }
+test_copy_that_is_not_a_pool_slot_is_left_after_teardown() { assert_scenario scn_copy_that_is_not_a_pool_slot_is_left_after_teardown "a copy that is not a pool slot is left after teardown, with no wake and no record"; }
+test_returned_copy_leased_again_before_the_retry_is_left() { assert_scenario scn_returned_copy_leased_again_before_the_retry_is_left "the retry reads the lease again and leaves a returned slot that a new launch leased"; }
+test_returned_copy_with_unique_ignored_file_is_kept() { assert_scenario scn_returned_copy_with_unique_ignored_file_is_kept "a returned copy with a unique ignored file is kept with one wake"; }
+test_returned_copy_preserves_bug_evidence_first() { assert_scenario scn_returned_copy_preserves_bug_evidence_first "a returned copy's preserve-list records are copied with checksums before it is removed"; }
 test_fallback_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off "a project lock held by another actor stops nothing, backs off silently, and the retry finishes"; }
 test_fallback_removes_a_copy_whose_preserve_paths_are_empty() { assert_scenario scn_empty_preserve_paths_do_not_keep_the_copy "an empty preserve-list path, in the copy or a nested copy, has nothing to checksum and does not keep the copy"; }
 
@@ -2229,6 +2337,10 @@ test_unsafe_mutations_are_caught() {
   [ -n "$pane" ] || return 0' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "failing closed on a pane that cannot be read"
   expect_caught no-slot-owner-check $orch '    mine|absent) ;;' '    mine|absent|other) ;;' scn_reassigned_slot_is_never_destroyed "slot-owner re-read"
   expect_caught no-project-lock $orch '  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?' '  :' scn_project_lock_busy_backs_off "project lock"
+  expect_caught returned-lease-not-read $orch '  [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] || return 0' '  return 0' scn_slot_teardown_keeps_leased_is_left_alone "lease proof of a returned slot"
+  expect_caught returned-lease-not-reread $orch '  if returned_slot "$copy" "$project"; then' '  if RETURNED_REAL=$copy; then' scn_returned_copy_leased_again_before_the_retry_is_left "lease re-read under the project lock"
+  expect_caught returned-ignored-not-proved $orch '  preserve_all "$real" "$dest" || return 1' '  :' scn_returned_copy_with_unique_ignored_file_is_kept "ignored-file proof of a returned copy"
+  expect_caught returned-records-not-preserved $orch '  preserve_all "$real" "$dest" || return 1' '  :' scn_returned_copy_preserves_bug_evidence_first "preserve-list copy of a returned copy"
   expect_caught no-project-lock-for-the-returned-copy $orch '  if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then' '  if false; then' scn_project_lock_busy_backs_off_for_the_returned_copy "project lock for the returned copy"
   expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
@@ -2293,13 +2405,17 @@ make_e2e_world() {
   cat > "$W/bin/treehouse" <<'SH'
 #!/usr/bin/env bash
 # Fake pool: `return` resets the slot in place, as the real tool does (detached
-# at origin/main, clean, still in the pool), and the reaper's `destroy` removes
-# the slot.
+# at origin/main, clean, still in the pool, its lease released in the pool's
+# treehouse-state.json), and the reaper's `destroy` removes the slot.
 printf '%s\n' "$*" >> "$TH_LOG"
 case "${1:-}" in
   return)
     for a in "$@"; do wt=$a; done
-    git -C "$wt" checkout -q --detach origin/main && git -C "$wt" reset -q --hard && git -C "$wt" clean -ffdxq
+    git -C "$wt" checkout -q --detach origin/main && git -C "$wt" reset -q --hard && git -C "$wt" clean -ffdxq || exit $?
+    real=$(cd "$wt" && pwd -P) || exit 1
+    st="${real%/*/*}/treehouse-state.json"
+    tmp=$(mktemp "$st.XXXXXX") || exit 1
+    jq --arg a "$wt" --arg b "$real" '.worktrees |= map(if (.path == $a or .path == $b) then (.leased = false | del(.lease_holder)) else . end)' "$st" > "$tmp" && mv -f "$tmp" "$st"
     exit $? ;;
   destroy)
     [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ] || { echo "stub treehouse: unexpected arguments: $*" >&2; exit 9; }
@@ -2684,6 +2800,11 @@ ALL_TESTS=(
   test_failed_wake_append_is_not_recorded_as_sent
   test_fallback_backs_off_while_the_project_lock_is_held
   test_returned_copy_removal_backs_off_while_the_project_lock_is_held
+  test_teardown_kept_leased_slot_is_left_alone
+  test_copy_that_is_not_a_pool_slot_is_left_after_teardown
+  test_returned_copy_leased_again_before_the_retry_is_left
+  test_returned_copy_with_unique_ignored_file_is_kept
+  test_returned_copy_preserves_bug_evidence_first
   test_fallback_removes_a_copy_whose_preserve_paths_are_empty
   test_e2e_merge_prunes_the_copy_with_the_real_teardown
   test_e2e_transient_contention_retries_then_succeeds
