@@ -266,12 +266,12 @@ test_claude_stop_hook_runs_the_host_without_the_file_and_off_opts_out() {
   pass "host+hook: a Claude home without config/supervision-host runs the host at the default engine, and an off file restores the plain arm"
 }
 
-# Quiet: a decision line written after the successor started is a new event
-# that successor closes on, so its liveness check would race that close.
-test_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
-  local home
-  home=$(make_primary_home hook-turns-main-only)
-  turn_main_only_at_second_offer "$home" quiet
+# Exercise both an offer-only transition and the decision event that closes
+# the successor while main is being rewoken.
+assert_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
+  local mode=$1 home drained
+  home=$(make_primary_home "hook-turns-main-only-$mode")
+  turn_main_only_at_second_offer "$home" "$mode"
   start_hook_session "$home"
   turn_end "$home"
   wait_until 150 watcher_live "$home" || fail "hook turns-main-only: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
@@ -280,8 +280,32 @@ test_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
   [ "$(cat "$home/offer-count" 2>/dev/null)" -ge 2 ] || fail "fixture: the close was not accepted before it turned main-only"
   [ "$(engine_calls "$home")" -eq 0 ] || fail "hook turns-main-only: the engine ran on a stale offer"
   assert_rewoke_main "$home" "hook turns-main-only"
-  watcher_live "$home" || fail "hook turns-main-only: the pass-through left no successor watcher"
-  pass "host+hook: a close that turns main-only at its turn rewakes main and keeps its successor watcher"
+  assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" \
+    "hook turns-main-only: the close did not pass through to main"
+  [ -f "$home/state/.supervision-host-left" ] && [ -s "$home/state/.supervision-host-left" ] \
+    || fail "hook turns-main-only: the host did not leave a recorded successor for main"
+  if [ "$mode" = decision ]; then
+    # Reach the assertion after the real successor has queued the new decision
+    # and closed, deterministically exercising the slow-reader ordering.
+    wait_until 250 grep -qF 'needs-decision: ' "$home/state/.wake-queue" \
+      || fail "hook turns-main-only: the successor never queued the decision"
+    wait_until 250 test ! -e "$home/state/.watch.lock/pid" \
+      || fail "hook turns-main-only: the successor never closed on the decision"
+    drained=$(main_drain "$home")
+    assert_contains "$drained" 'which export format?' "hook turns-main-only: main lost the successor's queued decision"
+    pass "host+hook: an at-turn main-only close rewakes main even after its recorded successor queued the decision and closed"
+  else
+    watcher_live "$home" || fail "hook turns-main-only: the pass-through left no successor watcher"
+    pass "host+hook: a close that turns main-only at its turn rewakes main and keeps its successor watcher"
+  fi
+}
+
+test_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
+  assert_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn quiet
+}
+
+test_claude_stop_hook_delivers_a_close_after_its_successor_queued_the_decision() {
+  assert_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn decision
 }
 
 # The successor a close that turns main-only at its turn leaves for main
@@ -745,6 +769,7 @@ run_host_case test_claude_stop_hook_delivers_a_main_only_pass_through
 run_host_case test_claude_stop_hook_rewakes_a_present_captain_beside_a_quiet_record
 run_host_case test_claude_stop_hook_runs_the_host_without_the_file_and_off_opts_out
 run_host_case test_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn
+run_host_case test_claude_stop_hook_delivers_a_close_after_its_successor_queued_the_decision
 run_host_case test_successor_left_at_the_turn_survives_the_hook_process_group_teardown
 run_host_case test_claude_stop_hook_notifies_when_at_turn_downtime_write_fails
 run_host_case test_successor_close_during_main_turn_is_delivered_at_the_next_turn_end
