@@ -1457,6 +1457,18 @@ test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower() {
   printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
   fm_lint_write_growing_shellcheck "$fakebin"
   : > "$flags_log"
+  if [ "$(uname)" != Darwin ]; then
+    # The resident watch runs only on native macOS, so elsewhere a root that
+    # crosses the number is left to its single attempt.
+    rc=0
+    out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
+      FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$pid_file" FM_TEST_GROW_STEPS=40 FM_TEST_GROW_HOLD=1.5 \
+      "$LINT" "$fixture" 2>&1) || rc=$?
+    [ "$rc" -eq 0 ] || fail "an unwatched root did not pass (exit $rc)"$'\n'"$out"
+    [ "$(cat "$flags_log")" = yes ] || fail "the resident watch ended a root off macOS"$'\n'"$(cat "$flags_log")"
+    pass "off macOS the resident-memory watch leaves a root over the bound to its single attempt"
+    return
+  fi
   rc=0
   started=$SECONDS
   out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
@@ -1520,6 +1532,10 @@ test_unbounded_root_under_resident_bound_is_untouched() {
 
 test_resident_watch_ends_its_command_when_its_owner_dies() {
   local tmp owner_pid command_pid i
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident-memory watch runs only on macOS): owner-death check"
+    return
+  fi
   tmp=$(fm_test_tmproot fm-lint-rss-owner)
   # The owner is killed outright, so no signal reaches the watch: it must see the
   # lost parent and end the command's own process group.
@@ -1541,46 +1557,109 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
   pass "the resident-memory watch ends its command when the owner dies"
 }
 
-test_resident_watch_reads_only_its_own_tree() {
-  local tmp shims real_ps real_python refuse rc decoy_pid count
-  tmp=$(fm_test_tmproot fm-lint-rss-narrow)
-  real_ps=$(command -v ps)
-  real_python=$(command -v python3)
-  shims="$tmp/shims"
-  mkdir -p "$shims"
-  # The ps shim logs how many processes each call listed, or refuses as a
-  # sandbox does under FM_TEST_PS_REFUSE=1; the python3 shim logs each call.
-  cat > "$shims/ps" <<'SH'
+# fm_lint_write_rss_shims <dir>: ps and python3 stand-ins for the resident watch.
+# Each runs the absolute binary in FM_TEST_REAL_PS or FM_TEST_REAL_PYTHON once.
+# A shim reached again below itself (FM_TEST_RSS_SHIM_DEPTH already set) refuses
+# with status 99, so a real path that resolves back to a shim cannot recurse.
+# Every entry appends its pid to FM_TEST_SHIM_TRACE when that is set. The ps
+# shim logs how many processes each call listed to FM_TEST_PS_LOG, or refuses
+# as a sandbox does under FM_TEST_PS_REFUSE=1; the python3 shim logs each
+# call's arguments to FM_TEST_PY_LOG.
+fm_lint_write_rss_shims() {  # <dir>
+  local guard
+  guard=$(cat <<'SH'
 #!/usr/bin/env bash
-[ "$FM_TEST_PS_REFUSE" = 0 ] || exit 1
+[ -z "${FM_TEST_SHIM_TRACE:-}" ] || printf '%s\n' "$$" >> "$FM_TEST_SHIM_TRACE"
+if [ -n "${FM_TEST_RSS_SHIM_DEPTH:-}" ]; then
+  echo "rss shim: refused a call from inside a shim" >&2
+  exit 99
+fi
+export FM_TEST_RSS_SHIM_DEPTH=1
+SH
+)
+  {
+    printf '%s\n' "$guard"
+    cat <<'SH'
+[ "${FM_TEST_PS_REFUSE:-0}" = 0 ] || exit 1
 out=$("$FM_TEST_REAL_PS" "$@") || exit
 printf '%s\n' "$out" | grep -c . >> "$FM_TEST_PS_LOG"
 printf '%s\n' "$out"
 SH
-  cat > "$shims/python3" <<'SH'
-#!/usr/bin/env bash
+  } > "$1/ps"
+  {
+    printf '%s\n' "$guard"
+    cat <<'SH'
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
 exec "$FM_TEST_REAL_PYTHON" "$@"
 SH
-  chmod +x "$shims/ps" "$shims/python3"
+  } > "$1/python3"
+  chmod +x "$1/ps" "$1/python3"
+}
+
+test_rss_shim_that_resolves_to_itself_is_refused() {
+  local tmp shims name rc err
+  tmp=$(fm_test_tmproot fm-lint-rss-shim-loop)
+  shims="$tmp/shims"
+  mkdir -p "$shims"
+  fm_lint_write_rss_shims "$shims"
+  for name in ps python3; do
+    : > "$tmp/trace"
+    rc=0
+    err=$("$ROOT/bin/fm-proc-budget.sh" 50 -- env -u FM_TEST_RSS_SHIM_DEPTH FM_TEST_SHIM_TRACE="$tmp/trace" \
+      FM_TEST_REAL_PS="$shims/ps" FM_TEST_REAL_PYTHON="$shims/python3" \
+      FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" "$shims/$name" -c 0 2>&1 >/dev/null) || rc=$?
+    [ "$rc" -eq 99 ] || fail "a $name shim that resolves to itself was not refused (exit $rc)"$'\n'"$err"
+    [ "$(grep -c . "$tmp/trace")" -eq 2 ] \
+      || fail "a $name shim that resolves to itself ran $(grep -c . "$tmp/trace") times, not twice"
+    assert_contains "$err" "rss shim: refused a call from inside a shim" "the $name shim did not name its refusal"
+  done
+  pass "a resident-watch shim that resolves to itself is refused at once"
+}
+
+test_resident_watch_reads_only_its_own_tree() {
+  local tmp shims real_ps real_python refuse rc decoy_pid count
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident-memory watch runs only on macOS): own-tree sampling check"
+    return
+  fi
+  tmp=$(fm_test_tmproot fm-lint-rss-narrow)
+  shims="$tmp/shims"
+  real_ps=/bin/ps
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  case "$real_python" in
+    /*) ;;
+    *) fail "python3 did not resolve to an absolute path: $real_python" ;;
+  esac
+  case "$real_python" in
+    "$tmp"/*) fail "python3 resolved inside the shim directory: $real_python" ;;
+  esac
+  mkdir -p "$shims"
+  fm_lint_write_rss_shims "$shims"
+  if [ ! -x "$real_ps" ] || [ "$real_ps" -ef "$shims/ps" ]; then
+    fail "no real ps outside the shim directory"
+  fi
+  # The watched command starts a decoy that leaves the command's process
+  # group and holds 160 MiB, over the 100 MiB bound, while the command lives.
+  cat > "$tmp/decoy-parent.sh" <<'SH'
+perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sleep 30' &
+echo "$!" > "$1"
+sleep 3
+SH
   for refuse in 0 1; do
     : > "$tmp/ps.log"
     : > "$tmp/py.log"
     rm -f "$tmp/rss" "$tmp/decoy.pid"
-    # The watched command starts a decoy that leaves the command's process
-    # group and holds 160 MiB, over the 100 MiB bound, while the command lives.
     rc=0
-    PATH="$shims:$PATH" FM_TEST_PS_REFUSE=$refuse FM_TEST_REAL_PS="$real_ps" \
-      FM_TEST_REAL_PYTHON="$real_python" FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
+    "$ROOT/bin/fm-proc-budget.sh" 200 -- env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
+      FM_TEST_PS_REFUSE="$refuse" FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
+      FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
-      bash -c 'perl -MPOSIX -e "POSIX::setpgid(0, 0); my \$held = q(x) x (160 * 1024 * 1024); sleep 30" & echo $! > "$1"; sleep 3' \
-      _ "$tmp/decoy.pid" > /dev/null 2>&1 || rc=$?
+      bash "$tmp/decoy-parent.sh" "$tmp/decoy.pid" > /dev/null 2>&1 || rc=$?
     decoy_pid=$(cat "$tmp/decoy.pid" 2>/dev/null || true)
     [ -z "$decoy_pid" ] || kill -KILL "$decoy_pid" 2>/dev/null || true
     [ -n "$decoy_pid" ] || fail "the decoy did not start"
     [ "$rc" -eq 0 ] && [ ! -e "$tmp/rss" ] \
       || fail "the watch counted a process outside its command's tree (exit $rc, ps refused=$refuse)"
-    [ -d /proc/self ] && break
     if [ "$refuse" = 0 ]; then
       [ -s "$tmp/ps.log" ] || fail "the watch never sampled through ps"
       while read -r count; do
@@ -1615,6 +1694,7 @@ test_memory_failure_retries_without_external_sources
 test_unbounded_root_over_resident_bound_is_ended_and_retried_narrower
 test_unbounded_root_under_resident_bound_is_untouched
 test_resident_watch_ends_its_command_when_its_owner_dies
+test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_cache_key_wait_preserves_root_retry_budget
 )

@@ -205,10 +205,11 @@ if (($ARGV[0] // '') eq 'gate') {
 }
 
 # Private resident-memory watch. Usage: perl fm-lint-cache.pl rsswatch <limit-kib> <rss-file> -- <command...>
-# Hosts that cannot apply ulimit -v (native macOS) have no other memory bound
-# on a root, so this runs the command in a process group of its own and samples
-# once a second the resident size of that command's process tree within that
-# group, reading only the group's own processes and never the whole host's.
+# fm-lint.sh runs this only on native macOS, which cannot apply ulimit -v and so
+# has no other memory bound on a root. It runs the command in a process group
+# of its own and samples once a second the resident size of that command's
+# process tree within that group, reading only the group's own processes and
+# never the whole host's.
 # Crossing the limit ends the group with KILL, records the peak sampled as
 # max_rss_kib=<KiB> in <rss-file> (the file /usr/bin/time would have written),
 # names the bound on stderr, and exits 98, which fm-lint.sh reports as a memory
@@ -216,8 +217,8 @@ if (($ARGV[0] // '') eq 'gate') {
 # command's own status straight through. A signal to the watch, or the loss of
 # its parent, ends the group within a second (the watch itself sits in a
 # group of its own, out of reach of its owner's group sweep), so no analysis
-# process outlives the lint that started it. A host where no sampler works warns once and runs the command
-# unwatched rather than failing lint.
+# process outlives the lint that started it. Samples that keep failing warn once
+# and sampling goes on each later tick rather than failing lint.
 if (($ARGV[0] // '') eq 'rsswatch') {
     require POSIX;
     require Time::HiRes;
@@ -232,50 +233,29 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # ended the command's group (it notices the lost parent within a tick).
     POSIX::setpgid(0, 0);
     my $ps_works = 1;
-    my $page_kib = -d '/proc/self' ? POSIX::sysconf(POSIX::_SC_PAGESIZE()) / 1024 : 0;
     # Resident KiB of the group leader <pid> and its live descendants in its
     # group, or undef when unreadable.
     my $tree_rss = sub {
         my ($root_pid) = @_;
         my (%parent, %rss);
-        if ($page_kib) {
-            my @queue = ($root_pid);
-            while (defined(my $pid = shift @queue)) {
-                open(my $stat, '<', "/proc/$pid/stat") or next;
-                my $line = <$stat>;
-                close $stat;
-                next unless defined $line && $line =~ /\A[0-9]+ \(.*\) \S ([0-9]+) ([0-9]+) /s && $2 == $root_pid;
-                $parent{$pid} = $1;
-                open(my $statm, '<', "/proc/$pid/statm") or next;
-                my @fields = split ' ', (<$statm> // '');
-                close $statm;
-                $rss{$pid} = $fields[1] * $page_kib if @fields > 1;
-                for my $children (glob "/proc/$pid/task/*/children") {
-                    open(my $list, '<', $children) or next;
-                    push @queue, split ' ', (<$list> // '');
-                    close $list;
+        if ($ps_works) {
+            no warnings 'exec';
+            if (open(my $ps, '-|', 'ps', '-o', 'pid=,ppid=,rss=', '-g', $root_pid)) {
+                while (my $line = <$ps>) {
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
+                    ($parent{$1}, $rss{$1}) = ($2, $3);
                 }
+                close $ps;
             }
-        } else {
-            if ($ps_works) {
-                no warnings 'exec';
-                if (open(my $ps, '-|', 'ps', '-o', 'pid=,ppid=,rss=', '-g', $root_pid)) {
-                    while (my $line = <$ps>) {
-                        next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
-                        ($parent{$1}, $rss{$1}) = ($2, $3);
-                    }
-                    close $ps;
-                }
-                $ps_works = exists $rss{$root_pid};
-            }
-            # A confined worker's sandbox refuses the setuid ps, so the sum then
-            # comes from the libproc reader beside this file.
-            unless ($ps_works) {
-                return undef unless -r $helper && open(my $reader, '-|', 'python3', $helper, 'rss-tree', $root_pid);
-                my $line = <$reader> // '';
-                close $reader;
-                return $line =~ /\A([0-9]+)\n\z/ ? $1 + 0 : undef;
-            }
+            $ps_works = exists $rss{$root_pid};
+        }
+        # A confined worker's sandbox refuses the setuid ps, so the sum then
+        # comes from the libproc reader beside this file.
+        unless ($ps_works) {
+            return undef unless -r $helper && open(my $reader, '-|', 'python3', $helper, 'rss-tree', $root_pid);
+            my $line = <$reader> // '';
+            close $reader;
+            return $line =~ /\A([0-9]+)\n\z/ ? $1 + 0 : undef;
         }
         return undef unless exists $rss{$root_pid};
         my (%children, $total, @queue);
@@ -287,7 +267,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         }
         return $total;
     };
-    my ($child, $caught, $term_at, $over, $unwatched);
+    my ($child, $caught, $term_at, $over, $warned);
     my ($peak, $misses) = (0, 0);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
@@ -307,15 +287,15 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             kill 'TERM', -$child;
         }
         kill 'KILL', -$child if $caught && Time::HiRes::time() - $term_at >= 5;
-        return if $caught || $unwatched || $over;
+        return if $caught || $over;
         my $rss = $tree_rss->($child);
         # A root that exits mid-sample is a zombie no sampler can read, so only
-        # three misses in a row mean the host has no working sampler.
+        # three misses in a row mean the sampler is failing.
         if (!defined $rss) {
             return unless kill 0, $child;
-            return if ++$misses < 3;
-            warn "fm-lint: resident-memory watch unavailable on this host; root runs without the per-root resident bound\n";
-            $unwatched = 1;
+            return if ++$misses < 3 || $warned;
+            warn "fm-lint: resident-memory watch cannot sample this root; the per-root resident bound applies only once a sample succeeds\n";
+            $warned = 1;
             return;
         }
         $misses = 0;
@@ -327,6 +307,7 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         warn sprintf("fm-lint: root exceeded the %d KiB resident-memory bound (FM_LINT_ROOT_RSS_KIB) at %d KiB; ended\n", $limit, $peak);
     };
     $SIG{ALRM} = sub {
+        local ($?, $!);
         return if $busy || !$child;
         $busy = 1;
         $sample->();
