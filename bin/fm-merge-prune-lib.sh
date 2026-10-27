@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # fm-merge-prune-lib.sh - the provable-scratch proofs behind bin/fm-merge-prune.sh.
 #
-# bin/fm-teardown.sh stays the authority. This library is used only when
+# bin/fm-teardown.sh stays the authority. This library is used when
 # teardown refused a merged task's pool copy for a reason that may not be real
 # unlanded work (a squash-merged copy that teardown calls not landed, or a
 # closeout driver's exact-tree refusal; bin/fm-merge-prune.sh names the only
-# refusals that reach it). It follows the criteria of the owner's
+# refusals that reach it), and for the removal of the copy that a successful
+# teardown returns to the pool (remove_returned in bin/fm-merge-prune.sh). It
+# follows the criteria of the owner's
 # treehouse-reap-clean reaper and proves, read live, that the copy holds nothing
 # worth keeping. It never forces, discards or hides anything: any proof it
 # cannot make keeps the copy. A read that fails (the ignored-file listing, the
@@ -406,9 +408,10 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
   fi
   # lsof exits 1 with no output and no message when nothing is open (it also
   # does so when something is, so the exit status alone proves nothing). An
-  # error exit or a message with no pid listed is a probe that failed, which
-  # cannot show that no process holds the copy.
-  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then
+  # error exit or a message is a probe that failed, whether or not it listed
+  # pids: it did not read the whole copy, so it cannot show that no other
+  # process holds it. Only a clean read proves "unused".
+  if [ "$rc" -gt 1 ] || [ -n "$err" ]; then
     fm_mp_verdict transient "process check of $copy failed (exit $rc${err:+: $err})"
     return 1
   fi
@@ -487,12 +490,17 @@ fm_mp_prove_pane_idle() {  # <real-copy> <pane-pid>
 
 # The process tree under <pane-pid> (the pane's shell and every descendant),
 # read into FM_MP_TREE_PIDS and FM_MP_TREE_PARENTS; empty when that process is
-# gone. Returns 1 when the process table cannot be read.
+# gone. Returns 1 when the process table cannot be read, or was read only in
+# part (ps failed after printing rows).
 fm_mp_read_pane_tree() {  # <pane-pid>
-  local tree p n
+  local table tree p n
   FM_MP_TREE_PIDS=()
   FM_MP_TREE_PARENTS=()
-  tree=$(ps -axo pid=,ppid= 2>/dev/null | awk -v root="$1" '
+  # The table is read whole, and a read that failed is not used even if it
+  # printed rows: the row of a live agent may be the one that is missing.
+  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
+  [ -n "$table" ] || return 1
+  tree=$(printf '%s\n' "$table" | awk -v root="$1" '
     { parent[$1] = $2; kids[$2] = kids[$2] " " $1 }
     END {
       if (!(root in parent)) exit 0
@@ -592,14 +600,16 @@ fm_mp_pane_pid() {  # <meta-file>
 # ending it would close the pane. A build, an editor, a test, or a shell running
 # one is not it.
 fm_mp_pane_shell() {  # <pid> <pane-pid> <real-copy>
-  local pid=$1 pane=${2:-} copy=$3 comm cwd
+  local pid=$1 pane=${2:-} copy=$3 comm cwd table
   [ -n "$pane" ] || return 1
   comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
   comm=$(printf '%s' "$comm" | tr -d '[:space:]')
   [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1
   cwd=$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null </dev/null | sed -n 's/^n//p' | sed -n 1p)
   case "$cwd" in "$copy"|"$copy"/*) ;; *) return 1 ;; esac
-  ps -axo pid=,ppid= 2>/dev/null | awk -v p="$pid" -v pane="$pane" '
+  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
+  [ -n "$table" ] || return 1
+  printf '%s\n' "$table" | awk -v p="$pid" -v pane="$pane" '
     { parent[$1] = $2; if ($2 == p) child = 1 }
     END {
       if (child) exit 1

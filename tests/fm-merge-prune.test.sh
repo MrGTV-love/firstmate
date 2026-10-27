@@ -185,6 +185,14 @@ case "$mode" in
     [ "$n" -ge 1 ] || exit 75
     done_ok "$1"
     ;;
+  # Real teardown ends the agent working in the copy before it returns the slot.
+  ok-ends-agents)
+    for pid in $(command -p lsof -a -d cwd +D "$copy" -t 2>/dev/null | sort -u); do kill "$pid" 2>/dev/null; done
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      [ -z "$(command -p lsof -a -d cwd +D "$copy" -t 2>/dev/null)" ] && break
+      sleep 1
+    done
+    rm -f "$FM_STATE_OVERRIDE/$1.status"; done_ok "$1" ;;
   lock) exit 75 ;;
   lease) exit 6 ;;
   timeout) exit 124 ;;
@@ -345,9 +353,16 @@ set_rec() {  # <id> <key> <value>
   sed "s/^$2=.*/$2=$3/" "$STATE/$1.merge-prune" > "$tmp" && mv -f "$tmp" "$STATE/$1.merge-prune"
 }
 
+# Wakes that say a copy stays; a reaped outcome is a wake of its own (reaped_wake_count).
 wake_count() {
   local n
-  n=$(grep -c 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null) || n=0
+  n=$(grep 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null | grep -vc ' reaped ') || n=0
+  printf '%s' "$n"
+}
+
+reaped_wake_count() {
+  local n
+  n=$(grep 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null | grep -c ' reaped ') || n=0
   printf '%s' "$n"
 }
 
@@ -667,12 +682,13 @@ scn_pane_job_keeps_the_copy_before_teardown() {
 # the copy, and teardown runs.
 scn_pane_agent_does_not_block_teardown() {
   make_world
-  printf 'ok\n' > "$W/stub.mode"
+  printf 'ok-ends-agents\n' > "$W/stub.mode"
   use_pane_backend tmux
   start_pane_agent || why "no agent stand-in survives a foreign name on this host" || return 1
   go
   [ "$(stub_calls)" = 1 ] || why "teardown did not run with only the worker's agent in the pane: $(rec_field t1 reason)" || return 1
   [ ! -e "$STATE/t1.merge-prune" ] || why "the record stayed: $(rec_field t1 reason)" || return 1
+  [ ! -e "$COPY" ] || why "the copy teardown returned was not removed" || return 1
   [ "$(wake_count)" = 0 ] || why "the worker's agent raised a wake" || return 1
   return 0
 }
@@ -1238,6 +1254,35 @@ scn_reassigned_slot_is_never_destroyed() {
 
 # Another actor holds the project lock: nothing is stopped or touched, the
 # attempt backs off silently, and a later attempt finishes.
+# The returned copy is removed under the same project lock as the fallback's
+# destroy, because every slot allocation takes it: a busy lock is a silent
+# retry that needs only the prune record, since teardown has already removed the
+# task's record.
+scn_project_lock_busy_backs_off_for_the_returned_copy() {
+  local lock holder
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  lock=$(project_lock_path)
+  sleep 120 &
+  holder=$!
+  WORKER_PIDS+=("$holder")
+  mkdir "$lock"
+  printf '%s\n' "$holder" > "$lock/pid"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the returned copy was touched while another actor held the project lock" || return 1
+  [ ! -e "$STATE/t1.meta" ] || why "the stand-in teardown did not finish the task record" || return 1
+  [ "$(rec_field t1 state)" = pending ] && [ "$(rec_field t1 returned)" = 1 ] && [ "$(wake_count)" = 0 ] || why "a busy project lock was not a silent retry: $(cat "$STATE/t1.merge-prune")" || return 1
+  kill "$holder" 2>/dev/null || true
+  rm -rf "$lock"
+  set_rec t1 next_at 0
+  prune run t1 >/dev/null 2>&1
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the retry after the lock cleared did not remove the returned copy: $(rec_field t1 reason)" || return 1
+  [ ! -e "$STATE/t1.merge-prune" ] || why "the record outlived the removal: $(cat "$STATE/t1.merge-prune")" || return 1
+  [ "$(reaped_wake_count)" = 1 ] || why "want one reaped outcome, got $(reaped_wake_count)" || return 1
+  [ "$(stub_calls)" = 1 ] || why "the retry asked teardown again" || return 1
+  return 0
+}
+
 scn_project_lock_busy_backs_off() {
   local lock holder
   make_world
@@ -1341,6 +1386,49 @@ scn_relaunched_agent_with_an_old_exit_marker_is_kept() {
   [ ! -s "$W/control.log" ] || why "the live agent was stopped: $(cat "$W/control.log")" || return 1
   [ "$(wake_count)" = 0 ] || why "the back-off raised a wake" || return 1
   rec_field t1 reason | grep -q 'automatic reap ineligible' || why "the prune did not back off as ineligible: $(rec_field t1 reason)" || return 1
+  return 0
+}
+
+# A process table that is only partly read proves nothing. `ps` prints the pane's
+# own row and then fails: the live agent's row may be the one that is missing,
+# so the pane does not show "no agent", whether the exit marker is old (the
+# reap admission) or a job runs in the pane (the check before teardown).
+partial_ps_stub() {  # <pane-pid>: the process table, cut to the pane's own row, then an error
+  local real_ps
+  real_ps=$(command -v ps)
+  cat > "$W/bin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-axo pid=,ppid="*) $real_ps -axo pid=,ppid= | awk -v p=$1 '\$1 == p'; exit 1 ;;
+  *) exec $real_ps "\$@" ;;
+esac
+SH
+  chmod +x "$W/bin/ps"
+}
+
+scn_partial_process_table_proves_no_agent_gone() {
+  make_world
+  rm -f "$STATE/t1.busy-state" "$STATE/t1.busy-gen"
+  printf 'gen=-\n' > "$STATE/t1.control-exit"
+  start_pane_agent || why "the fixture could not start the agent in the pane" || return 1
+  partial_ps_stub "$(cat "$W/pane.pid")"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a partly read process table admitted the removal of a copy with a live agent" || return 1
+  [ ! -s "$W/control.log" ] || why "the live agent was stopped on a partial process table: $(cat "$W/control.log")" || return 1
+  rec_field t1 reason | grep -Eq 'automatic reap ineligible|terminal pane failed' || why "the prune did not back off on the failed read: $(rec_field t1 reason)" || return 1
+  # The reap admission's own proof, asked directly: the pane's shell row alone is not "no agent".
+  if PATH="$W/bin:$PATH" bash -c '. "$1/fm-merge-prune-lib.sh"; fm_mp_pane_pid() { printf %s "$2"; }; fm_mp_pane_agent_gone "$3"' _ "$BIN_DIR" "$(cat "$W/pane.pid")" "$STATE/t1.meta" 2>/dev/null; then
+    why "the reap admission took a partly read process table for an agent that is gone" || return 1
+  fi
+  make_world
+  printf 'ok\n' > "$W/stub.mode"
+  use_pane_backend tmux
+  start_pane "$COPY" sleep 300
+  partial_ps_stub "$(cat "$W/pane.pid")"
+  go
+  [ "$(stub_calls)" = 0 ] || why "teardown ran on a partly read process table of the task's pane" || return 1
+  [ -e "$COPY" ] && [ -f "$STATE/t1.meta" ] || why "the copy or the task record did not stay" || return 1
+  [ "$(rec_field t1 state)" = pending ] && grep -q 'terminal pane failed' "$STATE/t1.merge-prune" || why "the failed pane read was not a retry: $(cat "$STATE/t1.merge-prune")" || return 1
   return 0
 }
 
@@ -1688,6 +1776,35 @@ scn_failed_process_probe_keeps_the_copy() {
   return 0
 }
 
+# A probe that lists some processes and then fails has not read the whole copy: a
+# live process in the part it could not read is not excluded.
+scn_partial_process_probe_keeps_the_copy() {
+  local real_ps pid
+  make_world
+  real_ps=$(command -v ps)
+  start_inside "$W" ""
+  pid=${WORKER_PIDS[$((${#WORKER_PIDS[@]} - 1))]}
+  cat > "$W/bin/lsof" <<SH
+#!/usr/bin/env bash
+printf '%s\n' $pid
+echo "lsof: can't stat protected subtree: Permission denied" >&2
+exit 2
+SH
+  cat > "$W/bin/ps" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *"-o comm= -p $pid") echo /System/Library/Frameworks/CoreServices.framework/Support/mdworker_shared ;;
+  *) exec $real_ps "\$@" ;;
+esac
+SH
+  chmod +x "$W/bin/lsof" "$W/bin/ps"
+  go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a probe that failed after listing a safe process proved the copy unused" || return 1
+  [ "$(rec_field t1 state)" = pending ] || why "the partial probe was not a retry: $(cat "$STATE/t1.merge-prune")" || return 1
+  grep -q 'process check' "$STATE/t1.merge-prune" || why "the record does not say the process check failed" || return 1
+  return 0
+}
+
 # A slot claim that names this task id under another Firstmate home belongs to
 # that home's task, not this one.
 scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept() {
@@ -1807,8 +1924,9 @@ test_merge_cleanup_runs_teardown_unforced() {
   [ "$(cat "$W/stub.log")" = "args=t1|admission=1|prune=1" ] || fail "teardown was not asked plainly: $(cat "$W/stub.log")"
   [ ! -e "$STATE/t1.merge-prune" ] || fail "the record outlived a completed teardown"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped"
-  [ "$(destroy_calls)" = 0 ] || fail "a completed teardown needed no fallback"
-  pass "a verified merge asks teardown once, never forced, and logs reaped"
+  [ "$(stub_calls)" = 1 ] || fail "the removal of the returned copy ran teardown again"
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || fail "the copy the completed teardown left was not removed with one destroy"
+  pass "a verified merge asks teardown once, never forced, removes the copy teardown left, and logs reaped"
 }
 
 test_transient_refusals_back_off_silently_then_succeed() {
@@ -1945,6 +2063,8 @@ test_fallback_keeps_a_linked_slot_with_its_own_unpushed_commit() { assert_scenar
 test_fallback_keeps_a_linked_slot_with_a_stash_of_its_own_branch() { assert_scenario scn_linked_slot_own_branch_stash_is_kept "in a linked worktree slot, a stash made on the copy's branch keeps it"; }
 test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit() { assert_scenario scn_clone_inside_a_scratch_directory_keeps_the_slot "an independent clone under .venv or node_modules with a commit on no remote keeps the whole slot with one wake"; }
 test_fallback_keeps_unique_data_under_claude_and_opencode() { assert_scenario scn_unique_data_under_claude_or_opencode_is_kept "ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake"; }
+test_fallback_keeps_the_copy_when_the_process_probe_fails_after_listing() { assert_scenario scn_partial_process_probe_keeps_the_copy "a process probe that lists a process and then fails keeps the copy and retries"; }
+test_partial_process_table_proves_no_agent_gone() { assert_scenario scn_partial_process_table_proves_no_agent_gone "a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown"; }
 test_fallback_keeps_the_copy_when_the_process_probe_fails() { assert_scenario scn_failed_process_probe_keeps_the_copy "a process probe that exits with an error, or prints a message, keeps the copy and retries; a silent exit 1 with nothing open does not"; }
 test_fallback_keeps_a_slot_claimed_by_the_same_task_id_of_another_home() { assert_scenario scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept "a slot claim that names this task id under another home, or no home, is never destroyed"; }
 test_failed_wake_append_is_not_recorded_as_sent() { assert_scenario scn_failed_wake_append_is_not_recorded_as_sent "a wake that could not be appended is not recorded as sent, and the repaired queue gets exactly one"; }
@@ -1970,6 +2090,7 @@ test_fallback_never_holds_the_project_lock_on_a_hung_remote() { assert_scenario 
 test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_keeps_the_copy "an idle shell that is not the task's pane shell keeps the copy with exactly one wake"; }
 test_fallback_exempts_nothing_when_the_pane_is_unreadable() { assert_scenario scn_unreadable_pane_exempts_nothing "a pane that cannot be read exempts no shell"; }
 test_fallback_never_destroys_a_reassigned_slot() { assert_scenario scn_reassigned_slot_is_never_destroyed "a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed"; }
+test_returned_copy_removal_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off_for_the_returned_copy "removing the copy teardown returned takes the project lock; a busy lock is a silent retry from the prune record alone, then the copy is removed and reported"; }
 test_fallback_backs_off_while_the_project_lock_is_held() { assert_scenario scn_project_lock_busy_backs_off "a project lock held by another actor stops nothing, backs off silently, and the retry finishes"; }
 test_fallback_removes_a_copy_whose_preserve_paths_are_empty() { assert_scenario scn_empty_preserve_paths_do_not_keep_the_copy "an empty preserve-list path, in the copy or a nested copy, has nothing to checksum and does not keep the copy"; }
 
@@ -2021,7 +2142,12 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-stash-check $lib '  if [ "$stashes" != 0 ]; then' '  if false; then' scn_stash_is_kept "stash proof"
   expect_caught scratch-dirs-not-searched $lib '    -path "$copy/.git" -prune -o' '    \( -path "$copy/.git" -o -name node_modules -o -name .venv -o -name venv -o -name __pycache__ \) -prune -o' scn_clone_inside_a_scratch_directory_keeps_the_slot "search of dependency and environment trees"
   expect_caught claude-wildcard-is-scratch $lib '    .claude/settings.local.json|.opencode/plugins/fm-busy-state.js) return 0 ;;' '    .claude/*|.opencode/*) return 0 ;;' scn_unique_data_under_claude_or_opencode_is_kept "unique data under .claude or .opencode"
-  expect_caught failed-probe-is-all-clear $lib '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' '  if false; then' scn_failed_process_probe_keeps_the_copy "failed process probe"
+  expect_caught failed-probe-is-all-clear $lib '  if [ "$rc" -gt 1 ] || [ -n "$err" ]; then' '  if false; then' scn_failed_process_probe_keeps_the_copy "failed process probe"
+  expect_caught partial-probe-is-all-clear $lib '  if [ "$rc" -gt 1 ] || [ -n "$err" ]; then' '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' scn_partial_process_probe_keeps_the_copy "a probe that failed after listing a process"
+  expect_caught partial-process-table-is-accepted $lib '  table=$(ps -axo pid=,ppid= 2>/dev/null) || return 1
+  [ -n "$table" ] || return 1
+  tree=' '  table=$(ps -axo pid=,ppid= 2>/dev/null) || true
+  tree=' scn_partial_process_table_proves_no_agent_gone "a partly read process table"
   expect_caught claim-of-another-home-passes fm-merge-prune.sh '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then' '  if false; then' scn_slot_claimed_by_the_same_task_id_of_another_home_is_kept "home check of the slot claim"
   expect_caught failed-wake-is-sent fm-merge-prune.sh '  if fm_wake_append check "merge-prune:$ID" "$1"; then' '  fm_wake_append check "merge-prune:$ID" "$1" || true
   if true; then' scn_failed_wake_append_is_not_recorded_as_sent "recording a wake as sent only when appended"
@@ -2103,6 +2229,7 @@ test_unsafe_mutations_are_caught() {
   [ -n "$pane" ] || return 0' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "failing closed on a pane that cannot be read"
   expect_caught no-slot-owner-check $orch '    mine|absent) ;;' '    mine|absent|other) ;;' scn_reassigned_slot_is_never_destroyed "slot-owner re-read"
   expect_caught no-project-lock $orch '  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?' '  :' scn_project_lock_busy_backs_off "project lock"
+  expect_caught no-project-lock-for-the-returned-copy $orch '  if ! fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1; then' '  if false; then' scn_project_lock_busy_backs_off_for_the_returned_copy "project lock for the returned copy"
   expect_caught wake-every-time $orch '  [ "$R_WAKE" = 0 ] || return 0' '  :' scn_changed_file_is_kept "one-wake rule"
   pass "mutation proof (unsafe direction): breaking any safety proof makes its keep case fail"
 }
@@ -2142,7 +2269,7 @@ test_over_strict_mutations_are_caught() {
   fi
 ' '' scn_pr_head_alone_proves_a_commit_the_default_branch_lacks "merged-PR-head landing rule"
   expect_caught landed-proof-needs-the-default-branch $lib '    && [ "${merged%%$'"'"'\n'"'"'*}" = "$tree" ]; then' '    && false; then' scn_squash_merged_copy_after_the_default_branch_moved_on "default-branch content landing rule"
-  expect_caught probe-error-on-silent-exit-1 $lib '  if [ -z "$out" ] && { [ "$rc" -gt 1 ] || [ -n "$err" ]; }; then' '  if [ -z "$out" ] && [ "$rc" -gt 0 ]; then' scn_failed_process_probe_keeps_the_copy "silent exit 1 means nothing is open"
+  expect_caught probe-error-on-silent-exit-1 $lib '  if [ "$rc" -gt 1 ] || [ -n "$err" ]; then' '  if [ "$rc" -gt 0 ] || [ -n "$err" ]; then' scn_failed_process_probe_keeps_the_copy "silent exit 1 means nothing is open"
   expect_caught every-claim-is-another-home fm-merge-prune.sh '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] && ! same_home "$FM_TREEHOUSE_SLOT_OWNER_HOME"; then' '  if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ]; then' scn_scratch_copy_is_removed "own-home slot claim"
   expect_caught clone-under-claude-worktrees-kept $lib '      if [ -e "$copy/$rel/.git" ]; then' '      if false; then' scn_unique_data_under_claude_or_opencode_is_kept "clone under .claude/worktrees"
   expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" "$1" "$(proof_scope "$n" "$project")" || return 1' '    false || return 1' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
@@ -2177,6 +2304,7 @@ case "${1:-}" in
   destroy)
     [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ] || { echo "stub treehouse: unexpected arguments: $*" >&2; exit 9; }
     case "$2" in "$TREEHOUSE_ROOT"/*/*/*) ;; *) echo "stub treehouse: outside the fake pool" >&2; exit 3 ;; esac
+    [ ! -s "${TH_FAIL:-/dev/null}" ] || { echo "stub treehouse: destroy refused" >&2; exit 4; }
     "$(dirname "$0")/th-gate" "$2" || exit 1
     "$(dirname "$0")/th-remove" "$2"; exit 0 ;;
 esac
@@ -2233,7 +2361,7 @@ SH
 prune_real() {
   HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
     FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE="$W/code-root" NM_HOME="$W/nm" \
-    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" FM_MERGE_PRUNE_EXIT_WAIT="${FM_MERGE_PRUNE_EXIT_WAIT:-0}" \
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" TH_FAIL="$W/th.fail" FM_MERGE_PRUNE_EXIT_WAIT="${FM_MERGE_PRUNE_EXIT_WAIT:-0}" \
     FM_TEARDOWN_GUARD_DONE=1 ROOT="$ROOT" STUB_LOG="$W/stub.log" FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-real" REFUSE_FLAG="$W/refuse" \
     FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
@@ -2241,11 +2369,7 @@ prune_real() {
     "$BIN_DIR/fm-merge-prune.sh" "$@"
 }
 
-wake_count_real() {
-  local n
-  n=$(grep -c 'merge-prune:t1' "$STATE/.wake-queue" 2>/dev/null) || n=0
-  printf '%s' "$n"
-}
+wake_count_real() { wake_count; }
 
 # Nothing is forced: teardown is only ever asked for the task by name, and the
 # fallback's treehouse calls never carry a force or an include-unlanded flag.
@@ -2266,25 +2390,29 @@ assert_not_destroyed() {  # <label>
   fi
 }
 
-# A pool slot that teardown returned stays in the pool, reset: clean, and no
-# longer on the task's branch.
-assert_slot_returned() {
-  [ -e "$COPY" ] || fail "the returned slot vanished from the pool"
-  [ -z "$(git -C "$COPY" status --porcelain --untracked-files=all)" ] || fail "the returned slot is not clean: $(git -C "$COPY" status --porcelain --untracked-files=all)"
-  ! git -C "$COPY" symbolic-ref -q HEAD >/dev/null || fail "the returned slot is still on a branch"
+# Real teardown returns the slot to the pool, reset in place, and the copy is
+# still on disk; the prune then removes it with the reaper's call. The copy is
+# gone, teardown returned the slot first, and the removal was never forced.
+assert_copy_removed() {
+  [ ! -e "$COPY" ] || fail "the returned copy is still on disk: $COPY"
+  grep -q '^return ' "$W/th.log" || fail "teardown did not return the slot through treehouse"
+  grep -q "^destroy .* --include-leased --yes\$" "$W/th.log" || fail "the returned copy was not removed with the reaper's call: $(cat "$W/th.log")"
+  [ "$(destroy_calls)" = 1 ] || fail "want exactly one removal, got $(destroy_calls)"
 }
 
 test_e2e_merge_prunes_the_copy_with_the_real_teardown() {
   make_e2e_world
   prune_real arm t1 --run || fail "arm --run failed"
   fm_test_wait_until 60 grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
-  assert_slot_returned
+  [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
+  assert_copy_removed
+  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there: real teardown did not complete"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
   grep -q '^return ' "$W/th.log" || fail "teardown did not return the slot through treehouse"
   assert_nothing_forced "e2e merge"
-  pass "end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, and the log says reaped"
+  pass "end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, the copy is gone, and the log and one wake say reaped"
 }
 
 test_e2e_transient_contention_retries_then_succeeds() {
@@ -2311,10 +2439,39 @@ test_e2e_transient_contention_retries_then_succeeds() {
   set_rec t1 next_at 0
   prune_real run t1 >/dev/null 2>&1
   [ ! -e "$STATE/t1.meta" ] && [ ! -e "$STATE/t1.merge-prune" ] || fail "the retry after the contention cleared did not reap: $(cat "$DATA/t1/merge-prune.log")"
-  assert_slot_returned
+  [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
+  assert_copy_removed
+  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   grep -q 'retry in' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not show the retry and then reaped"
   pass "end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps"
+}
+
+# The slot teardown returned cannot be removed (the pool refuses): the copy and
+# the prune record stay, the one wake names the copy, and no force is tried. The
+# task record is already gone, so the retry that follows the cleared refusal
+# removes the copy from the prune record alone and reports the outcome.
+test_e2e_removal_refused_after_teardown_keeps_the_record_and_wakes_once() {
+  make_e2e_world
+  printf 'refuse\n' > "$W/th.fail"
+  prune_real arm t1
+  prune_real run t1 --now >/dev/null 2>&1
+  [ ! -e "$STATE/t1.meta" ] || fail "real teardown did not complete"
+  [ -e "$COPY" ] || fail "the copy vanished although the pool refused its removal"
+  [ -e "$STATE/t1.merge-prune" ] || fail "the prune record was cleared while the copy is still on disk"
+  [ "$(rec_field t1 state)" = retained ] || fail "the refused removal is not retained: $(cat "$STATE/t1.merge-prune")"
+  [ "$(wake_count_real)" = 1 ] || fail "want exactly one wake for the refused removal, got $(wake_count_real)"
+  [ "$(reaped_wake_count)" = 0 ] || fail "a copy that stays was reported reaped"
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'treehouse destroy refused' || fail "the wake does not name the copy and the refusal: $(cat "$STATE/.wake-queue")"
+  assert_nothing_forced "e2e refused removal"
+  : > "$W/th.fail"
+  set_rec t1 next_at 0
+  prune_real run t1 >/dev/null 2>&1
+  [ ! -e "$COPY" ] || fail "the retry did not remove the returned copy"
+  [ ! -e "$STATE/t1.merge-prune" ] || fail "the prune record outlived the removal"
+  [ "$(wake_count_real)" = 1 ] && [ "$(reaped_wake_count)" = 1 ] || fail "want the one kept wake and one reaped outcome, got $(wake_count_real) and $(reaped_wake_count)"
+  assert_nothing_forced "e2e refused removal, retried"
+  pass "end to end: a refused removal of the returned copy keeps the copy and the prune record with one wake, and the retry removes it and reports reaped"
 }
 
 # A worker stopped with `fm-control.sh exit` before its PR merged: its busy
@@ -2333,7 +2490,9 @@ test_e2e_worker_exited_before_the_merge_is_pruned() {
   prune_real run t1 --now >/dev/null 2>&1
   [ ! -e "$STATE/t1.meta" ] || fail "a worker stopped before the merge kept its task: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null) $(cat "$STATE/t1.merge-prune" 2>/dev/null)"
   grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the log does not say reaped: $(cat "$DATA/t1/merge-prune.log")"
-  assert_slot_returned
+  [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
+  assert_copy_removed
+  [ "$(reaped_wake_count)" = 1 ] || fail "want exactly one reaped outcome where Main sees it, got $(reaped_wake_count): $(cat "$STATE/.wake-queue" 2>/dev/null)"
   [ "$(wake_count_real)" = 0 ] || fail "a clean prune raised a wake"
   assert_nothing_forced "e2e exited before the merge"
   pass "end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only its treehouse get and idle shell, is pruned through the real teardown with no human step"
@@ -2519,12 +2678,16 @@ ALL_TESTS=(
   test_fallback_keeps_a_clone_inside_a_scratch_directory_with_an_unpushed_commit
   test_fallback_keeps_unique_data_under_claude_and_opencode
   test_fallback_keeps_the_copy_when_the_process_probe_fails
+  test_fallback_keeps_the_copy_when_the_process_probe_fails_after_listing
+  test_partial_process_table_proves_no_agent_gone
   test_fallback_keeps_a_slot_claimed_by_the_same_task_id_of_another_home
   test_failed_wake_append_is_not_recorded_as_sent
   test_fallback_backs_off_while_the_project_lock_is_held
+  test_returned_copy_removal_backs_off_while_the_project_lock_is_held
   test_fallback_removes_a_copy_whose_preserve_paths_are_empty
   test_e2e_merge_prunes_the_copy_with_the_real_teardown
   test_e2e_transient_contention_retries_then_succeeds
+  test_e2e_removal_refused_after_teardown_keeps_the_record_and_wakes_once
   test_e2e_worker_exited_before_the_merge_is_pruned
   test_e2e_squash_merged_copy_with_ignored_files_is_reaped_by_the_fallback
   test_e2e_pushed_follow_up_commit_after_the_merge_keeps_the_copy
