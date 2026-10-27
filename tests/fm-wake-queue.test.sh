@@ -4035,7 +4035,7 @@ test_secondmate_liveness_tick_cadence_gates_the_probe() {
 }
 
 test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
-  local dir state pid ledger now
+  local dir state pid ledger now i
   dir=$(make_secondmate_liveness_case liveness-bound)
   state="$dir/state"
   ledger="$state/.secondmate-relaunch-sm1"
@@ -4072,7 +4072,13 @@ test_secondmate_liveness_tick_attempt_bound_parks_then_rearm_on_alive() {
   drain_liveness_wakes "$dir"
   rm -f "$state/.secondmate-liveness-tick"
   run_liveness_leg "$dir" rearm FM_FAKE_TMUX_CURRENT_COMMAND=claude; pid=$LIVENESS_PID
-  sleep 4
+  i=0
+  while [ "$i" -lt 300 ] && is_live_non_zombie "$pid" \
+    && { [ -e "$state/.secondmate-relaunch-bound-sm1" ] \
+      || [ "$(awk -F '\t' '$2 == "rearmed"' "$ledger" | wc -l | tr -d ' ')" -lt 1 ]; }; do
+    sleep 0.1
+    i=$((i + 1))
+  done
   is_live_non_zombie "$pid" \
     || fail "the watcher exited against a live rearmed mate: $(cat "$dir/watch-rearm.out" "$dir/watch-rearm.err")"
   kill_liveness_leg "$pid"
