@@ -467,46 +467,45 @@ case('darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_p
 
 def default_run_root_native_failure():
     import io
+    import resource
     import signal
     from unittest.mock import patch
 
     home, env = fixture('default-run-root-native-failure')
     env['FM_DURATION_NO_PROGRESS_SECS'] = '1'
     roots = []
-    busy_cpu = [0.0]
     def proc_table(pid):
         roots.append(pid)
         return None
-    def ps_table():
-        # A silent root whose only CPU is a busy child's, as Darwin ps reports it.
-        return {roots[-1]: (1, 0.0, ('root-start',), False),
-                999999: (roots[-1], 0.0, ('child-start',), False)}
     def native(pid):
-        if pid == roots[-1]:
-            return None
-        busy_cpu[0] += 1.0
-        return busy_cpu[0]
+        return None if pid == roots[-1] else 0.0
+    # A silent root whose child spends two CPU seconds without output, then exits 3.
+    child = 'import time\nwhile time.process_time() < 2:\n    pass\n'
+    command = f'import subprocess, sys; subprocess.run([sys.executable, "-c", {child!r}]); sys.exit(3)'
     handlers = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
     errors = io.TextIOWrapper(io.BytesIO(), write_through=True)
+    before = resource.getrusage(resource.RUSAGE_CHILDREN)
     try:
         with patch.dict(os.environ, env, clear=True):
             spec = importlib.util.spec_from_file_location('default_run_duration', home / 'bin/fm-duration.py')
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             with patch.object(module, 'proc_table', side_effect=proc_table), \
-                 patch.object(module, 'ps_table', side_effect=ps_table), \
                  patch.object(module, 'darwin_cpu_reader', return_value=native), \
                  patch.object(sys, 'platform', 'darwin'), \
                  patch.object(sys, 'stderr', errors), \
                  patch.object(sys, 'argv', ['fm-duration.py', 'run', 'root-blind.run', '--',
-                                            sys.executable, '-c', 'import time; time.sleep(3)']):
+                                            sys.executable, '-c', command]):
                 code = module.main()
     finally:
         for sig, handler in handlers.items():
             signal.signal(sig, handler)
+    after = resource.getrusage(resource.RUSAGE_CHILDREN)
+    child_cpu = (after.ru_utime + after.ru_stime) - (before.ru_utime + before.ru_stime)
     stderr = errors.buffer.getvalue().decode()
-    require(code == 0 and 'no_progress:' not in stderr and stderr.count('cpu_telemetry_unavailable:') == 1,
-            f'default run mode stopped a busy child after failed root reads: {code} {stderr}')
+    require(code == 3 and 'no_progress:' not in stderr and stderr.count('cpu_telemetry_unavailable:') == 1,
+            f'default run mode stopped a busy silent child after failed root reads: {code} {stderr}')
+    require(child_cpu > 1, f'the silent child did not outlast the no-progress interval in CPU: {child_cpu:.2f}s')
 case('default_run_mode_treats_failed_native_root_reads_as_blind_and_keeps_busy_silent_work', default_run_root_native_failure)
 
 def unavailable_ctypes():

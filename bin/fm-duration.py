@@ -98,9 +98,13 @@ command only at a true extreme: no output and no process-tree CPU progress for
 call whose client waits quietly on the shared daemon, is exempt from the
 no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
 forwarded signal or the absolute stop began still follows the cleanup rule
-below for every key. Polling cadence is observation, not a failure
-deadline, and neither an idle or failed sample nor an elapsed read wait kills
-work. Completion of the command's leader, a forwarded signal, or one of those
+below for every key. Every key also keeps only the 6 hour absolute stop while
+no complete process-tree CPU sample exists (a failed native root read, ps and
+fm-proc-info.py both unavailable, or native imports that cannot load): run
+then makes no no-progress decision and prints one cpu_telemetry_unavailable
+line, because a missing sample is neither progress nor a stall. Polling
+cadence is observation, not a failure deadline, and neither an idle or failed
+sample nor an elapsed read wait kills work. Completion of the command's leader, a forwarded signal, or one of those
 two extremes ends the run; descendants that outlive the leader and still hold
 its output streams are neither awaited nor counted as live work.
 An expiry or the first forwarded signal sends SIGTERM to the process group and
