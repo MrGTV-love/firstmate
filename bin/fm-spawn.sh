@@ -6186,6 +6186,15 @@ if [ "$KIND" != secondmate ] && { [ "$RELAUNCH" -eq 0 ] || [ "$SLOT_FRESH_BASE" 
     exit 1
   fi
 fi
+# Freshness can introduce the project owner after the initial classification.
+# Keep early governance sticky (including when freshness removes its owner),
+# but require the same explicit scope and preparation for a newly governed copy.
+if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$PROJ_ABS" "$WT"; then
+  SLOT_GOVERNED=1
+  fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || spawn_slot_refused
+  BRANCH=${BRANCH:-fm/$ID}
+  fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+fi
 spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
   local project=$1 report=$2 script result rc
   shift 2
