@@ -190,6 +190,9 @@ if [ -f "$SECONDMATES_MD" ]; then
     id=$SECONDMATE_REGISTRY_ID
     home=$SECONDMATE_REGISTRY_HOME
     if [ "$SECONDMATE_REGISTRY_REMOTE" -eq 1 ]; then
+      # The host entrypoint replays the job's stderr after its stdout, so a
+      # merged stream would put any host warning after the result line. Judge
+      # stdout alone and relay stderr as diagnostics.
       remote_err_file=$(mktemp "${TMPDIR:-/tmp}/fm-update-remote.XXXXXX")
       remote_rc=0
       remote_out=$("$SCRIPT_DIR/fm-on.sh" "$id" fm-remote-secondmate-control.sh update "$id" < /dev/null 2>"$remote_err_file") || remote_rc=$?
