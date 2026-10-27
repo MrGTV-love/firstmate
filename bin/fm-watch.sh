@@ -3642,7 +3642,9 @@ signal_phase() {
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
   # costs a full firstmate turn each. The re-scan also picks up a newer
-  # signature for an already-pending file (last write wins below).
+  # signature for an already-pending file. The merge below keeps one row per
+  # file and the second scan's newer signature wins
+  # (test_signal_rescan_deduplicates_pending).
   # The linger never runs while this watcher holds the wake-queue lock: every
   # queue writer and drain would wait out the grace, so that flush only
   # re-scans the race window (procevent_surface_queued flushes before locking;
