@@ -33,6 +33,7 @@
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it.
 set -u
+FM_PROC_BUDGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 fm_proc_budget_error() {
   echo "fm-proc-budget: $*" >&2
@@ -48,7 +49,16 @@ fm_proc_budget_count() {
   set -o pipefail
   case "$(uname -s)" in
     Linux) count=$(ps -L -U "$uid" -o lwp= | wc -l) || return 1 ;;
-    *) count=$(ps -U "$uid" -o pid= | wc -l) || return 1 ;;
+    # A confined worker's sandbox refuses to run setuid ps (exit 126), so the
+    # count then comes from bin/fm-proc-info.py instead.
+    *)
+      count=$(ps -U "$uid" -o pid= 2>/dev/null)
+      case $? in
+        0) [ -n "$count" ] || return 1; count=$(printf '%s\n' "$count" | wc -l) || return 1 ;;
+        126) count=$(python3 "$FM_PROC_BUDGET_DIR/fm-proc-info.py" count-uid "$uid") || return 1 ;;
+        *) return 1 ;;
+      esac
+      ;;
   esac
   count=$(printf '%s' "$count" | tr -d '[:space:]')
   case "$count" in

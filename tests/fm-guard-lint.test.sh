@@ -192,6 +192,22 @@ printf '%s\n' "$out" | grep -q 'active=2 retired=1 beyond_audit=1 excluded=0 unr
   || fail "inventory did not exclude post-audit guards: $out"
 pass "post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory"
 
+# --- post-audit active guards ------------------------------------------------
+POSTAUDIT=$(fixture postaudit)
+mutate "$POSTAUDIT" '.guards += [(.guards[0] | .id = "new-guard" | .invariant = "a post-audit invariant")]'
+out=$(run_lint "$POSTAUDIT" --counts) && fail "an unaccounted post-audit guard must fail the count"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 inventory' || fail "expected the inventory violation, got: $out"
+pass "a guard added after the audit fails the count until it is accounted for"
+mutate "$POSTAUDIT" '.beyond_audit_active = ["new-guard"]'
+out=$(run_lint "$POSTAUDIT" --counts) || fail "an accounted post-audit guard must keep the count clean: $out"
+printf '%s\n' "$out" | grep -q 'active=2 retired=0 beyond_audit=0 excluded=0 unregistered=0 audited=1 beyond_audit_active=1' \
+  || fail "the post-audit guard must be counted outside the audit: $out"
+pass "a post-audit guard in beyond_audit_active keeps the audited size unchanged"
+mutate "$POSTAUDIT" '.beyond_audit_active += ["unknown-guard"] | .audited = 0'
+out=$(run_lint "$POSTAUDIT" --counts) && fail "a post-audit entry with no registered guard must fail"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 unknown-guard' || fail "expected the unknown-guard violation, got: $out"
+pass "a post-audit entry must name a registered guard"
+
 # --- ratchet ----------------------------------------------------------------
 ALLOW=$(fixture allowlist)
 mutate "$ALLOW" '.guards[0].remedy = "a pointer with no command"'

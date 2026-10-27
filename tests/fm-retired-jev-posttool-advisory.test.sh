@@ -59,7 +59,8 @@ run_hook "$prompt_payload"
 if compgen -G "$TASK_DATA/jev-guard-doorbells-*.jsonl" >/dev/null; then
   fail "retired read-screening branch still persisted doorbell hashes"
 fi
-[ ! -e "$HOME_DIR/state/jev-guard.jsonl" ] || fail "retired post-tool payload reached the guard audit"
+audit_rows=$(node "$FM_GUARD_AUDIT_READER" "$HOME_DIR/state") || fail "cannot read guard audit history"
+[ -z "$audit_rows" ] || fail "retired post-tool payload reached the guard audit"
 pass "retired PostToolUse shell/read results and UserPromptSubmit capture emit nothing, exit 0 and start no guard service"
 
 # --- block case: the pre-tool deny is untouched -----------------------------

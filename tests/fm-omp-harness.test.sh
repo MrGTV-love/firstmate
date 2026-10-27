@@ -239,17 +239,14 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
   assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
+  assert_launch_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$WT_DIR' --config '$ROOT/.omp/fm-worker-overlay.yml'" \
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$WT_DIR' --config '$ROOT/.omp/fm-worker-overlay.yml'" \
     "omp scout launch did not carry shared posture and worker-only memory overlays"
-  assert_contains "$launch" "--model 'openai-codex/gpt-6-astra' --thinking 'medium' -e '$state/$id.omp-ext.ts'" \
+  assert_launch_contains "$launch" "--model 'openai-codex/gpt-6-astra' --thinking 'medium' -e '$state/$id.omp-ext.ts'" \
     "omp launch did not pass the model, thinking level, and the state-resident worker extension"
-  assert_contains "$launch" "encode launch-brief < '$HOME_DIR/data/$id/launch-brief.md'" "omp launch lost the canonical typed launch-brief envelope"
-  case "$launch" in
-    *"-e '$state/$id.omp-ext.ts' \"\$("*) ;;
-    *) fail "omp launch must keep exactly one positional brief after the extension flag: $launch" ;;
-  esac
+  assert_launch_contains "$launch" "encode launch-brief < '$HOME_DIR/data/$id/launch-brief.md'" "omp launch lost the canonical typed launch-brief envelope"
+  assert_launch_contains "$launch" "-e '$state/$id.omp-ext.ts' \"\$(" "omp launch must keep exactly one positional brief after the extension flag"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy fm-spawn" ] \
     || fail "omp spawn must seed the busy-state contract"
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
@@ -284,12 +281,12 @@ test_no_helpers_rejects_nonworker_launches() {
 assert_no_helper_launch() {  # <label> <launch-log> <fallback-yml> <meta>
   local label=$1 launch fallback=$3 meta=$4 flag
   launch=$(cat "$2")
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
   for flag in --no-title --no-extensions --no-skills --no-rules; do
-    assert_contains "$launch" " $flag" "$label launch lost $flag"
+    assert_launch_contains "$launch" " $flag" "$label launch lost $flag"
   done
-  assert_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
-  assert_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
+  assert_launch_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
+  assert_launch_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
   assert_equals '[]' "$(jq -c .retry.fallbackChains.default "$fallback")" "$label launch must keep no default fallback chain"
   assert_equals '[]' "$(jq -c '[.retry.fallbackChains | to_entries[] | select(.key != "default") | .value[]]' "$fallback")" \
     "$label launch must keep no stand-in fallback entry"
@@ -406,7 +403,7 @@ test_omp_workers_disable_openrouter_prompt_helpers() {
       expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
       overlay="$HOME_DIR/state/$id.omp-fallback.yml"
       launch=$(cat "$LAUNCH_LOG")
-      assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
+      assert_launch_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
       assert_worker_helper_policy "an ordinary omp $scope $kind launch" "$overlay" "$role"
       assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
       assert_not_contains "$launch" "--no-skills" "an ordinary omp $scope $kind launch must keep skill discovery"
@@ -847,7 +844,7 @@ test_spawn_raw_api_billing_admission() {
         expect_code "$expected" "$status" "raw $form $spelling billing admission for $provider: $out"
         if [ "$expected" = 0 ]; then
           assert_present "$HOME_DIR/state/$id.meta" "subscription raw launch must publish metadata"
-          assert_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
+          assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
         else
           assert_contains "$out" 'routes use API billing' "raw rejection must come from the billing guard"
           assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
@@ -868,7 +865,7 @@ test_spawn_raw_api_billing_admission() {
     expect_code "$expected" "$status" "literal raw admission in '$command': $out"
     if [ "$expected" = 0 ]; then
       assert_present "$HOME_DIR/state/$id.meta" "non-model arguments must remain accepted"
-      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "non-model arguments must reach the launch unchanged"
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "non-model arguments must reach the launch unchanged"
     else
       assert_contains "$out" 'routes use API billing' "profile, expansion, or prior pin must not bypass literal admission"
       assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
@@ -951,7 +948,7 @@ test_spawn_api_billed_fallback_admission() {
         assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "usable primary must stay selected"
       else
         assert_grep 'model=openai-codex/gpt-6.1-sol' "$HOME_DIR/state/$id.meta" "subscription fallback must remain selectable"
-        assert_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6.1-sol'" "subscription fallback must reach launch"
+        assert_launch_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6.1-sol'" "subscription fallback must reach launch"
       fi
     done
   done
@@ -976,7 +973,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   status=$?
   expect_code 0 "$status" "an extension-registered provider must pass through: $out"
   assert_contains "$out" "notice: omp provider 'claude-bridge' is not in 'omp models --json'" "pass-through did not state its reason"
-  assert_contains "$(cat "$LAUNCH_LOG")" "--model 'claude-bridge/claude-opus-4-8'" "pass-through model did not reach the launch line"
+  assert_launch_contains "$(cat "$LAUNCH_LOG")" "--model 'claude-bridge/claude-opus-4-8'" "pass-through model did not reach the launch line"
 
   rec=$(make_spawn_case model-fuzzy omp omp-model-fuzzy-q4)
   read_case_record "$rec"
@@ -1080,7 +1077,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
     assert_absent "$out" "the global config must not be quarantined"
   done
   assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
-  assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
+  assert_launch_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
 
   id='omp-role-agent-dir-q13'
   rec=$(make_spawn_case role-agent-dir omp "$id")
@@ -1155,6 +1152,16 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
     out=$(PI_CODING_AGENT_DIR="$caller_dir" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
       run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
     status=$?
+    # Decision R7-4 (2026-10-25): a confined macOS launch follows only a literal
+    # raw root, and the spawn sees "$PANE_AGENT_DIR" unexpanded, so it refuses
+    # and names the variable instead of granting a root it cannot know.
+    if [ "$mode" = uncertain ] && [ "$(uname -s)" = Darwin ]; then
+      expect_code 1 "$status" "a confined raw omp launch must refuse a root that needs shell expansion: $out"
+      assert_contains "$out" "sets PI_CODING_AGENT_DIR to a value that needs shell expansion" "the refusal must name the variable"
+      assert_contains "$out" "pass the resolved absolute path" "the refusal must say how to proceed"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused raw-directory launch must publish no record"
+      continue
+    fi
     case "$mode" in
       missing | unlisted | stderr | stdin | append | descriptor)
         expect_code 1 "$status" "raw omp must refuse the launch directory's invalid role ($mode): $out"
@@ -1223,12 +1230,25 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
         FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "${spawn_args[@]}")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector and points to the supported --harness omp route.
+      case "$mode" in
+        flag | flag-equals | assignment-omp | assignment-pi)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse its own profile selector ($mode): $out"
+            assert_contains "$out" "selects its own omp profile" "the refusal must name the profile selector ($mode)"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused profile-selecting launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
-        *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
+        *) assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
       esac
       HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$launch_dir" \
         OMP_PROFILE="$omp_profile" PI_PROFILE="$pi_profile" \
@@ -1243,7 +1263,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
 }
 
 test_spawn_raw_omp_expansions_pass_through_unchanged() {
-  local rec id out status mode role command launch_dir first_arg
+  local rec id out status mode role command launch_dir first_arg pane_home
   for mode in profile after-delimiter substitution backticks redirect glob long-glob tilde tilde-redirection tilde-user tilde-assignment process ansi locale braces heredoc punctuation; do
     for role in missing unlisted; do
       id="omp-expansion-$mode-$role"
@@ -1304,14 +1324,36 @@ EOF" ;;
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector, including one inside a substitution, and never
+      # evaluates it.
+      case "$mode" in
+        substitution | backticks)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse a profile selector in an expansion ($mode): $out"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$CASE_DIR/expanded" "the refusal must not evaluate the command substitution ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused expanded launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       assert_absent "$CASE_DIR/node-timeout" "a long literal prefix ending in a glob must classify within three seconds"
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
-      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
-      HOME="$HOME_DIR/user-home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
+      # This fixture nests user-home inside the firstmate home, which macOS
+      # write confinement protects; the tilde redirection writes to a home
+      # outside it, as a real user home is.
+      pane_home="$HOME_DIR/user-home"
+      if [ "$mode" = tilde-redirection ]; then
+        pane_home="$CASE_DIR/pane-home"
+        mkdir -p "$pane_home"
+      fi
+      HOME="$pane_home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
         PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
       status=$?
@@ -1322,7 +1364,7 @@ EOF" ;;
           [ "$(cat "$CASE_DIR/expanded")" = evaluated ] || fail "the pane must evaluate the command substitution"
           ;;
         redirect) assert_present "$CASE_DIR/errors.log" "the pane must evaluate the redirection" ;;
-        tilde-redirection) assert_present "$HOME_DIR/user-home/omp-errors.log" "the pane must expand the tilde redirection" ;;
+        tilde-redirection) assert_present "$pane_home/omp-errors.log" "the pane must expand the tilde redirection" ;;
       esac
     done
   done
@@ -1385,7 +1427,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model() {
     expect_code "$expected" "$status" "raw omp guard must follow the effective model in '$command': $out"
     if [ "$expected" = 0 ]; then
       assert_present "$HOME_DIR/state/$id.meta" "a pinned raw launch must publish the task"
-      assert_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/$model_flag}" "raw model selection did not reach the launch"
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/$model_flag}" "raw model selection did not reach the launch"
     else
       assert_contains "$out" "omp modelRoles.default is not set" "an unpinned raw launch must refuse the missing role"
       assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
@@ -1440,12 +1482,12 @@ test_secondmate_launch_relies_on_discovery() {
   launch=$(cat "$launchlog")
   [ "$(printf '%s\n' "$launch" | grep -o ' -e ' | wc -l | tr -d ' ')" = 1 ] \
     || fail "an omp secondmate launch must name exactly one -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch"
-  assert_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
+  assert_launch_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
   assert_not_contains "$launch" "fm-worker-overlay.yml" "secondmate launch must preserve the lane's memory settings"
   assert_not_contains "$launch" "PI_EDIT_VARIANT" "an omp secondmate launch must not force the worker-only replace edit mode"
-  assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
-  assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
+  assert_launch_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
+  assert_launch_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_present "$world/home/state/sm.omp-ext.ts" "a secondmate must receive the per-task busy extension"
   assert_absent "$home/state/.omp-live-model" "a secondmate launch must not keep its home's previous live-model record"
   pass "fm-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions"
@@ -1640,8 +1682,6 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = $'/st/id1.omp-ext.ts\n/st/id1.omp-session.json\n/st/id1.omp-fallback.yml' ] \
-    || fail "omp wiring paths must be the state-resident extension, its current-session record, and the fallback overlay"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"

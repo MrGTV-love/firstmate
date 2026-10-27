@@ -1181,9 +1181,28 @@ enable_teamclaude() {  # <case-dir>
   fm_test_fake_teamclaude "$1/fakebin"
 }
 
-# teamclaude_launch_line <log>: the newest launch the pane received.
+# assert_launch_word <file> <prefix> <value> <msg>: the launch in <file> passes
+# <value> right after <prefix>. A confined launch nests the command in more
+# single-quoted levels, so only quote characters may separate them.
+assert_launch_word() {
+  local value='' char i
+  for ((i = 0; i < ${#3}; i++)); do
+    char=${3:i:1}
+    case $char in
+      '[' | ']' | \\ | '.' | '*' | '^' | '$' | '+' | '?' | '(' | ')' | '{' | '}' | '|') value+="\\$char" ;;
+      *) value+=$char ;;
+    esac
+  done
+  grep -Eq -e "$2[\\\\']*'$value'" "$1" || fail "$4 (missing: $2'$3' in $(cat "$1"))"
+}
+
+# teamclaude_launch_line <log>: the newest launch the pane received. A confined
+# launch spans several lines inside its sandbox-exec wrapper and is kept whole.
 teamclaude_launch_line() {
-  grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
+  awk '/\/usr\/bin\/sandbox-exec /{buf=""; open=1}
+    open{buf=buf $0 "\n"}
+    /Firstmate operational input waiting: read/{last=open ? buf : $0 "\n"; open=0}
+    END{printf "%s", last}' "$1"
 }
 
 # arm_session_end <case-dir> <id>: record that the task's Claude session ended.

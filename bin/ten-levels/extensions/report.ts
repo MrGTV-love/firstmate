@@ -138,7 +138,11 @@ export function createGuardService(context: GuardServiceContext): GuardService {
   const active = context.noHelpers !== true && context.project === "firstmate";
   let apiKey: string | undefined;
   let client: JevClient | undefined;
-  const ledger = resolve(context.state, "jev-guard.jsonl");
+  // Launch binds this scope inside its final environment. Valid task IDs are
+  // unchanged by encoding; a malformed context can never turn the filename
+  // into a path traversal. No shared-ledger grant is needed by a worker.
+  const ledger = resolve(context.state, process.env.FM_WRITE_CONFINEMENT === "seatbelt-v1"
+    ? `${encodeURIComponent(context.task)}.jev-guard.jsonl` : "jev-guard.jsonl");
 
   function permitted(requestText: string): void {
     const timeout = preflightTimeout();

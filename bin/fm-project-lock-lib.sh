@@ -148,11 +148,19 @@ fm_project_lock_describe() {  # <lock> <head>
 
 # Cumulative centiseconds for a holder and its live descendants. macOS ps -S
 # includes reaped child CPU; Linux procps uses the portable live-tree fallback.
-# A sampling failure returns nonzero and establishes no progress.
+# A sampling failure returns nonzero and establishes no progress. A confined
+# worker's sandbox refuses to run setuid ps (exit 126), so the same total then
+# comes from bin/fm-proc-info.py instead.
+_FM_PROJECT_LOCK_PROC_INFO=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-proc-info.py
 fm_project_lock_cpu() {  # <holder-pid>
-  (
-    set -o pipefail
-    { LC_ALL=C ps -S -axo pid=,ppid=,time= 2>/dev/null || LC_ALL=C ps -axo pid=,ppid=,time=; } | LC_ALL=C awk -v root="$1" '
+  local table
+  table=$(LC_ALL=C ps -S -axo pid=,ppid=,time= 2>/dev/null)
+  case $? in
+    0) ;;
+    126) python3 "$_FM_PROJECT_LOCK_PROC_INFO" cpu-tree "$1" 2>/dev/null; return ;;
+    *) table=$(LC_ALL=C ps -axo pid=,ppid=,time=) || return 1 ;;
+  esac
+  printf '%s\n' "$table" | LC_ALL=C awk -v root="$1" '
       {
         children[$2] = children[$2] " " $1
         n = split($3, clock, "-"); seconds = n > 1 ? clock[1] * 86400 : 0
@@ -170,7 +178,6 @@ fm_project_lock_cpu() {  # <holder-pid>
         }
         printf "%.0f\n", total * 100
       }'
-  )
 }
 
 fm_project_lock_acquire() {  # <lock> <operation>

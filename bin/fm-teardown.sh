@@ -5584,6 +5584,7 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.pi-ext.ts" "$sub_state/$child_id.omp-ext.ts" "$sub_state/$child_id.omp-fallback.yml" \
       "$sub_state/$child_id.live-model" \
       "$sub_state/$child_id.omp-session.json" "$sub_state/$child_id.reboot-notice" \
+      "$sub_state/$child_id.write-confinement.sb" \
       "$sub_state/$child_id.grok-turnend-token" "$sub_state/$child_id.kimi-turnend-token" \
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
       "$sub_state/$child_id.cursor-session" "$sub_state/$child_id.reconcile-nudged" \
@@ -6135,7 +6136,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.omp-fallback.yml" "$STATE/$ID.live-model" \
   "$STATE/$ID.grok-turnend-token" \
-  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" \
+  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" "$STATE/$ID.write-confinement.sb" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
   "$STATE/$ID.muse-session-current" "$STATE/$ID.cursor-session" \
   "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior" \

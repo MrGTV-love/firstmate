@@ -35,6 +35,28 @@ fm_procevent_claim_root() {
   printf '%s\n' "${FM_PROCEVENT_CLAIM_ROOT:-${XDG_STATE_HOME:-$HOME/.local/state}/firstmate/procevent-claims}"
 }
 
+# One process fact: ppid, pgid or lstart for <pid>, or a process table with the
+# comma-separated fields among pid, ppid, pgid, lstart and command. Inside a
+# confined worker's sandbox, which refuses to run setuid ps (exit 126), they come
+# from bin/fm-proc-info.py instead. lstart is the C-locale start time with runs
+# of spaces collapsed, from either source.
+fm_procevent_proc() {  # <ppid|pgid|lstart> <pid> | table <fields>
+  local out status
+  case "$1" in
+    table) LC_ALL=C ps -axo "${2//,/=,}=" 2>/dev/null; status=$? ;;
+    lstart)
+      out=$(LC_ALL=C ps -o lstart= -p "$2" 2>/dev/null); status=$?
+      if [ "$status" -ne 126 ]; then
+        [ -z "$out" ] || printf '%s\n' "$out" | awk '{ $1 = $1; print }'
+        return 0
+      fi
+      ;;
+    *) ps -o "$1=" -p "$2" 2>/dev/null; status=$? ;;
+  esac
+  [ "$status" -eq 126 ] || return "$status"
+  python3 "${SCRIPT_DIR:-${BASH_SOURCE[0]%/*}}/fm-proc-info.py" "$1" "$2" 2>/dev/null
+}
+
 # Functions only: a runner started with exported functions does not inherit
 # shell variables, so a path built from a library variable would come out empty.
 fm_procevent_registry_dir_to() { printf -v "$1" '%s/procevent' "$2"; }

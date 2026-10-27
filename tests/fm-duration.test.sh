@@ -889,7 +889,7 @@ holder_code = (
     'import importlib.util as u\n'
     's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
     'gone = subprocess.Popen(["true"]); gone.wait()\n'
-    'listed = subprocess.run(["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, env=dict(os.environ, LC_ALL="C")).stdout\n'
+    'listed = d.proc_read(["ps", "-o", "lstart=", "-p", str(os.getpid())], ["lstart", str(os.getpid())], env=dict(os.environ, LC_ALL="C"))[0].stdout\n'
     'started = int(time.mktime(time.strptime(" ".join(listed.split()), "%a %b %d %H:%M:%S %Y")))\n'
     'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time())), "later1": (os.getpid(), started - 1), "later3": (os.getpid(), started - 3)}[sys.argv[3]]\n'
     'directory = d.slot_directory(sys.argv[2])\n'
