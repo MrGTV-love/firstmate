@@ -158,7 +158,7 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
 # stdout stays empty: the exit status and stderr are the whole contract. A repeated
 # line is written like any other; the cap is what stops a loop, and it stops it
 # loudly.
-IFS= command read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :
+IFS= read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :
 use strict;
 use warnings;
 use Fcntl qw(:DEFAULT :flock);
