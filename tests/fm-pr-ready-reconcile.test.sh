@@ -75,6 +75,10 @@ SH
   cat > "$FAKEBIN/fm-crew-state" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_READY_CASE/crew-state.calls"
+if [ -f "$FM_READY_CASE/crew-state-hang.$1" ]; then
+  printf '%s\n' "$$" > "$FM_READY_CASE/crew-state-hung.pid"
+  exec sleep 600
+fi
 if [ -f "$FM_READY_CASE/crew-state.$1" ]; then cat "$FM_READY_CASE/crew-state.$1";
 else printf 'state: working · source: run-step · validating (running) · run: 01RUN\n'; fi
 SH
@@ -227,6 +231,27 @@ calls_before=$(wc -l < "$CASE/crew-state.calls")
 out=$(run_pass)
 [ "$calls_before" -eq "$(($(wc -l < "$CASE/crew-state.calls") - 1))" ] || fail 'second pass did not re-read only the unready ship'
 pass 'a green no-mistakes run with no done line registers from its fm-crew-state.sh PR; a busy run and a direct-PR lane do not'
+
+# A run reading that never answers is cut at its own bound and skipped, so the
+# ready ship after it still registers in the same pass.
+make_case crew-state-hang
+write_ship a-slow
+write_ship b-ready
+printf 'working [at=1792479210]: validating with /no-mistakes\n' > "$CASE/home/state/a-slow.status"
+: > "$CASE/crew-state-hang.a-slow"
+rc=0
+fm_run_timed 60 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
+  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
+  PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1 || rc=$?
+out=$(cat "$CASE/pass.out")
+[ "$rc" -eq 0 ] || fail "pass with a hung run reading did not finish on its own: $rc $out"
+[ "$(printf '%s\n' "$out" | grep -c 'a-slow: run reading exceeded 10s; skipped this pass')" -eq 1 ] \
+  || fail "hung run reading was not reported once: $out"
+! kill -0 "$(cat "$CASE/crew-state-hung.pid")" 2>/dev/null || fail 'hung run reading outlived its bound'
+assert_unregistered a-slow
+assert_registered b-ready
+pass 'a hung run reading is cut at its own bound and the later ready ship registers in the same pass'
 
 make_case registration
 write_ship ready

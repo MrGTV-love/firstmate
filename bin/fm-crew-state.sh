@@ -19,6 +19,9 @@
 # For a terminal passed no-mistakes run, a matching merge-poll retirement
 # receipt is local merged evidence; otherwise a 5s-bounded forge read is tried.
 # FM_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
+# FM_CREW_STATE_CI_LOG_TAIL=1 reads an active run's ci log as no-mistakes'
+# bounded tail instead of the full log; a tail with no checks marker reads as
+# not green.
 # An absent or unreadable PR identity yields an honest unknown, never an
 # optimistic merged claim.
 # Output is one stable, parseable, token-tight line firstmate can read every
@@ -1048,12 +1051,13 @@ nm_effective_ci_step_status() {
 # ignores the line the same way, v1.32.2 through v1.79.0). Reading it as
 # not-ready held a green PR at working for as long as main kept advancing.
 nm_ci_checks_state() {
-  local run_id ci_log marker finished_run rc=0
+  local run_id ci_log marker finished_run full=--full rc=0
   run_id=$(strip_quotes "$(nm_field id)")
   [ -n "$run_id" ] || { printf 'unknown'; return; }
   # A finished run's ci log cannot change, so only that read is kept for good.
   fm_nm_run_is_active "$RUN_OUT" && finished_run='' || finished_run=$run_id
-  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || rc=$?
+  [ -n "$finished_run" ] || [ "${FM_CREW_STATE_CI_LOG_TAIL:-0}" != 1 ] || full=
+  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" ${full:+"$full"}) || rc=$?
   # This runs in its caller's command substitution, so the caller notes the cut.
   [ "$rc" != 124 ] || { printf 'unknown'; return 124; }
   [ -n "$ci_log" ] || { printf 'unknown'; return; }

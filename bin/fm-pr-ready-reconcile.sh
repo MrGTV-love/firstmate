@@ -10,7 +10,9 @@
 # The newest ready declaration in that window wins, even when subsequent
 # resolution notes follow it. A no-mistakes ship with no ready declaration is
 # registered when fm-crew-state.sh reads its run as `checks green: PR ready for
-# review` naming the run's PR; otherwise a missing declaration is a no-op.
+# review` naming the run's PR; otherwise a missing declaration is a no-op. That
+# read uses no-mistakes' bounded ci log tail and its own ten-second limit; a read
+# past it is printed and skipped for this pass so later records still run.
 # A refusal is printed, queued as one check wake per distinct reason, and
 # retained per task for ten minutes, during which the task is skipped before any
 # forge call; after that it is retried, so a repaired
@@ -30,6 +32,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 [ "$#" -eq 0 ] || { echo 'usage: fm-pr-ready-reconcile.sh' >&2; exit 2; }
 [ -d "$STATE" ] && [ ! -L "$STATE" ] || exit 0
@@ -53,12 +57,18 @@ REFUSAL_RETRY_SECS=600
 
 CREW_STATE_BIN=${FM_CREW_STATE_BIN:-$SCRIPT_DIR/fm-crew-state.sh}
 READY_DETAIL='checks green: PR ready for review'
+# measured: value=10 date=2026-10-27 host=Mac-Studio.local margin=2.62 (basis: 10 s / 3.81 s, the slowest of ten real FM_CREW_STATE_NO_FORGE=1 fm-crew-state.sh reads of this home's unrecorded no-mistakes ships with the full ci log; eight such reads plus eight 3.51 s registrations take 8 x 13.51 = 108.08 s, inside the watcher's 120 s pass limit)
+CREW_STATE_READ_SECS=10
 
-# The PR URL fm-crew-state.sh names in its checks-green reading, if any.
+# The PR URL fm-crew-state.sh names in its checks-green reading, if any; 124
+# when the read exceeded its own bound.
 crew_state_ready_url() {  # <id>
-  local line component
-  line=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CREW_STATE_NO_FORGE=1 \
-    "$CREW_STATE_BIN" "$1" 2>/dev/null) || return 1
+  local line component rc=0
+  line=$(fm_run_timed "$CREW_STATE_READ_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_CI_LOG_TAIL=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_READ_SECS" \
+    "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
+  ! fm_timed_out "$rc" || return 124
+  [ "$rc" -eq 0 ] || return 1
   case "$line" in "state: done · "*" · $READY_DETAIL"*': '*) ;; *) return 1 ;; esac
   component=${line#* · "$READY_DETAIL"}
   component=${component%% · *}
@@ -68,7 +78,7 @@ crew_state_ready_url() {  # <id>
 # Metadata is read once, without sourcing worker-controlled bytes.
 reconcile_one() {  # <meta> <id>
   local meta=$1 id=$2 line kind='' mode='' pr='' note url=''
-  local ready='' refusal="$CACHE/$2.refused" refused_at output age previous=''
+  local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
   if [ ! -f "$meta" ] || [ -L "$meta" ] || [ ! -r "$meta" ]; then
     printf 'pr-ready: %s: unreadable task record; skipped\n' "$id"
     return 0
@@ -111,7 +121,10 @@ reconcile_one() {  # <meta> <id>
     status_line_note "$ready" note
     url=$(fm_dod_pr_url_from_done_note "$note") || return 0
   else
-    [ "$mode" = no-mistakes ] && url=$(crew_state_ready_url "$id") || return 0
+    [ "$mode" = no-mistakes ] || return 0
+    url=$(crew_state_ready_url "$id") || rc=$?
+    [ "$rc" -ne 124 ] || printf 'pr-ready: %s: run reading exceeded %ss; skipped this pass\n' "$id" "$CREW_STATE_READ_SECS"
+    [ "$rc" -eq 0 ] || return 0
   fi
   fm_pr_url_parse "$url" || return 0
   url=$FM_PR_URL
