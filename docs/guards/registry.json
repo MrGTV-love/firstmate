@@ -535,7 +535,7 @@
       "remedy_verified": "fixture"
     },
     {
-      "decision": "deny",
+      "decision": "warn",
       "fail_direction": "closed",
       "proxy": false,
       "proxy_reason": "",
@@ -548,7 +548,7 @@
       "id": "persistent-cd-guard",
       "owner": "bin/fm-cd-pretool-check.sh",
       "invariant": "a persistent top-level cd never moves this session out of its home",
-      "layer": "runtime-block",
+      "layer": "runtime-warn",
       "source": "hook payload command string; git-dir versus git-common-dir of the destination",
       "trigger": "a top-level cd, pushd, or popd would leave the home or the repository",
       "remedy": "run the command in a subshell: ( cd <dir> && <command> ); bin/fm-cd-pretool-check.sh --command '<cmd>' reports the offending segment",
@@ -556,6 +556,7 @@
       "test": "tests/fm-cd-pretool-check.test.sh",
       "tier": "C",
       "harm": "reversible",
+      "layer_note": "warns by default (FM_CD_GUARD_MODE=warn): the correction is printed and the command runs with exit 0; FM_CD_GUARD_MODE=deny is the opt-in that restores the original runtime block; docs/cd-guard.md owns the contract",
       "remedy_verified": "fixture"
     },
     {
