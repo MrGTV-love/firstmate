@@ -2670,7 +2670,7 @@ watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
 # single-flight guards clear, and the next tick registers the ready ships.
 PR_READY_RECONCILE_PID=
 PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
-# measured: value=120 date=2026-10-20 host=Mac-Studio.local margin=34 (one ship costs 3.51s: slowest live registration pass over a 200,000-line log 2s with a stand-in forge, plus slowest of three real gh isDraft reads 0.87s and of three real gh headRefOid reads 0.64s)
+# measured: value=120 date=2026-10-20 host=Mac-Studio.local margin=2.14 (basis: one pass registers every ready ship in turn, so 120 s / (3.51 s per ship x 16, the firstmate capacity in config/project-capacity) = 120 / 56.16; one ship costs 3.51s: slowest live registration pass over a 200,000-line log 2s with a stand-in forge, plus slowest of three real gh isDraft reads 0.87s and of three real gh headRefOid reads 0.64s)
 case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then

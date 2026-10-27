@@ -43,7 +43,8 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 SCRATCH=$(mktemp "$CACHE/pass.XXXXXX")
-# measured: value=600 date=2026-10-20 host=Mac-Studio.local margin=40 (ten minutes is forty default 15-second watcher ticks; real-time live run at a 1-second tick: refusal at +1s, zero forge reads through +600s, retry registered at +603s, 3 forge reads in total)
+# Ten minutes is a Firstmate policy choice, not a measurement.
+# measured: value=600 date=2026-10-20 host=Mac-Studio.local margin=170.9 (basis: 600 s / 3.51 s, the measured cost of one registration attempt in the cited run; real-time live run at a 1-second tick: refusal at +1s, zero forge reads through +600s, retry registered at +603s, 3 forge reads in total)
 REFUSAL_RETRY_SECS=600
 
 # Metadata is read once, without sourcing worker-controlled bytes.
@@ -83,7 +84,6 @@ reconcile_one() {  # <meta> <id>
   # file of exactly 64 KiB, which is every snapshot of a large log.
   output=$(cat -- "$SCRATCH" | tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES")
   while IFS= read -r line; do
-    _fm_status_line_is_event "$line" "^[[:space:]]*(${FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" || continue
     fm_dod_should_gate_ship_done ship "$mode" "$line" || continue
     ready=$line
   done <<< "$output"
