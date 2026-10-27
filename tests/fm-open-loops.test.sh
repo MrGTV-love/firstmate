@@ -3223,14 +3223,23 @@ try:
         ack(boundary)
     print('PASS: firstmate escalation and steer stand for four hours, then require action', flush=True)
 
-    # An action recorded since the current presentation answers it however long the handling turn lasts.
+    # Free-text escalation is not proof of resolution, even before the turn closes.
+    # Exercise the exact receipt text the away daemon emits through the real CLI.
     publish([rows[0]])
     _, boundary = drain()
-    act('row-0')
-    clock += 5 * 3600
+    act('row-0', evidence='away supervisor escalation digest')
+    receipt_time = clock
+    clock = receipt_time + 14399
+    drain()
     call(loops, '--check-actions')
+    clock = receipt_time + 14400
+    assert call(loops, '--check-actions', good=False).returncode == 1
+    assert ack(boundary, good=False).returncode == 1
+    result, boundary = drain()
+    assert 'row-0' in result.stdout
+    act('row-0', evidence='followed up after the escalation recheck')
     ack(boundary)
-    print('PASS: a recorded action answers its own turn at any age', flush=True)
+    print('PASS: an unclosed turn cannot hide a free-text escalation beyond four hours', flush=True)
 
     # A heartbeat that changes only a stalled worker's elapsed-time counters changes no obligation.
     stalled = dict(rows[0], category='stalled_worker', subject='job', owner='worker:job',
@@ -3360,7 +3369,7 @@ try:
     ack(boundary)
     print('PASS: a refused batch line leaks no state into its siblings', flush=True)
 
-    # A hold-bound escalation answers its own turn by sequence, even if the hold ends or the backlog breaks.
+    # A hold answer or unreadable proof ends its receipt even before acknowledgement.
     backlog = home / 'data/backlog.md'
     held = ('## In flight\n- [ ] job - Recover the run (repo: firstmate) (kind: ship) (hold: exact run recovery)'
             ' (hold-kind: captain)\n  Captain hold set: '
@@ -3375,23 +3384,17 @@ try:
         _, boundary = drain()
         recorded = act('row-0')
         assert 'standing: captain hold job' in recorded.stdout, (label, recorded)
-        prior = stored()['handling']['presented_at']['main']['row-0']
         change()
-        runs.unlink(missing_ok=True)
         clock += 60
         result, boundary = drain()
-        assert 'row-0' not in result.stdout, (label, result.stdout)
-        call(loops, '--check-actions')
-        assert not runs.exists(), (label, 'a same-turn answer reads no backlog snapshot')
-        assert stored()['handling']['presented_at']['main']['row-0'] == prior, (label, 'no restamp')
-        ack(boundary)
-        result, boundary = drain()
-        assert 'row-0' in result.stdout and ack(boundary, good=False).returncode == 1, (label, 'next turn needs action')
+        assert 'row-0' in result.stdout, (label, result.stdout)
+        assert call(loops, '--check-actions', good=False).returncode == 1, label
+        assert ack(boundary, good=False).returncode == 1, label
         act('row-0')
         ack(boundary)
         backlog.unlink()
         backlog.write_text(empty)
-    print('PASS: a hold-bound escalation answers its own turn without a backlog read', flush=True)
+    print('PASS: a hold ending or becoming unreadable restores the same-turn action requirement', flush=True)
 
     # A home with no ledger acknowledges its wakes without starting the ledger receipt command.
     home = world / 'ledgerless'

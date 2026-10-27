@@ -1454,16 +1454,16 @@ def receipt_stands(action, row, now, waits):
 
 
 def action_answers(action, row, required, now, waits):
-    """Read-only validation: an action recorded since the presentation answers it at any age."""
+    """Reads preserve an answered presentation, not an expired or invalid receipt."""
     if action.get("sequence", 0) <= required or action.get("requires_followup") \
             or action.get("digest") != row_digest(row):
         return False
     kind = action.get("kind")
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "waiting":
+    if kind == "waiting" or action.get("hold"):
         return receipt_stands(action, row, now, waits)
-    return True
+    return 0 <= now - action.get("at_epoch", 0) < RECEIPT_SECONDS
 
 
 def steer_record_epoch(state, row, record):
