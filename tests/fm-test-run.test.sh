@@ -1473,7 +1473,8 @@ echo "ok - fixture"
 exit 0
 SH
   chmod +x "$fixture"
-  "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
+  FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
     || { rm -rf "$tmp"; fail "runner should pass on a green fixture"; }
   begin_n=$(grep -c '^FM_TEST_BEGIN ' "$out" || true)
   end_n=$(grep -c '^FM_TEST_END ' "$out" || true)
@@ -1502,6 +1503,9 @@ assert doc["summary"]["total"] == 1
 assert doc["summary"]["failed"] == 0
 assert "duration_ms" in doc["scripts"][0]
 assert "family" in doc["scripts"][0]
+assert "cpu_ms" in doc["scripts"][0], "the artifact must carry the CPU field"
+cpu_ms = doc["scripts"][0]["cpu_ms"]
+assert isinstance(cpu_ms, int) and cpu_ms > 0, cpu_ms
 ' "$json" || { rm -rf "$tmp"; fail "JSON timing artifact missing required fields"; }
   rm -rf "$tmp"
   pass "timing markers and JSON artifact are valid"
@@ -2653,6 +2657,7 @@ test_per_script_timeout_bounds_a_hang() {
   cp "$RUNNER" "$runner"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-duration.py" "$repo/bin/fm-duration.py"
   grandchild_pid="$tmp/grandchild.pid"
   cat >"$repo/$hang" <<'SH'
 #!/usr/bin/env bash
@@ -2664,8 +2669,8 @@ SH
 
   began=$(date +%s)
   set +e
-  GRANDCHILD_PID="$grandchild_pid" \
-    "$runner" --per-script-timeout-secs 3 "$hang" >"$tmp/out" 2>"$tmp/err"
+  GRANDCHILD_PID="$grandchild_pid" FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$runner" --per-script-timeout-secs 3 --json "$tmp/timing.json" "$hang" >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
   ended=$(date +%s)
@@ -2680,6 +2685,12 @@ SH
   # The run still completes and accounts for the script, rather than dying.
   grep -Fq 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out" \
     || fail "the bounded run did not report a complete summary: $(cat "$tmp/out")"
+  python3 -c '
+import json, sys
+script = json.load(open(sys.argv[1]))["scripts"][0]
+assert script["exit"] == 124, script
+assert "cpu_ms" in script and script["cpu_ms"] is None, script
+' "$tmp/timing.json" || fail "a bounded script must carry a null cpu_ms: $(cat "$tmp/timing.json")"
   [ -s "$grandchild_pid" ] || fail "the hanging fixture did not record its grandchild"
   grandchild=$(cat "$grandchild_pid")
   waited=0

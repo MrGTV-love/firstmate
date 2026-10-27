@@ -5,7 +5,7 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
-       fm-duration.py gate [--log-fd N] [--wait-file PATH] KEY -- COMMAND [ARGS...]
+       fm-duration.py gate [--log-fd N] [--wait-file PATH] [--cpu-file PATH] KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
@@ -123,7 +123,8 @@ a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
 writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
 starts (0 when a slot was free at once), so that caller can leave the wait out of
-its sample. Slots are exclusive
+its sample. --cpu-file receives the command tree's CPU milliseconds after
+COMMAND exits; gate's docstring owns what that sample counts. Slots are exclusive
 non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
 $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
@@ -970,8 +971,20 @@ def release_slot(fd):
         os.close(fd)
 
 
-def gate(key, command, log_fd, wait_file=None):
-    """Run COMMAND while holding one of KEY's slots; exit with its status."""
+def gate(key, command, log_fd, wait_file=None, cpu_file=None):
+    """Run COMMAND while holding one of KEY's slots; exit with its status.
+
+    With cpu_file, write the command tree's CPU milliseconds there after it
+    exits. The sample is the same process-tree accounting the progress runner
+    uses, taken once from this wrapper, so it includes descendants that were
+    already reaped into this process's waited-child time. A killed or orphaned
+    subtree is not counted, because nothing waits for it back up to this
+    wrapper, and work COMMAND leaves running past the sample is not counted
+    either. It is measurement
+    evidence, not a busy-versus-idle verdict: a wrapper waiting on a lock while
+    its command waits on I/O occupies no CPU either way. A cpu_file that cannot
+    be written never changes COMMAND's exit status.
+    """
     kept = ()
     if log_fd > 2:
         try:
@@ -1012,6 +1025,13 @@ def gate(key, command, log_fd, wait_file=None):
             slot_log(log_fd, f'command not executable: {command[0]}')
             return 126
         code = child.wait()
+        if cpu_file:
+            try:
+                cpu, _ = tree_cpu(os.getpid(), {})
+                Path(cpu_file).write_text(('' if cpu is None else f'{round(cpu * 1000)}') + '\n',
+                                          encoding='utf-8')
+            except OSError as error:
+                slot_log(log_fd, f'cannot report the command CPU to {cpu_file}: {error}')
         return 128 - code if code < 0 else code
     finally:
         for sig, handler in ignored.items():
@@ -1329,7 +1349,7 @@ def main():
     observer.add_argument('inactivity', type=float)
     observer.add_argument('paths', nargs='*')
     gater = commands.add_parser('gate')
-    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('--cpu-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -1386,7 +1406,7 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('gate requires -- COMMAND')
-        return gate(args.key, command, args.log_fd, args.wait_file)
+        return gate(args.key, command, args.log_fd, args.wait_file, args.cpu_file)
     return 0
 
 

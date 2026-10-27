@@ -409,6 +409,11 @@ The bearings Perl-timeout fixture includes `uname` for the PR library's cached p
 Portable shards, each portable serial shard, and the Herdr lane upload runner-generated timing JSON.
 `bin/fm-test-run.sh --aggregate-json` creates the combined summary artifact.
 `.github/workflows/ci.yml` owns the exact artifact names and aggregation wiring.
+Each script record carries `duration_ms` and, when the host-wide slot gate wrapped the script, `cpu_ms`.
+`cpu_ms` is one process-tree CPU sample taken by `bin/fm-duration.py gate` when the command exits, using the same accounting its progress runner uses for stall detection: `/proc` `utime+stime+cutime+cstime` on Linux, native libproc usage on Darwin, so a descendant reaped during the run is counted through its parent's waited-child time.
+A killed or orphaned subtree is not counted, because nothing waits for it back up to the wrapper, and work a suite leaves running past the sample is not counted either.
+It is evidence, not a classifier: a low ratio of CPU to wall time says the suite was not computing, which is equally consistent with waiting on I/O, on a lock, on a fixed `sleep`, or competing for a loaded runner, and the sample is taken once at the end rather than continuously.
+The runner records no value when that wrapper did not run or when the per-script bound killed the suite, since that CPU never reaches the sample, and the aggregate carries the field through unchanged.
 
 ## Lint partitions and end-to-end latency
 
