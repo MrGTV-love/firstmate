@@ -2239,6 +2239,9 @@ fm_failure_episode_reset() {
 #     "epoch=N owner_pid=P outcome=O updated_at=T" record. A "rewake" outcome
 #     also records "session_pid=S recovery_generation=G", binding that
 #     handling turn to its live session-lock owner and watcher recovery episode.
+#     A held-close "refused" outcome also records "recovery_generation=G": it
+#     is the early-redelivery receipt that the next claim (fm_autoarm_claim_next)
+#     consumes, so a refused write must keep that field.
 #     Line 2 is the claiming process's pid-identity, the same identity every other
 #     supervision lock in this repo records (fm_pid_identity above). The
 #     identity is MANDATORY: a claimant that cannot record it does not claim
@@ -2410,7 +2413,8 @@ fm_autoarm_midturn_healthy() {  # <state-dir> [grace]
 # Atomically publish this process as the owner of generation N+1.
 # Wait at most ten seconds for the queue lock before taking the ownership
 # micro-mutex, so claim publication cannot race a re-emit drain's mutations.
-# Returns 0 with FM_AUTOARM_MY_GEN set on success, 2 when a competing claimant
+# Returns 0 with FM_AUTOARM_MY_GEN and FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY
+# (the preceding held-close refusal's episode, if any) set on success, 2 when a competing claimant
 # won the race (the ledger holds an open claim), and 1 when the queue-lock wait
 # expires, the micro-mutex is contended, the mandatory identity cannot be
 # computed, or the write failed.
@@ -2420,6 +2424,7 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
   epoch="$state/.claude-autoarm-epoch"
   queue_lock="$state/.wake-queue.lock"
   FM_AUTOARM_MY_GEN=
+  FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=
   # Resolve the pid into a variable FIRST: expanding ${BASHPID:-$$} inside a
   # command substitution would resolve it in that subshell, recording the
   # identity of a process that exits immediately.
@@ -2435,6 +2440,13 @@ fm_autoarm_claim_next() {  # <state-dir> [grace]
     fm_lock_release "$lock"
     fm_lock_release "$queue_lock"
     return 2
+  fi
+  # claim_open read the predecessor under both locks. Only a held-close
+  # refusal carries its recovery generation; consuming that terminal entry
+  # bounds early redelivery to this refusal rather than every unacked Stop.
+  if [ "$FM_AUTOARM_OUTCOME" = refused ]; then
+    # shellcheck disable=SC2034 # Read by the Stop hook after claim publication.
+    FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=$FM_AUTOARM_RECOVERY
   fi
   gen=$(_fm_autoarm_epoch_field "$epoch" epoch 2>/dev/null || true)
   case "$gen" in
@@ -3049,6 +3061,61 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   # reaches END after failing to open the queue would otherwise report 0 rows.
   case "$count" in ''|*[!0-9]*) count=1 ;; esac
   printf '%s\n' "$count"
+}
+
+# Main's presented-row claim (state/.main-eligible-rows) outlives the turn that
+# presented it, because only an acknowledgement shrinks it and a branch grant
+# must keep excluding those rows. Whether the presenting main turn still holds
+# them is the separate held flag, which lasts only for that turn:
+# bin/fm-wake-drain.sh sets it when main presents rows, writing a token unique to
+# that presentation, and the first proof that the turn ended releases it - a
+# Claude Stop firing that passes its AFK and need gates
+# (bin/fm-claude-stop-autoarm.sh), a StopFailure or the next UserPromptSubmit
+# (bin/fm-claude-hold-release.sh), or the next main drain, which replaces it
+# with its own. A row counts as delivered only once main acknowledges it with
+# --ack-through; a refused host close leaves it queued for the next drain.
+fm_wake_main_presentation_hold() {
+  printf '%s %s %s\n' "$$" "$(date +%s)" "$RANDOM" > "$STATE/.main-eligible-rows.held"
+}
+
+# Clear the hold only while it still carries the token <seen> the Stop firing
+# read when it started, under the queue lock the drain sets it under, so an
+# older asynchronous firing never clears a newer turn's hold. An empty <seen>
+# means no hold existed when the Stop fired, so there is nothing to clear.
+fm_wake_main_presentation_release() {  # <seen>
+  local seen=${1:-} current status=0
+  [ -n "$seen" ] || return 0
+  fm_lock_acquire_wait_max "$FM_WAKE_QUEUE_LOCK" 10 || return 1
+  current=$(cat "$STATE/.main-eligible-rows.held" 2>/dev/null || true)
+  if [ "$current" = "$seen" ]; then
+    rm -f -- "$STATE/.main-eligible-rows.held" || status=1
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$status"
+}
+
+# 0 when main owns a queued row no presentation hold covers: a structurally valid
+# row no live branch grant reserves, unless main's presented-row claim names it
+# while the held flag above is set. Read without the queue lock, like the count
+# above; a queue that exists but cannot be read counts as unheld.
+fm_wake_main_unpresented() {
+  local rows="$STATE/.branch-eligible-rows" owner="$STATE/.branch-eligible-owner"
+  local presented='' grant='' count=''
+  [ -f "$FM_WAKE_QUEUE" ] || return 1
+  if fm_wake_branch_grant_live "$rows" "$owner"; then
+    grant=$rows
+  fi
+  [ ! -e "$STATE/.main-eligible-rows.held" ] || presented="$STATE/.main-eligible-rows"
+  count=$(awk -F '\t' -v seqs="$grant" -v presented="$presented" '
+    BEGIN {
+      if (seqs != "") while ((getline line < seqs) > 0) reserved[line] = 1
+      if (presented != "") while ((getline line < presented) > 0) shown[line] = 1
+    }
+    NF >= 5 && $2 ~ /^[0-9]+$/ && !($2 in reserved) && !($2 in shown) { n++ }
+    END { print n + 0 }
+  ' "$FM_WAKE_QUEUE") || return 0
+  case "$count" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$count" -gt 0 ]
 }
 
 fm_wake_main_rows() {

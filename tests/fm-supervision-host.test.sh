@@ -811,7 +811,7 @@ test_late_successor_failure_reaches_the_wake_queue() {
 }
 
 # A successor that reports its own startup failure ends the wait at once, even
-# while that arm process lingers.
+# while that arm process lingers; the close is delivered without another start.
 test_failed_successor_fails_fast() {
   local home host started elapsed
   home=$(make_home failed-successor attended)
@@ -825,6 +825,7 @@ test_failed_successor_fails_fast() {
   [ "$elapsed" -lt 15 ] || fail "failed successor: the host took ${elapsed}s to see the reported failure"
   expect_code 0 "$(cat "$home/host.rc")" "a main-only close must exit 0"
   assert_re 'pass-through	successor-unverified' "$home/state/.supervision-host.log" "a failed successor must be reported unverified"
+  [ "$(cat "$home/arm-calls")" -eq 2 ] || fail "failed successor: the failed start delayed the close with another attempt"
   assert_re '^signal: .*demo.status' "$home/host.out" "the close must still reach main"
   pass "host: a successor that reports failure ends the readiness wait at once"
 }

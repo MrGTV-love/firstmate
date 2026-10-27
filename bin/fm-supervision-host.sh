@@ -54,11 +54,12 @@
 #     that is unsafe or holds nothing for the branch) stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
-#     drops the handoff. It confirms no handling handoff, so the recovery
-#     marker still reads downtime and the re-arm owner delivers the close to
-#     main. The host records that successor's arm before relinquishing it
-#     (detach_successor owns the persistence check and failure path). The
-#     session's next park without --restart requests a take-over of its cycle
+#     drops the handoff. It confirms no engine handling handoff, so the host
+#     leaves the recovery marker as the closed watcher and any drain left it;
+#     docs/watcher-continuity.md owns the re-arm owner's delivery eligibility
+#     in either phase. The host records that successor's arm before
+#     relinquishing it (detach_successor owns the persistence check and
+#     failure path). The session's next park without --restart requests a take-over of its cycle
 #     rather than an ordinary attach; bin/fm-watch-arm.sh's --take-over header owns the
 #     conditions under which that restores a single owner and the fallback;
 #   - away (an away record exists): every close goes to the engine.
@@ -724,11 +725,11 @@ detach_successor() {
 }
 
 # Start the same successor a handled wake starts and leave it running. It
-# confirms no handling handoff: main, not the engine, handles this close, and
-# the re-arm owner delivers it only while the recovery marker still reads
-# downtime (autoarm_commit in bin/fm-claude-stop-autoarm.sh). A failed start
-# returns 1; the caller still prints the close unchanged. A successor still
-# starting is left running too, and SUCCESSOR_NOTE carries the line saying so.
+# confirms no handling handoff: main, not the engine, handles this close.
+# docs/watcher-continuity.md owns delivery eligibility if another drain changes
+# the shared recovery phase. A failed start returns 1; the caller still prints
+# the close unchanged. A successor still starting is left running too, and
+# SUCCESSOR_NOTE carries the line saying so.
 SUCCESSOR_NOTE=
 leave_successor_for_main() {
   local rc=0
@@ -1171,9 +1172,8 @@ while :; do
     # The successor this turn already started and confirmed stays up. Retiring
     # it is what left no watcher after a close that became main-only.
     detach_successor
-    # Main handles this close after all, so hand back the downtime the handoff
-    # above consumed: the re-arm owner delivers the close only while the
-    # recovery marker reads downtime (leave_successor_for_main).
+    # Main handles this close after all, so hand back the downtime the engine
+    # handoff above consumed (leave_successor_for_main).
     if [ -n "$SUCCESSOR_GENERATION" ] \
       && ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null 2>&1; then
       log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"

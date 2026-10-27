@@ -355,7 +355,31 @@ An acknowledged episode does not freeze the generation, because the next downtim
 ### Who presents queued wakes between turns
 
 While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
-Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+A supervision-host close commits against a valid unacknowledged downtime episode.
+It also commits against a handling episode whenever no healthy watcher runs, independently of queued rows or a presentation hold.
+With a healthy watcher, it commits only while main owns a queued row that no presentation hold covers (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
+Two invariants keep that refusal from dropping a wake.
+Delivery: the hold lasts only for the main turn that presented the rows, and a row counts as delivered only once main acknowledges it with `--ack-through`.
+Liveness: a supervision-host close that leaves no live successor is never refused in silence, because a handling-episode close is refused only while a healthy watcher runs (`fm_watcher_healthy`); the host does not change the marker for such a close ([supervision host](supervision-host.md#failure-direction)).
+A main presentation drain sets that held flag with a token unique to that presentation, and the first proof that the presenting turn ended releases it.
+Every Claude Stop firing of the session-lock owner that passes the AFK and need gates clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
+The firing reads the token before any gate or library load and clears the flag under the queue lock only while it still carries that token, so a late asynchronous firing never clears a hold that a newer turn's drain wrote.
+A turn that ends with no Stop releases it at the next proof: `bin/fm-claude-hold-release.sh` runs on `StopFailure` (an API error) and on the next `UserPromptSubmit`, which Claude fires for a typed prompt, a steer, and an asyncRewake turn, so it also follows a mid-stream Escape, which fires no hook ([Claude reference](../.agents/skills/harness-adapters/references/harness/claude.md)).
+A message typed while a turn is still running also releases it: on Claude Code 2.1.310 the hold cleared about 1 s after the message was queued ([verification](verification/supervision.md#claude-presentation-hold-release-2026-10-25-and-2026-10-26)), so a later host close for that turn's rows is delivered as a duplicate, which main handles idempotently.
+The next main drain replaces the hold with its own.
+The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
+When main's own drain entered handling, the turn that presented every row still holds them, and a healthy watcher runs, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and that watcher stays live beside it.
+With no healthy watcher, the close commits even while a hold covers its rows or the queue is empty, because a refusal could leave nothing to rewake main if that turn then ends with no Stop; main handles the possible duplicate idempotently.
+An empty-queue main drain can enter handling for an unacknowledged recovery episode, so a host cycle-boundary close must not depend on a queued row or held flag to take this liveness path.
+The boundary regression in `tests/fm-claude-stop-autoarm.test.sh` covers the downtime control and both pending and announced handling after a real empty-queue drain.
+Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so a host close that arrives after the release is delivered once.
+A close refused before the release is owed too: the refused terminal ledger entry records that held close's recovery generation, and the next Claude Stop firing consumes that entry when it takes a new auto-arm generation.
+Only when that receipt names the current handling episode and main still owns a queued row no hold covers does the firing rewake main before it arms, because `fm_recovery_marker_arm_check` waits on a handling episode.
+This allows one early redelivery per recorded held-close refusal, not a new rewake on every Stop that ends without an acknowledgement or whose acknowledgement the overdue-action gate refuses.
+That covers a turn that ended through Stop and the turn after the next prompt, including the prompt after a mid-stream Escape.
+A turn that ended on an API error releases its hold through `StopFailure`, but that hook cannot rewake main, so rows owed by a close refused beside a healthy watcher wait for the next turn's Stop while that watcher keeps supervising.
+Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.
+The direct-arm path still requires downtime.
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
 When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
 The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
@@ -364,8 +388,8 @@ Claim publication waits up to ten seconds for the queue lock before attempting t
 The ownership micro-mutex is never held across a lock wait or output.
 The handling turn the hook starts then runs the ordinary presentation drain, which enters handling, and uses the emitted `--ack-through` command only after handling completes.
 Once the claim is finished or absent and the ownership micro-mutex is available, the re-emit drains as before; homes without a Claude epoch ledger retain their ordinary drain behavior.
-A refused rewake commit (including a non-downtime marker or lost session-lock ownership) exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
-`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, and refusal cleanup.
+A refused rewake commit exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
+`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, refusal cleanup, a branch presentation overlapping a main-only host handback with and without a healthy successor, and a main presentation of that handback refused without a second wake while its turn is open beside a healthy watcher or after an in-turn acknowledgement, delivered once while held with no healthy watcher, and otherwise delivered once after that turn ended unacknowledged through Stop, `StopFailure`, or the next prompt, without repeated early rewakes when subsequent turns omit acknowledgement or the overdue-action gate refuses it; `tests/fm-supervision-host-hook.test.sh` covers a held close whose successor cannot start or is still starting, which leaves the marker in handling and still rewakes main, and a close main acknowledged before the hand-back, which keeps that acknowledged episode and is not rewoken.
 
 ## Per-actor acknowledgement
 
@@ -378,6 +402,7 @@ The Pi branch extension injects its branch actor into its own bash tool calls.
 Every presented row is claimed to exactly one actor under the durable queue lock.
 
 - Main records its presented set in `state/.main-eligible-rows`.
+  The claim outlives the presenting turn until acknowledgement; `state/.main-eligible-rows.held` says only whether the presenting turn still holds it ([who presents queued wakes](#who-presents-queued-wakes-between-turns)).
 - A branch grant is published through `bin/fm-wake-grant.sh` under that same lock in `state/.branch-eligible-rows`.
   The grant is bound to the live branch process and extension generation recorded in `state/.branch-eligible-owner`.
   Publication is refused if main already claimed any requested row.
