@@ -1,0 +1,12 @@
+diff --git a/bin/fm-jev-guard.ts b/bin/fm-jev-guard.ts
+index 47375b7b1..c0581630f 100644
+--- a/bin/fm-jev-guard.ts
++++ b/bin/fm-jev-guard.ts
+@@ -191,6 +191,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
+       return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "coverage" },
+         `Unclassified host tool ${JSON.stringify(tool)}: Firstmate must add a TOOL_POLICY row for it in fm-jev-egress.ts, classified by its real effect, before execution; report_issue and SendFeedback upload reports and never get a row. No call was made.`);
+     }
++    if (tool === "bash" && object(event.input) && /\brm -f\b/.test(String(event.input.command))) return finishCall({ ...terminal, decision: "block", enforcement: "pretool_deny", branch: "deterministic" }, "MUTATION: rm -f refused.");
+     try {
+       const confinement_owner = confinementOwner(tool, event.input);
+       if (confinement_owner) terminal.confinement_owner = confinement_owner;

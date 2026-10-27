@@ -1,0 +1,54 @@
+$ bash tests/fm-jev-guard.test.sh  # with mutation.diff applied
+ok - pure write boundaries
+not ok - bash acceptance: ✔ omp T2(a), B68: remove own smoke.py (79.512959ms)
+✔ omp T2(b), B69: four-file probe cleanup (71.073333ms)
+✔ omp T2(c), B57: six tracked cd-guard deletions (129.673417ms)
+✖ omp: rm -f of HEAD-tracked files named in the brief passes without refusal (109.476ms)
+✔ omp T2(d), B22/B48-B50: dispatch lab teardown command (105.141542ms)
+✔ omp T2(e), O13: acknowledge inbox with provider unreachable (62.830542ms)
+✔ omp T2(f): shell admission does not depend on audit availability or payload size (152.242625ms)
+✔ claude T2(a), B68: remove own smoke.py (9.1475ms)
+✔ claude T2(b), B69: four-file probe cleanup (16.231458ms)
+✔ claude T2(c), B57: six tracked cd-guard deletions (70.504167ms)
+✔ claude T2(d), B22/B48-B50: dispatch lab teardown command (56.294833ms)
+✔ claude T2(e), O13: acknowledge inbox with provider unreachable (9.817ms)
+✔ claude T2(f): shell admission does not depend on audit availability or payload size (97.881417ms)
+✔ claude: Bash, Monitor and PowerShell start no generated pre-call hook (0.281292ms)
+✔ claude: outbound and unknown shell-prefix names still reach the generated guard (605.235ms)
+✔ claude: Write and Edit still reach the generated jev-guard hook (220.800875ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1805.109916
+
+✖ failing tests:
+
+test at [eval1]:75:29
+✖ omp: rm -f of HEAD-tracked files named in the brief passes without refusal (109.476ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   block: true,
+  +   reason: '[jev-guard] MUTATION: rm -f refused. REVIEW_ON_UNAVAILABLE_V1. Do not retry an equivalent action through another command, tool, path or encoding. Report the refused action and reason to Firstmate and request an authorized correction or alternative.'
+  + }
+  - undefined
+  
+      at run (file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Z96ZTRZ7D6T2CZZ0BXRSS4/[eval1]:37:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Z96ZTRZ7D6T2CZZ0BXRSS4/[eval1]:85:5)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      at async file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Z96ZTRZ7D6T2CZZ0BXRSS4/[eval1]:75:23 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+exit=1

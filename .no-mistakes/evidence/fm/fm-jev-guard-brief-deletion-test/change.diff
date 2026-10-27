@@ -1,0 +1,26 @@
+diff --git a/tests/fm-jev-guard.test.sh b/tests/fm-jev-guard.test.sh
+index d5a182ffd..59647bdd8 100755
+--- a/tests/fm-jev-guard.test.sh
++++ b/tests/fm-jev-guard.test.sh
+@@ -176,6 +176,21 @@ for (const host of ['omp', 'claude']) {
+     for (const path of paths) assert.equal(existsSync(`${worktree}/${path}`), false);
+     assert.equal(execFileSync('git', ['diff', '--name-only'], { cwd: worktree, encoding: 'utf8' }).trim().split('\n').length, 6);
+   });
++  if (host === 'omp') await test('omp: rm -f of HEAD-tracked files named in the brief passes without refusal', async () => {
++    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs', 'docs/cd-guard.md'];
++    writeFileSync(`${data}/brief.md`, `# Task\nDelete these obsolete files:\n${paths.map(path => `- ${path}`).join('\n')}\n`);
++    for (const path of paths) {
++      mkdirSync(dirname(`${worktree}/${path}`), { recursive: true });
++      writeFileSync(`${worktree}/${path}`, 'obsolete tracked file\n');
++    }
++    execFileSync('git', ['add', '--', ...paths], { cwd: worktree });
++    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false',
++      'commit', '-qm', 'fixture', '--', ...paths], { cwd: worktree });
++    await run(`rm -f ${paths.join(' ')}`);
++    for (const path of paths) assert.equal(existsSync(`${worktree}/${path}`), false);
++    assert.deepEqual(execFileSync('git', ['diff', '--name-only', 'HEAD'], { cwd: worktree, encoding: 'utf8' }).trim().split('\n').sort(),
++      [...paths].sort());
++  });
+   await test(`${host} T2(d), B22/B48-B50: dispatch lab teardown command`, async () => {
+     const script = `${worktree}/fm-herdr-lab.sh`;
+     const marker = `${data}/teardown-args`;
