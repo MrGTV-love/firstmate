@@ -2416,6 +2416,29 @@ test_pid_alive_reads_proc_state_without_ps() {
   pass "a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict"
 }
 
+test_pid_alive_reads_multiline_proc_comm() {
+  local dir
+  dir=$(make_case pid-alive-multiline-proc)
+  mkdir -p "$dir/proc/$$"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROC_ROOT_OVERRIDE="$dir/proc" bash -c '
+    . "$1"
+    stat=$2/proc/$3/stat calls=$2/ps-calls
+    ps() { printf x >> "$calls"; return 1; }
+    printf "%s (worker) S 1\nname) Z 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 10
+    printf "%s (worker) Z 1\nname) S 1 2 3\n" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 11
+    printf "%s (worker)\nname) Z 1 2 3" "$3" > "$stat"
+    fm_pid_alive "$3" && exit 12
+    : > "$stat"
+    fm_pid_alive "$3" || exit 13
+    printf "%s (unterminated\nname" "$3" > "$stat"
+    fm_pid_alive "$3" || exit 14
+    [ ! -e "$calls" ] || exit 15
+  ' _ "$LIB" "$dir" "$$" || fail "fm_pid_alive misclassified a multiline /proc comm (rc=$?)"
+  pass "multiline /proc comm uses the state after the last closing parenthesis and keeps unreadable state alive"
+}
+
 test_dead_owner_alarm_names_its_trigger() {
   "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not name its proven verdict"
 import os, pathlib, signal, subprocess, sys, tempfile, time
@@ -3031,6 +3054,7 @@ test_exit_cleanup_wait_never_delivers_second_wake
 test_startup_queue_wait_alarm_releases_with_downtime
 test_lock_alarm_project_and_control_limits
 test_pid_alive_reads_proc_state_without_ps
+test_pid_alive_reads_multiline_proc_comm
 test_dead_owner_alarm_names_its_trigger
 test_dead_owner_alarm_requires_blocked_waiter
 test_dead_owner_alarm_needs_two_checks

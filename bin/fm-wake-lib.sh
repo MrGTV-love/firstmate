@@ -98,7 +98,10 @@ fm_pid_alive() {
   # character. An absent or unreadable result is not proof of death: retain
   # the kill -0 verdict.
   if [ -r "$proc_root/$pid/stat" ]; then
-    IFS= read -r state 2>/dev/null < "$proc_root/$pid/stat" || return 0
+    # comm may contain newlines and closing parentheses. Read through EOF,
+    # not just its first physical line, and split after the final closing one.
+    IFS= read -r -d '' state 2>/dev/null < "$proc_root/$pid/stat" || :
+    case "$state" in *') '*) ;; *) return 0 ;; esac
     state=${state##*)}
     state=${state# }
     state=${state%% *}
