@@ -739,17 +739,22 @@ EOF
 }
 
 fm_verification_plan_block() {  # <brief>
-  local root brief_q output_q builder_q
+  local root brief_q output_q builder_q memory_q home_q
   root=$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)
   printf -v builder_q '%q' "$root/bin/fm-dod-lib.sh"
   printf -v brief_q '%q' "$1"
   printf -v output_q '%q' "${1%/*}/verification-plan.md"
+  printf -v memory_q '%q' "$root/bin/fm-mem-guard.sh"
+  printf -v home_q '%q' "${FM_HOME:-$root}"
   cat <<EOF
 Before starting a new no-mistakes run, build the separate verification plan from the current durable task brief:
 \`bash $builder_q --verification-plan $brief_q > $output_q\`
 If plan construction fails, stop and report the error to firstmate; do not start a run with a partial plan.
 Pass \`--verification-plan $output_q\` when starting the run, alongside the unchanged \`--intent\` input described below.
 The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
+Start each NEW run through \`FM_HOME=$home_q $memory_q run -- no-mistakes axi run\`, appending the unchanged intent and verification-plan arguments, not the bare run command.
+That path records a fresh host memory reading immediately before exec and refuses new work with exit 75 while pressure is high or the measured baseline is unavailable; leave the work queued for retry without stopping any existing work.
+Reattach to existing runs and answer gates directly with no-mistakes; those calls must remain usable under pressure.
 
 EOF
 }

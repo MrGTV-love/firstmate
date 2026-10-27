@@ -7,12 +7,16 @@ This document owns the framework contract every guard family follows; each famil
 ## Shape
 
 Each family ships as a pair plus its tests.
-`bin/fm-<name>-guard.sh` is a thin wrapper that resolves its own directory and `exec`s the family engine with `python3`.
+`bin/fm-<name>-guard.sh` resolves its engine; the memory wrapper also owns new-work execution and publishes observations through the existing durable wake library.
 `bin/fm-<name>-guard.py` is the engine: it measures, classifies, and prints.
 `tests/fm-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
 
-The memory family is `fm-mem-guard`; its engine header owns Linux/macOS sources, metric interpretation, and command budget.
-It makes no Jev, model, or network call, so its former `fm-jev-mem-guard` name has been removed rather than kept as an alias.
+The memory family is `fm-mem-guard`; its engine header owns Linux/macOS diagnostic sources and budgets, macOS admission measurements, host baseline derivation, and the distinction between diagnostic fail-open and admission fail-closed behavior.
+It makes no Jev, model, or network call.
+The backend-neutral spawn owner and generated worker new-run instructions call the same admission wrapper; the watcher observes through its existing check cadence and surfaces already-queued memory payloads without duplicating rows.
+The process census reuses `fm-proc-info.py` for sandbox-safe kernel facts, supplements other-user RSS through `ps` when permitted, and records unreadable resident sizes explicitly rather than substituting zero.
+Paired task markers, a kernel cwd within the declared local home, and their descendant trees provide fleet attribution without relying on process names or publishing cwd and environment contents.
+[Host memory admission](configuration.md#host-memory-admission) owns operator setup; `tests/fm-mem-guard.test.sh`, `tests/fm-project-capacity.test.sh`, and `tests/fm-watch-typesafe-health.test.sh` cover classification, actual admission, and identifying wake delivery.
 
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
 Only its `check` command follows the one-shot verdict contract below.
@@ -21,6 +25,8 @@ The [adapter header](../bin/fm-procevent-proc.sh) owns bootstrap arming, shared 
 Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-procevent-proc.test.sh`, and the bootstrap arming case in `tests/fm-bootstrap.test.sh` exercise real-UID accounting, privacy, fixed threshold boundaries, watcher-free lifetime, durable capture/wake delivery, cross-home episode suppression, and override-only home routing.
 
 ## Engine contract
+
+These one-shot diagnostic rules do not authorize new work; the memory engine header separately owns its admission commands.
 
 - Read-only diagnostics: a guard never changes the system it measures and never mutates agent, session, or repository state except for diagnostic artifacts expressly owned by its engine header.
 - Fail-open verdicts: permission errors, missing pseudo-files, and virtualized-environment gaps degrade to a graceful `UNKNOWN` verdict with a reason, never a false alarm.
@@ -37,6 +43,6 @@ Behavioral coverage in `tests/fm-proc-guard.behavior.test.py`, `tests/fm-proceve
 
 ## Adding a family
 
-Copy the smallest existing pair, keep the wrapper under ten lines, and keep every threshold in the engine with a comment naming the resource it bounds.
+Copy the smallest diagnostic pair, keep diagnostic-only wrappers under ten lines, and keep every threshold in the engine with a comment naming the resource it bounds.
 Add the family's behavioral test alongside it and run it through `bin/fm-test-run.sh`.
 A family that needs a host-specific source (a fleet registry, a pool manager, a quota service, or a product's hook store) belongs to the operator's own layer, not this framework.

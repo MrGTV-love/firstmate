@@ -130,6 +130,32 @@ test_hung_probe_is_never_doubled() {
   pass "a probe still running is never started twice, and the poll keeps running"
 }
 
+test_memory_observation_wakes_with_the_process_identity() {
+  local dir state fakebin out pid native rc=0
+  dir=$(make_case memory-health-wake); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  native="$dir/native"; mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false}]\n' > "$native/processes.json"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_MEMORY_FIXTURE_DIR="$native" \
+    bash "$ROOT/bin/fm-mem-guard.sh" baseline >/dev/null || fail 'memory baseline fixture failed'
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":8589934592,"fleet":false}]\n' > "$native/processes.json"
+  start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  fm_test_wait_until 100 grep -q 'xprotectd PID 101' "$out" || {
+    stop_owned_watcher "$pid"
+    fail "the watcher failed to present the identifying memory alarm: $(cat "$out") $(cat "$out.err")"
+  }
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "memory alarm stopped watcher with an error: $(cat "$out.err")"
+  assert_contains "$(cat "$state/.wake-queue")" 'xprotectd PID 101' 'the presented memory observation was not durable'
+  jq -es '.[-1].source == "probe" and .[-1].alarms[0].pid == 101' "$state/memory-readings.jsonl" >/dev/null \
+    || fail 'watcher did not retain the alarm reading'
+  pass 'the real watcher starts native observation and presents its named non-fleet alarm through the existing durable wake queue'
+}
+
+test_memory_observation_wakes_with_the_process_identity
 test_probe_runs_detached_on_its_interval_with_the_home
 test_first_probe_waits_a_full_interval
 test_zero_interval_disables_the_probe

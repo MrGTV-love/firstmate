@@ -4,6 +4,9 @@
 # Usage: fm-spawn.sh <task-id> <project-dir> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> <project-dir> --scout [--fixed-family] [--base-branch <branch>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] [--herdr-resume-lock-wait]
 #        fm-spawn.sh <task-id> [<firstmate-home>] [--harness <name>|harness|launch-command] [--model <name>] [--effort <level>] [--backend <name>] --secondmate
+#   Fresh ship/scout admission first reads host memory through fm-mem-guard.sh;
+#   its measured native pressure/baseline rule returns 75 before task resources
+#   or backlog dispatch. Existing workers and recovery are never stopped.
 #   --mode and --yolo are this task's delivery contract, REQUIRED for every ship
 #   spawn and refused on --scout and --secondmate spawns. Firstmate resolves both
 #   per task at intake (AGENTS.md section 7); data/projects.md holds the captain's
@@ -4279,6 +4282,18 @@ else
   WT=""
   BRIEF="$DATA/$ID/brief.md"
 fi
+# Read host memory before allocating any fresh worker resources or moving its
+# backlog row. Recovery of an existing worker is not new work and stays usable.
+# bin/fm-mem-guard.sh owns the measured baseline, native sources and exit 75.
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
+  memory_rc=0
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}" admit >/dev/null || memory_rc=$?
+  if [ "$memory_rc" -ne 0 ]; then
+    echo "deferred: host memory admission refused new task $ID (exit $memory_rc); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl" >&2
+    exit 75
+  fi
+fi
 # Project capacity admission (bin/fm-project-capacity-lib.sh owns the
 # declaration, what holds a place, and why this is race-safe). A fresh worker
 # for a project whose declared capacity is already held is deferred here, before
@@ -4378,6 +4393,16 @@ if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
   if [ "$FM_PROJECT_CAPACITY_OCCUPANTS" -ge "$SPAWN_PROJECT_CAPACITY" ]; then
     echo "deferred: project $(basename "$PROJ_ABS") admits $SPAWN_PROJECT_CAPACITY worker(s) at once on this machine ($FM_PROJECT_CAPACITY_FILE) and $FM_PROJECT_CAPACITY_OCCUPANTS already hold a place ($FM_PROJECT_CAPACITY_OCCUPANT_IDS); task $ID was not launched and its backlog item stays queued - dispatch it again once one of them records its ready PR or is cleaned up" >&2
     exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
+  fi
+fi
+# A project-allocation wait can outlive the first health reading. Re-read while
+# holding its lock, before brief rendering or allocation, rather than admitting
+# from a snapshot taken before that wait.
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] && [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
+  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}" admit >/dev/null; then
+    echo "deferred: host memory changed while task $ID waited for allocation; no worker was launched and its backlog item stays queued" >&2
+    exit 75
   fi
 fi
 if [ "$RELAUNCH_RELOCATING" = 1 ]; then

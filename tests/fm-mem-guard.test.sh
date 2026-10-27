@@ -134,3 +134,153 @@ assert (report["reason"] is None) == (report["status"] == "OK"), report
 assert isinstance(report["top_processes"], list), report
 PY
 echo "ok - fm-mem-guard.sh wrapper --json --check exits 0 with a pass verdict"
+
+# Exercise the real shell entrypoint, append-only records, and existing wake
+# queue with native-command fixtures. Existing work is a real live child.
+python3 - "$SCRIPT_DIR/../bin/fm-mem-guard.sh" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+wrapper = str(Path(sys.argv[1]).resolve())
+gib = 1024 ** 3
+if sys.platform == "darwin":
+    with tempfile.TemporaryDirectory(prefix="fm-memory-ownership-") as temp:
+        fleet_home = (Path(temp)/"home").resolve()
+        outside = (Path(temp)/"home-unrelated").resolve()
+        fleet_home.mkdir(); outside.mkdir()
+        clean = dict(os.environ)
+        for key in ("FM_TASK_ID", "FM_TASK_INBOX", "FM_MEMORY_FLEET_ROOT"):
+            clean.pop(key,None)
+        children = []
+        try:
+            for cwd, extra in ((fleet_home,{}),(outside,{}),
+                    (outside,{"FM_TASK_ID":"owned", "FM_TASK_INBOX":str(fleet_home/"state/owned.inbox")})):
+                children.append(subprocess.Popen([sys.executable,"-c","import time; time.sleep(120)"],
+                                                cwd=cwd,env={**clean,**extra}))
+            result = subprocess.run([sys.executable,str(Path(wrapper).with_name("fm-proc-info.py")),"memory"],
+                                    capture_output=True,text=True,check=True,
+                                    env={**clean,"FM_MEMORY_FLEET_ROOT":str(fleet_home)})
+            by_pid = {row["pid"]:row for row in json.loads(result.stdout)}
+            assert [by_pid[child.pid]["fleet"] for child in children] == [True,False,True], by_pid
+            assert all("cwd" not in by_pid[child.pid] for child in children)
+            print("ok - actual native census independently attributes kernel home cwd and paired markers without claiming a sibling-prefix process")
+        finally:
+            for child in children:
+                child.terminate(); child.wait()
+else:
+    print("skip - native kernel fleet attribution requires macOS; portable alarm/ancestry fixtures still run")
+with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
+    home = Path(temp)
+    fixture = home / "native"
+    fixture.mkdir()
+    env = {**os.environ, "FM_HOME":str(home), "FM_ROOT_OVERRIDE":"",
+           "FM_STATE_OVERRIDE":"", "FM_MEMORY_FIXTURE_DIR":str(fixture)}
+    state = home / "state"
+    daemon = {"pid":101, "ppid":1, "comm":"xprotectd", "started":"start-101",
+              "rss_bytes":gib, "fleet":False}
+    fleet = {"pid":201, "ppid":1, "comm":"node", "started":"start-201",
+             "rss_bytes":6*gib, "fleet":True}
+    child = {"pid":202, "ppid":201, "comm":"python3", "started":"start-202",
+             "rss_bytes":5*gib, "fleet":False}
+
+    def facts(pressure=1, anonymous=16*gib, rss=None):
+        (fixture / "sysctl").write_text(f"{32*gib}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
+        (fixture / "vm_stat").write_text(
+            "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+            "Pages free: 1000.\nPages speculative: 100.\n"
+            f"Anonymous pages: {anonymous//16384}.\nPages occupied by compressor: 32768.\n")
+        rows = [dict(daemon), dict(fleet), dict(child)] if rss is None else rss
+        (fixture / "processes.json").write_text(json.dumps(rows))
+
+    def call(mode, *args, code=0):
+        result = subprocess.run(["bash",wrapper,mode,*args],capture_output=True,text=True,env=env)
+        assert result.returncode == code, (mode,result.returncode,result.stdout,result.stderr)
+        return json.loads(result.stdout) if result.stdout else None
+
+    facts()
+    report = call("admit",code=75)
+    assert report["admission"] == "defer" and report["baseline"] is None
+    assert any("unmeasured" in reason for reason in report["reasons"])
+    baseline = call("baseline")["baseline"]
+    assert baseline["non_fleet_max_bytes"] == gib, baseline  # excludes fleet descendants
+    assert "admission measurements or the healthy RSS baseline are unavailable" in (state / ".wake-queue").read_text()
+    report = call("admit")
+    assert report["anonymous_bytes"] == 16*gib and report["compressor_bytes"] == gib//2
+    assert report["unused_bytes"] == 1100*16384 and report["swap_used_bytes"] > 0
+    assert report["alarms"] == []  # equality does not alarm
+    original = (state / ".memory-baseline.json").read_bytes()
+    call("baseline",code=75)
+    assert (state / ".memory-baseline.json").read_bytes() == original
+    print("ok - unmeasured admission defers; explicit host baseline excludes fleet ancestry and never silently grows")
+
+    worker = subprocess.Popen(["sleep","120"])
+    try:
+        ran = home / "new-run"
+        # This represents the actual new-run entrypoint; its work must not start
+        # on pressure, while an already running process must remain alive.
+        launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
+        call("run",*launch)
+        assert ran.exists()
+        ran.unlink()
+        facts(pressure=2)
+        call("run",*launch,code=75)
+        assert not ran.exists() and worker.poll() is None
+        facts(pressure=4)
+        call("admit",code=75)
+        app_limit = ((24*1000**3 + 16383)//16384)*16384
+        facts(anonymous=app_limit)
+        report = call("admit",code=75)
+        assert any("24 GB" in r for r in report["reasons"])
+        facts(anonymous=app_limit-16384)
+        call("admit")
+        facts(rss=[dict(daemon),{**fleet,"comm":"ShellCheck","rss_bytes":4*1000**3}])
+        call("admit")
+        facts(rss=[dict(daemon),{**fleet,"comm":"ShellCheck","rss_bytes":4*1000**3+1}])
+        report = call("admit",code=75)
+        assert any("PID 201" in r and str(4*1000**3+1) in r for r in report["reasons"])
+        assert worker.poll() is None
+        print("ok - real run-start exec admits healthy work, refuses warning/critical/app/ShellCheck pressure with 75 and preserves existing work")
+    finally:
+        worker.terminate()
+        worker.wait()
+
+    facts()
+    call("probe")
+    before = (state / ".wake-queue").read_text().count("\n")
+    facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
+    report = call("probe")
+    assert len(report["alarms"]) == 1 and report["alarms"][0]["pid"] == 101
+    queue = (state / ".wake-queue").read_text()
+    assert queue.count("\n") == before+1
+    assert "xprotectd PID 101" in queue and "restarting any system daemon requires" in queue
+    call("probe")
+    assert (state / ".wake-queue").read_text() == queue
+    facts()
+    call("probe")
+    facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
+    call("probe")
+    assert (state / ".wake-queue").read_text().count("\n") == before+2
+    print("ok - a named non-fleet outlier raises one durable check per episode, including after recovery; fleet children never masquerade as leaks")
+
+    facts()
+    (fixture / "vm_stat").unlink()
+    report = call("admit",code=75)
+    assert report["errors"] and "anonymous_bytes" not in report
+    assert report["admission"] == "defer"
+    facts()
+    (fixture / "processes.json").write_text('[{"pid":101,"rss_bytes":"unknown"}]')
+    report = call("admit",code=75)
+    assert any("processes:" in e for e in report["errors"])
+    facts()
+    (state / ".memory-baseline.json").write_text('{"invalid":true}')
+    report = call("admit",code=75)
+    assert any("baseline:" in e for e in report["errors"])
+    records = [json.loads(line) for line in (state / "memory-readings.jsonl").read_text().splitlines()]
+    assert records[-1] == report and all(row["fixture"] == str(fixture) for row in records)
+    assert any(row["source"] == "probe" and row["alarms"] for row in records)
+    print("ok - unreadable facts/baselines remain explicit and fail closed; every observation is retained as independently parseable JSONL")
+PY

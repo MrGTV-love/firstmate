@@ -419,6 +419,10 @@ case "$TYPESAFE_HEALTH_INTERVAL" in
 esac
 TYPESAFE_HEALTH_BIN=${FM_TYPESAFE_HEALTH_BIN:-$SCRIPT_DIR/fm-typesafe-health.sh}
 TYPESAFE_HEALTH_NEXT=
+# Native memory observation shares the existing check cadence; the helper owns
+# recorded readings and durable, deduplicated alarms, never interventions.
+MEMORY_HEALTH_BIN=${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}
+MEMORY_HEALTH_PID=
 # Automatic retirement of finished Lavish listeners (the --auto mode of
 # bin/fm-procevent-lavish.sh sweep, which owns the rules and the record of why);
 # docs/configuration.md "Process-to-event sources" owns the cadence.
@@ -3223,6 +3227,37 @@ typesafe_health_tick() {
   TYPESAFE_HEALTH_PID=$!
 }
 
+# Native census is single-flight and detached just like account health. Keep
+# the due marker across watcher restarts and reuse the ordinary check cadence.
+memory_health_tick() {
+  local now next
+  fm_epoch_seconds_to now
+  next=0
+  if [ -r "$STATE/.memory-health-next" ]; then
+    IFS= read -r next < "$STATE/.memory-health-next" || next=0
+    case "$next" in ''|*[!0-9]*) next=0 ;; esac
+  fi
+  [ "$now" -ge "$next" ] || return 0
+  if [ -n "$MEMORY_HEALTH_PID" ]; then
+    kill -0 "$MEMORY_HEALTH_PID" 2>/dev/null && return 0
+    wait "$MEMORY_HEALTH_PID" 2>/dev/null || true
+  fi
+  printf '%s\n' "$((now + CHECK_INTERVAL))" > "$STATE/.memory-health-next"
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$MEMORY_HEALTH_BIN" probe </dev/null >/dev/null 2>&1 &
+  MEMORY_HEALTH_PID=$!
+}
+
+# The detached observer already appended its durable row. Present that exact
+# identifying payload on the next poll, without appending it a second time.
+memory_health_surface() {
+  local reason
+  [ -s "$FM_WAKE_QUEUE" ] || return 0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
+  reason=$(awk -F '\t' 'NF >= 5 && $3 == "check" && ($4 == "memory-health" || $4 == "memory-health-unavailable") { print $5; exit }' "$FM_WAKE_QUEUE")
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ -z "$reason" ] || wake "$reason"
+}
+
 # The Lavish sweep is detached and single-flight like the sweeps above: it reads
 # the session store and may stop listeners, and a missed tick loses nothing
 # because the next one re-reads the same facts. Only the home's own sources are
@@ -3596,6 +3631,8 @@ prelude_phase() {
   idle_reap_tick
   merge_prune_tick
   typesafe_health_tick
+  memory_health_tick
+  memory_health_surface
   lavish_auto_retire_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and

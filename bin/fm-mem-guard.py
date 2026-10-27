@@ -11,7 +11,26 @@ as exhausted RAM. SwapTotal is the currently allocated swap pool, not a fixed ca
 macOS swap occupancy is telemetry only and never classifies pressure, because
 the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
-Thresholds (run --help for defaults):
+Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run):
+  - macOS native pressure level 1 is normal; any other measured level defers.
+  - The supplied 24 GB anonymous-page cap applies to 32 GiB hosts, and the
+    supplied per-ShellCheck cap is 4 GB. These are operating limits, not newly
+    inferred exhaustion thresholds. Raw free + speculative pages (PhysMem
+    unused), occupied compressor pages, swap and largest residents are recorded.
+  - baseline explicitly records a normal-pressure reading's largest non-fleet
+    resident process as this host's observed RSS envelope; later RSS above that
+    measured share of RAM raises a named observation, not a leak diagnosis.
+    No default RSS fraction, swap utilization cutoff, or unused-memory cutoff is
+    guessed. An absent/unreadable baseline or missing required memory reading
+    defers admission with 75, while the legacy diagnostic remains fail-open.
+  - The first baseline must be taken during a known-healthy workload. It cannot
+    diagnose a process already oversized when measured. The envelope is empirical,
+    not a safe allocation bound; recorded readings support later reassessment.
+  - Every mode records one JSONL reading in the supplied state directory.
+    No daemon restart, process signal, or work cancellation is performed.
+    The wrapper owns root-home placement and the existing durable wake transport.
+
+Legacy diagnostic thresholds (run --help for defaults):
   - --warn-mem-pct / --crit-mem-pct: percent of total memory not available.
   - --warn-swap-pct / --crit-swap-pct: Linux-only percent of swap capacity in use.
 
@@ -31,7 +50,9 @@ Invariants:
 import argparse
 import json
 import os
+from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -274,8 +295,180 @@ def audit_memory(
     }
 
 
+def admission_read(command):
+    """Local, read-only native query; admission never wraps work in a timeout."""
+    fixture = os.environ.get("FM_MEMORY_FIXTURE_DIR")
+    if fixture:
+        name = "processes.json" if command[-1] == "memory" else Path(command[0]).name
+        return (Path(fixture) / name).read_text()
+    return subprocess.run(command, capture_output=True, text=True, check=True,
+                          env={**os.environ, "LC_ALL": "C"}).stdout
+
+
+def admission_sample():
+    """Complete native facts, distinct from the legacy diagnostic verdict."""
+    report = {"schema": "fm-memory-reading.v1",
+              "checked_at": datetime.now(timezone.utc).isoformat(),
+              "platform": "darwin" if os.environ.get("FM_MEMORY_FIXTURE_DIR") else sys.platform,
+              "host": socket.gethostname(),
+              "fixture": os.environ.get("FM_MEMORY_FIXTURE_DIR"), "errors": [], "processes": []}
+    if report["platform"] != "darwin":
+        report["errors"].append("native admission is supported on macOS only")
+        return report
+    try:
+        host = admission_read(["/usr/sbin/sysctl", "-n", "hw.memsize",
+                               "kern.memorystatus_vm_pressure_level", "vm.swapusage"])
+        lines = host.splitlines()
+        report["total_bytes"] = int(lines[0])
+        report["pressure_level"] = int(lines[1])
+        swap = re.search(r"total\s*=\s*([\d.]+)([KMG])\s+used\s*=\s*([\d.]+)([KMG])"
+                         r"\s+free\s*=\s*([\d.]+)([KMG])", host)
+        if not swap:
+            raise ValueError("incomplete swap reading")
+        units = {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
+        for name, value, unit in zip(("total", "used", "free"), swap.groups()[::2], swap.groups()[1::2]):
+            report[f"swap_{name}_bytes"] = int(float(value) * units[unit])
+        vm = admission_read(["/usr/bin/vm_stat"])
+        page_size = int(re.search(r"page size of (\d+) bytes", vm)[1])
+        def pages(name):
+            match = re.search(r"^" + re.escape(name) + r":\s*(\d+)\.", vm, re.MULTILINE)
+            if not match:
+                raise ValueError(f"missing {name}")
+            return int(match[1]) * page_size
+        report["page_size_bytes"] = page_size
+        report["unused_bytes"] = pages("Pages free") + pages("Pages speculative")
+        report["anonymous_bytes"] = pages("Anonymous pages")
+        report["compressor_bytes"] = pages("Pages occupied by compressor")
+        if (report["total_bytes"] <= 0 or page_size <= 0 or
+                any(report[key] > report["total_bytes"] for key in
+                    ("unused_bytes", "anonymous_bytes", "compressor_bytes")) or
+                report["swap_used_bytes"] > report["swap_total_bytes"] or
+                report["swap_free_bytes"] > report["swap_total_bytes"]):
+            raise ValueError("inconsistent native memory sizes")
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError, TypeError) as exc:
+        report["errors"].append(f"memory: {exc}")
+    try:
+        rows = json.loads(admission_read([sys.executable, str(Path(__file__).with_name("fm-proc-info.py")), "memory"]))
+        if not isinstance(rows, list) or any(
+                not isinstance(p, dict) or type(p.get("pid")) is not int or p["pid"] <= 0 or
+                type(p.get("ppid")) is not int or p["ppid"] < 0 or
+                not isinstance(p.get("comm"), str) or not isinstance(p.get("started"), str) or
+                type(p.get("fleet")) is not bool or "rss_bytes" not in p or
+                (p["rss_bytes"] is not None and
+                 (type(p["rss_bytes"]) is not int or p["rss_bytes"] < 0)) for p in rows):
+            raise ValueError("invalid process census")
+        # Ownership propagates by PPID, not executable names or string matches
+        # against unrelated node/python commands.
+        owned = {p["pid"] for p in rows if p["fleet"]}
+        while True:
+            children = {p["pid"] for p in rows if p["ppid"] in owned}
+            if children <= owned:
+                break
+            owned |= children
+        for row in rows:
+            row["fleet"] = row["pid"] in owned
+        report["processes"] = rows
+        report["rss_unreadable_pids"] = [p["pid"] for p in rows if p["rss_bytes"] is None]
+        if not any(p["rss_bytes"] is not None for p in rows):
+            raise ValueError("no resident processes readable")
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError) as exc:
+        report["errors"].append(f"processes: {exc}")
+    return report
+
+
+def admission_evaluate(report, baseline):
+    """Native pressure and explicit operating caps; RSS alarm is an envelope, not a leak diagnosis."""
+    reasons, alarms = [], []
+    rows = [p for p in report["processes"] if p["rss_bytes"] is not None]
+    if report["errors"]:
+        reasons.extend(report["errors"])
+    if report.get("pressure_level") not in (None, 1):
+        reasons.append(f"native memory pressure level {report['pressure_level']} (normal is 1)")
+    # Captain-supplied 24 GB/32 GiB anonymous-page limit for this host class,
+    # not a utilization percentage inferred from raw unused or swap occupancy.
+    if report.get("total_bytes") == 32 * 1024 ** 3 and report.get("anonymous_bytes", 0) >= 24 * 1000 ** 3:
+        reasons.append("anonymous pages reached the 24 GB operating limit on 32 GiB RAM")
+    for row in rows:
+        if row["comm"].lower() == "shellcheck" and row["rss_bytes"] > 4 * 1000 ** 3:
+            reasons.append(f"ShellCheck PID {row['pid']} RSS {row['rss_bytes']} exceeds 4 GB")
+            alarms.append({**row, "boundary_bytes": 4 * 1000 ** 3, "kind": "shellcheck"})
+    if baseline is not None:
+        if baseline["total_bytes"] != report.get("total_bytes") or baseline["host"] != report["host"]:
+            reasons.append("host identity or RAM differs from recorded memory baseline; remeasure it")
+        else:
+            for row in rows:
+                if not row["fleet"] and row["rss_bytes"] > baseline["non_fleet_max_bytes"]:
+                    alarms.append({**row, "boundary_bytes": baseline["non_fleet_max_bytes"],
+                                   "kind": "non-fleet"})
+    return reasons, alarms
+
+
+def admission_main(argv):
+    parser = argparse.ArgumentParser(description="Recorded macOS admission; never stops running work")
+    parser.add_argument("mode", choices=("sample", "admit", "probe", "baseline"))
+    parser.add_argument("--state", type=Path, required=True)
+    args = parser.parse_args(argv)
+    report = admission_sample()
+    report["source"] = args.mode
+    state = args.state
+    state.mkdir(parents=True, exist_ok=True)
+    baseline_path = state / ".memory-baseline.json"
+    baseline = None
+    try:
+        if baseline_path.exists():
+            baseline = json.loads(baseline_path.read_text())
+            if (baseline["schema"] != "fm-memory-baseline.v1" or not isinstance(baseline["host"], str) or
+                    type(baseline["total_bytes"]) is not int or baseline["total_bytes"] <= 0 or
+                    type(baseline["non_fleet_max_bytes"]) is not int or
+                    not 0 < baseline["non_fleet_max_bytes"] <= baseline["total_bytes"]):
+                raise ValueError("invalid baseline sizes")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        baseline = None
+        report["errors"].append(f"baseline: {exc}")
+    reasons, alarms = admission_evaluate(report, baseline)
+    # An explicit read-only baseline operation establishes the observed normal
+    # envelope. Never silently learn away an existing outlier or overwrite it.
+    if args.mode == "baseline" and not reasons:
+        candidates = [p["rss_bytes"] for p in report["processes"] if not p["fleet"] and p["rss_bytes"] is not None]
+        if candidates and baseline is None:
+            baseline = {"schema": "fm-memory-baseline.v1", "checked_at": report["checked_at"],
+                        "host": report["host"], "total_bytes": report["total_bytes"], "non_fleet_max_bytes": max(candidates),
+                        "derivation": "largest observed non-fleet RSS in this native-pressure-normal reading"}
+            with baseline_path.open("x") as stream:
+                json.dump(baseline, stream)
+        elif baseline is not None:
+            reasons.append("baseline already exists; retained unchanged")
+        else:
+            reasons.append("no readable non-fleet baseline candidates")
+    if baseline is None and report["platform"] == "darwin":
+        reasons.append("non-fleet RSS boundary unmeasured; run fm-mem-guard.sh baseline during a known healthy workload")
+    report["baseline"] = baseline
+    report["admission"] = "defer" if reasons else "admit"
+    report["reasons"] = reasons
+    report["alarms"] = alarms
+    report["top_processes"] = sorted((p for p in report["processes"] if p["rss_bytes"] is not None),
+                                     key=lambda p: p["rss_bytes"], reverse=True)[:10]
+    del report["processes"]
+    payload = (json.dumps(report, ensure_ascii=True) + "\n").encode()
+    # One append syscall per reading keeps concurrent starts' JSONL rows intact.
+    fd = os.open(state / "memory-readings.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        if os.write(fd, payload) != len(payload):
+            raise OSError("short memory reading append")
+    finally:
+        os.close(fd)
+    print(payload.decode(), end="")
+    return 75 if reasons and args.mode in ("admit", "baseline") else 0
+
+
 def main():
     sys.stdout.reconfigure(errors="replace")
+    if len(sys.argv) > 1 and sys.argv[1] in ("sample", "admit", "probe", "baseline"):
+        try:
+            sys.exit(admission_main(sys.argv[1:]))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"memory admission unreadable: {exc}", file=sys.stderr)
+            sys.exit(75)
     parser = argparse.ArgumentParser(
         description="Local host memory-pressure and top-RSS diagnostic (Linux and macOS; no API calls)"
     )

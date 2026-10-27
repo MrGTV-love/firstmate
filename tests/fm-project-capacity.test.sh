@@ -2089,6 +2089,39 @@ test_cpu_baseline_follows_a_falling_total() {
   pass "a falling live-tree CPU total lowers the baseline, so later growth still counts as progress"
 }
 
+test_memory_admission_defers_before_dispatch_then_admits_recovery() {
+  local case_dir home native rc out before worktrees
+  case_dir=$(make_case memory-admission later)
+  home="$case_dir/home"; native="$case_dir/native"
+  mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false}]\n' > "$native/processes.json"
+  FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_MEMORY_FIXTURE_DIR="$native" \
+    bash "$ROOT/bin/fm-mem-guard.sh" baseline >/dev/null || fail 'could not measure healthy fixture baseline'
+  write_live "$home" running "$case_dir/project"
+  cp "$home/state/running.meta" "$case_dir/running.before"
+  before=$(call_count "$case_dir"); worktrees=$(worktree_list "$case_dir")
+  printf '34359738368\n2\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    run_spawn "$case_dir" "$home" "$case_dir/no-new-copy" later "$case_dir/project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 75 "$rc" "native pressure must defer actual spawn: $out"
+  assert_nothing_created "$case_dir" "$home" later "$before" "$worktrees"
+  cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'memory deferral changed running work'
+  jq -es '.[-1].pressure_level == 2 and .[-1].admission == "defer" and .[-1].source == "admit"' \
+    "$home/state/memory-readings.jsonl" >/dev/null || fail 'actual spawn did not retain its pressured observation'
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  rc=0
+  out=$(FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" \
+    spawn_ship "$case_dir" later) || rc=$?
+  expect_code 0 "$rc" "healthy memory must admit the same queued task: $out"
+  assert_present "$home/state/later.meta" 'healthy memory failed to publish its worker'
+  cmp -s "$case_dir/running.before" "$home/state/running.meta" || fail 'healthy admission changed existing work'
+  pass 'actual spawn reads memory before dispatch, leaves pressure-deferred work queued, and admits it after pressure recovers'
+}
+
+test_memory_admission_defers_before_dispatch_then_admits_recovery
 test_cpu_sampler_portability_and_failure_extreme
 test_cpu_baseline_follows_a_falling_total
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock

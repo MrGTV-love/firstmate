@@ -2172,6 +2172,26 @@ When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record,
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
 Firstmate cannot see which part of a worker's life uses the resource, so the number bounds whole workers from launch to handoff, and the tightest resource every worker needs should decide it.
 
+## Host memory admission
+
+On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
+Its engine header owns the measured signals, operating limits, and baseline derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
+Before admitting work on a newly enabled host, inspect a `sample` and explicitly record a `baseline` during a known-healthy representative workload using that command's help.
+An unmeasured host defers new work rather than silently inventing a non-fleet RSS fraction.
+The first baseline is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+
+The root local home retains the baseline and append-only readings; secondmates use that same host-local record, not a remote parent's RAM budget.
+A changed host identity or RAM size requires a new measurement, and an existing baseline is never silently replaced as usage grows.
+Review readings over representative workloads before deliberately preserving and replacing the baseline; no exhaustion experiment is needed or recommended.
+The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
+The records contain process identity and resident size, not process arguments or environment contents.
+
+Generated worker instructions select the memory-checked new-run entrypoint; reattachment and gate responses remain direct so pressure cannot strand running validation.
+This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
+The watcher presents named non-fleet baseline outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
+No memory observation stops existing work or restarts a process.
+Linux retains the existing diagnostic interface; native admission is currently macOS-only.
+
 ## Nested task copy sweep (config/copy-budget)
 
 A task copy is nested when a clone registers it strictly inside its own directory, such as `<clone>/.claude/worktrees/<name>`.
