@@ -47,6 +47,22 @@ ok - host: a captain return during a failed engine turn still hands that turn's 
 ok - host: an engine turn whose result is incomplete hands its wake to main
 ok - host: two engine errors latch the session, main keeps every away wake in the cooldown, a failed probe doubles it up to its cap, and a report recovers it silently
 ok - host: an attended close in a latched session reaches main as the arm printed it and leaves the latch as it was, and a home that opted out with off never reads it
+tests/fm-supervision-host-helpers.sh: line 159: 65119 Terminated: 15          FM_HOME="$home" FM_CREW_STATE_BIN="$home/fakebin/fm-crew-state.sh" PATH="$home/fakebin:$PATH" MIRROR_ROOT="$MIRROR_ROOT" "$FAKE_CLAUDE" -c '
+      printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+      printf "%s\n" "$$" >> "$FM_HOME/claude-pids"
+      while [ ! -e "$FM_HOME/session.stop" ]; do
+        if [ -e "$FM_HOME/park.go" ]; then
+          rm -f "$FM_HOME/park.go"
+          for seed in "$FM_HOME"/mirror-seed.*; do
+            [ -f "$seed" ] || continue
+            FM_ROOT_OVERRIDE="$MIRROR_ROOT" "$MIRROR_ROOT/bin/fm-host-mirror.sh" hook claude < "$seed"
+          done
+          "$0" park > "$FM_HOME/host.out" 2>&1
+          printf "%s\n" "$?" > "$FM_HOME/host.rc"
+        fi
+        sleep 0.1
+      done
+    ' "$HOST" 2>> "$home/claude.err"
 ok - host: attended, two engine errors latch the session, main keeps every close unchanged in the cooldown, a failed probe doubles it up to its cap, and a routine probe's recovery stays in the ledger, off main
 ok - host: an engine turn is bounded, and tool processes outside its process group are reaped
 ok - host: a restarted host stops, by recorded identity, the cycle a killed predecessor left running
@@ -60,7 +76,7 @@ ok - host: the first cycle's status streams once, --restart replaces a stale wat
 ok - host: an unchanged held outcome reaches the captain once across cadences, and a later decision on the task still does
 ok - host: a home naming an unverified engine hands every away wake to main with the reason
 ok - host: a host outside the session-lock owner stands down without arming
-tests/fm-supervision-host-helpers.sh: line 159: 61091 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
-tests/fm-supervision-host-helpers.sh: line 159: 61091 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+tests/fm-supervision-host-helpers.sh: line 159: 82779 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
+tests/fm-supervision-host-helpers.sh: line 159: 82779 Terminated: 15          "$FAKE_CLAUDE" -c 'sleep 30'
 ok - host: a host under a superseded auto-arm generation stands down without touching the owner
-exit=0 secs=478
+exit=0

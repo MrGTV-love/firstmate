@@ -1,0 +1,25 @@
+=== base-healthy-successor tree=/Users/charlesabrooker/tmp/fm-lab-trees.37558/base (7eb37bf8e feat(bin): prune a merged task's pool copy right after its PR merges (#175)) 
+--- before (12:26:09)
+marker: announced:downtime:90436.1793121961.SiEYN2
+epoch:  epoch=16 owner_pid=99115 outcome=arming updated_at=1793121969
+held:   absent
+failure-notice: absent
+queue:
+fired labprobe at 12:26:09
+1793121970.997 watcher queued the main-only wake; host printed yet? 0; marker=pending:downtime:1626.1793121970.5ObjYI
+1793121971.195 branch row seq=11
+branch drain presented branch row: 1; presented main-only wake: 0
+host printed before branch drain finished? 1
+1793121972.175 branch drain done
+1793121972.192 marker -> pending:handling:1626.1793121970.5ObjYI
+1793121972.741 hook committed: epoch=16 owner_pid=99115 outcome=refused updated_at=1793121972 (last marker seen: pending:handling:1626.1793121970.5ObjYI)
+host log since fire:
+  1793121971	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:10
+--- after-hook-commit (12:26:14)
+marker: pending:handling:1626.1793121970.5ObjYI
+epoch:  epoch=16 owner_pid=99115 outcome=refused updated_at=1793121972
+held:   absent
+failure-notice: absent
+queue:
+  1793121970	10	check	/Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:10
+  1793121971	11	signal	lab-branch.status	signal: lab-branch.status old branch handling work

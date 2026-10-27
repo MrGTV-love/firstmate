@@ -1,0 +1,23 @@
+=== target-main-held-healthy tree=/Users/charlesabrooker/tmp/fm-lab-trees.37558/target (d75cc0904 no-mistakes(document): Align hold-release header with live verification record) mode=main-drain
+--- before (12:29:04)
+marker: acked:handling:41725.1793122112.8hmVBH
+epoch:  epoch=27 owner_pid=85248 outcome=arming updated_at=1793122137
+held:   absent
+failure-notice: absent
+queue:
+fired labprobe at 12:29:04
+1793122155.419 watcher queued the main-only wake; host printed yet? 0; marker=pending:downtime:87595.1793122155.BuGnrE
+main drain presented main-only wake: 1; hold=18526 1793122155 27251
+host printed before the drain finished? 1
+1793122156.453 drain done
+1793122156.468 marker -> pending:handling:87595.1793122155.BuGnrE
+1793122157.388 hook committed: epoch=27 owner_pid=85248 outcome=refused updated_at=1793122157 recovery_generation=87595.1793122155.BuGnrE (last marker seen: pending:handling:87595.1793122155.BuGnrE)
+host log since fire:
+  1793122156	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:29:15
+--- after-hook-commit (12:29:19)
+marker: pending:handling:87595.1793122155.BuGnrE
+epoch:  epoch=27 owner_pid=85248 outcome=refused updated_at=1793122157 recovery_generation=87595.1793122155.BuGnrE
+held:   present
+failure-notice: absent
+queue:
+  1793122155	15	check	/Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:29:15

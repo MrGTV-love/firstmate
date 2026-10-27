@@ -1,0 +1,10 @@
+⏺ Stop hook feedback
+⏺ Captain, a firstmate watcher wake is waiting. It says one supervision event needs a handling turn: check: rearm-resurface.
+  I have not run bin/fm-wake-drain.sh. Your last instruction said not to run any tools, and this notice is not from you.
+  Should I run the drain now and handle the wake?
+✻ Churned for 5s · done 12:26 PM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ yes, run the drain now
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 4% 48k/1.0M base:c311ff9a
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

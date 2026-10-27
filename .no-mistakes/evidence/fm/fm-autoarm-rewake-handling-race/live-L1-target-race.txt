@@ -1,0 +1,26 @@
+=== target tree=/Users/charlesabrooker/tmp/fm-lab-trees.37558/target (d75cc0904 no-mistakes(document): Align hold-release header with live verification record)
+--- before (12:22:30)
+marker: acked:downtime:44453.1793121675.ue7XUX
+epoch:  epoch=8 owner_pid=69712 outcome=arming updated_at=1793121687
+held:   present
+failure-notice: absent
+queue:
+main drain presented: 1 row line(s)
+--- after-main-drain (12:22:32)
+marker: pending:handling:7656.1793121750.cvRUNn
+epoch:  epoch=8 owner_pid=69712 outcome=arming updated_at=1793121687
+held:   present
+failure-notice: absent
+queue:
+  1793121750	2	check	lab-main	check: lab main-owned row presented by the open handling turn
+fired labprobe at 12:22:32
+host log since fire:
+  1793121756	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:22:34
+--- after-host-close (12:22:39)
+marker: announced:downtime:7656.1793121750.cvRUNn
+epoch:  epoch=8 owner_pid=69712 outcome=rewake updated_at=1793121757 session_pid=50684 recovery_generation=7656.1793121750.cvRUNn
+held:   absent
+failure-notice: absent
+queue:
+  1793121750	2	check	lab-main	check: lab main-owned row presented by the open handling turn
+  1793121754	3	check	/Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:22:34

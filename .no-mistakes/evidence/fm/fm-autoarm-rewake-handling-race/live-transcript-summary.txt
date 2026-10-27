@@ -1,0 +1,5 @@
+== base transcript: auto-arm FAILED count=4; lab probe wake deliveries=labprobe.check.sh: lab probe fired 12:26:55 
+firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.
+firstmate watcher auto-arm FAILED ...`), drain, inspect the automatic mechanism failure, and do not turn the notice into a repeating manual-arm loop.
+== target transcript: auto-arm FAILED count=1; lab probe wake deliveries=labprobe.check.sh: lab probe fired 12:22:34 labprobe.check.sh: lab probe fired 12:23:39 labprobe.check.sh: lab probe fired 12:24:20 labprobe.check.sh: lab probe fired 12:24:58 
+firstmate watcher auto-arm FAILED ...`), drain, inspect the automatic mechanism failure, and do not turn the notice into a repeating manual-arm loop.

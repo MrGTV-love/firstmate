@@ -1,0 +1,5 @@
+=== L5 hold release (target d75cc0904)
+hand-written hold: lab hold token
+non-owner shell ran hold-release hook: rc=0 stdout+stderr=[]; hold now: lab hold token
+after 6 s idle in Claude: hold present
+real Claude prompt submitted at 1793122221.326; hold gone at 1793122221.581

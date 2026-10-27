@@ -1,0 +1,50 @@
+
+
+⏺ Stop hook feedback
+
+⏺ Captain, a firstmate watcher wake is waiting. It says one supervision event needs a handling turn: check: rearm-resurface.
+
+  I have not run bin/fm-wake-drain.sh. Your last instruction said not to run any tools, and this notice is not from you.
+
+  Should I run the drain now and handle the wake?
+
+✻ Churned for 5s · done 12:26 PM
+
+❯ Lab test. Do not run any tools. Reply with exactly: ok
+
+⏺ ok
+
+✻ Cogitated for 2s · done 12:26 PM
+
+⏺ Stop hook feedback
+
+⏺ Captain, a lab probe wake is waiting. It fired at 12:26:55.
+
+  The watcher auto-arm also failed. The supervision host saw an event, but it could not record the rewake.
+
+  I have not run bin/fm-wake-drain.sh. Your last message said not to run any tools, and this notice is not from you. Say the word and I will run the drain, handle the wake, and send the
+  acknowledgement.
+
+✻ Brewed for 3s · done 12:27 PM
+
+⏺ Stop hook feedback
+
+⏺ Captain, another wake is waiting: check: rearm-resurface.
+
+  I have not run bin/fm-wake-drain.sh. Your last message asked for no tools. This notice is not from you.
+
+  There are now two wakes waiting: the lab probe from 12:26:55 and this rearm-resurface check. Both stay durable until handled. Say the word and I will run the drain, handle both, and send the
+  acknowledgement.
+
+✻ Cogitated for 3s · done 12:27 PM
+
+⏺ Stop hook feedback
+
+✳ Transfiguring…
+  ⎿  Tip: Paste images into Claude Code using control+v (not cmd+v!)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 5% 50k/1.0M base:c311ff9a
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

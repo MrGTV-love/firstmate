@@ -1,0 +1,27 @@
+=== target-no-healthy-watcher tree=/Users/charlesabrooker/tmp/fm-lab-trees.37558/target (d75cc0904 no-mistakes(document): Align hold-release header with live verification record) mode=kill-successor
+--- before (12:24:46)
+marker: acked:handling:46350.1793121860.1C3pAi
+epoch:  epoch=12 owner_pid=69817 outcome=arming updated_at=1793121880
+held:   absent
+failure-notice: absent
+queue:
+fired labprobe at 12:24:47
+1793121898.221 watcher queued the main-only wake; host printed yet? 0; marker=pending:downtime:74397.1793121898.XWQCHx
+1793121898.569 branch row seq=9
+branch drain presented branch row: 1; presented main-only wake: 0
+host printed before branch drain finished? 1
+1793121899.690 branch drain done
+1793121899.730 killed watcher 26100
+1793121899.741 marker -> pending:handling:74397.1793121898.XWQCHx
+1793121900.464 hook committed: epoch=12 owner_pid=69817 outcome=rewake updated_at=1793121900 session_pid=50684 recovery_generation=74397.1793121898.XWQCHx (last marker seen: pending:handling:74397.1793121898.XWQCHx)
+host log since fire:
+  1793121898	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+  1793121900	pass-through	successor-unrecorded	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+--- after-hook-commit (12:25:02)
+marker: pending:handling:74397.1793121898.XWQCHx
+epoch:  epoch=12 owner_pid=69817 outcome=rewake updated_at=1793121900 session_pid=50684 recovery_generation=74397.1793121898.XWQCHx
+held:   present
+failure-notice: absent
+queue:
+  1793121898	8	check	/Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+  1793121898	9	signal	lab-branch.status	signal: lab-branch.status old branch handling work

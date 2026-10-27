@@ -1,0 +1,16 @@
+⏺ Stop hook feedback
+  Ran 2 shell commands
+⏺ Captain, another lab probe signal came in, fired at 12:24:20. I handled it. The acknowledgement passed with exit 0.
+  - The probe is a test signal. It deletes a flag file and prints one line. No work was affected.
+  - Still open: the overdue item 209c939eb9411da1033ec260, "ledger degraded". The backlog is unavailable. It needs your decision. I have not changed it.
+✻ Cooked for 5s · done 12:24 PM
+⏺ Stop hook feedback
+  Drain the durable wake queue
+  ⎿  $ bin/fm-wake-drain.sh
+· Wibbling… (3s · ↓ 90 tokens · thinking)
+  ⎿  Tip: Use /permissions to pre-approve and pre-deny bash, edit, and MCP tools
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 66k/1.0M target:f515345a
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← 1 agent

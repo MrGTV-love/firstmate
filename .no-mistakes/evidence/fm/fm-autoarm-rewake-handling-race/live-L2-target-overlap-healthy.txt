@@ -1,0 +1,25 @@
+=== target-healthy-successor tree=/Users/charlesabrooker/tmp/fm-lab-trees.37558/target (d75cc0904 no-mistakes(document): Align hold-release header with live verification record) 
+--- before (12:24:19)
+marker: acked:handling:15120.1793121819.Zttnob
+epoch:  epoch=10 owner_pid=43829 outcome=arming updated_at=1793121827
+held:   absent
+failure-notice: absent
+queue:
+fired labprobe at 12:24:19
+1793121860.741 watcher queued the main-only wake; host printed yet? 0; marker=pending:downtime:46350.1793121860.1C3pAi
+1793121860.912 branch row seq=7
+branch drain presented branch row: 1; presented main-only wake: 0
+host printed before branch drain finished? 0
+1793121861.879 branch drain done
+1793121861.894 marker -> pending:handling:46350.1793121860.1C3pAi
+1793121862.836 hook committed: epoch=10 owner_pid=43829 outcome=rewake updated_at=1793121862 session_pid=50684 recovery_generation=46350.1793121860.1C3pAi (last marker seen: pending:handling:46350.1793121860.1C3pAi)
+host log since fire:
+  1793121861	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:20
+--- after-hook-commit (12:24:24)
+marker: pending:handling:46350.1793121860.1C3pAi
+epoch:  epoch=10 owner_pid=43829 outcome=rewake updated_at=1793121862 session_pid=50684 recovery_generation=46350.1793121860.1C3pAi
+held:   present
+failure-notice: absent
+queue:
+  1793121860	6	check	/Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:20
+  1793121860	7	signal	lab-branch.status	signal: lab-branch.status old branch handling work

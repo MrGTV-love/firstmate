@@ -96,4 +96,4 @@ ok - auto-arm: stands down only on a pi-code-delivered transcript_path (/.pi/)
 ok - PostToolUse reveals unhandled reviews only to their active primary, keeps listeners leased, and goes silent after handling
 ok - a helper-only turn longer than the owner lease keeps the primary's listener alive
 ok - PostToolUse recovery commands retain the inspected home and state from another cwd with conflicting selectors and quoted paths
-exit=0 secs=173
+exit=0

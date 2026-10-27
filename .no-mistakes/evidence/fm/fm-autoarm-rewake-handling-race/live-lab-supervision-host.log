@@ -1,0 +1,77 @@
+1793121600	start	gen=host-49709-1793121600	primary=claude
+1793121617	pass-through	attended	main-only	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793121636	start	gen=host-40310-1793121635	primary=claude
+1793121636	take-over	arm=90874
+1793121638	pass-through	attended	main-only	check: rearm-resurface
+1793121649	start	gen=host-76040-1793121649	primary=claude
+1793121649	take-over	arm=48753
+1793121651	pass-through	attended	main-only	check: rearm-resurface
+1793121657	start	gen=host-95044-1793121657	primary=claude
+1793121657	take-over	arm=81456
+1793121662	pass-through	attended	main-only	check: rearm-resurface
+1793121669	start	gen=host-32524-1793121669	primary=claude
+1793121669	take-over	arm=17033
+1793121671	pass-through	attended	main-only	check: rearm-resurface
+1793121675	start	gen=host-41876-1793121674	primary=claude
+1793121675	take-over	arm=35980
+1793121677	pass-through	attended	main-only	check: rearm-resurface
+1793121680	start	gen=host-56254-1793121680	primary=claude
+1793121680	take-over	arm=48261
+1793121682	pass-through	attended	main-only	check: rearm-resurface
+1793121688	start	gen=host-78922-1793121687	primary=claude
+1793121688	take-over	arm=60528
+1793121756	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:22:34
+1793121767	start	gen=host-56181-1793121767	primary=claude
+1793121767	take-over	arm=23537
+1793121818	pass-through	attended	main-only	check: rearm-resurface
+1793121827	start	gen=host-45644-1793121827	primary=claude
+1793121861	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:20
+1793121868	start	gen=host-40096-1793121868	primary=claude
+1793121868	take-over	arm=26737
+1793121870	pass-through	attended	main-only	check: rearm-resurface
+1793121880	start	gen=host-71053-1793121880	primary=claude
+1793121880	take-over	arm=48374
+1793121898	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+1793121900	pass-through	successor-unrecorded	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+1793121907	start	gen=host-48749-1793121906	primary=claude
+1793121909	pass-through	attended	main-only	check: rearm-resurface
+1793121916	start	gen=host-81662-1793121916	primary=claude
+1793121916	take-over	arm=56918
+1793121961	start	gen=host-89911-1793121961	primary=claude
+1793121962	pass-through	attended	main-only	check: rearm-resurface
+1793121969	start	gen=host-99788-1793121969	primary=claude
+1793121969	take-over	arm=92225
+1793121971	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:10
+1793121998	start	gen=host-62880-1793121997	primary=claude
+1793121998	take-over	arm=6032
+1793122015	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:55
+1793122017	pass-through	successor-unrecorded	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:55
+1793122021	start	gen=host-3682-1793122021	primary=claude
+1793122023	pass-through	attended	main-only	check: rearm-resurface
+1793122028	start	gen=host-24593-1793122028	primary=claude
+1793122028	take-over	arm=10290
+1793122030	pass-through	attended	main-only	check: rearm-resurface
+1793122035	start	gen=host-41187-1793122035	primary=claude
+1793122035	take-over	arm=29977
+1793122037	pass-through	attended	main-only	check: rearm-resurface
+1793122042	start	gen=host-53977-1793122041	primary=claude
+1793122042	take-over	arm=45399
+1793122043	pass-through	attended	main-only	check: rearm-resurface
+1793122047	start	gen=host-60590-1793122046	primary=claude
+1793122047	take-over	arm=57318
+1793122048	pass-through	attended	main-only	check: rearm-resurface
+1793122054	start	gen=host-74541-1793122053	primary=claude
+1793122054	take-over	arm=63373
+1793122056	pass-through	attended	main-only	check: rearm-resurface
+1793122061	start	gen=host-96409-1793122061	primary=claude
+1793122061	take-over	arm=83047
+1793122063	pass-through	attended	main-only	check: rearm-resurface
+1793122068	start	gen=host-15632-1793122067	primary=claude
+1793122068	take-over	arm=2575
+1793122070	pass-through	attended	main-only	check: rearm-resurface
+1793122092	start	gen=host-85895-1793122092	primary=claude
+1793122111	pass-through	attended	main-only	check: rearm-resurface
+1793122138	start	gen=host-87020-1793122137	primary=claude
+1793122156	pass-through	attended	main-only	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:29:15
+1793122181	start	gen=host-65130-1793122181	primary=claude
+1793122181	take-over	arm=20551

@@ -103,4 +103,4 @@ ok - fm-turnend-guard: away-mode beacon freshness uses the poll-derived grace, n
 ok - fm-turnend-guard: a dead away-mode daemon still blocks under the poll-derived grace
 ok - fm-turnend-guard: the poll-derived grace is bounded, not unlimited
 ok - fm-turnend-guard: with away mode off, the poll-derived grace never applies
-exit=0 secs=75
+exit=0

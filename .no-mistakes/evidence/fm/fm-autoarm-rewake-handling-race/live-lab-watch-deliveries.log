@@ -1,0 +1,28 @@
+50995	Tue Oct 27 12:20:00 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+44443	Tue Oct 27 12:20:37 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+78174	Tue Oct 27 12:20:50 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+11151	Tue Oct 27 12:21:00 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+33912	Tue Oct 27 12:21:10 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+44453	Tue Oct 27 12:21:15 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+57811	Tue Oct 27 12:21:20 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+7450	Tue Oct 27 12:21:34 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:22:34
+58893	Tue Oct 27 12:22:48 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+15120	Tue Oct 27 12:23:38 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:23:39
+46350	Tue Oct 27 12:23:47 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:20
+42816	Tue Oct 27 12:24:29 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+74397	Tue Oct 27 12:24:41 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:24:58
+50038	Tue Oct 27 12:25:07 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+90436	Tue Oct 27 12:26:01 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+1626	Tue Oct 27 12:26:09 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:10
+64082	Tue Oct 27 12:26:38 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:26:55
+4414	Tue Oct 27 12:27:01 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+26979	Tue Oct 27 12:27:08 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+42931	Tue Oct 27 12:27:15 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+55316	Tue Oct 27 12:27:22 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+61571	Tue Oct 27 12:27:27 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+77827	Tue Oct 27 12:27:34 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+98822	Tue Oct 27 12:27:42 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+18714	Tue Oct 27 12:27:48 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/base/bin/fm-watch.sh	check: rearm-resurface
+87655	Tue Oct 27 12:28:12 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: rearm-resurface
+41725	Tue Oct 27 12:28:31 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:28:31
+87595	Tue Oct 27 12:28:58 2026     bash /Users/charlesabrooker/tmp/fm-lab-trees.37558/target/bin/fm-watch.sh	check: /Users/charlesabrooker/tmp/fm-lab.8XfjWx/state/labprobe.check.sh: lab probe fired 12:29:15
