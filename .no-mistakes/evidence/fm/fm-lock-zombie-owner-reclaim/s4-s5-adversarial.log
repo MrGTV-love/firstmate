@@ -1,0 +1,9 @@
+S4: owner pid=84364 ps stat=T (stopped, alive)
+S4: waiter still blocked after 8s (correct); lock pid file=84364
+S4: after normal release a new waiter exit=0
+S5: control-lock owner pid=86479 ps stat=Z (zombie, parent 84270 never reaps)
+S5: live waiter pid=86533 registered and blocked on /Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.control-task-1.lock
+S5: watcher exit=0 stdout: check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.control-task-1.lock owner=86479 state=Z parent=84270 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=1s waiters=1 trigger=dead-owner
+S5: owner pid file still 86479 (alarm did not reclaim)
+S5: wake-queue dead-owner rows: 1
+S5 cleanup: reclaimed recovered_pid=86479

@@ -1,0 +1,36 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent
+[test_zombie_owner_is_reclaimed] exit=0 5s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - failed and empty ps results retain live lock ownership
+[test_unreadable_ps_never_reclaims_live_owner] exit=0 3s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - live-held lock is not stolen
+[test_lock_does_not_steal_live_lock] exit=0 2s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - waiter warns after 60s once per owner and continues to acquire
+[test_lock_wait_breadcrumb] exit=0 3s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue
+[test_long_held_lock_alarm] exit=0 3s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death
+[test_dead_owner_alarm_names_its_trigger] exit=0 5s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms
+[test_dead_owner_alarm_requires_blocked_waiter] exit=0 3s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner alarms only after two consecutive blocked checks, revalidated before publication
+[test_dead_owner_alarm_needs_two_checks] exit=0 5s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter
+[test_lock_alarm_project_and_control_limits] exit=0 7s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+[test_lock_receipts_retire_with_release] exit=0 3s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a readable /proc stat classifies zombies without ps; without it the ps fallback keeps a live verdict
+[test_pid_alive_reads_proc_state_without_ps] exit=0 2s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - multiline /proc comm uses the state after the last closing parenthesis and keeps unreadable state alive
+[test_pid_alive_reads_multiline_proc_comm] exit=0 3s

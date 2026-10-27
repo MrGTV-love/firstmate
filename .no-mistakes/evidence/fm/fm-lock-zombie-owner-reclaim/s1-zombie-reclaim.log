@@ -1,16 +1,21 @@
-== HEAD b7f16689f ==
-[head 00:11:02] holder pid=43146 owns /Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock -> /Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock.owner.ryuXDf
-[head 00:11:02] after SIGKILL: holder stat=Z ppid=43076 (parent 43076 has not reaped it)
-[head 00:11:02] kill -0 43146 still succeeds; lock pid file says 43146
-[head 00:11:02] real waiter `fm-fleet-ledger.sh dispatched` exit=0 after 0.18s stderr=''
-[head 00:11:02] new ledger rows: ['{"v":1,"ts":1793077862,"event":"task.dispatched","task":"incident-head","kind":"ship","project":"sample","harness":"claude","model":"opus"}']
-[head 00:11:02] lock now: released
-[head 00:11:02] zombie still unreaped: stat=Z; parent 43076 alive, never signalled
-== BASE 7971cec91 ==
-[base 00:11:02] holder pid=43497 owns /Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock -> /Users/charlesabrooker/tmp/fm-lab.X4DQKZ/state/.fleet-ledger.lock.owner.ysefkt
-[base 00:11:02] after SIGKILL: holder stat=Z ppid=43075 (parent 43075 has not reaped it)
-[base 00:11:02] kill -0 43497 still succeeds; lock pid file says 43497
-[base 00:11:22] real waiter `fm-fleet-ledger.sh dispatched` STILL BLOCKED after 20.0s (observer bound 20s, killed by this probe)
-[base 00:11:22] new ledger rows: []
-[base 00:11:22] lock now: present pid=43497
-[base 00:11:22] zombie still unreaped: stat=Z; parent 43075 alive, never signalled
+== BASE 7971cec (before fix) ==
+[base] holder pid=25739 holds /Users/charlesabrooker/tmp/fm-lab.eJd5qB/state/.fleet-ledger.lock -> /Users/charlesabrooker/tmp/fm-lab.eJd5qB/state/.fleet-ledger.lock.owner.83Y5Qn
+[base] lock pid file: 25739
+[base] after SIGKILL, ps: 25739 25687 Z    <defunct>  (parent 25687 has NOT reaped it)
+[base] kill -0 25739: rc=0
+[base] lock still present: True
+[base] waiter `fm-fleet-ledger.sh dispatched task-z1 ...` STILL BLOCKED after 20.0s (killed by test timeout)
+[base] ledger rows for task-z1: 0 []
+[base] lock present after waiter: True
+[base] holder still a zombie (never reaped): 25739 25687 Z    <defunct>
+
+== HEAD 5d1e976 (with fix) ==
+[head] holder pid=29564 holds /Users/charlesabrooker/tmp/fm-lab.eJd5qB/state/.fleet-ledger.lock -> /Users/charlesabrooker/tmp/fm-lab.eJd5qB/state/.fleet-ledger.lock.owner.aBbpaf
+[head] lock pid file: 29564
+[head] after SIGKILL, ps: 29564 25686 Z    <defunct>  (parent 25686 has NOT reaped it)
+[head] kill -0 29564: rc=0
+[head] lock still present: True
+[head] waiter `fm-fleet-ledger.sh dispatched task-z1 ...` exit=0 after 0.21s stderr=''
+[head] ledger rows for task-z1: 1 ['{"v":1,"ts":1793089207,"event":"task.dispatched","task":"task-z1","kind":"ship","project":"proj","harness":"claude","model":"opus"}']
+[head] lock present after waiter: False
+[head] holder still a zombie (never reaped): 29564 25686 Z    <defunct>

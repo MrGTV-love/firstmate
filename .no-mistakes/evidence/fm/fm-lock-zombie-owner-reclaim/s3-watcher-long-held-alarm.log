@@ -1,0 +1,16 @@
+settle (before any lock): unrelated first-arm wakes []; quiet=True
+live holder pid=34855 (its parent = this python pid 31772) holds /Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock
+2 real `fm-fleet-ledger.sh dispatched` waiters blocked: [34892, 34893]
+(a) FRESH hold: watcher output []; a quiet 8s arm reached=True; long-held alarms=0
+    -> backdated the hold start (pid file mtime) to 301s ago
+  [aged0] Main's real drain shows:
+    1793089640	1	check	long-held-lock-/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock.owner.SvpUo6:34855:1793089339:16777232:903117478	check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock owner=34855 state=S parent=31772 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=301s waiters=2
+(b)+(c) AGED hold, watcher re-armed until quiet for 10s: outputs=['check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock owner=34855 state=S parent=31772 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=301s waiters=2']
+    long-held alarms for this one episode=1; final arm quiet=True
+(d) after alarm: lock pid file=34855 holder alive=True waiters still waiting=[True, True]
+    after the owner released normally: waiter exits=[0, 0]; ledger rows for task-w*=2
+  [episode20] Main's real drain shows:
+    1793089640	1	check	long-held-lock-/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock.owner.SvpUo6:34855:1793089339:16777232:903117478	check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock owner=34855 state=S parent=31772 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=301s waiters=2
+    1793089653	2	check	long-held-lock-/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock.owner.Pr9UiK:46130:1793089339:16777232:903119033	check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock owner=46130 state=S parent=31772 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=313s waiters=0
+(e) NEW episode (owner pid=46130, aged): outputs=['check: long-held lock: lock=/Users/charlesabrooker/tmp/fm-lab.sW3xxc/state/.fleet-ledger.lock owner=46130 state=S parent=31772 parent_command=/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 age=313s waiters=0']; long-held alarms=1
+watcher stderr (non-empty only): {'watch-aged1.err': '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Y6XVR1JH9RBVQ0TT8GXNTW/bin/fm-wake-lib.sh: line 734: 45258 Terminated: 15          sleep "$POLL"', 'watch-settle0.err': '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M5Y6XVR1JH9RBVQ0TT8GXNTW/bin/fm-wake-lib.sh: line 734: 34273 Terminated: 15          sleep "$POLL"'}
