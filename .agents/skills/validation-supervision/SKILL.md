@@ -56,7 +56,8 @@ Run every git command directly, never inside a script, alias, subshell, or other
    Do not record this with `git merge -s ours`: a project can forbid that merge with no allowed form.
    Replay instead, before adding any commit or merging main, so the range holds no merge commit.
    Let B be the pipeline's rebased copy of the submitted commits, the commit just below the first pipeline fix commit.
-   Identify the submitted range's original base S-base and its rebased base B-base, then prove `git range-diff <S-base>..<S> <B-base>..<B>` pairs every commit on both sides.
+   Set S-base to the commit `git merge-base <S> <B>` prints, n to the count `git rev-list --count <S-base>..<S>` prints, and B-base to `<B>~<n>` with that literal count.
+   Prove `git range-diff <S-base>..<S> <B-base>..<B>` pairs every commit on both sides; a commit the rebase dropped or added leaves an unpaired commit, which is a stop.
    Accept `=` or `!` only when the latter changes solely hunk headers or unchanged context lines, with each pair's own added and removed lines identical; stop and report any unpaired commit or other difference.
    Run `git reset --keep refs/heads/archive/<task>-submitted-<S8>` and cherry-pick every commit of `git rev-list --reverse <B>..refs/heads/archive/<task>-pipeline-<P8>` in that order.
    A merge commit in the range cannot be picked without a mainline: stop and report it rather than choose one.
