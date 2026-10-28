@@ -894,9 +894,10 @@ write_refusing_slot_owner() { # <repository>
   cat > "$1/scripts/git-stability/provision_existing_slot.py" <<'PY'
 import json
 import os
+import sys
 from pathlib import Path
 
-Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text("invoked\n", encoding="utf-8")
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
 print(json.dumps({"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}))
 raise SystemExit(2)
 PY
@@ -1125,11 +1126,106 @@ test_local_only_source_selection() {
   done
 }
 
+# Verify argument binding through a deliberately refusing project interface.
+# This is not a substitute for actual-project acceptance in the governed cycle.
+run_local_only_binding_case() { # <prepared|unprepared>
+  local shape=$1 id rec selected remote out rc=0 prepared token stoppedbin
+  id="pool-local-binding-$shape-$(date +%s)-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
+  write_refusing_slot_owner "$PROJECT_DIR"
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted local owner'
+  selected=$(git -C "$PROJECT_DIR" rev-parse main)
+  token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
+  [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'binding task temp already exists'
+  [ ! -e "/tmp/fm-$id+$token" ] && [ ! -L "/tmp/fm-$id+$token" ] || fail 'binding staging already exists'
+  if [ "$shape" = unprepared ]; then
+    printf 'preserve pre-existing assigned work\n' > "$POOL_DIR/README.md"
+  fi
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
+    --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'deliberately refusing project interface admitted a worker'
+  if [ "$shape" = prepared ]; then
+    assert_contains "$out" 'fixture_provisioner_must_refuse' 'interface refusal not preserved'
+    python3 - "$CASE_DIR/provisioner.called" "$selected" <<'PY'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--base-source') + 1] == 'local-default'
+assert args[args.index('--base-sha') + 1] == sys.argv[2]
+assert args[args.index('--owned-path') + 1] == 'README.md'
+assert args.count('--owned-path') == 1
+PY
+  else
+    assert_contains "$out" 'dirty_worktree' 'unprepared refusal did not preserve dirt reason'
+    [ ! -e "$CASE_DIR/provisioner.called" ] || fail 'dirty copy reached the project owner'
+    assert_no_grep 'slot_prepared_head=' "$HOME_DIR/state/$id.meta" 'unprepared attempt gained a prepared identity'
+  fi
+  assert_grep "slot_source_ref=refs/heads/main" "$HOME_DIR/state/$id.meta" 'refusal lost qualified source'
+  assert_grep "slot_base_sha=$selected" "$HOME_DIR/state/$id.meta" 'refusal lost selected base'
+  if [ "$shape" = prepared ]; then
+    assert_grep "slot_prepared_head=$selected" "$HOME_DIR/state/$id.meta" 'refusal lost prepared branch'
+    prepared=$(git -C "$PROJECT_DIR" rev-parse "refs/heads/fm/$id")
+    [ "$prepared" = "$selected" ] || fail 'prepared branch is not the selected baseline'
+  else
+    prepared=$(git -C "$POOL_DIR" rev-parse HEAD)
+    printf 'later accepted work\n' > "$PROJECT_DIR/later.txt"
+    git -C "$PROJECT_DIR" add later.txt
+    git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'advance qualified default'
+  fi
+  [ "$(git -C "$PROJECT_DIR" rev-parse origin/main)" = "$remote" ] || fail 'binding relabeled local as origin'
+  # Model the existing, agent-free retained shell using the established relaunch fixture.
+  stoppedbin="$CASE_DIR/stopped"
+  mkdir "$stoppedbin"
+  {
+    cat <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;; esac
+SH
+    printf 'exec %q "$@"\n' "$FAKEBIN_DIR/tmux"
+  } > "$stoppedbin/tmux"
+  chmod +x "$stoppedbin/tmux"
+  rc=0
+  out=$(FM_FAKE_DUPLICATE_WINDOW="fm-$id" FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" fm_test_run_spawn \
+    "$HOME_DIR" "$POOL_DIR" "$stoppedbin:$FAKEBIN_DIR" "$id" --relaunch 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'deliberately refusing project admitted a relaunched worker'
+  if [ "$shape" = unprepared ]; then
+    assert_contains "$out" 'default changed or is ambiguous' 'unprepared retry did not refuse stale plan'
+    [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'unprepared retry fabricated a project declaration'
+    [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$prepared" ] || fail 'unprepared retry reset assigned source'
+    cmp "$POOL_DIR/README.md" <(printf 'preserve pre-existing assigned work\n') || fail 'unprepared retry lost valuable work'
+    assert_grep "slot_source_ref=refs/heads/main" "$HOME_DIR/state/$id.meta" 'retry lost local source mode'
+    assert_grep "slot_base_sha=$selected" "$HOME_DIR/state/$id.meta" 'retry relabeled the pinned base'
+    pass 'unprepared refused retry preserves local evidence and work without origin fallback'
+    return
+  fi
+  assert_contains "$out" 'fixture_provisioner_must_refuse' 'relaunch did not reach original declaration'
+  python3 - "$CASE_DIR/relaunch.called" "$selected" <<'PY'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--base-source') + 1] == 'local-default'
+assert args[args.index('--base-sha') + 1] == sys.argv[2]
+PY
+  [ "$(git -C "$PROJECT_DIR" rev-parse "refs/heads/fm/$id")" = "$prepared" ] || fail 'relaunch reset prepared task branch'
+  [ "$(git -C "$PROJECT_DIR" rev-parse origin/main)" = "$remote" ] || fail 'relaunch advanced origin to local work'
+  pass 'qualified local source is bound to provisioner arguments, refusal metadata and relaunch'
+}
+
+test_local_only_source_binding() { run_local_only_binding_case prepared; }
+test_local_only_unprepared_retry() { run_local_only_binding_case unprepared; }
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1137,6 +1233,8 @@ if [ "$#" -gt 0 ]; then
 fi
 
 test_local_only_source_selection
+test_local_only_source_binding
+test_local_only_unprepared_retry
 test_freshness_introduces_slot_owner
 test_freshness_introduces_scout_slot_owner
 test_freshness_slot_owner_requires_scope

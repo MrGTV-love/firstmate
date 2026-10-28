@@ -310,7 +310,7 @@ if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_man
   fi
   fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || exit 1
   fm_slot_provision fm_slot_run_local "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
-    "$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || exit 1
+    "$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json" '' '' "${SLOT_OWNED_PATHS[@]}" || exit 1
 fi
 
 # The promoted worker must receive the same delivery contract an ordinary ship
