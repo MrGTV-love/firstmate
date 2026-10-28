@@ -187,35 +187,47 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     child = {"pid":202, "ppid":201, "comm":"python3", "started":"start-202",
              "rss_bytes":5*gib, "fleet":False}
 
-    def facts(pressure=1, anonymous=16*gib, rss=None):
+    def facts(pressure=1, rss=None):
         (fixture / "sysctl").write_text(f"{32*gib}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
         (fixture / "vm_stat").write_text(
             "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
             "Pages free: 1000.\nPages speculative: 100.\n"
-            f"Anonymous pages: {anonymous//16384}.\nPages occupied by compressor: 32768.\n")
+            "Anonymous pages: 1048576.\nPages occupied by compressor: 32768.\n")
         rows = [dict(daemon), dict(fleet), dict(child)] if rss is None else rss
         (fixture / "processes.json").write_text(json.dumps(rows))
 
-    def call(mode, *args, code=0):
-        result = subprocess.run(["bash",wrapper,mode,*args],capture_output=True,text=True,env=env)
+    def call(mode, *args, code=0, environ=None):
+        result = subprocess.run(["bash",wrapper,mode,*args],capture_output=True,text=True,env=environ or env)
         assert result.returncode == code, (mode,result.returncode,result.stdout,result.stderr)
         return json.loads(result.stdout) if result.stdout else None
 
+    def queue():
+        return (state / ".wake-queue").read_text()
+
     facts()
-    report = call("admit",code=75)
-    assert report["admission"] == "defer" and report["baseline"] is None
-    assert any("unmeasured" in reason for reason in report["reasons"])
+    report = call("baseline",code=75)
+    assert any("at least two readings" in r and "has 1" in r for r in report["reasons"]), report
+    assert not (state / ".memory-baseline.json").exists()
+    report = call("admit")
+    assert report["admission"] == "admit" and report["baseline"] is None
+    assert "no baseline" in report["calibration"], report
+    assert "alarm is uncalibrated" in queue() and "admission is unaffected" in queue()
+    call("admit")
+    assert queue().count("\tmemory-health-uncalibrated\t") == 1
+    facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
+    call("sample")
+    facts()
     baseline = call("baseline")["baseline"]
-    assert baseline["non_fleet_max_bytes"] == gib, baseline  # excludes fleet descendants
-    assert "admission measurements or the healthy RSS baseline are unavailable" in (state / ".wake-queue").read_text()
+    assert baseline["non_fleet_max_bytes"] == gib and baseline["smallest_reading_max_bytes"] == gib//2, baseline
+    assert baseline["samples"] == 5 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
     report = call("admit")
     assert report["anonymous_bytes"] == 16*gib and report["compressor_bytes"] == gib//2
     assert report["unused_bytes"] == 1100*16384 and report["swap_used_bytes"] > 0
-    assert report["alarms"] == []  # equality does not alarm
+    assert report["alarms"] == [] and report["calibration"] is None  # equality does not alarm
     original = (state / ".memory-baseline.json").read_bytes()
     call("baseline",code=75)
     assert (state / ".memory-baseline.json").read_bytes() == original
-    print("ok - unmeasured admission defers; explicit host baseline excludes fleet ancestry and never silently grows")
+    print("ok - a missing alarm baseline never defers admission; baseline needs two healthy readings, excludes fleet ancestry and never silently grows")
 
     worker = subprocess.Popen(["sleep","120"])
     try:
@@ -231,56 +243,69 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
         assert not ran.exists() and worker.poll() is None
         facts(pressure=4)
         call("admit",code=75)
-        app_limit = ((24*1000**3 + 16383)//16384)*16384
-        facts(anonymous=app_limit)
-        report = call("admit",code=75)
-        assert any("24 GB" in r for r in report["reasons"])
-        facts(anonymous=app_limit-16384)
-        call("admit")
-        facts(rss=[dict(daemon),{**fleet,"comm":"ShellCheck","rss_bytes":4*1000**3}])
-        call("admit")
-        facts(rss=[dict(daemon),{**fleet,"comm":"ShellCheck","rss_bytes":4*1000**3+1}])
-        report = call("admit",code=75)
-        assert any("PID 201" in r and str(4*1000**3+1) in r for r in report["reasons"])
         assert worker.poll() is None
-        print("ok - real run-start exec admits healthy work, refuses warning/critical/app/ShellCheck pressure with 75 and preserves existing work")
+        print("ok - real run-start exec admits healthy work, refuses warning/critical pressure with 75 and preserves existing work")
     finally:
         worker.terminate()
         worker.wait()
 
     facts()
     call("probe")
-    before = (state / ".wake-queue").read_text().count("\n")
+    before = queue().count("\n")
     facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
     report = call("probe")
     assert len(report["alarms"]) == 1 and report["alarms"][0]["pid"] == 101
-    queue = (state / ".wake-queue").read_text()
-    assert queue.count("\n") == before+1
-    assert "xprotectd PID 101" in queue and "restarting any system daemon requires" in queue
+    assert queue().count("\n") == before+1
+    assert "xprotectd PID 101" in queue() and "across 5 healthy readings" in queue()
+    assert "restarting any system daemon requires" in queue()
     call("probe")
-    assert (state / ".wake-queue").read_text() == queue
+    facts(rss=[{**daemon,"pid":102,"started":"start-102","rss_bytes":gib+2},dict(fleet),dict(child)])
+    call("probe")
+    assert queue().count("\n") == before+1
     facts()
     call("probe")
     facts(rss=[{**daemon,"rss_bytes":gib+1},dict(fleet),dict(child)])
     call("probe")
-    assert (state / ".wake-queue").read_text().count("\n") == before+2
-    print("ok - a named non-fleet outlier raises one durable check per episode, including after recovery; fleet children never masquerade as leaks")
+    assert queue().count("\n") == before+2
+    print("ok - a named non-fleet outlier raises one durable check per episode, including after recovery or a restart; fleet children never masquerade as leaks")
 
     facts()
     (fixture / "vm_stat").unlink()
     report = call("admit",code=75)
     assert report["errors"] and "anonymous_bytes" not in report
-    assert report["admission"] == "defer"
+    assert report["admission"] == "defer" and "admission measurements are unavailable (memory:" in queue()
     facts()
     (fixture / "processes.json").write_text('[{"pid":101,"rss_bytes":"unknown"}]')
     report = call("admit",code=75)
     assert any("processes:" in e for e in report["errors"])
     facts()
     (state / ".memory-baseline.json").write_text('{"invalid":true}')
-    report = call("admit",code=75)
-    assert any("baseline:" in e for e in report["errors"])
+    report = call("admit")
+    assert "unusable" in report["calibration"] and report["admission"] == "admit"
+    (state / ".memory-baseline.json").write_text(json.dumps({**baseline, "host":"other-host"}))
+    report = call("admit")
+    assert "not host" in report["calibration"] and report["admission"] == "admit"
+    replaced = call("baseline")["baseline"]
+    assert replaced["host"] == report["host"] and replaced["samples"] > baseline["samples"]
     records = [json.loads(line) for line in (state / "memory-readings.jsonl").read_text().splitlines()]
-    assert records[-1] == report and all(row["fixture"] == str(fixture) for row in records)
+    assert all(row["fixture"] == str(fixture) for row in records)
     assert any(row["source"] == "probe" and row["alarms"] for row in records)
-    print("ok - unreadable facts/baselines remain explicit and fail closed; every observation is retained as independently parseable JSONL")
+    print("ok - unreadable facts fail closed, an unusable or other-host baseline only reports calibration and is replaced by baseline; every observation is parseable JSONL")
+
+    # A local secondmate home (and any confined worker in it) records its own
+    # readings, alarm episodes and wake rows, and reads the root's one baseline.
+    sub = home / "secondmate"
+    (sub / "state").mkdir(parents=True)
+    (sub / ".fm-secondmate-parent").write_text(f"schema=fm-secondmate-parent.v1\nroute=local\nparent_home={home}\n")
+    sub_env = {**env, "FM_HOME":str(sub)}
+    root_queue, root_readings = queue(), (state / "memory-readings.jsonl").read_bytes()
+    facts(rss=[{**daemon,"rss_bytes":2*gib},dict(fleet),dict(child)])
+    report = call("admit",environ=sub_env)
+    assert report["baseline"]["host"] == replaced["host"] and report["alarms"][0]["pid"] == 101
+    assert queue() == root_queue and (state / "memory-readings.jsonl").read_bytes() == root_readings
+    sub_rows = [line.split("\t") for line in (sub / "state/.wake-queue").read_text().splitlines()]
+    assert [row[1] for row in sub_rows] == ["1"] and "xprotectd PID 101" in sub_rows[0][4], sub_rows
+    assert (sub / "state/.wake-queue.seq").read_text().strip() == "1"
+    assert json.loads((sub / "state/memory-readings.jsonl").read_text())["source"] == "admit"
+    print("ok - a secondmate home's admission writes only its own readings and queue sequence while reading the root baseline")
 PY

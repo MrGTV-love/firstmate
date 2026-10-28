@@ -13,22 +13,27 @@ the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
 Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run):
   - macOS native pressure level 1 is normal; any other measured level defers.
-  - The supplied 24 GB anonymous-page cap applies to 32 GiB hosts, and the
-    supplied per-ShellCheck cap is 4 GB. These are operating limits, not newly
-    inferred exhaustion thresholds. Raw free + speculative pages (PhysMem
-    unused), occupied compressor pages, swap and largest residents are recorded.
-  - baseline explicitly records a normal-pressure reading's largest non-fleet
-    resident process as this host's observed RSS envelope; later RSS above that
-    measured share of RAM raises a named observation, not a leak diagnosis.
-    No default RSS fraction, swap utilization cutoff, or unused-memory cutoff is
-    guessed. An absent/unreadable baseline or missing required memory reading
-    defers admission with 75, while the legacy diagnostic remains fail-open.
-  - The first baseline must be taken during a known-healthy workload. It cannot
-    diagnose a process already oversized when measured. The envelope is empirical,
-    not a safe allocation bound; recorded readings support later reassessment.
-  - Every mode records one JSONL reading in the supplied state directory.
-    No daemon restart, process signal, or work cancellation is performed.
-    The wrapper owns root-home placement and the existing durable wake transport.
+    A missing required memory or process reading also defers with 75, while
+    the legacy diagnostic remains fail-open. Raw free + speculative pages
+    (PhysMem unused), occupied compressor pages, swap, each reading's largest
+    non-fleet RSS and the largest residents are recorded for later thresholds.
+  - The non-fleet RSS alarm is separate from admission: a missing, invalid or
+    other-host baseline never defers work and is reported as calibration.
+  - baseline derives that alarm boundary from every recorded reading beside the
+    baseline file with no errors, native pressure 1, and this host/RAM/fixture:
+    the boundary is the largest non-fleet RSS observed across them, and the
+    record keeps the sample count, time span, smallest per-reading maximum,
+    share of RAM, and readings with unreadable RSS (lower bounds). At least two
+    such readings are required to observe any variation; fewer returns that
+    missing input. No RSS fraction, headroom, multiplier, swap cutoff, or
+    unused-memory cutoff is guessed. A matching baseline is retained unchanged;
+    an invalid or other-host baseline is replaced by the new derivation.
+  - Readings must cover a known-healthy workload. A process already oversized
+    when measured is part of the envelope; it is empirical, not a safe
+    allocation bound, and an alarm is an observation, not a leak diagnosis.
+  - Every mode appends one JSONL reading to --state. No daemon restart, process
+    signal, or work cancellation is performed. The wrapper owns home placement
+    and the existing durable wake transport.
 
 Legacy diagnostic thresholds (run --help for defaults):
   - --warn-mem-pct / --crit-mem-pct: percent of total memory not available.
@@ -377,72 +382,96 @@ def admission_sample():
 
 
 def admission_evaluate(report, baseline):
-    """Native pressure and explicit operating caps; RSS alarm is an envelope, not a leak diagnosis."""
-    reasons, alarms = [], []
-    rows = [p for p in report["processes"] if p["rss_bytes"] is not None]
-    if report["errors"]:
-        reasons.extend(report["errors"])
+    """Native pressure or unreadable facts defer new work; the RSS alarm never does."""
+    reasons = list(report["errors"])
     if report.get("pressure_level") not in (None, 1):
         reasons.append(f"native memory pressure level {report['pressure_level']} (normal is 1)")
-    # Captain-supplied 24 GB/32 GiB anonymous-page limit for this host class,
-    # not a utilization percentage inferred from raw unused or swap occupancy.
-    if report.get("total_bytes") == 32 * 1024 ** 3 and report.get("anonymous_bytes", 0) >= 24 * 1000 ** 3:
-        reasons.append("anonymous pages reached the 24 GB operating limit on 32 GiB RAM")
-    for row in rows:
-        if row["comm"].lower() == "shellcheck" and row["rss_bytes"] > 4 * 1000 ** 3:
-            reasons.append(f"ShellCheck PID {row['pid']} RSS {row['rss_bytes']} exceeds 4 GB")
-            alarms.append({**row, "boundary_bytes": 4 * 1000 ** 3, "kind": "shellcheck"})
+    alarms = []
     if baseline is not None:
-        if baseline["total_bytes"] != report.get("total_bytes") or baseline["host"] != report["host"]:
-            reasons.append("host identity or RAM differs from recorded memory baseline; remeasure it")
-        else:
-            for row in rows:
-                if not row["fleet"] and row["rss_bytes"] > baseline["non_fleet_max_bytes"]:
-                    alarms.append({**row, "boundary_bytes": baseline["non_fleet_max_bytes"],
-                                   "kind": "non-fleet"})
+        alarms = [{**p, "boundary_bytes": baseline["non_fleet_max_bytes"], "samples": baseline["samples"]}
+                  for p in report["processes"] if not p["fleet"] and p["rss_bytes"] is not None and
+                  p["rss_bytes"] > baseline["non_fleet_max_bytes"]]
     return reasons, alarms
+
+
+def baseline_derive(report, readings_path):
+    """Observed non-fleet envelope across recorded healthy readings, or the missing input."""
+    def healthy(row):
+        return (not row.get("errors") and row.get("pressure_level") == 1 and
+                row.get("host") == report["host"] and row.get("total_bytes") == report["total_bytes"] and
+                row.get("fixture") == report["fixture"] and type(row.get("non_fleet_max_bytes")) is int)
+    rows = []
+    if readings_path.exists():
+        for line in readings_path.read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict) and healthy(row):
+                rows.append(row)
+    if healthy(report):
+        rows.append(report)
+    if len(rows) < 2:
+        return None, (f"baseline needs at least two readings with no errors, native pressure 1, a readable "
+                      f"non-fleet RSS and this host/RAM; {readings_path} plus this reading has {len(rows)}")
+    maxima = [row["non_fleet_max_bytes"] for row in rows]
+    return {"schema": "fm-memory-baseline.v1", "checked_at": report["checked_at"],
+            "host": report["host"], "total_bytes": report["total_bytes"],
+            "non_fleet_max_bytes": max(maxima), "non_fleet_max_share": max(maxima) / report["total_bytes"],
+            "smallest_reading_max_bytes": min(maxima), "samples": len(rows),
+            "first_checked_at": min(row["checked_at"] for row in rows),
+            "last_checked_at": max(row["checked_at"] for row in rows),
+            "incomplete_samples": sum(1 for row in rows if row.get("rss_unreadable_pids")),
+            "derivation": "largest non-fleet RSS observed across recorded healthy readings; "
+                          "incomplete samples are lower bounds"}, None
 
 
 def admission_main(argv):
     parser = argparse.ArgumentParser(description="Recorded macOS admission; never stops running work")
     parser.add_argument("mode", choices=("sample", "admit", "probe", "baseline"))
     parser.add_argument("--state", type=Path, required=True)
+    parser.add_argument("--baseline", type=Path, required=True)
     args = parser.parse_args(argv)
     report = admission_sample()
     report["source"] = args.mode
+    candidates = [p["rss_bytes"] for p in report["processes"] if not p["fleet"] and p["rss_bytes"] is not None]
+    report["non_fleet_max_bytes"] = max(candidates) if candidates else None
     state = args.state
     state.mkdir(parents=True, exist_ok=True)
-    baseline_path = state / ".memory-baseline.json"
-    baseline = None
+    baseline, calibration = None, None
     try:
-        if baseline_path.exists():
-            baseline = json.loads(baseline_path.read_text())
-            if (baseline["schema"] != "fm-memory-baseline.v1" or not isinstance(baseline["host"], str) or
-                    type(baseline["total_bytes"]) is not int or baseline["total_bytes"] <= 0 or
-                    type(baseline["non_fleet_max_bytes"]) is not int or
-                    not 0 < baseline["non_fleet_max_bytes"] <= baseline["total_bytes"]):
-                raise ValueError("invalid baseline sizes")
+        loaded = json.loads(args.baseline.read_text())
+        if (loaded["schema"] != "fm-memory-baseline.v1" or not isinstance(loaded["host"], str) or
+                type(loaded["total_bytes"]) is not int or loaded["total_bytes"] <= 0 or
+                type(loaded["non_fleet_max_bytes"]) is not int or
+                not 0 < loaded["non_fleet_max_bytes"] <= loaded["total_bytes"] or
+                type(loaded["samples"]) is not int or loaded["samples"] < 2):
+            raise ValueError("invalid baseline fields")
+        if loaded["host"] != report["host"] or loaded["total_bytes"] != report.get("total_bytes"):
+            raise ValueError(f"recorded for host {loaded['host']} with {loaded['total_bytes']} bytes, "
+                             f"not host {report['host']} with {report.get('total_bytes')} bytes")
+        baseline = loaded
+    except FileNotFoundError:
+        calibration = f"no baseline at {args.baseline}"
     except (OSError, ValueError, KeyError, TypeError) as exc:
-        baseline = None
-        report["errors"].append(f"baseline: {exc}")
+        calibration = f"baseline {args.baseline} unusable: {exc}"
     reasons, alarms = admission_evaluate(report, baseline)
-    # An explicit read-only baseline operation establishes the observed normal
-    # envelope. Never silently learn away an existing outlier or overwrite it.
+    # Only an explicit baseline operation writes the envelope; a matching one is
+    # never silently re-learned, so a growing process cannot hide in it.
     if args.mode == "baseline" and not reasons:
-        candidates = [p["rss_bytes"] for p in report["processes"] if not p["fleet"] and p["rss_bytes"] is not None]
-        if candidates and baseline is None:
-            baseline = {"schema": "fm-memory-baseline.v1", "checked_at": report["checked_at"],
-                        "host": report["host"], "total_bytes": report["total_bytes"], "non_fleet_max_bytes": max(candidates),
-                        "derivation": "largest observed non-fleet RSS in this native-pressure-normal reading"}
-            with baseline_path.open("x") as stream:
-                json.dump(baseline, stream)
-        elif baseline is not None:
-            reasons.append("baseline already exists; retained unchanged")
+        if baseline is not None:
+            reasons.append("baseline already exists for this host; retained unchanged")
         else:
-            reasons.append("no readable non-fleet baseline candidates")
-    if baseline is None and report["platform"] == "darwin":
-        reasons.append("non-fleet RSS boundary unmeasured; run fm-mem-guard.sh baseline during a known healthy workload")
+            derived, missing = baseline_derive(report, args.baseline.with_name("memory-readings.jsonl"))
+            if missing:
+                reasons.append(missing)
+            else:
+                temp = args.baseline.with_name(f"{args.baseline.name}.tmp.{os.getpid()}")
+                temp.write_text(json.dumps(derived))
+                os.replace(temp, args.baseline)
+                baseline, calibration = derived, None
     report["baseline"] = baseline
+    report["calibration"] = calibration
     report["admission"] = "defer" if reasons else "admit"
     report["reasons"] = reasons
     report["alarms"] = alarms

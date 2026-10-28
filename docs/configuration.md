@@ -2175,20 +2175,24 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 ## Host memory admission
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
-Its engine header owns the measured signals, operating limits, and baseline derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Before admitting work on a newly enabled host, inspect a `sample` and explicitly record a `baseline` during a known-healthy representative workload using that command's help.
-An unmeasured host defers new work rather than silently inventing a non-fleet RSS fraction.
-The first baseline is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+Its engine header owns the measured signals and baseline derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
+Every fresh spawn, secondmates included, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is high or a required reading is unavailable.
+The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and each home reports that missing calibration once as a check wake.
 
-The root local home retains the baseline and append-only readings; secondmates use that same host-local record, not a remote parent's RAM budget.
-A changed host identity or RAM size requires a new measurement, and an existing baseline is never silently replaced as usage grows.
-Review readings over representative workloads before deliberately preserving and replacing the baseline; no exhaustion experiment is needed or recommended.
+Each invoking home's state keeps its own append-only readings, alarm episodes and wake rows, so a confined worker in a secondmate home writes only state it may already write.
+The root local home keeps the one host baseline.
+Before running `baseline` from the root home, let its watcher record readings over a known-healthy representative workload.
+The command derives the alarm boundary from those readings and records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings it names that missing input instead of writing a baseline.
+The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
+A matching baseline is never silently replaced as usage grows; an invalid baseline, or one recorded for a different host name or RAM size, is replaced by the next `baseline`.
+No exhaustion experiment is needed or recommended.
 The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
 The records contain process identity and resident size, not process arguments or environment contents.
 
-Generated worker instructions select the memory-checked new-run entrypoint; reattachment and gate responses remain direct so pressure cannot strand running validation.
+Generated worker instructions select the memory-checked new-run entrypoint; on exit 75 the worker keeps its branch, declares a `paused:` host-memory wait with the refused reading, and waits for firstmate to re-admit it.
+Reattachment and gate responses remain direct so pressure cannot strand running validation.
 This does not intercept independently invoked external no-mistakes binaries outside that entrypoint.
-The watcher presents named non-fleet baseline outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
+The watcher presents each queued memory row once, naming non-fleet outliers as observations for investigation, not a diagnosis of a leak or authority to restart a system daemon.
 No memory observation stops existing work or restarts a process.
 Linux retains the existing diagnostic interface; native admission is currently macOS-only.
 

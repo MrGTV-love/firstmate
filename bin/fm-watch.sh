@@ -3247,15 +3247,33 @@ memory_health_tick() {
   MEMORY_HEALTH_PID=$!
 }
 
-# The detached observer already appended its durable row. Present that exact
-# identifying payload on the next poll, without appending it a second time.
+# The detached observer already appended its durable row. Present each queued
+# memory row once, without appending it a second time: like
+# procevent_surface_queued, a row whose wake was output is recorded as surfaced,
+# so a handling successor or a re-arm before acknowledgement supervises instead
+# of waking again. The marker keeps only still-queued sequence numbers.
+MEMORY_HEALTH_SURFACED=
 memory_health_surface() {
-  local reason
+  local rows reason
   [ -s "$FM_WAKE_QUEUE" ] || return 0
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
-  reason=$(awk -F '\t' 'NF >= 5 && $3 == "check" && ($4 == "memory-health" || $4 == "memory-health-unavailable") { print $5; exit }' "$FM_WAKE_QUEUE")
+  rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" && $4 ~ /^memory-health/ { print $2 "\t" $5 }' "$FM_WAKE_QUEUE")
   fm_lock_release "$FM_WAKE_QUEUE_LOCK"
-  [ -z "$reason" ] || wake "$reason"
+  [ -n "$rows" ] || return 0
+  reason=$(awk -F '\t' -v seen="$(cat "$STATE/.seen-memory-health" 2>/dev/null || true)" '
+    BEGIN { n = split(seen, list, "\n"); for (i = 1; i <= n; i++) done[list[i]] }
+    !($1 in done) { printf "%s%s", sep, $2; sep = "; " }' <<<"$rows")
+  [ -n "$reason" ] || return 0
+  MEMORY_HEALTH_SURFACED=$(cut -f1 <<<"$rows")
+  # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
+  FM_WAKE_POST_OUTPUT_ACTION=memory_health_after_output
+  wake "$reason"
+}
+
+memory_health_after_output() {
+  [ "$1" -eq 0 ] || return 0
+  printf '%s\n' "$MEMORY_HEALTH_SURFACED" > "$STATE/.seen-memory-health.tmp.$$" \
+    && mv -f "$STATE/.seen-memory-health.tmp.$$" "$STATE/.seen-memory-health"
 }
 
 # The Lavish sweep is detached and single-flight like the sweeps above: it reads

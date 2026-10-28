@@ -2097,8 +2097,6 @@ test_memory_admission_defers_before_dispatch_then_admits_recovery() {
   printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
   printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
   printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false}]\n' > "$native/processes.json"
-  FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_MEMORY_FIXTURE_DIR="$native" \
-    bash "$ROOT/bin/fm-mem-guard.sh" baseline >/dev/null || fail 'could not measure healthy fixture baseline'
   write_live "$home" running "$case_dir/project"
   cp "$home/state/running.meta" "$case_dir/running.before"
   before=$(call_count "$case_dir"); worktrees=$(worktree_list "$case_dir")

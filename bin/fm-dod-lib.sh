@@ -753,7 +753,8 @@ If plan construction fails, stop and report the error to firstmate; do not start
 Pass \`--verification-plan $output_q\` when starting the run, alongside the unchanged \`--intent\` input described below.
 The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
 Start each NEW run through \`FM_HOME=$home_q $memory_q run -- no-mistakes axi run\`, appending the unchanged intent and verification-plan arguments, not the bare run command.
-That path records a fresh host memory reading immediately before exec and refuses new work with exit 75 while pressure is high or the measured baseline is unavailable; leave the work queued for retry without stopping any existing work.
+That path records a fresh host memory reading immediately before exec and refuses the new run with exit 75 while native memory pressure is high or its readings are unavailable; it never stops existing work.
+If it exits 75, do not retry it on your own: keep your branch and commits, append one \`paused:\` status line that quotes the printed reading's \`pressure_level\`, \`unused_bytes\`, \`compressor_bytes\`, \`swap_used_bytes\` and \`reasons\` as an external host-memory wait for firstmate to re-admit, then end your turn and start the run again only when firstmate tells you to.
 Reattach to existing runs and answer gates directly with no-mistakes; those calls must remain usable under pressure.
 
 EOF

@@ -138,6 +138,8 @@ test_memory_observation_wakes_with_the_process_identity() {
   printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
   printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":1073741824,"fleet":false}]\n' > "$native/processes.json"
   FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_MEMORY_FIXTURE_DIR="$native" \
+    bash "$ROOT/bin/fm-mem-guard.sh" sample >/dev/null || fail 'memory reading fixture failed'
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_MEMORY_FIXTURE_DIR="$native" \
     bash "$ROOT/bin/fm-mem-guard.sh" baseline >/dev/null || fail 'memory baseline fixture failed'
   printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":8589934592,"fleet":false}]\n' > "$native/processes.json"
   start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
@@ -152,7 +154,18 @@ test_memory_observation_wakes_with_the_process_identity() {
   assert_contains "$(cat "$state/.wake-queue")" 'xprotectd PID 101' 'the presented memory observation was not durable'
   jq -es '.[-1].source == "probe" and .[-1].alarms[0].pid == 101' "$state/memory-readings.jsonl" >/dev/null \
     || fail 'watcher did not retain the alarm reading'
-  pass 'the real watcher starts native observation and presents its named non-fleet alarm through the existing durable wake queue'
+  # The row stays queued until handling acknowledges it; a handling successor
+  # must supervise instead of presenting the same row again and exiting.
+  start_watcher "$state" "$fakebin" "$out.successor" FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  sleep 4
+  if ! is_live_non_zombie "$pid" || grep -q 'memory-health' "$out.successor"; then
+    stop_owned_watcher "$pid"
+    fail "a handling successor re-presented the surfaced memory row: $(cat "$out.successor") $(cat "$out.successor.err")"
+  fi
+  stop_owned_watcher "$pid"
+  pass 'the real watcher presents its named non-fleet alarm once through the existing durable wake queue'
 }
 
 test_memory_observation_wakes_with_the_process_identity
