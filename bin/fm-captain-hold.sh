@@ -1570,6 +1570,7 @@ refuse_self_inventory() {
 # origin was recorded, so completion can disclose the legacy fallback.
 verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origin-state>"
   local origin=$1 entry=$2 resolved resolve_status=0 id how stored origin_state=unrecorded origin_id stored_id
+  local archived_rc
   # The origin task is never its own captain-call inventory: it is the work the
   # calls were found in, so accepting it would let a refused hold look recorded.
   if [ -n "$origin" ] && [ "$origin" != "$BINDING_ANY" ] && [ "$entry" = "$origin" ]; then
@@ -1583,12 +1584,14 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
   fi
   id=${resolved%% *}
   how=${resolved##* }
-  if [ "$how" = archive ]; then
+  if [ "$how" = archive ] || [ "$how" = archive-resolved ]; then
     # The archived row holds the same body a live closed row would show, so the
     # origin it was held for is read from it; its identity is the archived id.
     archive_row_lookup "$(fm_backlog_data_absolute "$DATA")" "$id" \
       || fail "archived task $id could not be read again after it resolved"
-    archived_answer_state "$ARCHIVE_ROW_BODY" \
+    archived_rc=0
+    archived_answer_state "$ARCHIVE_ROW_BODY" || archived_rc=$?
+    [ "$archived_rc" = 0 ] || [ "$archived_rc" = 5 ] \
       || fail "captain-held task $id is archived without a recorded captain answer"
     validate_slug backend-task-id "$id"
     stored=$(body_hold_origin "$ARCHIVE_ROW_BODY")
@@ -3005,7 +3008,7 @@ reconcile_note() {
 
 command_complete() {
   local origin=${1:-} meta previous='' supplied='' keys='' entry key status_file open has_meta=0 transfer_rc transfers=() resolved
-  local resolved_how attested_by_prefix='' attested_by_archive='' origin_state unrecorded_origin=''
+  local resolved_how attested_by_prefix='' attested_by_archive='' attested_by_archive_resolved='' origin_state unrecorded_origin=''
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   validate_slug origin-id "$origin"
   shift
@@ -3047,8 +3050,11 @@ command_complete() {
       if [ "$resolved_how" = migrated-prefix ]; then
         attested_by_prefix="${attested_by_prefix}${attested_by_prefix:+ }$entry=$resolved"
       fi
-      if [ "$resolved_how" = archive ] || [ "$resolved_how" = archive-resolved ]; then
+      if [ "$resolved_how" = archive ]; then
         attested_by_archive="${attested_by_archive}${attested_by_archive:+ }$resolved"
+      fi
+      if [ "$resolved_how" = archive-resolved ]; then
+        attested_by_archive_resolved="${attested_by_archive_resolved}${attested_by_archive_resolved:+ }$resolved"
       fi
     done <<EOF
 $(printf '%s\n' "$keys" | tr ',' '\n')
@@ -3089,9 +3095,10 @@ EOF
       fi
     fi
   fi
-  printf 'complete: %s captain-call inventory reviewed%s%s%s%s\n' "$origin" "${keys:+ ($keys)}" \
+  printf 'complete: %s captain-call inventory reviewed%s%s%s%s%s\n' "$origin" "${keys:+ ($keys)}" \
     "${attested_by_prefix:+ [attested through the configured prefix: $attested_by_prefix]}" \
     "${attested_by_archive:+ [answered and archived: $attested_by_archive]}" \
+    "${attested_by_archive_resolved:+ [decided by the parent or withdrawn, not a captain answer, and archived: $attested_by_archive_resolved]}" \
     "${unrecorded_origin:+ [no recorded origin on: $unrecorded_origin; not checked against $origin]}"
 }
 

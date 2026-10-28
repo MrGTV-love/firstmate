@@ -152,7 +152,10 @@ fm_idle_reap_classify() {
     "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" open "$id" --any-owner >/dev/null 2>&1 || hold_rc=$?
   if [ "$hold_rc" != 1 ]; then
     IDLE_REAP_CLASS=parked
-    if [ "$hold_rc" = 0 ]; then
+    if [ "$hold_rc" = 0 ] && FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" \
+      "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" open "$id" --parent-owned >/dev/null 2>&1; then
+      IDLE_REAP_DETAIL="parent-held: waiting for the parent firstmate's decision"
+    elif [ "$hold_rc" = 0 ]; then
       IDLE_REAP_DETAIL="captain-held: waiting for captain answer"
     else
       IDLE_REAP_DETAIL="captain hold unreadable; cleanup ineligible"

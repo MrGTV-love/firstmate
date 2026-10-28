@@ -658,6 +658,94 @@ test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records() {
   pass "the lifecycle readers and the completion gate know parent decisions and withdrawals, and a withdrawal retires its reconcile request"
 }
 
+# Makes the next `tasks-axi <subcommand>` in <home> fail once, so a command
+# stops after writing its record and the retry must finish it.
+fail_tasks_axi_once() {  # <home> <subcommand>
+  local real
+  real=$(command -v tasks-axi)
+  cat > "$1/fakebin/tasks-axi" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "$2" ] && [ ! -e "$1/tasks-axi-failed-once" ]; then
+  : > "$1/tasks-axi-failed-once"
+  echo "injected $2 failure" >&2
+  exit 1
+fi
+exec "$real" "\$@"
+EOF
+  chmod +x "$1/fakebin/tasks-axi"
+  rm -f "$1/tasks-axi-failed-once"
+}
+
+test_a_retried_decide_or_withdraw_finishes_without_a_second_record() {
+  local mate home channel decision evidence show
+  mate=$(make_mate_home retry-decide)
+  channel=$(mate_channel "$mate")
+  decision="$mate/decision.txt"
+  printf 'Retry once.\n' > "$decision"
+  make_legacy_mate_hold "$mate" retry-work "retry or fix one red check"
+  classify_as_parent "$mate" retry-work
+  fail_tasks_axi_once "$mate" unhold
+  if run_captain "$mate" decide retry-work --decision-file "$decision" >/dev/null 2>&1; then
+    fail "the injected unhold failure did not stop decide"
+  fi
+  assert_contains "$(tasks_in "$mate" show retry-work --full)" "held: yes" "the failed decide released the hold"
+  run_captain "$mate" decide retry-work --decision-file "$decision" >/dev/null || fail "the retried decide failed"
+  show=$(tasks_in "$mate" show retry-work --full)
+  assert_contains "$show" "held: no" "the retried decide did not release the hold"
+  [ "$(printf '%s' "$show" | grep -o 'Resolution mode: decided' | wc -l | tr -d ' ')" = 1 ] \
+    || fail "the retried decide wrote a second record"
+  [ "$(grep -c 'resolved \[key=captain-hold-retry-work-1\]' "$channel")" = 1 ] \
+    || fail "the retried decide did not resolve key 1 once: $(cat "$channel")"
+  ! grep -q 'captain-hold-retry-work-2' "$channel" || fail "the retried decide published a second key"
+
+  home=$(make_home retry-withdraw)
+  evidence="$home/evidence.txt"
+  printf 'Moot under the ruling.\n' > "$evidence"
+  printf 'retry-moot is moot.\n' > "$home/ruling.txt"
+  tasks_in "$home" add retry-moot "Retry moot" --kind ship --repo sample >/dev/null
+  run_captain "$home" hold retry-moot --reason "pick one" >/dev/null || fail "hold failed"
+  run_captain "$home" hold ruling-r --title "Ruling R" --reason "choose" --repo sample >/dev/null
+  run_captain "$home" answer ruling-r --decision-file "$home/ruling.txt" >/dev/null || fail "could not record the ruling"
+  fail_tasks_axi_once "$home" unhold
+  if run_captain "$home" withdraw retry-moot --evidence-file "$evidence" --ruling ruling-r >/dev/null 2>&1; then
+    fail "the injected unhold failure did not stop withdraw"
+  fi
+  assert_contains "$(tasks_in "$home" show retry-moot --full)" "held: yes" "the failed withdraw released the hold"
+  run_captain "$home" withdraw retry-moot --evidence-file "$evidence" --ruling ruling-r >/dev/null \
+    || fail "the retried withdraw failed"
+  show=$(tasks_in "$home" show retry-moot --full)
+  assert_contains "$show" "held: no" "the retried withdraw did not release the hold"
+  [ "$(printf '%s' "$show" | grep -o 'Resolution mode: withdrawn' | wc -l | tr -d ' ')" = 1 ] \
+    || fail "the retried withdraw wrote a second record"
+  pass "a decide or withdraw retried after a failed release finishes it without a second record or key"
+}
+
+# Retention archives a question row the parent's decision closed; the gate still
+# accepts it and lists it apart from the captain's answered calls.
+test_the_gate_accepts_an_archived_parent_decision() {
+  local mate decision out
+  mate=$(make_mate_home archived-parent)
+  printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
+    'archive = "data/done-archive.md"' 'done_keep = 1' > "$mate/.tasks.toml"
+  decision="$mate/decision.txt"
+  printf 'Retry once.\n' > "$decision"
+  tasks_in "$mate" add scout-b "Scout B" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$mate" scout-b
+  make_legacy_mate_question "$mate" q-arch "retry or fix one red check"
+  classify_as_parent "$mate" q-arch
+  run_captain "$mate" complete scout-b q-arch >/dev/null || fail "the gate refused an open parent decision"
+  run_captain "$mate" decide q-arch --decision-file "$decision" >/dev/null || fail "decide failed"
+  tasks_in "$mate" add filler-b "Filler" --kind captain --repo sample >/dev/null
+  tasks_in "$mate" "done" filler-b >/dev/null || fail "could not close the retention filler"
+  grep -q '^- \[x\] q-arch ' "$mate/data/done-archive.md" || fail "retention did not archive the decided row"
+  out=$(run_captain "$mate" complete scout-b q-arch) || fail "the gate refused an archived parent decision"
+  assert_contains "$out" "[decided by the parent or withdrawn, not a captain answer, and archived: q-arch]" \
+    "the archived parent decision was not listed under its own label"
+  assert_not_contains "$out" "answered and archived" "the archived parent decision was listed as an answered call"
+  run_captain "$mate" verify scout-b >/dev/null || fail "verify refused an archived parent decision"
+  pass "the completion gate accepts an archived parent decision and never lists it as an answer"
+}
+
 tests=(
 test_a_mate_home_must_declare_who_owns_each_hold
 test_a_parent_owned_call_closes_on_the_parents_decision
@@ -672,5 +760,7 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it
 test_a_recorded_captain_owner_is_never_reclassified
 test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse_it
 test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records
+test_a_retried_decide_or_withdraw_finishes_without_a_second_record
+test_the_gate_accepts_an_archived_parent_decision
 )
 captain_hold_run_tests "$@"

@@ -300,6 +300,8 @@ They read the second through `open --parent-owned` and name whose decision is ou
 Splitting the owner therefore never lets through a merge that the single captain kind would have stopped.
 Teardown, the idle reaper, and the session-end relauncher read `open --any-owner`, so cleanup never closes a row while either decision is open.
 The investigation completion gate (`complete` and `verify`) accepts an open classified parent hold, and a newest `decided` or `withdrawn` record, live or archived, as durable states, because each is attributed and marked `Not a captain answer.`.
+`complete` lists an archived one under its own label, never as an answered call.
+The idle reaper names an open parent decision as waiting on the parent firstmate, not on the captain.
 An archived parent decision or withdrawal is never a ruling for `withdraw`.
 A retried `decide` or `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
 
