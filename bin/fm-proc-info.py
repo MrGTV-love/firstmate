@@ -228,15 +228,16 @@ def process_identity(record):
     return struct.unpack_from("qq", record, P_START)
 
 
-def tree_snapshot(root, known):
+def tree_snapshot(root, known, skip=()):
     """Find descendants across sessions and retain observed orphans by identity.
 
     The root's own process group also catches children reparented before the
     first snapshot. Start timestamps prevent retaining a recycled PID. The
-    calling process is never a member.
+    calling process and any PID in skip are never members.
     """
     records = {struct.unpack_from("i", record, P_PID)[0]: record for record in kinfos()}
-    records.pop(os.getpid(), None)
+    for pid in (os.getpid(), *skip):
+        records.pop(pid, None)
     children = {}
     queue = []
     group_owned = (root not in records or root not in known

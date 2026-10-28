@@ -395,6 +395,37 @@ PY
   pass "a seen member in another session is ended by the dead-man link"
 }
 
+test_memory_supervisor_kill_during_cleanup() {
+  local root_pid job_pid
+  python3 - "$WRAP" "$TMP_ROOT/cleanup.pids" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            '(trap "" TERM; exec sleep 600) & echo "$$ $!" >"$0"; sleep 1.5', sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.01)
+root = int(open(sys.argv[2]).read().split()[0])
+# The root is reaped when cleanup starts; the leftover ignores TERM, so the
+# supervisor is still inside its one-second TERM grace when it is killed.
+while wrapper.poll() is None:
+    try:
+        os.kill(root, 0)
+    except ProcessLookupError:
+        break
+    time.sleep(0.01)
+time.sleep(0.2)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r root_pid job_pid <"$TMP_ROOT/cleanup.pids" || fail "memory-stopped command did not start"
+  assert_memory_pid_ended "$job_pid"
+  pass "a supervisor killed during its own cleanup leaves no TERM-ignoring member behind"
+}
+
 test_memory_supervisor_death_before_reader_ready() {
   local fixture="$TMP_ROOT/startup-fixture" root_pid
   mkdir -p "$fixture"
@@ -535,6 +566,7 @@ if memory_supported; then
   test_memory_supervisor_kill_ends_tree
   test_memory_ignored_hangup_passes_through
   test_memory_out_of_group_member_ends_with_supervisor
+  test_memory_supervisor_kill_during_cleanup
   test_memory_supervisor_death_before_reader_ready
   test_memory_group_kill_idiom_keeps_status
   test_memory_command_start_matches_exec

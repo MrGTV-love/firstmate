@@ -125,12 +125,14 @@ def uncounted_note(rows):
     return f"; {len(rows)} other-user member(s) with unreadable memory not counted: {names}"
 
 
-def end_tree(proc, root, known, grace=0):
+def end_tree(proc, root, known, grace=0, skip=()):
     """Freeze parents before killing them so detached children cannot orphan.
 
     With a grace, members first get TERM and up to that many seconds to exit.
     Cleanup does not depend on the memory reader: a dead, stalled, or broken
-    reader cannot prevent a fresh libproc descendant sweep. Each PID is checked
+    reader cannot prevent a fresh libproc descendant sweep. A live reader, in
+    skip, is neither signalled nor awaited, so its dead-man link still covers
+    the tree until the caller ends it after this sweep. Each PID is checked
     against its kernel start timestamp before a signal is sent. A refused
     signal does not stop the sweep; the first refusal is raised after it.
     """
@@ -146,7 +148,7 @@ def end_tree(proc, root, known, grace=0):
             errors.append(error)
 
     def live():
-        return {pid: record for pid, record in proc.tree_snapshot(root, known).items()
+        return {pid: record for pid, record in proc.tree_snapshot(root, known, skip).items()
                 if record[proc.P_STAT] != proc.SZOMB}
 
     try:
@@ -198,11 +200,8 @@ def run(limit, command):
         nonlocal ended, cleanup_error, reader
         if child is not None and not ended:
             ended = True
-            if reader is not None:
-                reader.close()
-                reader = None
             try:
-                end_tree(proc, child.pid, known, grace)
+                end_tree(proc, child.pid, known, grace, () if reader is None else (reader.process.pid,))
             except (OSError, LookupError) as error:
                 cleanup_error = error
             finally:
@@ -212,6 +211,9 @@ def run(limit, command):
                     child.kill()
                 except OSError as error:
                     cleanup_error = error
+                if reader is not None:
+                    reader.close()
+                    reader = None
 
     def outcome():
         return "ended" if cleanup_error is None else f"tree cleanup failed: {cleanup_error}"
@@ -245,6 +247,8 @@ def run(limit, command):
             os.close(gate)
         reader = Reader(child.pid, child.pid)
         reader.sample(known, uncounted)
+        if caught:
+            return 128 + caught
         os.write(release, b"\n")
         os.close(release)
         release = None
@@ -272,7 +276,8 @@ def run(limit, command):
             reason(f"cannot start memory reader ({error}); command not started")
         else:
             end_child()
-            reason(f"cannot sample command-tree memory ({error}); {outcome()}" + uncounted_note(uncounted))
+            ending = "command not started" if release is not None else outcome()
+            reason(f"cannot sample command-tree memory ({error}); {ending}" + uncounted_note(uncounted))
         return 125
     finally:
         if child is not None:
