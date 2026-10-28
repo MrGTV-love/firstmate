@@ -345,6 +345,7 @@ A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
 A slot in a superseded pool folder is not leased: Treehouse names a pool folder from the project's origin URL, so repointing origin leaves earlier copies in the old folder, and `treehouse lease` takes a slot name that it resolves in the current pool only.
 `treehouse get` does not hand out such a slot either, so that close goes ahead without a lease, as [Superseded pool folders](configuration.md#superseded-pool-folders) describes.
+The held-copy inventory still protects that slot: if the folder becomes current again, a start refuses while a held copy there is neither landed nor discarded, and names that copy.
 A lease that an earlier teardown took by name on a same-named slot of the current pool is released only after every refusal check has passed, so a close that refuses changes no lease.
 The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot stays claimed, reserved under a durable lease or, in a superseded pool folder, unleased.
 Nothing returns the slot automatically, and teardown removes no held copy: a held copy goes on the owner's word naming it.
@@ -465,6 +466,7 @@ Treehouse leases only the first entry with the requested name, so a lease cannot
 No other refusal names a lease as its remedy.
 A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
 An unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, does not stop a start, because `treehouse get` allocates from the current pool only; this is judged again at each start, so a folder that becomes current again is protected again.
+A start also refuses for a slot of the current pool that holds a copy listed in the held-copy inventory `data/held-foreign-copies.log` until that copy is landed or discarded, and names that copy and those routes instead of a lease.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.
 This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.

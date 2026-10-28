@@ -673,30 +673,37 @@ teardown_own_nested_other_repos() {
   done
 }
 
-# Appends each held foreign copy of the last proof to the record
-# data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
-# and the exact reason, tab separated. bin/fm-teardown.sh calls it once every
-# proof has passed and before anything is removed, and refuses the close when it
-# returns 1, so the inventory is never missing for a close that happened. A line
-# that is already there for the same task, slot, copy and reason is not written
-# again, so a rerun after a later refusal adds nothing. The record is only ever
-# appended to here; nothing returns the slot or removes a held copy on its own,
-# and a held copy goes only on the owner's word naming it.
-teardown_held_copies_record() {
-  local record="$DATA/held-foreign-copies.log" entry copy why slot stamp rc=0
-  [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
-  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  slot=$(fm_refuse_text "$TEARDOWN_HELD_SLOT")
+# Appends one entry to the held-copy inventory data/held-foreign-copies.log: UTC
+# time, closing task id, slot path, copy path and the exact reason, tab
+# separated. A line already there for the same task, slot, copy and reason is not
+# written again, so a rerun after a later refusal adds nothing. The inventory is
+# only ever appended to; bin/fm-task-copy-lib.sh's allocation guard reads it, and
+# an entry stops protecting its slot once its copy is landed or discarded
+# (fm_task_copy_held_copy_protected).
+teardown_held_inventory_add() {  # <slot> <copy> <why>
+  local record="$DATA/held-foreign-copies.log" slot copy why
+  slot=$(fm_refuse_text "$1")
+  copy=$(fm_refuse_text "$2")
+  why=$(fm_refuse_text "$3")
   mkdir -p "$DATA" 2>/dev/null || return 1
   [ ! -e "$record" ] || [ -f "$record" ] || return 1
+  if [ -f "$record" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$slot FM_HELD_COPY=$copy FM_HELD_WHY=$why awk -F'\t' \
+      '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
+    return 0
+  fi
+  { printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null
+}
+
+# Appends each held foreign copy of the last proof to the held-copy inventory.
+# bin/fm-teardown.sh calls it once every proof has passed and before anything is
+# removed, and refuses the close when it returns 1, so the inventory is never
+# missing for a close that happened. Nothing returns the slot or removes a held
+# copy on its own, and a held copy goes only on the owner's word naming it.
+teardown_held_copies_record() {
+  local entry rc=0
+  [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
-    copy=$(fm_refuse_text "${entry%%$'\t'*}")
-    why=$(fm_refuse_text "${entry#*$'\t'}")
-    if [ -f "$record" ] && FM_HELD_ID=$ID FM_HELD_SLOT=$slot FM_HELD_COPY=$copy FM_HELD_WHY=$why awk -F'\t' \
-        '$2 == ENVIRON["FM_HELD_ID"] && $3 == ENVIRON["FM_HELD_SLOT"] && $4 == ENVIRON["FM_HELD_COPY"] && $5 == ENVIRON["FM_HELD_WHY"] { f = 1 } END { exit !f }' "$record" 2>/dev/null; then
-      continue
-    fi
-    { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$slot" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
+    teardown_held_inventory_add "$TEARDOWN_HELD_SLOT" "${entry%%$'\t'*}" "${entry#*$'\t'}" || rc=1
   done
   return "$rc"
 }

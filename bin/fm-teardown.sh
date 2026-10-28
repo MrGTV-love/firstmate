@@ -4041,7 +4041,7 @@ require_owned_task_worktree_slot() {
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
 require_shared_task_worktree_slot() {
-  local slot state_dir other_meta copy kind marker holder i last
+  local slot state_dir other_meta copy kind marker holder i last held
   local -a sharers=() sharer_metas=()
   [ "$FORCE" != --force ] || return 0
   teardown_owns_worktree || return 0
@@ -4073,10 +4073,21 @@ require_shared_task_worktree_slot() {
       # Until reassociation, root-only records do not trigger the allocation
       # guard for nested current copies. Keep Treehouse itself from handing
       # out this slot throughout that interval, not just during our lock.
-      if ! fm_task_copy_pool_slot_held "$slot" \
-          && { [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] \
-            || fm_task_copy_slot_in_current_pool "$PROJ" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
-            || [ "$FM_TASK_COPY_POOL_CURRENCY" != superseded ]; }; then
+      # A slot in a superseded pool folder needs no lease, but the remaining
+      # copies go into the held-copy inventory, so the allocation guard protects
+      # them if the folder becomes current again.
+      held=0
+      ! fm_task_copy_pool_slot_held "$slot" || held=1
+      if [ "$held" = 0 ] && [ "$FM_TASK_COPY_SLOT_STATE" = unleased ] \
+          && ! fm_task_copy_slot_in_current_pool "$PROJ" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
+          && [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+        for ((i=0; i < ${#sharers[@]}; i++)); do
+          teardown_held_inventory_add "$slot" "$slot" "it is the current copy of task ${sharers[$i]}" || {
+            echo "REFUSED: shared pool slot $slot is in a superseded Treehouse pool folder, and the held-copy record $DATA/held-foreign-copies.log could not be written to protect its remaining copies; nothing was changed." >&2
+            return 1
+          }
+        done
+      elif [ "$held" = 0 ]; then
         holder='<remaining-task>'
         [ "${#sharers[@]}" -ne 1 ] || holder="'${sharers[0]}'"
         echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2

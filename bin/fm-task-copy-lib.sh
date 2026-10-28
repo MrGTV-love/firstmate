@@ -695,26 +695,57 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
   return 1
 }
 
+# Whether a copy the held-copy inventory (data/held-foreign-copies.log) lists
+# still holds work a reset of its slot would lose. It stops protecting its slot
+# once it is discarded (gone) or landed: an entry for a task's current copy
+# protects while that task's record still names it, one held for ignored files
+# protects while the copy exists, and any other protects while the copy has
+# uncommitted work or a commit on no remote. A copy that cannot be read
+# protects. <record> entries are "<task-id><TAB><canonical copy>".
+fm_task_copy_held_copy_protected() {  # <copy> <why> [<record>...]
+  local copy=$1 why=$2 owner record status unique
+  shift 2
+  [ -e "$copy" ] || [ -L "$copy" ] || return 1
+  copy=$(fm_task_copy_canonical_dir "$copy") || return 0
+  case "$why" in
+    "it is the current copy of task "*)
+      owner=${why#it is the current copy of task }
+      for record in "$@"; do
+        [ "$record" != "$owner"$'\t'"$copy" ] || return 0
+      done
+      return 1
+      ;;
+    "it holds ignored files that exist nowhere else:"*) return 0 ;;
+  esac
+  status=$(git -C "$copy" status --porcelain 2>/dev/null) || return 0
+  [ -z "$status" ] || return 0
+  unique=$(git -C "$copy" rev-list -n 1 HEAD --not --remotes 2>/dev/null) || return 0
+  [ -n "$unique" ]
+}
+
 # True when no pool slot of <project> that treehouse get could hand out strictly
 # contains the current copy (worktree=) of a task record in this home or any
-# locally registered Firstmate home. treehouse get resets and reassigns the slot
-# it hands out, so a slot holding a live record's nested copy must not be
+# locally registered Firstmate home, or holds a copy that a held close or a
+# shared-slot retire left in the held-copy inventory of one of those homes and
+# that still protects it (fm_task_copy_held_copy_protected). treehouse get
+# resets and reassigns the slot it hands out, so such a slot must not be
 # allocatable; a slot Treehouse's state durably holds
 # (fm_task_copy_pool_slot_held) is never handed out, whatever lies inside it,
 # nor is an unleased slot in a superseded pool folder
-# (fm_task_copy_slot_in_current_pool), which is judged again at each call, and a
-# slot a task merely left is not a record's current copy, so none of them
-# stops the allocation. A uniquely recorded unleased slot names the treehouse
-# lease command that holds it in place without touching it; teardown's
-# treehouse return releases that lease with the slot. Conflicting records
-# instead need inspection and repair: lease selects only the first matching
-# name, so it cannot reliably clear that refusal. No other refusal names a
-# lease as a remedy. A registered local home
+# (fm_task_copy_slot_in_current_pool), which is judged again at each call, so a
+# folder that becomes current again is protected again, and a slot a task merely
+# left is not a record's current copy, so none of them stops the allocation. A
+# uniquely recorded unleased slot names the treehouse lease command that holds
+# it in place without touching it; teardown's treehouse return releases that
+# lease with the slot. A held copy instead names landing it or its owner's
+# explicit discard. Conflicting records need inspection and repair: lease
+# selects only the first matching name, so it cannot reliably clear that
+# refusal. No other refusal names a lease as a remedy. A registered local home
 # that cannot be read is named in one warning line and skipped: one broken home
 # must not stop every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
-  local -a homes=()
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy log seen stamp why i
+  local -a homes=() logs=() records=() slots=() copies=() ids=() kinds=()
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_local_firstmate_state_dirs "$record_state" tolerant
@@ -723,45 +754,76 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
   done
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     home=$(fm_task_copy_canonical_dir "${state_dir%/*}") && homes+=("$home")
+    logs+=("${state_dir%/*}/data/held-foreign-copies.log")
   done
+  [ -z "${DATA:-}" ] || logs+=("$DATA/held-foreign-copies.log")
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
-      slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
-      fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
       id=$(basename "$meta" .meta)
-      case "$FM_TASK_COPY_SLOT_STATE" in
-        held) continue ;;
-        unleased)
-          if fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
-            remedy="To hold that slot in place without touching its contents, run: (cd '$project' && treehouse lease '$FM_TASK_COPY_CURRENT_SLOT_NAME' --lease-holder '$id')"
-          elif [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
-            continue
-          else
-            remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
-          fi
-          ;;
-        conflicting)
-          remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
-          ;;
-        recovered)
-          remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
-          ;;
-        escaped|relative)
-          remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
-          ;;
-        missing-jq)
-          remedy="Install jq so the pool state can be read, then retry; a lease does not clear this refusal."
-          ;;
-        *)
-          remedy="A lease does not clear this refusal; inspect the pool with: (cd '$project' && treehouse status)"
-          ;;
-      esac
-      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
-      echo "$remedy" >&2
-      return 1
+      records+=("$id"$'\t'"$copy")
+      slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
+      slots+=("$slot") copies+=("$copy") ids+=("$id") kinds+=(record)
     done
+  done
+  seen=
+  for log in "${logs[@]}"; do
+    case "$seen" in *$'\n'"$log"$'\n'*) continue ;; esac
+    seen=$seen$'\n'$log$'\n'
+    [ -e "$log" ] || [ -L "$log" ] || continue
+    if [ ! -f "$log" ] || [ ! -r "$log" ]; then
+      echo "error: the held-copy inventory $log cannot be read, so the copies held closes left in Treehouse pool slots cannot be protected; refusing allocation before treehouse get" >&2
+      echo "Make it a readable regular file again, then retry; a lease does not clear this refusal." >&2
+      return 1
+    fi
+    while IFS=$'\t' read -r stamp id slot copy why; do
+      [ -n "$slot" ] && [ -n "$copy" ] || continue
+      slot=$(fm_task_copy_canonical_dir "$slot") || continue
+      fm_treehouse_pool_slot "$project" "$slot" || continue
+      fm_task_copy_held_copy_protected "$copy" "$why" ${records[@]+"${records[@]}"} || continue
+      slots+=("$slot") copies+=("$copy") ids+=("$id") kinds+=(held)
+    done < "$log"
+  done
+  for ((i = 0; i < ${#slots[@]}; i++)); do
+    slot=${slots[$i]} copy=${copies[$i]} id=${ids[$i]}
+    fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
+    case "$FM_TASK_COPY_SLOT_STATE" in
+      held) continue ;;
+      unleased)
+        if fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
+          remedy="To hold that slot in place without touching its contents, run: (cd '$project' && treehouse lease '$FM_TASK_COPY_CURRENT_SLOT_NAME' --lease-holder '$id')"
+        elif [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+          continue
+        else
+          remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
+        fi
+        [ "${kinds[$i]}" = record ] \
+          || remedy="Land the work $copy holds, or have its owner discard it explicitly (a task's current copy goes with that task's own teardown), then retry; a lease does not clear this refusal."
+        ;;
+      conflicting)
+        remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
+        ;;
+      recovered)
+        remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
+        ;;
+      escaped|relative)
+        remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
+        ;;
+      missing-jq)
+        remedy="Install jq so the pool state can be read, then retry; a lease does not clear this refusal."
+        ;;
+      *)
+        remedy="A lease does not clear this refusal; inspect the pool with: (cd '$project' && treehouse status)"
+        ;;
+    esac
+    if [ "${kinds[$i]}" = record ]; then
+      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+    else
+      echo "error: Treehouse pool slot $slot holds copy $copy, which task $id's close left in the held-copy inventory, and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+    fi
+    echo "$remedy" >&2
+    return 1
   done
 }

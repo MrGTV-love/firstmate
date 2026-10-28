@@ -5102,6 +5102,45 @@ test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease() {
   pass "a held close in a superseded pool folder closes with the slot unleased and releases only this task's misdirected lease"
 }
 
+# The four steps a superseded held close must survive: the close leaves the
+# slot unleased in the old folder, the folder becomes current again, and a
+# start's allocation guard then refuses for that slot and names the held copy
+# from the held-copy inventory, never a lease. Once the held copy is landed the
+# slot no longer stops a start.
+held_allocation_check() {
+  FM_HOME="$FOREIGN_CASE/home" PATH="$FOREIGN_CASE/fakebin:$PATH" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-backend.sh"
+    . "$1/bin/fm-task-copy-lib.sh"
+    fm_task_copy_pool_slots_hold_no_current_copy "$2" "$3"
+  ' _ "$ROOT" "$FOREIGN_CASE/project" "$FOREIGN_CASE/state" 2>&1
+}
+
+test_a_held_copy_in_a_superseded_folder_is_protected_when_the_folder_returns() {
+  local rc out copy
+  held_superseded_case held-superseded-returns plain
+  copy=$(cd "$FOREIGN_COPY" && pwd -P)
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-superseded-returns: the held close must finish: $(cat "$FOREIGN_CASE/stderr")"
+  rc=0
+  out=$(held_allocation_check) || rc=$?
+  expect_code 0 "$rc" "held-superseded-returns: a slot of a superseded folder stopped a start: $out"
+  rm -f "$FOREIGN_CASE/status.json"
+  rc=0
+  out=$(held_allocation_check) || rc=$?
+  [ "$rc" -ne 0 ] || fail "held-superseded-returns: a start could take the slot over its held copy once the folder was current again"
+  assert_contains "$out" "holds copy $copy" "held-superseded-returns: the refusal did not name the held copy"
+  assert_contains "$out" "Land the work" "held-superseded-returns: the refusal did not name the supported routes"
+  assert_not_contains "$out" "treehouse lease" "held-superseded-returns: the refusal named a lease"
+  git -C "$FOREIGN_COPY" push -q origin HEAD:refs/heads/held-landed
+  git -C "$FOREIGN_CASE/project" fetch -q origin
+  rc=0
+  out=$(held_allocation_check) || rc=$?
+  expect_code 0 "$rc" "held-superseded-returns: a landed held copy still stopped a start: $out"
+  assert_present "$FOREIGN_COPY/unlanded.txt" "held-superseded-returns: the held copy's work is gone"
+  pass "a held copy a superseded close left stops a start once its folder is current again, and stops none once it is landed"
+}
+
 test_a_refused_held_close_releases_no_misdirected_lease() {
   local rc
   held_superseded_case held-superseded-refused misdirected
@@ -6128,6 +6167,7 @@ test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
 test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease
 test_a_refused_held_close_releases_no_misdirected_lease
+test_a_held_copy_in_a_superseded_folder_is_protected_when_the_folder_returns
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_leaves_one_record_line_and_a_rerun_adds_none
 test_a_held_copy_record_that_cannot_be_written_refuses_the_close

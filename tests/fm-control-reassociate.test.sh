@@ -1503,6 +1503,17 @@ test_unleased_shared_slot_gates_only_the_claimant() {
   pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
 }
 
+# shared_allocation_check <case-dir>: a start's allocation guard for the case
+# project, with the case's Treehouse stand-in.
+shared_allocation_check() {
+  FM_HOME="$1/home" PATH="$1/teardown-bin:$PATH" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-backend.sh"
+    . "$1/bin/fm-task-copy-lib.sh"
+    fm_task_copy_pool_slots_hold_no_current_copy "$2" "$3"
+  ' _ "$ROOT" "$1/proj" "$1/home/state" 2>&1
+}
+
 # treehouse get allocates from the project's current pool only, so a shared slot
 # in a superseded pool folder needs no lease before its claimant's record
 # retires; a shared slot the current pool lists still refuses with its lease
@@ -1532,6 +1543,17 @@ test_superseded_shared_slot_retires_its_claimant() {
     if [ "$shape" = superseded ]; then
       expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
       [ ! -e "$dir/home/state/$id.meta" ] || fail 'superseded shared-slot cleanup left the finished record'
+      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$slot" > "$dir/status.json"
+      rc=0
+      out=$(shared_allocation_check "$dir") || rc=$?
+      [ "$rc" -ne 0 ] || fail 'a start could take the shared slot once its folder was current again'
+      assert_contains "$out" "holds copy $slot" 'the refusal did not name the remaining copy'
+      assert_not_contains "$out" 'treehouse lease' 'the refusal named a lease'
+      rm "$dir/home/state/parked.meta"
+      rc=0
+      out=$(shared_allocation_check "$dir") || rc=$?
+      expect_code 0 "$rc" "a shared slot whose remaining record retired still stopped a start"$'\n'"$out"
+      fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
     else
       expect_code 1 "$rc" "an unleased shared slot of the current pool must refuse its claimant"$'\n'"$out"
       assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the refusal must name the lease remedy'
