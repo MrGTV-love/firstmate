@@ -606,6 +606,40 @@ assert_grep '- seed-keep ' "$TMP_ROOT/seed-parent/data/secondmates.md" "failed s
 assert_present "$TMP_ROOT/seed-keep-home/.fm-secondmate-home" "serialized seed lost its published remote home"
 pass "remote seed rollback preserves serialized competing routes"
 
+# The parent's code root and the remote host's code clone are different directories on
+# different machines. The charter's status command runs a helper from the code root, so
+# the seeded copy must run it from <remote-root>, and that command must work there: run
+# from the remote home as the remote worker would run it, it appends one line to the
+# remote relay log through the capped writer.
+SEED_PARENT_ROOT="$TMP_ROOT/seed-parent-code"
+mkdir -p "$SEED_PARENT_ROOT"
+(cd "$ROOT" && tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .) | (cd "$SEED_PARENT_ROOT" && tar -xf -)
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" init -q -b main
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" add .
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" -c user.email=test@example.com -c user.name=Test commit -qm 'parent fixture root'
+[ "$SEED_PARENT_ROOT" != "$REMOTE_ROOT" ] || fail "the fixture's parent and remote code roots must differ"
+FM_SECONDMATE_CHARTER='Two roots charter.' FM_SECONDMATE_SCOPE='two roots' \
+  seed_env env FM_ROOT_OVERRIDE="$SEED_PARENT_ROOT" "$SEED_PARENT_ROOT/bin/fm-remote-home-seed.sh" \
+  seed-roots remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-roots-home" --no-projects \
+  > "$TMP_ROOT/seed-roots.out" 2>&1 \
+  || fail "seeding with a parent code root that differs from the remote root failed: $(cat "$TMP_ROOT/seed-roots.out")"
+SEED_ROOTS_CHARTER="$TMP_ROOT/seed-roots-home/data/charter.md"
+assert_present "$SEED_ROOTS_CHARTER" "the two-root seed published no charter"
+assert_no_grep "$SEED_PARENT_ROOT/bin/" "$SEED_ROOTS_CHARTER" "the remote charter still names a helper in the parent machine's code root"
+assert_grep "$REMOTE_ROOT/bin/fm-status-append.sh" "$SEED_ROOTS_CHARTER" "the remote charter does not run the status helper from the remote code root"
+# shellcheck disable=SC2016 # The sed program matches literal backticks in the charter.
+seed_roots_cmd=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$SEED_ROOTS_CHARTER" | head -1)
+[ -n "$seed_roots_cmd" ] || fail "the remote charter carries no status command"
+seed_roots_cmd=${seed_roots_cmd//\{state\}/working}
+seed_roots_cmd=${seed_roots_cmd//\{one short line\}/from the remote worker}
+seed_roots_cmd=${seed_roots_cmd//<epoch>/1790000000}
+mkdir -p "$TMP_ROOT/seed-roots-home/state"
+(cd "$TMP_ROOT/seed-roots-home" && bash -c "$seed_roots_cmd") >/dev/null 2>"$TMP_ROOT/seed-roots-cmd.err" \
+  || fail "the remote charter's status command failed on the remote host: $(cat "$TMP_ROOT/seed-roots-cmd.err")"
+assert_grep 'working [at=1790000000]: from the remote worker' "$TMP_ROOT/seed-roots-home/state/parent-replies.status" \
+  "the remote charter's status command did not append to the remote relay log"
+pass "a remote charter runs its status helper from the remote code root, and the command works there"
+
 : > "$DOCTOR_LOG"
 if FM_SECONDMATE_CHARTER='Unknown readiness charter.' FM_SECONDMATE_SCOPE='unknown readiness' \
   FM_FAKE_SSH_MODE=doctor-fix-unknown seed_env "$ROOT/bin/fm-remote-home-seed.sh" \

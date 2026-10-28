@@ -312,6 +312,10 @@ The 1200000 ms target therefore bounds the model, not the slowest real shard: it
 Bounding real shard walls instead would take the mean of several runs plus a variance term rather than the slowest sample, which is a change to the weight basis and not to this table.
 The seven-way concurrent evidence for the fm-lint groups in [fm-test-isolation-proof.md](fm-test-isolation-proof.md#fm-lint-split-re-check) still stands, and a full portable-pool isolation proof remains outstanding.
 
+The serial member `tests/fm-status-runaway-guard.test.sh` (199417 ms, one local run of `bin/fm-test-run.sh`, not a CI measurement) joins main's twenty-one serial shards with no shard change.
+On 2026-10-27, `bin/fm-test-run.sh --check-coverage` on that branch reported `serial_shards=21` and `serial_max_ms=1196944`, inside the 1200000 ms packing target.
+The packing target, the shard count and the 60-minute job timeout are unchanged.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
