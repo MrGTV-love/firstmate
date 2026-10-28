@@ -25,7 +25,8 @@
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred. An escalation never
-# stands; the end of its bound captain hold returns the row for a new action.
+# stands; one without a bound captain hold answers only the turn it followed unless the
+# captain owns the row, and the end of its bound captain hold returns the row for a new action.
 # --hold TASK_ID, valid only with escalated, names the one task held for the captain that a firstmate-owned
 # open_pr, unanswered_question or unlanded_commit row waits on; omitted, the documentation below owns which task binds.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.

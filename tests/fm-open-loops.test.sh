@@ -2003,8 +2003,8 @@ def case(name, actor='main', empty=False, **fields):
                     '--recovery-generation', boundary[1])
     return home, ledger, row, call, ok, drain, ack
 
-# New rows gate; an unchanged row stays covered by its last action and is listed in the periodic waiting list.
-home, ledger, row, call, ok, drain, ack = case('change-gating')
+# New rows gate; an unchanged captain-owned row stays covered by its escalation and is listed in the periodic waiting list.
+home, ledger, row, call, ok, drain, ack = case('change-gating', owner='captain')
 _, boundary = drain()
 assert ack(boundary).returncode == 1
 assert ok(code / 'bin/fm-open-loops.sh', '--digest').stdout == '', 'an empty waiting list printed a header'
@@ -2043,8 +2043,22 @@ assert row['id'] in digest.stdout and 'new-row' not in digest.stdout
 clock['now'] = now
 print('PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage')
 
+# A stamped escalation with no captain hold binding answers only the turn it followed.
+home, ledger, row, call, ok, drain, ack = case('stamped-escalation')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'escalated')
+assert ack(boundary).returncode == 0, 'an escalation answers the turn it followed'
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"',
+   '_', code / 'bin/fm-wake-lib.sh')
+stamped, boundary = drain()
+assert stamped.stdout.startswith('OVERDUE:') and row['id'] in stamped.stdout.split('help:', 1)[0], stamped.stdout
+assert 'waiting on the captain' not in stamped.stdout, 'a stamped escalation was listed as waiting on the captain'
+assert ack(boundary).returncode == 1, 'a stamped escalation covered an unchanged row on the next turn'
+assert ok(code / 'bin/fm-open-loops.sh', '--digest').stdout == '', 'a stamped escalation was listed in the digest'
+print('PASS: an escalation without a captain hold binding answers only the turn it followed')
+
 # A row whose age clock restarted after its action is changed work, even when its text returns to the old value.
-home, ledger, row, call, ok, drain, ack = case('clock-restart')
+home, ledger, row, call, ok, drain, ack = case('clock-restart', owner='captain')
 _, boundary = drain()
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
 assert ack(boundary).returncode == 0
@@ -2058,7 +2072,7 @@ assert restarted.returncode == 1 and row['id'] in restarted.stdout, restarted
 assert row['id'] not in ok(code / 'bin/fm-open-loops.sh', '--digest').stdout, 'a restarted row belongs in the gate'
 clock['now'] = now
 # The unpause case: a new head is pushed after the presented ledger was generated (G) but before the action (T).
-home, ledger, row, call, ok, drain, ack = case('restart-before-record')
+home, ledger, row, call, ok, drain, ack = case('restart-before-record', owner='captain')
 _, boundary = drain()
 clock['now'] = now + 300
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
@@ -2072,7 +2086,7 @@ record['generated_epoch'] = pushed + 7200
 ledger.write_text(json.dumps(record))
 restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
 assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a head pushed between G and T stayed covered', restarted)
-home, ledger, row, call, ok, drain, ack = case('unchanged-clock')
+home, ledger, row, call, ok, drain, ack = case('unchanged-clock', owner='captain')
 _, boundary = drain()
 clock['now'] = now + 300
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
@@ -2091,7 +2105,7 @@ assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, '
 clock['now'] = now
 
 # A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.
-home, ledger, row, call, ok, drain, ack = case('resurface-reserved')
+home, ledger, row, call, ok, drain, ack = case('resurface-reserved', owner='captain')
 _, boundary = drain()
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
 assert ack(boundary).returncode == 0
@@ -2178,7 +2192,7 @@ for name, actor in (('host', 'branch'), ('secondmate', 'main')):
     assert row['id'] in report and '7200' in report and 'COMPLETIONS' not in report, report
 
 # Re-presentation is idempotent; unchanged overdue evidence remains covered by its prior action.
-home, ledger, row, call, ok, drain, ack = case('repeat')
+home, ledger, row, call, ok, drain, ack = case('repeat', owner='captain')
 _, boundary = drain()
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
 assert ack(boundary).returncode == 0
@@ -3027,8 +3041,8 @@ assert mentioned.returncode == 0 and 'no task held for the captain was named' in
 assert 'hold' not in stored()['handling']['actions'][row['id']], 'a task id written in the evidence must not bind a hold'
 backlog.write_text(held(answered=['elsewhere']))
 result, boundary = drain('unbound-later')
-assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'an unbound escalation covers unchanged evidence'
-assert status_of(ok, row['id']) == WAITING
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unbound escalation answers only the turn it followed'
+assert row['id'] not in ok(loops, '--digest').stdout, 'an unbound escalation was listed as waiting on the captain'
 
 # (b) A changed row, or a bound hold that is answered, released, blocked on an unresolved task, or re-held, needs a new
 # firstmate action; an unchanged pending hold keeps covering the row.
@@ -3065,7 +3079,8 @@ for label, text in transitions:
     assert ack(boundary).returncode == 0
     if text not in (None, REHELD):
         result, boundary = drain('next-' + label)
-        assert ack(boundary).returncode == 0, label
+        assert row['id'] in result.stdout and ack(boundary).returncode == 1, (label, 'an answered hold left no cover')
+        assert row['id'] not in ok(loops, '--digest').stdout, (label, 'an answered row is not waiting on the captain')
 # A hold the captain defers to a date is still held for the captain: the escalation keeps covering until the hold ends.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated')
 _, boundary = drain()
@@ -3098,7 +3113,7 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 result, boundary = drain('unreadable')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
 
-# Other categories cannot bind captain holds; their escalation covers unchanged evidence only.
+# Other categories cannot bind captain holds; their escalation answers only the turn it followed.
 for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: code or test', limit_seconds=0)),
                          ('stalled_worker', dict(subject='held-job', owner='worker:held-job',
                                                  source=dict(kind='task', task='held-job')))):
@@ -3109,11 +3124,10 @@ for category, fields in (('red_check', dict(subject=PR, next_action='diagnose: c
     assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
     assert ack(boundary).returncode == 0
     result, boundary = drain('again')
-    assert ack(boundary).returncode == 0, (category, result.stdout)
+    assert row['id'] in result.stdout and ack(boundary).returncode == 1, (category, result.stdout)
     refused = act('escalated', 'asked the captain', '--hold', 'held-job')
     assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, (category, refused)
-    backlog.write_text(ANSWERED_WORDS)
-    assert status_of(ok, row['id']) == WAITING, category
+    assert row['id'] not in ok(loops, '--digest').stdout, category
 
 # (c) A reviewed green PR has no standing receipt of any kind, however it is held.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
@@ -3219,7 +3233,7 @@ recorded = act('escalated', 'asked the captain')
 assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
 assert ack(boundary).returncode == 0
 result, boundary = drain('again')
-assert ack(boundary).returncode == 0, 'unchanged reviewer evidence stays covered without a hold binding'
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a reviewer row escalation answers only the turn it followed'
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, refused
 # Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row wait on that hold.
@@ -3272,7 +3286,7 @@ assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the row ne
 print('PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain,'
       ' also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold'
       ' needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and'
-      ' other categories cannot bind holds; the deferral limit remains enforced; one presentation reads the backlog once;'
+      ' other categories cannot bind holds, so their escalations answer only the turn they followed; the deferral limit remains enforced; one presentation reads the backlog once;'
       ' an unverifiable escalation answers only the turn it followed')
 PY
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'

@@ -1440,7 +1440,8 @@ def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
     A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
-    An escalation never stands: the end of its bound captain hold is a change that needs firstmate's next action.
+    An escalation never stands: only a captain-owned row or a bound captain hold is proof it waits on the captain,
+    and the end of that hold is a change that needs firstmate's next action.
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
     including between that ledger's generation and the record time, is changed work too.
     """
@@ -1449,8 +1450,9 @@ def receipt_covers(action, row, now, waits=None):
         return False
     kind = action.get("kind")
     if kind == "escalated":
-        return not action.get("unverified") and (
-            not action.get("hold") or (waits is not None and waits.hold_stands(action, row)))
+        if action.get("hold"):
+            return waits is not None and waits.hold_stands(action, row)
+        return row.get("owner") == "captain"
     if kind == "waiting":
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
@@ -1580,10 +1582,10 @@ def ledger_action(args, state, now):
         return 0
     if args.check_actions:
         def presentation_answered(ident):
-            # A reviewed green PR's action, or an escalation whose captain hold could not be verified,
+            # A reviewed green PR's action, or an escalation without a captain hold binding,
             # answers only the presentation it followed.
             action = actions.get(ident, {})
-            if action.get("kind") == "waiting":
+            if action.get("kind") == "waiting" or (action and not same_work(action, by_id[ident], now)):
                 return False
             return ident not in pending or (action.get("sequence", 0) > pending[ident] and not (
                 action.get("kind") == "deferred" and action.get("recheck_epoch", 0) <= now))
@@ -1592,7 +1594,8 @@ def ledger_action(args, state, now):
                    if (ident in presented or ident in actions)
                    and not receipt_covers(actions.get(ident, {}), row, now, waits)
                    and not ((row.get("category") == "review_pass_not_merged"
-                             or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
+                             or (actions.get(ident, {}).get("kind") == "escalated"
+                                 and not actions[ident].get("hold"))) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused")
             print(render_overdue(missing))
@@ -1704,8 +1707,6 @@ def ledger_action(args, state, now):
         actions[ident]["binding"] = binding
     if hold:
         actions[ident]["hold"] = hold
-    elif unverified:
-        actions[ident]["unverified"] = True
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     if not visible:
@@ -1722,8 +1723,8 @@ def ledger_action(args, state, now):
             print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
                   " the turn it followed (record it again once the backlog is readable)")
         else:
-            print("standing: no; no task held for the captain was named, so this escalation waits on the captain"
-                  " without a hold binding and covers this row only until it changes (name the hold with --hold TASK_ID)")
+            print("standing: no; no task held for the captain was named, so this escalation has no hold binding"
+                  " and answers only the turn it followed (name the hold with --hold TASK_ID)")
     return 0
 
 
