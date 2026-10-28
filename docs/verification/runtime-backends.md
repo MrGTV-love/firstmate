@@ -21,7 +21,8 @@ The direct fixture builds both the omp and the Claude profile over a synthetic H
 Every confined check was true for both profiles:
 
 - cases a-e, with B3's glob deletion against another task's directory in the shared `/private/tmp/claude-<uid>` root and B15's aged sweep against another task's `~/tmp` entry;
-- the task's own custody archives `archive/<task>-submitted-<8 hex>` and `archive/<task>-pipeline-<8 hex>` created with `git branch` (a second create refused), moved with `git update-ref` with a reflog, and deleted with `git branch -D`;
+- the task's own custody archives `archive/<task>-submitted-<8 hex>` and `archive/<task>-pipeline-<8 hex>` created with `git branch` (a second create refused), moved with `git update-ref` with a reflog, and deleted with `git branch -D`, after the empty `refs/heads/archive` and `logs/refs/heads/archive` folders were removed between the profile build and the confined run;
+- a project branch named `archive` left the profile build working and the branch in place, and with no archive grant the confined create of the task's own archive was refused after that branch was deleted;
 - own Git commit, inbox handling, the real busy writer, native session proof and task audit;
 - a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
 - a duration record appended through `bin/fm-duration.py`, and its process table, inactivity stop, stale slot holder and zombie process-group completion check read through `bin/fm-proc-info.py` while `ps` is refused, a procevent board registered, polled once by its runner and retired through `bin/fm-procevent.sh`, a process budget through `bin/fm-proc-budget.sh`, a session-lock ancestry walk, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;

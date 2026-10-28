@@ -240,10 +240,15 @@ def build(args):
     # The custody-return route makes this task's own recovery archives:
     # archive/<task>-{submitted,pipeline}-<8 lowercase hex>, the names
     # bin/fm-teardown.sh reaps. Both names are anchored on the whole id, so a
-    # task id that contains or extends this one never matches. The parents are
-    # created here so git never needs write access to the shared refs folders.
+    # task id that contains or extends this one never matches. Git may create
+    # each parent only as that exact folder, never rename or delete it.
     for parent in ("refs/heads/archive", "logs/refs/heads/archive"):
-        (Path(common) / parent).mkdir(parents=True, exist_ok=True)
+        folder = Path(common) / parent
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except FileExistsError:
+            continue
+        created.append(f"(require-all (literal {quoted(folder)}) (vnode-type DIRECTORY))")
         lines.append("(allow file-write* " + under(
             common, re.escape(parent) + "/" + re.escape(args.task) + "-(submitted|pipeline)-" + "[0-9a-f]" * 8 + r"(\.lock)?") + ")")
     lines += [f"(allow file-write* {item})" for item in runtime]

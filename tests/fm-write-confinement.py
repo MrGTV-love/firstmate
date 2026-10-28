@@ -727,6 +727,32 @@ def fresh_container(repo, manifest, base, mode, env):
     return {"session-folders-created": json.loads(folders.stdout), **json.loads(result.stdout)}
 
 
+def remove_archive_folders(manifest):
+    git_dir = Path(manifest["home"]) / "projects/project/.git"
+    for folder in (git_dir / "refs/heads/archive", git_dir / "logs/refs/heads/archive"):
+        if folder.is_dir():
+            folder.rmdir()
+
+
+# A project branch named archive fills the archive parent names with files.
+# The builder must still succeed and grant no archive name: once that branch
+# is gone, the confined create of this task's own archive stays refused.
+def archive_branch_file(repo, manifest, base, harness, mode, env):
+    worktree = manifest["worktree"]
+    remove_archive_folders(manifest)
+    assert git("-C", worktree, "branch", "archive").returncode == 0
+    profile = base / "archive-file-profile.sb"
+    build_profile(repo, manifest, harness, profile, env)
+    kept = git("-C", worktree, "rev-parse", "--verify", "-q", "refs/heads/archive").returncode == 0
+    assert git("-C", worktree, "branch", "-D", "archive").returncode == 0
+    sandbox = [] if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)]
+    name = "archive/task-submitted-0123abcd"
+    created = subprocess.run(sandbox + ["git", "-C", worktree, "branch", name], capture_output=True, text=True, env=dict(env, **GIT_ENV))
+    exists = git("-C", worktree, "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
+    git("-C", worktree, "update-ref", "-d", "refs/heads/" + name)
+    return {"archive-branch-kept": kept, "own-archive-created": created.returncode == 0 and exists}
+
+
 if sys.argv[1] == "--child":
     results = child(json.loads(sys.argv[2]))
     sys.exit(0 if all(results.values()) else 1)
@@ -755,6 +781,9 @@ for harness in ("claude", "omp"):
             manifest["identity_pid"] = unusual.pid
             for path in manifest["late"]:
                 write(path, "window=fmtest:fm-late\nkind=ship\n")
+            # Git removes an empty archive folder with its last ref while the
+            # worker runs; the child must still create its own archives.
+            remove_archive_folders(manifest)
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
             result = subprocess.run(invocation, capture_output=True, text=True, env=env)
@@ -776,6 +805,9 @@ for harness in ("claude", "omp"):
             assert fresh == {"session-folders-created": [] if confined else ["projects", "session-env", "file-history", "tasks"],
                              "symlink": not confined, "file": not confined, "create-and-append": True,
                              "renamed": not confined, "deleted": not confined}, (harness, mode, fresh)
+        archive_file = archive_branch_file(repo, manifest, base, harness, mode, env)
+        print(f"{harness} {mode} archive branch file: " + json.dumps(archive_file, sort_keys=True))
+        assert archive_file == {"archive-branch-kept": True, "own-archive-created": mode == "baseline"}, (harness, mode, archive_file)
         if mode == "baseline":
             for name in actual:
                 if name in CONTROL_KEYS or name.startswith("refused-"):
