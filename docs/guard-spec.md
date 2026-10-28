@@ -114,7 +114,7 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   The call is split with shell quoting rules and ends at an unquoted `;`, `&`, `|`, `<`, `>`, parenthesis, lone closing brace, or `#` that starts a word.
   A quoted `}` or `|`, and a `#` inside a word, are literal arguments, so the guard id, a later option and a following command never decide.
 
-A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun`, `deno` or `perl` (or is delimited by `PERL`), in which case the body is scanned as that language.
+A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun`, `deno` or `perl` (or is delimited by `PERL`), in which case the body is scanned as that language (a perl body with the shell rules, like a `.pl` file).
 A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
 That limit is deliberate, because every error exit would be a site, and it is why a new guard should use `fm_refuse` or the `REFUSED:` marker.
 The scan follows only Python triple-quoted strings across lines, so it does not reliably recognize the inner lines of a shell or JavaScript string that spans lines: some may be reported and others missed.
