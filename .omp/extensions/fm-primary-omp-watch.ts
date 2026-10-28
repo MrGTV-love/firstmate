@@ -1911,20 +1911,30 @@ export default function (pi: ExtensionAPI) {
   }
 
   // Bind and activate this instance's generation for a session event.
+  // A failure is recorded and surfaced, and leaves the bounded self-heal to retry.
   async function bindForSession(cause: string, ctx: unknown): Promise<void> {
     rememberContext(ctx);
-    await generationStopped;
-    if (!instance.isCurrent()) return;
-    bindLiveGeneration(cause);
-    markLoaded();
-    if (lockOwnership() !== "owned") return;
-    activateOwnedWatch(generation);
+    try {
+      await generationStopped;
+      if (!instance.isCurrent()) return;
+      bindLiveGeneration(cause);
+      markLoaded();
+      if (lockOwnership() !== "owned") return;
+      activateOwnedWatch(generation);
+    } catch (error) {
+      if (!instance.isCurrent()) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      lifecycle("session-bind-failed", { cause, generation: generation.id, error: detail });
+      surfaceFailure(generation, `watcher: FAILED - omp extension could not bind the session generation\n${detail}`);
+      recoveryPending = true;
+      scheduleSelfHeal(generation);
+    }
   }
 
   pi.on?.("before_agent_start", (_event, ctx) => {
     if (!instance.isCurrent()) {
       if (!claimHomeForPrimary("turn-start", ctx)) return;
-      void bindForSession("turn-start", ctx).catch(() => {});
+      void bindForSession("turn-start", ctx);
     }
     sessionActivity += 1;
     rememberContext(ctx);

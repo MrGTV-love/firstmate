@@ -4503,6 +4503,54 @@ EOF
   pass ".omp watch extension: a rebound primary keeps the home and the instance it replaced gets nothing"
 }
 
+# A session event that fails to bind its generation is not a dead end: the
+# failure is recorded and surfaced as a watcher FAILED wake, and the bounded
+# self-heal arms once the cause is gone, with no fm_watch_arm_omp call.
+test_watch_extension_heals_a_failed_session_bind() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-bind-fail/repo"; home="$TMP_ROOT/watch-bind-fail/home"
+  install_omp_extension_fixture "$repo"
+  install_counting_arm "$repo"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); const sent = [];
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {}, sendUserMessage(m) { sent.push(m); return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(sent)}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+// The loaded-build marker cannot be written while the session binds.
+const marker = `${home}/state/.omp-watch-extension-loaded`;
+rmSync(marker, { force: true });
+mkdirSync(marker);
+await handlers.get("session_start")({ type: "session_start" }, idle).catch(() => {});
+await until(() => sent.some((m) => m.includes("could not bind the session generation")), "the surfaced bind failure");
+if (arms() !== 0) throw new Error(`the failed bind armed ${arms()} cycles`);
+rmSync(marker, { recursive: true });
+await until(() => arms() === 1, "the self-heal arm");
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["event=session-bind-failed", "cause=session_start", "event=self-heal "]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+await handlers.get("session_shutdown")({}, idle);
+console.log("bind-heal-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension failed session bind: $out"
+  case "$out" in *bind-heal-ok*) ;; *) fail "the failed session bind test did not finish: $out" ;; esac
+  pass ".omp watch extension: a failed session bind is surfaced and the bounded self-heal arms without a repair call"
+}
+
 # Readiness is judged by liveness and progress, not by a fixed total time: a
 # successor that is slow to report keeps running and is reported as still
 # starting, a cycle whose process dies is reported as failed and replaced by the
@@ -4758,5 +4806,6 @@ test_watch_extension_repairs_a_stale_arm_owner
 test_watch_extension_observes_an_arm_exit_held_open_by_a_descendant
 test_watch_extension_keeps_the_home_from_a_helper_session
 test_watch_extension_rebound_primary_keeps_the_home
+test_watch_extension_heals_a_failed_session_bind
 test_watch_extension_judges_readiness_by_liveness
 test_watch_extension_repairs_after_handoff_publication_failure
