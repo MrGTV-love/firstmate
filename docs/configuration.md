@@ -2193,7 +2193,7 @@ Before running `baseline` from the root home, let its watcher record readings ov
 The command derives the alarm boundary from those readings and records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings, or readings whose largest non-fleet resident size never varies, it names that missing input instead of writing a baseline, so the alarm waits for real spread.
 An alarm starts when a non-fleet process exceeds the largest non-fleet resident size observed across those readings, and the episode lasts until that process is at or below the smallest per-reading maximum, the low end of the same measured variation, so a process moving around the boundary wakes once.
 The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
-A matching baseline is never silently replaced as usage grows; an invalid baseline, or one recorded for a different host name or RAM size, is replaced by the next `baseline`.
+A matching baseline is never silently replaced as usage grows; an invalid baseline, one whose readings show no spread, or one recorded for a different host name or RAM size, is unusable for alarms and is replaced by the next `baseline`.
 The recorded `rss_unreadable_pids` are missing measurements, not zero-RSS processes; a sandboxed reading may therefore miss a system daemon that an unrestricted host observer can read.
 The records contain process identity, run identity and resident size, not process arguments, environment contents or working directories.
 
