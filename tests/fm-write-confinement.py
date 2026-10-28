@@ -233,6 +233,48 @@ def child(manifest):
     other_branch = git("-C", str(worktree), "rev-parse", "fm/other").stdout
     git("-C", str(worktree), "update-ref", "refs/heads/fm/other", "HEAD")
     results["refused-other-branch"] = git("-C", str(worktree), "rev-parse", "fm/other").stdout == other_branch
+    # The custody-return route creates this task's own archive branches. They
+    # must work with the route's own git commands, while no other ref name
+    # does: another task's archive, ids that contain or extend this task's id,
+    # and names outside the two documented shapes.
+    def ref_exists(name):
+        return git("-C", str(worktree), "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
+
+    def ref_refused(name):
+        failed = git("-C", str(worktree), "update-ref", "refs/heads/" + name, "HEAD").returncode != 0 and not ref_exists(name)
+        git("-C", str(worktree), "update-ref", "-d", "refs/heads/" + name)  # leave the unconfined control clean
+        return failed
+
+    head, base = (git("-C", str(worktree), "rev-parse", ref).stdout.strip() for ref in ("HEAD", "HEAD~1"))
+    for kind, hex8 in (("submitted", "0123abcd"), ("pipeline", "89abcdef")):
+        name = f"archive/task-{kind}-{hex8}"
+        created = git("-C", str(worktree), "branch", name, head)
+        again = git("-C", str(worktree), "branch", name, head)
+        moved = git("-C", str(worktree), "update-ref", "refs/heads/" + name, base, head)
+        reflog = git("-C", str(worktree), "reflog", "show", "--format=%H", "refs/heads/" + name).stdout.split()
+        results[f"archive-own-{kind}-create"] = (created.returncode == 0 and again.returncode != 0
+                                                  and git("-C", str(worktree), "rev-parse", "refs/heads/" + name).stdout.strip() == base)
+        results[f"archive-own-{kind}-update"] = moved.returncode == 0 and bool(reflog)
+        deleted = git("-C", str(worktree), "branch", "-D", name)
+        results[f"archive-own-{kind}-delete"] = deleted.returncode == 0 and not ref_exists(name)
+    for label, name in (("other-task", "archive/other-submitted-0123abcd"),
+                        ("extending-id", "archive/task-2-submitted-0123abcd"),
+                        ("contained-id", "archive/tas-submitted-0123abcd"),
+                        ("containing-id", "archive/xtask-submitted-0123abcd"),
+                        ("own-id-other-shape", "archive/task-other-0123abcd"),
+                        ("own-id-short-hex", "archive/task-submitted-0123abc"),
+                        ("own-id-long-hex", "archive/task-submitted-0123abcde"),
+                        ("own-id-upper-hex", "archive/task-submitted-0123ABCD"),
+                        ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
+                        ("outside-archive", "task-submitted-0123abcd")):
+        results[f"refused-archive-{label}"] = ref_refused(name)
+    # The primary checkout's HEAD stays refused; a failed attempt changes nothing.
+    primary = str(Path(manifest["home"]) / "projects/project")
+    before = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
+    git("-C", primary, "symbolic-ref", "HEAD", "refs/heads/fm/pool")
+    after = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
+    git("-C", primary, "symbolic-ref", "HEAD", before)
+    results["refused-primary-head"] = after == before
     record = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-duration.py"), "record", "fixture.write-confinement", "1234", "0"],
                             capture_output=True, text=True)
     ledger = data / "command-durations.jsonl"

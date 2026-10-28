@@ -10,7 +10,9 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
-from this task's directory and the duration ledger, temp roots, Main-owned
+from this task's directory and the duration ledger, other tasks' branches (this
+task keeps its declared branch and its archive/<task>-{submitted,pipeline}-<hex8>
+recovery branches), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
@@ -235,6 +237,15 @@ def build(args):
             path.parent.mkdir(parents=True, exist_ok=True)
             for suffix in ("", ".lock"):
                 lines.append(f"(allow file-write* (literal {quoted(str(path) + suffix)}))")
+    # The custody-return route makes this task's own recovery archives:
+    # archive/<task>-{submitted,pipeline}-<8 lowercase hex>, the names
+    # bin/fm-teardown.sh reaps. Both names are anchored on the whole id, so a
+    # task id that contains or extends this one never matches. The parents are
+    # created here so git never needs write access to the shared refs folders.
+    for parent in ("refs/heads/archive", "logs/refs/heads/archive"):
+        (Path(common) / parent).mkdir(parents=True, exist_ok=True)
+        lines.append("(allow file-write* " + under(
+            common, re.escape(parent) + "/" + re.escape(args.task) + "-(submitted|pipeline)-" + "[0-9a-f]" * 8 + r"(\.lock)?") + ")")
     lines += [f"(allow file-write* {item})" for item in runtime]
     lines += [f"(allow file-write-create {item})" for item in created]
     lines += [f"(deny file-write* {item})" for item in harness_protected]
