@@ -70,10 +70,12 @@ def run(command):
                 error = None
                 try:
                     cpu, runnable = duration.tree_cpu(child.pid, observed)
-                    if not any(pid == child.pid for pid, _ in observed):
+                    if cpu is None:
+                        error = 'cpu_telemetry_unavailable'
+                    elif not any(pid == child.pid for pid, _ in observed):
                         cpu, error = None, 'root_not_observed'
-                    elif cpu is None or not math.isfinite(cpu) or cpu < 0:
-                        cpu, error = None, 'invalid_or_missing_cpu'
+                    elif not math.isfinite(cpu) or cpu < 0:
+                        cpu, error = None, 'nonfinite_or_negative_cpu'
                 except Exception as exc:
                     cpu, runnable, error = None, None, type(exc).__name__ + ': ' + str(exc)
                 row = dict(mark=mark, root_pid=child.pid, cpu_seconds=cpu,
