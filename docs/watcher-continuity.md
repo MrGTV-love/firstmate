@@ -79,20 +79,12 @@ The prompt flow never touches the composer, so an operator draft stays unsent, a
 ### Stopped generations and duplicate loads
 
 omp can repair a missing successor automatically or through an explicit arm call; Pi requires a live replacement runtime rather than repair through its invalidated outgoing API.
-The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
+The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, stale callback behavior, and omp's rule that only the primary session and a live arm child count as owners.
 The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns predecessor-reference release after factory handoff.
-
-omp judges arm ownership by positive evidence, never by a record that an owner once existed.
-The primary session owns the home and its supervision wakes.
-omp's agent registry names each session in the process with its kind, and only the `main` session is the primary.
-A factory bind made while the primary session already runs, from a task or subagent helper session or from a rebind for the primary, waits: it claims the home only when a `session_start`, turn start, or arm call from the primary session reaches it.
-So a helper session never takes the home and never receives a forwarded arm or a wake, whether or not it is still live, and a rebound primary keeps the home while the instance it replaced gets nothing.
-An arm child owns the watch only while its process runs and its readiness has not failed, so a repair call that finds a dead recorded child replaces it and reports `started`, not `unchanged`.
-An arm ends at its process exit: the remaining output drains for at most `FM_WATCH_ARM_RETIRE_TIMEOUT_MS`, because `close` also waits for every descendant that holds an output pipe, and then the bounded retry and the wake delivery run without a repair call.
-`home-claimed`, `arm-owner-stale`, and a `bound-expired` record with `waited-on=arm-output-drain` in the lifecycle log record these transitions.
 
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
+omp's `home-claimed`, `arm-owner-stale`, and `bound-expired` with `waited-on=arm-output-drain` record ownership transitions.
 The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy. Expiry waits recheck a monotonic deadline before settling; early timer callbacks wait only the remaining duration. The `actual` field records measured monotonic elapsed milliseconds, not a value clamped to the bound, so wall-clock changes do not distort deadline evidence.
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 
