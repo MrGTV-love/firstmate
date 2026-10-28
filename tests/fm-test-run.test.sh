@@ -491,11 +491,13 @@ test_captain_hold_groups_share_helper_changed_selection() {
 # group file defines and registers its own cases in <registry>, and the two sets
 # must be equal. Array-nested mode is for a suite whose registered case also
 # calls smaller cases by name: a defined case that is not registered must then
-# be called from another line of its file, because a case nothing runs is the
-# loss, while one a registered case runs is not. Definitions inside a heredoc
-# are fixture text for another script, never cases; a heredoc opener whose
-# terminator never comes would hide the rest of its file, so it is a problem
-# named by file and line. In calls mode the cases live in <helper> and each
+# be called as a command from another line of its file, because a case nothing
+# runs is the loss, while one a registered case runs is not. In both array
+# modes no case may be defined by two groups, because a forgotten copy that a
+# registered case still calls runs twice. Definitions inside a heredoc are
+# fixture text for another script, never cases; a heredoc opener whose
+# terminator never comes, or that opens again inside its own body, would hide
+# the cases after it, so it is a problem named by file and line. In calls mode the cases live in <helper> and each
 # listed script calls its share by bare name, optionally followed by
 # "|| exit $?"; the helper's definitions are then the inventory and every one
 # of them must be called by exactly one listed script.
@@ -520,26 +522,33 @@ partition_called() {
 
 partition_defined() {
   awk -v label="$2" '
-    hd != "" { line = $0; sub(/^\t+/, "", line); if (line == hd) hd = ""; next }
-    match($0, /^test_[A-Za-z0-9_]+\(\)/) { print substr($0, 1, RLENGTH - 2) }
-    match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/) && substr($0, RSTART - 1, 1) != "<" {
+    function opener(tag) {
+      if (!match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/) || substr($0, RSTART - 1, 1) == "<") return ""
       tag = substr($0, RSTART, RLENGTH)
       gsub(/^<<-?[[:space:]]*["\047]?|["\047]$/, "", tag)
-      hd = tag
-      hdline = NR
+      return tag
     }
+    hd != "" {
+      line = $0
+      sub(/^\t+/, "", line)
+      if (line == hd) { hd = ""; next }
+      if (opener() == hd) printf "%s:%d: heredoc <<%s opens inside the <<%s heredoc from line %d, so the cases between are unjudged\n", label, NR, hd, hd, hdline
+      next
+    }
+    match($0, /^test_[A-Za-z0-9_]+\(\)/) { print substr($0, 1, RLENGTH - 2) }
+    (tag = opener()) != "" { hd = tag; hdline = NR }
     END { if (hd != "") printf "%s:%d: heredoc <<%s never closes, so the rest of the file is unjudged\n", label, hdline, hd }
-  ' "$1" | LC_ALL=C sort
+  ' "$1" | LC_ALL=C sort -u
 }
 
-# partition_called_elsewhere <file> <case>: true when a non-comment line other
-# than the case's own definition names it.
+# partition_called_elsewhere <file> <case>: true when a non-comment line of the
+# file runs the case as a command, alone or with arguments.
 partition_called_elsewhere() {
-  grep -vE "^[[:space:]]*#|^$2\(\)" "$1" | grep -qw -- "$2"
+  grep -vE '^[[:space:]]*#' "$1" | grep -qE "(^|[;{(|&])[[:space:]]*$2([[:space:]]|[;)]|$)"
 }
 
 partition_problems() {
-  local root=$1 mode=$2 registry=$3 helper=$4 group file registered defined helper_defined seen='' dup name stray listed=''
+  local root=$1 mode=$2 registry=$3 helper=$4 group file registered defined helper_defined seen='' all_defined='' dup name stray listed=''
   shift 4
   if [ "$mode" = calls ]; then
     helper_defined=$(partition_defined "$root/tests/$helper" "tests/$helper")
@@ -576,12 +585,15 @@ partition_problems() {
         [ "$mode" = array-nested ] && partition_called_elsewhere "$file" "$name" && continue
         printf 'tests/%s.test.sh defines %s but does not register it\n' "$group" "$name"
       done
+      all_defined=$(printf '%s\n%s\n' "$all_defined" "$defined")
     fi
     seen=$(printf '%s\n%s\n' "$seen" "$registered")
   done
   seen=$(printf '%s\n' "$seen" | grep '^test_' | LC_ALL=C sort || true)
   dup=$(printf '%s\n' "$seen" | uniq -d | tr '\n' ' ')
   [ -z "$dup" ] || printf 'registered in more than one group: %s\n' "$dup"
+  dup=$(printf '%s\n' "$all_defined" | grep '^test_' | LC_ALL=C sort | uniq -d | tr '\n' ' ')
+  [ -z "$dup" ] || printf 'defined in more than one group: %s\n' "$dup"
   if [ "$mode" = calls ]; then
     for name in $helper_defined; do
       printf '%s\n' "$seen" | grep -qx "$name" \
@@ -697,6 +709,15 @@ test_partition_checks_judge_loss_and_duplication() {
   problems=$(nested_problems)
   assert_contains "$problems" "defines test_orphan but does not register it" "a case nothing runs must fail even in nested mode"
   array_base
+  printf '%s\n' 'test_a() { echo "test_named"; }' 'test_named() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(nested_problems)
+  assert_contains "$problems" "defines test_named but does not register it" "a case only named in a string must fail in nested mode"
+  array_base
+  printf '%s\n' 'test_a() { test_child; }' 'test_child() { :; }' >> "$root/tests/demo-one.test.sh"
+  partition_fixture_group "$root" demo-two demo_test_cases 'test_c test_child' 'test_c test_child'
+  problems=$(nested_problems)
+  assert_contains "$problems" "defined in more than one group: test_child" "a copy left behind that a registered case still runs must fail"
+  array_base
   printf '%s\n' "cat <<'SH'" 'test_fixture_only() { :; }' 'SH' >> "$root/tests/demo-one.test.sh"
   [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "a definition inside a heredoc was counted as a case: $(array_problems)"; }
 
@@ -710,6 +731,10 @@ test_partition_checks_judge_loss_and_duplication() {
   printf '%s\n' 'echo "use <<DONE here"' 'test_hidden() { :; }' >> "$root/tests/demo-two.test.sh"
   problems=$(array_problems)
   assert_contains "$problems" "tests/demo-two.test.sh:5: heredoc <<DONE never closes" "a string heredoc opener must not hide a case"
+  array_base
+  printf '%s\n' "# the stub is written with <<'SH' below" 'test_hidden() {' "  cat > f <<'SH'" 'x' 'SH' '}' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh:9: heredoc <<SH opens inside the <<SH heredoc from line 7" "a false opener closed by a later real heredoc must not hide a case"
 
   calls_problems() { partition_problems "$root" calls '' demo-helpers.sh demo-one demo-two; }
   calls_base() {
