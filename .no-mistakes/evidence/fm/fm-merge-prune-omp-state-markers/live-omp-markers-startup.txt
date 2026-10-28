@@ -1,0 +1,21 @@
+# omp omp/18.12.6 live, idle after startup
+== HOME: lab FM_HOME, no FM_TASK_ID  [/Users/charlesabrooker/tmp/fm-lab.wMnB7l]
+  PRESENT state/.omp-live-model
+  PRESENT state/.omp-turnend-extension-loaded
+  PRESENT state/.omp-watch-extension-loaded
+  PRESENT state/extensions/omp-primary-watch
+  state/ listing: ./.fm-lab-tmux-dir ./.omp-live-model ./.omp-turnend-extension-loaded ./.omp-watch-extension-loaded ./extensions ./extensions/omp-primary-watch ./extensions/omp-primary-watch/lifecycle.log 
+== WORKER new code: FM_TASK_ID set, no FM_HOME  [/tmp/fm-omp-livecheck.R3Gn/worker-new]
+  absent  state/.omp-live-model
+  absent  state/.omp-turnend-extension-loaded
+  absent  state/.omp-watch-extension-loaded
+  absent  state/extensions/omp-primary-watch
+  (no state/ directory)
+  git status --porcelain --ignored: [!! tests/fixtures/slack/config/ ]
+== WORKER old code 8e1f3bf0e: FM_TASK_ID set, no FM_HOME  [/tmp/fm-omp-livecheck.R3Gn/worker-base]
+  PRESENT state/.omp-live-model
+  PRESENT state/.omp-turnend-extension-loaded
+  PRESENT state/.omp-watch-extension-loaded
+  PRESENT state/extensions/omp-primary-watch
+  state/ listing: ./.guard-pass-checked ./.inactive-outcome-reconcile ./.lock ./.omp-live-model ./.omp-turnend-extension-loaded ./.omp-watch-extension-loaded ./.session-start-agents-baseline ./.session-start-complete ./.startup-network.delivered ./.startup-network.report ./.startup-network.status ./.startup-network.timings ./.trace-context-effective ./.wake-queue ./extensions ./extensions/omp-primary-watch ./extensions/omp-primary-watch/lifecycle.log ./home-summary.json ./procevent ./procevent/.owner-lease ./procevent/proc-guard.source ./terminal-outcomes 
+  git status --porcelain --ignored: [!! config/ !! state/ !! tests/fixtures/slack/config/ ]

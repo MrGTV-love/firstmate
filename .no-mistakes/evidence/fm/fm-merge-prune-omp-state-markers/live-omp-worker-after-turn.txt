@@ -1,0 +1,8 @@
+# omp live, after turn
+== WORKER new code after one real model turn (seatbelt + session_stop ran)  [/tmp/fm-omp-livecheck.R3Gn/worker-new]
+  absent  state/.omp-live-model
+  absent  state/.omp-turnend-extension-loaded
+  absent  state/.omp-watch-extension-loaded
+  absent  state/extensions/omp-primary-watch
+  (no state/ directory)
+  git status --porcelain --ignored: [!! tests/fixtures/slack/config/ ]

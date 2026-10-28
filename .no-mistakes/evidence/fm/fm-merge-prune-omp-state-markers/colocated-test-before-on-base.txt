@@ -1,0 +1,3 @@
+== base 8e1f3bf0e code + new test
+not ok - a task worker copy must get no state directory from the primary extensions
+exit=0
