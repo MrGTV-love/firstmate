@@ -1,0 +1,76 @@
+== S-A: new unmapped REFUSED in bin/fm-teardown.sh (enforce)
+VIOLATION S1 site:bin/fm-teardown.sh:f2813161b1: bin/fm-teardown.sh:6306 [A,B] echo "REFUSED: lab probe slot cannot retire; nothing was changed" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-A2: same, new-or-touched vs base
+VIOLATION S1 site:bin/fm-teardown.sh:f2813161b1: bin/fm-teardown.sh:6306 [A,B] echo "REFUSED: lab probe slot cannot retire; nothing was changed" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-B: map it with a registry sites marker -> passes (enforce + new-or-touched)
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
+== S-B2: marker count wrong (count 2, matches 1) -> S2
+VIOLATION S2 teardown-unlanded: site marker 'lab probe slot cannot retire' in bin/fm-teardown.sh matches 1 sites, the entry declares 2; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-C: new fm_refuse_* helper call in a new script -> C site, S1
+VIOLATION S1 site:bin/fm-lab-probe.sh:51f7677d74: bin/fm-lab-probe.sh:3 [C] fm_lab_refuse_now maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-D: new '|| exit 2' in a hook script -> D site, S1
+VIOLATION S1 site:bin/fm-turnend-guard.sh:1a52a9cbc6: bin/fm-turnend-guard.sh:600 [D] fm_lab_probe_check || exit 2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-E: re-indent touched allowlisted legacy shared-slot REFUSED line (new-or-touched)
+ bin/fm-teardown.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+== S-E2: same with diff.noprefix=true (fail-open regression)
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+== S-F: allowlist grows against base -> S5
+STALE S1 site:bin/fm-lab.sh:0000000000: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=1 shown=0 sites=895
+VIOLATION S5 site:bin/fm-lab.sh:0000000000: allowlist entry S1 is not in HEAD; the allowlist may only shrink
+exit=1
+== S-F2: allowlist grows by a real new unmapped site (hide new debt) -> S5
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=846 stale=0 shown=0 sites=896
+exit=0
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=846 stale=0 shown=0 sites=896
+VIOLATION S1 site:bin/fm-teardown.sh:6946a8fdff: bin/fm-teardown.sh:6306 [A,B] echo "REFUSED: lab probe hidden debt" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-teardown.sh:6946a8fdff: allowlist entry S1 is not in HEAD; the allowlist may only shrink
+exit=1
+== S-G: delete a legacy site but keep its allowlist entry -> stale
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=1 shown=0 sites=894
+exit=1
+== S-H: typed unregistered_ids wrong length -> S4; right length -> pass
+VIOLATION S4 inventory: the registry types unregistered_ids (3) but the scan computes 845; remove the typed list
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=895
+exit=1
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+== S-I: false-positive probes are NOT sites (docstring w/ apostrophe header comment, $refused var, .refused path, == 'refused')
+probe sites found: []
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+== S-I2: stderr heredoc refusal IS a site
+VIOLATION S1 site:bin/fm-lab-fp.sh:d4f4783734: bin/fm-lab-fp.sh:3 [B] error: refusing to retire the lab slot maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== S-J: --help does not print set -u
+registry; 2 usage or environment error. A missing registry is a violation, not a skip,
+because a guard population with no registry is exactly the state this lint
+exists to make visible.
+== final clean state
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0

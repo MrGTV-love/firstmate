@@ -1,0 +1,9 @@
+Auto-merging bin/fm-teardown.sh
+== CI: merge commit, --base HEAD^1 (PR adds unmapped refusal) -> must fail only on PR's line
+VIOLATION S1 site:bin/fm-teardown.sh:1448d30de8: bin/fm-teardown.sh:6306 [A,B] echo "REFUSED: lab pr unmapped refusal" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+== base itself (main tip) clean
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:cf9181c4c5: bin/fm-teardown.sh:4047 [A,B] echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1  (main's own touched legacy line flagged against its parent: expected for main's commit)
