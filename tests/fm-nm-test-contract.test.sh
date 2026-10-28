@@ -35,7 +35,7 @@ doc = YAML.load_file(ARGV[0]) || {}
 r = doc["rebase"]
 puts r.is_a?(Hash) ? r["strategy"].to_s : ""
 ' "$NM") || fail "failed to parse .no-mistakes.yaml as YAML"
-  [ "$val" = "merge" ] || fail "rebase.strategy must be merge so sync can fast-forward; got: '$val'"
+  [ "$val" = "merge" ] || fail "rebase.strategy must be merge so the rebase step keeps the submitted head an ancestor; got: '$val'"
   pass "no-mistakes integrates newer main by merge"
 }
 

@@ -9,11 +9,12 @@
 # HEAD-continuity guard; see docs/architecture.md "No-mistakes gate authority boundary."
 disable_project_settings: true
 
-# Integrate newer main into a run by merge, never by rewriting the submitted
-# commits. The submitted head then stays an ancestor of the published head, so
-# `no-mistakes axi sync` takes its strict fast-forward path instead of refusing a
-# diverged branch. Trusted-only: honored from the default-branch copy of this
-# file. docs/architecture.md "Event-driven supervision" owns the run-binding rule.
+# The rebase step integrates newer main into a run by merge instead of rewriting
+# the submitted commits, so that step keeps the submitted head an ancestor of the
+# published head. CI merge-conflict repair does not read this setting and can
+# still rewrite history (tracked as nm-ci-fix-conflict-repair-merge-strategy).
+# Trusted-only: honored from the default-branch copy of this file.
+# docs/architecture.md "Event-driven supervision" owns the run-binding rule.
 rebase:
   strategy: merge
 
