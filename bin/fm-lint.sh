@@ -89,7 +89,8 @@
 # positive decimal integer or lint exits 2 on every host). A root that crosses
 # it is ended and takes the memory retry described below, and the roots log's
 # last end-record column counts the samples each source gave (libproc, or ps
-# where libproc could not read the root). Linux runs are never watched, and CI
+# for a tick libproc did not answer in time) and names any attempt that gave
+# up its libproc reader, with the reason. Linux runs are never watched, and CI
 # runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
@@ -236,11 +237,14 @@ fm_lint_root_rss() {  # <rss-file>
 }
 
 # Samples each source gave the macOS resident-memory watch across a root's
-# attempts, as libproc:<n>,ps:<n>, or none when no watch sampled the root.
+# attempts, as libproc:<n>,ps:<n>, followed by ,reader-unavailable:<reason>
+# for each attempt that gave up its libproc reader, or none when no watch
+# sampled the root.
 fm_lint_root_rss_samples() {  # <rss-file>...
   cat "$@" 2>/dev/null | awk -F '[=:,]' '
     /^rss_samples=/ { for (i = 2; i < NF; i += 2) count[$i] += $(i + 1); found = 1 }
-    END { if (found) printf "libproc:%d,ps:%d\n", count["libproc"], count["ps"]; else print "none" }
+    /^rss_reader_unavailable=/ { reasons = reasons ",reader-unavailable:" $2 }
+    END { if (found) printf "libproc:%d,ps:%d%s\n", count["libproc"], count["ps"], reasons; else print "none" }
   '
 }
 
