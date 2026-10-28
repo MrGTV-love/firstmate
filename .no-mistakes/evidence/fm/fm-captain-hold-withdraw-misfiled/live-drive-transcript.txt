@@ -1,0 +1,193 @@
+[setup] mate lab home: /Users/charlesabrooker/tmp/fm-lab.iTA5U9
+[setup] parent lab home: /Users/charlesabrooker/tmp/fm-lab.WCtI10
+
+===== S1: legacy PR-290 shape — a mate ship task held as a captain call before owners were recorded =====
+legacy hold filed (main-shape) exit 0
+
+$ fm-captain-hold.sh open ship-290 --distinguish-absent
+  -> exit 0
+
+$ fm-captain-hold.sh open ship-290 --parent-owned --distinguish-absent
+  -> exit 1
+
+===== S2: root cause — a mate home can no longer file a hold without saying whose call it is =====
+
+$ fm-captain-hold.sh hold ship-new --reason retry or fix the red check
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+  -> exit 1
+
+$ fm-captain-hold.sh hold ship-new --reason retry the red check once --owner parent
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+  -> exit 1
+      held: no
+      hold_kind: "-"
+
+===== S3: Main cannot speak for the captain on the misfiled hold =====
+
+$ fm-captain-hold.sh decide ship-290 --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/main-decision.txt
+fm-captain-hold: task ship-290 is not waiting on the parent firstmate (recorded owner: unrecorded); only the captain's own words release a captain call, so use answer for that
+  -> exit 1
+
+===== S4: classify the legacy hold as Main's, then Main's decision releases it; work stays open =====
+
+$ fm-captain-hold.sh classify ship-290 --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/classify-evidence.txt --reason the hold reason names a Main-reserved decision
+classified: ship-290 as parent
+  -> exit 0
+
+$ fm-captain-hold.sh open ship-290 --distinguish-absent
+  -> exit 1
+
+$ fm-captain-hold.sh open ship-290 --parent-owned --distinguish-absent
+  -> exit 0
+
+$ fm-captain-hold.sh open ship-290 --any-owner --distinguish-absent
+  -> exit 0
+
+$ fm-captain-hold.sh answer ship-290 --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/main-decision.txt --release
+fm-captain-hold: task ship-290 is not held for the captain; hold it first or name the right task
+  -> exit 1
+
+$ fm-captain-hold.sh decide ship-290 --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/main-decision.txt
+decided: ship-290
+  -> exit 0
+
+$ fm-captain-hold.sh open ship-290 --any-owner --distinguish-absent
+  -> exit 1
+--- task ship-290:
+    task:
+      id: ship-290
+      title: Host hook successor watcher race
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: ship
+      repo: sample
+      priority: "-"
+      created: 2026-10-28
+      closed: "-"
+      deps: none
+      links: none
+      body: "Resolution recorded by fm-captain-hold.\nDecision digest: 406d2ca096afb966ddf83ee6150b3e245de0ed7c6fdbf4ed5878ea5b8252a404\nResolution mode: decided\nResolves hold set: 2026-01-01T00:00:00Z\nResolved at: 2026-10-28T21:12:33Z\nDecided by: parent firstmate\nNot a captain answer.\n\nParent decision:\nMain decided: retry once at unchanged head.\n\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the hold reason names a Main-reserved decision\nClassification evidence digest: 9f98c59ad56f422ae03fbb50353923739a3a31708decb4ecd66e7791ec22add9\nOriginal hold reason: Main180/181 reserve ask-user decisions to Main: retry or fix one red CI check\n\nShip PR 290.\n\nClassification evidence:\nHold reason itself says Main180/181 reserve this ask to Main."
+--- parent channel (/Users/charlesabrooker/tmp/fm-lab.WCtI10/state/mini-id.status):
+    needs-decision [key=captain-hold-ship-290-1] [at=1793221944]: parent decision ship-290: Parent classification as the parent's call, not the captain's words: the hold reason names a Main-reserved decision. Original hold reason: Main180/181 reserve ask-user decisions to Main: retry or fix one red CI check
+    resolved [key=captain-hold-ship-290-1] [at=1793221955]: parent decision ship-290: decided by the parent firstmate
+--- replay decide (same file) is a no-op:
+
+$ fm-captain-hold.sh decide ship-290 --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/main-decision.txt
+decided: ship-290
+  -> exit 0
+    decided records in body: 1
+
+===== S5: adversarial — classify never reclassifies a recorded captain call; decide never releases it =====
+
+$ fm-captain-hold.sh hold ship-cap --reason captain must pick design A or B for ship-cap --owner captain
+ship-cap
+  -> exit 0
+
+$ fm-captain-hold.sh classify ship-cap --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/classify-evidence.txt --reason try to steal it
+fm-captain-hold: task ship-cap records its owner (captain) from when it was filed or classified; a recorded owner is never reclassified
+  -> exit 1
+
+$ fm-captain-hold.sh decide ship-cap --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/main-decision.txt
+fm-captain-hold: task ship-cap is not waiting on the parent firstmate (recorded owner: captain); only the captain's own words release a captain call, so use answer for that
+  -> exit 1
+
+$ fm-captain-hold.sh open ship-cap --distinguish-absent
+  -> exit 0
+
+===== S6: adversarial — withdraw refuses with no ruling, an unknown ruling, and an unrelated captain ruling =====
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt
+fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a legacy hold classified as the parent's is released with decide, and nothing else releases a captain call without the captain's words
+  -> exit 1
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling no-such-ruling
+fm-captain-hold: no-such-ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw ship-cap
+  -> exit 1
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling ruling-other
+fm-captain-hold: ruling ruling-other does not name ship-cap in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw ship-cap
+  -> exit 1
+
+$ fm-captain-hold.sh open ship-cap --distinguish-absent
+  -> exit 0
+
+===== S7: withdraw releases a moot captain call on a recorded captain ruling that names it; work stays open =====
+
+$ fm-captain-hold.sh hold ruling-a --title Captain ruling A (covers ship-cap) --reason ruling A: decides the design question in ship-cap --owner captain --repo sample
+ruling-a
+  -> exit 0
+
+$ fm-captain-hold.sh answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/ruling-a.txt
+answered: ruling-a
+  -> exit 0
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling ruling-a
+withdrawn: ship-cap
+  -> exit 0
+
+$ fm-captain-hold.sh open ship-cap --any-owner --distinguish-absent
+  -> exit 1
+--- task ship-cap:
+    task:
+      id: ship-cap
+      title: Captain-owned gated work
+      state: queued
+      blocked: no
+      blocked_by: none
+      held: no
+      hold_reason: "-"
+      hold_kind: "-"
+      hold_until: "-"
+      kind: ship
+      repo: sample
+      priority: "-"
+      created: 2026-10-28
+      closed: "-"
+      deps: none
+      links: none
+      body: "Resolution recorded by fm-captain-hold.\nDecision digest: 8452f3652cfc2ceedd37faaaf2d5090bc2390a4d51d0d91824daf20988aa91f3\nResolution mode: withdrawn\nResolves hold set: 2026-01-01T00:00:00Z\nResolved at: 2026-10-28T21:13:22Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: captain\nRun from: secondmate home\nNot a captain answer.\n\nWithdrawal evidence:\nCaptain ruling A made this moot.\n\nDecision owner: captain\n\nWork."
+--- replay withdraw:
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling ruling-a
+withdrawn: ship-cap
+  -> exit 0
+    withdrawn records in body: 1
+--- adversarial: re-held for a NEW captain call, the old ruling cannot release it:
+
+$ fm-captain-hold.sh hold ship-cap --reason new captain call on ship-cap after ruling A --owner captain
+ship-cap
+  -> exit 0
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling ruling-a
+fm-captain-hold: ruling ruling-a was recorded at 2026-10-28T21:13:17Z, not after this hold was set at 2026-10-28T21:13:30Z; a ruling made before this hold, including one an earlier withdrawal cited, does not make it moot; refusing to withdraw ship-cap
+  -> exit 1
+
+$ fm-captain-hold.sh open ship-cap --distinguish-absent
+  -> exit 0
+
+===== S8: an expired dated captain hold can still be withdrawn =====
+
+$ fm-captain-hold.sh hold ship-dated --reason captain said revisit later --owner captain --until 2026-02-01
+ship-dated
+  -> exit 0
+      state: queued
+      held: no
+      hold_reason: "captain said revisit later"
+      hold_kind: captain
+      hold_until: 2026-02-01
+
+$ fm-captain-hold.sh open ship-dated --distinguish-absent
+  -> exit 0
+
+$ fm-captain-hold.sh withdraw ship-dated --evidence-file /Users/charlesabrooker/tmp/fm-lab.iTA5U9/withdraw-evidence.txt --ruling ruling-b
+withdrawn: ship-dated
+  -> exit 0
+      state: queued
+      held: no
+      hold_kind: "-"
+[teardown] removed lab homes

@@ -1,0 +1,4 @@
+ok - fm-pr-merge prints the exact captain-hold release command with the real task id
+ok - fm-pr-merge refuses an open parent decision and merges once the parent's decision is recorded
+ok - fm-pr-merge keeps refusing a captain-owned hold that only the parent's decision was recorded against
+ok - fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge

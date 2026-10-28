@@ -1,0 +1,65 @@
+[setup] mate lab home: /Users/charlesabrooker/tmp/fm-lab.EO8Iye
+
+===== M1: legacy misfiled hold classified as Main's blocks the local merge until Main decides =====
+
+$ fm-merge-local.sh ship-290
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61RB5A4JCHQV6KG0QYGWHNB/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: task ship-290 is still held for the captain; release it before merging
+  -> exit 1
+
+$ fm-captain-hold.sh classify ship-290 --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.EO8Iye/ev.txt --reason the call was Main's
+classified: ship-290 as parent
+  -> exit 0
+
+$ fm-merge-local.sh ship-290
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task ship-290 is still waiting on the parent firstmate's decision; record it with fm-captain-hold.sh decide before merging
+  -> exit 1
+
+$ fm-captain-hold.sh decide ship-290 --decision-file /Users/charlesabrooker/tmp/fm-lab.EO8Iye/dec.txt
+decided: ship-290
+  -> exit 0
+
+$ fm-merge-local.sh ship-290
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+merged fm/ship-290 into local main (a07eae9 -> 383da61) in /Users/charlesabrooker/tmp/fm-lab.EO8Iye/projects/ship-290
+  -> exit 0
+
+===== M2: a captain-owned hold still blocks the local merge; Main's decide does not open it; withdraw on a captain ruling does =====
+
+$ fm-captain-hold.sh hold ship-cap --reason captain picks A or B for ship-cap --owner captain
+ship-cap
+  -> exit 0
+
+$ fm-captain-hold.sh decide ship-cap --decision-file /Users/charlesabrooker/tmp/fm-lab.EO8Iye/dec.txt
+fm-captain-hold: task ship-cap is not waiting on the parent firstmate (recorded owner: captain); only the captain's own words release a captain call, so use answer for that
+  -> exit 1
+
+$ fm-merge-local.sh ship-cap
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task ship-cap is still held for the captain; release it before merging
+  -> exit 1
+
+$ fm-captain-hold.sh hold ruling-a --title Captain ruling A covers ship-cap --reason ruling A decides ship-cap --owner captain --repo sample
+ruling-a
+  -> exit 0
+
+$ fm-captain-hold.sh answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-lab.EO8Iye/ra.txt
+answered: ruling-a
+  -> exit 0
+
+$ fm-captain-hold.sh withdraw ship-cap --evidence-file /Users/charlesabrooker/tmp/fm-lab.EO8Iye/ev.txt --ruling ruling-a
+withdrawn: ship-cap
+  -> exit 0
+
+$ fm-merge-local.sh ship-cap
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+merged fm/ship-cap into local main (6494091 -> 9683bde) in /Users/charlesabrooker/tmp/fm-lab.EO8Iye/projects/ship-cap
+  -> exit 0
+[teardown] removed lab homes
