@@ -339,7 +339,7 @@ printf 'def go(x):\n    """\n    This function refuses nothing.\n    """\n    re
 pass "multiline docstrings are not sites while the runtime multiline string beside them is"
 
 SIG=$(fixture sig_docstring_forms)
-printf 'def a(x):\n    r"""\n    a refuses nothing.\n    """\n    return x\n\ndef b(x):  # noqa\n    """\n    b refuses nothing.\n    """\n    return x\n\ndef c(x):  # noqa\n    u"""c refuses nothing."""\n    return x\n' >"$SIG/bin/example.py"
+printf 'def a(x):\n    r"""\n    a refuses nothing.\n    """\n    return x\n\ndef b(x):  # noqa\n    """\n    b refuses nothing.\n    """\n    return x\n\ndef c(x):  # noqa\n    u"""c refuses nothing."""\n    return x\n\ndef d(x):  # don'"'"'t touch\n    """\n    d refuses nothing.\n    """\n    return x\n\ndef e(x="#"):  # don'"'"'t touch\n    """e refuses nothing."""\n    return x\n' >"$SIG/bin/example.py"
 [ -z "$(site_ids "$SIG")" ] || fail "prefixed docstrings and docstrings after a commented header must not be sites: $(site_ids "$SIG")"
 pass "prefixed docstrings and docstrings after a commented header are not sites"
 

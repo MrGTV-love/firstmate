@@ -185,7 +185,7 @@ def is_docstring_open(stripped, prev_code):
     """A triple-quoted string opening a block (first statement after a header) documents; any other runs."""
     if not re.match(r'[rRuUbBfF]{0,2}("""|\'\'\')', stripped):
         return False
-    return prev_code is None or re.sub(r'\s*#[^\'"]*$', '', prev_code).endswith(':')
+    return prev_code is None or STRING.sub('S', prev_code).split('#', 1)[0].rstrip().endswith(':')
 
 
 def event_denies(body):
