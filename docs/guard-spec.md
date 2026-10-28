@@ -116,7 +116,8 @@ A docstring is a triple-quoted string that opens a block, as the first statement
 A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun` or `deno`, in which case the body is scanned as that language.
 A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
 That limit is deliberate, because every error exit would be a site, and it is why a new guard should use `fm_refuse` or the `REFUSED:` marker.
-The scan follows only Python triple-quoted strings across lines, so a refusal word in a shell or JavaScript string that spans lines is not enumerated on any of its lines; the `REFUSED:` marker is still found on any line, so such a message should carry the marker or stay on one line.
+The scan follows only Python triple-quoted strings across lines, so it does not reliably recognize the inner lines of a shell or JavaScript string that spans lines: some may be reported and others missed.
+A refusal message should therefore stay on one line, or carry the `REFUSED:` marker on a line the scan does not read as a comment (one that starts with `#` in shell and Python, or with `//`, `*` or `/*` in JavaScript).
 
 A site maps to a registry entry through the entry's `sites` list.
 Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
