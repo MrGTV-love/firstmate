@@ -239,7 +239,7 @@ fm_lint_stub_shellcheck() {
   cat > "$fakebin/shellcheck" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  printf 'ShellCheck - shell script analysis tool\nversion: %s\n' "\${FM_TEST_SHELLCHECK_VERSION:-0.11.0}"
   exit 0
 fi
 mode=on
