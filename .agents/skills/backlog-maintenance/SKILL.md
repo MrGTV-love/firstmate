@@ -12,7 +12,7 @@ A decision is simply a task held for the captain: create the task with `bin/fm-t
 When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
 
-An escalated open-work receipt marked `standing: no` because no captain-held task was named answers only the turn it followed.
+An escalated open-work receipt marked `standing: no` because no captain-held task was named has no proof it reached the captain: its unchanged row stays in the periodic waiting list as `escalated, no proof it reached the captain`, never as waiting on the captain.
 Name the actual captain-held task with `--hold TASK_ID` rather than treating that receipt as a standing wait.
 
 `.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax.

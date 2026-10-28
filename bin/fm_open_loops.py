@@ -1460,6 +1460,15 @@ def receipt_covers(action, row, now, waits=None):
     return kind in ("steered", "merged")
 
 
+def needs_no_action(action, row, now, waits=None):
+    """Change-gated eligibility: the last action covers the row, or is an escalation without proof it reached
+    the captain recorded on this unchanged work, which leaves the row in the periodic waiting list instead."""
+    return receipt_covers(action, row, now, waits) or (
+        action.get("kind") == "escalated" and not action.get("hold") and not action.get("unverified")
+        and not action.get("invalidated") and row.get("category") != "review_pass_not_merged"
+        and same_work(action, row, now))
+
+
 def steer_record_epoch(state, row, record):
     """When the row's task steering inbox (bin/fm-task-inbox-lib.sh) recorded this delivery, or None."""
     if not re.fullmatch(r"[0-9]+[.]msg", record):
@@ -1491,13 +1500,16 @@ def merge_recorded(state, row, url):
                for marker in state.glob("*.pr-poll-merge-notified"))
 
 
-def render_digest(rows, actions):
+def render_digest(rows, actions, captain_waiting):
     """One list for the existing periodic ledger wake, with no per-row notification churn."""
     fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "status", "last_action"]
     lines = ["WAITING OPEN WORK (periodic list for the captain):", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
     for row in rows:
         action = actions.get(row["id"], {})
-        status = "escalated, waiting on the captain" if action.get("kind") == "escalated" else action.get("kind")
+        status = action.get("kind")
+        if status == "escalated":
+            status = "escalated, waiting on the captain" if row["id"] in captain_waiting \
+                else "escalated, no proof it reached the captain"
         last = {key: action.get(key) for key in ("kind", "evidence", "at_epoch")}
         values = [row.get(field) for field in fields[:-2]] + [status, last]
         lines.append("  " + ",".join(json.dumps(value, ensure_ascii=False) for value in values))
@@ -1553,16 +1565,17 @@ def ledger_action(args, state, now):
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
     if args.digest:
-        covered = [row for row in rows if receipt_covers(actions.get(row["id"], {}), row, now, waits)]
-        if covered:
-            print(render_digest(covered, actions))
+        listed = [row for row in rows if needs_no_action(actions.get(row["id"], {}), row, now, waits)]
+        if listed:
+            print(render_digest(listed, actions, {row["id"] for row in listed
+                                                  if receipt_covers(actions.get(row["id"], {}), row, now, waits)}))
         return 0
     if args.present_overdue:
         needing, standing = [], []
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if receipt_covers(action, row, now, waits):
+            if needs_no_action(action, row, now, waits):
                 standing.append(row)
                 continue
             needing.append(row)
@@ -1574,7 +1587,7 @@ def ledger_action(args, state, now):
             print(render_overdue(needing))
             if standing:
                 print(render_overdue(standing).replace(
-                    "OVERDUE:", "STANDING (its last action still covers unchanged evidence; no action needed):", 1))
+                    "OVERDUE:", "STANDING (unchanged since its last action; no action needed):", 1))
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
                   " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]"
@@ -1582,7 +1595,7 @@ def ledger_action(args, state, now):
         return 0
     if args.check_actions:
         def presentation_answered(ident):
-            # A reviewed green PR's action, or an escalation without a captain hold binding,
+            # A reviewed green PR's action, or an escalation whose captain hold could not be verified,
             # answers only the presentation it followed.
             action = actions.get(ident, {})
             if action.get("kind") == "waiting" or (action and not same_work(action, by_id[ident], now)):
@@ -1592,10 +1605,9 @@ def ledger_action(args, state, now):
         presented = {ident for marked in controls["presentations"].values() for ident in marked}
         missing = [row for ident, row in by_id.items()
                    if (ident in presented or ident in actions)
-                   and not receipt_covers(actions.get(ident, {}), row, now, waits)
+                   and not needs_no_action(actions.get(ident, {}), row, now, waits)
                    and not ((row.get("category") == "review_pass_not_merged"
-                             or (actions.get(ident, {}).get("kind") == "escalated"
-                                 and not actions[ident].get("hold"))) and presentation_answered(ident))]
+                             or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
             print("error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused")
             print(render_overdue(missing))
@@ -1707,6 +1719,8 @@ def ledger_action(args, state, now):
         actions[ident]["binding"] = binding
     if hold:
         actions[ident]["hold"] = hold
+    elif unverified:
+        actions[ident]["unverified"] = True
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     if not visible:
@@ -1723,8 +1737,9 @@ def ledger_action(args, state, now):
             print(f"standing: no; the captain hold could not be verified ({unverified}), so this receipt answers only"
                   " the turn it followed (record it again once the backlog is readable)")
         else:
-            print("standing: no; no task held for the captain was named, so this escalation has no hold binding"
-                  " and answers only the turn it followed (name the hold with --hold TASK_ID)")
+            print("standing: no; no task held for the captain was named, so this escalation has no hold binding:"
+                  " it is never listed as waiting on the captain, and while the row is unchanged it needs no new action"
+                  " and stays in the periodic waiting list (name the hold with --hold TASK_ID)")
     return 0
 
 
