@@ -38,7 +38,7 @@
 #   S2 a sites marker matches exactly the sites it declares, and no site is
 #      mapped by two entries
 #   S3 an entry that maps more than one site states group_reason
-#   S4 a typed unregistered count in the registry equals the computed one
+#   S4 a typed unregistered_ids list in the registry has the computed length
 # In new-or-touched mode a site on a changed line must map even when it is
 # allowlisted, and the allowlist may not grow against --base (S5).
 #
@@ -155,10 +155,9 @@ jq -r '.errors[] | [.rule, .id, .message] | @tsv' "$SITES_JSON" \
   | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
 SITES_N=$(jq -r '.sites | length' "$SITES_JSON")
 UNREGISTERED_N=$(jq -r '[.sites[] | select(.entry == null)] | length' "$SITES_JSON")
-typed_unregistered=$(jq -r 'if (.unregistered | type) == "number" then .unregistered
-  elif (.unregistered_ids | type) == "array" then (.unregistered_ids | length) else "" end' "$REGISTRY")
+typed_unregistered=$(jq -r 'if (.unregistered_ids | type) == "array" then (.unregistered_ids | length) else "" end' "$REGISTRY")
 if [ -n "$typed_unregistered" ] && [ "$typed_unregistered" != "$UNREGISTERED_N" ]; then
-  violation S4 inventory "the registry types unregistered=$typed_unregistered but the scan computes $UNREGISTERED_N; remove the typed count"
+  violation S4 inventory "the registry types unregistered_ids ($typed_unregistered) but the scan computes $UNREGISTERED_N; remove the typed list"
 fi
 
 # ---------------------------------------------------------------- R1 uniqueness

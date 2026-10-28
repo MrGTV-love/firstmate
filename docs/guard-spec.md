@@ -123,14 +123,14 @@ Two entries may not map the same site, and a marker that matches nothing is stal
 
 A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.
 The lint computes the unregistered count as the number of sites that map to nothing.
-A registry may carry a typed `unregistered` count only if it equals the computed one.
+A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 
 Rules 10 to 14 are mechanically checked on top of the nine rules above:
 
 10. **S1** Every refusal site maps to a registry entry.
 11. **S2** A `sites` item matches exactly the sites it declares, and no site has two owners.
 12. **S3** An entry that maps more than one site states `group_reason`.
-13. **S4** A typed unregistered count equals the computed one.
+13. **S4** A typed `unregistered_ids` list has the computed length.
 14. **S5** The allowlist does not grow against the base (new-or-touched mode only).
 
 ## Tiers

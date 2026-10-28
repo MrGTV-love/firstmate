@@ -183,9 +183,9 @@ def is_comment(stripped, kind):
 
 def is_docstring_open(stripped, prev_code):
     """A triple-quoted string opening a block (first statement after a header) documents; any other runs."""
-    if not stripped.startswith(('"""', "'''")):
+    if not re.match(r'[rRuUbBfF]{0,2}("""|\'\'\')', stripped):
         return False
-    return prev_code is None or prev_code.endswith(':')
+    return prev_code is None or re.sub(r'\s*#[^\'"]*$', '', prev_code).endswith(':')
 
 
 def event_denies(body):
@@ -329,11 +329,11 @@ def touched_lines(root, ref, rels):
         print('error: cannot resolve base ref %r' % ref, file=sys.stderr)
         sys.exit(2)
     changed = {}
-    diff = git('diff', '-U0', '--no-color', '--no-ext-diff', ref, '--', *rels)
+    diff = git('diff', '-U0', '--no-color', '--no-ext-diff', '--no-prefix', ref, '--', *rels)
     current = None
     for row in diff.stdout.split('\n'):
         if row.startswith('+++ '):
-            current = None if row == '+++ /dev/null' else row[6:]
+            current = None if row == '+++ /dev/null' else row[4:]
             if current is not None:
                 changed.setdefault(current, set())
         elif row.startswith('@@') and current is not None:

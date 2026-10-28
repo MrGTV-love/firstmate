@@ -28,7 +28,7 @@
 #     inside an already-mapped owner file still needs its own mapping
 #   - a marker that matches nothing, the wrong number of sites, or a site another entry owns fails
 #     S2, and a multi-site entry with no group_reason fails S3
-#   - a typed unregistered count that differs from the computed one fails S4
+#   - a typed unregistered_ids list whose length differs from the computed count fails S4
 #   - an allowlisted site passes, deleting the site makes its entry stale, a touched site fails
 #     in new-or-touched mode even when allowlisted, and the sealed allowlist cannot grow (S5)
 set -u
@@ -338,6 +338,11 @@ printf 'def go(x):\n    """\n    This function refuses nothing.\n    """\n    re
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the runtime string may be a site, not the function and class docstrings: $(site_ids "$SIG")"
 pass "multiline docstrings are not sites while the runtime multiline string beside them is"
 
+SIG=$(fixture sig_docstring_forms)
+printf 'def a(x):\n    r"""\n    a refuses nothing.\n    """\n    return x\n\ndef b(x):  # noqa\n    """\n    b refuses nothing.\n    """\n    return x\n\ndef c(x):  # noqa\n    u"""c refuses nothing."""\n    return x\n' >"$SIG/bin/example.py"
+[ -z "$(site_ids "$SIG")" ] || fail "prefixed docstrings and docstrings after a commented header must not be sites: $(site_ids "$SIG")"
+pass "prefixed docstrings and docstrings after a commented header are not sites"
+
 SIG=$(fixture sig_event_id_allow)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf '"$DIR/fm-guard-event.sh" deployment-allow-check deny --source-ok true\n' >"$SIG/bin/a.sh"
@@ -456,14 +461,14 @@ assert_fails_with "S2 fails a site that two entries map" "$TWICE" S2
 # --- computed unregistered count ---------------------------------------------
 TYPED=$(fixture typed_unregistered)
 printf 'echo "REFUSED: an unmapped refusal" >&2\n' >"$TYPED/bin/gnew.sh"
-mutate "$TYPED" '.unregistered = 0'
-out=$(run_lint "$TYPED") && fail "a typed unregistered count below the computed one must fail: $out"
+mutate "$TYPED" '.unregistered_ids = []'
+out=$(run_lint "$TYPED") && fail "a typed unregistered_ids list shorter than the computed count must fail: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION S4 inventory' || fail "expected S4, got: $out"
-pass "S4 fails a typed unregistered count that disagrees with the scan"
-mutate "$TYPED" '.unregistered = 1'
+pass "S4 fails a typed unregistered_ids list that disagrees with the scan"
+mutate "$TYPED" '.unregistered_ids = ["site:bin/gnew.sh"]'
 out=$(run_lint "$TYPED") && fail "the unmapped site itself must still fail: $out"
-printf '%s\n' "$out" | grep -q '^VIOLATION S4 ' && fail "a typed count equal to the computed one must not fail S4: $out"
-pass "a typed unregistered count equal to the scan raises no S4"
+printf '%s\n' "$out" | grep -q '^VIOLATION S4 ' && fail "a typed list of the computed length must not fail S4: $out"
+pass "a typed unregistered_ids list of the computed length raises no S4"
 out=$(run_lint "$TYPED" --counts) && fail "the unmapped site must fail the counts run: $out"
 printf '%s\n' "$out" | grep -q 'unregistered=1 ' || fail "counts must print the computed unregistered=1, got: $out"
 pass "--counts prints the computed unregistered count"
@@ -505,6 +510,11 @@ printf 'legacy() {\n    echo "REFUSED: a legacy refusal" >&2\n  return 1\n}\n' >
 out=$("$LINT" --root "$NATS" --mode new-or-touched --base HEAD 2>&1) && fail "a touched legacy site that is still unmapped must fail: $out"
 printf '%s\n' "$out" | grep -q "^VIOLATION S1 $NATS_ID" || fail "expected the touched legacy site to fail, got: $out"
 pass "new-or-touched fails a touched legacy site that is still unmapped"
+git -C "$NATS" config diff.noprefix true
+out=$("$LINT" --root "$NATS" --mode new-or-touched --base HEAD 2>&1) && fail "diff.noprefix must not hide a touched legacy site: $out"
+printf '%s\n' "$out" | grep -q "^VIOLATION S1 $NATS_ID" || fail "expected the touched legacy site to fail under diff.noprefix, got: $out"
+git -C "$NATS" config --unset diff.noprefix
+pass "new-or-touched fails a touched legacy site under diff.noprefix"
 mutate "$NATS" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a legacy refusal"}]'
 printf '{"schema_version":2,"allowed":[]}\n' >"$NATS/docs/guards/lint-allowlist.json"
 "$LINT" --root "$NATS" --mode new-or-touched --base HEAD >/dev/null 2>&1 \
