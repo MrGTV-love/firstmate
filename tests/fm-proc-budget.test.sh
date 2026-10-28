@@ -205,6 +205,139 @@ test_budget_stops_a_runaway_tree_inside_the_tree() {
   pass "a budgeted runaway tree stops at depth $depth while an unbudgeted probe forks freely"
 }
 
+# Run every memory case inside a real 2 GiB memory stop, including fixtures
+# that deliberately break the inner reader. No ad-hoc watchdog is needed.
+run_memory_case() {
+  "$WRAP" --memory-kib 2097152 -- "$@"
+}
+
+memory_supported() {
+  if [ "$(uname -s)" != Darwin ]; then
+    "$WRAP" --memory-kib 2097152 -- touch "$TMP_ROOT/unsupported-ran" 2>"$TMP_ROOT/unsupported.err"
+    expect_code 125 $? "unsupported memory reader refuses before launch"
+    assert_absent "$TMP_ROOT/unsupported-ran" "unsupported reader must not launch the command"
+    pass "memory stop refuses unsupported hosts before launch"
+    return 1
+  fi
+  return 0
+}
+
+test_memory_tree_over_limit() {
+  local rc pid
+  cat >"$TMP_ROOT/memory-tree.py" <<'PY'
+import os
+import subprocess
+import sys
+import time
+
+if len(sys.argv) == 1:
+    subprocess.Popen([sys.executable, __file__, "child"])
+    time.sleep(60)
+else:
+    if sys.argv[1] == "child":
+        subprocess.Popen([sys.executable, __file__, "grandchild"])
+    with open(os.environ["FM_MEMORY_PIDS"], "a") as handle:
+        handle.write(str(os.getpid()) + "\n")
+    # Both allocations are finite and together exceed 128 MiB, not 2 GiB.
+    allocation = bytearray(80 * 1024 * 1024)
+    time.sleep(60)
+PY
+  FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" run_memory_case \
+    "$WRAP" --memory-kib 131072 -- python3 "$TMP_ROOT/memory-tree.py" 2>"$TMP_ROOT/memory.err"
+  rc=$?
+  expect_code 99 "$rc" "over-limit command tree"
+  assert_contains "$(cat "$TMP_ROOT/memory.err")" "exceeded 131072 KiB" "over-limit reason names the bound"
+  [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
+  [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
+  while read -r pid; do
+    # Zombies have ended, even when the host has not reaped them yet.
+    case "$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat | while read -r candidate state; do
+      [ "$candidate" != "$pid" ] || printf '%s' "$state"
+    done)" in
+      ''|Z*|*E) ;;
+      *) fail "memory stop left descendant $pid alive" ;;
+    esac
+  done <"$TMP_ROOT/memory.pids"
+  pass "over-limit child and grandchild are ended with status 99"
+}
+
+test_memory_normal_command() {
+  local output rc
+  output=$(run_memory_case "$WRAP" 1500 --memory-kib 262144 -- bash -c 'printf "%s|" "a b"; sleep 2; exit 7')
+  rc=$?
+  expect_code 7 "$rc" "under-limit status passes through"
+  assert_equals 'a b|' "$output" "under-limit arguments and output are untouched"
+  pass "normal memory-bounded command retains output and status"
+}
+
+test_memory_reader_failure() {
+  local fixture="$TMP_ROOT/memory-fixture" rc pid mode marker
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import os
+import sys
+import time
+for line in sys.stdin:
+    if not os.path.exists(os.environ["FM_MEMORY_MARKER"]):
+        print("1 1", flush=True)
+        continue
+    mode = os.environ["FM_MEMORY_FAILURE"]
+    if mode == "exit":
+        sys.exit(0)
+    if mode == "hang":
+        time.sleep(60)
+    print("-" if mode == "unreadable" else "malformed", flush=True)
+PY
+  for mode in unreadable malformed exit hang; do
+    marker="$TMP_ROOT/reader-$mode.pid"
+    PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
+      FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE="$mode" run_memory_case \
+      "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- \
+      bash -c 'echo "$$" >"$FM_MEMORY_MARKER"; exec sleep 60' 2>"$TMP_ROOT/reader.err"
+    rc=$?
+    expect_code 125 "$rc" "failed memory sample ($mode)"
+    assert_contains "$(cat "$TMP_ROOT/reader.err")" "cannot sample command-tree memory" "failed sample has a clear reason ($mode)"
+    [ "$(wc -l <"$TMP_ROOT/reader.err" | tr -d ' ')" -eq 1 ] || fail "reader failure must emit exactly one reason ($mode)"
+    read -r pid <"$marker"
+    if kill -0 "$pid" 2>/dev/null; then fail "failed sample left the command running ($mode)"; fi
+  done
+
+  PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
+    FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE=unreadable run_memory_case \
+    "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- touch "$TMP_ROOT/reader-started" 2>"$TMP_ROOT/reader-start.err"
+  expect_code 125 $? "unavailable reader at preflight"
+  assert_absent "$TMP_ROOT/reader-started" "unavailable reader must refuse before launch"
+  pass "unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch"
+}
+
+test_no_memory_option_never_starts_reader() {
+  local fixture="$TMP_ROOT/no-memory-fixture" output
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-info.py" "$fixture/"
+  output=$("$fixture/fm-proc-budget.sh" -- bash -c 'printf unchanged; exit 0') || fail "no-option call unexpectedly requires a memory helper"
+  assert_equals unchanged "$output" "without option the original exec path still works"
+  pass "no memory option needs no reader or watcher"
+}
+
+test_memory_invalid_limits() {
+  local limit
+  for limit in 0 01 -1 nope 1.5 999999999999999999999999; do
+    "$WRAP" --memory-kib "$limit" -- touch "$TMP_ROOT/bad-memory-ran" 2>/dev/null
+    expect_code 2 $? "invalid memory limit $limit"
+    assert_absent "$TMP_ROOT/bad-memory-ran" "invalid memory limit cannot run the command"
+  done
+  pass "invalid memory bounds refuse before launch"
+}
+
+test_memory_invalid_limits
+test_no_memory_option_never_starts_reader
+if memory_supported; then
+  test_memory_tree_over_limit
+  test_memory_normal_command
+  test_memory_reader_failure
+fi
+
 test_default_extra_is_added_to_the_count
 test_explicit_extra
 test_budget_never_widens_the_inherited_limit

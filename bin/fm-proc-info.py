@@ -2,7 +2,8 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | mem-tree PID | table FIELDS
+       lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PGID |
+       table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -25,7 +26,11 @@ whole KiB of resident memory and of physical footprint (which also counts
 compressed pages) held right now by PID and its live descendants in PID's
 process group, reading only that group's processes and summed from libproc's
 ri_resident_size and ri_phys_footprint; it prints `-` for a sample that cannot
-be read and exits at the end of stdin. Facts come from sysctl KERN_PROC
+be read and exits at the end of stdin. rss-tree uses the same streaming
+protocol for every live member of PGID, including orphaned descendants, and
+invalidates the whole sample if any live member cannot be read; an empty
+group returns `0 0`. It is the strict reader for fm-proc-budget.sh.
+Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
@@ -198,10 +203,36 @@ def mem_tree(root):
     return f"{resident // 1024} {footprint // 1024}"
 
 
-def mem_watch(root):
+def rss_tree(group):
+    """Read every live member of an owned command group, including orphans.
+
+    Unlike the lint reader, an unreadable live member invalidates the sample.
+    A vanished member or a zombie no longer owns resident memory.
+    """
+    resident, footprint = 0, 0
+    for record in kinfos(KERN_PROC_PGRP, group):
+        if record[P_STAT] == SZOMB or struct.unpack_from("i", record, P_FLAG)[0] & P_WEXIT:
+            continue
+        pid = struct.unpack_from("i", record, P_PID)[0]
+        try:
+            more_resident, more_footprint = memory(pid)
+        except LookupError:
+            try:
+                current = kinfo(pid)
+            except LookupError:
+                continue
+            if current[P_STAT] == SZOMB or struct.unpack_from("i", current, P_FLAG)[0] & P_WEXIT:
+                continue
+            raise
+        resident += more_resident
+        footprint += more_footprint
+    return f"{resident // 1024} {footprint // 1024}"
+
+
+def mem_watch(root, reader=mem_tree):
     while sys.stdin.readline():
         try:
-            answer = mem_tree(root)
+            answer = reader(root)
         except (OSError, LookupError, struct.error, IndexError):
             answer = "-"
         print(answer, flush=True)
@@ -217,6 +248,8 @@ def main(argv_):
     number = 0 if fields else int(argv_[2])
     if command == "mem-tree":
         return mem_watch(number)
+    if command == "rss-tree":
+        return mem_watch(number, rss_tree)
     try:
         if command == "table":
             value = table(fields)
