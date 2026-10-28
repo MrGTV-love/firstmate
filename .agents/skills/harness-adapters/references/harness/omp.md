@@ -47,6 +47,8 @@ Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's s
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
 A file that is both auto-discovered and named with `-e` loads twice, so the per-task busy extension lives in `state/` and is the only `-e` a secondmate launch names.
 The primary extensions stay auto-discovered and are not named again.
+A ship or scout worker in a task copy of this repository also auto-discovers them, so both stand down when `FM_TASK_ID` is set (`../../../.omp/extensions/lib/fm-task-worker.ts`): the copy never receives `state/.omp-live-model`, the two `-extension-loaded` markers, or `state/extensions/omp-primary-watch`.
+`bin/fm-spawn.sh` exports `FM_TASK_ID` into every ship and scout pane and never into a primary or secondmate home.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration

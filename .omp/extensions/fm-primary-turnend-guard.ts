@@ -38,6 +38,7 @@ import {
   encodeFirstmateOperationalInput,
 } from "../../.pi/extensions/lib/fm-operational-input.ts";
 import { installLiveModelPublisher } from "../../bin/fm-omp-live-model.ts";
+import { taskWorkerSession } from "./lib/fm-task-worker.ts";
 
 // The omp extension API surface this file uses, declared locally: omp ships no
 // separately installable type package and is a Pi fork whose event names match
@@ -505,6 +506,8 @@ function runPretoolCheck(command: string): Promise<{ code: number; stderr: strin
 }
 
 export default function (pi: ExtensionAPI) {
+  // A task worker is not a home: it writes no home marker and guards no turn.
+  if (taskWorkerSession()) return;
   let sessionstartGeneration: SessionstartGeneration | null = null;
   let sessionstartExitListenerRegistered = false;
   let sessionStarts = 0;
