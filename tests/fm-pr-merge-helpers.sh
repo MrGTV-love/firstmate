@@ -52,7 +52,10 @@ make_case() {
   local name=$1 case_dir fakebin
   case_dir="$TMP_ROOT/$name"
   fakebin="$case_dir/fakebin"
-  mkdir -p "$case_dir/state" "$case_dir/home/data" "$case_dir/home/config" "$fakebin"
+  mkdir -p "$case_dir/state" "$case_dir/home/data" "$case_dir/home/config" "$fakebin" "$case_dir/user-home/.no-mistakes"
+  # A no-mistakes host with no recorded run: an existing, readable, empty pipeline database.
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$case_dir/user-home/.no-mistakes/state.sqlite"
   fm_git_init_commit "$case_dir/wt"
   git -C "$case_dir/wt" update-ref refs/remotes/origin/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
   git -C "$case_dir/wt" rev-parse refs/remotes/origin/main > "$case_dir/github-base"
