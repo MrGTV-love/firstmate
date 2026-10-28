@@ -580,6 +580,13 @@ Missing, empty, duplicate, malformed, backend-inconsistent, or task-mismatched e
 
 Legacy tmux metadata remains cleanup-compatible when its exact window name is `fm-<id>`; opaque non-tmux endpoints require their recorded `endpoint_task_id=` binding.
 
+### Superseded pool folders
+
+Treehouse names a project's pool folder `<repo>-<first six hex digits of the SHA-256 of the resolved origin URL>`, so repointing `origin` (for example from an upstream to a fork) moves the project to a new, empty folder and leaves earlier copies, and the task records that name them, in the old one.
+Teardown acts only on the slot whose path is the recorded copy, because `treehouse lease` and `treehouse return <name>` resolve a slot name in the current pool only: it leases a slot only when `treehouse status --json`, run from the project, lists that exact path, and otherwise keeps project custody and returns the copy by path.
+The landed-work test is unchanged for such a copy, so an unlanded or dirty copy in an old folder is still refused.
+A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, and only when its holder is that task, no other task claims the slot, and no process runs inside it.
+
 ### Herdr homes and presentation
 
 `FM_HOME` determines Herdr's home label: the primary home uses `firstmate`, and a secondmate home marked by `.fm-secondmate-home` uses `2ndmate-<secondmate-id>`.

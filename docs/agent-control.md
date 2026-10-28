@@ -343,6 +343,8 @@ It does not return the slot, and it does not touch the slot's claim or any forei
 Before it removes anything, it reserves the slot under a durable lease in Treehouse state, exactly as an ordinary return does, because a slot taken with a plain `treehouse get` holds only a process lease that lapses when the worker exits and a later `treehouse get` could then reset it over the held copies.
 A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
+A slot in a superseded pool folder cannot be leased at all: Treehouse names a pool folder from the project's origin URL, so repointing origin leaves earlier copies in the old folder, and `treehouse lease` takes a slot name that it resolves in the current pool only.
+So that close refuses with that reason, while an ordinary teardown of a landed copy there returns it by path under project custody, as [Superseded pool folders](configuration.md#superseded-pool-folders) describes.
 The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot is reserved under a durable lease and stays claimed.
 Nothing returns the slot automatically, and teardown removes no held copy: a held copy goes on the owner's word naming it.
 The [nested task copy sweep](configuration.md#nested-task-copy-sweep-configcopy-budget), when its `--apply` job is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock through Vernant's closeout driver, after preserving its unique ignored files, when that copy passes the proofs the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) owns; it never removes an unlocked copy held for unique ignored files, whether or not its HEAD is landed, so that goes only on the owner's word naming it.
@@ -461,6 +463,7 @@ When an unleased entry's state name is duplicated or another entry names the sam
 Treehouse leases only the first entry with the requested name, so a lease cannot reliably clear a duplicate-entry refusal in either entry order, and the refusal does not describe a partly leased slot as unleased.
 No other refusal names a lease as its remedy.
 A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
+A refusal for an unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, tells the operator not to lease it: a lease takes a slot name and would hold a different copy of that name.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.
 This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.
