@@ -97,6 +97,7 @@ cannot be checked mechanically belongs in the reviewer's checklist, not here.
 A guard that lives only inside a script never got these fields, because nothing noticed it existed.
 `bin/fm-guard-sites.py` therefore enumerates the refusal sites of the runtime code, and `bin/fm-guard-lint.sh` requires every one to map to a registry entry.
 The scan covers `bin/`, `.claude/`, `.codex/`, `.cursor/`, `.dsh/`, `.grok/`, `.omp/`, `.opencode/` and `.pi/` (skipping test directories), plus every owner file the registry names.
+In a git work tree it reads only the files git tracks or would track, so a git-ignored file is never a site.
 A site is one code line that matches a signature outside comments, heredoc bodies and docstrings.
 A docstring is a triple-quoted string that opens a block, as the first statement after a header line that ends in `:` (such as `def` or `class`) or at the top of a file; a triple-quoted string anywhere else, such as an exception message, is runtime text and is scanned line by line:
 

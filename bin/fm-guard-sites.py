@@ -81,16 +81,36 @@ def shebang_kind(path):
     return None
 
 
-def walk(root, rel_dir):
-    base = os.path.join(root, rel_dir)
-    for here, dirs, files in os.walk(base):
-        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
-        for name in sorted(files):
-            path = os.path.join(here, name)
-            rel = os.path.relpath(path, root)
-            if os.path.splitext(name)[1] in CODE_EXT or (
-                    not os.path.splitext(name)[1] and shebang_kind(path)):
-                yield rel
+def git_files(root):
+    """Paths git tracks or would track; None when root is not the top of a git work tree."""
+    try:
+        top = subprocess.run(['git', '-C', root, 'rev-parse', '--show-toplevel'],
+                             capture_output=True, text=True)
+        if top.returncode != 0 or os.path.realpath(top.stdout.strip()) != os.path.realpath(root):
+            return None
+        listed = subprocess.run(['git', '-C', root, 'ls-files', '-z', '--cached', '--others',
+                                 '--exclude-standard'],
+                                capture_output=True, text=True)
+    except OSError:
+        return None
+    if listed.returncode != 0:
+        return None
+    return {rel for rel in listed.stdout.split('\0') if rel and os.path.isfile(os.path.join(root, rel))}
+
+
+def walk(root, rel_dir, listed):
+    if listed is None:
+        rels = []
+        for here, dirs, files in os.walk(os.path.join(root, rel_dir)):
+            dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
+            rels.extend(os.path.relpath(os.path.join(here, name), root) for name in sorted(files))
+    else:
+        rels = sorted(rel for rel in listed if rel.startswith(rel_dir + '/')
+                      and not SKIP_DIRS.intersection(rel.split('/')[:-1]))
+    for rel in rels:
+        ext = os.path.splitext(rel)[1]
+        if ext in CODE_EXT or (not ext and shebang_kind(os.path.join(root, rel))):
+            yield rel
 
 
 def registry_owner_files(registry):
@@ -469,12 +489,15 @@ def main(argv):
         registry = {'guards': []}
     registry['guards'] = [g for g in registry['guards'] if isinstance(g, dict)]
 
+    owners = registry_owner_files(registry)
+    listed = git_files(root)
     files = []
     for rel_dir in DEFAULT_DIRS:
         if os.path.isdir(os.path.join(root, rel_dir)):
-            files.extend(walk(root, rel_dir))
-    for owned in registry_owner_files(registry):
-        if owned not in files and os.path.isfile(os.path.join(root, owned)):
+            files.extend(walk(root, rel_dir, listed))
+    for owned in owners:
+        if owned not in files and os.path.isfile(os.path.join(root, owned)) and (
+                listed is None or owned in listed):
             files.append(owned)
     files = sorted(set(files))
 

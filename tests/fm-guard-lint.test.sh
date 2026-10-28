@@ -31,6 +31,7 @@
 #   - a typed unregistered_ids list whose length differs from the computed count fails S4
 #   - an allowlisted site passes, deleting the site makes its entry stale, a touched site fails
 #     in new-or-touched mode even when allowlisted, and the sealed allowlist cannot grow (S5)
+#   - in a git root, a file under a git-ignored directory is not a site, while an untracked new file is
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -574,6 +575,19 @@ mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand ne
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD --counts 2>&1 | grep -q ' mapped=1$' \
   || fail "the mapped new site must count as mapped"
 pass "new-or-touched passes a new refusal site once its guard entry maps it"
+
+IGN=$(fixture site_ignored)
+printf '.claude/worktrees/\n' >"$IGN/.gitignore"
+git -C "$IGN" init -q
+git -C "$IGN" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$IGN" -c user.email=t@example.invalid -c user.name=t commit -qm base
+mkdir -p "$IGN/.claude/worktrees/w1/bin"
+printf 'echo "REFUSED: a copy in an ignored worktree" >&2\n' >"$IGN/.claude/worktrees/w1/bin/a.sh"
+printf 'echo "REFUSED: an untracked new refusal" >&2\n' >"$IGN/bin/gnew.sh"
+IGN_IDS=$(site_ids "$IGN")
+printf '%s\n' "$IGN_IDS" | grep -q '^site:bin/gnew.sh:' || fail "an untracked file that git does not ignore must still be a site: $IGN_IDS"
+printf '%s\n' "$IGN_IDS" | grep -q '\.claude/worktrees/' && fail "a file under a git-ignored directory must not be a site: $IGN_IDS"
+pass "a git-ignored file is not a site while an untracked new file still is"
 
 ABSORB=$(fixture site_absorbed)
 printf 'echo "REFUSED: lease gone" >&2\n' >"$ABSORB/bin/gguard.sh"
