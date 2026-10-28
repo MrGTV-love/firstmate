@@ -1,6 +1,6 @@
 ---
 name: backlog-maintenance
-description: "Load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named."
+description: "Load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts whose output names no captain hold."
 user-invocable: false
 metadata:
   internal: true

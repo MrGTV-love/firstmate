@@ -2279,7 +2279,7 @@ test_stands_down_only_on_pi_code_transcript_path
 # but it must neither arm supervision nor consume the pending review.
 POST_HOME=$(make_primary_dir "$TMP_ROOT/posttool")
 for post_script in fm-procevent-posttool-check.sh fm-procevent-lib.sh fm-procevent-lavish.sh \
-  fm-pr-lib.sh fm-status-wake-lib.sh; do
+  fm-pr-lib.sh fm-file-identity-lib.sh fm-status-wake-lib.sh; do
   cp "$ROOT/bin/$post_script" "$POST_HOME/bin/$post_script"
 done
 write_arm_fixture "$POST_HOME" actionable

@@ -2740,6 +2740,35 @@ test_ignored_files_that_exist_nowhere_else_hold_a_copy() {
   pass "a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy"
 }
 
+# graft's generated output (tests/lib.sh fm_test_graft_output) alone holds no
+# copy; a custom .ignore or a clone below graft/ beside it still does
+# (data/fm-merge-prune-graft-scratch/report.md).
+test_graft_output_alone_holds_no_copy() {
+  make_world graft
+  add_copy graftonly
+  fm_test_graft_output "$(copy_path graftonly)"
+  add_copy graftignore
+  fm_test_graft_output "$(copy_path graftignore)"
+  printf 'project-private/\n' >> "$(copy_path graftignore)/.ignore"
+  add_copy graftclone
+  fm_test_graft_output "$(copy_path graftclone)"
+  git init -q "$(copy_path graftclone)/graft/n1"
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class graftonly REAPABLE-PROVEN
+  assert_class graftignore HELD-DIRTY
+  assert_class graftclone HELD-DIRTY
+  assert_contains "$OUT" "it holds ignored files that exist nowhere else: .ignore" "a custom .ignore beside graft output did not hold its copy"
+  assert_contains "$OUT" "it holds ignored files that exist nowhere else: graft" "a clone below graft/ did not hold its copy"
+  take_snapshots before graftignore graftclone
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  [ ! -e "$(copy_path graftonly)" ] || fail "a copy holding only graft output was not reaped"
+  take_snapshots after graftignore graftclone
+  assert_untouched graftignore graftclone
+  pass "graft output alone is reaped, and a custom .ignore or a clone below graft/ still holds the copy"
+}
+
 add_big_dirty_copy() {  # <name>: a dirty 10 GiB copy in the current $SLOT
   add_copy "$1"
   printf 'dirty\n' > "$(copy_path "$1")/untracked.txt"
@@ -3094,6 +3123,7 @@ run_case test_an_outer_copy_holding_a_dirty_inner_copy_is_kept
 run_case test_an_outer_copy_is_reaped_after_its_inner_copy_is_gone
 run_case test_a_zero_padded_or_odd_check_timeout_is_normalized
 run_case test_ignored_files_that_exist_nowhere_else_hold_a_copy
+run_case test_graft_output_alone_holds_no_copy
 run_case test_a_slow_enumeration_still_prints_the_wake_for_the_clones_it_reached
 run_case test_a_slow_home_project_enumeration_is_cut_at_the_time_bound
 run_case test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach

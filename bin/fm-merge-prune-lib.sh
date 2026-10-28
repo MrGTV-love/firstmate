@@ -53,7 +53,8 @@
 # Ignored scratch: virtual environments, node_modules, tool and build caches
 # (.venv, venv, node_modules, __pycache__, .pytest_cache, .ruff_cache,
 # .mypy_cache, .next, graphify-out, .import_linter_cache, *.tsbuildinfo,
-# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, and
+# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, graft's
+# generated output (teardown_graft_generated), and
 # scripts/hooks/_conformance_manifest.json: the disposable entries of
 # teardown_preservable_ignored in bin/fm-teardown-nested-lib.sh, which
 # tests/fm-merge-prune.test.sh holds to the same verdict, except one named
@@ -74,12 +75,17 @@
 # this fallback is stricter by design and writes to its own preserve directory.
 #
 # Requires bin/fm-timeout-lib.sh, bin/fm-backend.sh and bin/fm-task-copy-lib.sh to be
-# sourced first.
+# sourced first; sources bin/fm-teardown-nested-lib.sh itself when the caller has
+# not.
 # Regression coverage: tests/fm-merge-prune.test.sh.
 
 FM_MP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-agent-process-lib.sh
 . "$FM_MP_LIB_DIR/fm-agent-process-lib.sh"
+if ! declare -F teardown_graft_generated >/dev/null 2>&1; then
+  # shellcheck source=bin/fm-teardown-nested-lib.sh
+  . "$FM_MP_LIB_DIR/fm-teardown-nested-lib.sh"
+fi
 # shellcheck disable=SC2034 # Output globals, read by bin/fm-merge-prune.sh.
 FM_MP_VERDICT=
 # shellcheck disable=SC2034 # Output globals, read by bin/fm-merge-prune.sh.
@@ -330,7 +336,7 @@ EOF
 fm_mp_classify_entry() {  # <real-copy> <relative-path>
   local copy=$1 rel=$2 name child n children
   name=${rel##*/}
-  if [ -L "$copy/$rel" ]; then
+  if [ -L "$copy/$rel" ] || teardown_graft_generated "$copy" "$rel"; then
     return 0
   fi
   case "$rel" in
