@@ -451,7 +451,7 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
     "the classification did not reach the parent channel"
   [ "$(open_status "$mate" legacy-work)" = 1 ] || fail "the classified hold still reads as an open captain call"
   [ "$(open_status "$mate" legacy-work --parent-owned)" = 0 ] || fail "the classified hold does not read as the parent's open call"
-  if run_captain "$mate" classify legacy-work --owner captain --evidence-file "$evidence" --reason again >/dev/null 2>&1; then
+  if run_captain "$mate" classify legacy-work --owner parent --evidence-file "$evidence" --reason again >/dev/null 2>&1; then
     fail "a classified hold was classified a second time"
   fi
 
@@ -485,7 +485,7 @@ test_a_recorded_captain_owner_is_never_reclassified() {
   # A parent-owned hold, a closed task, and a task that is not a captain hold are not classifiable.
   tasks_in "$mate" add parent-work "Parent work" --kind ship --repo sample >/dev/null
   run_captain "$mate" hold parent-work --owner parent --reason "parent call" >/dev/null
-  if run_captain "$mate" classify parent-work --owner captain --evidence-file "$evidence" --reason "flip" >/dev/null 2>&1; then
+  if run_captain "$mate" classify parent-work --owner parent --evidence-file "$evidence" --reason "flip" >/dev/null 2>&1; then
     fail "classify flipped a hold recorded as the parent's at filing"
   fi
   tasks_in "$mate" add plain-work "Plain work" --kind ship --repo sample >/dev/null
@@ -544,14 +544,23 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
     fail "the parent's decision released a hold the captain took back"
   fi
 
-  # Classifying to the captain leaves it a captain hold and says who classified it.
+  # A legacy hold that is the captain's is marked so by re-holding it, never by classify.
   make_legacy_mate_hold "$mate" kept-work "kept-captain-reason pending"
-  run_captain "$mate" classify kept-work --owner captain --evidence-file "$evidence" \
-    --reason "this really is the captain's" >/dev/null || fail "classify to the captain failed"
+  if run_captain "$mate" classify kept-work --owner captain --evidence-file "$evidence" \
+    --reason "this really is the captain's" 2>"$mate/refusal.err" >/dev/null; then
+    fail "classify accepted an owner other than the parent"
+  fi
+  assert_contains "$(cat "$mate/refusal.err")" "hold kept-work --owner captain" "the refusal did not name the re-hold command"
+  run_captain "$mate" hold kept-work --owner captain --reason "this really is the captain's" >/dev/null \
+    || fail "re-holding a legacy hold as the captain's failed"
   show=$(shown "$mate" kept-work)
-  assert_contains "$show" "hold_kind: captain" "classifying to the captain changed the kind"
-  assert_contains "$show" "Parent classification as the captain's call, not the captain's words" "the hold reason does not say it is a parent classification"
-  [ "$(open_status "$mate" kept-work)" = 0 ] || fail "a hold classified to the captain is not an open captain call"
+  assert_contains "$show" "hold_kind: captain" "re-holding as the captain's changed the kind"
+  assert_contains "$show" "Decision owner: captain" "re-holding did not record the captain as owner"
+  assert_contains "$show" "this really is the captain's" "the hold reason does not show the re-hold reason"
+  [ "$(open_status "$mate" kept-work)" = 0 ] || fail "a hold re-held as the captain's is not an open captain call"
+  if run_captain "$mate" classify kept-work --owner parent --evidence-file "$evidence" --reason "now the parent's" >/dev/null 2>&1; then
+    fail "classify moved a hold re-held as the captain's to the parent"
+  fi
   pass "a classified hold reads as Main's classification in every list, and the captain can take it back"
 }
 

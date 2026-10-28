@@ -24,7 +24,7 @@
 #     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
 #     [--owner captain|parent]
 #   fm-captain-hold.sh decide <task-id> --decision-file <path>
-#   fm-captain-hold.sh classify <task-id> --owner captain|parent \
+#   fm-captain-hold.sh classify <task-id> --owner parent \
 #     --evidence-file <path> --reason <reason>
 #   fm-captain-hold.sh withdraw <task-id> --evidence-file <path> --ruling <ruling-task-id>
 #   fm-captain-hold.sh answer <task-id> --decision-file <path> [--release]
@@ -115,12 +115,14 @@
 # hold reason, marked `Not a captain answer.`. A hold whose owner is recorded, whether at filing or by
 # an earlier classification, is refused, so a call recorded as the captain's is
 # never reclassified; a main home is refused, because its holds are the
-# captain's by construction. `--owner parent` re-files the hold as an external
-# parent decision that only `decide` releases and that still blocks the merge
-# gate; `--owner captain` leaves it a captain hold. Both rewrite the hold reason
-# to say it is a parent classification, so every list that shows a hold shows that, and both
-# publish the classification on the parent channel. The captain reverses a
-# parent classification by re-holding with `--owner captain`.
+# captain's by construction. `--owner parent` is the only owner it takes: it
+# re-files the hold as an external parent decision that only `decide` releases
+# and that still blocks the merge gate. A legacy hold that is the captain's is
+# marked so by re-holding it with `hold <id> --owner captain`, never by classify.
+# The hold reason is rewritten to say it is a parent classification, so every
+# list that shows a hold shows that, and the classification is published on the
+# parent channel. The captain reverses a parent classification by re-holding
+# with `--owner captain`.
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -2100,12 +2102,11 @@ command_withdraw() {
 # the evidence, in the task body and in the hold reason every list shows. It is
 # never written as the captain's words. A hold whose owner was recorded at filing
 # is never reclassified, and a main home has no parent to classify toward.
-# Classifying to the parent files the hold as the parent's (external, so only
-# decide releases it); classifying to the captain leaves it a captain hold.
-# The captain reverses a parent classification by re-holding with --owner captain.
+# Classifying files the hold as the parent's (external, so only decide releases
+# it). The captain reverses a parent classification by re-holding with --owner captain.
 command_classify() {
   local id=${1:-} owner='' evidence_file='' reason='' show state hold_kind held body decoded orig until
-  local run_role occurrence stored_reason new_reason notes label
+  local run_role occurrence stored_reason new_reason notes
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -2118,10 +2119,8 @@ command_classify() {
     shift
   done
   validate_slug task-id "$id"
-  case "$owner" in
-    captain|parent) : ;;
-    *) fail "--owner must be captain or parent: ${owner:-<missing>}" ;;
-  esac
+  [ "$owner" = parent ] \
+    || fail "classify takes only --owner parent: ${owner:-<missing>}; a legacy hold that is the captain's is marked so with bin/fm-captain-hold.sh hold $id --owner captain --reason <reason>"
   validate_one_line reason "$reason"
   [ -n "$evidence_file" ] || fail "--evidence-file is required; a classification records its evidence, never an assertion"
   [ "$(home_decision_scope)" = mate ] \
@@ -2149,32 +2148,19 @@ command_classify() {
   orig=$(printf '%s' "$orig" | tr '\n\r' '  ' | cut -c1-400)
   until=$(show_field_value "$show" hold_until)
   [ "$until" != "-" ] || until=
-  label=captain
-  [ "$owner" != parent ] || label=parent
   notes=$(printf 'Owner classified: %s, a parent classification, run from %s home. Not a captain answer.\nClassification reason: %s\nClassification evidence digest: %s\nOriginal hold reason: %s' \
     "$owner" "$run_role" "$reason" "$DECISION_DIGEST" "$orig")
   write_decision_owner "$id" "$body" "$owner" "$notes" "$DECISION_TEXT"
-  new_reason="Parent classification as the $label's call, not the captain's words: $reason. Original hold reason: $orig"
+  new_reason="Parent classification as the parent's call, not the captain's words: $reason. Original hold reason: $orig"
   stored_reason=$(fm_hold_reason_encode "$new_reason") || fail "could not encode the classified hold reason"
-  if [ "$owner" = parent ]; then
-    if [ -n "$until" ]; then
-      tasks_axi hold "$id" --reason "$stored_reason" --kind external --until "$until" >/dev/null \
-        || fail "could not file $id as the parent's call; its owner line was recorded, re-run classify"
-    else
-      tasks_axi hold "$id" --reason "$stored_reason" --kind external >/dev/null \
-        || fail "could not file $id as the parent's call; its owner line was recorded, re-run classify"
-    fi
-    publish_parent_hold "$id" "$occurrence" needs-decision "$new_reason" "parent decision"
+  if [ -n "$until" ]; then
+    tasks_axi hold "$id" --reason "$stored_reason" --kind external --until "$until" >/dev/null \
+      || fail "could not file $id as the parent's call; its owner line was recorded, re-run classify"
   else
-    if [ -n "$until" ]; then
-      tasks_axi hold "$id" --reason "$stored_reason" --kind captain --until "$until" >/dev/null \
-        || fail "could not annotate captain hold $id"
-    else
-      tasks_axi hold "$id" --reason "$stored_reason" --kind captain >/dev/null \
-        || fail "could not annotate captain hold $id"
-    fi
-    publish_parent_hold "$id" "$occurrence" needs-decision "$new_reason"
+    tasks_axi hold "$id" --reason "$stored_reason" --kind external >/dev/null \
+      || fail "could not file $id as the parent's call; its owner line was recorded, re-run classify"
   fi
+  publish_parent_hold "$id" "$occurrence" needs-decision "$new_reason" "parent decision"
   printf 'classified: %s as %s\n' "$id" "$owner"
 }
 
