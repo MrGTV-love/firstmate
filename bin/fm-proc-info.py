@@ -6,9 +6,13 @@ Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID
        table FIELDS | memory
 
 memory prints a JSON RSS census with PID, PPID, kernel name, start time,
-resident bytes (null when unreadable), and fleet attribution only.
-Paired task/inbox markers or a kernel cwd within FM_MEMORY_FLEET_ROOT prove
-attribution; names alone never do. It prints no arguments, environment or cwd.
+resident bytes (null when unreadable), fleet attribution, and the run identity
+that attributed it (null otherwise) only. Paired task/inbox markers identify
+run task:<id>; a kernel cwd inside a no-mistakes run worktree
+($NM_HOME or ~/.no-mistakes, then worktrees/<repo>/<run>) identifies run
+no-mistakes:<repo>/<run>; a kernel cwd within FM_MEMORY_FLEET_ROOT attributes
+without a run. Names alone never attribute. It prints no arguments,
+environment or cwd.
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -384,6 +388,7 @@ def memory_processes():
         pass
     rows = []
     fleet_root = os.environ.get("FM_MEMORY_FLEET_ROOT", "")
+    run_root = os.path.join(os.environ.get("NM_HOME") or os.path.expanduser("~/.no-mistakes"), "worktrees")
     vnode = VnodePathInfo()
     for record in kinfos():
         pid = struct.unpack_from("i", record, P_PID)[0]
@@ -392,7 +397,7 @@ def memory_processes():
         info = ctypes.create_string_buffer(TASKINFO_SIZE)
         readable = libc.proc_pidinfo(pid, PROC_PIDTASKINFO, ctypes.c_uint64(0), info, TASKINFO_SIZE) == TASKINFO_SIZE
         rss = struct.unpack_from("Q", info.raw, 8)[0] if readable else resident.get(pid)
-        fleet = False
+        fleet, run = False, None
         try:
             data = sysctl(CTL_KERN, KERN_PROCARGS2, pid)
             argc = struct.unpack_from("i", data, 0)[0]
@@ -401,20 +406,24 @@ def memory_processes():
             task = environ.get(b"FM_TASK_ID", b"")
             inbox = environ.get(b"FM_TASK_INBOX", b"")
             fleet = bool(task and b"/" not in task and inbox.endswith(b"/state/" + task + b".inbox"))
+            run = "task:" + os.fsdecode(task) if fleet else None
         except (OSError, LookupError, struct.error, IndexError):
             pass
-        # Supervisors and workers predating paired markers can still be
-        # positively attributed by a kernel cwd inside the declared local home.
-        # Never print cwd or inspect another home's endpoint namespace.
-        if not fleet and os.path.isabs(fleet_root):
-            size = ctypes.sizeof(vnode)
-            if libc.proc_pidinfo(pid, 9, ctypes.c_uint64(0), ctypes.byref(vnode), size) == size:
-                cwd = os.fsdecode(vnode.cdir.path)
-                if os.path.isabs(cwd):
+        # A pipeline run's own processes, and supervisors and workers predating
+        # paired markers, are positively attributed by kernel cwd. Never print
+        # cwd or inspect another home's endpoint namespace.
+        size = ctypes.sizeof(vnode)
+        if not fleet and libc.proc_pidinfo(pid, 9, ctypes.c_uint64(0), ctypes.byref(vnode), size) == size:
+            cwd = os.fsdecode(vnode.cdir.path)
+            if os.path.isabs(cwd):
+                parts = os.path.relpath(cwd, run_root).split(os.sep)
+                if os.path.commonpath((run_root, cwd)) == run_root and len(parts) >= 2:
+                    fleet, run = True, "no-mistakes:" + "/".join(parts[:2])
+                elif os.path.isabs(fleet_root):
                     fleet = os.path.commonpath((fleet_root, cwd)) == fleet_root
         rows.append({"pid": pid, "ppid": struct.unpack_from("i", record, E_PPID)[0],
                      "comm": os.fsdecode(record[P_COMM:P_COMM + 17].split(b"\0", 1)[0]),
-                     "started": lstart(record), "rss_bytes": rss, "fleet": fleet})
+                     "started": lstart(record), "rss_bytes": rss, "fleet": fleet, "run": run})
     return rows
 
 

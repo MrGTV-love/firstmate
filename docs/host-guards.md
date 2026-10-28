@@ -11,11 +11,11 @@ Each family ships as a pair plus its tests.
 `bin/fm-<name>-guard.py` is the engine: it measures, classifies, and prints.
 `tests/fm-<name>-guard.test.sh` drives the engine through its public CLI and asserts observable output, never engine source text.
 
-The memory family is `fm-mem-guard`; its engine header owns Linux/macOS diagnostic sources and budgets, macOS admission measurements, the separate alarm baseline derivation, and the distinction between diagnostic fail-open and admission fail-closed behavior.
+The memory family is `fm-mem-guard`; its engine header owns Linux/macOS diagnostic sources and budgets, macOS admission measurements, the run-peak and pressure calibration record, the separate alarm baseline derivation, and the distinction between diagnostic fail-open and admission fail-closed behavior.
 It makes no Jev, model, or network call.
-The backend-neutral spawn owner and generated worker new-run instructions call the same admission wrapper; the watcher observes through its existing check cadence and surfaces each already-queued memory payload once without duplicating rows.
+The backend-neutral spawn owner and generated worker new-run instructions call the same admission wrapper; the root home's watcher observes through its existing check cadence and surfaces each already-queued memory payload once without duplicating rows.
 The process census reuses `fm-proc-info.py` for sandbox-safe kernel facts, supplements other-user RSS through `ps` when permitted, and records unreadable resident sizes explicitly rather than substituting zero.
-Paired task markers, a kernel cwd within the declared local home, and their descendant trees provide fleet attribution without relying on process names or publishing cwd and environment contents.
+Paired task markers, a kernel cwd inside a no-mistakes run worktree or the declared local home, and their descendant trees provide fleet and run attribution without relying on process names or publishing cwd and environment contents.
 [Host memory admission](configuration.md#host-memory-admission) owns operator setup; `tests/fm-mem-guard.test.sh`, `tests/fm-project-capacity.test.sh`, and `tests/fm-watch-typesafe-health.test.sh` cover classification, actual admission, and identifying wake delivery.
 
 The process family is `fm-proc-guard`; its engine header owns the count semantics, thresholds, and census document.
