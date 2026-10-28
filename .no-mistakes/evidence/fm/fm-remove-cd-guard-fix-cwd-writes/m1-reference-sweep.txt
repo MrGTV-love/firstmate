@@ -1,0 +1,22 @@
+$ git grep -n -e fm-cd-pretool-check -e fm-cd-command-policy -e FM_CD_GUARD_MODE -e docs/cd-guard.md
+docs/fm-test-isolation-proof.json:14:    {"duration_ms": 16582, "exit": 0, "path": "tests/fm-cd-pretool-check.test.sh", "worker": 5},
+tests/fm-jev-guard.test.sh:166:    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs',
+tests/fm-jev-guard.test.sh:167:      'tests/fm-cd-pretool-check.test.sh', 'docs/cd-guard.md', '.grok/hooks/fm-primary-cd-check.json',
+tests/fm-jev-guard.test.sh:180:    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs', 'docs/cd-guard.md'];
+
+$ git grep -n cd-guard
+docs/fm-test-portable-shards.md:35:On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, join the twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`).
+docs/guards/retired.json:142:    "id": "persistent-cd-guard",
+docs/guards/retired.json:148:    "evidence": "data/fm-cd-guard-warn-not-block/harm-reassessment-inbox018.md; data/fm-remove-cd-guard-fix-cwd-writes/pr-evidence.md (cwd-relative writer harm analysis)",
+docs/guards/retired.json:150:    "retirement_test": "tests/fm-retired-persistent-cd-guard.test.sh"
+tests/fm-jev-guard.test.sh:164:  await test(`${host} T2(c), B57: six tracked cd-guard deletions`, async () => {
+tests/fm-jev-guard.test.sh:167:      'tests/fm-cd-pretool-check.test.sh', 'docs/cd-guard.md', '.grok/hooks/fm-primary-cd-check.json',
+tests/fm-jev-guard.test.sh:180:    const paths = ['bin/fm-cd-pretool-check.sh', 'bin/fm-cd-command-policy.mjs', 'docs/cd-guard.md'];
+tests/fm-retired-persistent-cd-guard.test.sh:2:# Retirement test for persistent-cd-guard.
+
+$ git grep -n persistent-cd
+docs/fm-test-portable-shards.md:35:On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, join the twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`).
+docs/guards/retired.json:142:    "id": "persistent-cd-guard",
+docs/guards/retired.json:150:    "retirement_test": "tests/fm-retired-persistent-cd-guard.test.sh"
+tests/fm-retired-persistent-cd-guard.test.sh:2:# Retirement test for persistent-cd-guard.
+tests/fm-retired-persistent-cd-guard.test.sh:16:TMP_ROOT=$(fm_test_tmproot fm-retired-persistent-cd)

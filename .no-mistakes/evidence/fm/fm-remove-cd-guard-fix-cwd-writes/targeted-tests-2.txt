@@ -1,0 +1,5 @@
+tests/fm-arm-pretool-check.test.sh exit=0 secs=104 oks=237 not_ok=0
+tests/fm-tasks-axi.test.sh exit=0 secs=199 oks=28 not_ok=0
+tests/fm-home-writes.test.sh exit=0 secs=62 oks=6 not_ok=0
+tests/fm-retired-persistent-cd-guard.test.sh exit=0 secs=7 oks=10 not_ok=0
+tests/fm-cursor-primary.test.sh exit=0 secs=106 oks=29 not_ok=0

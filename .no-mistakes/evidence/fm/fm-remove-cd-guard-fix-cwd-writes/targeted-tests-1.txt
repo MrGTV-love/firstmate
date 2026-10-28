@@ -1,0 +1,37 @@
+### tests/fm-home-writes.test.sh
+ok - negative control: home-target assertion rejects a bare relative write after cd
+ok - backlog add/start/done/hold/unhold/prune write only the configured home
+ok - brief, inbox note/reply/ack, custom-check registration/retirement, and guard events use home data/state
+ok - an unset home falls back to the script's own root, not the caller's directory
+ok - spawn/send/status-resolution/control-exit/teardown keep durable writes in the configured home
+ok - promotion and captain-hold/answer persist their contracts and decisions in the home
+exit=
+### tests/fm-retired-persistent-cd-guard.test.sh
+ok - claude pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - claude pre-tool shell hooks still deny a backgrounded watcher arm
+ok - codex pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - codex pre-tool shell hooks still deny a backgrounded watcher arm
+ok - grok pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - grok pre-tool shell hooks still deny a backgrounded watcher arm
+ok - cursor pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - cursor pre-tool shell hooks still deny a backgrounded watcher arm
+ok - the OpenCode, Pi and omp adapter command mode lets a top-level cd, pushd or popd run silently
+ok - the adapter command mode still denies a backgrounded watcher arm at exit 2
+exit=
+### tests/fm-guard-audit-closure.test.sh
+ok - G-28 every retired guard ships a retirement test
+ok - G-15/G-17 one event writer, one metrics reader, and a twenty-row replay
+ok - G-16 all 18 instrumented guards call the event writer
+ok - G-12 every registered remedy carries an executable token or path
+ok - G-14 a malformed brief is refused once with every problem listed
+ok - G-20 worktree isolation names the reassociation repair
+ok - G-22 gate containment names the one-command lab home it permits
+ok - G-21 publication role names where authority is granted
+ok - G-05 send names the working invocation
+ok - G-06 kimi refusal names the install step
+ok - G-13 merge names the attended waiver
+ok - G-13b merge names the hold release command
+ok - G-01 one liveness owner, and the Claude repair line is a command
+ok - G-04 every retired guard is absent from bin/ and the advisory cut is recorded
+ok - fm-guard-audit-closure
+exit=

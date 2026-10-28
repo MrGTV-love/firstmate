@@ -1,0 +1,6 @@
+# omp -p --mode json, cwd=<plain clone at head>
+{"type":"tool_execution_start","tool":"bash","args":{"command":"cd docs"},"result":null,"isError":null}
+{"type":"tool_execution_end","tool":"bash","args":null,"result":{"content":[{"type":"text","text":"(no output)"}],"details":{"wallTimeNoticeEmitted":false,"timeoutSeconds":300,"wallTimeMs":11.034875000001193}},"isError":false}
+{"type":"tool_execution_start","tool":"bash","args":{"command":"bin/fm-watch-arm.sh &"},"result":null,"isError":null}
+{"type":"tool_execution_end","tool":"bash","args":null,"result":{"content":[{"type":"text","text":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line\"}"}],"details":{}},"isError":true}
+"CD_RESULT=allowed ARM_RESULT=blocked \"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line\""

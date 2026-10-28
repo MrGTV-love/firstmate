@@ -1,0 +1,52 @@
+=== base wrapper: cwd=project FM_HOME=../homes/one (relative)
+  wrapper: ok: added relative-proof (ship, repo sample) -> Queued
+  wrapper: task:
+  wrapper:   id: relative-proof
+  wrapper:   title: relative home proof
+  wrapper:   state: queued
+  wrapper:   blocked: no
+  wrapper:   blocked_by: none
+  wrapper:   held: no
+  wrapper:   hold_reason: "-"
+  wrapper:   hold_kind: "-"
+  wrapper:   hold_until: "-"
+  wrapper:   kind: ship
+  wrapper:   repo: sample
+  wrapper:   priority: 2
+  wrapper:   created: 2026-10-28
+  wrapper:   closed: "-"
+  wrapper:   deps: none
+  wrapper:   links: none
+  wrapper:   body: ""
+  wrapper: help[2]:
+  wrapper:   - Run `tasks-axi start relative-proof` to move it to in flight
+  wrapper:   - Run `tasks-axi block relative-proof --by <other>` to record a dependency
+  backlog row in home:            1 match(es)
+  home/state/fleet-ledger.jsonl:  ABSENT
+  decoy homes/homes/one ledger:   ["task.filed","relative-proof"]
+=== head wrapper: cwd=project FM_HOME=../homes/one (relative)
+  wrapper: ok: added relative-proof (ship, repo sample) -> Queued
+  wrapper: task:
+  wrapper:   id: relative-proof
+  wrapper:   title: relative home proof
+  wrapper:   state: queued
+  wrapper:   blocked: no
+  wrapper:   blocked_by: none
+  wrapper:   held: no
+  wrapper:   hold_reason: "-"
+  wrapper:   hold_kind: "-"
+  wrapper:   hold_until: "-"
+  wrapper:   kind: ship
+  wrapper:   repo: sample
+  wrapper:   priority: 2
+  wrapper:   created: 2026-10-28
+  wrapper:   closed: "-"
+  wrapper:   deps: none
+  wrapper:   links: none
+  wrapper:   body: ""
+  wrapper: help[2]:
+  wrapper:   - Run `tasks-axi start relative-proof` to move it to in flight
+  wrapper:   - Run `tasks-axi block relative-proof --by <other>` to record a dependency
+  backlog row in home:            1 match(es)
+  home/state/fleet-ledger.jsonl:  ["task.filed","relative-proof"]
+  decoy homes/homes/one ledger:   absent

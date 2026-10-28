@@ -1,0 +1,12 @@
+=== base code
+ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+ok - bootstrap stays silent when the code root is the home
+not ok - home add missed the original home ledger after changing cwd
+exit=1
+=== head code
+ok - bootstrap reports a regular code-root backlog and stays silent for a link into the home or no copy
+ok - bootstrap reports a code-root backlog linked elsewhere and a forked archive
+ok - bootstrap stays silent when the code root is the home
+ok - nested relative FM_HOME and caller-relative state/config keep filed and closed records in the original home
+exit=0
