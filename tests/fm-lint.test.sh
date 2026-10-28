@@ -346,7 +346,7 @@ fm_lint_stub_shellcheck() {
   cat > "$fakebin/shellcheck" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  printf 'ShellCheck - shell script analysis tool\nversion: %s\n' "\${FM_TEST_SHELLCHECK_VERSION:-0.11.0}"
   exit 0
 fi
 mode=on
@@ -887,27 +887,108 @@ test_missing_shellcheck_fails_closed() {
   pass "missing ShellCheck fails closed"
 }
 
-test_rejects_wrong_shellcheck_version() {
-  # Version-independent: a fake shellcheck reporting a different version must be
-  # refused before any lint, proving local and CI cannot silently diverge.
-  local tmp fakebin out rc
-  tmp=$(fm_test_tmproot fm-lint-ver)
+test_strict_version_refuses_wrong_shellcheck() {
+  local tmp fakebin log out rc mode
+  tmp=$(fm_test_tmproot fm-lint-strict-ver)
   fakebin=$(fm_fakebin "$tmp")
+  log="$tmp/roots"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  printf '#!/usr/bin/env bash\ntrue\n' > "$tmp/root.sh"
+  for mode in strict ci; do
+    rc=0
+    case "$mode" in
+      strict)
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_SHELLCHECK_VERSION=0.9.9 \
+          "$LINT" --strict-version "$tmp/root.sh" 2>&1) || rc=$?
+        ;;
+      ci)
+        out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true FM_TEST_SHELLCHECK_VERSION=0.9.9 \
+          "$LINT" "$tmp/root.sh" 2>&1) || rc=$?
+        ;;
+    esac
+    expect_code 1 "$rc" "$mode must refuse a non-pinned ShellCheck: $out"
+    assert_contains "$out" "$REQUIRED" "$mode refusal did not name the pin"
+    assert_contains "$out" "0.9.9" "$mode refusal did not name the resolved version"
+    assert_contains "$out" "fm-install-shellcheck.sh" "$mode refusal did not name the installer"
+  done
+  [ ! -s "$log" ] || fail "a refused version still invoked ShellCheck: $(cat "$log")"
+  pass "fm-lint.sh refuses a non-pinned ShellCheck in strict and CI modes"
+}
+
+test_local_wrong_shellcheck_warns_and_proceeds() {
+  local tmp fakebin log out rc
+  tmp=$(fm_test_tmproot fm-lint-local-ver)
+  fakebin=$(fm_fakebin "$tmp")
+  log="$tmp/roots"
+  fm_lint_stub_shellcheck "$fakebin" "$log"
+  printf '#!/usr/bin/env bash\ntrue\n' > "$tmp/root.sh"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_SHELLCHECK_VERSION=0.12.0 \
+    "$LINT" "$tmp/root.sh" 2>&1) || rc=$?
+  expect_code 0 "$rc" "a newer local ShellCheck must not be a wall: $out"
+  assert_contains "$out" "WARNING" "local mismatch did not warn"
+  assert_contains "$out" "0.12.0" "local warning did not name the resolved version"
+  assert_contains "$out" "$REQUIRED" "local warning did not name the CI pin"
+  assert_contains "$out" "fm-install-shellcheck.sh" "local warning did not name the installer"
+  assert_contains "$(cat "$log")" "root.sh" "local mismatch did not proceed to lint"
+  pass "fm-lint.sh warns and proceeds under a newer local ShellCheck"
+}
+
+test_check_version_reports_current_behind_and_unknown() {
+  local tmp fakebin sc al out rc
+  tmp=$(fm_test_tmproot fm-lint-currency)
+  fakebin=$(fm_fakebin "$tmp")
+  sc="$tmp/shellcheck.json"
+  al="$tmp/actionlint.json"
+  cat > "$fakebin/curl" <<'SH'
+#!/usr/bin/env bash
+url=${!#}
+[ -z "${CURL_FAIL:-}" ] || exit 22
+case "$url" in
+  */koalaman/shellcheck/*) cat "${SC_JSON:?}" ;;
+  */rhysd/actionlint/*) cat "${AL_JSON:?}" ;;
+  *) exit 22 ;;
+esac
+SH
+  chmod +x "$fakebin/curl"
+  # The check must not need, or call, a local linter.
   cat > "$fakebin/shellcheck" <<'SH'
 #!/usr/bin/env bash
-if [ "$1" = "--version" ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.9.9\nlicense: x\nwebsite: y\n'
-  exit 0
-fi
-exit 0
+exit 99
 SH
   chmod +x "$fakebin/shellcheck"
+  printf '%s\n' '{"tag_name":"v0.11.0"}' > "$sc"
+  printf '%s\n' '{"tag_name":"v1.7.12"}' > "$al"
   rc=0
-  out=$(PATH="$fakebin:$PATH" "$LINT" 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "fm-lint.sh accepted a shellcheck version other than the pin"$'\n'"$out"
-  assert_contains "$out" "$REQUIRED" "fm-lint.sh did not name the required version on mismatch"
-  assert_contains "$out" "0.9.9" "fm-lint.sh did not report the resolved (wrong) version"
-  pass "fm-lint.sh refuses to lint under a non-pinned ShellCheck version"
+  out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
+  expect_code 0 "$rc" "current pins must pass the currency check: $out"
+  assert_contains "$out" "shellcheck: pinned $REQUIRED, latest $REQUIRED (current)" \
+    "current ShellCheck pin was not reported"
+  assert_contains "$out" "actionlint: pinned 1.7.12, latest 1.7.12 (current)" \
+    "current actionlint pin was not reported"
+
+  printf '%s\n' '{"tag_name":"v0.12.0"}' > "$sc"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
+  expect_code 1 "$rc" "a behind ShellCheck pin must fail the currency check: $out"
+  assert_contains "$out" "BEHIND" "behind ShellCheck was not marked BEHIND"
+  assert_contains "$out" "REQUIRED_SHELLCHECK" "behind ShellCheck did not name the pin to bump"
+  assert_contains "$out" "fm-install-shellcheck.sh" "behind ShellCheck did not name the installer"
+
+  printf '%s\n' '{"tag_name":"v0.11.0"}' > "$sc"
+  printf '%s\n' '{"tag_name":"v1.8.0"}' > "$al"
+  rc=0
+  out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
+  expect_code 1 "$rc" "a behind actionlint pin must fail the currency check: $out"
+  assert_contains "$out" "REQUIRED_ACTIONLINT" "behind actionlint did not name the pin to bump"
+  assert_contains "$out" "fm-install-actionlint.sh" "behind actionlint did not name the installer"
+
+  rc=0
+  out=$(PATH="$fakebin:$PATH" CURL_FAIL=1 SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
+  expect_code 2 "$rc" "an unreachable release API must be unknown, not behind: $out"
+  assert_contains "$out" "UNKNOWN" "a failed fetch was not marked UNKNOWN"
+  assert_not_contains "$out" "BEHIND" "a failed fetch claimed a behind pin"
+  pass "fm-lint.sh --check-version distinguishes current, behind and unknown without a local linter"
 }
 
 test_catches_a_real_lint_defect() {
@@ -4021,7 +4102,9 @@ test_installer_falls_back_to_shasum
 test_installer_prefers_sha256sum_over_shasum
 test_installer_rejects_unsupported_platform
 test_missing_shellcheck_fails_closed
-test_rejects_wrong_shellcheck_version
+test_strict_version_refuses_wrong_shellcheck
+test_local_wrong_shellcheck_warns_and_proceeds
+test_check_version_reports_current_behind_and_unknown
 test_catches_a_real_lint_defect
 test_rejects_direct_beads_cli_invocations
 test_rejects_direct_beads_cli_in_explicit_core_path

@@ -2,7 +2,7 @@
 # fm-lint.sh - the single owner of firstmate's lint definition.
 #
 # Runs ShellCheck's default severity and extended, source-aware analysis with
-# ambient configuration disabled and one exact ShellCheck version.
+# ambient configuration disabled and one maintained ShellCheck version.
 # CI selects the complete canonical set; local branches select changed files,
 # known transitive sourcing callers, and possible callers of unresolved imports.
 # Every mode attempts --norc --external-sources and the same diagnostic rules.
@@ -16,6 +16,12 @@
 # The default (no explicit-path) path also runs bin/fm-lint-workflows.sh so a
 # malformed GitHub workflow, including a self-broken ci.yml, fails locally
 # before merge instead of only failing to run as CI.
+#
+# The ShellCheck and actionlint versions are maintained pins, not a freeze.
+# CI and --strict-version refuse a different local ShellCheck; an ordinary local
+# run warns and proceeds so a newer local tool is not a wall. --check-version
+# compares both pins with the latest upstream releases (exit 0 current, 1
+# behind, 2 unknown) so a bump is routine rather than discovered by a failure.
 #
 # With no explicit paths, the file set depends on context:
 #   - In CI (GITHUB_ACTIONS=true or CI=true), on the main branch, or when no
@@ -161,6 +167,8 @@
 #   fm-lint.sh --partition <1of3|2of3|3of3> lint one canonical CI partition (see fallback above)
 #   fm-lint.sh --telemetry <path> ...  write a quiet metrics snapshot
 #   fm-lint.sh --required-version      print the ShellCheck pin
+#   fm-lint.sh --check-version         report whether the ShellCheck/actionlint pins are current
+#   fm-lint.sh --strict-version        refuse a local ShellCheck that differs from the pin
 #   fm-lint.sh --list-files            print the file set that would be linted
 #   fm-lint.sh --help                  print this usage
 set -u
@@ -550,9 +558,81 @@ if [ "${1:-}" = "--internal-timed" ]; then
   fm_exec_timed "$2" "$3" "${@:4}"
 fi
 
+# --- version currency -------------------------------------------------------
+# The pinned versions are maintained snapshots. --check-version makes an
+# upstream release visible before the pin silently diverges from CI; it uses
+# only the public release API and never needs a local linter installed.
+fm_lint_release_url() {  # <owner/repo>
+  printf '%s/%s/releases/latest' "${FM_LINT_RELEASE_API_BASE:-https://api.github.com/repos}" "$1"
+}
+
+fm_lint_latest_tag() {  # <owner/repo>; prints the tag without a leading v, or returns 2
+  local repo=$1 url json tag
+  command -v curl >/dev/null 2>&1 || return 2
+  url=$(fm_lint_release_url "$repo")
+  # measured: value=15 date=2026-10-27 host=Mac-Studio.local margin=36x (three public release API reads, slowest 0.414 s)
+  json=$(curl -fsSL --max-time 15 -H 'Accept: application/vnd.github+json' "$url" 2>/dev/null) || return 2
+  if command -v jq >/dev/null 2>&1; then
+    tag=$(printf '%s' "$json" | jq -r '.tag_name // empty' 2>/dev/null)
+  else
+    tag=$(printf '%s' "$json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+  fi
+  [ -n "$tag" ] || return 2
+  printf '%s\n' "${tag#v}"
+}
+
+fm_lint_check_one() {  # <tool> <owner/repo> <pinned> <bump-hint>; 0 current, 1 behind, 2 unknown
+  local tool=$1 repo=$2 pinned=$3 hint=$4 latest
+  if latest=$(fm_lint_latest_tag "$repo"); then
+    if [ "$latest" = "$pinned" ]; then
+      printf '%s: pinned %s, latest %s (current)\n' "$tool" "$pinned" "$latest"
+      return 0
+    fi
+    printf '%s: pinned %s, latest %s (BEHIND; bump %s)\n' "$tool" "$pinned" "$latest" "$hint"
+    return 1
+  fi
+  printf '%s: pinned %s, latest UNKNOWN (could not read %s)\n' "$tool" "$pinned" "$(fm_lint_release_url "$repo")"
+  return 2
+}
+
+fm_lint_check_versions() {
+  local behind=0 unknown=0 current=0 rc required_actionlint
+  fm_lint_check_one shellcheck koalaman/shellcheck "$REQUIRED_SHELLCHECK" \
+    'REQUIRED_SHELLCHECK in bin/fm-lint.sh and the SHA table in bin/fm-install-shellcheck.sh'
+  rc=$?
+  case "$rc" in
+    0) current=$((current + 1)) ;;
+    1) behind=$((behind + 1)) ;;
+    *) unknown=$((unknown + 1)) ;;
+  esac
+  required_actionlint=$("$SELF_DIR/fm-lint-workflows.sh" --required-version 2>/dev/null) || required_actionlint=
+  if [ -n "$required_actionlint" ]; then
+    fm_lint_check_one actionlint rhysd/actionlint "$required_actionlint" \
+      'REQUIRED_ACTIONLINT in bin/fm-lint-workflows.sh and the SHA table in bin/fm-install-actionlint.sh'
+    rc=$?
+    case "$rc" in
+      0) current=$((current + 1)) ;;
+      1) behind=$((behind + 1)) ;;
+      *) unknown=$((unknown + 1)) ;;
+    esac
+  else
+    printf 'actionlint: pinned UNKNOWN (could not read bin/fm-lint-workflows.sh --required-version)\n'
+    unknown=$((unknown + 1))
+  fi
+  printf 'fm-lint.sh: version check: %s behind, %s unknown, %s current\n' "$behind" "$unknown" "$current" >&2
+  [ "$behind" -eq 0 ] || return 1
+  [ "$unknown" -eq 0 ] || return 2
+  return 0
+}
+
 if [ "${1:-}" = "--required-version" ]; then
   printf '%s\n' "$REQUIRED_SHELLCHECK"
   exit 0
+fi
+
+if [ "${1:-}" = "--check-version" ]; then
+  fm_lint_check_versions
+  exit $?
 fi
 
 fm_lint_usage() {
@@ -810,6 +890,7 @@ JOBS=${FM_LINT_JOBS:-2}
 TELEMETRY=${FM_LINT_TELEMETRY:-}
 FAST=0
 ANALYSIS_MODE=full
+STRICT_VERSION=0
 PARTITION=
 PARTITION_REQUESTED=0
 LIST_FILES=0
@@ -847,6 +928,10 @@ while [ "$#" -gt 0 ]; do
     --fast)
       FAST=1
       ANALYSIS_MODE=fast
+      shift
+      ;;
+    --strict-version)
+      STRICT_VERSION=1
       shift
       ;;
     --list-files)
@@ -1606,10 +1691,17 @@ unset SHELLCHECK_OPTS
 SHELLCHECK_BIN=$(command -v shellcheck)
 resolved=$("$SHELLCHECK_BIN" --version | awk '/^version:/ {print $2; exit}')
 printf 'fm-lint.sh: ShellCheck %s (pinned %s)\n' "$resolved" "$REQUIRED_SHELLCHECK" >&2
+if [ "$STRICT_VERSION" -eq 1 ] || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+  export FM_LINT_STRICT_VERSION=1
+fi
 if [ "$resolved" != "$REQUIRED_SHELLCHECK" ]; then
-  printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
-    "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
-  exit 1
+  if [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ]; then
+    printf 'fm-lint.sh: ShellCheck %s required for CI parity, found %s. Install %s with bin/fm-install-shellcheck.sh <destination-directory>.\n' \
+      "$REQUIRED_SHELLCHECK" "$resolved" "$REQUIRED_SHELLCHECK" >&2
+    exit 1
+  fi
+  printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to refuse.\n' \
+    "$resolved" "$REQUIRED_SHELLCHECK" "$REQUIRED_SHELLCHECK" >&2
 fi
 CACHE_DIR=${FM_LINT_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint}
 if [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
