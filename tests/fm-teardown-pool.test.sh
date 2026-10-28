@@ -2051,7 +2051,7 @@ test_unverified_pool_reservation_preserves_processes() {
     > "$case_dir/pool/treehouse-state.json"
   # This provider has the lease command and acknowledges it but never changes
   # state. A successful command is not evidence that this slot became
-  # nonallocatable.
+  # nonallocatable. Its status lists the slot in the current pool.
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
@@ -2059,6 +2059,7 @@ if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
   exit 0
 fi
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+[ "\${1:-}" != status ] || printf '[{"name":"1","path":"%s"}]\n' "$NESTED_SLOT"
 exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
@@ -2444,6 +2445,65 @@ test_unreadable_pool_status_never_leases_by_name() {
   assert_equals 1 "$returns" 'the recorded copy must be returned once, by its own path'
   cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail 'teardown changed the current pool'
   pass 'an unreadable Treehouse status keeps project custody and never leases a slot by name'
+}
+
+# A copy in the project's current pool folder is placed there by the folder's
+# name alone, so the common teardown reserves it by name and returns it without
+# reading a treehouse status listing under the project lock.
+test_current_pool_copy_tears_down_without_a_status_listing() {
+  local case_dir rc
+  make_lease_modeling_pool_case pool-current-folder '' ship current-folder
+  case_dir=$POOL_CASE
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a landed copy in the current pool folder must tear down: $(cat "$case_dir/stderr")"
+  assert_no_log_line '^status' "$case_dir/treehouse.log" 'the common teardown read a treehouse status listing'
+  assert_equals 1 "$(grep -c '^lease 1 --lease-holder task-x1$' "$case_dir/treehouse.log" || true)" \
+    'the current-pool slot was not reserved by its name exactly once'
+  assert_equals 1 "$(grep -c "^return --force $POOL_SLOT\$" "$case_dir/treehouse.log" || true)" \
+    'the recorded copy must be returned once, by its own path'
+  assert_absent "$case_dir/state/task-x1.meta" 'teardown kept the task record'
+  [ ! -e "$POOL_LOCK" ] || fail 'teardown left the project lock held'
+  pass 'a copy in the current pool folder is reserved by name and returned with no treehouse status listing'
+}
+
+# The status listing that places a slot outside the current pool is read once
+# per process and reused, as one forced teardown does across its descendants;
+# a slot in the current pool folder needs no listing at all.
+test_current_pool_listing_is_read_once_per_process() {
+  local dir out hash
+  dir="$TMP_ROOT/pool-listing-once"
+  mkdir -p "$dir/fakebin" "$dir/old-pool/1/repo" "$dir/old-pool/2/repo" "$dir/new-pool/1/repo" "$dir/other"
+  git init -q "$dir/repo"
+  git -C "$dir/repo" remote add origin https://example.invalid/repo.git
+  git init -q "$dir/other/repo"
+  hash=$(printf '%s' https://example.invalid/repo.git | shasum -a 256)
+  mkdir -p "$dir/repo-${hash:0:6}/3/repo"
+  cat > "$dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s %s\n' "\$PWD" "\$*" >> "$dir/treehouse.log"
+[ "\${1:-}" = status ] && printf '[{"name":"1","path":"%s"}]\n' "$dir/new-pool/1/repo"
+exit 0
+SH
+  chmod +x "$dir/fakebin/treehouse"
+  : > "$dir/treehouse.log"
+  out=$(PATH="$dir/fakebin:$PATH" bash -c '
+    . "$1/bin/fm-task-copy-lib.sh"
+    for slot in "$2/repo-$3/3/repo" "$2/old-pool/1/repo" "$2/old-pool/2/repo" "$2/new-pool/1/repo"; do
+      fm_task_copy_slot_in_current_pool "$2/repo" "$slot" 9 || true
+      printf "%s %s\n" "$FM_TASK_COPY_POOL_CURRENCY" "$FM_TASK_COPY_CURRENT_SLOT_NAME"
+    done
+    fm_task_copy_slot_in_current_pool "$2/other/repo" "$2/old-pool/1/repo" 1 || true
+    printf "%s\n" "$FM_TASK_COPY_POOL_CURRENCY"
+  ' _ "$ROOT" "$dir" "${hash:0:6}")
+  assert_equals $'current 9\nsuperseded \nsuperseded \ncurrent 1\nsuperseded' "$out" \
+    'slots were not placed against the current pool'
+  assert_equals 1 "$(grep -c "^$dir/repo status --json\$" "$dir/treehouse.log" || true)" \
+    'the status listing of one project was not read exactly once'
+  assert_equals 2 "$(grep -c ' status --json$' "$dir/treehouse.log" || true)" \
+    'each project did not get its own single listing'
+  pass 'the current-pool listing is read at most once per project in one process, and never for a slot in the current pool folder'
 }
 
 # The idle reaper's teardown never waits before it has closed anything, but
@@ -3058,6 +3118,8 @@ test_superseded_pool_copy_tears_down_without_touching_the_current_pool
 test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks
 test_unlanded_superseded_pool_copy_is_refused_and_the_landed_retry_finishes
 test_unreadable_pool_status_never_leases_by_name
+test_current_pool_copy_tears_down_without_a_status_listing
+test_current_pool_listing_is_read_once_per_process
 test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
 test_unverified_pool_reservation_preserves_processes

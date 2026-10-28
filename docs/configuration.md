@@ -583,9 +583,11 @@ Legacy tmux metadata remains cleanup-compatible when its exact window name is `f
 ### Superseded pool folders
 
 Treehouse names a project's pool folder `<repo>-<first six hex digits of the SHA-256 of the resolved origin URL>`, so repointing `origin` (for example from an upstream to a fork) moves the project to a new, empty folder and leaves earlier copies, and the task records that name them, in the old one.
-Teardown acts only on the slot whose path is the recorded copy, because `treehouse lease` and `treehouse return <name>` resolve a slot name in the current pool only: it leases a slot only when `treehouse status --json`, run from the project, lists that exact path, and otherwise keeps project custody and returns the copy by path.
+Teardown acts only on the slot whose path is the recorded copy, because `treehouse lease` and `treehouse return <name>` resolve a slot name in the current pool only: it leases a slot only when the slot is proved to be in the current pool, and otherwise keeps project custody and returns the copy by path.
+A slot whose folder has the current folder's name is in the current pool, with no `treehouse status` call; otherwise one `treehouse status --json` listing, run from the project, is read at most once per teardown and reused for every descendant, and only a path it lists is in the current pool.
+`treehouse get` allocates from the current pool only, so an unleased slot in a superseded folder does not stop a start, does not stop a shared slot's claimant record from retiring, and does not stop a held close; each decision judges this again, so a folder that becomes current again is protected again.
 The landed-work test is unchanged for such a copy, so an unlanded or dirty copy in an old folder is still refused.
-A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, and only when its holder is that task, no other task claims the slot, and no process runs inside it.
+A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, only after every refusal check has passed, and only when its holder is that task, no other task claims the slot, and no process runs inside it.
 
 ### Herdr homes and presentation
 

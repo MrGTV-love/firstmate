@@ -613,30 +613,78 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   return 1
 }
 
-# Where pool slot <slot> stands against the pool Treehouse resolves for
-# <project> today. Treehouse names a pool folder <repo>-<first six hex digits of
-# the SHA-256 of the origin URL>, so repointing origin moves the project to a
-# new, initially empty folder and leaves earlier copies in the old one, whose
-# state file still records them. treehouse lease and treehouse return <name>
-# resolve a slot NAME in the current pool only, so a name taken from an older
-# folder's state would act on a different copy that shares it. Only a path that
-# treehouse status --json lists, run from <project>, is in the current pool.
-# Sets FM_TASK_COPY_POOL_CURRENCY to current (status lists <slot>, and
-# FM_TASK_COPY_CURRENT_SLOT_NAME to the name it gives it), superseded (status
-# was read and does not list <slot>), or unknown (treehouse or jq is missing, or
-# status failed or is not a list); FM_TASK_COPY_CURRENT_POOL_JSON keeps the
-# listing it read. Returns 0 only for current.
+# The folder name Treehouse gives <project>'s pool today: the checkout's
+# directory name, a dash, and the first six hex digits of the SHA-256 of the
+# origin URL git reports for it.
+fm_task_copy_current_pool_folder() {  # <project>
+  local project=$1 top origin hash
+  top=$(git -C "$project" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
+  origin=$(git -C "$project" remote get-url origin 2>/dev/null) && [ -n "$origin" ] || return 1
+  if command -v shasum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$origin" | shasum -a 256 2>/dev/null) || return 1
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$origin" | sha256sum 2>/dev/null) || return 1
+  else
+    return 1
+  fi
+  [ "${#hash}" -ge 6 ] || return 1
+  printf '%s-%s\n' "${top##*/}" "${hash:0:6}"
+}
+
+# treehouse status --json run from <project>, read once per process and kept,
+# with a failed read kept as an empty listing, for every later call: one
+# teardown reuses it across all its descendants. Sets
+# FM_TASK_COPY_CURRENT_POOL_JSON; returns 0 only when the listing was read.
+FM_TASK_COPY_CURRENT_POOL_JSON=
+FM_TASK_COPY_POOL_LISTING_PROJECTS=()
+FM_TASK_COPY_POOL_LISTINGS=()
+fm_task_copy_current_pool_listing() {  # <project>
+  local project=$1 i json=
+  for ((i = 0; i < ${#FM_TASK_COPY_POOL_LISTING_PROJECTS[@]}; i++)); do
+    [ "${FM_TASK_COPY_POOL_LISTING_PROJECTS[$i]}" = "$project" ] || continue
+    FM_TASK_COPY_CURRENT_POOL_JSON=${FM_TASK_COPY_POOL_LISTINGS[$i]}
+    [ -n "$FM_TASK_COPY_CURRENT_POOL_JSON" ]
+    return
+  done
+  if command -v treehouse >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    json=$(cd "$project" 2>/dev/null && treehouse status --json </dev/null 2>/dev/null) \
+      && jq -e 'type == "array"' <<<"$json" >/dev/null 2>&1 || json=
+  fi
+  FM_TASK_COPY_POOL_LISTING_PROJECTS+=("$project")
+  FM_TASK_COPY_POOL_LISTINGS+=("$json")
+  FM_TASK_COPY_CURRENT_POOL_JSON=$json
+  [ -n "$json" ]
+}
+
+# Where pool slot <slot>, named <state-name> in its own pool folder's state, stands
+# against the pool Treehouse resolves for <project> today. Treehouse names a
+# pool folder as fm_task_copy_current_pool_folder derives it, so repointing
+# origin moves the project to a new, initially empty folder and leaves earlier
+# copies in the old one, whose state file still records them. treehouse get
+# allocates from the current pool only, and treehouse lease and treehouse
+# return <name> resolve a slot NAME there, so a name taken from an older
+# folder's state would act on a different copy that shares it. A slot whose
+# folder has the current folder's name is in the current pool, with no
+# treehouse status call; otherwise only a path that the status listing
+# (fm_task_copy_current_pool_listing) holds is.
+# Sets FM_TASK_COPY_POOL_CURRENCY to current (and FM_TASK_COPY_CURRENT_SLOT_NAME
+# to the name the current pool gives <slot>), superseded (the listing was read
+# and does not hold <slot>), or unknown (the listing could not be read).
+# Returns 0 only for current.
 FM_TASK_COPY_POOL_CURRENCY=
 FM_TASK_COPY_CURRENT_SLOT_NAME=
-FM_TASK_COPY_CURRENT_POOL_JSON=
-fm_task_copy_slot_in_current_pool() {  # <project> <slot>
-  local project=$1 slot=$2 listing name path
+fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
+  local project=$1 slot=$2 state_name=$3 pool folder listing name path
   FM_TASK_COPY_POOL_CURRENCY=unknown
   FM_TASK_COPY_CURRENT_SLOT_NAME=
-  FM_TASK_COPY_CURRENT_POOL_JSON=
-  command -v treehouse >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
-  FM_TASK_COPY_CURRENT_POOL_JSON=$(cd "$project" 2>/dev/null && treehouse status --json </dev/null 2>/dev/null) || return 1
-  jq -e 'type == "array"' <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" >/dev/null 2>&1 || return 1
+  pool=${slot%/*/*}
+  if [ -n "$state_name" ] && folder=$(fm_task_copy_current_pool_folder "$project") \
+      && [ "${pool##*/}" = "$folder" ]; then
+    FM_TASK_COPY_POOL_CURRENCY=current
+    FM_TASK_COPY_CURRENT_SLOT_NAME=$state_name
+    return 0
+  fi
+  fm_task_copy_current_pool_listing "$project" || return 1
   listing=$(jq -r '.[] | ["N" + (.name // "" | tostring), "P" + (.path // "" | tostring)] | @tsv' \
     <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null) || return 1
   FM_TASK_COPY_POOL_CURRENCY=superseded
@@ -658,7 +706,9 @@ fm_task_copy_slot_in_current_pool() {  # <project> <slot>
 # it hands out, so a slot holding a live record's nested copy must not be
 # allocatable; a slot Treehouse's state durably holds
 # (fm_task_copy_pool_slot_held) is never handed out, whatever lies inside it,
-# and a slot a task merely left is not a record's current copy, so neither
+# nor is an unleased slot in a superseded pool folder
+# (fm_task_copy_slot_in_current_pool), which is judged again at each call, and a
+# slot a task merely left is not a record's current copy, so none of them
 # stops the allocation. A uniquely recorded unleased slot names the treehouse
 # lease command that holds it in place without touching it; teardown's
 # treehouse return releases that lease with the slot. Conflicting records
@@ -690,10 +740,10 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
         unleased)
-          if fm_task_copy_slot_in_current_pool "$project" "$slot"; then
+          if fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
             remedy="To hold that slot in place without touching its contents, run: (cd '$project' && treehouse lease '$FM_TASK_COPY_CURRENT_SLOT_NAME' --lease-holder '$id')"
           elif [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
-            remedy="Treehouse leases by slot name in the project's current pool only, and treehouse status run from $project does not list $slot, so a lease would hold a different copy; do not lease it. Inspect with: (cd '$project' && treehouse status)"
+            continue
           else
             remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
           fi

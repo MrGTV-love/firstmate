@@ -2840,6 +2840,8 @@ make_held_case() {  # <name>
 # plain treehouse get records (leased=false), with a Treehouse stand-in that
 # models lease and return. Its lease command fails while <case-dir>/lease-fails
 # exists, and reports no lease command while <case-dir>/no-lease-command exists.
+# Its status lists <case-dir>/status.json while that exists, as for a project
+# whose current pool is another folder, else the case's own pool.
 # Lease calls land in lease.log and returns in treehouse.log.
 held_plain_get_slot() {
   local case_dir=$1
@@ -2854,7 +2856,11 @@ if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
 fi
 case "\${1:-}" in
   status)
-    jq -c '[.worktrees[]? | {name, path, lease_holder: (.lease_holder // ""), processes: []}]' "\$state"
+    if [ -f "$case_dir/status.json" ]; then
+      cat "$case_dir/status.json"
+    else
+      jq -c '[.worktrees[]? | {name, path, lease_holder: (.lease_holder // ""), processes: []}]' "\$state"
+    fi
     ;;
   lease)
     printf '%s\n' "\$*" >> "$case_dir/lease.log"
@@ -2955,10 +2961,17 @@ assert_own_locked_copy_untouched() {  # <label>
 # A pool-slot ship whose only copy is the slot itself, recorded the way spawn
 # publishes it, with a Treehouse stand-in that models the installed CLI: lease
 # resolves the pool from the working directory's repository and records a
-# durable holder; return releases it.
-make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind]
-  local case_dir slot kind=${3:-ship}
+# durable holder; return releases it. With current-folder, the pool folder has
+# the name Treehouse gives the project's current pool, <repo>-<first six hex
+# digits of the SHA-256 of the origin URL>, and pool/ links to it.
+make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind] [current-folder]
+  local case_dir slot kind=${3:-ship} hash
   case_dir=$(make_case "$1")
+  if [ "${4:-}" = current-folder ]; then
+    hash=$(git -C "$case_dir/project" remote get-url origin | tr -d '\n' | shasum -a 256)
+    mkdir -p "$case_dir/project-${hash:0:6}"
+    ln -s "project-${hash:0:6}" "$case_dir/pool"
+  fi
   slot="$case_dir/pool/1/project"
   mkdir -p "${slot%/*}" "$case_dir/primary-home/state"
   git -C "$case_dir/project" worktree add -q -b fm/pool-root "$slot" main

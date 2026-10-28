@@ -5054,6 +5054,68 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
   pass "a held close refuses before it removes anything when the slot cannot be durably leased, and says why"
 }
 
+# A held close of a copy in a superseded pool folder: the project's current pool
+# is another folder, so treehouse get never hands this slot out and the close
+# goes ahead with the slot unleased. A lease an earlier teardown took by name on
+# a same-named slot of the current pool is released only once every refusal
+# check has passed, so a close that refuses changes no lease.
+held_superseded_case() {  # <name> <misdirected|plain>
+  local cur
+  make_held_case "$1"
+  held_foreign_unlanded "$FOREIGN_COPY"
+  held_plain_get_slot "$FOREIGN_CASE"
+  cur=$FOREIGN_CASE/current-pool/1/project
+  mkdir -p "$cur"
+  HELD_CURRENT_SLOT=$(cd "$cur" && pwd -P)
+  if [ "$2" = misdirected ]; then
+    printf '[{"name":"1","path":"%s","lease_holder":"task-x1","processes":[]}]\n' "$HELD_CURRENT_SLOT"
+  else
+    printf '[{"name":"1","path":"%s","lease_holder":"","processes":[]}]\n' "$HELD_CURRENT_SLOT"
+  fi > "$FOREIGN_CASE/status.json"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+}
+
+test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease() {
+  local rc shape
+  for shape in plain misdirected; do
+    held_superseded_case "held-superseded-$shape" "$shape"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "held-superseded-$shape: a landed task must close beside a held copy in a superseded pool folder: $(cat "$FOREIGN_CASE/stderr")"
+    held_assert_closed "held-superseded-$shape"
+    assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-$shape: the close leased a slot by name"
+    cmp -s "$FOREIGN_CASE/lease-before" "$FOREIGN_CASE/pool/treehouse-state.json" \
+      || fail "held-superseded-$shape: the old folder's lease record changed"
+    held_fingerprint "$FOREIGN_COPY" | cmp -s - "$FOREIGN_CASE/held-before.$(basename "$FOREIGN_COPY")" \
+      || fail "held-superseded-$shape: the held copy changed"
+    cmp -s "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" || fail "held-superseded-$shape: the slot's claim changed"
+    if [ "$shape" = misdirected ]; then
+      assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
+        "held-superseded-$shape: the misdirected lease was not released by the conditional return alone"
+    else
+      assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-$shape: a pool slot was returned"
+    fi
+    assert_grep "is in a superseded Treehouse pool folder, which treehouse get does not hand out, so it stays unleased and claimed" \
+      "$FOREIGN_CASE/stdout" "held-superseded-$shape: the output did not say why the slot is not leased"
+    assert_grep "treehouse return $(printf '%q' "$FOREIGN_SLOT") </dev/null" "$FOREIGN_CASE/stdout" \
+      "held-superseded-$shape: the next step did not return the slot by its path"
+  done
+  pass "a held close in a superseded pool folder closes with the slot unleased and releases only this task's misdirected lease"
+}
+
+test_a_refused_held_close_releases_no_misdirected_lease() {
+  local rc
+  held_superseded_case held-superseded-refused misdirected
+  mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-superseded-refused: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "could not be written" "$FOREIGN_CASE/stderr" "held-superseded-refused: the refusal did not say why"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-refused: the task record was removed"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-refused: the refusal leased a slot"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
+  held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "a held close that refuses releases no lease, not even a misdirected one"
+}
+
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
   local rc second copy holder copy_q holder_q slot_q proj_q
   make_held_case held-notice
@@ -6064,6 +6126,8 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
+test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease
+test_a_refused_held_close_releases_no_misdirected_lease
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_leaves_one_record_line_and_a_rerun_adds_none
 test_a_held_copy_record_that_cannot_be_written_refuses_the_close
