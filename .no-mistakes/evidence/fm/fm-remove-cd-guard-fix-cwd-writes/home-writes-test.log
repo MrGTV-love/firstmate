@@ -1,0 +1,7 @@
+ok - negative control: home-target assertion rejects a bare relative write after cd
+ok - backlog add/start/done/hold/unhold/prune write only the configured home
+ok - brief, inbox note/reply/ack, custom-check registration/retirement, and guard events use home data/state
+ok - an unset home falls back to the script's own root, not the caller's directory
+ok - spawn/send/status-resolution/control-exit/teardown keep durable writes in the configured home
+ok - promotion and captain-hold/answer persist their contracts and decisions in the home
+exit=0

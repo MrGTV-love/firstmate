@@ -1,0 +1,11 @@
+ok - claude pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - claude pre-tool shell hooks still deny a backgrounded watcher arm
+ok - codex pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - codex pre-tool shell hooks still deny a backgrounded watcher arm
+ok - grok pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - grok pre-tool shell hooks still deny a backgrounded watcher arm
+ok - cursor pre-tool shell hooks let a top-level cd, pushd or popd run silently
+ok - cursor pre-tool shell hooks still deny a backgrounded watcher arm
+ok - the OpenCode, Pi and omp adapter command mode lets a top-level cd, pushd or popd run silently
+ok - the adapter command mode still denies a backgrounded watcher arm at exit 2
+exit=0

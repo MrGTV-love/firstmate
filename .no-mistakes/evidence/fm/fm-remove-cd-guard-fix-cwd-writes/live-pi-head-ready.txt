@@ -1,0 +1,60 @@
+
+ ▀▀█  v1.0.2
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+
+[Context]
+  AGENTS.md
+
+[Skills]
+  afk, agent-skill-trigger-index, agents-sdk, ahoy, ask-user-authority, ast-grep, away-quiet-supervision, axi, backlog-maintenance, bearings, bootstrap-diagnostics, captain-facing-wording,
+captain-hold-lifecycle, chain-of-custody, check-result-handling, cloudflare, cloudflare-email-service, crew-brief-authoring, decision-hold-lifecycle, define-done-and-grading,
+defining-operational-solutions, diagnostic-reasoning, dispatch-profile-intake, durable-objects, find-skills, firstmate-codexapp, firstmate-coding-guidelines, firstmate-orca, firstmate-self-repo,
+fmx-respond, harness-adapters, hook-audit, hyper-jev, install-anti-slop, knowledge-routing, kun, lavish, no-mistakes, operational-home-layout, process-event-sources, project-management, quiet,
+quota-array-dispatch, quota-axi, sandbox-sdk, scout-completion, secondmate-provisioning, session-start-recovery, ship-landing, stow, stuck-crewmate-recovery, task-delivery, tasks-axi, turnstile-spin,
+typesafe-ai, updatefirstmate, use-railway, validation-supervision, vision, web-perf, worker-steering, workers-best-practices, wrangler
+
+[Extensions]
+  fm-primary-turnend-guard.ts
+
+[Skill conflicts]
+  ~/.pi/agent/skills/agent-browser/SKILL.md
+    Nested mappings are not allowed in compact mappings at line 2, column 14:
+
+description: Browser automation CLI for AI agents — navigate, fill forms, click…
+             ^
+
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 1.4.0 is available. Run pi update
+ Changelog: https://pi.dev/changelog
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+/private/tmp/fm-live-clone.AuhMsS/primary (detached)
+$0.000 (sub) 0.0%/272k (auto)                                                                                                                                                       gpt-6.1-sol • medium

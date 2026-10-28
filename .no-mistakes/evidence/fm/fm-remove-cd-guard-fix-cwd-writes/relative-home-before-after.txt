@@ -1,0 +1,16 @@
+=== base bin/fm-tasks-axi.sh, cwd=/tmp/fm-relhome.IuSd7I/run-base/project, FM_HOME=../homes/one
+help[2]:
+  - Run `tasks-axi start relhome-base` to move it to in flight
+  - Run `tasks-axi block relhome-base --by <other>` to record a dependency
+-- backlog row in real home:
+1
+-- real home ledger: MISSING
+-- decoy (homes/homes/one) ledger: {"v":1,"ts":1793174168,"at":"2026-10-28T07:56:08Z","event":"task.filed","task":"relhome-base","repo":"sample","kind":"ship","priority":2}
+=== head bin/fm-tasks-axi.sh, cwd=/tmp/fm-relhome.IuSd7I/run-head/project, FM_HOME=../homes/one
+help[2]:
+  - Run `tasks-axi start relhome-head` to move it to in flight
+  - Run `tasks-axi block relhome-head --by <other>` to record a dependency
+-- backlog row in real home:
+1
+-- real home ledger: {"v":1,"ts":1793174168,"at":"2026-10-28T07:56:08Z","event":"task.filed","task":"relhome-head","repo":"sample","kind":"ship","priority":2}
+-- decoy (homes/homes/one) ledger: absent

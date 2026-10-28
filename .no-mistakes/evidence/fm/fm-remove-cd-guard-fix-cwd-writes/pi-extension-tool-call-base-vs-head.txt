@@ -1,0 +1,14 @@
+=== base (1f843933b5af38820f2e54adad855f28f1c594d9) Pi extension .pi/extensions/fm-primary-turnend-guard.ts tool_call, primary-shaped clone
+{"command":"cd projects/foo","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-"}}
+{"command":"cd ..","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-"}}
+{"command":"pushd projects/foo","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-"}}
+{"command":"popd","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-"}}
+{"command":"cd projects/foo && tasks-axi add x","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[persistent-"}}
+{"command":"bin/fm-watch-arm.sh &","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-bac"}}
+=== head (bc8ddb7a1f3050ee1cdf8195506f18490dce3322) Pi extension .pi/extensions/fm-primary-turnend-guard.ts tool_call, primary-shaped clone
+{"command":"cd projects/foo","result":"allowed"}
+{"command":"cd ..","result":"allowed"}
+{"command":"pushd projects/foo","result":"allowed"}
+{"command":"popd","result":"allowed"}
+{"command":"cd projects/foo && tasks-axi add x","result":"allowed"}
+{"command":"bin/fm-watch-arm.sh &","result":{"block":true,"reason":"{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\"},\"systemMessage\":\"[watcher-bac"}}

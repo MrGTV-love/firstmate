@@ -1,0 +1,60 @@
+
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   /private/tmp/fm-live-clone.Xhuzr1/primary
+
+⚠ Your login expires in 3 days · run /login to renew
+
+❯ Do only this, nothing else: use the Bash tool once to run exactly: cd projects/foo && pwd   . Then use the Bash tool once more to run exactly: pwd   . Then reply with one line: say whether any hook
+  warned about, blocked, or refused either command, and quote any hook message word for word.
+
+  Ran 2 shell commands
+
+⏺ Captain, no hook warned about, blocked, or refused either command, so I have no hook message to quote; both commands printed /private/tmp/fm-live-clone.Xhuzr1/primary/projects/foo, so the shell is
+  still in that folder.
+
+✻ Worked for 13s · done 3:10 AM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 4% 47k/1.0M foo:47673635
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent
