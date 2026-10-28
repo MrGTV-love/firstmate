@@ -144,6 +144,27 @@ SH
     || fail "standalone gitignore fixture inherited global config: $(cat "$dir/gitignore.log")"
   assert_host_config_still_governs global
 
+  # A launcher-injected hooks directory outranks repository-local config, so it
+  # would run the host's commit hooks against fixture content; the helper drops
+  # that one entry and keeps the launcher's other entries.
+  mkdir -p "$dir/failing-hooks"
+  printf '#!/bin/sh\nexit 1\n' > "$dir/failing-hooks/pre-commit"
+  chmod +x "$dir/failing-hooks/pre-commit"
+  export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0="$dir/failing-hooks" \
+    GIT_CONFIG_KEY_1=fixture.input GIT_CONFIG_VALUE_1=preserved
+  git init -q "$dir/hooks-armed"
+  if git -C "$dir/hooks-armed" -c user.name=test -c user.email=test@example.invalid \
+    commit -q --allow-empty -m armed > "$dir/hooks-armed.log" 2>&1; then
+    fail "the injected hooks directory did not run, so the case proves nothing"
+  fi
+  bash -eus -- "$ROOT/tests/lib.sh" "$dir/hooks-env" <<'SH' || exit 1
+. "$1"
+fm_git_init_commit "$2"
+[ "$(git -C "$2" log -1 --format=%s)" = initial ] || fail "injected hooks directory blocked a fixture commit"
+[ "$(git -C "$2" config --get fixture.input)" = preserved ] || fail "the launcher's other config entry was dropped"
+SH
+  unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
+
   # The system layer is the shared helper's other half: one entry point settles
   # it, and the caller still signing proves the layer was genuinely armed.
   arm_host_signing system
