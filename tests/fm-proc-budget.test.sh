@@ -472,6 +472,13 @@ test_memory_group_kill_idiom_keeps_status() {
   pass "a command's kill 0 does not kill its memory reader"
 }
 
+test_memory_inherited_fd_reaches_command() {
+  "$WRAP" --memory-kib 262144 -- bash -c 'echo inherited >&3' 3>"$TMP_ROOT/fd3.log"
+  expect_code 0 $? "a command writing to a descriptor its caller passed"
+  assert_equals inherited "$(cat "$TMP_ROOT/fd3.log")" "descriptor 3 reaches the command as with exec"
+  pass "descriptors the caller passes reach the memory-stopped command"
+}
+
 test_memory_command_start_matches_exec() {
   local target plain memory
   printf 'echo ran-as-script\n' >"$TMP_ROOT/no-shebang"
@@ -569,6 +576,7 @@ if memory_supported; then
   test_memory_supervisor_kill_during_cleanup
   test_memory_supervisor_death_before_reader_ready
   test_memory_group_kill_idiom_keeps_status
+  test_memory_inherited_fd_reaches_command
   test_memory_command_start_matches_exec
   test_memory_reader_failure
 fi

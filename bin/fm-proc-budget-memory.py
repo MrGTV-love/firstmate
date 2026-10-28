@@ -238,10 +238,11 @@ def run(limit, command):
             return 128 + caught
         gate, release = os.pipe()
         try:
+            os.set_inheritable(gate, True)
             child = subprocess.Popen(
                 ["/bin/bash", "-c", f'read -r _ <&{gate} || exit 125; exec {gate}<&-; exec "$@"',
                  "fm-proc-budget", *command],
-                preexec_fn=os.setpgrp, pass_fds=(gate,),
+                preexec_fn=os.setpgrp, close_fds=False,
             )
         finally:
             os.close(gate)
