@@ -1,0 +1,360 @@
+######## A: no rebase (S equals B)
+$ git rev-parse S
+d712fed3042300023e265d2024d7fbe33dd34023
+exit: 0
+$ git rev-parse S
+d712fed3042300023e265d2024d7fbe33dd34023
+exit: 0
+# same full ID -> skip proofs, go to reset
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 079e2c2707ab6491e8201935a6ff64705f05934b
+[work 079e2c2] pipeline fix
+ Date: Wed Oct 28 02:55:03 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+$ git merge-base --is-ancestor S HEAD
+exit: 0
+$ git -c color.ui=false range-diff S..refs/heads/archive/t-pipeline S..HEAD
+1:  079e2c2 = 1:  079e2c2 pipeline fix
+exit: 0
+# REPLAY COMPLETE
+######## B0: rebase onto newer main that changed only context (old proof fails)
+# old proofs:
+$ git cherry -v B S
++ d712fed3042300023e265d2024d7fbe33dd34023 submitted work
+exit: 0
+$ git diff --quiet S B -- a.txt
+exit: 1
+$ git rev-parse S
+d712fed3042300023e265d2024d7fbe33dd34023
+exit: 0
+$ git rev-parse B
+ea0fbf210e67ac56308fe9ddff360285ea2e2375
+exit: 0
+# S-base=38f94edab0408fc50a4524a649281bb540d678ea n=1 B-base=B~1
+$ git -c color.ui=false range-diff 38f94edab0408fc50a4524a649281bb540d678ea..S B~1..B
+1:  d712fed ! 1:  ea0fbf2 submitted work
+    @@ Commit message
+     
+      ## a.txt ##
+     @@
+    - context=old
+    + context=new
+      line2
+      line3
+     -value=base
+exit: 0
+# proof accepted
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 6d3b4b7820743ef2c62d5a321023b0d53f801006
+Auto-merging a.txt
+[work 80dff1c] pipeline fix
+ Date: Wed Oct 28 02:55:03 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+$ git merge-base --is-ancestor S HEAD
+exit: 0
+$ git -c color.ui=false range-diff B..refs/heads/archive/t-pipeline S..HEAD
+1:  6d3b4b7 = 1:  80dff1c pipeline fix
+exit: 0
+# REPLAY COMPLETE
+######## B1: rebase changed the submitted commit's own + line
+$ git rev-parse S
+73db750aad84119deb7b146dab85452784be9de2
+exit: 0
+$ git rev-parse B
+1fb014e66db0ff2a6df341a4a5152fbb3c1badd3
+exit: 0
+# S-base=a8533c39de30e8ce36a91f305bc0731dbf041b9f n=1 B-base=B~1
+$ git -c color.ui=false range-diff a8533c39de30e8ce36a91f305bc0731dbf041b9f..S B~1..B
+1:  73db750 < -:  ------- submitted work
+-:  ------- > 1:  1fb014e submitted work
+exit: 0
+# STOP: unpaired commit
+######## C: rebase dropped a submitted commit (main already had it)
+$ git rev-parse S
+53425b73da82f4ad6be30bddf5d8ff1edf930f03
+exit: 0
+$ git rev-parse B
+7fbb01dda6cff4e542095ecaa93622738214bf77
+exit: 0
+# S-base=a8533c39de30e8ce36a91f305bc0731dbf041b9f n=2 B-base=B~2
+$ git -c color.ui=false range-diff a8533c39de30e8ce36a91f305bc0731dbf041b9f..S B~2..B
+2:  53425b7 ! 1:  bc33dd1 submitted other=2
+    @@ Metadata
+     Author: t <t@example.invalid>
+     
+      ## Commit message ##
+    -    submitted other=2
+    +    main: other=2
+     
+      ## o.txt ##
+     @@
+1:  edfc5e6 = 2:  7fbb01d submitted work
+exit: 0
+# proof accepted
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 30b82b3e00332df0e00ff6400ed93bd38b8afb75
+[work 5c7232d] pipeline fix
+ Date: Wed Oct 28 02:55:05 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+$ git merge-base --is-ancestor S HEAD
+exit: 0
+$ git -c color.ui=false range-diff B..refs/heads/archive/t-pipeline S..HEAD
+1:  30b82b3 = 1:  5c7232d pipeline fix
+exit: 0
+# REPLAY COMPLETE
+######## D: rebase added a commit
+$ git rev-parse S
+7b6e12f4b0d9fad10c6da4f00a89e293e6c143da
+exit: 0
+$ git rev-parse B
+5409528d4752ce0a660e2123e9cad7c8632b90b3
+exit: 0
+# S-base=e3d1d493b6192212db1dc77b74647c1b09152d2f n=1 B-base=B~1
+$ git -c color.ui=false range-diff e3d1d493b6192212db1dc77b74647c1b09152d2f..S B~1..B
+1:  7b6e12f ! 1:  5409528 submitted work
+    @@ Commit message
+     
+      ## a.txt ##
+     @@
+    - context=old
+    + context=new
+      line2
+      line3
+     -value=base
+exit: 0
+# proof accepted
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 9cb3f5c07dd56904872bfae3a4688507b63f52fc
+Auto-merging a.txt
+[work f79012a] pipeline fix
+ Date: Wed Oct 28 02:55:06 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+$ git merge-base --is-ancestor S HEAD
+exit: 0
+$ git -c color.ui=false range-diff B..refs/heads/archive/t-pipeline S..HEAD
+1:  9cb3f5c = 1:  f79012a pipeline fix
+exit: 0
+# REPLAY COMPLETE
+######## E: S is a strict ancestor of B (n=0 but IDs differ)
+$ git rev-parse S
+ad787c03447b3d53310f0beee1af803a976f7479
+exit: 0
+$ git rev-parse B
+7e7070baf69c4536c8f3d9e2ff18654bfc38721f
+exit: 0
+# S-base=ad787c03447b3d53310f0beee1af803a976f7479 n=0 B-base=B~0
+$ git -c color.ui=false range-diff ad787c03447b3d53310f0beee1af803a976f7479..S B~0..B
+fatal: need two commit ranges
+
+usage: git range-diff [<options>] <old-base>..<old-tip> <new-base>..<new-tip>
+   or: git range-diff [<options>] <old-tip>...<new-tip>
+   or: git range-diff [<options>] <base> <old-tip> <new-tip>
+
+    --[no-]creation-factor <n>
+                          percentage by which creation is weighted
+    --no-dual-color       use simple diff colors
+    --dual-color          opposite of --no-dual-color
+    --[no-]notes[=<notes>]
+                          passed to 'git log'
+    --[no-]diff-merges <style>
+                          passed to 'git log'
+    --[no-]max-memory <size>
+                          maximum memory for cost matrix (default 4G)
+    --[no-]remerge-diff   passed to 'git log'
+    --[no-]left-only      only emit output related to the first range
+    --[no-]right-only     only emit output related to the second range
+
+Diff output format options
+    -p, --patch           generate patch
+    -s, --no-patch        suppress diff output
+    -u                    generate patch
+    -U, --unified[=<n>]   generate diffs with <n> lines context
+    -W, --[no-]function-context
+                          generate diffs with <n> lines context
+    --raw                 generate the diff in raw format
+    --patch-with-raw      synonym for '-p --raw'
+    --patch-with-stat     synonym for '-p --stat'
+    --numstat             machine friendly --stat
+    --shortstat           output only the last line of --stat
+    -X, --dirstat[=<param1>,<param2>...]
+                          output the distribution of relative amount of changes for each sub-directory
+    --cumulative          synonym for --dirstat=cumulative
+    --dirstat-by-file[=<param1>,<param2>...]
+                          synonym for --dirstat=files,<param1>,<param2>...
+    --check               warn if changes introduce conflict markers or whitespace errors
+    --summary             condensed summary such as creations, renames and mode changes
+    --name-only           show only names of changed files
+    --name-status         show only names and status of changed files
+    --stat[=<width>[,<name-width>[,<count>]]]
+                          generate diffstat
+    --stat-width <width>  generate diffstat with a given width
+    --stat-name-width <width>
+                          generate diffstat with a given name width
+    --stat-graph-width <width>
+                          generate diffstat with a given graph width
+    --stat-count <count>  generate diffstat with limited lines
+    --[no-]compact-summary
+                          generate compact summary in diffstat
+    --binary              output a binary diff that can be applied
+    --[no-]full-index     show full pre- and post-image object names on the "index" lines
+    --[no-]color[=<when>] show colored diff
+    --ws-error-highlight <kind>
+                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff
+    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat
+    --[no-]abbrev[=<n>]   use <n> digits to display object names
+    --src-prefix <prefix> show the given source prefix instead of "a/"
+    --dst-prefix <prefix> show the given destination prefix instead of "b/"
+    --line-prefix <prefix>
+                          prepend an additional prefix to every line of output
+    --no-prefix           do not show any source or destination prefix
+    --default-prefix      use default prefixes a/ and b/
+    --inter-hunk-context <n>
+                          show context between diff hunks up to the specified number of lines
+    --output-indicator-new <char>
+                          specify the character to indicate a new line instead of '+'
+    --output-indicator-old <char>
+                          specify the character to indicate an old line instead of '-'
+    --output-indicator-context <char>
+                          specify the character to indicate a context instead of ' '
+
+Diff rename options
+    -B, --break-rewrites[=<n>[/<m>]]
+                          break complete rewrite changes into pairs of delete and create
+    -M, --find-renames[=<n>]
+                          detect renames
+    -D, --irreversible-delete
+                          omit the preimage for deletes
+    -C, --find-copies[=<n>]
+                          detect copies
+    --[no-]find-copies-harder
+                          use unmodified files as source to find copies
+    --no-renames          disable rename detection
+    --[no-]rename-empty   use empty blobs as rename source
+    --[no-]follow         continue listing the history of a file beyond renames
+    -l <n>                prevent rename/copy detection if the number of rename/copy targets exceeds given limit
+
+Diff algorithm options
+    --minimal             produce the smallest possible diff
+    -w, --ignore-all-space
+                          ignore whitespace when comparing lines
+    -b, --ignore-space-change
+                          ignore changes in amount of whitespace
+    --ignore-space-at-eol ignore changes in whitespace at EOL
+    --ignore-cr-at-eol    ignore carrier-return at the end of line
+    --ignore-blank-lines  ignore changes whose lines are all blank
+    -I, --[no-]ignore-matching-lines <regex>
+                          ignore changes whose all lines match <regex>
+    --[no-]indent-heuristic
+                          heuristic to shift diff hunk boundaries for easy reading
+    --patience            generate diff using the "patience diff" algorithm
+    --histogram           generate diff using the "histogram diff" algorithm
+    --diff-algorithm <algorithm>
+                          choose a diff algorithm
+    --anchored <text>     generate diff using the "anchored diff" algorithm
+    --word-diff[=<mode>]  show word diff, using <mode> to delimit changed words
+    --word-diff-regex <regex>
+                          use <regex> to decide what a word is
+    --color-words[=<regex>]
+                          equivalent to --word-diff=color --word-diff-regex=<regex>
+    --[no-]color-moved[=<mode>]
+                          moved lines of code are colored differently
+    --[no-]color-moved-ws <mode>
+                          how white spaces are ignored in --color-moved
+
+Other diff options
+    --[no-]relative[=<prefix>]
+                          when run from subdir, exclude changes outside and show relative paths
+    -a, --[no-]text       treat all files as text
+    -R                    swap two inputs, reverse the diff
+    --[no-]exit-code      exit with 1 if there were differences, 0 otherwise
+    --[no-]quiet          disable all output of the program
+    --[no-]ext-diff       allow an external diff helper to be executed
+    --[no-]textconv       run external text conversion filters when comparing binary files
+    --ignore-submodules[=<when>]
+                          ignore changes to submodules in the diff generation
+    --submodule[=<format>]
+                          specify how differences in submodules are shown
+    --ita-invisible-in-index
+                          hide 'git add -N' entries from the index
+    --ita-visible-in-index
+                          treat 'git add -N' entries as real in the index
+    -S <string>           look for differences that change the number of occurrences of the specified string
+    -G <regex>            look for differences that change the number of occurrences of the specified regex
+    --pickaxe-all         show all changes in the changeset with -S or -G
+    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression
+    -O <file>             control the order in which files appear in the output
+    --rotate-to <path>    show the change in the specified path first
+    --skip-to <path>      skip the output to the specified path
+    --find-object <object-id>
+                          look for differences that change the number of occurrences of the specified object
+    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]
+                          select files by diff type
+    --max-depth <depth>   maximum tree depth to recurse
+    --output <file>       output to a specific file
+
+exit: 129
+# STOP: range-diff refused
+######## F: pipeline fix conflicts with S on replay
+$ git rev-parse S
+7764c342f7680771d090197c0cee6632a788ac5d
+exit: 0
+$ git rev-parse B
+01876271617f6073018e3bb154026e0d71ab93f2
+exit: 0
+# S-base=218732ed80031f59d1d7c354e604e57419b9d1c1 n=1 B-base=B~1
+$ git -c color.ui=false range-diff 218732ed80031f59d1d7c354e604e57419b9d1c1..S B~1..B
+1:  7764c34 ! 1:  0187627 submitted work
+    @@ Commit message
+     
+      ## a.txt ##
+     @@
+    - context=old
+    + context=new
+      line2
+      line3
+     -value=base
+exit: 0
+# proof accepted
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 48b0ae53563c4ae379a47d49094f68803769cf05
+Auto-merging a.txt
+CONFLICT (content): Merge conflict in a.txt
+error: could not apply 48b0ae5... pipeline fix touching main-changed line
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+exit: 1
+# STOP: cherry-pick conflict/refusal/empty
+######## G: empty cherry-pick (pipeline fix already present in S)
+$ git rev-parse S
+1be65f291a33c158d03e9a936cab36609c38e621
+exit: 0
+$ git rev-parse B
+e8e7a593362b69720452b67edec7fb1fd114f962
+exit: 0
+# S-base=109b0ce7d3b470e9726b7c8ebafbfdc403f8042c n=1 B-base=B~1
+$ git -c color.ui=false range-diff 109b0ce7d3b470e9726b7c8ebafbfdc403f8042c..S B~1..B
+1:  1be65f2 < -:  ------- submitted work
+-:  ------- > 1:  e8e7a59 submitted work
+exit: 0
+# STOP: unpaired commit
+
+######## TESTER NOTE
+The "# proof accepted" labels in this file come from a helper that only flagged unpaired rows and changed own +/- lines.
+In scenario C, the "!" pair changes the commit message (## Commit message ## -submitted other=2 / +main: other=2).
+Step 5 accepts a "!" only for hunk-header or unchanged-context differences, and says to stop on "any ... other difference".
+So under the skill text, scenario C is a STOP, not a pass.
+In scenario D, the added commit sits below B~n, so the range-diff does not see it; the replay goes onto S, so its content never enters the new head.

@@ -1,0 +1,867 @@
+=== device-id  S=6a40598b2534a80beb0316f85d3464b6edd90b50 B=031f479bef82fcd724a4d6f6615149800f0f3ce8
+$ git rev-parse <S>; git rev-parse <B>
+6a40598b2534a80beb0316f85d3464b6edd90b50
+031f479bef82fcd724a4d6f6615149800f0f3ce8
+$ git merge-base <S> <B> -> 7eb37bf8e58800ecefd5892f2d73195c8a61e87f
+$ git rev-list --count <S-base>..<S> -> 10
+B-base = <B>~10 = 7c64d0d1e2188ac8cf76c6c10475af67c6a401ab
+$ git range-diff 7eb37bf8e58800ecefd5892f2d73195c8a61e87f..6a40598b2534a80beb0316f85d3464b6edd90b50 031f479bef82fcd724a4d6f6615149800f0f3ce8~10..031f479bef82fcd724a4d6f6615149800f0f3ce8
+ 1:  6f6b177e8 =  1:  43cc9e1dc fix(watcher): migrate device-only identities without replay
+ 2:  2d0bdb265 =  2:  c9247c299 no-mistakes(review): Migrate classified watcher identity across device shifts
+ 3:  5e825f7df =  3:  e0602a707 no-mistakes(review): Fork-free heartbeat marker path; vanished status log is quiet
+ 4:  0235aaea8 =  4:  7f58a3040 no-mistakes(review): Skip signature decode for same-device lagging markers
+ 5:  6a57f91b2 =  5:  2ae858a3d no-mistakes(review): Skip owned capture for status logs with no new bytes
+ 6:  8975f8e74 =  6:  e00278bd8 no-mistakes(document): Point device-remount docs at their owner
+ 7:  78166bfb2 =  7:  9f8e29dcc no-mistakes(ci): Most of these 9 red checks are not caused by this PR. I fixed two real defects in this PR's own tests. The changes are not committed. **Not this PR (no code change for these):** `main` at the base commit ff899e92a fails the same 7 shards with the same assertions: parallel 1, serial 2, 5, 7, 11, 12, 15. PR #199 (Ubuntu 26.04 runner fixes) already covers them. Serial 3 and serial 6 also fail on other `main` runs, with these assertions: - Serial 3: `fm-supervision-host-hook` "left no successor watcher" (main run d04398065). - Serial 6: `fm-remote-transport-lanes` "concurrent sequence claims were not unique" (main run 93e65be73). In an Ubuntu 26.04 container it fails the same way at base. I could not reproduce serial 3 anywhere. It passed on macOS, and the container skipped it because `node` is missing. I treat it as not caused by this PR because `main` fails the same way. That is not proven. **Real defects in this PR (fixed):** 1. **Failure swallowed.** The 8 new device-shift tests in `tests/fm-watch-triage-helpers.sh` run in a subshell. `fail` only left the subshell. The driver ignored the result. Serial 10 printed `not ok - mode identity change did not signal` and still exited 0 (green). Invariant: a failing test must fail its file. Fix: `|| exit $?` on all 8 call sites in `tests/fm-watch-triage.test.sh`. I did the same for the one sibling, `test_classify_signal_device_shift_dedup` in `tests/fm-daemon.test.sh`. This is the repo's own idiom, as in `fm-backlog-atomicity`. 2. **Hidden test dependency.** The `mode` case adds no bytes. It wakes only if the crew is not "provably working". An earlier test in the shared shell leaves `FM_FAKE_CREW_STATE` set to "working", so the watcher absorbed the wake on CI. Run alone on macOS, it passed. Invariant: a device-shift test must not depend on env left by earlier tests. The no-resignal assertions could also pass for the wrong reason. Fix: `watch_identity_fixture` now installs a fake `fm-crew-state.sh` that always reports "unknown". Every identity test uses this fixture. **Verification:** - Ubuntu 26.04 container (uutils `stat`, same as CI), real driver through line 69: the old code fails at `mode`. With only fix 1 the file exits 1. With both fixes it exits 0 and all 8 tests pass. - Same driver on macOS: exit 0. - `bin/fm-lint.sh` is clean on the touched files. `tests/fm-daemon.test.sh` passes on macOS (147 ok). - macOS, same host, run alone: `fm-contributions` fails at base (3 `not ok`) but passed at HEAD. `fm-remote-transport-lanes` passes at both. These are timing-sensitive tests. **Gaps:** No full-file run of `fm-watch-triage` passed in the container, because the image has no `node` and the file needs it at a later test. The Ubuntu runner shards will confirm
+ 8:  4f406853d =  8:  7597fdbae no-mistakes(review): Skip signature decode when no device migration is possible
+ 9:  60dcc1e69 =  9:  d250cc09c no-mistakes(document): List marker device adoption as a classifier purity exception
+10:  6a40598b2 = 10:  031f479be no-mistakes(review): Preflight file-identity lib in teardown; document pending dedupe
+exit: 0
+--- old proof for contrast: git cherry -v <B> <S>
+- 6f6b177e8104223f6c3547035a13c7c78350fbe8 fix(watcher): migrate device-only identities without replay
+- 2d0bdb2654452a85dfdd2344c3d2e9b9a2a5cfd4 no-mistakes(review): Migrate classified watcher identity across device shifts
+- 5e825f7df4f350785f28e01e7e30239f9a26882a no-mistakes(review): Fork-free heartbeat marker path; vanished status log is quiet
+- 0235aaea88c10860ef8bd2d376725ad9315dabc3 no-mistakes(review): Skip signature decode for same-device lagging markers
+- 6a57f91b2d555478f83988a94e4e3e7b86fd9150 no-mistakes(review): Skip owned capture for status logs with no new bytes
+- 8975f8e749eac0c6bb4541d3469505d42d2b2d1b no-mistakes(document): Point device-remount docs at their owner
+- 78166bfb2d3485905ce3735c2c94a3d1dc02229e no-mistakes(ci): Most of these 9 red checks are not caused by this PR. I fixed two real defects in this PR's own tests. The changes are not committed. **Not this PR (no code change for these):** `main` at the base commit ff899e92a fails the same 7 shards with the same assertions: parallel 1, serial 2, 5, 7, 11, 12, 15. PR #199 (Ubuntu 26.04 runner fixes) already covers them. Serial 3 and serial 6 also fail on other `main` runs, with these assertions: - Serial 3: `fm-supervision-host-hook` "left no successor watcher" (main run d04398065). - Serial 6: `fm-remote-transport-lanes` "concurrent sequence claims were not unique" (main run 93e65be73). In an Ubuntu 26.04 container it fails the same way at base. I could not reproduce serial 3 anywhere. It passed on macOS, and the container skipped it because `node` is missing. I treat it as not caused by this PR because `main` fails the same way. That is not proven. **Real defects in this PR (fixed):** 1. **Failure swallowed.** The 8 new device-shift tests in `tests/fm-watch-triage-helpers.sh` run in a subshell. `fail` only left the subshell. The driver ignored the result. Serial 10 printed `not ok - mode identity change did not signal` and still exited 0 (green). Invariant: a failing test must fail its file. Fix: `|| exit $?` on all 8 call sites in `tests/fm-watch-triage.test.sh`. I did the same for the one sibling, `test_classify_signal_device_shift_dedup` in `tests/fm-daemon.test.sh`. This is the repo's own idiom, as in `fm-backlog-atomicity`. 2. **Hidden test dependency.** The `mode` case adds no bytes. It wakes only if the crew is not "provably working". An earlier test in the shared shell leaves `FM_FAKE_CREW_STATE` set to "working", so the watcher absorbed the wake on CI. Run alone on macOS, it passed. Invariant: a device-shift test must not depend on env left by earlier tests. The no-resignal assertions could also pass for the wrong reason. Fix: `watch_identity_fixture` now installs a fake `fm-crew-state.sh` that always reports "unknown". Every identity test uses this fixture. **Verification:** - Ubuntu 26.04 container (uutils `stat`, same as CI), real driver through line 69: the old code fails at `mode`. With only fix 1 the file exits 1. With both fixes it exits 0 and all 8 tests pass. - Same driver on macOS: exit 0. - `bin/fm-lint.sh` is clean on the touched files. `tests/fm-daemon.test.sh` passes on macOS (147 ok). - macOS, same host, run alone: `fm-contributions` fails at base (3 `not ok`) but passed at HEAD. `fm-remote-transport-lanes` passes at both. These are timing-sensitive tests. **Gaps:** No full-file run of `fm-watch-triage` passed in the container, because the image has no `node` and the file needs it at a later test. The Ubuntu runner shards will confirm
+- 4f406853d1cf1dd68c0e6b80b28ca5dbea966906 no-mistakes(review): Skip signature decode when no device migration is possible
+- 60dcc1e69eade987a76d8ed5b57106051d1addbf no-mistakes(document): List marker device adoption as a classifier purity exception
+- 6a40598b2534a80beb0316f85d3464b6edd90b50 no-mistakes(review): Preflight file-identity lib in teardown; document pending dedupe
+
+=== status-runaway  S=505355f8c0a775a1f7dccd759e4a21856074851f B=9dac01ab4
+$ git rev-parse <S>; git rev-parse <B>
+505355f8c0a775a1f7dccd759e4a21856074851f
+9dac01ab4b5c821b9918e1a9bbcefc75740d2b21
+$ git merge-base <S> <B> -> 7eb37bf8e58800ecefd5892f2d73195c8a61e87f
+$ git rev-list --count <S-base>..<S> -> 32
+B-base = <B>~32 = 7c64d0d1e2188ac8cf76c6c10475af67c6a401ab
+$ git range-diff 7eb37bf8e58800ecefd5892f2d73195c8a61e87f..505355f8c0a775a1f7dccd759e4a21856074851f 9dac01ab4b5c821b9918e1a9bbcefc75740d2b21~32..9dac01ab4b5c821b9918e1a9bbcefc75740d2b21
+ 1:  992efd4db =  1:  c18b83fb9 fix(bin): cap status logs and bound every status reader so a runaway append cannot fill the disk
+ 2:  21a2e19af !  2:  4156a13a7 no-mistakes(review): Remove repeat-collapse; exact bounded reads; growth re-alert
+    @@ bin/fm-watch.sh: EOF
+      $records
+      EOF
+     @@ bin/fm-watch.sh: while :; do
+    -   watcher_beat force
+    +   pr_ready_reconcile_tick
+        lock_alarm_tick
+      
+     +  # A runaway writer makes every status signal fire first, and the fleet-ledger
+ 3:  0ff475cd5 =  3:  179fe87e6 no-mistakes(review): Isolate refused logs; unknown not empty; cap remote mirror
+ 4:  7f76980a3 =  4:  a75c581d1 no-mistakes(review): Map remote helper paths; crew-state unknown on refused log
+ 5:  1172ac008 =  5:  fc9abc7f4 no-mistakes(review): Bound diverged key scan and Pi dispatch log read
+ 6:  081e11be6 =  6:  6d6fba06a no-mistakes(test): Retry lsof for reopening writers; check cap during linger
+ 7:  7143fc93f =  7:  0d5a010d7 no-mistakes(test): Fix cap-wake linger delay; drop reopen-loop retries
+ 8:  fe29a09c5 =  8:  dc5c118a4 no-mistakes(test): Bound wake drain annotation reads by status read limit
+ 9:  894623884 =  9:  f58a18b87 no-mistakes(document): Fix stale fleet-ledger and report-helper docs
+10:  c0b830c83 = 10:  9e4c3bda5 no-mistakes(document): Sync state inventory and over-cap wake docs
+11:  f3095ca79 = 11:  c8edccb25 no-mistakes(ci): I fixed all 4 failing checks. I changed 4 files and did not commit or push. **Lint 2 (caused by this PR)** - Rule broken: a library the tests load must not make ShellCheck see a variable the tests change inside `$(...)`. - Cause: `bin/fm-status-cap-lib.sh:262` had `${name//[^A-Za-z0-9._-]/_}`. ShellCheck reads the bare `_` inside that bracket as a variable. `tests/fm-control.test.sh:393` has `for _ in` inside `$(...)`, so SC2030 fired. - I found it by copying the base commit and adding the PR's files back until the warning appeared. Only `fm-status-cap-lib.sh` plus `fm-status-record-lib.sh` (which loads it) cause it. - Fix: I removed `_` from the class. The replacement is also `_`, so the output is identical (I checked it on a tricky name). I added a 2-line comment. - Other places with the same bracket form: none. - Checked: `bin/fm-lint.sh` on all changed files with the CI ShellCheck version (0.11.0) is clean. **Behavior portable serial 10: `tests/fm-open-loops.test.sh` (caused by this PR)** - Rule broken: the "deadline escapes questions" test must hook a command the reader really runs. - Cause: the test hooked a fake `cat`. This PR replaced `cat "$2"` with `[ -r "$2" ]` in `bin/fm_open_loops.py`. That change is right, because `cat` on a 265 GB log is the incident. So the fake `cat` never ran and the deadline never fired. - Fix: the test now hooks `FM_STATUS_SIZE_READER`, the seam the bounded reader uses to get a log's size. - Checked: one full local run passed, including "deadline escapes questions source recovery". - Note: on this Mac, the deadline tests sometimes fail with `[Errno 1] Operation not permitted`. The base commit does it too, on the `origins` test (2 of 3 runs under load). It is a macOS quirk in the collector's cleanup. Linux CI does not do it. I did not touch it. **Behavior portable serial 5: `tests/fm-copy-sweep.test.sh` (not caused by this PR)** - This test also failed on the base commit's own CI run (`b5ad5d7d6`), before this PR. - Cause: the sweep counts time left in whole seconds, so a `du` can get up to 1 second more than is really left. With a 1.6 s `du` and a 3 s bound, the outcome depended on the sub-second clock phase. - Fix: `FAKE_DU_SLEEP=3.5` and `FM_CHECK_TIMEOUT=11`. The first `du` always gets 4 s or more, and the second gets 3 s or less. I changed both calls and added a comment. - Checked: the old values failed 1 time in 12. The new values failed 0 times in 10. **Behavior portable serial 6: `tests/fm-turnend-guard.test.sh` (not caused by this PR)** - Cause: the node harness sent the hook payload through a pipe. Hooks that are off for Grok exit at once without reading it. On a busy host, node writes to a closed pipe and gets `EPIPE`. - Fix: `invoke` now gives the child a file as its stdin. A file cannot raise `EPIPE`. - Checked: a small demo under CPU load failed 11 of 1500 times with a pipe and 0 of 1500 with a file. The whole test passed 3 of 3 runs (94 ok each). `invoke` is the only pipe-input call in that file, and both modes use it. **Other checks:** `tests/fm-status-runaway-guard.test.sh` passes (20 ok). `git diff --check` is clean. **Left alone:** the user decisions you listed (declined items and the rest) were not touched. The macOS cleanup quirk is not fixed. I did not run the full suite or the CI shards, and I could not run a Linux job here. The Linux CI run should confirm the fixes
+12:  3cd80f76e = 12:  634fed8d1 no-mistakes(ci): I fixed the failing test. I changed one file: tests/fm-watch-triage-helpers.sh. I did not commit or push. FAILED CHECK: Behavior portable serial 10. The test was tests/fm-watch-triage.test.sh, case test_wait_identity_concurrent_append_uses_one_snapshot. Error: "not ok - the concurrent append fixture did not append during the read". CAUSE (this PR, in the test; the product code is right): The test put a fake `tail` in front of the real one. The fake appended a line to the live log on the second `tail` call. This PR made last_status_line read through fm_status_tail_lines, which runs two `tail` calls at the same time as pipeline stages. The second call now lands where `$f` is the snapshot copy, not the live log. The append went to the wrong file. The test passed only when the two stages raced and both read count 0, so it was flaky. The earlier CI run passed by luck. I reproduced it here: 104 of 224 runs failed under load, and a trace showed the second call reading count 1. INVARIANT: A fixture that injects a concurrent append must not depend on how many internal helper calls the reader makes, or in which scope. FIX: I removed the fake `tail` and the call counter. The test now sets FM_STATUS_SPAN_READER, an existing test seam that other tests already use. The function reads the exact bytes, then appends the restated line to the live log once. So the append lands after the endpoint is captured and during the read, every time. The assertions are unchanged. SIBLING SITES CHECKED: Only this fixture counted calls. The other fakes match on argument or path shape, or hook files that are not status reads. They are the `wc` fake in tests/fm-watch-triage-helpers.sh, the `cat` fake in tests/fm-wake-drain-outcome-backstop.test.sh, and the `grep` fakes in tests/fm-captain-hold-cleanup.test.sh and tests/fm-captain-hold-reconcile.test.sh. I left them alone. I did not touch the macOS cleanup quirk from round 4. VERIFIED: bash -n on the file is clean. git diff --check is clean. One run of the fixed function passed. A stress run passed 4 of 4, but I stopped it early, so it is not the 16 runs I planned. NOT VERIFIED: bin/fm-lint.sh did not finish. The machine load average was 165, and I stopped it. Lint for this file is not confirmed. I did not run the mutation check, which would break the product code on purpose to show the test fails. I did not run the full tests/fm-watch-triage.test.sh file. I could not run a Linux job, so the Linux CI run is the real check. CLEANUP: I removed my scratch files, including /tmp/ci-log-r5 and the .scratch-ci directory in the worktree. git status shows only tests/fm-watch-triage-helpers.sh as modified. The "failed exit 144" notices from the harness came from my own pkill. They are not test failures
+13:  08efa8f01 = 13:  d479a3fbd no-mistakes(ci): I fixed ci-1 with a test-only change. I changed one file: tests/fm-status-runaway-guard.test.sh. I did not commit or push. I did not change anything in bin/. FAILED CHECK: Behavior portable serial 13, tests/fm-status-runaway-guard.test.sh. The failing case was test_foreign_omp_writer_is_named_stopped_and_never_deleted, with "the watcher did not wake for the runaway log". ROOT CAUSE (the fixture, not bin/): - start_paced_writer wrote 13000 five-byte lines ("text\n") every 3 s. - The watcher sorts the unread lines of a signaled log one at a time in the shell. The cap check (status_cap_tick) cannot run while it does that. - I timed the sorter on 13000 short lines. It took 67 s on this loaded host, and 3000 lines took 17 s. - The test gives the first watcher 300 polls (30 s). In CI that wait ran 33 s, with empty output and the watcher alive in state S. That matches the watcher being busy sorting lines. - In a local trace before the fix, attempt 1 lasted 83 s. It ended on a `signal:` wake with the log at 1,625,000 bytes. The log was far past the 262,144 byte cap, but the cap wake did not come until attempt 2. CI is faster per poll, so it hit the 30 s limit first. - Earlier CI runs passed by luck. The outcome depends on how many lines the log has when the first sort starts, and on the host speed. - The product behavior is documented. docs/configuration.md line 1099 says the watcher's span sorter is slow on long unread spans. The sibling case test_a_lingering_signal_does_not_hold_back_the_over_cap_stop already says "13000 short lines would take longer than the deadline on a loaded host" and uses 1000-byte lines. INVARIANT: A fixture that needs the watcher to reach its over-cap check must not give the watcher thousands of unread lines first, because the check cannot run during a sort. SIBLING SITES CHECKED: - start_paced_writer is used by three cases: the foreign omp case (the failing one), the non-omp case, and the resumed-writer case. All three go through run_until_cap_wake, and one edit fixes all three. - The linger case already uses 1000-byte lines. - The foreign-none log is one long line. - The held-open incident writer (3 million tiny lines) runs the guard scan only, with no watcher, so it is not affected. It still pins the tiny-line incident shape. FIX: start_paced_writer now writes 65 lines of 1000 bytes per round instead of 13000 lines of 5 bytes. Each round is still 65000 bytes, so the cap (262144), the 60 rounds, the 4 MiB hard limit and every assertion are unchanged. I updated the comment to explain why. No assertion was weakened, removed or skipped. MEASURED (this Mac, load average about 35): - Before: attempt 1 lasted 83 s and ended on `signal:`. - After: attempt 1 lasted 8 s, and the cap wake came in attempt 2 after 4 s, at 325000 bytes. - Full tests/fm-status-runaway-guard.test.sh: exit 0, 20 ok. - The four watcher cases (foreign omp, non-omp, resumed, linger) passed 2 more times in a row, 4 ok each time. - bin/fm-lint.sh on the file: exit 0 (ShellCheck 0.11.0). git diff --check is clean. NOT RUN: I could not run a Linux job here. The Linux CI run is the real check. The before/after timing comes from this Mac, not from the CI runner. I did not run the mutation check on the product code. PRODUCT NOTE (not changed, as instructed): While the watcher sorts a span of up to 32,768 lines, it cannot raise the over-cap wake. A `signal:` wake also exits without a cap check, which is why attempt 1 above ended on `signal:`. If the owner wants this closed, the exact remedy is to run status_cap_tick in bin/fm-watch.sh signal_phase right after the classification and before wake "$reason". Bounding the classification time would be the other option. This is close to the declined test-resume-rearm item, so I left it alone. CLEANUP: I removed my scratch files and the probe copy of the test. git status shows only tests/fm-status-runaway-guard.test.sh as modified. Test runs left temp directories under ~/tmp
+14:  90fd03293 = 14:  430513412 no-mistakes(review): Check status cap during signal sorts and before wakes
+15:  93a1f9c1e ! 15:  a37438530 no-mistakes(review): Check status cap during stale and push walks
+    @@ bin/fm-push-transition-lib.sh: handle_push_transition() {  # <backend> <session>
+        esac
+     
+      ## bin/fm-watch.sh ##
+    -@@ bin/fm-watch.sh: watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+    -   return 0
+    +@@ bin/fm-watch.sh: pr_ready_reconcile_tick() {
+    +   PR_READY_RECONCILE_PID=$!
+      }
+      
+     +# A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
+16:  827cbcdc3 = 16:  2cca37a47 no-mistakes(document): Confirm status-cap guard docs match walk ticks
+17:  13a87ea54 ! 17:  d4048f766 no-mistakes(review): Check status cap before every wake and steer fold
+    @@ bin/fm-watch.sh: inbox_steer_check() {  # <window> <task>
+          [ -z "$own_open" ] || return 0
+        fi
+        rec=${action#* }
+    -@@ bin/fm-watch.sh: watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+    +@@ bin/fm-watch.sh: pr_ready_reconcile_tick() {
+      # file never wakes twice. The wake is queued before the marker is written, so a
+      # failed append is retried on the next poll instead of being lost. It runs at the top
+      # of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
+18:  de70e80b7 ! 18:  66e290a8a no-mistakes(review): Stop cap check from re-entering its own wake
+    @@ Commit message
+         no-mistakes(review): Stop cap check from re-entering its own wake
+     
+      ## bin/fm-watch.sh ##
+    -@@ bin/fm-watch.sh: watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+    +@@ bin/fm-watch.sh: pr_ready_reconcile_tick() {
+      # after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
+      # signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
+      # just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
+19:  e44594d06 ! 19:  1a7898ef7 no-mistakes(review): Check status cap inside its wake without a second wake
+    @@ bin/fm-status-cap-guard.sh: case "${1:-}" in
+          ;;
+     
+      ## bin/fm-watch.sh ##
+    -@@ bin/fm-watch.sh: watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+    +@@ bin/fm-watch.sh: pr_ready_reconcile_tick() {
+      # after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
+      # signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
+      # just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
+20:  182298e4b = 20:  7cda4b358 no-mistakes(ci): Fixed the PR-caused failure. Two other failures are pre-existing flakes and are not caused by this PR. Root cause (ci-1, ci-2, ci-5): the new serial member tests/fm-status-runaway-guard.test.sh (199417 ms, the weight the user chose) made `bin/fm-test-run.sh --check-coverage` refuse the 20-shard layout. Shard 3 packed 1203868 ms, which is above the 1200000 ms target and above its own largest suite (917727 ms). I reproduced this locally. - Invariant: every portable serial shard that holds more than one script must model at or below 1200000 ms. The shard count in bin/fm-test-run.sh, the CI matrix and the docs must agree. - Sites that use the shard count: PORTABLE_SERIAL_SHARDS in bin/fm-test-run.sh (the one owner), the shard matrix in .github/workflows/ci.yml (tests/fm-ci-workflow.test.sh requires it to match --list-lanes), and docs/fm-test-portable-shards.md. - Why "Test coverage guard" failed: it runs the same guard. - Why "Behavior portable parallel 1" failed: tests/fm-test-run.test.sh runs the same guard. - Why "Behavior portable serial 11" failed: tests/fm-ci-workflow.test.sh reads parallel_jobs from --check-coverage, so it failed with "the runner did not report parallel_jobs". Fix: I added one shard, which is the remedy the guard itself names ("rebalance or add shards; do not raise the job timeout"). 1. bin/fm-test-run.sh: PORTABLE_SERIAL_SHARDS changes from 20 to 21. 2. .github/workflows/ci.yml: shard 21 is added to the serial matrix. 3. docs/fm-test-portable-shards.md: a dated 2026-10-23 note explains why there are 21 shards, and the job-count line now says twenty-seven jobs (twenty-one serial). 4. No change to the packing target, the timeouts or any weight. The user's 199417 weight is kept. - At 21 shards, every multi-script shard models between 1140193 and 1140402 ms. Shards 1 and 2 each hold one indivisible suite. Not caused by this PR (no code change): - ci-4, serial 15, tests/fm-wake-queue.test.sh "concurrent append/drain subprocess failed" ("queue lock could not be acquired safely"): the same failure happened on main run 40036043378 (48b2df356, an ancestor of the base) and on runs 40020260758 and 39948616410. This PR does not change the drain or lock code. - ci-3, serial 13, tests/fm-contributions.test.sh "unchanged PR was re-read with 2 counted REST calls": the read path (bin/fm-gh-rest.sh, bin/fm-pr-poll.sh) is not changed by this PR. The full suite passed locally: 56 ok, exit 0. This is a load-sensitive CI flake. Checks I ran: - `bin/fm-test-run.sh --check-coverage`: exit 0, FM_TEST_COVERAGE ok, serial_shards=21, parallel_jobs=3. - tests/fm-ci-workflow.test.sh: exit 0, 10 ok. - tests/fm-test-run.test.sh: exit 0, 65 ok, 0 not ok. - tests/fm-documentation-audiences.test.sh: exit 0. - `git diff --check`: clean
+21:  84cef40e3 = 21:  535760187 no-mistakes(review): Refuse cold open-decision folds; correct shard note
+22:  555997f8b = 22:  bce3852f4 no-mistakes(review): Accept refused latest-event reads; keep fold stderr on fd 2
+23:  7b6d7bcd0 = 23:  a515c23b8 no-mistakes(document): Document open-loops handling of refused latest-event reads
+24:  45ff15ceb = 24:  6c3764392 no-mistakes(ci): ci-2 (Behavior portable serial 7) was caused by this PR and is fixed. ci-1 (Behavior portable serial 5) is a pre-existing timing race in code this PR does not touch, so it gets no code change. ci-2: tests/fm-control-relaunch-recovery.test.sh, case test_relocation_refuses_a_non_lease_copy, variant missing-jq, failed with empty output. - Root cause: this PR makes bin/fm-spawn.sh source bin/fm-status-cap-lib.sh. That library ran `IFS= command read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :` at load time. The test masks jq through BASH_ENV with a shell function named `command`. Under `set -eu`, a function-wrapped `command read` makes bash exit silently even with `|| :` (I reproduced this on bash 3.2 here, and CI's Linux bash does the same). So fm-spawn died before it could print its 'needs jq' refusal. - Invariant: sourcing a library only defines functions and constants and must never end the caller's shell. The library header says exactly this. - Sibling sites: I checked every top-level `command` use in the libraries and scripts this PR adds or changes. This line was the only one. Every other heredoc read in the repo (bin/fm-brief.sh, bin/fm-spawn.sh:7373) already uses plain `IFS= read -r -d ''`. - Fix: one line in bin/fm-status-cap-lib.sh:161 drops the `command` prefix, so the line now matches the repo's usual form. - Proof: the existing test already reproduces the bug. The case fails on HEAD before the fix, passes on base 7eb37bf8e, and passes on HEAD after the fix. tests/fm-status-runaway-guard.test.sh: 33 ok, 0 not ok. shellcheck bin/fm-status-cap-lib.sh: clean. git diff --check: clean. ci-1: tests/fm-remote-transport-lanes.test.sh failed with 'concurrent exclusive creators left mutex litter: ...claim.creating.owner.268301.*.reaped.claim.creating.owner.268315.*'. - This PR's only change to that test adds bin/fm-status-cap-lib.sh to a copy list. The PR does not change bin/fm-remote-job-lib.sh, where the code under test lives. - Race I traced: fm_remote_job_reload_lock_release first runs `rm -f` on the lock and then `rm -rf` on its owner folder. A reclaimer that read the old link can see that folder half-deleted (pid file gone) and judge the owner dead. It then moves the folder into a tomb. Next it finds that the lock already points to a new, live owner, so it returns 1. The tomb stays behind, and no later caller clears it. - Evidence it is a rare timing flake: the same test passed 15 of 15 runs on HEAD here. Of the last 40 failed CI runs in the repo, this failure shows up in this run only. - Fixing that lock-release race would change remote-job locking that this PR does not touch, so it is out of scope. A rerun should pass. The race should be tracked as a separate defect in fm_remote_job_reload_lock_release / fm_remote_job_reload_lock_take
+25:  cf98ddaee = 25:  ed73fd403 Make a refused unread suffix an incomplete open set and bound the snapshot and Pi status reads
+26:  431049aad = 26:  32c806e38 no-mistakes(review): Fix Pi status-read spies, ledger clamp edge, drain docs
+27:  61297e1d2 = 27:  498e28d38 no-mistakes(review): Whole-log status readers and folds take the byte limit alone
+28:  117628bd3 = 28:  e1f40983a no-mistakes(review): Bound whole-log status scans with one filter pass
+29:  b353511c1 = 29:  b528492d6 no-mistakes(review): Narrow event filter, absolute wait identity, ticked scans
+30:  41bd3eaf8 = 30:  fd94e91cf no-mistakes(review): Hand off captured-tick rate, tick stale windows, widen filter
+31:  5d6cf4903 = 31:  9b3de841b no-mistakes(review): Carry only the held growth rate; expire it off-list
+32:  505355f8c = 32:  9dac01ab4 no-mistakes(document): List status-cap handoff file among watcher state internals
+exit: 0
+--- old proof for contrast: git cherry -v <B> <S>
+- 992efd4db94c29ad315572015bafc602c70e1410 fix(bin): cap status logs and bound every status reader so a runaway append cannot fill the disk
++ 21a2e19afd58c3dcb7153e036568085f5708e290 no-mistakes(review): Remove repeat-collapse; exact bounded reads; growth re-alert
+- 0ff475cd5b2fa23c25939e3e92e2e6184e14d220 no-mistakes(review): Isolate refused logs; unknown not empty; cap remote mirror
+- 7f76980a38f0cfdc4fe85da6dd5f8b0819514b01 no-mistakes(review): Map remote helper paths; crew-state unknown on refused log
+- 1172ac00883854209a0b81050670eb727edd5b20 no-mistakes(review): Bound diverged key scan and Pi dispatch log read
+- 081e11be6dd423edada02338566e04dcf285a4ff no-mistakes(test): Retry lsof for reopening writers; check cap during linger
+- 7143fc93f4902709b35e31c05a35678e1b0f791f no-mistakes(test): Fix cap-wake linger delay; drop reopen-loop retries
+- fe29a09c56604e40873dfa5ea1e7b5d5d6683b0b no-mistakes(test): Bound wake drain annotation reads by status read limit
+- 8946238842a619953566cb0c84f7e1d8a1e9544d no-mistakes(document): Fix stale fleet-ledger and report-helper docs
+- c0b830c83ba794995fd42fbbbdd3dfc820b3a791 no-mistakes(document): Sync state inventory and over-cap wake docs
+- f3095ca7922c59d2a4ed6e4d6a9efc1e821834a2 no-mistakes(ci): I fixed all 4 failing checks. I changed 4 files and did not commit or push. **Lint 2 (caused by this PR)** - Rule broken: a library the tests load must not make ShellCheck see a variable the tests change inside `$(...)`. - Cause: `bin/fm-status-cap-lib.sh:262` had `${name//[^A-Za-z0-9._-]/_}`. ShellCheck reads the bare `_` inside that bracket as a variable. `tests/fm-control.test.sh:393` has `for _ in` inside `$(...)`, so SC2030 fired. - I found it by copying the base commit and adding the PR's files back until the warning appeared. Only `fm-status-cap-lib.sh` plus `fm-status-record-lib.sh` (which loads it) cause it. - Fix: I removed `_` from the class. The replacement is also `_`, so the output is identical (I checked it on a tricky name). I added a 2-line comment. - Other places with the same bracket form: none. - Checked: `bin/fm-lint.sh` on all changed files with the CI ShellCheck version (0.11.0) is clean. **Behavior portable serial 10: `tests/fm-open-loops.test.sh` (caused by this PR)** - Rule broken: the "deadline escapes questions" test must hook a command the reader really runs. - Cause: the test hooked a fake `cat`. This PR replaced `cat "$2"` with `[ -r "$2" ]` in `bin/fm_open_loops.py`. That change is right, because `cat` on a 265 GB log is the incident. So the fake `cat` never ran and the deadline never fired. - Fix: the test now hooks `FM_STATUS_SIZE_READER`, the seam the bounded reader uses to get a log's size. - Checked: one full local run passed, including "deadline escapes questions source recovery". - Note: on this Mac, the deadline tests sometimes fail with `[Errno 1] Operation not permitted`. The base commit does it too, on the `origins` test (2 of 3 runs under load). It is a macOS quirk in the collector's cleanup. Linux CI does not do it. I did not touch it. **Behavior portable serial 5: `tests/fm-copy-sweep.test.sh` (not caused by this PR)** - This test also failed on the base commit's own CI run (`b5ad5d7d6`), before this PR. - Cause: the sweep counts time left in whole seconds, so a `du` can get up to 1 second more than is really left. With a 1.6 s `du` and a 3 s bound, the outcome depended on the sub-second clock phase. - Fix: `FAKE_DU_SLEEP=3.5` and `FM_CHECK_TIMEOUT=11`. The first `du` always gets 4 s or more, and the second gets 3 s or less. I changed both calls and added a comment. - Checked: the old values failed 1 time in 12. The new values failed 0 times in 10. **Behavior portable serial 6: `tests/fm-turnend-guard.test.sh` (not caused by this PR)** - Cause: the node harness sent the hook payload through a pipe. Hooks that are off for Grok exit at once without reading it. On a busy host, node writes to a closed pipe and gets `EPIPE`. - Fix: `invoke` now gives the child a file as its stdin. A file cannot raise `EPIPE`. - Checked: a small demo under CPU load failed 11 of 1500 times with a pipe and 0 of 1500 with a file. The whole test passed 3 of 3 runs (94 ok each). `invoke` is the only pipe-input call in that file, and both modes use it. **Other checks:** `tests/fm-status-runaway-guard.test.sh` passes (20 ok). `git diff --check` is clean. **Left alone:** the user decisions you listed (declined items and the rest) were not touched. The macOS cleanup quirk is not fixed. I did not run the full suite or the CI shards, and I could not run a Linux job here. The Linux CI run should confirm the fixes
+- 3cd80f76e15b4eb49789c03b7aa9a4d973b442ae no-mistakes(ci): I fixed the failing test. I changed one file: tests/fm-watch-triage-helpers.sh. I did not commit or push. FAILED CHECK: Behavior portable serial 10. The test was tests/fm-watch-triage.test.sh, case test_wait_identity_concurrent_append_uses_one_snapshot. Error: "not ok - the concurrent append fixture did not append during the read". CAUSE (this PR, in the test; the product code is right): The test put a fake `tail` in front of the real one. The fake appended a line to the live log on the second `tail` call. This PR made last_status_line read through fm_status_tail_lines, which runs two `tail` calls at the same time as pipeline stages. The second call now lands where `$f` is the snapshot copy, not the live log. The append went to the wrong file. The test passed only when the two stages raced and both read count 0, so it was flaky. The earlier CI run passed by luck. I reproduced it here: 104 of 224 runs failed under load, and a trace showed the second call reading count 1. INVARIANT: A fixture that injects a concurrent append must not depend on how many internal helper calls the reader makes, or in which scope. FIX: I removed the fake `tail` and the call counter. The test now sets FM_STATUS_SPAN_READER, an existing test seam that other tests already use. The function reads the exact bytes, then appends the restated line to the live log once. So the append lands after the endpoint is captured and during the read, every time. The assertions are unchanged. SIBLING SITES CHECKED: Only this fixture counted calls. The other fakes match on argument or path shape, or hook files that are not status reads. They are the `wc` fake in tests/fm-watch-triage-helpers.sh, the `cat` fake in tests/fm-wake-drain-outcome-backstop.test.sh, and the `grep` fakes in tests/fm-captain-hold-cleanup.test.sh and tests/fm-captain-hold-reconcile.test.sh. I left them alone. I did not touch the macOS cleanup quirk from round 4. VERIFIED: bash -n on the file is clean. git diff --check is clean. One run of the fixed function passed. A stress run passed 4 of 4, but I stopped it early, so it is not the 16 runs I planned. NOT VERIFIED: bin/fm-lint.sh did not finish. The machine load average was 165, and I stopped it. Lint for this file is not confirmed. I did not run the mutation check, which would break the product code on purpose to show the test fails. I did not run the full tests/fm-watch-triage.test.sh file. I could not run a Linux job, so the Linux CI run is the real check. CLEANUP: I removed my scratch files, including /tmp/ci-log-r5 and the .scratch-ci directory in the worktree. git status shows only tests/fm-watch-triage-helpers.sh as modified. The "failed exit 144" notices from the harness came from my own pkill. They are not test failures
+- 08efa8f016b266caee00d443bc3103d5bbf7f049 no-mistakes(ci): I fixed ci-1 with a test-only change. I changed one file: tests/fm-status-runaway-guard.test.sh. I did not commit or push. I did not change anything in bin/. FAILED CHECK: Behavior portable serial 13, tests/fm-status-runaway-guard.test.sh. The failing case was test_foreign_omp_writer_is_named_stopped_and_never_deleted, with "the watcher did not wake for the runaway log". ROOT CAUSE (the fixture, not bin/): - start_paced_writer wrote 13000 five-byte lines ("text\n") every 3 s. - The watcher sorts the unread lines of a signaled log one at a time in the shell. The cap check (status_cap_tick) cannot run while it does that. - I timed the sorter on 13000 short lines. It took 67 s on this loaded host, and 3000 lines took 17 s. - The test gives the first watcher 300 polls (30 s). In CI that wait ran 33 s, with empty output and the watcher alive in state S. That matches the watcher being busy sorting lines. - In a local trace before the fix, attempt 1 lasted 83 s. It ended on a `signal:` wake with the log at 1,625,000 bytes. The log was far past the 262,144 byte cap, but the cap wake did not come until attempt 2. CI is faster per poll, so it hit the 30 s limit first. - Earlier CI runs passed by luck. The outcome depends on how many lines the log has when the first sort starts, and on the host speed. - The product behavior is documented. docs/configuration.md line 1099 says the watcher's span sorter is slow on long unread spans. The sibling case test_a_lingering_signal_does_not_hold_back_the_over_cap_stop already says "13000 short lines would take longer than the deadline on a loaded host" and uses 1000-byte lines. INVARIANT: A fixture that needs the watcher to reach its over-cap check must not give the watcher thousands of unread lines first, because the check cannot run during a sort. SIBLING SITES CHECKED: - start_paced_writer is used by three cases: the foreign omp case (the failing one), the non-omp case, and the resumed-writer case. All three go through run_until_cap_wake, and one edit fixes all three. - The linger case already uses 1000-byte lines. - The foreign-none log is one long line. - The held-open incident writer (3 million tiny lines) runs the guard scan only, with no watcher, so it is not affected. It still pins the tiny-line incident shape. FIX: start_paced_writer now writes 65 lines of 1000 bytes per round instead of 13000 lines of 5 bytes. Each round is still 65000 bytes, so the cap (262144), the 60 rounds, the 4 MiB hard limit and every assertion are unchanged. I updated the comment to explain why. No assertion was weakened, removed or skipped. MEASURED (this Mac, load average about 35): - Before: attempt 1 lasted 83 s and ended on `signal:`. - After: attempt 1 lasted 8 s, and the cap wake came in attempt 2 after 4 s, at 325000 bytes. - Full tests/fm-status-runaway-guard.test.sh: exit 0, 20 ok. - The four watcher cases (foreign omp, non-omp, resumed, linger) passed 2 more times in a row, 4 ok each time. - bin/fm-lint.sh on the file: exit 0 (ShellCheck 0.11.0). git diff --check is clean. NOT RUN: I could not run a Linux job here. The Linux CI run is the real check. The before/after timing comes from this Mac, not from the CI runner. I did not run the mutation check on the product code. PRODUCT NOTE (not changed, as instructed): While the watcher sorts a span of up to 32,768 lines, it cannot raise the over-cap wake. A `signal:` wake also exits without a cap check, which is why attempt 1 above ended on `signal:`. If the owner wants this closed, the exact remedy is to run status_cap_tick in bin/fm-watch.sh signal_phase right after the classification and before wake "$reason". Bounding the classification time would be the other option. This is close to the declined test-resume-rearm item, so I left it alone. CLEANUP: I removed my scratch files and the probe copy of the test. git status shows only tests/fm-status-runaway-guard.test.sh as modified. Test runs left temp directories under ~/tmp
+- 90fd03293b522f27555ffabb21591c1f82f33e53 no-mistakes(review): Check status cap during signal sorts and before wakes
++ 93a1f9c1e400191490e55da6d7d5f5cc78309537 no-mistakes(review): Check status cap during stale and push walks
+- 827cbcdc3ba31ecc00a69ea9f4d8b47ad35ca2a1 no-mistakes(document): Confirm status-cap guard docs match walk ticks
+- 13a87ea5441eae26250dd05ecec43445227065d3 no-mistakes(review): Check status cap before every wake and steer fold
+- de70e80b7c1567eff205fa860deec458eb57b54f no-mistakes(review): Stop cap check from re-entering its own wake
+- e44594d0686b995b9672607cf652cce80bdf982d no-mistakes(review): Check status cap inside its wake without a second wake
+- 182298e4be29377e8a3c504e92d7364dc801c117 no-mistakes(ci): Fixed the PR-caused failure. Two other failures are pre-existing flakes and are not caused by this PR. Root cause (ci-1, ci-2, ci-5): the new serial member tests/fm-status-runaway-guard.test.sh (199417 ms, the weight the user chose) made `bin/fm-test-run.sh --check-coverage` refuse the 20-shard layout. Shard 3 packed 1203868 ms, which is above the 1200000 ms target and above its own largest suite (917727 ms). I reproduced this locally. - Invariant: every portable serial shard that holds more than one script must model at or below 1200000 ms. The shard count in bin/fm-test-run.sh, the CI matrix and the docs must agree. - Sites that use the shard count: PORTABLE_SERIAL_SHARDS in bin/fm-test-run.sh (the one owner), the shard matrix in .github/workflows/ci.yml (tests/fm-ci-workflow.test.sh requires it to match --list-lanes), and docs/fm-test-portable-shards.md. - Why "Test coverage guard" failed: it runs the same guard. - Why "Behavior portable parallel 1" failed: tests/fm-test-run.test.sh runs the same guard. - Why "Behavior portable serial 11" failed: tests/fm-ci-workflow.test.sh reads parallel_jobs from --check-coverage, so it failed with "the runner did not report parallel_jobs". Fix: I added one shard, which is the remedy the guard itself names ("rebalance or add shards; do not raise the job timeout"). 1. bin/fm-test-run.sh: PORTABLE_SERIAL_SHARDS changes from 20 to 21. 2. .github/workflows/ci.yml: shard 21 is added to the serial matrix. 3. docs/fm-test-portable-shards.md: a dated 2026-10-23 note explains why there are 21 shards, and the job-count line now says twenty-seven jobs (twenty-one serial). 4. No change to the packing target, the timeouts or any weight. The user's 199417 weight is kept. - At 21 shards, every multi-script shard models between 1140193 and 1140402 ms. Shards 1 and 2 each hold one indivisible suite. Not caused by this PR (no code change): - ci-4, serial 15, tests/fm-wake-queue.test.sh "concurrent append/drain subprocess failed" ("queue lock could not be acquired safely"): the same failure happened on main run 40036043378 (48b2df356, an ancestor of the base) and on runs 40020260758 and 39948616410. This PR does not change the drain or lock code. - ci-3, serial 13, tests/fm-contributions.test.sh "unchanged PR was re-read with 2 counted REST calls": the read path (bin/fm-gh-rest.sh, bin/fm-pr-poll.sh) is not changed by this PR. The full suite passed locally: 56 ok, exit 0. This is a load-sensitive CI flake. Checks I ran: - `bin/fm-test-run.sh --check-coverage`: exit 0, FM_TEST_COVERAGE ok, serial_shards=21, parallel_jobs=3. - tests/fm-ci-workflow.test.sh: exit 0, 10 ok. - tests/fm-test-run.test.sh: exit 0, 65 ok, 0 not ok. - tests/fm-documentation-audiences.test.sh: exit 0. - `git diff --check`: clean
+- 84cef40e3f0ca225c25c9919aca352d72a3d684e no-mistakes(review): Refuse cold open-decision folds; correct shard note
+- 555997f8b96f605f5d3dbceb661a4ed4efca5bab no-mistakes(review): Accept refused latest-event reads; keep fold stderr on fd 2
+- 7b6d7bcd02c7da433bc90ae66e74958c7d43043a no-mistakes(document): Document open-loops handling of refused latest-event reads
+- 45ff15cebdccd882c79d57a80c7dc3043c926379 no-mistakes(ci): ci-2 (Behavior portable serial 7) was caused by this PR and is fixed. ci-1 (Behavior portable serial 5) is a pre-existing timing race in code this PR does not touch, so it gets no code change. ci-2: tests/fm-control-relaunch-recovery.test.sh, case test_relocation_refuses_a_non_lease_copy, variant missing-jq, failed with empty output. - Root cause: this PR makes bin/fm-spawn.sh source bin/fm-status-cap-lib.sh. That library ran `IFS= command read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :` at load time. The test masks jq through BASH_ENV with a shell function named `command`. Under `set -eu`, a function-wrapped `command read` makes bash exit silently even with `|| :` (I reproduced this on bash 3.2 here, and CI's Linux bash does the same). So fm-spawn died before it could print its 'needs jq' refusal. - Invariant: sourcing a library only defines functions and constants and must never end the caller's shell. The library header says exactly this. - Sibling sites: I checked every top-level `command` use in the libraries and scripts this PR adds or changes. This line was the only one. Every other heredoc read in the repo (bin/fm-brief.sh, bin/fm-spawn.sh:7373) already uses plain `IFS= read -r -d ''`. - Fix: one line in bin/fm-status-cap-lib.sh:161 drops the `command` prefix, so the line now matches the repo's usual form. - Proof: the existing test already reproduces the bug. The case fails on HEAD before the fix, passes on base 7eb37bf8e, and passes on HEAD after the fix. tests/fm-status-runaway-guard.test.sh: 33 ok, 0 not ok. shellcheck bin/fm-status-cap-lib.sh: clean. git diff --check: clean. ci-1: tests/fm-remote-transport-lanes.test.sh failed with 'concurrent exclusive creators left mutex litter: ...claim.creating.owner.268301.*.reaped.claim.creating.owner.268315.*'. - This PR's only change to that test adds bin/fm-status-cap-lib.sh to a copy list. The PR does not change bin/fm-remote-job-lib.sh, where the code under test lives. - Race I traced: fm_remote_job_reload_lock_release first runs `rm -f` on the lock and then `rm -rf` on its owner folder. A reclaimer that read the old link can see that folder half-deleted (pid file gone) and judge the owner dead. It then moves the folder into a tomb. Next it finds that the lock already points to a new, live owner, so it returns 1. The tomb stays behind, and no later caller clears it. - Evidence it is a rare timing flake: the same test passed 15 of 15 runs on HEAD here. Of the last 40 failed CI runs in the repo, this failure shows up in this run only. - Fixing that lock-release race would change remote-job locking that this PR does not touch, so it is out of scope. A rerun should pass. The race should be tracked as a separate defect in fm_remote_job_reload_lock_release / fm_remote_job_reload_lock_take
+- cf98ddaee09fabd288a2a0f4c2dff380d6aad270 Make a refused unread suffix an incomplete open set and bound the snapshot and Pi status reads
+- 431049aad9faff1f6dfc5dd94a733a8a61cc83a2 no-mistakes(review): Fix Pi status-read spies, ledger clamp edge, drain docs
+- 61297e1d212a72b867ae91f44f0527fb6b6f4998 no-mistakes(review): Whole-log status readers and folds take the byte limit alone
+- 117628bd3f15c27e0a85024831acef423cc7891c no-mistakes(review): Bound whole-log status scans with one filter pass
+- b353511c1ae07d13a89479f283bef8f4231df06e no-mistakes(review): Narrow event filter, absolute wait identity, ticked scans
+- 41bd3eaf8e65b94181e2731936cdcee00a782640 no-mistakes(review): Hand off captured-tick rate, tick stale windows, widen filter
+- 5d6cf49033cb616b1ab8d30c87e30338e3f43455 no-mistakes(review): Carry only the held growth rate; expire it off-list
+- 505355f8c0a775a1f7dccd759e4a21856074851f no-mistakes(document): List status-cap handoff file among watcher state internals
+
+=== remove-cd-guard-1  S=f226d9958b913236922d04d7f3fe97ec218c5e42 B=8ef307f3a46f111f89271d8dfc103e328bb1f632
+$ git rev-parse <S>; git rev-parse <B>
+f226d9958b913236922d04d7f3fe97ec218c5e42
+8ef307f3a46f111f89271d8dfc103e328bb1f632
+$ git merge-base <S> <B> -> e9e48e1a201a1cb6e96be7743737cc1e61f3a43a
+$ git rev-list --count <S-base>..<S> -> 2
+B-base = <B>~2 = 7f90859803a14015f6739afae598c82550c7d3d7
+$ git range-diff e9e48e1a201a1cb6e96be7743737cc1e61f3a43a..f226d9958b913236922d04d7f3fe97ec218c5e42 8ef307f3a46f111f89271d8dfc103e328bb1f632~2..8ef307f3a46f111f89271d8dfc103e328bb1f632
+1:  36168dafe ! 1:  5b6e9f108 wip: cd-guard removal and cwd-write fixes before the six file deletions
+    @@ bin/fm-test-isolation-proof.sh: tests/fm-captain-hold-keyed-answers.test.sh
+      tests/fm-crew-state.test.sh
+     
+      ## bin/fm-test-run.sh ##
+    +@@ bin/fm-test-run.sh: PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
+    + # 1200000 ms bounds a real lane near 20 minutes, and a new member or a slow
+    + # path fails the coverage guard instead of quietly stretching the workflow.
+    + # The 2026-10-26 refresh measured every parallel hint, including the five the
+    +-# fm-lint split had apportioned; the fm-cd-pretool-check hint has since become a
+    +-# scaled estimate that docs/fm-test-portable-shards.md records. Lane 1 is
+    ++# fm-lint split had apportioned. Lane 1 is
+    + # fm-test-run, fm-lint, fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
+    + # fm-backend-herdr, fm-arm-pretool-check, fm-brief, fm-grok-harness,
+    + # fm-send-strict, fm-pi-primary-types, and fm-supervision-instructions;
+    + # fm-pi-primary-types stays in lane 1 because that is the job that installs the
+    + # Pi package and the TypeScript compiler it typechecks with. Lane 2 holds the
+    +-# other twenty. Their three-bin packings model at 1030514 ms and 1043313 ms, so
+    +-# the reported parallel_makespan_ms is 1043313 ms, and replaying each run's own
+    ++# other nineteen. Their three-bin packings model at 1030514 ms and 1023089 ms, so
+    ++# the reported parallel_makespan_ms is 1030514 ms, and replaying each run's own
+    + # durations through that membership puts a real lane between 958965 ms and
+    + # 1027567 ms. Like the serial target this is packing arithmetic, not an
+    + # execution timeout.
+     @@ bin/fm-test-run.sh: family_for_basename() {
+          fm-arm-pretool-check.test.sh|fm-ask-user-authority.test.sh|\
+          fm-bearings-board.test.sh|\
+    @@ bin/fm-test-run.sh: tests/fm-captain-hold-keyed-answers.test.sh
+      tests/fm-composer-ghost.test.sh
+      tests/fm-composer-lib.test.sh
+      tests/fm-crew-state.test.sh
+    -@@ bin/fm-test-run.sh: tests/fm-captain-hold-keyed-answers.test.sh 185475
+    - tests/fm-captain-hold-lifecycle.test.sh 277909
+    - tests/fm-captain-hold-reconcile.test.sh 268161
+    - tests/fm-captain-hold-sweep.test.sh 261144
+    --tests/fm-cd-pretool-check.test.sh 19990
+    - tests/fm-composer-ghost.test.sh 3649
+    - tests/fm-composer-lib.test.sh 192576
+    - tests/fm-crew-state.test.sh 116812
+    -@@ bin/fm-test-run.sh: tests/fm-captain-hold-lifecycle.test.sh
+    - tests/fm-captain-hold-reconcile.test.sh
+    - tests/fm-captain-hold-sweep.test.sh
+    - tests/fm-arm-pretool-check.test.sh
+    +@@ bin/fm-test-run.sh: tests/fm-captain-hold-keyed-answers.test.sh 350046
+    + tests/fm-captain-hold-lifecycle.test.sh 509030
+    + tests/fm-captain-hold-reconcile.test.sh 446667
+    + tests/fm-captain-hold-sweep.test.sh 494535
+    +-tests/fm-cd-pretool-check.test.sh 66063
+    + tests/fm-composer-ghost.test.sh 5046
+    + tests/fm-composer-lib.test.sh 373103
+    + tests/fm-crew-state.test.sh 251251
+    +@@ bin/fm-test-run.sh: tests/fm-captain-hold-keyed-answers.test.sh
+    + tests/fm-lint-report.test.sh
+    + tests/fm-crew-state.test.sh
+    + tests/fm-lint-slots.test.sh
+     -tests/fm-cd-pretool-check.test.sh
+    - tests/fm-tmux-submit-busy.test.sh
+    - tests/fm-review-diff.test.sh
+    - tests/fm-send-strict.test.sh
+    + tests/fm-x-mode.test.sh
+    + tests/fm-herdr-lab.test.sh
+    + tests/fm-lint-policy.test.sh
+     
+      ## bin/fm-turnend-guard.sh ##
+     @@ bin/fm-turnend-guard.sh: fi
+    @@ docs/fm-test-isolation-proof.md: This record owns concurrent isolation evidence
+      - `tests/fm-composer-ghost.test.sh`
+      - `tests/fm-composer-lib.test.sh`
+      - `tests/fm-crew-state.test.sh`
+    -@@ docs/fm-test-isolation-proof.md: That run is therefore not a clean 29-path pass and does not replace the archived
+    +@@ docs/fm-test-isolation-proof.md: The portable parallel lanes are the confirmation for the three new paths, and a
+      | 27529 | 0 | 1 | `tests/fm-arm-pretool-check.test.sh` |
+      | 20922 | 0 | 21 | `tests/fm-test-run.test.sh` |
+      | 17558 | 0 | 8 | `tests/fm-crew-state.test.sh` |
+    @@ docs/fm-test-isolation-proof.md: That run is therefore not a clean 29-path pass
+     
+      ## docs/guards/registry.json ##
+     @@
+    -       "harm": "reversible",
+    -       "remedy_verified": "fixture"
+    -     },
+    --    {
+    --      "decision": "deny",
+    --      "fail_direction": "closed",
+    --      "proxy": false,
+    --      "proxy_reason": "",
+    --      "precheck_gap": "",
+    --      "exemptions": [],
+    --      "instrumented": false,
+    --      "status": "active",
+    --      "telemetry": "state/guard-events.jsonl",
+    --      "version": "1",
+    +       "status": "active",
+    +       "telemetry": "state/guard-events.jsonl",
+    +       "version": "1",
+     -      "id": "persistent-cd-guard",
+     -      "owner": "bin/fm-cd-pretool-check.sh",
+     -      "invariant": "a persistent top-level cd never moves this session out of its home",
+    --      "layer": "runtime-block",
+    +-      "layer": "runtime-warn",
+     -      "source": "hook payload command string; git-dir versus git-common-dir of the destination",
+     -      "trigger": "a top-level cd, pushd, or popd would leave the home or the repository",
+     -      "remedy": "run the command in a subshell: ( cd <dir> && <command> ); bin/fm-cd-pretool-check.sh --command '<cmd>' reports the offending segment",
+    @@ docs/guards/registry.json
+     -      "test": "tests/fm-cd-pretool-check.test.sh",
+     -      "tier": "C",
+     -      "harm": "reversible",
+    +-      "layer_note": "warns by default (FM_CD_GUARD_MODE=warn): the correction is printed and the command runs with exit 0; FM_CD_GUARD_MODE=deny is the opt-in that restores the original runtime block; docs/cd-guard.md owns the contract",
+     -      "remedy_verified": "fixture"
+     -    },
+    -     {
+    -       "decision": "deny",
+    -       "fail_direction": "closed",
+    +-    {
+    +-      "decision": "deny",
+    +-      "fail_direction": "closed",
+    +-      "proxy": false,
+    +-      "proxy_reason": "",
+    +-      "precheck_gap": "",
+    +-      "exemptions": [],
+    +-      "instrumented": false,
+    +-      "status": "active",
+    +-      "telemetry": "state/guard-events.jsonl",
+    +-      "version": "1",
+    +       "id": "watcher-arm-pretool",
+    +       "owner": "bin/fm-arm-pretool-check.sh",
+    +       "invariant": "a watcher arm never runs backgrounded in the shell",
+     
+      ## docs/subagent-guard.md ##
+     @@
+    @@ tests/fm-cursor-primary.test.sh: test_pretool_guards_deduplicate_and_render_curs
+     -  local dir payload out decision
+     -  dir=$(make_primary_dir "$TMP_ROOT/host-cd")
+     -  payload='{"tool_name":"Shell","tool_input":{"command":"cd projects/example"},"cursor_version":"2026.08.11-e8db854"}'
+    --  out=$(printf '%s' "$payload" | FM_HOME="$dir" bash "$dir/bin/fm-cd-pretool-check.sh" --cursor 2>/dev/null)
+    +-  out=$(printf '%s' "$payload" | FM_HOME="$dir" FM_CD_GUARD_MODE=deny bash "$dir/bin/fm-cd-pretool-check.sh" --cursor 2>/dev/null)
+     -  decision=$(printf '%s' "$out" | jq -r '.permission // empty' 2>/dev/null)
+     -  [ "$decision" = deny ] || fail "expected a Cursor deny object from the cd guard, got: $out"
+     -  out=$(printf '%s' "$payload" | FM_HOME="$dir" bash "$dir/bin/fm-cd-pretool-check.sh" 2>&1)
+2:  f226d9958 ! 2:  8ef307f3a Remove obsolete persistent-directory-change guard
+    @@ .opencode/plugins/fm-primary-cd-check.js (deleted)
+     -import { resolve } from "node:path";
+     -import { spawn } from "node:child_process";
+     -
+    --// PreToolUse seatbelt for OpenCode: block a stray persistent top-level `cd` in
+    --// the primary firstmate checkout before the agent's bash tool relocates the
+    --// shell out of the home (see bin/fm-cd-pretool-check.sh and docs/cd-guard.md).
+    +-// PreToolUse seatbelt for OpenCode: in FM_CD_GUARD_MODE=deny, block a stray
+    +-// persistent top-level `cd` in the primary firstmate checkout before the
+    +-// agent's bash tool relocates the shell out of the home (see
+    +-// bin/fm-cd-pretool-check.sh and docs/cd-guard.md). The default warn mode exits
+    +-// 0, so this plugin does nothing for it.
+     -// This mirrors fm-primary-pretool-check.js, calling the cd-guard owner instead
+     -// of the watcher-arm one. tool.execute.before can block by throwing (verified
+     -// 2026-07-09 against OpenCode 1.17.15 for the watcher-arm plugin; the same
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -// A stray persistent top-level `cd projects/<clone>` silently relocates the
+     -// primary shell, so the next firstmate-owned command (a backlog write, an
+     -// fm-* lifecycle call, tasks-axi) runs inside a project clone instead of the
+    --// home. This policy blocks exactly that class of command; the environmental
+    --// scoping to the real primary checkout lives in the bin/fm-cd-pretool-check.sh
+    --// transport, not here. See docs/cd-guard.md for the full contract.
+    +-// home. This policy warns about exactly that class of command, or denies it
+    +-// when FM_CD_GUARD_MODE=deny; the environmental scoping to the real primary
+    +-// checkout lives in the bin/fm-cd-pretool-check.sh transport, not here. See
+    +-// docs/cd-guard.md for the full contract.
+     -//
+     -// The shell tokenizer and command-position analysis are imported from
+     -// bin/fm-arm-command-policy.mjs, the sole owner of firstmate's shell
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -    "a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
+     -};
+     -
+    +-// The warn decision lets the command run, so its text must not claim a block.
+    +-const WARN_REASONS = {
+    +-  "persistent-cd":
+    +-    "a persistent top-level directory change in the primary firstmate checkout already ran, so the shell is now outside the firstmate home and a later firstmate-owned command runs inside that directory. Run cd back to the firstmate home before any firstmate-owned command. Next time reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...).",
+    +-};
+    +-
+     -// Directory-changing builtins that mutate the calling shell's own cwd.
+     -const CD_BUILTINS = new Set(["cd", "pushd", "popd"]);
+     -
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -  return { decision: "deny", code, reason: REASONS[code] };
+     -}
+     -
+    +-function warn(code) {
+    +-  return { decision: "warn", code, reason: WARN_REASONS[code] };
+    +-}
+    +-
+     -function hasPathQualifiedCommandPrefix(position) {
+     -  return position.words
+     -    .slice(position.prefixAssignments, position.index)
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -  return false;
+     -}
+     -
+    --function decision(command) {
+    +-function decision(command, mode = "warn") {
+     -  const lexed = new Lexer(command).tokenize();
+     -  // Fail open on syntax this classifier cannot tokenize. The cd-guard's threat
+     -  // model is agent mistakes - an accidental bare `cd projects/foo` always
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -    if (!command) continue;
+     -    if (!CD_BUILTINS.has(command.value)) continue;
+     -    if (position.wrappers.some((wrapper) => FORKING_WRAPPERS.has(wrapper))) continue;
+    --    return deny("persistent-cd");
+    +-    return mode === "deny" ? deny("persistent-cd") : warn("persistent-cd");
+     -  }
+     -  return { decision: "allow" };
+     -}
+    @@ bin/fm-cd-command-policy.mjs (deleted)
+     -    if (!args.commandSet || !args.command) {
+     -      process.stdout.write("allow\n");
+     -    } else {
+    --      const result = decision(args.command);
+    +-      const result = decision(args.command, process.env.FM_CD_GUARD_MODE === "deny" ? "deny" : "warn");
+     -      if (result.decision === "allow") {
+     -        process.stdout.write("allow\n");
+     -      } else {
+    --        process.stdout.write(`deny\t${result.code}\t${result.reason}\n`);
+    +-        process.stdout.write(`${result.decision}\t${result.code}\t${result.reason}\n`);
+     -      }
+     -    }
+     -  } catch (error) {
+    @@ bin/fm-cd-pretool-check.sh (deleted)
+     -# A stray persistent top-level `cd projects/<clone>` in the PRIMARY firstmate
+     -# shell silently relocates the shell, so a later firstmate-owned command (a
+     -# backlog write, an fm-* lifecycle call, tasks-axi) runs inside a project clone
+    --# instead of the home. This seatbelt denies such a command before it runs.
+    --# bin/fm-cd-command-policy.mjs is the sole owner of the block/allow decision; it
+    +-# instead of the home. This seatbelt warns by default; FM_CD_GUARD_MODE=deny
+    +-# restores the block. bin/fm-cd-command-policy.mjs owns the decision; it
+     -# reuses the shell classifier owned by bin/fm-arm-command-policy.mjs. This
+     -# wrapper only scopes the guard to the real primary checkout, acquires the
+     -# harness payload, invokes that policy, and renders the established harness
+    @@ bin/fm-cd-pretool-check.sh (deleted)
+     -#
+     -# Stdin mode extracts .toolInput.command for Grok or .tool_input.command for
+     -# Claude, Codex, and Cursor. CLI mode is used by OpenCode and Pi after their
+    --# adapters extract the exact command string. --cursor selects Cursor's own deny
+    --# rendering and marks this invocation as the Cursor registration rather than the
+    --# Claude-settings duplicate Cursor also loads.
+    +-# adapters extract the exact command string. --cursor selects Cursor's own
+    +-# decision rendering and marks this invocation as the Cursor registration rather
+    +-# than the Claude-settings duplicate Cursor also loads.
+     -#
+    --# Exit/output contract (identical shape to bin/fm-arm-pretool-check.sh):
+    +-# Exit/output contract (FM_CD_GUARD_MODE=warn by default; deny restores blocks):
+     -#   ALLOW - exit 0 and no output.
+    +-#   WARN - exit 0, stderr empty, and a systemMessage plus
+    +-#          hookSpecificOutput.additionalContext object on stdout with no
+    +-#          permissionDecision, because an allow would auto-approve the command;
+    +-#          --cursor uses permission=allow and user_message on stdout instead.
+     -#   DENY - exit 2, a Claude-shaped deny object on stderr, and a Grok-shaped
+     -#          deny object on stdout unless --claude was supplied.
+     -#   DENY, --cursor - exit 0 and Cursor's own decision object on stdout. Cursor
+    @@ bin/fm-cd-pretool-check.sh (deleted)
+     -toolInput.command, or Claude/Codex tool_input.command).
+     -Fires only in the real primary firstmate checkout; it is a silent no-op in a
+     -crewmate/scout task worktree or any non-firstmate repo.
+    --Exits 0 to allow and 2 to deny a persistent top-level cwd change.
+    --The deny reason is written to stderr, with a Grok decision object on stdout
+    +-FM_CD_GUARD_MODE=warn (default) allows persistent top-level cwd changes with a
+    +-correction message on stdout (systemMessage and additionalContext, no
+    +-permissionDecision) and exit 0. Set FM_CD_GUARD_MODE=deny to restore exit 2 and
+    +-the original deny response on stderr, with a Grok decision object on stdout
+     -unless --claude is supplied.
+    +-With --cursor, warnings use permission=allow and user_message on stdout.
+     -With --cursor, a deny is Cursor's own decision object on stdout and exit 0,
+     -because Cursor reads the returned object rather than the exit status.
+     -Malformed transport and an unavailable classifier runtime fail open.
+    @@ bin/fm-cd-pretool-check.sh (deleted)
+     -
+     -TAB=$(printf '\t')
+     -DECISION=${POLICY_OUTPUT%%"$TAB"*}
+    --[ "$DECISION" = "deny" ] || exit 0
+    +-case "$DECISION" in
+    +-  warn|deny) ;;
+    +-  *) exit 0 ;;
+    +-esac
+     -REST=${POLICY_OUTPUT#*"$TAB"}
+     -[ "$REST" != "$POLICY_OUTPUT" ] || exit 0
+     -CODE=${REST%%"$TAB"*}
+    @@ bin/fm-cd-pretool-check.sh (deleted)
+     -
+     -DETAIL="[$CODE] $REASON"
+     -ESCAPED=$(json_escape "$DETAIL")
+    +-if [ "$DECISION" = warn ]; then
+    +-  if [ "$CURSOR_MODE" -eq 1 ]; then
+    +-    printf '{"permission":"allow","user_message":"%s"}\n' "$ESCAPED"
+    +-  else
+    +-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"%s"},"systemMessage":"%s"}\n' "$ESCAPED" "$ESCAPED"
+    +-  fi
+    +-  exit 0
+    +-fi
+     -if [ "$CURSOR_MODE" -eq 1 ]; then
+     -  printf '{"permission":"deny","user_message":"%s"}\n' "$ESCAPED"
+     -  exit 0
+    @@ docs/cd-guard.md (deleted)
+     -The primary firstmate shell persists its working directory across tool calls.
+     -A stray persistent top-level `cd projects/<clone>` therefore silently relocates the shell, so the next firstmate-owned command - a backlog write, an `fm-*` lifecycle call - runs inside a project clone instead of the home.
+     -That has actually happened: a persistent top-level `cd` caused a firstmate-owned backlog write to execute inside a project clone rather than the home.
+    --The seatbelt denies exactly that command shape - a cwd change that persists to the primary shell - before it runs.
+    +-The seatbelt warns about exactly that command shape - a cwd change that persists to the primary shell - and lets it run by default.
+    +-`FM_CD_GUARD_MODE` accepts `warn` (default) and `deny`; setting `FM_CD_GUARD_MODE=deny` restores the original block with one variable, without changing classification or scope.
+     -
+     -This guard is not a general sandbox.
+     -It classifies shell command positions only; it never evaluates, expands, sources, or runs any byte of the submitted command.
+    @@ docs/cd-guard.md (deleted)
+     -It therefore applies in a git-cloned secondmate home where git-dir equals git-common-dir, but remains inert in a treehouse-leased secondmate home that is itself a linked worktree.
+     -Secondmate child crew and scout worktrees are likewise inert under the linked-worktree test.
+     -
+    --## Block vs allow
+    +-## Warn vs silent allow
+     -
+     -The discriminator is persistence to the parent shell's cwd, not the mere presence of the token `cd`.
+     -
+    --The guard **blocks** a `cd`, `pushd`, or `popd` builtin that runs in an executed top-level position in the parent shell, because such a command persistently changes the primary shell's own working directory.
+    +-The guard **warns** by default (or **blocks** in `deny` mode) for a `cd`, `pushd`, or `popd` builtin that runs in an executed top-level position in the parent shell, because such a command persistently changes the primary shell's own working directory.
+     -This covers a bare `cd projects/foo`, `cd ..`, `cd`, `cd -`, an absolute `cd /some/path` (still a persistent relocation of the parent shell), `pushd <dir>`, `popd`, a leading-assignment form such as `X=1 cd foo`, quoted or escaped command-word fragments that cook to a bare builtin, and any list form where the builtin runs in the parent shell (`cd x && cmd`, `cmd; cd x`, `cmd || cd x`, `command cd x`, `command -p cd x`, `command -- cd x`, `builtin cd x`, `command builtin cd x`, `cd x >/dev/null`, and newline-separated lists).
+     -
+     -The guard **allows** everything else, including these safe scoped forms that must never be blocked:
+    @@ docs/cd-guard.md (deleted)
+     -- A `command` query such as `command -v cd`, `command -V cd`, or a clustered form such as `command -pv cd`, because it reports command resolution without executing the named builtin.
+     -- The token `cd` appearing as data: quoted text (`echo "cd projects/foo"`), a comment, a substring of another word (`cdk`, `abcd`, `record`), a `printf` payload, or any later argument word.
+     -
+    --An absolute-path `cd` is blocked on purpose: the ALLOW carve-out for absolute paths is for commands that address a target by absolute path, not for `cd`, which relocates the shell itself regardless of whether its argument is relative or absolute.
+    --Blocking a top-level `cd` is safe in the strong sense: the guard's steady state is "always at the home", so a return-to-home `cd` is redundant rather than necessary, and the block never causes a wrong-directory write.
+    +-An absolute-path `cd` intentionally receives the same warning (or block in `deny` mode): the silent-allow carve-out for absolute paths is for commands that address a target by absolute path, not for `cd`, which relocates the shell itself regardless of whether its argument is relative or absolute.
+    +-In default `warn` mode the correction is advisory, not protection against a wrong-directory write; `deny` mode prevents the classified command from running.
+     -
+     -### Accepted non-goals
+     -
+    @@ docs/cd-guard.md (deleted)
+     -
+     -## Stable reason code
+     -
+    --Every deny carries one stable code in square brackets before its prose reason.
+    +-Every warning and deny carries the same stable code in square brackets before its prose reason.
+    +-`deny` mode keeps the original reason, which says the directory change "is blocked", so its response is unchanged byte for byte.
+    +-`warn` mode uses its own reason, because the command has already run: it says the directory change already ran and the shell is now outside the firstmate home, then names `git -C <dir>`, an absolute path on the command itself, `(cd <dir> && ...)`, and `cd` back to the firstmate home.
+     -
+     -| Code | Meaning |
+     -| --- | --- |
+     -| `persistent-cd` | A top-level `cd`/`pushd`/`popd` would persistently change the primary shell's own working directory. |
+     -
+    --The reason directs the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
+    --It does not permit `cd /home/project`, because an absolute-path `cd` remains a persistent directory change and is denied.
+    +-Both reasons direct the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
+    +-An absolute-path `cd /home/project` remains a persistent directory change, so it receives the correction rather than a silent allow.
+     -
+     -## Transport and fail-open behavior
+     -
+    @@ docs/cd-guard.md (deleted)
+     -- Grok sends stdin JSON at `.toolInput.command`.
+     -- OpenCode sends the exact command string through `--command <exact string>`.
+     -- Pi, pi-signed, and omp send the exact command string through `--command <exact string>`.
+    --- Cursor sends stdin JSON at `.tool_input.command` and adds `--cursor`, which renders the deny as Cursor's own returned decision object.
+    +-- Cursor sends stdin JSON at `.tool_input.command` and adds `--cursor`, which renders warnings and denies as Cursor's own returned decision objects.
+     -
+     -Processing order is cheapest-first: a strict-superset prefilter, then the primary-checkout scope, then the Node policy owner.
+     -The prefilter removes ordinary single quotes, double quotes, backslashes, carriage returns, and newlines before fast-allowing any command that carries no `cd`, `pushd`, or `popd` substring and no quoting-decoder marker (`$'` ANSI-C or `$"` locale), so quoted or escaped command-word fragments delegate to the policy while most commands never pay for the git scoping calls or the Node process.
+    @@ docs/cd-guard.md (deleted)
+     -
+     -## Output contract
+     -
+    --Identical in shape to `docs/arm-pretool-check.md`:
+    --
+    --- Allow (and inert-outside-primary) returns exit 0 with both streams empty.
+    --- Deny returns exit 2 and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` to stderr.
+    --- Default deny mode also writes `{"decision":"deny","reason":"[persistent-cd] reason"}` to stdout for Grok.
+    --- `--claude` suppresses stdout completely because Claude ignores a PreToolUse deny when stdout is nonempty.
+    +-- Silent allow (and inert-outside-primary) returns exit 0 with both streams empty.
+    +-- Warn returns exit 0, keeps stderr empty, and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] warn reason"},"systemMessage":"[persistent-cd] warn reason"}` to stdout.
+    +-- The warn object carries no `permissionDecision`.
+    +-- With `--cursor`, warn instead writes `{"permission":"allow","user_message":"[persistent-cd] warn reason"}` to stdout and keeps stderr empty.
+    +-- In `deny` mode, the original output is unchanged: exit 2 and `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` on stderr, plus `{"decision":"deny","reason":"[persistent-cd] reason"}` on stdout for Grok unless `--claude` suppresses stdout.
+    +-- With `--cursor`, deny instead returns exit 0 with `{"permission":"deny","user_message":"[persistent-cd] reason"}` on stdout and stderr empty, because Cursor reads the permission object rather than the exit status.
+    +-- Claude's stdout stays empty in `deny` mode because Claude ignores a PreToolUse deny when stdout is nonempty.
+     -- Codex blocks on exit 2 and displays stderr.
+     -- OpenCode throws only when the checker exits 2.
+     -- Pi, pi-signed, and omp return `{block: true}` only when the checker exits 2.
+     -
+    +-The warn shape departs from the original work order, which specified an `allow` object on stderr with stdout empty.
+    +-A successful exit does not deliver stderr, and a `permissionDecision` of `allow` would auto-approve the `cd`, so warn prints `systemMessage` and `additionalContext` on stdout with no permission decision.
+    +-Warning delivery to the model is proven for Claude by the live-session evidence in [the warning-mode PR](https://github.com/MrGTV-love/firstmate/pull/189); delivery in other harnesses remains unproven.
+    +-The OpenCode, Pi, pi-signed, and omp adapters act only on exit 2 and never read the checker's stdout on exit 0, so they do not forward the warning.
+    +-
+     -## Shared classifier ownership
+     -
+     -`bin/fm-cd-command-policy.mjs` imports the shell tokenizer and command-position analysis (`Lexer`, `splitProgram`, `commandPosition`) from `bin/fm-arm-command-policy.mjs`, the sole owner of firstmate's shell classification.
+    @@ docs/cd-guard.md (deleted)
+     -
+     -## Harness wiring
+     -
+    +-The table describes the unchanged blocking behavior in `deny` mode; default warnings exit 0 without a deny decision.
+    +-
+     -| Harness | Entry | Adapter behavior on checker exit 2 |
+     -| --- | --- | --- |
+     -| Claude | `.claude/settings.json` PreToolUse Bash hook forwarding stdin with `--claude` | Blocks the tool call; stderr deny object, stdout empty. |
+    @@ docs/cd-guard.md (deleted)
+     -## Automated validation
+     -
+     -`tests/fm-cd-pretool-check.test.sh` owns the acceptance matrix.
+    --Every block and allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, and Pi-shaped CLI entry forms.
+    --The suite also proves the end-to-end cwd-leak regression (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
+    +-Every classified and silent-allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, Pi-shaped CLI, and Cursor-shaped stdin entry forms with the mode unset and with `deny`; an explicit `warn` is spot-checked on `cd projects/foo` for each entry form, because it takes the same path as the unset default.
+    +-The original Claude-shaped stderr deny object and Cursor's stdout deny object are compared byte for byte with golden captures, including escaping and the trailing newline.
+    +-The Grok-shaped stdout deny object is checked for decoded JSON equality, not byte equality.
+    +-The suite also proves the end-to-end cwd-leak regression in `deny` mode (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
+     -
+     -Run:
+     -
+    @@ docs/cd-guard.md (deleted)
+     -
+     -## Live validation record, 2026-07-11
+     -
+    +-This record predates default warnings and describes the blocking behavior retained by `FM_CD_GUARD_MODE=deny`.
+    +-It is not live evidence of warning delivery.
+    +-
+     -Each harness ran against a scratch primary-shaped firstmate checkout: a plain git repo with `AGENTS.md`, `bin/` holding the real `fm-cd-pretool-check.sh`, `fm-cd-command-policy.mjs`, and `fm-arm-command-policy.mjs` plus a no-op dummy `fm-arm-pretool-check.sh`, a `projects/foo/` stand-in clone, and the tracked harness hook config.
+     -No live watcher, fleet state, or the captain's real primary checkout was involved.
+     -Each harness was told to run, as separate tool calls, a top-level `cd projects/foo && touch <abs>/BLOCKED` (must be denied) and a subshell `(cd projects/foo && touch <abs>/ALLOWED)` (must run), with the sentinel files as the observable.
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -# shellcheck disable=SC1091,SC2016
+     -# Behavior tests for the cd-guard PreToolUse seatbelt (docs/cd-guard.md).
+     -#
+    --# bin/fm-cd-command-policy.mjs is the single owner of the block/allow decision;
+    +-# bin/fm-cd-command-policy.mjs is the single owner of the warn/deny/allow decision;
+     -# it reuses the shell classifier owned by bin/fm-arm-command-policy.mjs.
+     -# bin/fm-cd-pretool-check.sh is the stable transport: it scopes the guard to the
+    --# real primary checkout, then drives all five harness entry forms. This suite
+    +-# real primary checkout, then drives all six harness entry forms. This suite
+     -# proves the decision matrix, the harness-output shaping, the primary-checkout
+     -# scoping (including the deliberate secondmate-home difference from the turn-end
+     -# guard), the fail-open transport behavior, the prefilter fast path, the
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -# shellcheck source=tests/lib.sh
+     -. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+     -
+    +-# Exercise the unset default independently of the invoking shell's override.
+    +-unset FM_CD_GUARD_MODE
+     -fm_git_identity fmtest fmtest@example.invalid
+     -TMP_ROOT=$(fm_test_tmproot fm-cd-pretool-check)
+     -
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -matrix_case A34 allow 'command -V cd'
+     -matrix_case A35 allow 'command -pv cd'
+     -matrix_case A36 allow 'command -vp cd'
+    +-matrix_case A37 allow 'cd "projects/foo'
+     -
+     -MATRIX_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-cd-policy-matrix.XXXXXX")
+     -FM_TEST_CLEANUP_DIRS+=("$MATRIX_TMP")
+     -
+    +-# Golden wire output captured from the original deny renderers before the warn
+    +-# change. Compare files so whitespace, escaping, and the final newline are part
+    +-# of the compatibility contract, not just the parsed JSON values.
+    +-cat > "$MATRIX_TMP/deny-claude.golden" <<'EOF'
+    +-{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+    +-EOF
+    +-cat > "$MATRIX_TMP/deny-cursor.golden" <<'EOF'
+    +-{"permission":"deny","user_message":"[persistent-cd] a persistent top-level directory change in the primary firstmate checkout is blocked; it would move the shell out of the home so a later firstmate-owned command runs inside a project clone. Reach the target without moving the shell - use git -C <dir> or an absolute path on the command itself - or scope the cd to a subshell like (cd <dir> && ...)."}
+    +-EOF
+    +-
+     -run_matrix_entry() {
+    --  local id=$1 expected=$2 entry=$3 cmd=$4 payload out_file err_file rc
+    --  out_file="$MATRIX_TMP/$id-$entry.out"
+    --  err_file="$MATRIX_TMP/$id-$entry.err"
+    +-  local id=$1 expected=$2 entry=$3 cmd=$4 mode=$5 payload out_file err_file rc
+    +-  out_file="$MATRIX_TMP/$id-$entry-$mode.out"
+    +-  err_file="$MATRIX_TMP/$id-$entry-$mode.err"
+     -
+     -  case "$entry" in
+     -    codex)
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -      "$CHECK" --command "$cmd" >"$out_file" 2>"$err_file"
+     -      rc=$?
+     -      ;;
+    +-    cursor)
+    +-      payload=$(jq -cn --arg command "$cmd" '{tool_name:"Shell",tool_input:{command:$command},cursor_version:"2026.08.11-e8db854"}')
+    +-      printf '%s' "$payload" | "$CHECK" --cursor >"$out_file" 2>"$err_file"
+    +-      rc=$?
+    +-      ;;
+     -    *)
+     -      fail "unknown matrix entry form: $entry"
+     -      ;;
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -    return
+     -  fi
+     -
+    --  [ "$rc" -eq 2 ] || fail "$id via $entry must deny, got exit $rc"
+    --  jq -e '.hookSpecificOutput.permissionDecision == "deny" and (.systemMessage | test("\\[persistent-cd\\]"))' "$err_file" >/dev/null 2>&1 \
+    --    || fail "$id via $entry deny must carry the persistent-cd reason code on stderr: $(cat "$err_file")"
+    --  if [ "$entry" = claude ]; then
+    --    [ ! -s "$out_file" ] || fail "$id via claude deny must leave stdout empty: $(cat "$out_file")"
+    --  elif [ "$entry" = grok ]; then
+    --    jq -e '.decision == "deny"' "$out_file" >/dev/null 2>&1 \
+    --      || fail "$id via grok deny must carry decision=deny on stdout: $(cat "$out_file")"
+    +-  local expected_rc=0 message_file=$out_file
+    +-  if [ "$mode" = deny ] && [ "$entry" != cursor ]; then
+    +-    expected_rc=2
+    +-    message_file=$err_file
+    +-  fi
+    +-  if [ "$mode" = deny ]; then
+    +-    if [ "$entry" = cursor ]; then
+    +-      [ ! -s "$err_file" ] || fail "$id via cursor must leave stderr empty"
+    +-      cmp -s "$MATRIX_TMP/deny-cursor.golden" "$out_file" \
+    +-        || fail "$id via cursor deny output differs from the original captured bytes"
+    +-    else
+    +-      cmp -s "$MATRIX_TMP/deny-claude.golden" "$err_file" \
+    +-        || fail "$id via $entry deny output differs from the original captured bytes"
+    +-      if [ "$entry" = claude ]; then
+    +-        [ ! -s "$out_file" ] || fail "$id via claude deny must leave stdout empty"
+    +-      else
+    +-        jq -e --arg reason "$(jq -r .systemMessage "$err_file")" \
+    +-          '. == {decision:"deny",reason:$reason}' "$out_file" >/dev/null 2>&1 \
+    +-          || fail "$id via $entry deny must preserve the Grok object"
+    +-      fi
+    +-    fi
+    +-  else
+    +-    [ ! -s "$err_file" ] || fail "$id via $entry in $mode mode must leave stderr empty: $(cat "$err_file")"
+    +-    if [ "$entry" = cursor ]; then
+    +-      jq -e '
+    +-        .permission == "allow" and
+    +-        (.user_message | contains("[persistent-cd]") and contains("git -C") and contains("already ran") and contains("cd back") and (contains("is blocked") | not)) and
+    +-        (keys == ["permission", "user_message"])
+    +-      ' "$out_file" >/dev/null 2>&1 || fail "$id via cursor lacks its warn correction object: $(cat "$out_file")"
+    +-    else
+    +-      jq -e '
+    +-        (.systemMessage | contains("[persistent-cd]") and contains("git -C") and contains("absolute path") and contains("(cd <dir> && ...)") and contains("already ran") and contains("cd back") and (contains("is blocked") | not)) and
+    +-        .hookSpecificOutput == {hookEventName:"PreToolUse",additionalContext:.systemMessage} and
+    +-        (keys == ["hookSpecificOutput", "systemMessage"])
+    +-      ' "$out_file" >/dev/null 2>&1 || fail "$id via $entry lacks its warn correction object: $(cat "$out_file")"
+    +-    fi
+    +-  fi
+    +-  expect_code "$expected_rc" "$rc" "$id via $entry in $mode mode"
+    +-  if [ "$id" = B01 ] && { [ "$entry" = claude ] || [ "$entry" = cursor ]; }; then
+    +-    pass "cd-guard: $entry $mode mode exit=$rc correction=$(cat "$message_file")"
+     -  fi
+     -}
+     -
+     -test_full_acceptance_matrix() {
+    --  local i entry
+    --  for ((i = 0; i < ${#MATRIX_IDS[@]}; i++)); do
+    --    for entry in codex claude grok opencode pi; do
+    --      run_matrix_entry "${MATRIX_IDS[$i]}" "${MATRIX_EXPECTED[$i]}" "$entry" "${MATRIX_COMMANDS[$i]}"
+    +-  local i entry mode
+    +-  for mode in default deny; do
+    +-    if [ "$mode" = default ]; then
+    +-      unset FM_CD_GUARD_MODE
+    +-    else
+    +-      export FM_CD_GUARD_MODE=$mode
+    +-    fi
+    +-    for ((i = 0; i < ${#MATRIX_IDS[@]}; i++)); do
+    +-      for entry in codex claude grok opencode pi cursor; do
+    +-        run_matrix_entry "${MATRIX_IDS[$i]}" "${MATRIX_EXPECTED[$i]}" "$entry" "${MATRIX_COMMANDS[$i]}" "$mode"
+    +-      done
+     -    done
+     -  done
+    --  pass "cd-guard acceptance matrix: ${#MATRIX_IDS[@]} cases x 5 harness entry forms, block/allow all correct"
+    +-  export FM_CD_GUARD_MODE=warn
+    +-  for entry in codex claude grok opencode pi cursor; do
+    +-    run_matrix_entry B01 deny "$entry" 'cd projects/foo' warn
+    +-  done
+    +-  unset FM_CD_GUARD_MODE
+    +-  pass "cd-guard acceptance matrix: ${#MATRIX_IDS[@]} cases x 6 harness entry forms in default and deny modes, explicit warn spot-checked, warning/deny/silent allow all correct"
+     -}
+     -
+     -# --- primary-checkout scoping ----------------------------------------------
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -  local dir out rc
+     -  dir=$(make_secondmate_fixture "$TMP_ROOT/secondmate")
+     -  out=$("$dir/bin/fm-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
+    --  expect_code 2 "$rc" "cd-guard must fire in a secondmate's own primary session (unlike the turn-end guard)"
+    --  assert_contains "$out" '[persistent-cd]' "secondmate-home block must carry the reason code"
+    +-  expect_code 0 "$rc" "cd-guard must warn in a secondmate's own primary session (unlike the turn-end guard)"
+    +-  assert_contains "$out" '[persistent-cd]' "secondmate-home warning must carry the reason code"
+    +-  printf '%s' "$out" | jq -e '.hookSpecificOutput | has("permissionDecision") | not' >/dev/null \
+    +-    || fail "secondmate-home warning must not carry a permission decision"
+     -  pass "cd-guard: fires in a secondmate home (its own primary session is a primary)"
+     -}
+     -
+     -test_inert_in_child_worktree() {
+    --  local base dir out rc
+    +-  local base dir out rc mode
+     -  base="$TMP_ROOT/child-base"
+     -  dir="$TMP_ROOT/child-wt"
+     -  make_child_worktree_fixture "$base" "$dir" >/dev/null
+    --  out=$("$dir/bin/fm-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
+    --  expect_code 0 "$rc" "cd-guard must be inert in a crewmate/scout linked worktree"
+    --  [ -z "$out" ] || fail "cd-guard produced output in a child worktree: $out"
+    --  pass "cd-guard: inert in a crewmate/scout task worktree (linked git worktree)"
+    +-  for mode in warn deny; do
+    +-    out=$(FM_CD_GUARD_MODE=$mode "$dir/bin/fm-cd-pretool-check.sh" --claude --command 'cd projects/foo' 2>&1); rc=$?
+    +-    expect_code 0 "$rc" "cd-guard must be inert in a crewmate/scout linked worktree in $mode mode"
+    +-    [ -z "$out" ] || fail "cd-guard produced output in a child worktree: $out"
+    +-  done
+    +-  pass "cd-guard: inert in a crewmate/scout task worktree in both modes (linked git worktree)"
+     -}
+     -
+     -test_inert_when_not_firstmate_repo() {
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -  [ "$home_updated" -eq 0 ] || fail "baseline: home backlog was updated, cwd leak did not reproduce"
+     -  [ "$leaked" -eq 1 ] || fail "baseline: backlog write did not leak into the clone"
+     -
+    --  # With the guard, the exact stray command is denied before it can run, so the
+    +-  # With deny mode, the exact stray command is denied before it can run, so the
+     -  # real harness never lets cwd leave the home.
+    --  out=$("$CHECK" --claude --command 'cd projects/clone' 2>&1); rc=$?
+    +-  out=$(FM_CD_GUARD_MODE=deny "$CHECK" --claude --command 'cd projects/clone' 2>&1); rc=$?
+     -  expect_code 2 "$rc" "guard must deny the stray persistent cd that caused the leak"
+     -  assert_contains "$out" '[persistent-cd]' "leak-preventing block must carry the reason code"
+     -  pass "cd-guard: reproduces the cwd leak and denies the exact command that causes it"
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -
+     -# --- fail-open transport behavior ------------------------------------------
+     -
+    --test_fail_open_empty_stdin() {
+    --  local out rc
+    --  out=$("$CHECK" < /dev/null 2>&1); rc=$?
+    --  expect_code 0 "$rc" "transport must exit 0 on empty stdin"
+    --  [ -z "$out" ] || fail "transport produced output on empty stdin: $out"
+    --  pass "cd-guard: fails open on empty stdin"
+    --}
+    --
+    --test_fail_open_unparseable_json() {
+    --  local out rc
+    --  out=$(printf 'not json at all' | "$CHECK" 2>&1); rc=$?
+    --  expect_code 0 "$rc" "transport must exit 0 on unparseable stdin JSON"
+    --  [ -z "$out" ] || fail "transport produced output on unparseable JSON: $out"
+    --  pass "cd-guard: fails open on unparseable stdin JSON"
+    +-test_fail_open_empty_and_malformed_stdin() {
+    +-  local out rc input renderer mode
+    +-  for mode in warn deny; do
+    +-    for renderer in --claude --cursor; do
+    +-      for input in '' 'not json at all'; do
+    +-        out=$(printf '%s' "$input" | FM_CD_GUARD_MODE=$mode "$CHECK" "$renderer" 2>&1); rc=$?
+    +-        expect_code 0 "$rc" "transport must exit 0 on empty/malformed stdin ($renderer, $mode)"
+    +-        [ -z "$out" ] || fail "transport produced output on empty/malformed stdin: $out"
+    +-      done
+    +-    done
+    +-  done
+    +-  pass "cd-guard: empty and malformed stdin stay silent for Claude and Cursor in both modes"
+     -}
+     -
+     -test_fail_open_missing_node() {
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -test_policy_cli_direct() {
+     -  local policy
+     -  policy="$ROOT/bin/fm-cd-command-policy.mjs"
+    --  [ "$(node "$policy" --command 'cd projects/foo' | cut -f1)" = deny ] \
+    --    || fail "policy CLI must deny a bare top-level cd"
+    +-  [ "$(node "$policy" --command 'cd projects/foo' | cut -f1)" = warn ] \
+    +-    || fail "policy CLI must warn for a bare top-level cd"
+    +-  [ "$(node "$policy" --command 'cd projects/foo' | cut -f3 | grep -c 'already ran')" -eq 1 ] \
+    +-    || fail "policy CLI warn reason must say the directory change already ran"
+    +-  [ "$(FM_CD_GUARD_MODE=deny node "$policy" --command 'cd projects/foo' | cut -f1)" = deny ] \
+    +-    || fail "policy CLI must deny a bare top-level cd in deny mode"
+    +-  [ "$(FM_CD_GUARD_MODE=deny node "$policy" --command 'cd projects/foo' | cut -f3 | grep -c 'is blocked')" -eq 1 ] \
+    +-    || fail "policy CLI deny reason must say the directory change is blocked"
+     -  [ "$(node "$policy" --command 'git -C projects/foo status')" = allow ] \
+     -    || fail "policy CLI must allow git -C"
+     -  [ "$(node "$policy" --command '(cd projects/foo && pwd)')" = allow ] \
+     -    || fail "policy CLI must allow a subshell-local cd"
+     -  [ "$(node "$policy")" = allow ] \
+     -    || fail "policy CLI must allow when no command is supplied"
+    --  pass "cd-guard: fm-cd-command-policy.mjs CLI honors the deny/allow output contract"
+    +-  pass "cd-guard: fm-cd-command-policy.mjs CLI honors the warn/deny/allow output contract"
+     -}
+     -
+     -# --- per-harness wiring -----------------------------------------------------
+    @@ tests/fm-cd-pretool-check.test.sh (deleted)
+     -test_inert_when_not_firstmate_repo
+     -test_inert_when_not_a_git_repo
+     -test_e2e_cwd_leak_regression
+    --test_fail_open_empty_stdin
+    --test_fail_open_unparseable_json
+    +-test_fail_open_empty_and_malformed_stdin
+     -test_fail_open_missing_node
+     -test_fail_open_missing_jq_on_stdin
+     -test_prefilter_skips_node_without_cd_substring
+exit: 0
+--- old proof for contrast: git cherry -v <B> <S>
++ 36168dafecc28e80f91b915a799b2f62fded09e1 wip: cd-guard removal and cwd-write fixes before the six file deletions
++ f226d9958b913236922d04d7f3fe97ec218c5e42 Remove obsolete persistent-directory-change guard
+
+=== remove-cd-guard-2  S=090061f314224d1d70f3001861c8b037a717e1bc B=a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+$ git rev-parse <S>; git rev-parse <B>
+090061f314224d1d70f3001861c8b037a717e1bc
+a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+$ git merge-base <S> <B> -> 7f90859803a14015f6739afae598c82550c7d3d7
+$ git rev-list --count <S-base>..<S> -> 4
+B-base = <B>~4 = 7c64d0d1e2188ac8cf76c6c10475af67c6a401ab
+$ git range-diff 7f90859803a14015f6739afae598c82550c7d3d7..090061f314224d1d70f3001861c8b037a717e1bc a528e3e4df4c145d1c6f59bab224dd9f0d7ba819~4..a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+1:  5b6e9f108 = 1:  230851d56 wip: cd-guard removal and cwd-write fixes before the six file deletions
+2:  8ef307f3a = 2:  a9113a070 Remove obsolete persistent-directory-change guard
+3:  72ee81d5f = 3:  ce5381556 no-mistakes(review): Retire persistent-cd-guard in ledger and drop stale references
+4:  090061f31 = 4:  a528e3e4d no-mistakes(document): Drop stale two-seatbelt wording from harness references
+exit: 0
+--- old proof for contrast: git cherry -v <B> <S>
+- 5b6e9f108a07f52584b8e829de38f081fbef3eec wip: cd-guard removal and cwd-write fixes before the six file deletions
+- 8ef307f3a46f111f89271d8dfc103e328bb1f632 Remove obsolete persistent-directory-change guard
+- 72ee81d5f7afc1fd4db3bbdcd4d3155d0fb1e2e7 no-mistakes(review): Retire persistent-cd-guard in ledger and drop stale references
+- 090061f314224d1d70f3001861c8b037a717e1bc no-mistakes(document): Drop stale two-seatbelt wording from harness references
+

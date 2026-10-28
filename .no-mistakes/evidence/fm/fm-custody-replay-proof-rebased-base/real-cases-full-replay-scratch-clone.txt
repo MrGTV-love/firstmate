@@ -1,0 +1,138 @@
+##### device-id S=6a40598b2534a80beb0316f85d3464b6edd90b50 B=031f479bef82fcd724a4d6f6615149800f0f3ce8 P=f83b073454b102d0c51da3ec5f6bfe3629a3ca8e
+$ git branch archive/device-id-submitted-6a40598b 6a40598b2534a80beb0316f85d3464b6edd90b50
+exit: 0
+$ git branch archive/device-id-pipeline-f83b0734 f83b073454b102d0c51da3ec5f6bfe3629a3ca8e
+exit: 0
+$ git reset --keep refs/heads/archive/device-id-pipeline-f83b0734
+exit: 0
+# step 5 (new):
+$ git rev-parse 6a40598b2534a80beb0316f85d3464b6edd90b50
+6a40598b2534a80beb0316f85d3464b6edd90b50
+exit: 0
+$ git rev-parse 031f479bef82fcd724a4d6f6615149800f0f3ce8
+031f479bef82fcd724a4d6f6615149800f0f3ce8
+exit: 0
+S-base=7eb37bf8e58800ecefd5892f2d73195c8a61e87f n=10
+$ git -c color.ui=false range-diff --no-patch 7eb37bf8e58800ecefd5892f2d73195c8a61e87f..6a40598b2534a80beb0316f85d3464b6edd90b50 031f479bef82fcd724a4d6f6615149800f0f3ce8~10..031f479bef82fcd724a4d6f6615149800f0f3ce8
+ 1:  6f6b177e =  1:  43cc9e1d fix(watcher): migrate device-only identities without replay
+ 2:  2d0bdb26 =  2:  c9247c29 no-mistakes(review): Migrate classified watcher identity across device shifts
+ 3:  5e825f7d =  3:  e0602a70 no-mistakes(review): Fork-free heartbeat marker path; vanished status log is quiet
+ 4:  0235aaea =  4:  7f58a304 no-mistakes(review): Skip signature decode for same-device lagging markers
+ 5:  6a57f91b =  5:  2ae858a3 no-mistakes(review): Skip owned capture for status logs with no new bytes
+ 6:  8975f8e7 =  6:  e00278bd no-mistakes(document): Point device-remount docs at their owner
+ 7:  78166bfb =  7:  9f8e29dc no-mistakes(ci): Most of these 9 red checks are not caused by this PR. I fixed two real defects in this PR's own tests. The changes are not committed. **Not this PR (no code change for these):** `main` at the base commit ff899e92a fails the same 7 shards with the same assertions: parallel 1, serial 2, 5, 7, 11, 12, 15. PR #199 (Ubuntu 26.04 runner fixes) already covers them. Serial 3 and serial 6 also fail on other `main` runs, with these assertions: - Serial 3: `fm-supervision-host-hook` "left no successor watcher" (main run d04398065). - Serial 6: `fm-remote-transport-lanes` "concurrent sequence claims were not unique" (main run 93e65be73). In an Ubuntu 26.04 container it fails the same way at base. I could not reproduce serial 3 anywhere. It passed on macOS, and the container skipped it because `node` is missing. I treat it as not caused by this PR because `main` fails the same way. That is not proven. **Real defects in this PR (fixed):** 1. **Failure swallowed.** The 8 new device-shift tests in `tests/fm-watch-triage-helpers.sh` run in a subshell. `fail` only left the subshell. The driver ignored the result. Serial 10 printed `not ok - mode identity change did not signal` and still exited 0 (green). Invariant: a failing test must fail its file. Fix: `|| exit $?` on all 8 call sites in `tests/fm-watch-triage.test.sh`. I did the same for the one sibling, `test_classify_signal_device_shift_dedup` in `tests/fm-daemon.test.sh`. This is the repo's own idiom, as in `fm-backlog-atomicity`. 2. **Hidden test dependency.** The `mode` case adds no bytes. It wakes only if the crew is not "provably working". An earlier test in the shared shell leaves `FM_FAKE_CREW_STATE` set to "working", so the watcher absorbed the wake on CI. Run alone on macOS, it passed. Invariant: a device-shift test must not depend on env left by earlier tests. The no-resignal assertions could also pass for the wrong reason. Fix: `watch_identity_fixture` now installs a fake `fm-crew-state.sh` that always reports "unknown". Every identity test uses this fixture. **Verification:** - Ubuntu 26.04 container (uutils `stat`, same as CI), real driver through line 69: the old code fails at `mode`. With only fix 1 the file exits 1. With both fixes it exits 0 and all 8 tests pass. - Same driver on macOS: exit 0. - `bin/fm-lint.sh` is clean on the touched files. `tests/fm-daemon.test.sh` passes on macOS (147 ok). - macOS, same host, run alone: `fm-contributions` fails at base (3 `not ok`) but passed at HEAD. `fm-remote-transport-lanes` passes at both. These are timing-sensitive tests. **Gaps:** No full-file run of `fm-watch-triage` passed in the container, because the image has no `node` and the file needs it at a later test. The Ubuntu runner shards will confirm
+ 8:  4f406853 =  8:  7597fdba no-mistakes(review): Skip signature decode when no device migration is possible
+ 9:  60dcc1e6 =  9:  d250cc09 no-mistakes(document): List marker device adoption as a classifier purity exception
+10:  6a40598b = 10:  031f479b no-mistakes(review): Preflight file-identity lib in teardown; document pending dedupe
+exit: 0
+$ git reset --keep refs/heads/archive/device-id-submitted-6a40598b
+exit: 0
+$ git cherry-pick b13f11330bc45bb73d7be8070c7b63dec6317cf3
+Auto-merging bin/fm-watch.sh
+Auto-merging docs/watcher-continuity.md
+[fm/device-id 259a1e88] no-mistakes(review): Bound status reclassification by inactivity, not total time
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 20:08:45 2026 -0500
+ 4 files changed, 92 insertions(+), 15 deletions(-)
+exit: 0
+$ git cherry-pick f83b073454b102d0c51da3ec5f6bfe3629a3ca8e
+Auto-merging docs/configuration.md
+[fm/device-id 9365bc17] no-mistakes(document): Document stall bound use for status reclassification
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 22:05:32 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+# step 6:
+$ git merge-base --is-ancestor 6a40598b2534a80beb0316f85d3464b6edd90b50 HEAD
+exit: 0
+$ git -c color.ui=false range-diff 031f479bef82fcd724a4d6f6615149800f0f3ce8..refs/heads/archive/device-id-pipeline-f83b0734 6a40598b2534a80beb0316f85d3464b6edd90b50..HEAD
+1:  b13f1133 = 1:  259a1e88 no-mistakes(review): Bound status reclassification by inactivity, not total time
+2:  f83b0734 = 2:  9365bc17 no-mistakes(document): Document stall bound use for status reclassification
+exit: 0
+$ git status --short
+exit: 0
+##### status-runaway S=505355f8c0a775a1f7dccd759e4a21856074851f B=9dac01ab4b5c821b9918e1a9bbcefc75740d2b21 P=959a1a2ba2c9000ebd0d7f2c2794512ffb453e74
+$ git branch archive/status-runaway-submitted-505355f8 505355f8c0a775a1f7dccd759e4a21856074851f
+exit: 0
+$ git branch archive/status-runaway-pipeline-959a1a2b 959a1a2ba2c9000ebd0d7f2c2794512ffb453e74
+exit: 0
+$ git reset --keep refs/heads/archive/status-runaway-pipeline-959a1a2b
+exit: 0
+# step 5 (new):
+$ git rev-parse 505355f8c0a775a1f7dccd759e4a21856074851f
+505355f8c0a775a1f7dccd759e4a21856074851f
+exit: 0
+$ git rev-parse 9dac01ab4b5c821b9918e1a9bbcefc75740d2b21
+9dac01ab4b5c821b9918e1a9bbcefc75740d2b21
+exit: 0
+S-base=7eb37bf8e58800ecefd5892f2d73195c8a61e87f n=32
+$ git -c color.ui=false range-diff --no-patch 7eb37bf8e58800ecefd5892f2d73195c8a61e87f..505355f8c0a775a1f7dccd759e4a21856074851f 9dac01ab4b5c821b9918e1a9bbcefc75740d2b21~32..9dac01ab4b5c821b9918e1a9bbcefc75740d2b21
+ 1:  992efd4d =  1:  c18b83fb fix(bin): cap status logs and bound every status reader so a runaway append cannot fill the disk
+ 2:  21a2e19a !  2:  4156a13a no-mistakes(review): Remove repeat-collapse; exact bounded reads; growth re-alert
+ 3:  0ff475cd =  3:  179fe87e no-mistakes(review): Isolate refused logs; unknown not empty; cap remote mirror
+ 4:  7f76980a =  4:  a75c581d no-mistakes(review): Map remote helper paths; crew-state unknown on refused log
+ 5:  1172ac00 =  5:  fc9abc7f no-mistakes(review): Bound diverged key scan and Pi dispatch log read
+ 6:  081e11be =  6:  6d6fba06 no-mistakes(test): Retry lsof for reopening writers; check cap during linger
+ 7:  7143fc93 =  7:  0d5a010d no-mistakes(test): Fix cap-wake linger delay; drop reopen-loop retries
+ 8:  fe29a09c =  8:  dc5c118a no-mistakes(test): Bound wake drain annotation reads by status read limit
+ 9:  89462388 =  9:  f58a18b8 no-mistakes(document): Fix stale fleet-ledger and report-helper docs
+10:  c0b830c8 = 10:  9e4c3bda no-mistakes(document): Sync state inventory and over-cap wake docs
+11:  f3095ca7 = 11:  c8edccb2 no-mistakes(ci): I fixed all 4 failing checks. I changed 4 files and did not commit or push. **Lint 2 (caused by this PR)** - Rule broken: a library the tests load must not make ShellCheck see a variable the tests change inside `$(...)`. - Cause: `bin/fm-status-cap-lib.sh:262` had `${name//[^A-Za-z0-9._-]/_}`. ShellCheck reads the bare `_` inside that bracket as a variable. `tests/fm-control.test.sh:393` has `for _ in` inside `$(...)`, so SC2030 fired. - I found it by copying the base commit and adding the PR's files back until the warning appeared. Only `fm-status-cap-lib.sh` plus `fm-status-record-lib.sh` (which loads it) cause it. - Fix: I removed `_` from the class. The replacement is also `_`, so the output is identical (I checked it on a tricky name). I added a 2-line comment. - Other places with the same bracket form: none. - Checked: `bin/fm-lint.sh` on all changed files with the CI ShellCheck version (0.11.0) is clean. **Behavior portable serial 10: `tests/fm-open-loops.test.sh` (caused by this PR)** - Rule broken: the "deadline escapes questions" test must hook a command the reader really runs. - Cause: the test hooked a fake `cat`. This PR replaced `cat "$2"` with `[ -r "$2" ]` in `bin/fm_open_loops.py`. That change is right, because `cat` on a 265 GB log is the incident. So the fake `cat` never ran and the deadline never fired. - Fix: the test now hooks `FM_STATUS_SIZE_READER`, the seam the bounded reader uses to get a log's size. - Checked: one full local run passed, including "deadline escapes questions source recovery". - Note: on this Mac, the deadline tests sometimes fail with `[Errno 1] Operation not permitted`. The base commit does it too, on the `origins` test (2 of 3 runs under load). It is a macOS quirk in the collector's cleanup. Linux CI does not do it. I did not touch it. **Behavior portable serial 5: `tests/fm-copy-sweep.test.sh` (not caused by this PR)** - This test also failed on the base commit's own CI run (`b5ad5d7d6`), before this PR. - Cause: the sweep counts time left in whole seconds, so a `du` can get up to 1 second more than is really left. With a 1.6 s `du` and a 3 s bound, the outcome depended on the sub-second clock phase. - Fix: `FAKE_DU_SLEEP=3.5` and `FM_CHECK_TIMEOUT=11`. The first `du` always gets 4 s or more, and the second gets 3 s or less. I changed both calls and added a comment. - Checked: the old values failed 1 time in 12. The new values failed 0 times in 10. **Behavior portable serial 6: `tests/fm-turnend-guard.test.sh` (not caused by this PR)** - Cause: the node harness sent the hook payload through a pipe. Hooks that are off for Grok exit at once without reading it. On a busy host, node writes to a closed pipe and gets `EPIPE`. - Fix: `invoke` now gives the child a file as its stdin. A file cannot raise `EPIPE`. - Checked: a small demo under CPU load failed 11 of 1500 times with a pipe and 0 of 1500 with a file. The whole test passed 3 of 3 runs (94 ok each). `invoke` is the only pipe-input call in that file, and both modes use it. **Other checks:** `tests/fm-status-runaway-guard.test.sh` passes (20 ok). `git diff --check` is clean. **Left alone:** the user decisions you listed (declined items and the rest) were not touched. The macOS cleanup quirk is not fixed. I did not run the full suite or the CI shards, and I could not run a Linux job here. The Linux CI run should confirm the fixes
+12:  3cd80f76 = 12:  634fed8d no-mistakes(ci): I fixed the failing test. I changed one file: tests/fm-watch-triage-helpers.sh. I did not commit or push. FAILED CHECK: Behavior portable serial 10. The test was tests/fm-watch-triage.test.sh, case test_wait_identity_concurrent_append_uses_one_snapshot. Error: "not ok - the concurrent append fixture did not append during the read". CAUSE (this PR, in the test; the product code is right): The test put a fake `tail` in front of the real one. The fake appended a line to the live log on the second `tail` call. This PR made last_status_line read through fm_status_tail_lines, which runs two `tail` calls at the same time as pipeline stages. The second call now lands where `$f` is the snapshot copy, not the live log. The append went to the wrong file. The test passed only when the two stages raced and both read count 0, so it was flaky. The earlier CI run passed by luck. I reproduced it here: 104 of 224 runs failed under load, and a trace showed the second call reading count 1. INVARIANT: A fixture that injects a concurrent append must not depend on how many internal helper calls the reader makes, or in which scope. FIX: I removed the fake `tail` and the call counter. The test now sets FM_STATUS_SPAN_READER, an existing test seam that other tests already use. The function reads the exact bytes, then appends the restated line to the live log once. So the append lands after the endpoint is captured and during the read, every time. The assertions are unchanged. SIBLING SITES CHECKED: Only this fixture counted calls. The other fakes match on argument or path shape, or hook files that are not status reads. They are the `wc` fake in tests/fm-watch-triage-helpers.sh, the `cat` fake in tests/fm-wake-drain-outcome-backstop.test.sh, and the `grep` fakes in tests/fm-captain-hold-cleanup.test.sh and tests/fm-captain-hold-reconcile.test.sh. I left them alone. I did not touch the macOS cleanup quirk from round 4. VERIFIED: bash -n on the file is clean. git diff --check is clean. One run of the fixed function passed. A stress run passed 4 of 4, but I stopped it early, so it is not the 16 runs I planned. NOT VERIFIED: bin/fm-lint.sh did not finish. The machine load average was 165, and I stopped it. Lint for this file is not confirmed. I did not run the mutation check, which would break the product code on purpose to show the test fails. I did not run the full tests/fm-watch-triage.test.sh file. I could not run a Linux job, so the Linux CI run is the real check. CLEANUP: I removed my scratch files, including /tmp/ci-log-r5 and the .scratch-ci directory in the worktree. git status shows only tests/fm-watch-triage-helpers.sh as modified. The "failed exit 144" notices from the harness came from my own pkill. They are not test failures
+13:  08efa8f0 = 13:  d479a3fb no-mistakes(ci): I fixed ci-1 with a test-only change. I changed one file: tests/fm-status-runaway-guard.test.sh. I did not commit or push. I did not change anything in bin/. FAILED CHECK: Behavior portable serial 13, tests/fm-status-runaway-guard.test.sh. The failing case was test_foreign_omp_writer_is_named_stopped_and_never_deleted, with "the watcher did not wake for the runaway log". ROOT CAUSE (the fixture, not bin/): - start_paced_writer wrote 13000 five-byte lines ("text\n") every 3 s. - The watcher sorts the unread lines of a signaled log one at a time in the shell. The cap check (status_cap_tick) cannot run while it does that. - I timed the sorter on 13000 short lines. It took 67 s on this loaded host, and 3000 lines took 17 s. - The test gives the first watcher 300 polls (30 s). In CI that wait ran 33 s, with empty output and the watcher alive in state S. That matches the watcher being busy sorting lines. - In a local trace before the fix, attempt 1 lasted 83 s. It ended on a `signal:` wake with the log at 1,625,000 bytes. The log was far past the 262,144 byte cap, but the cap wake did not come until attempt 2. CI is faster per poll, so it hit the 30 s limit first. - Earlier CI runs passed by luck. The outcome depends on how many lines the log has when the first sort starts, and on the host speed. - The product behavior is documented. docs/configuration.md line 1099 says the watcher's span sorter is slow on long unread spans. The sibling case test_a_lingering_signal_does_not_hold_back_the_over_cap_stop already says "13000 short lines would take longer than the deadline on a loaded host" and uses 1000-byte lines. INVARIANT: A fixture that needs the watcher to reach its over-cap check must not give the watcher thousands of unread lines first, because the check cannot run during a sort. SIBLING SITES CHECKED: - start_paced_writer is used by three cases: the foreign omp case (the failing one), the non-omp case, and the resumed-writer case. All three go through run_until_cap_wake, and one edit fixes all three. - The linger case already uses 1000-byte lines. - The foreign-none log is one long line. - The held-open incident writer (3 million tiny lines) runs the guard scan only, with no watcher, so it is not affected. It still pins the tiny-line incident shape. FIX: start_paced_writer now writes 65 lines of 1000 bytes per round instead of 13000 lines of 5 bytes. Each round is still 65000 bytes, so the cap (262144), the 60 rounds, the 4 MiB hard limit and every assertion are unchanged. I updated the comment to explain why. No assertion was weakened, removed or skipped. MEASURED (this Mac, load average about 35): - Before: attempt 1 lasted 83 s and ended on `signal:`. - After: attempt 1 lasted 8 s, and the cap wake came in attempt 2 after 4 s, at 325000 bytes. - Full tests/fm-status-runaway-guard.test.sh: exit 0, 20 ok. - The four watcher cases (foreign omp, non-omp, resumed, linger) passed 2 more times in a row, 4 ok each time. - bin/fm-lint.sh on the file: exit 0 (ShellCheck 0.11.0). git diff --check is clean. NOT RUN: I could not run a Linux job here. The Linux CI run is the real check. The before/after timing comes from this Mac, not from the CI runner. I did not run the mutation check on the product code. PRODUCT NOTE (not changed, as instructed): While the watcher sorts a span of up to 32,768 lines, it cannot raise the over-cap wake. A `signal:` wake also exits without a cap check, which is why attempt 1 above ended on `signal:`. If the owner wants this closed, the exact remedy is to run status_cap_tick in bin/fm-watch.sh signal_phase right after the classification and before wake "$reason". Bounding the classification time would be the other option. This is close to the declined test-resume-rearm item, so I left it alone. CLEANUP: I removed my scratch files and the probe copy of the test. git status shows only tests/fm-status-runaway-guard.test.sh as modified. Test runs left temp directories under ~/tmp
+14:  90fd0329 = 14:  43051341 no-mistakes(review): Check status cap during signal sorts and before wakes
+15:  93a1f9c1 ! 15:  a3743853 no-mistakes(review): Check status cap during stale and push walks
+16:  827cbcdc = 16:  2cca37a4 no-mistakes(document): Confirm status-cap guard docs match walk ticks
+17:  13a87ea5 ! 17:  d4048f76 no-mistakes(review): Check status cap before every wake and steer fold
+18:  de70e80b ! 18:  66e290a8 no-mistakes(review): Stop cap check from re-entering its own wake
+19:  e44594d0 ! 19:  1a7898ef no-mistakes(review): Check status cap inside its wake without a second wake
+20:  182298e4 = 20:  7cda4b35 no-mistakes(ci): Fixed the PR-caused failure. Two other failures are pre-existing flakes and are not caused by this PR. Root cause (ci-1, ci-2, ci-5): the new serial member tests/fm-status-runaway-guard.test.sh (199417 ms, the weight the user chose) made `bin/fm-test-run.sh --check-coverage` refuse the 20-shard layout. Shard 3 packed 1203868 ms, which is above the 1200000 ms target and above its own largest suite (917727 ms). I reproduced this locally. - Invariant: every portable serial shard that holds more than one script must model at or below 1200000 ms. The shard count in bin/fm-test-run.sh, the CI matrix and the docs must agree. - Sites that use the shard count: PORTABLE_SERIAL_SHARDS in bin/fm-test-run.sh (the one owner), the shard matrix in .github/workflows/ci.yml (tests/fm-ci-workflow.test.sh requires it to match --list-lanes), and docs/fm-test-portable-shards.md. - Why "Test coverage guard" failed: it runs the same guard. - Why "Behavior portable parallel 1" failed: tests/fm-test-run.test.sh runs the same guard. - Why "Behavior portable serial 11" failed: tests/fm-ci-workflow.test.sh reads parallel_jobs from --check-coverage, so it failed with "the runner did not report parallel_jobs". Fix: I added one shard, which is the remedy the guard itself names ("rebalance or add shards; do not raise the job timeout"). 1. bin/fm-test-run.sh: PORTABLE_SERIAL_SHARDS changes from 20 to 21. 2. .github/workflows/ci.yml: shard 21 is added to the serial matrix. 3. docs/fm-test-portable-shards.md: a dated 2026-10-23 note explains why there are 21 shards, and the job-count line now says twenty-seven jobs (twenty-one serial). 4. No change to the packing target, the timeouts or any weight. The user's 199417 weight is kept. - At 21 shards, every multi-script shard models between 1140193 and 1140402 ms. Shards 1 and 2 each hold one indivisible suite. Not caused by this PR (no code change): - ci-4, serial 15, tests/fm-wake-queue.test.sh "concurrent append/drain subprocess failed" ("queue lock could not be acquired safely"): the same failure happened on main run 40036043378 (48b2df356, an ancestor of the base) and on runs 40020260758 and 39948616410. This PR does not change the drain or lock code. - ci-3, serial 13, tests/fm-contributions.test.sh "unchanged PR was re-read with 2 counted REST calls": the read path (bin/fm-gh-rest.sh, bin/fm-pr-poll.sh) is not changed by this PR. The full suite passed locally: 56 ok, exit 0. This is a load-sensitive CI flake. Checks I ran: - `bin/fm-test-run.sh --check-coverage`: exit 0, FM_TEST_COVERAGE ok, serial_shards=21, parallel_jobs=3. - tests/fm-ci-workflow.test.sh: exit 0, 10 ok. - tests/fm-test-run.test.sh: exit 0, 65 ok, 0 not ok. - tests/fm-documentation-audiences.test.sh: exit 0. - `git diff --check`: clean
+21:  84cef40e = 21:  53576018 no-mistakes(review): Refuse cold open-decision folds; correct shard note
+22:  555997f8 = 22:  bce3852f no-mistakes(review): Accept refused latest-event reads; keep fold stderr on fd 2
+23:  7b6d7bcd = 23:  a515c23b no-mistakes(document): Document open-loops handling of refused latest-event reads
+24:  45ff15ce = 24:  6c376439 no-mistakes(ci): ci-2 (Behavior portable serial 7) was caused by this PR and is fixed. ci-1 (Behavior portable serial 5) is a pre-existing timing race in code this PR does not touch, so it gets no code change. ci-2: tests/fm-control-relaunch-recovery.test.sh, case test_relocation_refuses_a_non_lease_copy, variant missing-jq, failed with empty output. - Root cause: this PR makes bin/fm-spawn.sh source bin/fm-status-cap-lib.sh. That library ran `IFS= command read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :` at load time. The test masks jq through BASH_ENV with a shell function named `command`. Under `set -eu`, a function-wrapped `command read` makes bash exit silently even with `|| :` (I reproduced this on bash 3.2 here, and CI's Linux bash does the same). So fm-spawn died before it could print its 'needs jq' refusal. - Invariant: sourcing a library only defines functions and constants and must never end the caller's shell. The library header says exactly this. - Sibling sites: I checked every top-level `command` use in the libraries and scripts this PR adds or changes. This line was the only one. Every other heredoc read in the repo (bin/fm-brief.sh, bin/fm-spawn.sh:7373) already uses plain `IFS= read -r -d ''`. - Fix: one line in bin/fm-status-cap-lib.sh:161 drops the `command` prefix, so the line now matches the repo's usual form. - Proof: the existing test already reproduces the bug. The case fails on HEAD before the fix, passes on base 7eb37bf8e, and passes on HEAD after the fix. tests/fm-status-runaway-guard.test.sh: 33 ok, 0 not ok. shellcheck bin/fm-status-cap-lib.sh: clean. git diff --check: clean. ci-1: tests/fm-remote-transport-lanes.test.sh failed with 'concurrent exclusive creators left mutex litter: ...claim.creating.owner.268301.*.reaped.claim.creating.owner.268315.*'. - This PR's only change to that test adds bin/fm-status-cap-lib.sh to a copy list. The PR does not change bin/fm-remote-job-lib.sh, where the code under test lives. - Race I traced: fm_remote_job_reload_lock_release first runs `rm -f` on the lock and then `rm -rf` on its owner folder. A reclaimer that read the old link can see that folder half-deleted (pid file gone) and judge the owner dead. It then moves the folder into a tomb. Next it finds that the lock already points to a new, live owner, so it returns 1. The tomb stays behind, and no later caller clears it. - Evidence it is a rare timing flake: the same test passed 15 of 15 runs on HEAD here. Of the last 40 failed CI runs in the repo, this failure shows up in this run only. - Fixing that lock-release race would change remote-job locking that this PR does not touch, so it is out of scope. A rerun should pass. The race should be tracked as a separate defect in fm_remote_job_reload_lock_release / fm_remote_job_reload_lock_take
+25:  cf98ddae = 25:  ed73fd40 Make a refused unread suffix an incomplete open set and bound the snapshot and Pi status reads
+26:  431049aa = 26:  32c806e3 no-mistakes(review): Fix Pi status-read spies, ledger clamp edge, drain docs
+27:  61297e1d = 27:  498e28d3 no-mistakes(review): Whole-log status readers and folds take the byte limit alone
+28:  117628bd = 28:  e1f40983 no-mistakes(review): Bound whole-log status scans with one filter pass
+29:  b353511c = 29:  b528492d no-mistakes(review): Narrow event filter, absolute wait identity, ticked scans
+30:  41bd3eaf = 30:  fd94e91c no-mistakes(review): Hand off captured-tick rate, tick stale windows, widen filter
+31:  5d6cf490 = 31:  9b3de841 no-mistakes(review): Carry only the held growth rate; expire it off-list
+32:  505355f8 = 32:  9dac01ab no-mistakes(document): List status-cap handoff file among watcher state internals
+exit: 0
+$ git reset --keep refs/heads/archive/status-runaway-submitted-505355f8
+exit: 0
+$ git cherry-pick 5a20cba430c0437980c8483f1eee3789ef06bc44
+Auto-merging bin/fm-watch.sh
+Auto-merging docs/configuration.md
+Auto-merging docs/scripts.md
+[fm/status-runaway 25692db2] no-mistakes(review): Reserve only for decision verbs; stop any writing pid
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 20:10:35 2026 -0500
+ 10 files changed, 173 insertions(+), 78 deletions(-)
+exit: 0
+$ git cherry-pick 96e572fc1af10a19f072b4e970de6449472787ea
+Auto-merging docs/configuration.md
+[fm/status-runaway 5844bf66] no-mistakes(review): Spare the capped appender; bound its lock wait at 10 s
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 20:30:38 2026 -0500
+ 5 files changed, 124 insertions(+), 11 deletions(-)
+exit: 0
+$ git cherry-pick 959a1a2ba2c9000ebd0d7f2c2794512ffb453e74
+Auto-merging docs/configuration.md
+Auto-merging docs/scripts.md
+[fm/status-runaway 2c967543] no-mistakes(review): Retry mirror on lock timeout; blocker only when capped
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 21:36:18 2026 -0500
+ 4 files changed, 58 insertions(+), 3 deletions(-)
+exit: 0
+# step 6:
+$ git merge-base --is-ancestor 505355f8c0a775a1f7dccd759e4a21856074851f HEAD
+exit: 0
+$ git -c color.ui=false range-diff 9dac01ab4b5c821b9918e1a9bbcefc75740d2b21..refs/heads/archive/status-runaway-pipeline-959a1a2b 505355f8c0a775a1f7dccd759e4a21856074851f..HEAD
+1:  5a20cba4 = 1:  25692db2 no-mistakes(review): Reserve only for decision verbs; stop any writing pid
+2:  96e572fc = 2:  5844bf66 no-mistakes(review): Spare the capped appender; bound its lock wait at 10 s
+3:  959a1a2b = 3:  2c967543 no-mistakes(review): Retry mirror on lock timeout; blocker only when capped
+exit: 0
+$ git status --short
+exit: 0

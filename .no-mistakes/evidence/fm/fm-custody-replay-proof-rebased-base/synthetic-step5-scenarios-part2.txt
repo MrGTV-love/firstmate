@@ -1,0 +1,64 @@
+######## B2: rebase changed one own + line inside a larger submitted commit
+$ git rev-parse S
+0a70dcaef4da3b508c4ad19b18b28126dd2c8e4f
+exit: 0
+$ git rev-parse B
+aaf419e1da31a5dbbaa9d15a6300185ebca32d74
+exit: 0
+# S-base=7d6e5ad0a4ecca3c25f7ed970fd2927fb0eabef5 n=1
+$ git -c color.ui=false range-diff 7d6e5ad0a4ecca3c25f7ed970fd2927fb0eabef5..S B~1..B
+1:  0a70dca ! 1:  aaf419e submitted work
+    @@ Commit message
+     
+      ## a.txt ##
+     @@
+    - context=old
+    + context=new
+      line2
+      line3
+     -value=base
+    -+value=submitted
+    ++value=CHANGED
+      line5
+      line6
+      line7
+exit: 0
+######## G2: empty cherry-pick on replay (fix only undoes a main change)
+$ git rev-parse S
+f6a9dd149933282908c03fb7ae66f8cdb3ce39d1
+exit: 0
+$ git rev-parse B
+ad209f56cfc8bc3082f09af3a08a9d156a0ad4ab
+exit: 0
+# S-base=ca25e555b30d04e10cb960d4e5e109ad2a03cde9 n=1
+$ git -c color.ui=false range-diff ca25e555b30d04e10cb960d4e5e109ad2a03cde9..S B~1..B
+1:  f6a9dd1 ! 1:  ad209f5 submitted work
+    @@ Commit message
+     
+      ## a.txt ##
+     @@
+    - context=old
+    + context=new
+      line2
+      line3
+     -value=base
+exit: 0
+$ git reset --keep refs/heads/archive/t-submitted
+exit: 0
+$ git cherry-pick 0bd3f92468e18e8a7e0096afe4680fe464c55183
+The previous cherry-pick is now empty, possibly due to conflict resolution.
+If you wish to commit it anyway, use:
+
+    git commit --allow-empty
+
+Otherwise, please use 'git cherry-pick --skip'
+On branch work
+You are currently cherry-picking commit 0bd3f92.
+  (all conflicts fixed: run "git cherry-pick --continue")
+  (use "git cherry-pick --skip" to skip this patch)
+  (use "git cherry-pick --abort" to cancel the cherry-pick operation)
+
+nothing to commit, working tree clean
+exit: 1
+$ git status --short
+exit: 0

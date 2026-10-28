@@ -1,0 +1,36 @@
+# old proof for contrast
+$ git diff --quiet 090061f314224d1d70f3001861c8b037a717e1bc a528e3e4df4c145d1c6f59bab224dd9f0d7ba819 -- docs/fm-test-portable-shards.md
+exit: 1
+$ git branch archive/remove-cd-guard-submitted-090061f3 090061f314224d1d70f3001861c8b037a717e1bc
+exit: 0
+$ git branch archive/remove-cd-guard-pipeline-90cc3e9c 90cc3e9c4c4221867af1ee691f5005f85ffa1f34
+exit: 0
+$ git rev-parse 090061f314224d1d70f3001861c8b037a717e1bc
+090061f314224d1d70f3001861c8b037a717e1bc
+exit: 0
+$ git rev-parse a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+exit: 0
+S-base=7f90859803a14015f6739afae598c82550c7d3d7 n=4
+$ git -c color.ui=false range-diff 7f90859803a14015f6739afae598c82550c7d3d7..090061f314224d1d70f3001861c8b037a717e1bc a528e3e4df4c145d1c6f59bab224dd9f0d7ba819~4..a528e3e4df4c145d1c6f59bab224dd9f0d7ba819
+1:  5b6e9f10 = 1:  230851d5 wip: cd-guard removal and cwd-write fixes before the six file deletions
+2:  8ef307f3 = 2:  a9113a07 Remove obsolete persistent-directory-change guard
+3:  72ee81d5 = 3:  ce538155 no-mistakes(review): Retire persistent-cd-guard in ledger and drop stale references
+4:  090061f3 = 4:  a528e3e4 no-mistakes(document): Drop stale two-seatbelt wording from harness references
+exit: 0
+$ git reset --keep refs/heads/archive/remove-cd-guard-submitted-090061f3
+exit: 0
+$ git cherry-pick 90cc3e9c4c4221867af1ee691f5005f85ffa1f34
+Auto-merging docs/fm-test-portable-shards.md
+[fm/remove-cd-guard f939ad53] no-mistakes(review): Name both unhinted serial suites in shard doc
+ Author: Charles Brooker <charles@greentreetherapeutics.com>
+ Date: Tue Oct 27 19:40:55 2026 -0500
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+exit: 0
+$ git merge-base --is-ancestor 090061f314224d1d70f3001861c8b037a717e1bc HEAD
+exit: 0
+$ git -c color.ui=false range-diff a528e3e4df4c145d1c6f59bab224dd9f0d7ba819..refs/heads/archive/remove-cd-guard-pipeline-90cc3e9c 090061f314224d1d70f3001861c8b037a717e1bc..HEAD
+1:  90cc3e9c = 1:  f939ad53 no-mistakes(review): Name both unhinted serial suites in shard doc
+exit: 0
+$ git status --short
+exit: 0
