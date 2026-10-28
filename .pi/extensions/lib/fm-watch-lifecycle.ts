@@ -12,11 +12,11 @@
 //
 // Single instance: one process may evaluate a watcher extension more than
 // once for the same home (for example when it is both auto-discovered and named
-// with -e, when a helper session loads it, or when a reload rebinds it). Each
-// factory bind claims the home's slot in a process-global registry, so the
-// latest bind is the current instance and every earlier one learns it was
-// superseded. A bind may instead wait (claim: false) and take the slot later
-// through claim, once the extension has proof it should own the home. The
+// with -e, when a helper session loads it, or when a reload rebinds it). A
+// factory bind claims the home's slot in a process-global registry unless it
+// waits (claim: false) for the extension's proof that it should own the home,
+// and then takes the slot later through claim. So the latest bind that claimed
+// is the current instance, and every earlier one learns it was superseded. The
 // registry only answers who is current; each extension decides what a
 // superseded or waiting instance does.
 // A binding's previous slot is only for transferring predecessor state. Callers

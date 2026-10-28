@@ -4404,7 +4404,7 @@ const afterHelper = await arm(primary, primaryCtx);
 if (!/^watcher: unchanged/.test(afterHelper.content[0].text)) throw new Error(`the primary arm call went elsewhere: ${afterHelper.content[0].text}`);
 if (helper.box.sent.length !== 0) throw new Error(`a helper received a wake: ${JSON.stringify(helper.box.sent)}`);
 const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
-for (const needle of ["waiting=primary-session", "reason=not-primary-session"]) {
+for (const needle of ["waiting=primary-session", "event=session_start-ignored reason=not-primary-session", "event=session_shutdown-ignored reason=not-primary-session"]) {
   if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
 }
 if (record.includes("event=home-claimed") || record.includes("event=instance-retired")) throw new Error(`a helper took the home:\n${record}`);

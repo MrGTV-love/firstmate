@@ -59,8 +59,9 @@
 // Recovery remains pending until activation hands off to a tracked arm or
 // scheduled retry. Timed activation failures surface through the failure-wake
 // path and leave recovery available to a later arm call or successor.
-// Single instance: the latest factory bind in this process owns the home
-// (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry). An earlier
+// Single instance: the latest factory bind in this process owns the home unless
+// it waits for primary proof (below; .pi/extensions/lib/fm-watch-lifecycle.ts
+// owns the registry). An earlier
 // instance retires its generation and its event handlers become no-ops, and
 // its arm tool and command forward to the current instance, so a session that
 // loaded this file twice still has exactly one live generation and one arm.
@@ -1976,7 +1977,7 @@ export default function (pi: ExtensionAPI) {
     // omp carries no shutdown reason, so pending work is always persisted;
     // watcher delivery re-reads the queue on the next owning activation.
     if (!instance.isCurrent()) {
-      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      lifecycle("session_shutdown-ignored", { reason: awaitingPrimaryProof ? "not-primary-session" : "superseded-instance" });
       return;
     }
     lifecycle("session_shutdown", { generation: generation.id });
