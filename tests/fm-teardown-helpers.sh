@@ -177,7 +177,7 @@ fm_teardown_phase_mark() {
   fm_teardown_phase_selected || return 0
   [ "${FM_TEARDOWN_CPU_CHILD:-0}" = 1 ] || return 0
   [ -n "${FM_TEARDOWN_CPU_MARK_FD:-}" ] && [ -n "${FM_TEARDOWN_CPU_ACK_FD:-}" ] || return 0
-  printf 'phase|%s|%s|%s|%s|%s\n' "$1" "${BASHPID:-}" "$PPID" "$2" "${3:-}" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
+  printf 'phase|%s|%s||%s|%s\n' "$1" "${BASHPID:-}" "$2" "${3:-}" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
   IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
 }
 # END temporary phase diagnostic definition

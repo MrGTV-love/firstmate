@@ -109,14 +109,17 @@ class PhaseLedger:
             emit(event='phase_unavailable', case=case, mark=mark,
                  reason='shell_sender_pid_unavailable', cpu_seconds=None, valid=False)
             return
+        def decimal(value):
+            return value.isascii() and value.isdecimal() and len(value) <= 20
         if (len(parts) != 6 or parts[0] != 'phase' or parts[1] not in ('helper', 'product') or
-                not all(value.isascii() and value.isdecimal() and len(value) <= 20 for value in parts[2:4])):
+                not decimal(parts[2]) or
+                (parts[3] != '' if parts[1] == 'helper' else not decimal(parts[3]))):
             emit(event='instrumentation_error', error='malformed_phase_mark', mark=mark)
             return
         _, scope, pid, ppid, edge, status = parts
-        pid, ppid = int(pid), int(ppid)
+        pid, ppid = int(pid), None if scope == 'helper' else int(ppid)
         allowed = {'helper': {'setup.start', 'setup.end', 'cli.start', 'cli.end'},
-                   'product': {'entry', 'startup.end', 'backend.end', 'safety.start', 'safety.end',
+                   'product': {'entry', 'startup.end', 'backend.start', 'backend.end', 'safety.start', 'safety.end',
                                'runtime.start', 'runtime.end', 'docker.start', 'docker.end'}}
         if edge not in allowed[scope] or (status and (
                 scope != 'helper' or edge != 'cli.end' or not status.isascii() or
@@ -173,6 +176,9 @@ class PhaseLedger:
         region, action = edge.rsplit('.', 1)
         key = (owner['invocation_id'], region)
         if action == 'start':
+            if region == 'backend':
+                _, preflight = self.open.pop((owner['invocation_id'], 'preflight'), (owner, None))
+                self.interval(owner, 'preflight', preflight, row)
             if key in self.open:
                 _, old = self.open.pop(key)
                 self.interval(owner, region, old, None, 'missing_end:repeated_start')
@@ -181,7 +187,7 @@ class PhaseLedger:
             _, start = self.open.pop(key, (owner, None))
             self.interval(owner, region, start, row)
             if region == 'startup' and start is not None:
-                self.open[(owner['invocation_id'], 'backend')] = (owner, row)
+                self.open[(owner['invocation_id'], 'preflight')] = (owner, row)
 
 
 def run(command):
