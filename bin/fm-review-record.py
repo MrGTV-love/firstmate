@@ -21,7 +21,9 @@ verify derives authors anew from the exact head's commits outside the merge base
 with replacement objects disabled. fm-pr-merge.sh supplies --base as the live
 forge's exact full 40- or 64-hex base SHA, never a stale local target ref. verify requires
 --task selecting state/<task>.meta and --base; fetch the exact base and full head
-locally first. Non-pipeline commits form group ship, using the current meta,
+locally first. Group ship exists whenever any commit lacks the no-mistakes(
+prefix or the current incarnation has a ship model, even when every subject
+starts no-mistakes(. It uses the current meta,
 any state/<task>.control-relaunch.meta-prior, and every model in the
 append-only state/<task>.launch-models history reached from the current meta's
 spawn_gen through prior links, so a reused task id never inherits an earlier
@@ -31,13 +33,19 @@ starting exactly no-mistakes( form no-mistakes:<family> groups. Their models
 come from matching runs and agent_invocations in <NM_HOME>/state.sqlite
 (default ~/.no-mistakes), opened with SQLite mode=ro; a relative NM_HOME is
 never resolved and leaves the pipeline commits unknown. A matching run names
-this PR or this task's repository and branch. A pipeline commit is attributed
+this PR or this task's repository and branch. A matching run whose recorded
+invocations include a commit-rewriting step (exactly rebase, whose agent edits
+replayed commits it did not create) makes every PR commit inside its recorded
+range a pipeline commit regardless of subject and adds its invocation families;
+without such an invocation, commits without the prefix take no run families.
+A matching run whose invocation records cannot be read makes its in-range
+commits unknown. A pipeline commit is attributed
 only when some matching run with invocations contains it in its recorded
 base-to-head or base-to-pushed range; a missing or all-zero recorded base (a
 new-branch push) is bounded by the PR merge base instead. Attribution is
-conservative: every invocation model of every matching run is author evidence
-for every pipeline commit, so a rebase that rewrites an earlier run's commits
-never drops that run's author family. A recorded provider can resolve an otherwise
+conservative: when any commit carries the prefix, every invocation model of
+every matching run is author evidence for every pipeline commit, so a rebase
+that rewrites an earlier run's commits never drops that run's author family. A recorded provider can resolve an otherwise
 unknown model alias; conflicting provider/model families are unknown. Every
 invocation counts, including cancelled and errored ones. An invocation with an
 empty model takes a family from its agent only when the agent is exactly claude
@@ -76,10 +84,13 @@ unknown-family refusal instead asks for repaired author evidence or prints the
 exact-head captain-word command, whose words must be the captain's actual fresh
 instruction. When every group is covered but the newest reader is unknown, the
 refusal names that reader and prints a known-family reread command.
-verify accepts the newest captain-word only at the exact live head, unless a FAIL
-at that head was appended after it. Any exact-head FAIL blocks regardless of later
-PASS reads until fresh exact-head captain words are recorded. Reviews of other
-heads do not clear it. Without captain words, the newest review must also name the
+verify accepts the newest captain-word when it names the exact live head, unless
+a FAIL at that head was appended after it. An exact-head FAIL, with or without
+captain words, stands until PASS reads at that head appended after it cover every
+group the FAIL read (its covered groups, or every group for all), each author
+family by a known reader of a different family as above; otherwise only fresh
+exact-head captain words appended after it clear it. Reviews of other heads never
+clear it. Without captain words, the newest review must also name the
 live head and have a known reader family. Trigger answers remain required, recorded
 and printed by latest, but yes answers alone do not require captain words.
 Captain words waive no existing forge/hold guard. The caller records as captain-word only a
@@ -120,6 +131,7 @@ FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
             "moonshot": "moonshot", "kimi": "moonshot", "meta": "meta", "llama": "meta"}
 RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
+REWRITING_STEPS = {"rebase"}
 
 
 class RecordError(Exception):
@@ -323,94 +335,101 @@ def derived_authors(home, pr, head, task, base):
     if not commits:
         raise RecordError("author commit group is empty; fetch the PR base and exact head before recording a read")
     groups = {}
-    if any(not subject.startswith("no-mistakes(") for _, subject in commits):
-        models = [meta.get("model") or "unknown"]
-        state = state_dir(home)
-        history = state / f"{task}.launch-models"
-        prior = state / f"{task}.control-relaunch.meta-prior"
-        try:
-            if history.exists():
-                entries = [line.split("\t") for line in history.read_text(encoding="utf-8").splitlines()]
-                pending, seen = [meta.get("spawn_gen")], set()
-                while pending:
-                    gen = pending.pop()
-                    if not gen or gen in seen:
-                        continue
-                    seen.add(gen)
-                    for fields in entries:
-                        if len(fields) == 3 and fields[0] == gen:
-                            models.append(fields[2] or "unknown")
-                            pending.append(fields[1])
-            if prior.exists():
-                fields = dict(line.split("=", 1) for line in prior.read_text(encoding="utf-8").splitlines() if "=" in line)
-                models.append(fields.get("model") or "unknown")
-        except (OSError, UnicodeError) as exc:
-            raise RecordError(f"cannot read ship launch-model evidence for {task}") from exc
+    models = [meta.get("model") or "unknown"]
+    state = state_dir(home)
+    history = state / f"{task}.launch-models"
+    prior = state / f"{task}.control-relaunch.meta-prior"
+    try:
+        if history.exists():
+            entries = [line.split("\t") for line in history.read_text(encoding="utf-8").splitlines()]
+            pending, seen = [meta.get("spawn_gen")], set()
+            while pending:
+                gen = pending.pop()
+                if not gen or gen in seen:
+                    continue
+                seen.add(gen)
+                for fields in entries:
+                    if len(fields) == 3 and fields[0] == gen:
+                        models.append(fields[2] or "unknown")
+                        pending.append(fields[1])
+        if prior.exists():
+            fields = dict(line.split("=", 1) for line in prior.read_text(encoding="utf-8").splitlines() if "=" in line)
+            models.append(fields.get("model") or "unknown")
+    except (OSError, UnicodeError) as exc:
+        raise RecordError(f"cannot read ship launch-model evidence for {task}") from exc
+    if meta.get("model") or len(models) > 1 or any(not subject.startswith("no-mistakes(") for _, subject in commits):
         groups["ship"] = [modelled(value or "unknown", "ship model") for value in sorted(set(models))]
-    pipeline = [sha for sha, subject in commits if subject.startswith("no-mistakes(")]
-    if pipeline:
-        root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
-        models = []
-        covered = set()
-        try:
-            if not root.is_absolute():
-                raise OSError(f"relative NM_HOME {root} is not author evidence")
-            with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
-                runs = db.execute("SELECT id, base_sha, head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
-                                  "OR (branch = ? AND repo_id IN (SELECT id FROM repos WHERE working_path IN (?, ?)))",
-                                  (pr, meta.get("branch", ""), str(worktree), meta.get("project", ""))).fetchall()
-                for run_id, run_base, run_head, pushed in runs:
-                    invocations = db.execute("SELECT agent, model, model_provider FROM agent_invocations WHERE run_id = ?", (run_id,)).fetchall()
-                    if not invocations:
+    shas = {sha for sha, _ in commits}
+    prefixed = {sha for sha, subject in commits if subject.startswith("no-mistakes(")}
+    pipeline = set(prefixed)
+    root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
+    models = []
+    covered = set()
+    try:
+        if not root.is_absolute():
+            raise OSError(f"relative NM_HOME {root} is not author evidence")
+        with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
+            runs = db.execute("SELECT id, base_sha, head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
+                              "OR (branch = ? AND repo_id IN (SELECT id FROM repos WHERE working_path IN (?, ?)))",
+                              (pr, meta.get("branch", ""), str(worktree), meta.get("project", ""))).fetchall()
+            for run_id, run_base, run_head, pushed in runs:
+                lower = base_sha if not run_base or set(run_base) == {"0"} else run_base
+                contained = set()
+                for tip in (run_head, pushed):
+                    if not tip:
                         continue
-                    lower = base_sha if not run_base or set(run_base) == {"0"} else run_base
-                    for tip in (run_head, pushed):
-                        if not tip:
-                            continue
-                        try:
-                            covered.update(set(pipeline) & set(git(worktree, "rev-list", f"{lower}..{tip}").splitlines()))
-                        except RecordError:
-                            continue
-                    for agent, exact_model, provider in invocations:
-                        item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
-                        # Only fresh database evidence supplies a provider; typed
-                        # declarations and historical family fields never do.
-                        if provider in RECORDED_FAMILIES - {"unknown"}:
-                            if item["family"] == "unknown":
-                                item["family"] = provider
-                            elif item["family"] != provider:
-                                item["family"] = "unknown"
-                        item.update(agent=agent, evidence_provider=provider)
-                        models.append(item)
-        except (sqlite3.Error, OSError):
-            covered.clear()
-            models.clear()
-        if set(pipeline) - covered:
-            models.append(modelled("unknown", "pipeline model"))
-        for item in {(item["model"], item["family"]): item for item in models}.values():
-            groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
+                    try:
+                        contained.update(shas & set(git(worktree, "rev-list", f"{lower}..{tip}").splitlines()))
+                    except RecordError:
+                        continue
+                try:
+                    invocations = db.execute("SELECT step_name, agent, model, model_provider FROM agent_invocations WHERE run_id = ?", (run_id,)).fetchall()
+                except sqlite3.Error:
+                    if contained:
+                        models.append(modelled("unknown", "pipeline model"))
+                    continue
+                if not invocations:
+                    continue
+                if any(step in REWRITING_STEPS for step, _, _, _ in invocations):
+                    pipeline |= contained
+                elif not prefixed:
+                    continue
+                covered |= contained
+                for _, agent, exact_model, provider in invocations:
+                    item = modelled(exact_model or ("claude" if agent == "claude" else "unknown"), "pipeline model")
+                    # Only fresh database evidence supplies a provider; typed
+                    # declarations and historical family fields never do.
+                    if provider in RECORDED_FAMILIES - {"unknown"}:
+                        if item["family"] == "unknown":
+                            item["family"] = provider
+                        elif item["family"] != provider:
+                            item["family"] = "unknown"
+                    models.append(item)
+    except (sqlite3.Error, OSError):
+        covered.clear()
+        models.clear()
+    if pipeline - covered:
+        models.append(modelled("unknown", "pipeline model"))
+    for item in {(item["model"], item["family"]): item for item in models}.values():
+        groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
     return task, groups
 
 
 def verify(records, rows, head, home, pr, task, base):
     word = records["captain-word"]
     review = records["review"]
-    if word is not None and word["head"] == head:
-        last_word = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word")
-        after_word = rows[last_word + 1:]
-    else:
-        after_word = rows
-    failed = next((row for row in reversed(after_word) if row["kind"] == "review"
-                   and row["head"] == head and row["verdict"] == "FAIL"), None)
-    if failed is not None:
-        raise RecordError(f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); a PASS never clears an exact-head FAIL; record fresh captain words with fm-review-record.py captain-word --pr {pr} --head {head} --words WORDS, then retry the merge")
-    if word is not None and word["head"] == head:
+    at_word = word is not None and word["head"] == head
+    start = max(i for i, row in enumerate(rows) if row["kind"] == "captain-word") + 1 if at_word else 0
+    fails = [i for i in range(start, len(rows)) if rows[i]["kind"] == "review"
+             and rows[i]["head"] == head and rows[i]["verdict"] == "FAIL"]
+    if at_word and not fails:
         return "captain-word"
-    if review is None:
-        raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
-    if review["head"] != head:
-        raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    task, derived = derived_authors(home, pr, head, task, base)
+    if not at_word:
+        if review is None:
+            raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
+        if review["head"] != head:
+            raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
+    _, derived = derived_authors(home, pr, head, task, base)
     groups = {group: list(authors) for group, authors in derived.items()}
     derived_families = {a["family"] for authors in derived.values() for a in authors}
 
@@ -421,8 +440,10 @@ def verify(records, rows, head, home, pr, task, base):
         return [{"model": a["model"], "family": known[a["model"]] if a["model"] in known
                  else model(a["model"], "author_groups model")} for a in authors]
 
-    unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
-    passes = [row for row in rows if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
+    def passes_at_head(window):
+        return [row for row in window if row["kind"] == "review" and row["head"] == head and row["verdict"] == "PASS"]
+
+    passes = passes_at_head(rows)
     # Typed groups can only add author constraints, never erase the derived ones.
     for row in passes:
         for group, authors in row["author_groups"].items():
@@ -435,6 +456,9 @@ def verify(records, rows, head, home, pr, task, base):
                 target = groups.setdefault(group, [])
                 target.extend(a for a in authors if a not in target)
     env = f"FM_HOME={shlex.quote(str(home))} FM_STATE_OVERRIDE={shlex.quote(str(state_dir(home)))}"
+    captain = shlex.join([str(BIN / "fm-review-record.py"), "captain-word", "--pr", pr, "--head", head,
+                          "--words", "FRESH_CAPTAIN_WORDS"])
+    captain_help = f"obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: {env} {captain}"
 
     def review_command(reader, covered):
         models = {key: sorted({a["model"] for a in values}) for key, values in groups.items()}
@@ -445,10 +469,10 @@ def verify(records, rows, head, home, pr, task, base):
                            "--loosens-deny-allow-list", "no", "--widens-guard", "no",
                            "--customer-data-billing-spend", "no", "--report", "LOCAL_READER_REPORT"])
 
-    for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
+    def uncovered(group, authors, reads):
         families = {a["family"] for a in authors}
         readers = set()
-        for row in passes:
+        for row in reads:
             named = row.get("covered_groups", list(row["author_groups"]))
             key = group if group in row["author_groups"] else "all"
             declared_families = {a["family"] for a in declared(key, row["author_groups"].get(key, []))}
@@ -459,19 +483,36 @@ def verify(records, rows, head, home, pr, task, base):
             if (group in named or "all" in named) and required <= declared_families and reader != "unknown":
                 readers.add(reader)
         # Every author family needs some reading PASS from a different family.
-        uncovered = sorted(f for f in families if f == "unknown" or not readers - {f})
-        if not uncovered:
+        return sorted(f for f in families if f == "unknown" or not readers - {f})
+
+    # A FAIL stands until later exact-head PASS reads cover every group it read.
+    for index in fails:
+        failed = rows[index]
+        named = failed.get("covered_groups", list(failed["author_groups"]))
+        for group in sorted(groups) if "all" in named else named:
+            missing = uncovered(group, groups.get(group) or declared(group, failed["author_groups"].get(group, [])),
+                                passes_at_head(rows[index + 1:]))
+            if not missing:
+                continue
+            reason = (f"verdict is FAIL at live head {head} (reader {failed['reader_model']}, report {failed['report']}); "
+                      f"no later exact-head PASS covers group {group}, family {','.join(missing)}, that this FAIL read; ")
+            if "unknown" in missing:
+                raise RecordError(f"{reason}model family unknown is never covered by a PASS; {captain_help}")
+            raise RecordError(f"{reason}record later exact-head PASS reads of that group from readers outside each of its families with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group])}; or {captain_help}")
+    if at_word:
+        return "captain-word"
+    unknown_reader = model(review["reader_model"], "reader_model") == "unknown"
+    for group, authors in sorted(groups.items(), key=lambda item: ("unknown" not in {a["family"] for a in item[1]}, item[0])):
+        missing = uncovered(group, authors, passes)
+        if not missing:
             continue
         reason = f"model family unknown for newest reader {review['reader_model']}; " if unknown_reader else ""
-        if "unknown" in uncovered:
-            captain = shlex.join([str(BIN / "fm-review-record.py"), "captain-word", "--pr", pr, "--head", head,
-                                  "--words", "FRESH_CAPTAIN_WORDS"])
-            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered)}; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: {env} {captain}")
-        raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(uncovered)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group])}")
+        if "unknown" in missing:
+            raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or {captain_help}")
+        raise RecordError(f"{reason}uncovered commit group {group}, family {','.join(missing)}; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: {env} {review_command('OUTSIDE_FAMILY_MODEL', [group])}")
     if unknown_reader:
         raise RecordError(f"model family unknown for newest reader {review['reader_model']}; every group is covered by known-family reads, but the newest review must name a known reader family; obtain a reread from a known-family reader, set its actual trigger answers and local report, then record it with: {env} {review_command('KNOWN_FAMILY_MODEL', sorted(groups))}")
     return "PASS"
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

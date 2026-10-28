@@ -686,7 +686,7 @@ test_spawn_ship_native_fallback_authors() {
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$CASE_DIR/review.md" 2>&1)
     expect_code 0 $? "record the $reader read: $out"
     rc=0
-    out=$(FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
+    out=$(NM_HOME="$CASE_DIR/no-mistakes" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
       --task "$id" --base "$base" 2>&1) || rc=$?
     case "$reader" in
       claude-opus-5-5:openai-codex/gpt-6.1-sol)

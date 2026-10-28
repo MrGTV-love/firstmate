@@ -17,7 +17,7 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command rewritten
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp null-base rebased-openai; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp null-base rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial; do
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -29,8 +29,11 @@ test_derived_author_coverage() {
       rewritten=$(git -C "$case_dir/wt" rev-parse HEAD)
       git -C "$case_dir/wt" reset -q --hard HEAD~1
     fi
+    if [ "$scenario" = all-prefixed ]; then
+      git -C "$case_dir/wt" commit -q --amend --allow-empty -m 'no-mistakes(review): worker-amended implementation'
+    fi
     case "$scenario" in
-      ship-*) ;;
+      ship-*|rebase-*) ;;
       *) git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): repair consumer behavior' ;;
     esac
     head=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -41,20 +44,23 @@ import sys
 with sqlite3.connect(sys.argv[1]) as db:
     db.executescript('''CREATE TABLE repos (id TEXT, working_path TEXT);
 CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, base_sha TEXT, head_sha TEXT, last_pushed_sha TEXT, pr_url TEXT);
-CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT, status TEXT);''')
+CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model TEXT, model_provider TEXT, status TEXT);''')
     db.execute('INSERT INTO repos VALUES (?, ?)', ('repo', sys.argv[2]))
     run_base = '0' * 40 if sys.argv[6] == 'null-base' else sys.argv[3]
     db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run', 'repo', 'fm/fixture', run_base, sys.argv[4], sys.argv[4], sys.argv[5]))
     if sys.argv[6] == 'rebased-openai':
         db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?)', ('run-a', 'repo', 'fm/fixture', sys.argv[3], sys.argv[7], sys.argv[7], sys.argv[5]))
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run-a', 'acp:omp', 'gpt-5.1-codex', 'openai', 'completed'))
-    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run-a', 'review', 'acp:omp', 'gpt-5.1-codex', 'openai', 'completed'))
+    step = 'rebase' if sys.argv[6].startswith('rebase-') else 'review'
+    db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'acp:omp', None, None, 'completed'))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', None, None, 'completed'))
     if sys.argv[6] == 'cancelled-claude':
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'claude', '', None, 'cancelled'))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'claude', '', None, 'cancelled'))
     if sys.argv[6] == 'errored-omp':
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?)', ('run', 'acp:omp', '', None, 'error'))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', '', None, 'error'))
+    if sys.argv[6] == 'rebase-unreadable':
+        db.execute('DROP TABLE agent_invocations')
 PY
     case "$scenario" in
       unreadable|config-fallback|changed-config|unknown-captain-word)
@@ -105,6 +111,19 @@ PY
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
+      rebase-claude)
+        # The Claude rebase agent edited the OpenAI worker's commits in its range.
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex"]}' >/dev/null || fail 'record Claude-only read' ;;
+      rebase-deepseek)
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model deepseek-v4 >/dev/null || fail 'record DeepSeek read' ;;
+      all-prefixed)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --reader-model gpt-5.1-codex >/dev/null || fail 'record OpenAI-only read' ;;
+      fail-partial)
+        # Earlier reads cover every group, but after the FAIL only ship is reread.
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" >/dev/null || fail 'record Claude read'
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" --reader-model gpt-5.1-codex >/dev/null || fail 'record OpenAI read'
+        record_review "$case_dir" "$url" "$head" --verdict FAIL --author-groups "$groups" --reader-model gemini-3-pro >/dev/null || fail 'record FAIL of both groups'
+        record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record later ship-only read' ;;
       rebased-openai)
         # The OpenAI-only PASS covers the Claude pipeline family, never run A's OpenAI one.
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record Claude read of ship'
@@ -181,16 +200,17 @@ PY
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
     case "$scenario" in
-      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|null-base)
+      two-readers|ship-only|ship-multi-read|ship-history|ship-reused|ship-all-extra|alias-command|unknown-captain-word|ship-unknown-reader|cancelled-claude|null-base|exact-head-fail|rebase-deepseek|rebase-two-readers)
         expect_code 0 "$rc" "$scenario must merge: $(cat "$case_dir/stderr")"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
         expect_code 1 "$rc" "$scenario must refuse: $(cat "$case_dir/stderr")"
         assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario must not reach forge mutation"
         case "$scenario" in
-          exact-head-fail) expected='verdict is FAIL' ;;
+          fail-partial) expected='no later exact-head PASS covers group no-mistakes:anthropic, family anthropic, that this FAIL read' ;;
+          all-prefixed) expected='uncovered commit group ship, family openai' ;;
           head-mismatch) expected='head mismatch' ;;
-          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp|rebase-unreadable) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;
@@ -362,8 +382,7 @@ test_triggered_review_verifies_only_when_independent() {
   done
 }
 
-# A later independent PASS cannot clear any exact-head reader's FAIL.
-test_captain_fail_triggered_pass_requires_fresh_word() {
+test_captain_fail_triggered_independent_pass_merges() {
   local case_dir head url trigger rc
   head=1111111111111111111111111111111111111111
   url=https://github.com/example/repo/pull/9
@@ -377,15 +396,9 @@ test_captain_fail_triggered_pass_requires_fresh_word() {
     record_review "$case_dir" "$url" "$head" "--$trigger" yes >/dev/null || fail "could not record triggered PASS"
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 1 "$rc" "a triggered PASS must not clear the exact-head FAIL"
-    assert_no_grep '^pr merge ' "$case_dir/gh.log" "FAIL must prevent forge mutation"
-    review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge this exact PR despite the recorded FAIL.' >/dev/null \
-      || fail 'could not record renewed captain authority'
-    rc=0
-    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-    expect_code 0 "$rc" "fresh exact-head captain words must authorize merge: $(cat "$case_dir/stderr")"
+    expect_code 0 "$rc" "captain-word, FAIL, independent PASS covering the FAIL's groups with $trigger=yes must merge: $(cat "$case_dir/stderr")"
     assert_logged_gh_merge "$case_dir" 9 example/repo --squash
-    pass "a $trigger PASS cannot clear FAIL; fresh exact-head captain words can"
+    pass "an independent $trigger PASS covering every FAIL group clears it without renewed captain words"
   done
 }
 
@@ -741,7 +754,6 @@ test_recorded_review_merge_conditions() {
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
         review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9 despite the FAIL.' >/dev/null ;;
       captain-fail-pass)
-        expected='verdict is FAIL at live head'
         review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null
         record_review "$case_dir" "$url" "$head" --verdict FAIL >/dev/null
         record_review "$case_dir" "$url" "$head" >/dev/null ;;
@@ -755,7 +767,7 @@ test_recorded_review_merge_conditions() {
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|trigger-list|trigger-guard|trigger-data|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain)
+      valid|trigger-list|trigger-guard|trigger-data|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
       *)
@@ -1911,7 +1923,7 @@ test_author_verification_accepts_sha256_base
 test_github_unreadable_base_names_the_refusal
 test_identical_captain_words_follow_append_order
 test_triggered_review_verifies_only_when_independent
-test_captain_fail_triggered_pass_requires_fresh_word
+test_captain_fail_triggered_independent_pass_merges
 test_review_record_requires_matching_local_report
 test_late_fail_before_away_hold_refuses
 test_attended_override_without_review_refuses
