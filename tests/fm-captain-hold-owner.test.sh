@@ -201,7 +201,7 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   evidence="$home/evidence.txt"
   tasks_in "$home" add moot-work "Moot work" --kind ship --repo sample --body 'Gated work plan.' >/dev/null
   run_captain "$home" hold moot-work --reason "moot-premise-choice pending" >/dev/null || fail "hold failed"
-  printf 'Ruling A: use the demand map.\n' > "$decision"
+  printf 'Ruling A: use the demand map; moot-work is moot.\n' > "$decision"
   run_captain "$home" hold ruling-a --title "Ruling A" --reason "choose the approach" --repo sample >/dev/null
   run_captain "$home" answer ruling-a --decision-file "$decision" >/dev/null || fail "could not record the ruling"
   printf 'Main decided after ruling A: the mechanism call is moot.\n' > "$evidence"
@@ -313,19 +313,33 @@ test_withdraw_releases_a_legacy_mate_hold_on_a_captain_ruling() {
   mate=$(make_mate_home withdraw-legacy)
   evidence="$mate/evidence.txt"
   decision="$mate/ruling.txt"
-  printf 'The captain ruled A; the mechanism call is moot.\n' > "$evidence"
+  printf 'The captain ruled A; legacy-work is moot.\n' > "$evidence"
   printf 'Ruling A: use the demand map.\n' > "$decision"
   run_captain "$mate" hold ruling-a --title "Ruling A" --reason "choose the approach" --repo sample --owner captain >/dev/null
   run_captain "$mate" answer ruling-a --decision-file "$decision" >/dev/null || fail "could not record the ruling"
   make_legacy_mate_hold "$mate" legacy-work "retry or fix one red CI check"
   [ "$(open_status "$mate" legacy-work)" = 0 ] || fail "the legacy hold is not an open captain call"
 
-  run_captain "$mate" withdraw legacy-work --evidence-file "$evidence" --ruling ruling-a >/dev/null \
-    || fail "withdraw refused a legacy hold moot under a recorded ruling"
+  # A ruling whose own records never name the hold does not make it moot, even
+  # when the evidence written at withdraw time names it.
+  if run_captain "$mate" withdraw legacy-work --evidence-file "$evidence" --ruling ruling-a 2>"$mate/refusal.err" >/dev/null; then
+    fail "withdraw released a hold on an unrelated captain ruling"
+  fi
+  assert_contains "$(cat "$mate/refusal.err")" "does not name legacy-work in its own records" \
+    "the refusal did not say what the ruling was missing"
+  assert_contains "$(tasks_in "$mate" show legacy-work --full)" "held: yes" "the refused withdrawal released the hold"
+  [ "$(open_status "$mate" legacy-work)" = 0 ] || fail "the refused withdrawal changed the open captain call"
+
+  # A ruling whose recorded question names the hold makes it moot.
+  printf 'Fix it; the retry is moot.\n' > "$decision"
+  run_captain "$mate" hold ruling-c --title "Retry or fix for legacy-work" --reason "choose" --repo sample --owner captain >/dev/null
+  run_captain "$mate" answer ruling-c --decision-file "$decision" >/dev/null || fail "could not record the naming ruling"
+  run_captain "$mate" withdraw legacy-work --evidence-file "$evidence" --ruling ruling-c >/dev/null \
+    || fail "withdraw refused a legacy hold named by a recorded ruling"
   show=$(tasks_in "$mate" show legacy-work --full)
   assert_contains "$show" "held: no" "the withdrawal did not release the hold"
   assert_not_contains "$show" "state: done" "the withdrawal completed the work item"
-  assert_contains "$show" "Withdrawn by: moot under the recorded captain ruling ruling-a" "the basis was not recorded"
+  assert_contains "$show" "Withdrawn by: moot under the recorded captain ruling ruling-c" "the basis was not recorded"
   assert_contains "$show" "Filed owner: unrecorded" "the filed owner was not recorded"
   assert_contains "$show" "Run from: secondmate home" "the home role was not derived and recorded"
   assert_contains "$show" "Not a captain answer." "the record did not say it is not a captain answer"
@@ -333,7 +347,7 @@ test_withdraw_releases_a_legacy_mate_hold_on_a_captain_ruling() {
   assert_contains "$(plain_channel "$mate")" "resolved [key=captain-hold-legacy-work-1]: captain hold legacy-work: withdrawn, not a captain answer" \
     "the withdrawal did not close the parent channel key"
   [ "$(open_status "$mate" legacy-work)" = 1 ] || fail "the withdrawn legacy hold still reads as open"
-  pass "withdraw releases a legacy mate hold on a recorded captain ruling and keeps the work open"
+  pass "withdraw refuses an unrelated ruling and releases a legacy mate hold on a ruling that names it, keeping the work open"
 }
 
 test_the_divergence_guard_stops_reporting_a_withdrawn_call() {
@@ -343,7 +357,7 @@ test_the_divergence_guard_stops_reporting_a_withdrawn_call() {
   decision="$mate/ruling.txt"
   printf 'Moot under the ruling.\n' > "$evidence"
   printf 'Ruling B.\n' > "$decision"
-  run_captain "$mate" hold ruling-b --title "Ruling B" --reason "choose" --repo sample --owner captain >/dev/null
+  run_captain "$mate" hold ruling-b --title "Ruling B" --reason "choose; settles diverged-work" --repo sample --owner captain >/dev/null
   run_captain "$mate" answer ruling-b --decision-file "$decision" >/dev/null || fail "could not record the ruling"
   make_legacy_mate_hold "$mate" diverged-work "retry"
   # The status log of the task reads resolved while the hold is still open: the
@@ -358,16 +372,23 @@ test_the_divergence_guard_stops_reporting_a_withdrawn_call() {
   pass "the divergence guard stops reporting a call once it is withdrawn"
 }
 
-test_the_decision_hold_shim_declares_the_captain_in_a_secondmate_home() {
+test_the_decision_hold_shim_refuses_a_secondmate_hold_with_no_owner() {
   local mate main out rc=0 show
   mate=$(make_mate_home shim-mate)
   tasks_in "$mate" add shim-origin "Shim origin" --kind scout --repo sample --start >/dev/null
   write_origin_meta "$mate" shim-origin
-  run_shim "$mate" hold shim-origin pick --title "Pick one" --reason "captain pick pending" --repo sample >/dev/null \
+  out=$(run_shim "$mate" hold shim-origin pick --title "Pick one" --reason "captain pick pending" --repo sample 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "the shim filed a secondmate hold with no owner"
+  assert_contains "$out" "--owner is required in a secondmate home" "the shim refusal did not name the missing owner"
+  if tasks_in "$mate" show shim-origin-decision-pick >/dev/null 2>&1; then
+    fail "the refused shim hold still created a task"
+  fi
+
+  run_shim "$mate" hold shim-origin pick --title "Pick one" --reason "captain pick pending" --repo sample --owner captain >/dev/null \
     || fail "the shim hold failed in a secondmate home"
   show=$(tasks_in "$mate" show shim-origin-decision-pick --full)
   assert_contains "$show" "hold_kind: captain" "the shim hold is not a captain call"
-  assert_contains "$show" "Decision owner: captain" "the shim did not declare the captain as owner"
+  assert_contains "$show" "Decision owner: captain" "the shim did not keep the caller's captain owner"
 
   # A caller that names an owner keeps it.
   run_shim "$mate" hold shim-origin parent-pick --title "Parent pick" --reason "parent pick pending" --repo sample --owner parent >/dev/null \
@@ -383,7 +404,7 @@ test_the_decision_hold_shim_declares_the_captain_in_a_secondmate_home() {
     || fail "the shim hold failed in a main home"
   assert_not_contains "$(tasks_in "$main" show shim-origin-decision-pick --full)" "Decision owner:" \
     "the shim added an owner line in a main home"
-  pass "the decision-hold shim files captain decisions in a secondmate home and leaves a main home alone"
+  pass "the decision-hold shim refuses an ownerless secondmate hold, keeps a named owner, and leaves a main home alone"
 }
 
 test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
@@ -397,12 +418,11 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   make_legacy_mate_hold "$mate" legacy-work "retry or fix one red CI check"
   [ "$(open_status "$mate" legacy-work)" = 0 ] || fail "the legacy hold is not an open captain call"
 
-  # A missing piece of the record is refused and changes nothing.
-  for args in "--owner parent --evidence-file $evidence --reason why" \
-    "--owner parent --by main --reason why" \
-    "--owner parent --by main --evidence-file $evidence" \
-    "--owner parent --by captain --evidence-file $evidence --reason why" \
-    "--owner maybe --by main --evidence-file $evidence --reason why"; do
+  # A missing piece of the record, or the retired --by flag, is refused and changes nothing.
+  for args in "--owner parent --reason why" \
+    "--owner parent --evidence-file $evidence" \
+    "--owner parent --by main --evidence-file $evidence --reason why" \
+    "--owner maybe --evidence-file $evidence --reason why"; do
     # shellcheck disable=SC2086
     if run_captain "$mate" classify legacy-work $args >/dev/null 2>&1; then
       fail "classify accepted an incomplete record: $args"
@@ -410,28 +430,28 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   done
   assert_contains "$(tasks_in "$mate" show legacy-work --full)" "hold_kind: captain" "a refused classification changed the hold"
 
-  out=$(run_captain "$mate" classify legacy-work --owner parent --by main --evidence-file "$evidence" \
+  out=$(run_captain "$mate" classify legacy-work --owner parent --evidence-file "$evidence" \
     --reason "the question was Main's: a retry of one red check, never the captain's") || fail "classify refused a legacy hold"
   assert_equals "classified: legacy-work as parent" "$out" "classify did not report the classification"
   show=$(shown "$mate" legacy-work)
   assert_contains "$show" "hold_kind: external" "the classified hold is still a captain call"
   assert_contains "$show" "Decision owner: parent" "the owner was not recorded"
-  assert_contains "$show" "Owner classified: parent by main, run from secondmate home. Not a captain answer." \
-    "the classifier and the not-captain marker were not recorded"
+  assert_contains "$show" "Owner classified: parent, a parent classification, run from secondmate home. Not a captain answer." \
+    "the parent classification and the not-captain marker were not recorded"
   assert_contains "$show" "Classification reason: the question was Main's" "the reason was not recorded"
   assert_contains "$show" "Original hold reason: retry or fix one red CI check" "the original reason was lost"
   assert_contains "$show" "Classification evidence:" "the evidence block was not recorded"
   assert_contains "$show" "independent PASS at the head" "the evidence text was not recorded"
-  assert_contains "$show" "Classified by main as the parent's call, not the captain's words" \
-    "the hold reason every list shows does not say Main classified it"
+  assert_contains "$show" "Parent classification as the parent's call, not the captain's words" \
+    "the hold reason every list shows does not say it is a parent classification"
   assert_not_contains "$show" "Captain decision:" "the classification was written as the captain's words"
   assert_not_contains "$show" "Answered by:" "the classification was labelled as an answer"
   assert_contains "$(plain_channel "$mate")" \
-    "needs-decision [key=captain-hold-legacy-work-1]: parent decision legacy-work: Classified by main as the parent's call" \
+    "needs-decision [key=captain-hold-legacy-work-1]: parent decision legacy-work: Parent classification as the parent's call" \
     "the classification did not reach the parent channel"
   [ "$(open_status "$mate" legacy-work)" = 1 ] || fail "the classified hold still reads as an open captain call"
   [ "$(open_status "$mate" legacy-work --parent-owned)" = 0 ] || fail "the classified hold does not read as the parent's open call"
-  if run_captain "$mate" classify legacy-work --owner captain --by main --evidence-file "$evidence" --reason again >/dev/null 2>&1; then
+  if run_captain "$mate" classify legacy-work --owner captain --evidence-file "$evidence" --reason again >/dev/null 2>&1; then
     fail "a classified hold was classified a second time"
   fi
 
@@ -454,7 +474,7 @@ test_a_recorded_captain_owner_is_never_reclassified() {
   printf 'Main thinks this was its own call.\n' > "$evidence"
   tasks_in "$mate" add recorded-work "Recorded work" --kind ship --repo sample >/dev/null
   run_captain "$mate" hold recorded-work --owner captain --reason "needs the captain" >/dev/null
-  if run_captain "$mate" classify recorded-work --owner parent --by main --evidence-file "$evidence" --reason "not his" \
+  if run_captain "$mate" classify recorded-work --owner parent --evidence-file "$evidence" --reason "not his" \
     2>"$mate/refusal.err" >/dev/null; then
     fail "classify reclassified a hold recorded as the captain's at filing"
   fi
@@ -465,11 +485,11 @@ test_a_recorded_captain_owner_is_never_reclassified() {
   # A parent-owned hold, a closed task, and a task that is not a captain hold are not classifiable.
   tasks_in "$mate" add parent-work "Parent work" --kind ship --repo sample >/dev/null
   run_captain "$mate" hold parent-work --owner parent --reason "parent call" >/dev/null
-  if run_captain "$mate" classify parent-work --owner captain --by main --evidence-file "$evidence" --reason "flip" >/dev/null 2>&1; then
+  if run_captain "$mate" classify parent-work --owner captain --evidence-file "$evidence" --reason "flip" >/dev/null 2>&1; then
     fail "classify flipped a hold recorded as the parent's at filing"
   fi
   tasks_in "$mate" add plain-work "Plain work" --kind ship --repo sample >/dev/null
-  if run_captain "$mate" classify plain-work --owner parent --by main --evidence-file "$evidence" --reason "none" >/dev/null 2>&1; then
+  if run_captain "$mate" classify plain-work --owner parent --evidence-file "$evidence" --reason "none" >/dev/null 2>&1; then
     fail "classify accepted a task that is not held"
   fi
 
@@ -478,7 +498,7 @@ test_a_recorded_captain_owner_is_never_reclassified() {
   tasks_in "$main" add main-work "Main work" --kind ship --repo sample >/dev/null
   run_captain "$main" hold main-work --reason "captain choice" >/dev/null
   printf 'Main thinks this was its own call.\n' > "$main/evidence.txt"
-  if run_captain "$main" classify main-work --owner parent --by main --evidence-file "$main/evidence.txt" --reason "not his" \
+  if run_captain "$main" classify main-work --owner parent --evidence-file "$main/evidence.txt" --reason "not his" \
     2>"$main/refusal.err" >/dev/null; then
     fail "classify moved a main-home captain call to a parent that does not exist"
   fi
@@ -495,7 +515,7 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
   printf 'Main decided; this was a retry of one check.\n' > "$evidence"
   printf 'Go.\n' > "$decision"
   make_legacy_mate_hold "$mate" classified-work "classify-readers-reason pending"
-  run_captain "$mate" classify classified-work --owner parent --by main --evidence-file "$evidence" \
+  run_captain "$mate" classify classified-work --owner parent --evidence-file "$evidence" \
     --reason "never a captain call" >/dev/null || fail "classify failed"
 
   # Bearings no longer lists it as the captain's call.
@@ -506,7 +526,7 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
   out=$(tasks_in "$mate" list --state held --fields hold_kind,hold_reason 2>&1 \
     | (. "$ROOT/bin/fm-hold-reason-lib.sh"; fm_hold_reason_decode_stream)) || true
   assert_contains "$out" "external" "the held listing does not show the classified hold's kind"
-  assert_contains "$out" "Classified by main as the parent" "the held listing does not show Main's classification"
+  assert_contains "$out" "Parent classification as the parent" "the held listing does not show the parent classification"
   # The divergence check does not treat it as a captain call.
   printf 'needs-decision [key=classified-work]: retry\nresolved [key=classified-work]: main decided\n' > "$mate/state/readers-origin.status"
   out=$(run_captain "$mate" diverged) || fail "diverged failed"
@@ -526,11 +546,11 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
 
   # Classifying to the captain leaves it a captain hold and says who classified it.
   make_legacy_mate_hold "$mate" kept-work "kept-captain-reason pending"
-  run_captain "$mate" classify kept-work --owner captain --by main --evidence-file "$evidence" \
+  run_captain "$mate" classify kept-work --owner captain --evidence-file "$evidence" \
     --reason "this really is the captain's" >/dev/null || fail "classify to the captain failed"
   show=$(shown "$mate" kept-work)
   assert_contains "$show" "hold_kind: captain" "classifying to the captain changed the kind"
-  assert_contains "$show" "Classified by main as the captain's call, not the captain's words" "the hold reason does not say Main classified it"
+  assert_contains "$show" "Parent classification as the captain's call, not the captain's words" "the hold reason does not say it is a parent classification"
   [ "$(open_status "$mate" kept-work)" = 0 ] || fail "a hold classified to the captain is not an open captain call"
   pass "a classified hold reads as Main's classification in every list, and the captain can take it back"
 }
@@ -544,7 +564,7 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling
 test_withdraw_never_releases_a_genuine_captain_call
 test_withdraw_releases_a_legacy_mate_hold_on_a_captain_ruling
 test_the_divergence_guard_stops_reporting_a_withdrawn_call
-test_the_decision_hold_shim_declares_the_captain_in_a_secondmate_home
+test_the_decision_hold_shim_refuses_a_secondmate_hold_with_no_owner
 test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it
 test_a_recorded_captain_owner_is_never_reclassified
 test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse_it

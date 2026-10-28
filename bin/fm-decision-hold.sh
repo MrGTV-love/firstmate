@@ -11,8 +11,6 @@
 #   id <origin> <key>                      -> prints the legacy <origin>-decision-<key> identity
 #   hold <origin> <key> --title --reason [--repo]
 #                                          -> hold <origin>-decision-<key> --origin <origin> ...
-#                                             (plus --owner captain in a secondmate home when
-#                                             the caller names no owner)
 #   complete <origin> (--none | <key>...)  -> complete <origin> (--none | <origin>-decision-<key>...)
 #   verify <origin>                        -> verify <origin>
 #   resolve <origin> <key> --decision-file <f> --routed-to <id>...
@@ -215,16 +213,6 @@ command_hold() {
   [ "$#" -ge 2 ] || { usage >&2; exit 2; }
   id=$(compose "$origin" "$key")
   shift 2
-  # A secondmate home must declare each hold's owner (bin/fm-captain-hold.sh).
-  # This shim files captain decisions, so it declares the captain unless the
-  # caller named an owner itself; a main home needs no owner and is left alone.
-  local arg owner_given=0
-  if [ -e "$FM_HOME/.fm-secondmate-home" ] || [ -L "$FM_HOME/.fm-secondmate-home" ]; then
-    for arg in "$@"; do
-      case "$arg" in --owner|--owner=*) owner_given=1 ;; esac
-    done
-    [ "$owner_given" = 1 ] || set -- "$@" --owner captain
-  fi
   exec "$CAPTAIN_HOLD" hold "$id" --origin "$origin" "$@"
 }
 

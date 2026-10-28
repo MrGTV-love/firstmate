@@ -304,7 +304,10 @@ Bearings and the divergence guard read only open captain-kind holds, so a withdr
 
 The one eligibility fact is `--ruling <id>`, a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
 An evidence-only close, a release, a parent decision, and another withdrawal are not rulings.
-The basis works on any captain hold, including one recorded as the captain's or filed before owners were recorded, because the captain has already ruled.
+The ruling must also name the withdrawn task id in its own records, written before the withdrawal: its title (the recorded question), its hold reason, or its body with the captain's recorded answer.
+A ruling that never names the hold is refused, and the refusal says what was missing.
+A name written only at withdraw time, such as in the evidence file, never counts, because it would let any closed ruling release any hold.
+The basis works on any captain hold, including one recorded as the captain's or filed before owners were recorded, because the captain has already ruled on it.
 
 There is no weaker basis for `withdraw`.
 A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
@@ -314,24 +317,36 @@ A call the parent owns is filed as such with `--owner parent` and released with 
 
 A hold filed before owners were recorded has no `Decision owner:` line, so nothing says whether its question was the captain's.
 Leaving every such hold captain-only turned each misfiled one into a fake captain decision that needed words the captain never had to give.
-`classify` is the one honest correction: Main records, once, the owner the hold should have had.
-It needs `--by main`, a one-line `--reason`, and an evidence file whose text is stored in the task body.
+`classify` is the one honest correction: the parent records, once, the owner the hold should have had.
+It needs a one-line `--reason` and an evidence file whose text is stored in the task body.
+It asks for no caller identity, because it could not check one (see the reassessment below).
 
 - Only a hold with no owner on record can be classified, and only in a secondmate home.
-  A hold whose owner was recorded at filing, or by an earlier classification, is refused, so a call recorded as the captain's is never reclassified by Main.
+  A hold whose owner was recorded at filing, or by an earlier classification, is refused, so a call recorded as the captain's is never reclassified.
   A main home is refused, because its holds are the captain's by construction.
-- The record names the owner, `by main`, the home role the command ran from (derived, never typed), the reason, the evidence digest, and the original hold reason, and says `Not a captain answer.`.
+- The legacy set is closed and cannot grow: a secondmate home refuses every new hold that names no owner, through `bin/fm-captain-hold.sh hold` and the `bin/fm-decision-hold.sh` shim alike.
+- The record names the owner, says it is `a parent classification`, and names the home role the command ran from (derived, never typed), the reason, the evidence digest, and the original hold reason, and says `Not a captain answer.`.
   It is never written under `Captain decision:` or `Answered by:`.
 - `--owner parent` re-files the hold as an `external` parent decision, so the existing `decide` releases it with the work item left open, and the merge gate refuses it until then.
   `--owner captain` leaves a captain hold in place.
-- Both rewrite the hold reason to read `Classified by main as the ...'s call, not the captain's words: <reason>. Original hold reason: ...`, and both publish that on the parent channel.
-  Every list that shows held rows, including the return brief and the fleet snapshot, therefore shows Main's classification.
+- Both rewrite the hold reason to read `Parent classification as the ...'s call, not the captain's words: <reason>. Original hold reason: ...`, and both publish that on the parent channel.
+  Every list that shows held rows, including the return brief and the fleet snapshot, therefore shows the parent classification.
   Bearings and the divergence check read only captain-kind holds, so a parent classification leaves the captain's call surface without ever being recorded as his word.
 - The captain reverses a parent classification by re-holding with `--owner captain`.
   That clears the classification from the record and restores an open captain call, which `decide` then refuses.
 
-The widest thing `classify` does is let Main move an ownerless mate-home hold off the captain's call surface.
-The bound is that it needs evidence and a reason, never touches a recorded owner, leaves a visible Main-attributed record, still blocks the merge until `decide`, and is reversible by the captain.
+#### Harm-model reassessment for `classify`
+
+The harm this guard judges is a non-captain actor releasing a genuine captain call without the captain's words.
+`classify --owner parent` widens what the guard permits: before it, an ownerless mate-home hold could be released only by the captain's words.
+An identity check cannot bound that widening, because processes of the same OS user cannot be told apart inside one home.
+A typed `--by main` flag recorded nothing a caller could not type, so it was removed rather than presented as a check.
+The guard instead bounds the release to a closed legacy set and makes every use visible, cited and reversible:
+
+- Closed set: only a captain hold with no owner recorded at filing, in a secondmate home, once per hold; new ownerless holds are refused there, so the set cannot grow.
+- Cited: `--reason` and an evidence file are required, and the evidence text is stored in the task body.
+- Visible: the record and the hold reason say it is a parent classification and `Not a captain answer.`; the parent channel carries it; Bearings, the return brief, and the divergence check show it so.
+- Reversible: the captain re-holds with `--owner captain`, and the merge gate still refuses until `decide`.
 
 ## Reconcile: re-check reality, never a blind close
 
