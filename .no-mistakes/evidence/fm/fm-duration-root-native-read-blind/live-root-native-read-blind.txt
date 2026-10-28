@@ -1,13 +1,151 @@
-host: Darwin 27.0.0 arm64 user=charlesabrooker date=2026-10-27T04:40:37Z
-native proc_pid_rusage(361) as non-root user:
-  read_cpu(361) = None
-=== base-7971cec91: progress-check <fresh record> 361 1 (pid 361 = root-owned /usr/libexec/IOMFB_bics_daemon, ps TIME   0:00.01) ===
-sample 1: exit=0 record_exists=yes stderr=<none>
-sample 2: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 1.5s"
-sample 3: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 3.0s"
-sample 4: exit=124 record_exists=yes stderr=no_progress: "pid=361 no CPU or watched-file progress for 4.4s"
-=== target-395c80150: progress-check <fresh record> 361 1 (pid 361 = root-owned /usr/libexec/IOMFB_bics_daemon, ps TIME   0:00.01) ===
-sample 1: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
-sample 2: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
-sample 3: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
-sample 4: exit=0 record_exists=no stderr=cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+# Live drive of bin/fm-duration.py: failed native Darwin ROOT CPU read
+host: Darwin 27.0.0 arm64, 18 cpus; load at start: { 16.49 14.54 13.88 }; python: Python 3.13.6
+base=7c2041048 (main before change)  mid=615fa03a6 (root-blind tree_cpu only)  head=5bfef82fe (this branch)
+Fault injection: DYLD_INSERT_LIBRARIES=failrusage.dylib (source: failrusage.c) makes the real libproc proc_pid_rusage fail
+  FMLAB_FAIL=root -> runner's direct child (the root); nonroot -> deeper descendants; pid:N -> pid N. Product code is unmodified.
+Workload batch.py 16: 16 quiet children, each ~0.05 s CPU then reaped, root sleeps 0.45 s between; exits 7. No output.
+
+## S1 keep-going 2 s, root native read fails: base false-stops, head finishes
+[base keep-going 1] fail=root exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+[base keep-going 2] fail=root exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+[base keep-going 3] fail=root exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+[base keep-going 4] fail=root exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+[base keep-going 5] fail=root exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+[head keep-going 1] fail=root exit=7
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+[head keep-going 2] fail=root exit=7
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+[head keep-going 3] fail=root exit=7
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+[head keep-going 4] fail=root exit=7
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+[head keep-going 5] fail=root exit=7
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+## S1 control: healthy native telemetry, same workload, head
+[head keep-going control 1] fail=none exit=7
+
+[head keep-going control 2] fail=none exit=7
+
+[head keep-going control 3] fail=none exit=7
+
+
+## S2 default run mode (FM_DURATION_NO_PROGRESS_SECS=2), root native read fails
+[base run-mode 1] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.03s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[base run-mode 2] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.03s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[base run-mode 3] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.03s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[mid run-mode 1] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[mid run-mode 2] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[mid run-mode 3] fail=root exit=124
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    no_progress: "lab.batch made no output or CPU progress for 2s; stopping"
+[head run-mode 1] fail=root exit=7
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+[head run-mode 2] fail=root exit=7
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+[head run-mode 3] fail=root exit=7
+    calibration: "0 of 5 samples for lab.batch on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    progress: "lab.batch elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+
+## S3 healthy telemetry, truly idle tree is still stopped (head)
+[head keep-going idle] fail=none exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+    wall=2.8s
+[head run-mode idle] fail=none exit=124
+    calibration: "0 of 5 samples for lab.idle on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.idle elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    no_progress: "lab.idle made no output or CPU progress for 2s; stopping"
+    wall=2.8s
+
+## S4 non-root native read fails: not blind; idle child stopped, busy child kept (head)
+[head keep-going idle child] fail=nonroot exit=124
+    no_progress: "operational-read made no output or CPU progress for 2s; stopping"
+    wall=2.8s
+[head run-mode idle child] fail=nonroot exit=124
+    calibration: "0 of 5 samples for lab.idlechild on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    progress: "lab.idlechild elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    no_progress: "lab.idlechild made no output or CPU progress for 2s; stopping"
+    wall=2.8s
+[head keep-going busy child (5 s CPU)] fail=nonroot exit=5
+
+    wall=5.3s
+
+## S5 root-blind default run mode keeps the absolute stop (scaled from 6 h to 4 s)
+[head run-mode root-blind hung] fail=root exit=124
+    calibration: "0 of 5 samples for lab.hung on Mac-Studio.local"
+    fallback: "no destructive deadline; collect samples"
+    cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    progress: "lab.hung elapsed=0.5s output_bytes=0 tree_cpu=0.00s"
+    absolute_limit: "lab.hung reached the 4s absolute limit; stopping"
+    wall=4.5s
+
+## S6 progress-check RECORD PID 1 on a real idle pid
+=== base
+[step 1] healthy first sample:
+    exit=0
+[step 2] root (pid 96473) native read fails, 2 s idle:
+no_progress: "pid=96473 no CPU or watched-file progress for 2.2s"
+    exit=124
+    record unchanged by blind sample: NO
+[step 3] no prior record, root read fails:
+    exit=0
+    record created: YES
+[step 4] healthy baseline:
+    exit=0
+[step 5] healthy, truly idle 2 s:
+no_progress: "pid=96473 no CPU or watched-file progress for 7.4s"
+    exit=124
+=== head
+[step 1] healthy first sample:
+    exit=0
+[step 2] root (pid 25398) native read fails, 2 s idle:
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    exit=0
+    record unchanged by blind sample: yes
+[step 3] no prior record, root read fails:
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+    exit=0
+    record created: no
+[step 4] healthy baseline:
+    exit=0
+[step 5] healthy, truly idle 2 s:
+no_progress: "pid=25398 no CPU or watched-file progress for 2.2s"
+    exit=124
+
+load at end: { 19.69 15.10 14.13 }

@@ -1,0 +1,18 @@
+# The two new cases in tests/fm-work-progress.test.sh run alone against bin/fm-duration.py from three commits (lib.sh helper warning removed)
+=== bin/fm-duration.py from base (base=7c2041048 mid=615fa03a6 head=5bfef82fe)
+not ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle: unreadable native root was treated as idle: 124 no_progress: "pid=100 no CPU or watched-file progress for 2.0s"
+
+not ok - default_run_mode_treats_failed_native_root_reads_as_blind_and_keeps_busy_silent_work: default run mode stopped a busy silent child after failed root reads: 3 calibration: "0 of 5 samples for root-blind.run on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "root-blind.run elapsed=0.3s output_bytes=0 tree_cpu=0.02s"
+
+=== bin/fm-duration.py from mid (base=7c2041048 mid=615fa03a6 head=5bfef82fe)
+ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle
+not ok - default_run_mode_treats_failed_native_root_reads_as_blind_and_keeps_busy_silent_work: default run mode stopped a busy silent child after failed root reads: 124 calibration: "0 of 5 samples for root-blind.run on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "root-blind.run elapsed=0.3s output_bytes=0 tree_cpu=0.00s"
+no_progress: "root-blind.run made no output or CPU progress for 1s; stopping"
+
+=== bin/fm-duration.py from head (base=7c2041048 mid=615fa03a6 head=5bfef82fe)
+ok - darwin_root_native_failure_is_blind_but_nonroot_ps_fallback_still_proves_progress_and_idle
+ok - default_run_mode_treats_failed_native_root_reads_as_blind_and_keeps_busy_silent_work
