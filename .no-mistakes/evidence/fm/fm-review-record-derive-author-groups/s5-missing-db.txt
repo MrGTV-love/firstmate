@@ -1,0 +1,28 @@
+=== Scenario 5a: no pipeline DB at NM_HOME, task mode=no-mistakes ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s5a/home FM_STATE_OVERRIDE=<lab>/s5a/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 385bfd06045763c1ce1ecc9fc1d2ff56ce74665c --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1
+=== Scenario 5b: no pipeline DB, mode not recorded (defaults to no-mistakes) ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s5b/home FM_STATE_OVERRIDE=<lab>/s5b/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 385bfd06045763c1ce1ecc9fc1d2ff56ce74665c --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1
+=== Scenario 5c: no pipeline DB, task mode=direct-PR, Claude PASS of OpenAI ship ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+review: PASS
+  rc=0
+=== Scenario 5d: no pipeline DB, mode=direct-PR, but a no-mistakes( subject exists ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s5d/home FM_STATE_OVERRIDE=<lab>/s5d/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head bb6839afcdbeee1425a326a01518a8d32302cc20 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1

@@ -1,0 +1,8 @@
+=== Scenario 2: rebase-agent run, then later clean rebase run; no no-mistakes( subject at head ===
+runs: run1 (branch match, Claude rebase agent), run2 (pr_url match, no agent)
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=<lab>/s2/home FM_STATE_OVERRIDE=<lab>/s2/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head a9a10fe78066456e007a204e828993d1dbe15c4d --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+  rc=1

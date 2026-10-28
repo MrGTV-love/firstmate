@@ -1,0 +1,19 @@
+=== Scenario 3: pipeline DB exists but is not a SQLite file ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py review --verdict PASS --reader-model gemini-3-pro --author-groups '{"ship":["gpt-5.1-codex"],"no-mistakes:unknown":["unknown"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py review --verdict PASS --reader-model deepseek-v4 --author-groups '{"all":["gpt-5.1-codex","unknown"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s3/home FM_STATE_OVERRIDE=<lab>/s3/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head b701ca51009acf0c3e11fd6091cf0fce2932680d --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1
+--- the printed fix: record fresh captain words at the exact head ---
+recorded: captain-word
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+review: captain-word
+  rc=0

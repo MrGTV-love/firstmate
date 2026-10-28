@@ -1,0 +1,7 @@
+=== Scenario 4: pipeline DB opens but the runs query fails (no runs table) ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s4/home FM_STATE_OVERRIDE=<lab>/s4/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 5260a09739b7b4654946255ecae7120a22162b0f --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1

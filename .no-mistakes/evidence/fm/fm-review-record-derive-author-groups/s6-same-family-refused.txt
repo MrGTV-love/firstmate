@@ -1,0 +1,18 @@
+=== Scenario 6: same-family read; Claude ship worker, Claude PASS with typed OpenAI-only groups ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-sonnet-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+--- BEFORE (base verify) ---
+review: PASS
+  rc=0
+--- AFTER ---
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group declared:all, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=<lab>/s6/home FM_STATE_OVERRIDE=<lab>/s6/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head cdd04981075e4597f364bbe198b8a27f852dbeab --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["claude-opus-5-5"],"declared:all":["gpt-5.1-codex"]}' --covered-groups '["declared:all"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+  rc=1
+--- an OpenAI read of the ship group then clears it ---
+$ fm-review-record.py review --verdict PASS --reader-model gpt-5.1-codex --author-groups '{"ship":["claude-opus-5-5"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+error: uncovered commit group declared:all, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=<lab>/s6/home FM_STATE_OVERRIDE=<lab>/s6/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head cdd04981075e4597f364bbe198b8a27f852dbeab --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["claude-opus-5-5"],"declared:all":["gpt-5.1-codex"]}' --covered-groups '["declared:all"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+  rc=1

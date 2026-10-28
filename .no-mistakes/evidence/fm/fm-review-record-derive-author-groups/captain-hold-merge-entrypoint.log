@@ -1,0 +1,2 @@
+ok - merge entrypoints own task state before forced cleanup can retire it
+ok - captain-hold lifecycle leaves no runner or watchdog processes

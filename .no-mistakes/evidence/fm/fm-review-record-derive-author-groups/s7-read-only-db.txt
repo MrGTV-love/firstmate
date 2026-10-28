@@ -1,0 +1,27 @@
+=== Scenario 7: verify opens the pipeline DB read-only (WAL DB, real table layout) ===
+$ fm-review-record.py review --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"ship":["gpt-5.1-codex"]}' 
+recorded: review
+  rc=0
+$ fm-review-record.py review --verdict PASS --reader-model gpt-5.1-codex --author-groups '{"no-mistakes:anthropic":["claude-opus-5-5"]}' 
+recorded: review
+  rc=0
+before:
+state.sqlite state.sqlite-shm state.sqlite-wal 
+  04bd2de96aa68869f3253698ec1c91762e0293e4c54fd0663093a1615fec2eac state.sqlite
+  919eb6a79db85f9b7f01d70732f23fe01020bb1a6caa745ba55a37508a587a40 state.sqlite-shm
+  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 state.sqlite-wal
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+review: PASS
+  rc=0
+after:
+state.sqlite state.sqlite-shm state.sqlite-wal 
+  04bd2de96aa68869f3253698ec1c91762e0293e4c54fd0663093a1615fec2eac state.sqlite
+  fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb state.sqlite-shm
+  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 state.sqlite-wal
+--- same DB made read-only (chmod 444 file): verify still reads it ---
+$ fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head <head> --task task-x1 --base <base>
+review: PASS
+  rc=0
+--- planted DB under a relative NM_HOME is not evidence ---
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=<lab>/s7/home FM_STATE_OVERRIDE=<lab>/s7/home/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61HE43BH67HDNS9A0KVRCJP/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 63a25b763337a246e6b835158ed43c90f261361e --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+  rc=1
