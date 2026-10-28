@@ -785,38 +785,62 @@ test_project_freeze() {
   pass "an open project freeze parks only the declared project's finished tasks until it is released"
 }
 
-# A secondmate home reads only its own backlog. It sees its parent's freeze
-# through the mirror hold it files itself, which declares the project there;
-# nothing crosses between homes, and the parent's hold freezes none of the
-# mate's tasks.
-test_secondmate_mirror_freeze() {
+# A local secondmate home also reads its parent home's open captain holds
+# through the parent binding its parent channel uses, so the parent declares a
+# freeze once and the mate needs no mirror. A binding or a parent backlog that
+# cannot be read parks the task with that reason, and the parent's answer frees
+# it.
+test_secondmate_parent_freeze() {
   local main mate pr=https://github.com/acme/widget/pull/41 out
   main=$(make_home freeze-main)
   mate=$(make_home freeze-mate)
+  printf 'mate\n' > "$mate/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$main" > "$mate/.fm-secondmate-parent"
   mk_task "$mate" vernant-mate-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$mate/projects/vernant"
   merge_marker "$mate" vernant-mate-merged acme/widget 41
+  mk_task "$mate" sample-mate-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$mate/projects/sample"
+  merge_marker "$mate" sample-mate-merged acme/widget 41
+  printf 'Frozen by the captain.\n' > "$main/release.txt"
+
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "with no parent hold, the mate's finished task is reap-ready"
 
   FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
-    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant --freeze-project vernant >/dev/null \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
     || fail "parent hold failed"
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "parent freeze declaration failed"
   out=$(run_reap "$mate" scan) || fail "scan failed: $out"
-  expect_class "$out" vernant-mate-merged reap "a parent's freeze is not read across homes"
-
-  FM_HOME="$mate" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold mate-hold-vernant-freeze \
-    --title "Vernant freeze (mirror)" --reason "mirror of the parent's Vernant freeze" --repo vernant >/dev/null \
-    || fail "mirror hold failed"
-  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
-  expect_class "$out" vernant-mate-merged reap "a mirror hold that declares no project freezes nothing"
-
-  FM_HOME="$mate" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze mate-hold-vernant-freeze --project vernant >/dev/null \
-    || fail "mirror freeze declaration failed"
-  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
-  expect_class "$out" vernant-mate-merged parked "the mate's reaper honors the mirrored freeze"
+  expect_class "$out" vernant-mate-merged parked "the mate's reaper honors its parent's freeze"
+  expect_class "$out" sample-mate-merged reap "the parent's freeze covers only its declared project"
   case "$(row_detail "$out" vernant-mate-merged)" in
-    *"frozen by captain hold mate-hold-vernant-freeze"*) ;;
-    *) fail "the mate's parked row must name its mirror hold: $(row_detail "$out" vernant-mate-merged)" ;;
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the mate's parked row must name the parent's hold: $(row_detail "$out" vernant-mate-merged)" ;;
   esac
-  pass "a secondmate home honors its parent's freeze through the mirror hold it declares"
+
+  mv "$main/data" "$main/data.off"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "an unreadable parent backlog parks the task"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"captain freeze unreadable"*"parent home"*) ;;
+    *) fail "the parked row must say the parent could not be read: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+  mv "$main/data.off" "$main/data"
+
+  mv "$mate/.fm-secondmate-parent" "$mate/.fm-secondmate-parent.off"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "a missing parent binding parks the task"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"captain freeze unreadable"*"parent binding"*) ;;
+    *) fail "the parked row must say the parent binding could not be read: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+  mv "$mate/.fm-secondmate-parent.off" "$mate/.fm-secondmate-parent"
+
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$main/release.txt" --release >/dev/null || fail "parent release failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "the parent's release makes the mate's task eligible again"
+  pass "a secondmate home honors its parent's freeze, fails closed when the parent cannot be read, and frees the task on release"
 }
 
 test_stale_selection_is_revalidated() {
@@ -948,7 +972,7 @@ test_canonical_forge_markers
 test_semantic_idle_sources
 test_captain_holds
 test_project_freeze
-test_secondmate_mirror_freeze
+test_secondmate_parent_freeze
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate

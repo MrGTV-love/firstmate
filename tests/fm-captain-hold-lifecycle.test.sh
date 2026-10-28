@@ -1692,8 +1692,9 @@ test_hold_ledger_records_creation_direct_answer_and_reconcile() {
 # A hold declares the one project it freezes in its own header block. `frozen`
 # answers for a task from that declaration only: the task's recorded project must
 # equal it, a plain hold or a quoted declaration below the header freezes nothing,
-# rewriting the origin keeps the declaration, and an answer ends it for good, even
-# when the same task is held again.
+# rewriting the origin keeps the declaration, a passed --until revisit date does
+# not lift it, and an answer ends it for good, even when the same task is held
+# again.
 test_freeze_declaration_scopes_one_project() {
   local home out rc show
   home=$(make_home freeze-scope)
@@ -1719,8 +1720,6 @@ test_freeze_declaration_scopes_one_project() {
   expect_code 1 "$rc" "a project that is not a plain name is refused"
   rc=0; run_captain "$home" freeze missing-hold --project vernant >/dev/null 2>&1 || rc=$?
   expect_code 1 "$rc" "freezing a task that does not exist is refused"
-  rc=0; run_captain "$home" hold refused-empty --title "T" --reason "r" --freeze-project '' >/dev/null 2>&1 || rc=$?
-  expect_code 1 "$rc" "an empty --freeze-project is refused instead of ignored"
   run_captain "$home" freeze plain-hold --project vernant >/dev/null || fail "freeze failed"
   out=$(run_captain "$home" frozen in-scope) || fail "frozen must exit 0 for the declared project"
   assert_equals plain-hold "$out" "frozen names the freezing hold"
@@ -1750,10 +1749,17 @@ test_freeze_declaration_scopes_one_project() {
   rc=0; run_captain "$home" frozen out-scope >/dev/null 2>&1 || rc=$?
   expect_code 1 "$rc" "re-holding released work starts a new lifecycle with no freeze"
 
-  run_captain "$home" hold filed-frozen --title "Frozen at filing" --reason "freeze at filing" \
-    --repo sample --freeze-project vernant >/dev/null || fail "hold --freeze-project failed"
-  out=$(run_captain "$home" frozen in-scope) || fail "a hold filed with --freeze-project must freeze"
-  assert_equals filed-frozen "$out" "the filing command declares the freeze"
+  run_captain "$home" hold revisit-hold --title "Revisit" --reason "revisit later" --until 2020-01-01 >/dev/null \
+    || fail "a hold with a passed revisit date failed"
+  run_captain "$home" freeze revisit-hold --project vernant >/dev/null \
+    || fail "freeze must accept an open call whose revisit date passed"
+  out=$(run_captain "$home" frozen in-scope) || fail "a passed revisit date must not lift the freeze"
+  assert_equals revisit-hold "$out" "the open call past its revisit date still freezes"
+  run_captain "$home" hold revisit-hold --reason "asked again" >/dev/null || fail "re-holding the revisit call failed"
+  show=$(tasks_in "$home" show revisit-hold --full)
+  assert_contains "$show" "Captain hold freezes project: vernant" "re-holding an open call past its revisit date lost the freeze"
+  out=$(run_captain "$home" frozen in-scope) || fail "re-holding an open call must not lift its freeze"
+  assert_equals revisit-hold "$out" "the re-held call still freezes"
 
   rm -f "$home/.tasks.toml"
   mkdir "$home/.tasks.toml"

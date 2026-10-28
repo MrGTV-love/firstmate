@@ -61,23 +61,26 @@ fm_idle_reap_exited_by_control() {  # <state> <id>
   fm_mp_pane_agent_gone "$1/$2.meta"
 }
 
-# A captain hold that declares this task's project frozen stops every automatic
-# cleanup of it, whether or not the task has a hold of its own. The answer is
+# A captain hold that declares this task's project frozen, in this home or in
+# a local secondmate home's parent, stops every automatic cleanup of it,
+# whether or not the task has a hold of its own. The answer is
 # bin/fm-captain-hold.sh frozen; an answer it cannot establish also stops
-# cleanup. Sets the parked class and its reason and returns 0 when the task is
-# frozen or unsure, and returns 1 when nothing freezes it.
+# cleanup and names its reason. Sets the parked class and its reason and
+# returns 0 when the task is frozen or unsure, and returns 1 when nothing
+# freezes it.
 fm_idle_reap_frozen() {  # <home> <state> <data> <id>
-  local out rc=0 project
+  local out rc=0 project last
   out=$(FM_HOME="$1" FM_STATE_OVERRIDE="$2" FM_DATA_OVERRIDE="$3" \
-    "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" frozen "$4" 2>/dev/null) || rc=$?
+    "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" frozen "$4" 2>&1) || rc=$?
+  last=${out##*$'\n'}
   case "$rc" in
     0)
       project=$(fm_meta_get "$2/$4.meta" project)
       project=${project%/}
-      IDLE_REAP_DETAIL="frozen by captain hold ${out%%$'\n'*}: project ${project##*/} is frozen until the captain releases it"
+      IDLE_REAP_DETAIL="frozen by captain hold $last: project ${project##*/} is frozen until the captain releases it"
       ;;
     1) return 1 ;;
-    *) IDLE_REAP_DETAIL="captain freeze unreadable; cleanup ineligible" ;;
+    *) IDLE_REAP_DETAIL="captain freeze unreadable: ${last#fm-captain-hold: }; cleanup ineligible" ;;
   esac
   IDLE_REAP_CLASS=parked
   return 0
