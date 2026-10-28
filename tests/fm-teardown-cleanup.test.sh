@@ -10,6 +10,17 @@
 
 set -u
 
+# Temporary CI attribution: the observer re-enters this same suite once.
+if [ "${FM_TEARDOWN_CPU_CHILD:-0}" != 1 ]; then
+  exec python3 "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-cpu-probe.py" "$@"
+fi
+fm_teardown_cpu_mark() {
+  local acknowledgement
+  printf '%s\n' "$1" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
+  IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+}
+fm_teardown_cpu_mark suite.start
+
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-helpers.sh"
 
@@ -6580,10 +6591,26 @@ test_teardown_retires_the_dsh_launch_state
 # registered after it. test_local_only_force_overrides_unpushed
 # is the first such case here, so restore that errexit state once before it.
 errexit_restored=false
+# Temporary CI attribution: the shared runner calls this hook before every
+# registered case and runs that case next only when it is selected, so the hook
+# closes the case that just ran and opens the selected one.
+teardown_cpu_requested=("$@")
+teardown_cpu_case=
 fm_test_before_case() {
+  if [ -n "$teardown_cpu_case" ]; then
+    fm_teardown_cpu_mark "$teardown_cpu_case.end"
+    teardown_cpu_case=
+  fi
   if [ "$errexit_restored" = false ] && [ "$1" = test_local_only_force_overrides_unpushed ]; then
     set -e
     errexit_restored=true
   fi
+  if [ "${#teardown_cpu_requested[@]}" -eq 0 ] || fm_test_case_known "$1" "${teardown_cpu_requested[@]}"; then
+    teardown_cpu_case=$1
+    fm_teardown_cpu_mark "$teardown_cpu_case.start"
+  fi
 }
 fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
+if [ -n "$teardown_cpu_case" ]; then
+  fm_teardown_cpu_mark "$teardown_cpu_case.end"
+fi
