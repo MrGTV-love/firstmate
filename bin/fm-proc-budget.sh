@@ -6,12 +6,13 @@
 #   fm-proc-budget.sh --memory-kib 2097152 -- <command...>  2 GiB memory stop
 #
 # --memory-kib adds an opt-in sampled hard stop: once per second, sum the
-# command process group's resident memory and physical footprint, in KiB
-# (1024 bytes), and compare the larger sum with the positive decimal limit.
-# Crossing it immediately KILLs the whole group and exits 99 with one stderr
-# line naming the limit and sample. This is not a kernel allocation ceiling:
-# memory can overshoot between samples. Children must remain in this group.
-# A failed, malformed, or late memory sample KILLs the group and exits 125.
+# command tree's resident memory and physical footprint, in KiB (1024 bytes),
+# and compare the larger sum with the positive decimal limit. Descendants are
+# tracked across process groups and sessions, including nested wrappers.
+# Crossing it STOPs and re-scans the tree before KILLing every member, then
+# exits 99 with one stderr line naming the limit and sample. This is not a
+# kernel allocation ceiling: memory can overshoot between samples.
+# A failed, malformed, or late memory sample ends the tree and exits 125.
 # The libproc reader is checked before launch; an unsupported host (currently
 # any non-Darwin host) or unavailable reader refuses to start with status 125.
 # No ps memory sampler or external watcher is used. Without this option the

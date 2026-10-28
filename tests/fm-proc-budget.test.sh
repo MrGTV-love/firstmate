@@ -222,6 +222,20 @@ memory_supported() {
   return 0
 }
 
+assert_memory_pid_ended() {
+  local pid=$1 state attempt
+  for attempt in {1..50}; do
+    state=$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat | while read -r candidate status; do
+      [ "$candidate" != "$pid" ] || printf '%s' "$status"
+    done)
+    case "$state" in
+      ''|Z*|*E) return 0 ;;
+    esac
+    sleep 0.1
+  done
+  fail "memory stop left descendant $pid alive ($state)"
+}
+
 test_memory_tree_over_limit() {
   local rc pid
   cat >"$TMP_ROOT/memory-tree.py" <<'PY'
@@ -250,15 +264,25 @@ PY
   [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
   [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
   while read -r pid; do
-    # Zombies have ended, even when the host has not reaped them yet.
-    case "$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat | while read -r candidate state; do
-      [ "$candidate" != "$pid" ] || printf '%s' "$state"
-    done)" in
-      ''|Z*|*E) ;;
-      *) fail "memory stop left descendant $pid alive" ;;
-    esac
+    assert_memory_pid_ended "$pid"
   done <"$TMP_ROOT/memory.pids"
   pass "over-limit child and grandchild are ended with status 99"
+}
+
+test_memory_nested_wrapper() {
+  local rc pid
+  # The inner wrapper creates another session and has a higher bound. A
+  # process-group-only outer watch misses its 192 MiB payload entirely.
+  FM_MEMORY_NESTED_PID="$TMP_ROOT/nested-memory.pid" run_memory_case "$WRAP" --memory-kib 131072 -- \
+    "$WRAP" --memory-kib 524288 -- python3 -c \
+    'import os, time; open(os.environ["FM_MEMORY_NESTED_PID"], "w").write(str(os.getpid())); allocation = bytearray(192 * 1024 * 1024); time.sleep(4); raise SystemExit(7)' \
+    2>"$TMP_ROOT/nested-memory.err"
+  rc=$?
+  expect_code 99 "$rc" "lower outer memory stop covers nested wrapper sessions"
+  assert_contains "$(cat "$TMP_ROOT/nested-memory.err")" "exceeded 131072 KiB" "the outer bound, not the higher inner bound, must stop the payload"
+  read -r pid <"$TMP_ROOT/nested-memory.pid"
+  assert_memory_pid_ended "$pid"
+  pass "lower outer limit accounts for and ends payloads in nested wrapper sessions"
 }
 
 test_memory_normal_command() {
@@ -274,33 +298,42 @@ test_memory_reader_failure() {
   local fixture="$TMP_ROOT/memory-fixture" rc pid mode marker
   mkdir -p "$fixture"
   cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
   cat >"$fixture/fm-proc-info.py" <<'PY'
 import os
+from pathlib import Path
+import runpy
 import sys
 import time
-for line in sys.stdin:
-    if not os.path.exists(os.environ["FM_MEMORY_MARKER"]):
-        print("1 1", flush=True)
-        continue
-    mode = os.environ["FM_MEMORY_FAILURE"]
-    if mode == "exit":
-        sys.exit(0)
-    if mode == "hang":
-        time.sleep(60)
-    print("-" if mode == "unreadable" else "malformed", flush=True)
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ != "__main__":
+    # Only the memory transport is faulted; cleanup still reads the real tree.
+    globals().update(runpy.run_path(real))
+else:
+    for line in sys.stdin:
+        if not os.path.exists(os.environ["FM_MEMORY_MARKER"]):
+            print('{"rss_kib":1,"members":[]}', flush=True)
+            continue
+        mode = os.environ["FM_MEMORY_FAILURE"]
+        if mode == "exit":
+            sys.exit(0)
+        if mode == "hang":
+            time.sleep(60)
+        print("-" if mode == "unreadable" else "malformed", flush=True)
 PY
   for mode in unreadable malformed exit hang; do
     marker="$TMP_ROOT/reader-$mode.pid"
     PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
       FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE="$mode" run_memory_case \
       "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- \
-      bash -c 'echo "$$" >"$FM_MEMORY_MARKER"; exec sleep 60' 2>"$TMP_ROOT/reader.err"
+      "$WRAP" --memory-kib 524288 -- \
+      bash -c 'echo "$$" >"$FM_MEMORY_MARKER"; exec sleep 20' 2>"$TMP_ROOT/reader.err"
     rc=$?
     expect_code 125 "$rc" "failed memory sample ($mode)"
     assert_contains "$(cat "$TMP_ROOT/reader.err")" "cannot sample command-tree memory" "failed sample has a clear reason ($mode)"
     [ "$(wc -l <"$TMP_ROOT/reader.err" | tr -d ' ')" -eq 1 ] || fail "reader failure must emit exactly one reason ($mode)"
     read -r pid <"$marker"
-    if kill -0 "$pid" 2>/dev/null; then fail "failed sample left the command running ($mode)"; fi
+    assert_memory_pid_ended "$pid"
   done
 
   PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
@@ -334,6 +367,7 @@ test_memory_invalid_limits
 test_no_memory_option_never_starts_reader
 if memory_supported; then
   test_memory_tree_over_limit
+  test_memory_nested_wrapper
   test_memory_normal_command
   test_memory_reader_failure
 fi

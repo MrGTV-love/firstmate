@@ -2,7 +2,7 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PGID |
+       lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PID |
        table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
@@ -26,16 +26,20 @@ whole KiB of resident memory and of physical footprint (which also counts
 compressed pages) held right now by PID and its live descendants in PID's
 process group, reading only that group's processes and summed from libproc's
 ri_resident_size and ri_phys_footprint; it prints `-` for a sample that cannot
-be read and exits at the end of stdin. rss-tree uses the same streaming
-protocol for every live member of PGID, including orphaned descendants, and
-invalidates the whole sample if any live member cannot be read; an empty
-group returns `0 0`. It is the strict reader for fm-proc-budget.sh.
+be read and exits at the end of stdin. rss-tree is the strict streaming reader
+for fm-proc-budget.sh: each input line requests a JSON object with rss_kib (the
+larger of resident memory and footprint) and members (PID, kernel start seconds,
+kernel start microseconds). It follows descendants across process groups and
+sessions and retains observed orphans by start identity. An unreadable live
+member makes rss_kib null; a failed tree read prints `-`. An empty tree has
+rss_kib zero. The supervisor uses these identities for fail-closed cleanup.
 Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
 """
 import ctypes
+import json
 import struct
 import sys
 import time
@@ -203,17 +207,51 @@ def mem_tree(root):
     return f"{resident // 1024} {footprint // 1024}"
 
 
-def rss_tree(group):
-    """Read every live member of an owned command group, including orphans.
+def process_identity(record):
+    return struct.unpack_from("qq", record, P_START)
 
-    Unlike the lint reader, an unreadable live member invalidates the sample.
-    A vanished member or a zombie no longer owns resident memory.
+
+def tree_snapshot(root, known):
+    """Find descendants across sessions and retain observed orphans by identity.
+
+    The initial owned process group also catches children reparented before the
+    first snapshot. Start timestamps prevent retaining a recycled PID.
     """
+    records = {struct.unpack_from("i", record, P_PID)[0]: record for record in kinfos()}
+    children = {}
+    queue = []
+    group_owned = (root not in records or root not in known
+                   or process_identity(records[root]) == known[root])
+    for pid, record in records.items():
+        children.setdefault(struct.unpack_from("i", record, E_PPID)[0], []).append(pid)
+        identity = process_identity(record)
+        if (known.get(pid) == identity
+                or pid == root and (root not in known or known[root] == identity)
+                or group_owned and struct.unpack_from("i", record, E_PGID)[0] == root):
+            queue.append(pid)
+    selected = {}
+    while queue:
+        pid = queue.pop()
+        if pid in selected:
+            continue
+        selected[pid] = records[pid]
+        queue.extend(children.get(pid, []))
+    original_root = known.get(root)
+    known.clear()
+    known.update((pid, process_identity(record)) for pid, record in selected.items())
+    if original_root is not None:
+        known[root] = original_root
+    return selected
+
+
+def rss_tree(root, known):
+    """Strict libproc sample of the full tracked tree, not just its group."""
+    records = tree_snapshot(root, known)
     resident, footprint = 0, 0
-    for record in kinfos(KERN_PROC_PGRP, group):
+    readable = True
+    for pid, record in records.items():
         if record[P_STAT] == SZOMB or struct.unpack_from("i", record, P_FLAG)[0] & P_WEXIT:
             continue
-        pid = struct.unpack_from("i", record, P_PID)[0]
         try:
             more_resident, more_footprint = memory(pid)
         except LookupError:
@@ -221,12 +259,18 @@ def rss_tree(group):
                 current = kinfo(pid)
             except LookupError:
                 continue
-            if current[P_STAT] == SZOMB or struct.unpack_from("i", current, P_FLAG)[0] & P_WEXIT:
+            if (process_identity(current) != process_identity(record)
+                    or current[P_STAT] == SZOMB
+                    or struct.unpack_from("i", current, P_FLAG)[0] & P_WEXIT):
                 continue
-            raise
+            readable = False
+            continue
         resident += more_resident
         footprint += more_footprint
-    return f"{resident // 1024} {footprint // 1024}"
+    return json.dumps({
+        "rss_kib": max(resident, footprint) // 1024 if readable else None,
+        "members": [[pid, *process_identity(record)] for pid, record in records.items()],
+    }, separators=(",", ":"))
 
 
 def mem_watch(root, reader=mem_tree):
@@ -249,7 +293,8 @@ def main(argv_):
     if command == "mem-tree":
         return mem_watch(number)
     if command == "rss-tree":
-        return mem_watch(number, rss_tree)
+        known = {}
+        return mem_watch(number, lambda root: rss_tree(root, known))
     try:
         if command == "table":
             value = table(fields)
