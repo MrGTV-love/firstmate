@@ -1715,6 +1715,12 @@ test_freeze_declaration_scopes_one_project() {
     || fail "quoting hold failed"
   rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
   expect_code 1 "$rc" "a declaration quoted below the header block freezes nothing"
+  run_captain "$home" hold quoted-hold --reason "quotes the declaration below its header" --origin in-scope >/dev/null \
+    || fail "rewriting the quoting hold's origin failed"
+  show=$(tasks_in "$home" show quoted-hold --full)
+  assert_contains "$show" "Captain hold freezes project: vernant" "an origin rewrite deleted a declaration quoted below the header block"
+  rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "an origin rewrite does not lift a quoted declaration into the header block"
 
   rc=0; run_captain "$home" freeze plain-hold --project 'vernant/x' >/dev/null 2>&1 || rc=$?
   expect_code 1 "$rc" "a project that is not a plain name is refused"

@@ -1354,8 +1354,13 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its origin was recorded"
   freeze=$(body_hold_freeze_project "$body")
-  rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: / && !/^Captain hold freezes project: /' \
-    | awk 'NF || started { started = 1; print }')
+  rest=$(printf '%s\n' "$body" | sed 1d | awk '
+      BEGIN { header = 1 }
+      header && NF == 0 { header = 0 }
+      /^Captain hold origin: / { next }
+      header && /^Captain hold freezes project: / { next }
+      { print }
+    ' | awk 'NF || started { started = 1; print }')
   new_body=$stamp
   if [ -n "$origin" ]; then
     new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
