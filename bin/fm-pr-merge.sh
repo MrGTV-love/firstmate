@@ -33,14 +33,14 @@
 # Only the final attempt is reported: incomplete sources remain unreadable,
 # never evidence that a required check is missing, and exhausted UNKNOWN alone
 # reports mergeability still pending rather than unmergeable.
-# A green check also has to have tested the head merged with the base branch's
-# current tip: a GitHub Actions run on the pull_request event tests the merge
-# GitHub built when the run was created and keeps it across a re-run, so a tip
-# that arrived after the run began was never combined with the head by any
-# check. github_stale_base_check below owns how that is placed from the base
-# branch's push history, the refusal, and why no waiver applies. The head
-# binding below does not extend to the base, so a tip that arrives between that
-# last read and the forge command is a limit this script cannot close.
+# The head also has to contain the base branch's live tip, so the tree the
+# merge lands is the head's own tree, the one its checks ran on;
+# github_read_base_containment below owns that tree rule, why run timing is
+# never trusted instead, and why no waiver applies. The tip is read again
+# immediately before the forge command and a moved tip refuses, because the
+# head binding below does not extend to the base; a tip that lands in the
+# seconds between that last read and GitHub applying the merge is a residual
+# this script cannot close.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -560,6 +560,7 @@ require_recorded_review() {
 # returns non-zero after reporting every condition that failed.
 FM_PR_MERGE_HEAD=
 FM_PR_MERGE_BASE=
+FM_PR_MERGE_BASE_TIP=
 FM_PR_GITLAB_ASYNC_CONFIGURED=false
 gitlab_verify_mergeable() {
   local json fields line
@@ -847,7 +848,7 @@ github_read_check_rollup() {
   local head=$1 pages
   # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
   pages=$(gh api graphql --paginate \
-    -f query='query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt checkSuite{workflowRun{createdAt event}}} ... on StatusContext{id context state}}}}}}}}' \
+    -f query='query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt} ... on StatusContext{id context state}}}}}}}}' \
     -F "owner=$PR_OWNER" -F "repo=$PR_REPO" -F "head=$head" 2>/dev/null) || return 1
   printf '%s' "$pages" | jq -sce --arg head "$head" '
     if length == 0 or any(.[]; (.errors // [] | length) != 0
@@ -1052,105 +1053,40 @@ github_required_checks_missing() {
   ' 2>/dev/null || return 1
 }
 
-# Whether the green pull_request checks tested the head merged with the base
-# branch's current tip. A GitHub Actions run on the pull_request event tests the
-# merge of the head with the base as GitHub built it when that workflow run was
-# created, and a re-run or a reopen of the pull request keeps that same merge.
-# GitHub names that base in no API field, so it is placed from the base
-# branch's own push history: a run whose creation is not after the arrival of
-# the current tip cannot have included the tip, and the combined tree it did not
-# include was never checked. Only completed SUCCESS or NEUTRAL runs of that
-# event are judged, each check name by its newest run; a red, pending, skipped,
-# or other-producer check is judged by the rules above and below, and a check
-# name with no such run leaves nothing to place. No waiver applies, because
+# Whether the head contains the base branch's live tip. Every check that ran on
+# the head tested the head's own tree, and a squash or merge of a head that
+# already contains the tip onto that tip lands that same tree, so green head
+# checks then cover the landed tree with no timing evidence at all. A head that
+# lacks the tip lands a tree combined with base commits no check ran beside it.
+# Run timing cannot stand in for this: a GitHub Actions pull_request run tests
+# the merge GitHub built from the base it saw, a re-run keeps that merge (CI run
+# 40719661158 attempt 2), and PR 254 was closed and reopened after its base
+# moved and its new run still tested the old merge. No waiver applies, because
 # there is no verdict to waive: the checks passed, on a different tree.
-# A run created in the same second as the tip cannot be ordered against it, so it
-# is stale and its tested base is reported as the tip before that second.
-#
-# Sets FM_PR_STALE_LINES (refusal lines) and FM_PR_STALE_NAMES (stale check
-# names). Returns 0 when nothing is stale, 1 when a green check is stale, and 4
-# when the push history cannot place the current tip: unreadable, malformed, or
-# not ending at base_oid, which also covers the base moving mid-read and a
-# history that has not caught up, so the bounded retry owns both.
-FM_PR_STALE_LINES=
-FM_PR_STALE_NAMES=
-github_stale_base_check() {
-  local json=$1 base=$2 base_oid=$3 judged history verdict ref line kind a b c
-  local tip_ts='' oldest_ts='' lines='' names=''
-  FM_PR_STALE_LINES=
-  FM_PR_STALE_NAMES=
-  if ! judged=$(printf '%s' "$json" | jq -c '
-      def iso: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
-               then . else error("undated workflow run") end;
-      if (.statusCheckRollup | type) != "array" then error("no check rollup") else . end
-      | [ .statusCheckRollup[]
-          | select(.__typename == "CheckRun" and .status == "COMPLETED"
-              and (.conclusion == "SUCCESS" or .conclusion == "NEUTRAL")
-              and .checkSuite.workflowRun.event == "pull_request")
-          | {name: (if (.name // "") == "" then "(unnamed check)" else .name end),
-             at: (.checkSuite.workflowRun.createdAt | iso)} ]
-      | group_by(.name) | map({name: .[0].name, at: (map(.at) | max)})' 2>/dev/null); then
-    FM_PR_STALE_LINES="  - the workflow runs behind the green checks could not be dated, so whether they tested the current $base cannot be told
-"
-    return 4
-  fi
-  [ "$judged" != '[]' ] || return 0
-
-  ref=$(github_urlencode_path_segment "refs/heads/$base")
-  if ! history=$(gh api "repos/$PR_OWNER/$PR_REPO/activity?ref=$ref&per_page=100" 2>/dev/null) \
-    || ! history=$(printf '%s' "$history" | jq -c '
-      if type != "array" then error("activity payload is unreadable") else . end
-      | [ .[]
-          | select(type == "object" and (.after | type) == "string" and (.after | test("^[0-9a-f]{40}$")))
-          | if (.timestamp | type) == "string"
-               and (.timestamp | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))
-            then {ts: .timestamp, sha: .after} else error("undated push") end ]
-      | sort_by(.ts) | reverse' 2>/dev/null); then
-    FM_PR_STALE_LINES="  - the push history of base branch $base could not be read, so whether the green checks tested its current tip $base_oid cannot be told
-"
-    return 4
-  fi
-  verdict=$(jq -rn --argjson judged "$judged" --argjson history "$history" --arg oid "$base_oid" '
-    ($history | first // null) as $newest
-    | if $newest == null or $newest.sha != $oid then
-        "unreadable\t" + ($newest.sha // "none")
-      else
-        "tip\t" + $newest.ts,
-        "oldest\t" + ($history | last | .ts),
-        ( $judged | map(select(.at <= $newest.ts)) | group_by(.at)[]
-          | .[0].at as $at
-          | "group\t" + $at + "\t"
-            + (($history | map(select(.ts < $at)) | first // {sha: "-"}) | .sha)
-            + "\t" + (map(.name) | sort | join(", ")) )
-      end' 2>/dev/null) || verdict=
-  if [ -z "$verdict" ]; then
-    FM_PR_STALE_LINES="  - the push history of base branch $base could not be read, so whether the green checks tested its current tip $base_oid cannot be told
-"
-    return 4
-  fi
-  while IFS=$'\t' read -r kind a b c; do
-    case "$kind" in
-      unreadable)
-        FM_PR_STALE_LINES="  - the push history of base branch $base ends at ${a}, not at its current tip $base_oid, so whether the green checks tested that tip cannot be told yet
-"
-        return 4
-        ;;
-      tip) tip_ts=$a ;;
-      oldest) oldest_ts=$a ;;
-      group)
-        [ "$b" != - ] || b="an older tip than the $base pushes read (the oldest read arrived at $oldest_ts)"
-        lines="$lines  - pull_request checks from the workflow run created at $a tested the head merged with $base at $b, but $base is now at $base_oid (that tip arrived at $tip_ts, after the run began): $c
-"
-        names="${names:+$names, }$c"
-        ;;
-    esac
-  done <<VERDICT
-$verdict
-VERDICT
-  [ -n "$names" ] || return 0
-  FM_PR_STALE_LINES=$lines
-  FM_PR_STALE_NAMES=$names
-  return 1
+# The tip is read from the base branch itself through the compare API, never
+# from the pull request's baseRefOid, which GitHub leaves at the base of the
+# last head push. Sets FM_PR_BASE_TIP (the live tip), FM_PR_BASE_BUILT_ON (the
+# newest base commit the head contains), and FM_PR_BASE_BEHIND (the number of
+# base commits the head lacks). Returns 1 when the comparison cannot be read.
+FM_PR_BASE_TIP=
+FM_PR_BASE_BUILT_ON=
+FM_PR_BASE_BEHIND=
+github_read_base_containment() {
+  local head=$1 base=$2 comparison fields
+  FM_PR_BASE_TIP=
+  FM_PR_BASE_BUILT_ON=
+  FM_PR_BASE_BEHIND=
+  comparison=$(gh api "repos/$PR_OWNER/$PR_REPO/compare/$(github_urlencode_path_segment "$base")...$head?per_page=1" 2>/dev/null) \
+    || return 1
+  fields=$(printf '%s' "$comparison" | jq -r '
+    if (.base_commit.sha | type) == "string" and (.base_commit.sha | test("^[0-9a-f]{40}$"))
+       and (.merge_base_commit.sha | type) == "string" and (.merge_base_commit.sha | test("^[0-9a-f]{40}$"))
+       and (.behind_by | type) == "number" and .behind_by >= 0 and .behind_by == (.behind_by | floor)
+    then "\(.base_commit.sha) \(.merge_base_commit.sha) \(.behind_by)"
+    else error("unreadable comparison") end' 2>/dev/null) || return 1
+  read -r FM_PR_BASE_TIP FM_PR_BASE_BUILT_ON FM_PR_BASE_BEHIND <<FIELDS
+$fields
+FIELDS
 }
 
 # Pre-merge conditions from a live PR view, complete head rollup, base
@@ -1164,7 +1100,7 @@ github_verify_mergeable() {
   local state='' draft='' review_decision='' mergeable='' merge_state='' live_head='' base=''
   local kind action req_text required_known=true
   local any_pending=false any_failed=false
-  local base_oid stale_status=0 stale_names=''
+  local lacks_tip=''
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
@@ -1337,21 +1273,17 @@ $missing
 EOF
   fi
 
-  # Every green pull_request check must have run on the head merged with the
-  # base branch's current tip; github_stale_base_check owns how that is placed.
-  base_oid=$(printf '%s' "$json" | jq -r '.baseRefOid // ""' 2>/dev/null) || base_oid=
-  github_stale_base_check "$json" "$base" "$base_oid" || stale_status=$?
-  case "$stale_status" in
-    0) ;;
-    1)
-      refusals="$refusals$FM_PR_STALE_LINES"
-      stale_names=$FM_PR_STALE_NAMES
-      ;;
-    *)
-      source_unreadable=true
-      refusals="$refusals$FM_PR_STALE_LINES"
-      ;;
-  esac
+  # The head must contain the base branch's live tip, so the landed tree is the
+  # one its checks ran on; github_read_base_containment owns the rule.
+  if ! github_read_base_containment "$live_head" "$base"; then
+    source_unreadable=true
+    refusals="$refusals  - whether head $live_head contains the current tip of base branch $base could not be read
+"
+  elif [ "$FM_PR_BASE_BEHIND" -ne 0 ]; then
+    lacks_tip=$FM_PR_BASE_TIP
+    refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind): it was built on $base at $FM_PR_BASE_BUILT_ON, so no check ran on the tree this merge would land
+"
+  fi
 
   if [ -n "$mergeable_refusal" ]; then
     if [ -z "$refusals" ] && [ "$mergeable" = UNKNOWN ]; then
@@ -1364,18 +1296,16 @@ EOF
     # One event per green-check decision: a denial needs a definite check it
     # read, while a refusal whose source could not be read carries no verdict
     # to report.
-    if [ -n "$uncovered" ] || [ -n "$unreported" ] || [ -n "$stale_names" ]; then
+    if [ -n "$uncovered" ] || [ -n "$unreported" ] || [ -n "$lacks_tip" ]; then
       FM_PR_GREEN_HEAD_BLOCKED=true
     fi
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
-    if [ -n "$stale_names" ]; then
-      printf 'error: these checks passed on a merge built before the current tip of base branch %s arrived, so the head merged with that tip was never checked: %s\n' \
-        "$base" "$stale_names" >&2
-      printf 'Refresh them with a new head that includes the current %s (rebase onto it or merge it into the branch, then push): that starts a new pull_request run on a merge GitHub builds against the current %s. Re-running the jobs or reopening the pull request does not rebuild that merge, and no waiver applies. When the new run passes, re-run this merge: %s %s %s\n' \
-        "$base" "$base" "$0" "$ID" "$URL" >&2
+    if [ -n "$lacks_tip" ]; then
+      printf 'Update the branch so its head contains %s at %s (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
+        "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
     fi
     if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
       if [ "$any_pending" = true ]; then
@@ -1406,9 +1336,10 @@ EOF
     fi
     return 1
   fi
-  printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
-    "$URL" "$live_head" >&2
+  printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which contains the current %s tip %s\n' \
+    "$URL" "$live_head" "$base" "$FM_PR_BASE_TIP" >&2
   FM_PR_MERGE_HEAD=$live_head
+  FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
   FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || FM_PR_MERGE_BASE=
   fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitHub PR base commit for author evidence' >&2; return 4; }
   FM_PR_GITHUB_BASE=$base
@@ -1989,6 +1920,20 @@ case "$PROVIDER" in
     refuse_github_queue_while_away || exit 2
     merge_status=0
     require_recorded_review || exit 1
+    # --match-head-commit binds only the head, so the base tip is read once
+    # more here and a tip that moved since the verify read refuses. A tip that
+    # lands in the seconds between this read and GitHub applying the merge is
+    # not closed.
+    if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
+      printf 'error: refusing to merge %s: the tip of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
+        "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
+      exit 1
+    fi
+    if [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
+      printf 'error: refusing to merge %s: base branch %s moved from %s to %s after head %s was verified, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
+        "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_MERGE_BASE_TIP" "$FM_PR_BASE_TIP" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
+      exit 1
+    fi
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?

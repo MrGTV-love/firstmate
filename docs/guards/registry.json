@@ -414,11 +414,11 @@
       "sites": [
         {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny"}
       ],
-      "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while a green pull_request check ran on a merge built before the base branch's current tip arrived",
+      "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while that head lacks the base branch's live tip, so the landed tree is one no check ran on",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
-      "trigger": "any unwaived required check at the current head is not green, or a green pull_request workflow run was created at or before the arrival of the base branch's current tip",
-      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a green check that ran on an older base clears only by a new head that includes the current base, and no waiver applies",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head",
+      "trigger": "any unwaived required check at the current head is not green, or the head does not contain the base branch's live tip, read before verifying and again immediately before the merge",
+      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a head that lacks the base tip clears only by updating the branch so CI runs on the combined tree, and no waiver applies",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",

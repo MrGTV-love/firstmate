@@ -174,6 +174,9 @@ case "${1:-} ${2:-}" in
       *) printf '%s\n' '[]' ;;
     esac
     ;;
+  "api repos/"*"/compare/"*)
+    printf '%s\n' '{"behind_by":0,"base_commit":{"sha":"0000000000000000000000000000000000000000"},"merge_base_commit":{"sha":"0000000000000000000000000000000000000000"}}'
+    ;;
   "api repos/"*) printf '%s\n' '{"name":"main","protected":false}' ;;
 esac
 SH

@@ -145,29 +145,17 @@ check_run() {
     "$name" "$status" "$conclusion_json" "$started_json" "$completed_json"
 }
 
-# One CheckRun rollup entry from a GitHub Actions run on the pull_request event,
-# the way GitHub reports it: the entry carries the creation time of the workflow
-# run, which a re-run keeps while its own startedAt moves on. Args: name
-# run_created_at [started_at] [conclusion] [event]
-workflow_check_run() {
-  local name=$1 created=$2 started=${3:-$2} conclusion=${4:-SUCCESS} event=${5:-pull_request}
-  printf '{"__typename":"CheckRun","name":"%s","status":"COMPLETED","conclusion":"%s","startedAt":"%s","completedAt":"%s","checkSuite":{"workflowRun":{"createdAt":"%s","event":"%s"}}}' \
-    "$name" "$conclusion" "$started" "$started" "$created" "$event"
-}
-
-# The base branch's push history as GitHub's activity API lists it, newest
-# first. Each argument is "<timestamp> <sha>": the tip the push left behind.
-# Args: case_dir [timestamp sha]...
-write_github_activity() {
-  local case_dir=$1 entry='' ts sha before=0000000000000000000000000000000000000000
-  shift
-  while [ "$#" -gt 0 ]; do
-    ts=${1%% *}
-    sha=${1#* }
-    entry="${entry:+$entry,}{\"timestamp\":\"$ts\",\"activity_type\":\"pr_merge\",\"ref\":\"refs/heads/main\",\"before\":\"$before\",\"after\":\"$sha\"}"
-    shift
-  done
-  printf '[%s]\n' "$entry" > "$case_dir/github-activity.json"
+# The compare API's answer for the base branch's live tip against the head:
+# the tip itself, the newest base commit the head contains, and how many base
+# commits the head lacks. With no call number it answers every read; with one it
+# answers only that read, so a case can move the tip between two reads. Args:
+# case_dir tip built_on behind_by [call_number]
+write_github_compare() {
+  local case_dir=$1 tip=$2 built_on=$3 behind=$4 call=${5:-final}
+  mkdir -p "$case_dir/compare-responses"
+  printf '{"status":"%s","ahead_by":1,"behind_by":%s,"base_commit":{"sha":"%s"},"merge_base_commit":{"sha":"%s"}}\n' \
+    "$([ "$behind" -eq 0 ] && echo ahead || echo diverged)" "$behind" "$tip" "$built_on" \
+    > "$case_dir/compare-responses/$call"
 }
 
 status_context() {
@@ -316,9 +304,22 @@ case "${1:-} ${2:-}" in
     # The required-check reads: the branch itself, and its rules read without
     # the merge-queue filter the queue reader below applies.
     case " $* " in
-      *" repos/"*"/activity?"*)
-        [ -f "${FM_TEST_GH_ACTIVITY:-}" ] || exit 1
-        cat "$FM_TEST_GH_ACTIVITY"
+      *" repos/"*"/compare/"*)
+        case "$*" in
+          *"...$(cat "$FM_TEST_GH_HEAD")?"*) ;;
+          *) exit 1 ;;
+        esac
+        calls=$(( $(cat "$FM_TEST_GH_COMPARE_CALLS" 2>/dev/null || echo 0) + 1 ))
+        printf '%s\n' "$calls" > "$FM_TEST_GH_COMPARE_CALLS"
+        for reply in "$FM_TEST_GH_COMPARE_RESPONSES/$calls" "$FM_TEST_GH_COMPARE_RESPONSES/final"; do
+          if [ -f "$reply" ]; then
+            cat "$reply"
+            exit 0
+          fi
+        done
+        # By default the head already contains the base tip the view reports.
+        base=$(cat "$FM_TEST_GH_BASE") || exit 1
+        printf '{"status":"ahead","ahead_by":1,"behind_by":0,"base_commit":{"sha":"%s"},"merge_base_commit":{"sha":"%s"}}\n' "$base" "$base"
         exit 0
         ;;
       *" repos/"*"/commits/"*"/check-runs"*)
@@ -788,7 +789,9 @@ run_pr_merge() {
   FM_TEST_GH_HEAD="$case_dir/github-head" \
   FM_TEST_GH_RUNS="$case_dir/github-runs.json" \
   FM_TEST_GH_RUNS_FIRST="$case_dir/github-runs-first.json" \
-  FM_TEST_GH_ACTIVITY="$case_dir/github-activity.json" \
+  FM_TEST_GH_BASE="$case_dir/github-base" \
+  FM_TEST_GH_COMPARE_RESPONSES="$case_dir/compare-responses" \
+  FM_TEST_GH_COMPARE_CALLS="$case_dir/compare-calls" \
   FM_TEST_GH_RUNS_CALLS="$case_dir/github-runs-calls" \
   FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
