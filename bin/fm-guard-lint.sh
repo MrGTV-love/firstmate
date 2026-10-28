@@ -67,7 +67,7 @@ RETIRED=
 JSON=0
 COUNTS=0
 
-usage() { sed -n '3,56p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,55p' "$0" | sed 's/^# \{0,1\}//'; }
 
 die_usage() { echo "error: $*" >&2; echo "run with --help" >&2; exit 2; }
 
