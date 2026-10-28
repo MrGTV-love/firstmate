@@ -943,7 +943,7 @@ The first of these that is currently held binds: the explicit `--hold TASK_ID`, 
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time, whichever comes first, except for `review_pass_not_merged`.
+An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time (for a steer, from its delivery), whichever comes first, except for `review_pass_not_merged`.
 This bounded standing also applies when an optional hold could not be verified; an explicit unverifiable `--hold` still refuses.
 A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded, rather than falling back to the time-based receipt.
 When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
