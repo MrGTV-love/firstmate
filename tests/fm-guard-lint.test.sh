@@ -322,6 +322,11 @@ assert_site "S1 finds a refuse helper call inside a one-line function definition
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the wrapper's call must count as a site: $(site_ids "$SIG")"
 pass "a one-line wrapper's helper call is a site, the helper's own definition is not"
 
+SIG=$(fixture sig_case_arm)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'refuse() { echo "$*" >&2; exit 1; }\ncase "$1" in\n  ""|*[!a-z]*) refuse "no task named" ;;\nesac\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a refuse helper call after a case-arm pattern" "$SIG" 'C'
+
 SIG=$(fixture sig_oneline_event)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"

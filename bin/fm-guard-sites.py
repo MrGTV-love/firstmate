@@ -145,7 +145,7 @@ def call_pattern(names, kind):
         return None
     alt = '|'.join(re.escape(n) for n in sorted(names, key=len, reverse=True))
     if kind == 'sh':
-        return re.compile(r'(?:^\s*|[;&|({]\s*|\b(?:then|do|else|elif|if|while|until)\s+|!\s*)(?:' + alt
+        return re.compile(r'(?:^\s*|[;&|({)]\s*|\b(?:then|do|else|elif|if|while|until)\s+|!\s*)(?:' + alt
                           + r')(?=\s|;|$)')
     return re.compile(r'(?<![.\w$])(?:' + alt + r')\s*\(')
 
