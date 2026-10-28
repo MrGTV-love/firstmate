@@ -1,0 +1,30 @@
+name: Lint currency
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check pinned linter versions
+    runs-on: ubuntu-latest
+    # Fast tier: two public release API reads, seconds of work.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compare the pinned versions with the latest releases
+        run: |
+          set +e
+          bin/fm-lint.sh --check-version
+          rc=$?
+          set -e
+          case "$rc" in
+            0) ;;
+            1) exit 1 ;;
+            2) echo "::warning::the release check could not complete; inspect the log and rerun" ;;
+            *) echo "::error::unexpected exit $rc"; exit 1 ;;
+          esac
