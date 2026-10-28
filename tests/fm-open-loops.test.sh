@@ -2123,6 +2123,22 @@ assert loops_as(home, 'branch', '--check-actions').returncode == 0, "another act
 assert loops_as(home, 'main', '--check-actions').returncode == 1
 assert row['id'] in loops_as(home, 'branch', '--present-overdue').stdout
 assert loops_as(home, 'branch', '--check-actions').returncode == 1, "the branch actor's next drain did not gate the row"
+home, ledger, row, call, ok, drain, ack = case('cross-actor-changed')
+assert row['id'] in loops_as(home, 'main', '--present-overdue').stdout
+inbox(home, '001.msg')
+assert loops_as(home, 'main', 'action', row['id'], 'steered', '--evidence', '001.msg').returncode == 0
+assert loops_as(home, 'main', '--check-actions').returncode == 0
+assert row['id'] not in loops_as(home, 'branch', '--present-overdue').stdout
+assert row['id'] not in json.loads(ledger.read_text())['handling']['presentations'].get('branch', {})
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+assert loops_as(home, 'branch', '--check-actions').returncode == 0, 'a row changed after the branch drain gated its ack'
+assert row['id'] in loops_as(home, 'branch', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 1, 'the next branch drain did not gate the changed row'
+inbox(home, '002.msg')
+assert loops_as(home, 'branch', 'action', row['id'], 'steered', '--evidence', '002.msg').returncode == 0
+assert loops_as(home, 'branch', '--check-actions').returncode == 0
 print('PASS: each actor gates only the rows its own drain presented')
 
 # A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.

@@ -1636,9 +1636,9 @@ def ledger_action(args, state, now, batch=()):
             action = actions.get(ident, {})
             if action.get("kind") == "waiting" or (action and not same_work(action, by_id[ident], now)):
                 return False
-            return ident not in pending or action_answers(action, by_id[ident], pending[ident], now, waits)
+            return action_answers(action, by_id[ident], pending[ident], now, waits)
         missing = [row for ident, row in by_id.items()
-                   if (ident in pending or ident in actions)
+                   if (ident in pending or actions.get(ident, {}).get("kind") == "waiting")
                    and not needs_no_action(actions.get(ident, {}), row, now, waits)
                    and not ((row.get("category") == "review_pass_not_merged"
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
