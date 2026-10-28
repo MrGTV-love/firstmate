@@ -2,7 +2,7 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | table FIELDS
+       lstart PID | identity PID | cpu-tree PID | mem-tree PID | table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -19,8 +19,14 @@ lstart and command, like `ps -axo <field>=,...`; stat carries the state letters
 macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
 else S) and E for a process that is exiting. cpu-tree prints the
 whole centiseconds of CPU used by PID and its live descendants, including their
-reaped children, as macOS `ps -S` counts them. Facts come from sysctl KERN_PROC
-and KERN_PROCARGS2, and CPU from libproc's proc_pid_rusage. A process or fact
+reaped children, as macOS `ps -S` counts them. mem-tree keeps running and
+answers each line read on stdin with one line, `<resident> <footprint>`: the
+whole KiB of resident memory and of physical footprint (which also counts
+compressed pages) held right now by PID and its live descendants in PID's
+process group, reading only that group's processes and summed from libproc's
+ri_resident_size and ri_phys_footprint; it prints `-` for a sample that cannot
+be read and exits at the end of stdin. Facts come from sysctl KERN_PROC
+and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
 """
@@ -30,7 +36,7 @@ import sys
 import time
 
 CTL_KERN, KERN_PROC, KERN_PROCARGS2 = 1, 14, 49
-KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_RUID = 0, 1, 6
+KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_PGRP, KERN_PROC_RUID = 0, 1, 2, 6
 # struct kinfo_proc on 64-bit Darwin: kp_proc.p_pid, kp_proc.p_comm,
 # kp_proc.p_flag, kp_proc.p_stat, kp_eproc.e_ppid and kp_eproc.e_pgid.
 KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40, 243, 32, 36, 560, 564
@@ -102,14 +108,14 @@ def argv(pid):
     return [shown(word) for word in words]
 
 
-def kinfos():
-    data = sysctl(CTL_KERN, KERN_PROC, KERN_PROC_ALL)
+def kinfos(*selector):
+    data = sysctl(CTL_KERN, KERN_PROC, *(selector or (KERN_PROC_ALL,)))
     for offset in range(0, len(data) - KINFO_SIZE + 1, KINFO_SIZE):
         yield data[offset:offset + KINFO_SIZE]
 
 
-def processes():
-    for record in kinfos():
+def processes(*selector):
+    for record in kinfos(*selector):
         yield struct.unpack_from("i", record, P_PID)[0], struct.unpack_from("i", record, E_PPID)[0]
 
 
@@ -168,6 +174,40 @@ def cpu_tree(root):
     return round(total * timebase.numer / timebase.denom / 1e7)
 
 
+def memory(pid):
+    usage = RusageInfoV2()
+    if libc.proc_pid_rusage(pid, RUSAGE_INFO_V2, ctypes.byref(usage)):
+        raise LookupError(pid)
+    return usage.ri_resident_size, usage.ri_phys_footprint
+
+
+def mem_tree(root):
+    group = struct.unpack_from("i", kinfo(root), E_PGID)[0]
+    children = {}
+    for pid, ppid in processes(KERN_PROC_PGRP, group):
+        children.setdefault(ppid, []).append(pid)
+    (resident, footprint), queue = memory(root), list(children.get(root, []))
+    while queue:
+        pid = queue.pop()
+        queue.extend(children.get(pid, []))
+        try:
+            more_resident, more_footprint = memory(pid)
+        except LookupError:
+            continue
+        resident, footprint = resident + more_resident, footprint + more_footprint
+    return f"{resident // 1024} {footprint // 1024}"
+
+
+def mem_watch(root):
+    while sys.stdin.readline():
+        try:
+            answer = mem_tree(root)
+        except (OSError, LookupError, struct.error, IndexError):
+            answer = "-"
+        print(answer, flush=True)
+    return 0
+
+
 def main(argv_):
     fields = argv_[2].split(",") if len(argv_) == 3 and argv_[1] == "table" else []
     if len(argv_) != 3 or (fields and not set(fields) <= set(TABLE_FIELDS)) or (not fields and not argv_[2].isdigit()):
@@ -175,6 +215,8 @@ def main(argv_):
         return 2
     command = argv_[1]
     number = 0 if fields else int(argv_[2])
+    if command == "mem-tree":
+        return mem_watch(number)
     try:
         if command == "table":
             value = table(fields)
