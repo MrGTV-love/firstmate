@@ -120,7 +120,8 @@ class PhaseLedger:
         pid, ppid = int(pid), None if scope == 'helper' else int(ppid)
         allowed = {'helper': {'setup.start', 'setup.end', 'cli.start', 'cli.end'},
                    'product': {'entry', 'startup.end', 'backend.start', 'backend.end', 'safety.start', 'safety.end',
-                               'runtime.start', 'runtime.end', 'docker.start', 'docker.end'}}
+                               'runtime.start', 'runtime.end', 'docker.start', 'docker.end',
+                               'guard.end', 'routing.end'}}
         if edge not in allowed[scope] or (status and (
                 scope != 'helper' or edge != 'cli.end' or not status.isascii() or
                 not status.isdecimal() or len(status) > 3 or int(status) > 255)):
@@ -172,6 +173,8 @@ class PhaseLedger:
             return
         if owner['case'] != case:
             emit(event='instrumentation_error', error='product_crossed_case_boundary', mark=mark)
+            return
+        if edge in ('guard.end', 'routing.end'):
             return
         region, action = edge.rsplit('.', 1)
         key = (owner['invocation_id'], region)

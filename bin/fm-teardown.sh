@@ -1857,6 +1857,7 @@ fm_teardown_phase_mark product backend.end
 if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
   "$FM_ROOT/bin/fm-guard.sh" || true
 fi
+fm_teardown_phase_mark product guard.end
 HOME_PATH=$(grep '^home=' "$META" | cut -d= -f2- || true)
 PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
 # tasktmp is recorded by fm-spawn for tasks that set up a per-task temp root
@@ -5954,6 +5955,7 @@ teardown_launch_home_token() {
   esac
   printf '%s' "$hash"
 }
+fm_teardown_phase_mark product routing.end
 LAUNCH_HOME_TOKEN=$(teardown_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
 # An unresolvable durable parent binding refuses by name before the custody
 # walks below, which climb the same parent records and would only report a
