@@ -1008,17 +1008,135 @@ test_freshness_present_slot_owner_refuses() { run_freshness_slot_case present sh
 test_freshness_absent_slot_owner_launches() { run_freshness_slot_case absent ship; }
 test_freshness_removed_slot_owner_refuses() { run_freshness_slot_case removed ship; }
 
+# Local-only chooses a qualified descendant of both defaults, not arbitrary HEAD.
+# These ungoverned selector controls do not claim project attestation compatibility.
+run_local_only_source_case() { # <local|equal|remote|diverged|missing|feature|dirty|publish|scout|no-origin|named>
+  local shape=$1 id rec out rc=0 local_sha remote_sha before token real_git moved_sha args=()
+  id="pool-local-$shape-$(date +%s)-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  remote_sha=$(git -C "$PROJECT_DIR" rev-parse origin/main)
+  case "$shape" in
+    local|equal|feature|dirty|publish|scout|no-origin|named|moved|alias|dirty-copy)
+      git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null ;;
+  esac
+  case "$shape" in
+    local|feature|dirty|publish|scout|no-origin|named|diverged|moved|alias|dirty-copy)
+      printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
+      git -C "$PROJECT_DIR" add accepted-a.txt
+      git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
+      ;;
+  esac
+  local_sha=$(git -C "$PROJECT_DIR" rev-parse refs/heads/main)
+  before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  case "$shape" in
+    feature)
+      git -C "$PROJECT_DIR" checkout --quiet -b unrelated-feature
+      printf 'never a baseline\n' > "$PROJECT_DIR/feature-only.txt"
+      git -C "$PROJECT_DIR" add feature-only.txt
+      git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm feature ;;
+    dirty) printf 'uncommitted primary bytes\n' > "$PROJECT_DIR/accepted-a.txt" ;;
+    missing) git -C "$PROJECT_DIR" branch -m main not-the-default ;;
+    no-origin) git -C "$PROJECT_DIR" remote remove origin ;;
+    alias)
+      git -C "$PROJECT_DIR" branch alias-default main
+      git -C "$PROJECT_DIR" symbolic-ref refs/heads/main refs/heads/alias-default ;;
+    dirty-copy) printf 'preserve assigned dirt\n' > "$POOL_DIR/README.md" ;;
+    moved)
+      real_git=$(command -v git)
+      moved_sha=$(printf 'concurrent accepted commit\n' | git -C "$PROJECT_DIR" \
+        -c user.name=Tests -c user.email=tests@example.invalid commit-tree "main^{tree}" -p main)
+      # Move only this fixture's named default immediately after its first read.
+      # Genuine Git returns the old snapshot, then custody must reject the move.
+      {
+        printf '#!/usr/bin/env bash\n'
+        printf 'real=%q\nproject=%q\nnew=%q\nold=%q\nmarker=%q\n' \
+          "$real_git" "$PROJECT_DIR" "$moved_sha" "$local_sha" "$CASE_DIR/ref-moved"
+        cat <<'SH'
+if [ "${1:-}" = -C ] && [ "${2:-}" = "$project" ] &&
+  [ "${3:-}" = rev-parse ] && [ "${*: -1}" = 'refs/heads/main^{commit}' ] && [ ! -e "$marker" ]; then
+  "$real" "$@" || exit $?
+  "$real" -C "$project" update-ref refs/heads/main "$new" "$old" || exit $?
+  printf 'moved\n' > "$marker"
+  exit 0
+fi
+exec "$real" "$@"
+SH
+      } > "$FAKEBIN_DIR/git"
+      chmod +x "$FAKEBIN_DIR/git"
+      ;;
+  esac
+  args=(--mode local-only --yolo off)
+  case "$shape" in
+    publish) args=(--mode direct-PR --yolo off) ;;
+    scout) args=(--scout) ;;
+    named) args+=(--base-branch main) ;;
+  esac
+  token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
+  [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'task temp already exists'
+  [ ! -e "/tmp/fm-$id+$token" ] && [ ! -L "/tmp/fm-$id+$token" ] || fail 'staging temp already exists'
+  out=$(run_spawn "$id" "${args[@]}" 2>&1) || rc=$?
+  case "$shape" in
+    diverged|missing|named|alias|moved|dirty-copy)
+      [ "$rc" -ne 0 ] || fail "$shape local-only source unexpectedly admitted"
+      [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail 'refusal changed assigned source'
+      [ ! -f "$HOME_DIR/state/$id.meta" ] || fail 'refusal published task metadata'
+      [ ! -f "${POOL_DIR%/*}/.fm-slot-owner" ] || fail 'refusal claimed assigned copy'
+      case "$shape" in
+        diverged) assert_contains "$out" 'defaults diverge' 'divergence reason missing' ;;
+        missing|alias) assert_contains "$out" 'missing or ambiguous' 'qualification reason missing' ;;
+        moved)
+          [ -f "$CASE_DIR/ref-moved" ] || fail 'mutable-ref control did not move the ref'
+          [ "$(git -C "$PROJECT_DIR" rev-parse main)" = "$moved_sha" ] || fail 'concurrent commit lost'
+          assert_contains "$out" 'default changed or is ambiguous' 'stale-plan reason missing' ;;
+        dirty-copy)
+          cmp "$POOL_DIR/README.md" <(printf 'preserve assigned dirt\n') || fail 'assigned dirt lost'
+          assert_contains "$out" 'not clean' 'dirty assigned copy reason missing' ;;
+        named) assert_contains "$out" 'local-only' 'named-base refusal reason missing' ;;
+      esac
+      ;;
+    *)
+      expect_code 0 "$rc" "$shape source selection failed"$'\n'"$out"
+      case "$shape" in
+        remote|equal|publish|scout) [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$remote_sha" ] || fail 'remote descendant not selected' ;;
+        no-origin) [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail 'originless contract changed' ;;
+        *) [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$local_sha" ] || fail 'qualified local descendant not selected'
+           cmp "$POOL_DIR/accepted-a.txt" <(printf 'accepted local-only work\n') || fail 'local source bytes changed' ;;
+      esac
+      [ ! -f "$POOL_DIR/feature-only.txt" ] || fail 'arbitrary primary feature HEAD selected'
+      ;;
+  esac
+  if [ "$shape" != no-origin ]; then
+    [ "$(git -C "$PROJECT_DIR" rev-parse origin/main)" = "$remote_sha" ] || fail 'local work mislabeled as origin'
+    [ "$(git -C "$PROJECT_DIR" ls-remote origin refs/heads/main | cut -f1)" = "$remote_sha" ] || fail 'remote changed'
+  fi
+  pass "local-only source selection: $shape"
+}
+
+test_local_only_source_selection() {
+  local shape
+  for shape in local equal remote diverged missing alias moved feature dirty dirty-copy publish scout no-origin named; do
+    run_local_only_source_case "$shape"
+  done
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
   exit 0
 fi
 
+test_local_only_source_selection
 test_freshness_introduces_slot_owner
 test_freshness_introduces_scout_slot_owner
 test_freshness_slot_owner_requires_scope
