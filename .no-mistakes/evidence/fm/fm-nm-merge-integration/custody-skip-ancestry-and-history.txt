@@ -1,0 +1,21 @@
+## control-base-config
+$ git merge-base --is-ancestor <S> <P>
+exit=1
+$ git log --graph --oneline --format='%h %s' <P>
+* 105fc0d pipeline fix round
+* d45dc87 worker change
+* 1bc6ba1 main advance
+* cf32203 base
+
+## candidate-branch-config
+$ git merge-base --is-ancestor <S> <P>
+exit=0
+$ git log --graph --oneline --format='%h %s' <P>
+* 68478ea pipeline fix round
+*   5b19f4b Merge remote-tracking branch 'origin/main' into feature
+|\  
+| * 17435d9 main advance
+* | db2aafd worker change
+|/  
+* 593c571 base
+

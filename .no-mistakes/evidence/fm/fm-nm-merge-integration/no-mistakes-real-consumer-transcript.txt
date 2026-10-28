@@ -1,0 +1,24 @@
+$ FM_EVID_OUT=$SCR/repos go test -overlay overlay.json ./internal/pipeline/steps -run TestFMEvidence_MergeIntegration -count=1 -v
+=== RUN   TestFMEvidence_MergeIntegration
+    zz_fm_merge_integration_evidence_test.go:150: CONFIG branch-trusted + pushed(strategy: rebase) -> effective rebase.strategy="merge"
+    zz_fm_merge_integration_evidence_test.go:151: CONFIG base-commit trusted (control) -> effective rebase.strategy="rebase"
+    zz_fm_merge_integration_evidence_test.go:164: ADVERSARIAL typo strategy: merges -> loader error: parse repo config: rebase.strategy: "merges" is not a valid strategy (want "rebase" or "merge")
+    helpers_test.go:210: fetching latest upstream state...
+    helpers_test.go:210: rebasing onto origin/main...
+    helpers_test.go:210: updated head SHA to d45dc8731795
+    helpers_test.go:210: fetching latest upstream state...
+    helpers_test.go:210: merging origin/main...
+    helpers_test.go:210: updated head SHA to 5b19f4be1e7c
+    zz_fm_merge_integration_evidence_test.go:172: CASE control-base-config strategy=rebase submitted=62658451 integrated=d45dc873 parents=[1bc6ba12d5fc368ae00d86ae80136d7664a7276e] published=105fc0d0 submitted_is_ancestor=false
+    zz_fm_merge_integration_evidence_test.go:172: CASE candidate-branch-config strategy=merge submitted=db2aafd8 integrated=5b19f4be parents=[db2aafd8b91f8092c1c9188c9edb9cbb6c6ac9f0 17435d933013559deccdc1535749aa63c89d02e8] published=68478ea8 submitted_is_ancestor=true
+--- PASS: TestFMEvidence_MergeIntegration (1.74s)
+PASS
+ok  	github.com/kunchenguid/no-mistakes/internal/pipeline/steps	2.156s
+
+$ FM_EVID_OUT=$SCR/repos go test -overlay overlay.json ./internal/branchsync -run TestFMEvidence_SyncRelation -count=1 -v
+=== RUN   TestFMEvidence_SyncRelation
+    zz_fm_sync_relation_evidence_test.go:51: SYNC control-base-config (strategy=rebase): state=diverged relation=diverged safety=blocked_diverged next_action=inspect_and_reconcile_manually
+    zz_fm_sync_relation_evidence_test.go:51: SYNC candidate-branch-config (strategy=merge): state=behind relation=behind safety=safe_fast_forward next_action=sync
+--- PASS: TestFMEvidence_SyncRelation (0.12s)
+PASS
+ok  	github.com/kunchenguid/no-mistakes/internal/branchsync	0.217s

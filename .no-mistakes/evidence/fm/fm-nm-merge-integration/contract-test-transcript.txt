@@ -1,0 +1,12 @@
+$ bash tests/fm-nm-test-contract.test.sh   # branch head
+ok - no-mistakes does not configure commands.test
+ok - no-mistakes integrates newer main by merge
+exit=0
+
+$ bash <copy>/tests/fm-nm-test-contract.test.sh   # same test, base-commit .no-mistakes.yaml (no rebase.strategy)
+/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-nm-merge-evid.hauyW3VeQE/neg/tests/lib.sh: line 39: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-nm-merge-evid.hauyW3VeQE/neg/tests/git-config-helpers.sh: No such file or directory
+_: /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/fm-nm-merge-evid.hauyW3VeQE/neg/bin/fm-wake-lib.sh: No such file or directory
+_: fm_pid_identity: command not found
+ok - no-mistakes does not configure commands.test
+not ok - rebase.strategy must be merge so the rebase step keeps the submitted head an ancestor; got: ''
+exit=1

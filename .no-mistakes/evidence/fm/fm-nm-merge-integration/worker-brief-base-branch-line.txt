@@ -1,0 +1,5 @@
+$ source bin/fm-dod-lib.sh; fm_dod_block no-mistakes demo-task fm/demo-task none release/2.x "" <brief>   # branch head
+8:This task's base branch is `release/2.x`, not the repository default: pass `--base-branch release/2.x` on every `no-mistakes axi run` that starts a run, so the pipeline integrates newer commits from, opens its PR against, and watches CI for that branch.
+
+$ (same call, base commit 7c204105 bin/)
+8:This task's base branch is `release/2.x`, not the repository default: pass `--base-branch release/2.x` on every `no-mistakes axi run` that starts a run, so the pipeline rebases onto, opens its PR against, and watches CI for that branch.
