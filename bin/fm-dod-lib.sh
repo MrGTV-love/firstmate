@@ -356,8 +356,10 @@ fm_dod_item_shape() {  # <template|authorities|rule|shape>
   case "$1" in
     template) printf '%s\n' "$template" ;;
     authorities) printf '%s\n' "$words" ;;
-    rule) printf 'Each mandatory item starts its own line as `%s`, with an id matching `%s` that is unique within the section and every field nonempty; %s is exactly %s.\n' \
-      "$template" "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_AUTHORITY_FIELD" "$words" ;;
+    rule)
+      # shellcheck disable=SC2016 # Backticks are literal Markdown in the printed rule.
+      printf 'Each mandatory item starts its own line as `%s`, with an id matching `%s` that is unique within the section and every field nonempty; %s is exactly %s.\n' \
+        "$template" "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_AUTHORITY_FIELD" "$words" ;;
     shape)
       printf 'id=%s\nlead=%s\nfields=%s\nauthority_field=%s\nauthorities=%s\nitem=%s\nrule=%s\n' \
         "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_ITEM_LEAD" "$FM_DOD_ITEM_FIELDS" "$FM_DOD_AUTHORITY_FIELD" \

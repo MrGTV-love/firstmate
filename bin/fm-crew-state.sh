@@ -1420,6 +1420,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     # correctly.
     if [ "$RUN_STATE" = "done" ] && [ "$RUN_MODE" = no-mistakes ]; then
       evidence_plan=$(fm_dod_nm_expected_plan "$STATE" "$ID")
+      evidence_head=''
       meta_value_to evidence_head pr_head
       if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan" "$evidence_head"); then
         RUN_STATE=unknown

@@ -262,7 +262,8 @@ test_verification_plan_requires_its_shared_rubric() {
 
 test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
   local brief="$TMP_ROOT/byte-plan.md" criteria="$TMP_ROOT/byte-criteria.md" out rc first second
-  first=$(fm_test_dod_item C1) && second=$(fm_test_dod_item C2) || fail 'the item shape could not be read'
+  first=$(fm_test_dod_item C1) || fail 'the item shape could not be read'
+  second=$(fm_test_dod_item C2) || fail 'the item shape could not be read'
   printf "# Task\r\n## Captain's intent\r\nFix the badge.\r\nOut of scope: Keep billing.\r\n## Firstmate spec\r\nKeep the renderer.\r\n### Out of scope\r\n- Keep layout.\r\n## Definition Of Done (task)\r\n### Mandatory items\r\n%s\r\n## How You're Graded\r\nNot a criterion.\r\n" "$first" > "$brief"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF plan construction failed'
   assert_contains "$out" "$first" 'CRLF criteria were lost'
