@@ -1,0 +1,25 @@
+Takeover fixture diagnosis (retained V1 failure: "not ok - fixture: the successor watcher has no arm of its own")
+Host: GTT-CB.local (same host as the retained failing logs pass-after.log / canonical-targeted.log).
+
+Where it fails: tests/fm-supervision-host-hook.test.sh leave_a_cycle_for_main_and_restart (line ~470),
+unchanged by this PR. It reads .watch.lock/pid right after the Stop hook exits 2 and requires the
+watcher's parent (the successor arm) to be a live non-init pid.
+
+Re-runs in this test step (no timeout wrapper, all under bin/fm-proc-budget.sh):
+1. target 17154e98, bin/fm-test-run.sh, alone                -> 22/22 ok, exit 0 (whole-script-target-run1.log)
+2. target 17154e98, bin/fm-test-run.sh, 2 runs concurrently  -> 22/22 ok, exit 0 each (whole-script-target-run2.log, run3.log)
+3. current main 7c204105 test file (no change), alone        -> 21/21 ok, exit 0 (whole-script-base-main.log)
+4. old intake base 7eb37bf8 + this PR's test diff, 2 concurrent -> 16/16 ok, exit 0 each (whole-script-oldbase-run1.log, run2.log)
+The takeover cases ("the next park takes over..." and "a park stopped mid take-over...") passed in all 6 runs.
+
+Conclusions:
+- Not caused by this change: the change only adds a separate decision-mode case with its own fixture home;
+  cleanup is pid-scoped per home (stop_home_processes); the takeover fixture and all bin/ code are unchanged.
+- Current main is not affected in any observed run (0 of 4 whole runs on the 7c204105 base failed).
+- The failure also did not recur on the old intake base where it was first seen (0 of 2).
+- Code vs test: not established, because it could not be reproduced. One unconfirmed candidate mechanism:
+  if the successor watcher does not report "started" within FM_SUPERVISION_HOST_READY_TIMEOUT (25s) under
+  heavy host pressure, the host's pass-through legitimately leaves it "still starting"
+  (bin/fm-supervision-host.sh start_successor rc=2 -> SUCCESSOR_NOTE), and the fixture's immediate
+  .watch.lock/pid read then finds no live watcher. That would be a fixture timing assumption, not a
+  production defect. This is a hypothesis only; no log proves it.
