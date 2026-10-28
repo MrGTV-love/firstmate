@@ -17,6 +17,9 @@ WATCH="$ROOT/bin/fm-watch.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 REGISTER="$ROOT/bin/fm-check-register.sh"
 TMP_ROOT=$(fm_test_tmproot fm-pr-check-security)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 fm_git_identity fmtest fmtest@example.invalid
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)
@@ -131,6 +134,7 @@ make_case() {
   git -C "$dir/wt" init -q
   git -C "$dir/wt" commit -q --allow-empty -m init
   git -C "$dir/wt" update-ref refs/remotes/origin/main "$(git -C "$dir/wt" rev-parse HEAD)"
+  fm_fake_ship_review_history "$fakebin"
   cat > "$fake_root/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'guard\n' >> "$FM_TEST_GUARD_LOG"
@@ -157,7 +161,7 @@ case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
       *mergeStateStatus*)
-        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\"}"
+        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\",\"baseRefOid\":\"0000000000000000000000000000000000000000\"}"
         exit 0
         ;;
       *" --json isDraft "*)
@@ -291,6 +295,7 @@ write_task_meta() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     "kind=ship" \
+    "model=gpt-5.1-codex" \
     "mode=no-mistakes"
 }
 
@@ -303,6 +308,7 @@ write_poll_meta() {
   fm_write_meta "$state/$id.meta" \
     "window=fm-$id" \
     "worktree=$case_dir/wt" \
+    "model=gpt-5.1-codex" \
     "$@" \
     "pr=$url"
 }
@@ -769,7 +775,7 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   dir=$(make_case direct-pr-unpushed)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
   git -C "$dir/wt" commit -q --allow-empty -m 'fix only in the copy'
   later=$(git -C "$dir/wt" rev-parse HEAD)
@@ -790,7 +796,7 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   dir=$(make_case multi-pr-registration)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   printf 'done [at=1]: PR %s checks green\ndone [at=2]: PR %s checks green\n' \
     https://github.com/o/r/pull/3 https://github.com/o/r/pull/4 > "$dir/home/state/task-a.status"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
@@ -1000,6 +1006,7 @@ SH
       "worktree=$dir/wt" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     cat > "$dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -1655,6 +1662,7 @@ test_teardown_removes_poll_artifacts() {
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only'
   printf 'check\n' > "$dir/home/state/task-a.check.sh"
   printf 'data\n' > "$dir/home/state/task-a.pr-poll"
@@ -1683,6 +1691,7 @@ SH
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'pr=https://github.com/o/r/pull/18'
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/18
@@ -1712,6 +1721,7 @@ SH
       "worktree=$dir/missing-worktree" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
       counterpart=pr-poll
@@ -3343,6 +3353,7 @@ test_teardown_cannot_race_authority_consumption() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'yolo=on'
   write_away_record "$dir"
