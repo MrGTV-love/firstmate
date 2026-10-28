@@ -1,0 +1,24 @@
+== wake 1: incident writer pid=21902
+  arm #1 wake: check: status-log-over-cap: file=d1-intake.status size=3609163 bytes (cap 1048576) growth=0 bytes/s writer=none found (l
+  arm #2 wake: signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/r
+  arm #3 wake: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json) 
+  arm #4 wake: 
+  arm #5 wake: watcher: already running pid 76228 
+  arm #6 wake: watcher: already running pid 76228 
+  arm #7 wake: watcher: already running pid 76228 
+  arm #8 wake: watcher: already running pid 76228 
+  arm #9 wake: watcher: already running pid 76228 
+  arm #10 wake: watcher: already running pid 76228 
+writer state=T; log=1424013; marker size=1424013
+== operator resumes it: kill -CONT 21902
+  arm #1 wake: watcher: already running pid 76228 
+  arm #2 wake: watcher: already running pid 76228 
+  arm #3 wake: signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status 
+  arm #4 wake: 
+  arm #5 wake: watcher: already running pid 68819 
+  arm #6 wake: watcher: already running pid 68819 
+  arm #7 wake: watcher: already running pid 68819 
+  arm #8 wake: watcher: already running pid 68819 
+  arm #9 wake: watcher: already running pid 68819 
+  arm #10 wake: watcher: already running pid 68819 
+writer state=T (T = stopped again); log=3070923; marker size=3070923

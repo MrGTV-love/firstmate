@@ -1,0 +1,6 @@
+ok - a verbless text loop through the helper stops at the cap, and done:, blocked: and resolved: still land in the reserve
+ok - a sanctioned append behind a stopped lock holder is refused loudly with exit 75 within the lock bound, and lands once the lock is free
+ok - the guard names a capped append that holds an over-cap log open but never stops it, and later appends still land
+ok - a raw >> loop held by a bash child is named and stopped, and a log with no writer still wakes and stops nothing
+ok - the guard names but never stops the firstmate session, and never names or stops a process that only reads the log
+bash tests/fm-status-runaway-guard.test.sh       18.17s user 27.45s system 62% cpu 1:13.45 total

@@ -1,0 +1,8 @@
+incident writer pid=82784 (bash, holds the log open, no pause); reader tail -f pid=82781
+arm #1: watcher exited after ~4s; wake head: check: status-log-over-cap: file=d1-intake.status size=1276183 bytes (cap 1048576) growth=464391 bytes/s writer=pid 82784 bash; stopped pid 82784 (bash) with SI
+--- over-cap wake text (got=1) ---
+check: status-log-over-cap: file=d1-intake.status size=1276183 bytes (cap 1048576) growth=464391 bytes/s writer=pid 82784 bash; stopped pid 82784 (bash) with SIGSTOP; resume it with kill -CONT 82784; nothing was deleted, truncated or rewritten
+writer state=T (T = stopped)   reader (tail -f) state=S
+log size now=1276183, 3 s later=1276183 (cap 1048576); log still exists: yes
+wake-queue rows naming the check: 1
+alert marker: 16777233:925790135:1793174246 /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status 1276183

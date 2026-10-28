@@ -1,0 +1,11 @@
+== A0: log=1276183 is over the cap from S4; ack S4's wake, arm a watcher; no growth -> no wake
+ack failed
+watcher woke: signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+== A1: a fresh incident writer appends to the same over-cap log (as a resumed/relaunched writer)
+arm #1 wake head: signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status 
+--- wake ---
+signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+writer pid=82466 state=R; log=3606833; marker: 16777233:925790135:1793174246 /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status 1276183
+== B: firstmate session on line 1 of state/.lock holds the log for writing; a zsh writer does too
+check: status-log-over-cap: file=fmcase.status size=1100000 bytes (cap 1048576) growth=0 bytes/s writer=pid 14328 sleep, pid 14332 zsh, pid 22259 sleep; stopped nothing: pid 14328 is the firstmate session; stopped pid 14332 (zsh) with SIGSTOP; resume it with kill -CONT 14332; stopped pid 22259 (sleep) with SIGSTOP; resume it with kill -CONT 22259; nothing was deleted, truncated or rewritten
+firstmate session pid=14328 state=S (must not be T); zsh writer pid=14332 state=T (T expected)

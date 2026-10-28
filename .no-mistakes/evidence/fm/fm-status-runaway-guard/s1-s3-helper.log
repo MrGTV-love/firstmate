@@ -1,0 +1,22 @@
+== S1: incident-shape verbless 'text' loop through the helper (cap=65536, reserve=8192), hard stop at 100000 iterations
+iterations=4097 last_exit=75 size=65536 cap=65536
+refusal stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status is 65536 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 8192 for decision and terminal lines)
+== S1b: working: and note: also stop at the cap
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status is 65536 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 8192 for decision and terminal lines)
+working exit=75
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status is 65536 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 8192 for decision and terminal lines)
+note exit=75
+size=65536
+== S2: a done: line still lands in the reserve
+done exit=0
+size=65582
+last line: done [at=1793174158]: finished after the loop
+== S2b: blocked: still lands
+blocked exit=0
+last line: blocked [at=1793174158]: need a call
+== S3: a log already past cap+reserve refuses even done:
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/huge.status is 81920 bytes and this line would pass the limit of 73728 bytes (cap 65536, reserve 8192 for decision and terminal lines)
+done exit=75 size_before=81920 size_after=81920
+== S3b: malformed call (newline in line) is exit 2 and writes nothing
+fm-status-append: one event per argument; no newline inside a line
+exit=2

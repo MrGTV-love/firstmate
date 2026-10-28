@@ -1,0 +1,16 @@
+holder locked
+foreign holder pid=84202 (perl, no marker); sanctioned append shell pid=86861, its perl pid=86888
+lsof: COMMAND   PID            USER   FD   TYPE DEVICE SIZE/OFF      NODE NAME
+lsof: perl    84202 charlesabrooker    3w   REG   1,17    70001 925755487 /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/lockcase.status
+lsof: perl    86888 charlesabrooker    3u   REG   1,17    70001 925755487 /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/lockcase.status
+== guard scan
+16777233:925699653:1793174047	/Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status	65619	check: status-log-over-cap: file=d1-intake.status size=65619 bytes (cap 65536) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+16777233:925749389:1793174158	/Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/huge.status	81920	check: status-log-over-cap: file=huge.status size=81920 bytes (cap 65536) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+16777233:925755487:1793174177	/Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/lockcase.status	70001	check: status-log-over-cap: file=lockcase.status size=70001 bytes (cap 65536) growth=0 bytes/s writer=pid 84202 perl, pid 86888 perl; stopped pid 84202 (perl) with SIGSTOP; resume it with kill -CONT 84202; stopped nothing: pid 86888 is the capped append, which the cap bounds; nothing was deleted, truncated or rewritten
+guard exit=0
+holder state=T (T = stopped)
+append perl state=S
+sanctioned append exit=75 after 10.04 s
+append stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/lockcase.status stayed locked by another writer for 10 s; nothing was written
+== after the holder is gone, a done: lands? (log is 70001 bytes, under cap+reserve 73728)
+exit=0  last line: done [at=1793174188]: lock free now

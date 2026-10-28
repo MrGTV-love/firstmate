@@ -1,0 +1,17 @@
+1793174248	1	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174248	2	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174249	3	check	status-log-over-cap-858153622	check: status-log-over-cap: file=d1-intake.status size=1276183 bytes (cap 1048576) growth=464391 bytes/s writer=pid 82784 bash; stopped pid 82784 (bash) with SIGSTOP; resume it with kill -CONT 82784; nothing was deleted, truncated or rewritten
+1793174249	4	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174250	5	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174281	6	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174281	7	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status
+1793174922	8	check	status-log-over-cap-4032361932	check: status-log-over-cap: file=d1-intake.status size=3609163 bytes (cap 1048576) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+1793174923	9	check	status-log-over-cap-1254793311	check: status-log-over-cap: file=resume.status size=1424013 bytes (cap 1048576) growth=412018 bytes/s writer=pid 21902 bash; stopped pid 21902 (bash) with SIGSTOP; resume it with kill -CONT 21902; nothing was deleted, truncated or rewritten
+1793174923	10	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status
+1793174923	11	signal	resume.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status
+1793174924	12	signal	d1-intake.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status
+1793174924	13	signal	resume.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/d1-intake.status /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status
+1793174934	14	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+1793175134	15	check	status-log-over-cap-2998187356	check: status-log-over-cap: file=resume.status size=3070923 bytes (cap 1048576) growth=514035 bytes/s writer=pid 21902 bash; stopped pid 21902 (bash) with SIGSTOP; resume it with kill -CONT 21902; nothing was deleted, truncated or rewritten
+1793175135	16	signal	resume.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status
+1793175135	17	signal	resume.status	signal: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/resume.status

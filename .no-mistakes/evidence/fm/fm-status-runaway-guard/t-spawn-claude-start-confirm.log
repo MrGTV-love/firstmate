@@ -1,0 +1,7 @@
+ok - a claude worker parked on any of its startup dialogs is reported loudly and stays recorded
+ok - a startup report the capped writer refuses is surfaced on the spawn's stderr with the file, the refusal and the exit status
+ok - verified active and completed turns override all four historical dialog signatures
+ok - absence of proof without a dialog is not a fault
+ok - a dialog that clears inside the window is not reported
+ok - an unreadable pane ends the start wait immediately
+# all fm-spawn-claude-start-confirm tests passed

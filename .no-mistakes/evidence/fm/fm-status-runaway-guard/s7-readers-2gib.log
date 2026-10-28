@@ -1,0 +1,26 @@
+log=2147483648 bytes (1088 KiB on disk)
+== fm-status-append.sh done: on the 2 GiB log
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.Dwiceb/state/huge.status is 2147483648 bytes and this line would pass the limit of 34603008 bytes (cap 33554432, reserve 1048576 for decision and terminal lines)
+  -> exit=75 in .03 s
+== bin/fm-wake-drain.sh
+fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it
+fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+fm-status: huge.status is past the read limits; its open decisions cannot be shown and it is skipped
+== bin/fm-crew-state.sh huge
+fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+state: unknown · source: status-log · status log huge.status is past the status read limits and cannot be read
+  -> exit=0 in .23 s
+== bin/fm-fleet-snapshot.sh --json
+fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+[{"id":"huge","hints":{"open_decisions_unreadable":true}}]
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-28T08:16:19Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-lab.Dwiceb",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60QAQJ7R538P3ZGAH2X3J9W",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.Dlog after=2147483648 bytes; files over 1 MB in state besides *.status: 0
+== timings on the 2 GiB lab log (second pass)
+wake drain exit=0 in 1 s
+fleet snapshot exit=0 in 0 s; schema=fm-fleet-snapshot.v1
+log size after: 2147483648

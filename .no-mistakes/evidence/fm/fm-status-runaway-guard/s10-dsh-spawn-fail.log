@@ -1,0 +1,6 @@
+== over-limit log: spawn exit=1, log bytes before=6001 after=6001
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-dsh-spawn.Ouy7O6/capped-fail/home/state/dsh-capped-fail.status is 6001 bytes and this line would pass the limit of 4608 bytes (cap 4096, reserve 512 for decision and terminal lines)
+warning: could not record the status line in /Users/charlesabrooker/tmp/fm-dsh-spawn.Ouy7O6/capped-fail/home/state/dsh-capped-fail.status (exit 75): failed [at=1793176079]: dsh-tui screen: could not parse the composer frame or its input content; refusing launch
+error: dsh-tui screen: could not parse the composer frame or its input content; refusing launch; inspect window firstmate:fm-dsh-capped-fail
+== normal log: spawn exit=1; failed: line in the status log:
+failed [at=1793176088]: dsh-tui screen: could not parse the composer frame or its input content; refusing launch
