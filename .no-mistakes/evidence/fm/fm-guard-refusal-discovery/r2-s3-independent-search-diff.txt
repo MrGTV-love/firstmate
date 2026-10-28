@@ -1,0 +1,11 @@
+# Independent grep for the REFUSED: marker (default scan dirs, code files, no test dirs) vs discovery A sites
+grep lines with marker:      199
+discovery A sites:           199
+## in grep, not in discovery (each needs an explanation):
+## in discovery, not in grep:
+## signature totals:
+ 199 A
+ 631 B
+ 206 C
+  29 D
+  19 E

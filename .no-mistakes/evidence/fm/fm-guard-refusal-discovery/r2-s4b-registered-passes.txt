@@ -1,0 +1,12 @@
+## Scenario B (re-driven, correct base): site registered on teardown-unlanded; checkout the register commit
+821eba5 register site
+4402dea add site
+6bfe084 base
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~2
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=889
+exit=0
+
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=889
+exit=0
+

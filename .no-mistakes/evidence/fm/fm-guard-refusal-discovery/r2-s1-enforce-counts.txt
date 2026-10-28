@@ -1,0 +1,7 @@
+$ git rev-parse HEAD
+780dffce9fc72a4461921ef4b93cece8f50f1506
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=36 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=9 sites=888 mapped=45
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0

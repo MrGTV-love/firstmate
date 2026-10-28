@@ -1,0 +1,27 @@
+## H1: new script whose refusal goes through a helper (fm_refuse) and a guard event; message text has no refusal word
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+VIOLATION S1 site:bin/fm-r2-helper.sh:8be971a1c4: bin/fm-r2-helper.sh:3 [C] slot_busy() { fm_refuse "the slot is busy" "run fm-r2-helper.sh --free"; } maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-r2-helper.sh:ff8c5f70a5: bin/fm-r2-helper.sh:4 [E] bin/fm-guard-event.sh r2-probe deny "slot busy" maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm_r2_helper.py:ea1f524ddf: bin/fm_r2_helper.py:2 [B] msg = "the slot is busy, so this run is " + "refusing allocation" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=36 violations=846 allowlisted=843 stale=0 shown=3 sites=891
+exit=1
+
+## H2 (documented limit, docs/guard-spec.md:119): a shell string that spans lines with the refusal word on the continuation line
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+
+-> not enumerated, as docs/guard-spec.md now states:
+119:The scan follows only Python triple-quoted strings across lines, so a refusal word on a continuation line of a shell or JavaScript string that spans lines is not enumerated; keep the refusal word on the line that opens the string.
+
+## H3: the doc's remedy (refusal word on the opening line) is found
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+
+## H4: Python triple-quoted runtime string with the refusal word on a continuation line IS found
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+VIOLATION S1 site:bin/fm_r2_tq.py:6c2b50cc9d: bin/fm_r2_tq.py:3 [B] so this run is refusing allocation""") maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=889
+exit=1
+

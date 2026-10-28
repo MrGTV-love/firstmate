@@ -1,0 +1,10 @@
+$ python3 bin/fm-guard-sites.py | jq sites for the two guards
+A,B bin/fm-task-copy-lib.sh:371 entry=null echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+B bin/fm-task-copy-lib.sh:660 entry=null remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
+B bin/fm-task-copy-lib.sh:672 entry=null echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+A,B bin/fm-teardown.sh:4016 entry=null echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociati
+A,B bin/fm-teardown.sh:4048 entry=null echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
+
+$ grep -n fm_task_copy_pool_slots_hold_no_current_copy bin/fm-task-copy-lib.sh
+13:#     task record's current copy (fm_task_copy_pool_slots_hold_no_current_copy);
+631:fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>

@@ -1,0 +1,23 @@
+== A1: second 'teardown-unlanded deny' event line that the existing count=4 marker would absorb ==
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S2 teardown-unlanded: site marker 'teardown-unlanded deny' in bin/fm-teardown.sh matches 5 sites, the entry declares 4; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=new-or-touched guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=889
+exit=1
+
+== A2: CI shape - commit a new unmapped site as its own commit, then lint --base HEAD^1 ==
+unknown option: -c user.email=lab@x -c user.name=lab
+usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
+           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
+           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--no-lazy-fetch]
+           [--no-optional-locks] [--no-advice] [--bare] [--git-dir=<path>]
+           [--work-tree=<path>] [--namespace=<name>] [--config-env=<name>=<envvar>]
+           <command> [<args>]
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+exit=2
+C bin/fm-lab-probe.sh:4 | [ -n "${1:-}" ] || lab_refuse_probe "slot is busy"
+E bin/fm-lab-probe.sh:8 | "$(dirname "$0")/fm-guard-event.sh" lab-probe deny --reason busy
+B bin/fm-lab-probe.sh:11 | refused because the slot is busy""")
+fatal: ambiguous argument 'HEAD^1': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'

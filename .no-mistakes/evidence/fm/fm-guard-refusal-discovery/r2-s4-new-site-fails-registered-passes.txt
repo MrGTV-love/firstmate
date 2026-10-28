@@ -1,0 +1,27 @@
+## Scenario A: new unregistered REFUSED site inside a registered owner file (bin/fm-teardown.sh, owner of teardown-unlanded)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+VIOLATION S1 site:bin/fm-teardown.sh:2e6b459d8a: bin/fm-teardown.sh:6306 [A,B] fm_r2_probe() { echo "REFUSED: r2 probe slot is busy; run fm-teardown.sh --help" >&2; exit 1; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=889
+exit=1
+
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S1 site:bin/fm-teardown.sh:2e6b459d8a: bin/fm-teardown.sh:6306 [A,B] fm_r2_probe() { echo "REFUSED: r2 probe slot is busy; run fm-teardown.sh --help" >&2; exit 1; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=889
+exit=1
+
+## Scenario B: same site registered with a sites marker on the full-field entry teardown-unlanded
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^2
+error: cannot resolve base ref 'HEAD^2'
+error: refusal site discovery failed (base ref 'HEAD^2' in new-or-touched mode)
+exit=2
+
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=889
+exit=0
+
+## Scenario C: a new site silently absorbed by an existing marker (teardown-unlanded deny, count 4)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+VIOLATION S2 teardown-unlanded: site marker 'teardown-unlanded deny' in bin/fm-teardown.sh matches 5 sites, the entry declares 4; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=new-or-touched guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=890
+exit=1
+

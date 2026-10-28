@@ -1,0 +1,41 @@
+### single
+    | #!/usr/bin/env bash
+    | msg="refusing to continue: the slot is busy"
+    | echo "$msg" >&2; exit 1
+    -> site B line 2: msg="refusing to continue: the slot is busy"
+
+### openline
+    | #!/usr/bin/env bash
+    | msg="refusing to continue: the slot is busy,
+    | so this run stops"
+    | echo "$msg" >&2; exit 1
+    -> sites: none
+
+### openline_echo
+    | #!/usr/bin/env bash
+    | echo "refusing to continue: the slot is busy,
+    | so this run stops" >&2
+    | exit 1
+    -> sites: none
+
+### after_multiline
+    | #!/usr/bin/env bash
+    | note="first line
+    | second line"
+    | echo "slot busy; refusing to continue" >&2
+    | exit 1
+    -> site B line 4: echo "slot busy; refusing to continue" >&2
+
+### js_openline
+    | #!/usr/bin/env bash
+    | node -e 'console.error(`refusing to continue,
+    | slot busy`)'
+    -> sites: none
+
+
+## Finding: the round-1 doc sentence advised 'keep the refusal word on the line that opens the string'; probes 'openline', 'openline_echo', 'js_openline' above show that does NOT get the site enumerated.
+## Marker probe (same scanner):
+bin/fm-r2-m.sh:2 A msg="REFUSED: the slot is busy,
+bin/fm-r2-n.sh:3 A REFUSED: so this run stops"
+## Corrected docs/guard-spec.md line (worktree, uncommitted test-phase fix):
+119:The scan follows only Python triple-quoted strings across lines, so a refusal word in a shell or JavaScript string that spans lines is not enumerated on any of its lines; the `REFUSED:` marker is still found on any line, so such a message should carry the marker or stay on one line.

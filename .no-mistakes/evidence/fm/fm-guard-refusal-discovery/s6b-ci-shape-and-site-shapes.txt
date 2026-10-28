@@ -1,0 +1,12 @@
+== A2: CI shape - commit a new unmapped guard script as its own commit, then lint --base HEAD^1 ==
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+VIOLATION S1 site:bin/fm-lab-probe.sh:cf5c9b4783: bin/fm-lab-probe.sh:4 [C] [ -n "${1:-}" ] || lab_refuse_probe "slot is busy" maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-lab-probe.sh:31c9d013de: bin/fm-lab-probe.sh:8 [E] "$(dirname "$0")/fm-guard-event.sh" lab-probe deny --reason busy maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-lab-probe.sh:293a43702b: bin/fm-lab-probe.sh:11 [B] refused because the slot is busy""") maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=36 violations=846 allowlisted=843 stale=0 shown=3 sites=891
+exit=1
+-- sites the scan reports in bin/fm-lab-probe.sh:
+  C bin/fm-lab-probe.sh:4 | [ -n "${1:-}" ] || lab_refuse_probe "slot is busy"
+  E bin/fm-lab-probe.sh:8 | "$(dirname "$0")/fm-guard-event.sh" lab-probe deny --reason busy
+  B bin/fm-lab-probe.sh:11 | refused because the slot is busy""")
+-- lines 5-6 and 13-14 are two-line shell strings whose refusal word sits on the second line

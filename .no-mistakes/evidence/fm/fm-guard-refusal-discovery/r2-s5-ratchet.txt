@@ -1,0 +1,34 @@
+## R1: delete a legacy allowlisted site line -> its allowlist entry is stale -> enforce fails
+1638:            results.append((line, ident, kind, "refused", str(error)))
+$ bin/fm-guard-lint.sh --mode enforce
+STALE S1 site:bin/fm_open_loops.py:c78a1a3d95: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=36 violations=842 allowlisted=842 stale=1 shown=0 sites=887
+exit=1
+
+## R2: grow the allowlist -> new-or-touched fails (S5)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+STALE S1 site:bin/fake.sh:0000000000: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=1 shown=0 sites=888
+VIOLATION S5 site:bin/fake.sh:0000000000: allowlist entry S1 is not in HEAD~1; the allowlist may only shrink
+exit=1
+
+## R3: re-word an allowlisted legacy site (shared-slot teardown REFUSED line) -> must map now
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+VIOLATION S1 site:bin/fm-teardown.sh:c5da9df37c: bin/fm-teardown.sh:4048 [A,B] echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed (r2)." maps to no registry entry: add a sites marker to the guard that owns it
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=842 stale=1 shown=1 sites=888
+exit=1
+
+## R4: re-indent only (same id) an allowlisted site -> touched site still must map
+-      echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing w
++        echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD~1
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+VIOLATION S1 site:bin/fm-teardown.sh:cf9181c4c5: bin/fm-teardown.sh:4048 [A,B] echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+

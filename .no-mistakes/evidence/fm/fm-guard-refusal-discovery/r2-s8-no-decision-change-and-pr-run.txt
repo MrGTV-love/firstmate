@@ -1,0 +1,23 @@
+## Files changed vs base b34192a21 (runtime guard code untouched: only the lint, its helper, docs, CI, registry metadata, tests)
+.github/workflows/ci.yml
+bin/fm-guard-lint.sh
+bin/fm-guard-sites.py
+docs/guard-spec.md
+docs/guards/lint-allowlist.json
+docs/guards/registry.json
+docs/scripts.md
+tests/fm-guard-audit-closure.test.sh
+tests/fm-guard-lint.test.sh
+
+## Registry: every changed guard field other than the new sites markers
+ids added: [] ids removed: []
+non-sites field changes: []
+top-level keys changed: []
+entries gaining sites: 17
+
+## PR-shape run: new-or-touched against the PR base
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+## CI step as written (HEAD^1 = merge parent)
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0

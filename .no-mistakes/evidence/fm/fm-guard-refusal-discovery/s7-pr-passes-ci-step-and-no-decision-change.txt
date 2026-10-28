@@ -1,0 +1,22 @@
+$ bin/fm-guard-lint.sh --mode new-or-touched --base b34192a21   (CI: --base HEAD^1 of the merge = PR base)
+exit=0
+LINT_SUMMARY mode=new-or-touched guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+
+$ git rev-parse 8182ec754^1
+8b4055f23
+
+== registry semantics with sites stripped: base vs head ==
+guards base= 36 head= 36 removed= [] added= []
+guards whose non-sites fields changed: []
+
+$ git diff --stat b34192a21 8182ec754  (runtime files touched)
+ .github/workflows/ci.yml             |   7 +
+ bin/fm-guard-lint.sh                 | 146 ++++--
+ bin/fm-guard-sites.py                | 506 +++++++++++++++++++++
+ docs/guard-spec.md                   |  53 ++-
+ docs/guards/lint-allowlist.json      | 850 ++++++++++++++++++++++++++++++++++-
+ docs/guards/registry.json            |  63 +++
+ docs/scripts.md                      |   3 +-
+ tests/fm-guard-audit-closure.test.sh |  23 +-
+ tests/fm-guard-lint.test.sh          | 348 +++++++++++++-
+ 9 files changed, 1950 insertions(+), 49 deletions(-)

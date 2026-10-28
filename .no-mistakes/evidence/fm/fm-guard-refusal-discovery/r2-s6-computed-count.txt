@@ -1,0 +1,28 @@
+## K1: registry carries no typed count; lint computes unregistered from the scan
+false
+false
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO inventory: active=36 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=9 sites=888 mapped=45
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+
+## K2: typed unregistered_ids with wrong length (1) -> S4 fails
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S4 inventory: the registry types unregistered_ids (1) but the scan computes 843; remove the typed list
+LINT_SUMMARY mode=enforce guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=888
+exit=1
+
+## K3: typed unregistered_ids with the computed length (843, ids from the allowlist) -> passes
+843
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO inventory: active=36 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=9 sites=888 mapped=45
+LINT_SUMMARY mode=enforce guards=36 violations=843 allowlisted=843 stale=0 shown=0 sites=888
+exit=0
+
+## K4: a new unregistered site moves the computed count from 843 to 844 with no registry edit
+$ bin/fm-guard-lint.sh --mode report --counts
+INFO inventory: active=36 retired=14 beyond_audit=12 excluded=1 unregistered=844 audited=30 beyond_audit_active=9 sites=889 mapped=45
+VIOLATION S1 site:bin/fm-teardown.sh:6a6d654c6f: bin/fm-teardown.sh:6306 [A,B] fm_r2_x() { echo "REFUSED: r2 count probe" >&2; return 1; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=report guards=36 violations=844 allowlisted=843 stale=0 shown=1 sites=889
+exit=0
+
