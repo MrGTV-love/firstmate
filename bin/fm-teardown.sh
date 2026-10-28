@@ -654,12 +654,12 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # BEGIN temporary phase diagnostic definition
 fm_teardown_phase_mark() {
-  local acknowledgement
+  local _
   [ "${BASHPID:-}" = "$$" ] && [ "$PPID" = "${FM_TEARDOWN_CPU_PHASE_HELPER_PID:-}" ] || return 0
   [ "${FM_TEARDOWN_CPU_CHILD:-0}" = 1 ] || return 0
   [ -n "${FM_TEARDOWN_CPU_MARK_FD:-}" ] && [ -n "${FM_TEARDOWN_CPU_ACK_FD:-}" ] || return 0
   printf 'phase|%s|%s|%s|%s|%s\n' "$1" "${BASHPID:-}" "$PPID" "$2" "${3:-}" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
-  IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+  IFS= read -r _ <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
 }
 # END temporary phase diagnostic definition
 fm_teardown_phase_mark product entry
