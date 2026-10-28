@@ -1,0 +1,40 @@
+FM_TASK_ID=remote-stay-live FM_TASK_INBOX=/Users/charlesabrooker/tmp/fm-remote-stay-live.P1DhqJ/remote/state/parent-rou
+te/remote-stay-live.inbox FM_SPAWN_GEN=live-37954 CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false /Users/charlesabrooker/.no
+-mistakes/worktrees/32d18ed9638d/01M60YKWH0SGRQTVDHVNQNGEHT/bin/fm-teamclaude-launch.sh --dangerously-skip-permissions
+--setting-sources project,local --settings \{\"hooks\":\{\"Stop\":\[\{\"hooks\":\[\{\"type\":\"command\"\,\"command\":\
+"touch\ \'/Users/charlesabrooker/tmp/fm-remote-stay-live.P1DhqJ/turn-finished\'\"\}\]\}\]\}\} Use\ Bash\ to\ run\ sleep
+\ 600\ with\ run_in_background=true.\ Then\ reply\ BACKGROUND_READY\ and\ wait.\ When\ you\ receive\ a\ Firstmate\ inst
+ruction\ waiting\ doorbell\,\ read\ exactly\ its\ named\ file\,\ carry\ out\ its\ instruction\ and\ move\ it\ to\ the\
+handled\ directory\ beside\ it.\ Do\ not\ stop\ the\ background\ shell.\ Do\ not\ edit\ any\ other\ file.
+charlesabrooker@Mac-Studio remote % FM_TASK_ID=remote-stay-live FM_TASK_INBOX=/Users/charlesabrooker/tmp/fm-remote-stay
+-live.P1DhqJ/remote/state/parent-route/remote-stay-live.inbox FM_SPAWN_GEN=live-37954 CLAUDE_CODE_ENABLE_PROMPT_SUGGEST
+ION=false /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60YKWH0SGRQTVDHVNQNGEHT/bin/fm-teamclaude-launc
+h.sh --dangerously-skip-permissions --setting-sources project,local --settings \{\"hooks\":\{\"Stop\":\[\{\"hooks\":\[\
+{\"type\":\"command\"\,\"command\":\"touch\ \'/Users/charlesabrooker/tmp/fm-remote-stay-live.P1DhqJ/turn-finished\'\"\}
+\]\}\]\}\} Use\ Bash\ to\ run\ sleep\ 600\ with\ run_in_background=true.\ Then\ reply\ BACKGROUND_READY\ and\ wait.\ Wh
+en\ you\ receive\ a\ Firstmate\ instruction\ waiting\ doorbell\,\ read\ exactly\ its\ named\ file\,\ carry\ out\ its\ i
+nstruction\ and\ move\ it\ to\ the\ handled\ directory\ beside\ it.\ Do\ not\ stop\ the\ background\ shell.\ Do\ not\ e
+dit\ any\ other\ file.
+ ▐▛███▛█   Claude Code v2.1.312
+▝▜██████▀  Opus 5.5 · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-remote-stay-live.P1DhqJ/remote
+
+⚠ Your login expires in 3 days · run /login to renew
+
+❯ Use Bash to run sleep 600 with run_in_background=true. Then reply BACKGROUND_READY and wait. When you receive a
+  Firstmate instruction waiting doorbell, read exactly its named file, carry out its instruction and move it to the
+  handled directory beside it. Do not stop the background shell. Do not edit any other file.
+
+⏺ Bash(sleep 600)
+  ⎿  Running in the background (↓ to manage)
+
+⏺ BACKGROUND_READY
+
+✻ Churned for 7s · done 5:06 AM · 1 shell still running
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ bypass permissions on · 1 shell · ← 1 agent · ↓ to manage          Fast mode is now available · /fast to turn on
+ok - 2.1.312 (Claude Code): remote stay releases the real picker, preserves the route and queued record, and the same agent acknowledges steering
+FM_REMOTE_STAY_LIVE=1 bin/fm-proc-budget.sh -- bash   4.84s user 8.97s system 27% cpu 50.493 total

@@ -1,0 +1,13 @@
+ok - T1 main + secondmate fast-forward (single-parent), reread + restart signalled
+ok - T3 a non-instruction advance still restarts the live secondmate
+ok - T3b a bin/-only advance restarts the secondmate
+ok - T3c an unverifiable secondmate receives the fallback nudge
+ok - T3d an already-stopped secondmate is left to startup recovery
+ok - T3e a legacy remote advance still restarts the live remote mate
+ok - T3e captured gtt-cb scratch update is accepted without inventing an incident reproduction
+not ok - a trailing host stderr line turned a current result into a malformed one (missing: 'remote secondmate sm1: already current on remote-mac (93e65be73ad6289be95a8c02ee636dc19f2afd41)')
+--- output ---
+firstmate: already current
+reread-firstmate: no
+restart-secondmates: none
+nudge-secondmates: none
