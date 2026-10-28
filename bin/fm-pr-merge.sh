@@ -1493,6 +1493,31 @@ require_released_captain_hold() {
       printf 'error: task %s is still held for the captain; nothing was merged\n' "$ID" >&2
       printf "Release it with the captain's own words, then re-run this merge: %s answer %s --decision-file <captain-answer-file> --release\n" \
         "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      printf 'If the question was never the captain'"'"'s, release it honestly instead: %s withdraw %s --evidence-file <file> (--ruling <captain-ruling-task> | --parent-routed)\n' \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task deny --source-ok true --elapsed-ms 0 2>/dev/null
+      return 1
+      ;;
+    1|3) ;;
+    *)
+      printf 'error: could not determine whether task %s is still held for the captain; refusing to merge, and nothing was merged\n' \
+        "$ID" >&2
+      printf 'Re-read the hold and release it if it is open, then re-run this merge: %s open %s\n' \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      return 1
+      ;;
+  esac
+  # A decision the parent firstmate owns blocks the merge just as a captain call
+  # does, until the parent's own decision is recorded; it is never released with
+  # the captain's words.
+  hold_status=0
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --distinguish-absent --parent-owned || hold_status=$?
+  case "$hold_status" in
+    0)
+      printf 'error: task %s is still waiting on the parent firstmate'"'"'s decision; nothing was merged\n' "$ID" >&2
+      printf "Record that decision, then re-run this merge: %s decide %s --decision-file <parent-decision-file>\n" \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task deny --source-ok true --elapsed-ms 0 2>/dev/null
       return 1
       ;;
@@ -1501,10 +1526,8 @@ require_released_captain_hold() {
       return 0
       ;;
     *)
-      printf 'error: could not determine whether task %s is still held for the captain; refusing to merge, and nothing was merged\n' \
+      printf 'error: could not determine whether task %s is still waiting on the parent firstmate; refusing to merge, and nothing was merged\n' \
         "$ID" >&2
-      printf 'Re-read the hold and release it if it is open, then re-run this merge: %s open %s\n' \
-        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       return 1
       ;;
   esac

@@ -1664,6 +1664,90 @@ test_held_task_refusal_prints_the_exact_release_command() {
   pass "fm-pr-merge prints the exact captain-hold release command with the real task id"
 }
 
+# A secondmate home's parent channel carries two kinds of held call. A call the
+# parent firstmate owns blocks the merge until the parent's decision is recorded,
+# and that decision, not the captain's words, releases it. A call the captain
+# owns is never released by the parent's decision. Recorded 2026-10-28: a Mac
+# mini mate's ship task was held as a captain call although the question was the
+# main firstmate's, and no honest release existed.
+test_merge_gate_reads_a_parent_owned_hold_without_captain_words() {
+  local case_dir rc head url
+  head=b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1
+  url=https://github.com/example/repo/pull/197
+  case_dir=$(make_home_case merge-gate-parent-owned local)
+  mkdir -p "$case_dir/parent/state"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$case_dir/parent" \
+    > "$case_dir/home/.fm-secondmate-parent"
+  add_gh_mocks "$case_dir" "$head"
+  hold_fixture_task_owned "$case_dir" parent
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "merge-gate-parent-owned: an open parent decision must refuse the merge"
+  assert_grep "task task-x1 is still waiting on the parent firstmate's decision; nothing was merged" \
+    "$case_dir/stderr" "merge-gate-parent-owned: the refusal did not name the parent's decision"
+  assert_no_grep 'still held for the captain' "$case_dir/stderr" \
+    "merge-gate-parent-owned: a parent decision was reported as a captain call"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh decide task-x1 --decision-file" "$case_dir/stderr" \
+    "merge-gate-parent-owned: the parent's release command was not printed"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "merge-gate-parent-owned: gh pr merge ran on an open parent decision"
+
+  printf '%s\n' 'the captain never said this' > "$case_dir/captain-answer"
+  if FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" answer task-x1 --decision-file "$case_dir/captain-answer" --release \
+    >/dev/null 2>&1; then
+    fail "merge-gate-parent-owned: the captain's answer path released a parent decision"
+  fi
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "merge-gate-parent-owned: a refused captain answer must not unblock the merge"
+
+  printf '%s\n' 'retry the failing check once on the unchanged head' > "$case_dir/parent-decision"
+  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" decide task-x1 --decision-file "$case_dir/parent-decision" >/dev/null \
+    || fail "merge-gate-parent-owned: the printed release command did not record the parent's decision"
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout-decided" 2> "$case_dir/stderr-decided" \
+    || fail "merge-gate-parent-owned: the decided hold still refused the merge: $(cat "$case_dir/stderr-decided")"
+  assert_logged_gh_merge "$case_dir" 197 example/repo --squash
+  pass "fm-pr-merge refuses an open parent decision and merges once the parent's decision is recorded"
+}
+
+test_merge_gate_still_refuses_a_captain_owned_hold_after_a_parent_decision() {
+  local case_dir rc head url
+  head=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+  url=https://github.com/example/repo/pull/198
+  case_dir=$(make_home_case merge-gate-captain-owned local)
+  mkdir -p "$case_dir/parent/state"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$case_dir/parent" \
+    > "$case_dir/home/.fm-secondmate-parent"
+  add_gh_mocks "$case_dir" "$head"
+  hold_fixture_task_owned "$case_dir" captain
+
+  printf '%s\n' 'the parent decides' > "$case_dir/parent-decision"
+  if FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" decide task-x1 --decision-file "$case_dir/parent-decision" \
+    >/dev/null 2>&1; then
+    fail "merge-gate-captain-owned: the parent's decision released a captain-owned hold"
+  fi
+  set +e
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "merge-gate-captain-owned: a captain-owned hold must still refuse the merge"
+  assert_grep 'task task-x1 is still held for the captain; nothing was merged' "$case_dir/stderr" \
+    "merge-gate-captain-owned: the refusal did not name the captain"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh answer task-x1 --decision-file" "$case_dir/stderr" \
+    "merge-gate-captain-owned: the captain's release command was not printed"
+  assert_grep "$ROOT/bin/fm-captain-hold.sh withdraw task-x1 --evidence-file" "$case_dir/stderr" \
+    "merge-gate-captain-owned: the honest release for a call that was never the captain's was not printed"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "merge-gate-captain-owned: gh pr merge ran on a captain-owned hold"
+  pass "fm-pr-merge keeps refusing a captain-owned hold that only the parent's decision was recorded against"
+}
+
 # One event per guard decision. A refused merge appends a single green-head
 # deny, a green merge appends allows, and an unwritable log cannot change the
 # merge's own exit status because the writer is never in a deciding condition.
@@ -1797,6 +1881,8 @@ test_allow_missing_refused_on_forgejo
 test_green_head_refusal_names_each_check_and_its_repair
 test_away_waiver_refusal_names_the_posture_and_the_attended_path
 test_held_task_refusal_prints_the_exact_release_command
+test_merge_gate_reads_a_parent_owned_hold_without_captain_words
+test_merge_gate_still_refuses_a_captain_owned_hold_after_a_parent_decision
 test_guard_events_record_the_merge_decisions_without_changing_them
 test_github_review_required_refuses
 )

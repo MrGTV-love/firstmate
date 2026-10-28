@@ -14,6 +14,7 @@ This document records the deterministic mechanism, structured surfaces, compatib
 | Why does cleanup of finished work leave a captain call open? | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | How does a keyed answer from chat or a board reach the call? | [Answer-time resolution](#answer-time-resolution) |
 | How is a call closed when it stopped being a question? | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
+| Who owns a call, and how is one that was never the captain's released? | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | Why did a decision card disappear from the board? | [Card hygiene](#card-hygiene-a-landed-subject-is-not-a-live-call) |
 | Where does a hold appear in snapshots and Bearings? | [Structured read surfaces](#structured-read-surfaces) |
 | What does a `RECORD DIVERGENCE` section mean? | [Record divergence](#record-divergence) |
@@ -35,9 +36,11 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | --- | --- | --- |
 | `hold` | Creates or reuses a task and holds it for the captain. | [Creating a hold](#creating-a-hold-hold) |
 | `answer` | Records the captain's exact words and resolves the call. | [Answering a call](#answering-a-call-answer) |
+| `decide` | Records the parent firstmate's decision on a call it owns and releases that hold. | [Decision owner and honest release](#decision-owner-and-honest-release) |
+| `withdraw` | Releases a captain-kind hold that was never the captain's, without writing captain words. | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
-| `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
+| `open` | Read-only check of whether a row is still an open captain call, or with `--parent-owned` an open parent decision. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
@@ -254,6 +257,61 @@ It can never let freeform captain prose forge a task id or a mode.
 - [`configuration.md`](configuration.md#slack-decision-plane-env) owns its configuration and mechanics.
 
 Trusted external process-event adapters intentionally expose no answer operation and cannot feed this authority-bearing intake; [`extension-bindings.md`](extension-bindings.md#trust-boundary) owns that boundary.
+
+## Decision owner and honest release
+
+A secondmate home's parent channel carries two kinds of call, and a hold with a single owner could not tell them apart.
+A mate that held a decision the main firstmate makes itself, such as an ask-user finding or a retry, filed it as a captain call.
+The only closes were the captain's words, which the captain never gave, and an evidence-backed `reconcile close`, which refuses unfinished worker-owned work.
+The merge gate then refused the task with no honest path forward.
+That happened on 2026-10-10 twice and again on 2026-10-28 for a Mac mini mate's ship task.
+
+### Owner recorded at filing
+
+`hold` writes the owner on a `Decision owner:` line directly beneath the hold-set stamp.
+The owner is a fact written at filing and is never inferred from the reason text.
+A main home needs no `--owner`, because no parent exists and the owner is the captain.
+A main home refuses `--owner parent` for the same reason.
+A secondmate home must pass `--owner`, so a mate cannot file a call without deciding whose it is.
+A hold filed before owners were recorded has no line.
+It reads as the captain's in a main home and as `unrecorded` in a secondmate home.
+
+A parent-owned hold is an `external` hold carrying `Decision owner: parent`, so it is never a captain call.
+The captain predicate `open`, the Bearings captain section, the divergence guard, and `answer` all ignore or refuse it.
+It still publishes a `needs-decision` line on the parent channel under the same `captain-hold-<task>-<n>` key family, with the label `parent decision`, so the parent is woken.
+The owner is fixed while a hold is open: neither owner can be re-filed as the other until the first is released.
+
+### Closing a parent-owned call
+
+`decide` records the parent's decision text as a `Parent decision:` block marked `Not a captain answer.`.
+It lifts the hold so the work item resumes without closing, and it publishes the matching `resolved` line.
+An exact replay is accepted and publishes nothing twice.
+It refuses every hold whose recorded owner is not the parent, so it cannot release a captain call.
+
+The merge entry points (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh`) refuse while a captain call or a parent decision is open.
+They read the second through `open --parent-owned` and name whose decision is outstanding.
+Splitting the owner therefore never lets through a merge that the single captain kind would have stopped.
+
+### Withdrawing a call that was never the captain's
+
+`withdraw` is the honest release for a captain-kind hold on an open work item.
+It never writes the captain's words and never completes the work item.
+It lifts the hold and writes a `Resolution mode: withdrawn` record that names the basis, the owner the hold was filed with, and the home role it ran from (derived, never typed).
+It also records the evidence file and the line `Not a captain answer.`, and it publishes a `resolved` line saying the call was withdrawn.
+The record carries a `Withdrawal evidence:` label instead of `Captain decision:`, so every reader that recognizes a captain answer skips it.
+Bearings and the divergence guard read only open captain-kind holds, so a withdrawn call leaves both.
+
+Eligibility rests on recorded facts and never on free text:
+
+- `--ruling <id>` names a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
+  An evidence-only close, a release, a parent decision, and another withdrawal are not rulings.
+  This basis works on any captain hold, including one recorded as the captain's, because the captain has already ruled.
+- `--parent-routed` is accepted only in a secondmate home, only for a hold whose owner is `unrecorded`, and only when this home's parent channel carries that hold's `needs-decision` line for its current occurrence.
+  That line shows the call was delivered to the parent, which is the only addressee a mate home had before owners were recorded.
+
+A hold recorded as the captain's, a main-home hold, and a legacy hold that never reached the channel cannot be withdrawn on that basis.
+They need the captain's words or a recorded captain ruling.
+A legacy hold is the one class whose owner cannot be proven from its own record, and it stays bounded to calls the parent channel delivered.
 
 ## Reconcile: re-check reality, never a blind close
 
@@ -530,8 +588,9 @@ It then finishes any still-recorded dependency-edge cleanup without rewriting th
 
 ## Verification record
 
-The focused end-to-end regression suites are the six `tests/fm-captain-hold-*.test.sh` files, using only synthetic identities and decision text.
-The [captain-hold groups](fm-test-portable-shards.md#captain-hold-groups) table names the file that owns each area, and every case named below runs in exactly one of them.
+The focused end-to-end regression suites are the `tests/fm-captain-hold-*.test.sh` files, using only synthetic identities and decision text.
+The [captain-hold groups](fm-test-portable-shards.md#captain-hold-groups) table names the file that owns each of the six original areas, and every case named below runs in exactly one of them.
+`tests/fm-captain-hold-owner.test.sh` owns the decision-owner cases listed under "Decision owner coverage".
 Together they prove the behaviors below.
 The suites do not test the accepted merge-to-cleanup re-hold window or asynchronous queued-forge landing because those events occur after the locally serialized merge command has returned.
 
@@ -634,6 +693,20 @@ It proves:
 
 One case in that family needs no beads install and always runs.
 It uses a stubbed tasks-axi that fails any markdown file override, and proves the captain-hold hold, answer, and close mutations reach a beads-configured home without one.
+
+### Decision owner coverage
+
+The owner, parent decision, and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.sh`, and the merge gate cases in `tests/fm-pr-merge-checks.test.sh`:
+
+- A secondmate home refuses a hold with no owner or an unknown one, and a main home refuses `--owner parent`.
+- A parent-owned hold is an external hold with the owner recorded, reads as no captain call, publishes a `parent decision` line once, and refuses re-filing as the captain's.
+- The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases the hold, leaves the work item open, closes the channel key, and replays once.
+- A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
+- `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
+  It refuses a missing basis, two bases, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, and a missing evidence file.
+- `withdraw --parent-routed` releases a legacy secondmate hold whose call the channel carried, and refuses a recorded captain hold, a legacy hold the channel never carried, and a main home.
+- The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
+- The merge gate refuses an open parent decision with a message naming the parent, proceeds after `decide`, and refuses a captain-owned hold after a `decide` attempt.
 
 ### Reconcile coverage
 

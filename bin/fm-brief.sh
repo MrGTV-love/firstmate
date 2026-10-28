@@ -571,6 +571,8 @@ Nobody reads this chat: the captain and the main firstmate see only what is appe
 That file is your parent channel, and in this home it IS the captain: every sentence you would say to the captain, and every outcome the local AGENTS.md tells a firstmate to bring to the captain, is one appended line there, never chat.
 Your own machinery publishes the durable facts about your crew's work for you (\`bin/fm-parent-channel-lib.sh\`): a child's terminal done or failed line with its note and PR on every supervision poll, a PR-ready line when you register a PR, a task you hold for the captain and its answer, a merge, and a child's final line at cleanup all reach the parent channel from the scripts that record them, whether or not you append anything.
 What only you can append is judgement: the answer to a marked request below, a recommendation or caveat on a delivered outcome, a blocker or failure of your own, and anything else you would otherwise say to the captain.
+A call you hold with \`bin/fm-captain-hold.sh hold\` must declare its owner: \`--owner parent\` when the main firstmate decides it (an ask-user finding, a retry, a hygiene call), \`--owner captain\` only when it needs the captain's own words.
+The main firstmate's decision releases a parent-owned call through \`bin/fm-captain-hold.sh decide\`; only the captain's words release a captain-owned one.
 
 # Requests from the main firstmate
 You are a firstmate in your own home, so an incoming message reaches you in your own chat.

@@ -21,7 +21,11 @@
 #
 # Usage:
 #   fm-captain-hold.sh hold <task-id> --reason <reason> \
-#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD]
+#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
+#     [--owner captain|parent]
+#   fm-captain-hold.sh decide <task-id> --decision-file <path>
+#   fm-captain-hold.sh withdraw <task-id> --evidence-file <path> \
+#     (--ruling <ruling-task-id> | --parent-routed)
 #   fm-captain-hold.sh answer <task-id> --decision-file <path> [--release]
 #   fm-captain-hold.sh answers [<legacy-origin> | --any-origin] --source <provenance>   (keyed answers on stdin)
 #   fm-captain-hold.sh reconcile-requests --source-id <source-id> --source <provenance>   (task ids on stdin)
@@ -30,7 +34,7 @@
 #   fm-captain-hold.sh binding <source-id>
 #   fm-captain-hold.sh complete <origin-id> (--none | <task-id>...)
 #   fm-captain-hold.sh verify <origin-id>
-#   fm-captain-hold.sh open <task-id> [--identity] [--distinguish-absent]
+#   fm-captain-hold.sh open <task-id> [--identity] [--distinguish-absent] [--parent-owned]
 #   fm-captain-hold.sh open-bound <source-id> <card-key>
 #   fm-captain-hold.sh diverged
 #   fm-captain-hold.sh reconcile list
@@ -60,6 +64,41 @@
 # `--until` records the captain's own deferral date through `tasks-axi hold
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
+#
+# WHO OWNS THE CALL. Every hold records the owner of the decision it waits on, as
+# a fact written at filing. In a main home the owner is the captain and no
+# `--owner` is needed. In a secondmate home `--owner` is required, because the
+# home's parent channel is its only addressee and that channel carries two
+# kinds of call: `--owner parent` for a decision the main firstmate makes itself
+# (an ask-user finding, a retry, a hygiene call), and `--owner captain` for one
+# that needs the captain's own words. A parent-owned hold is an `external` hold
+# carrying a `Decision owner: parent` line, so it is never a captain call: the
+# captain predicate `open`, Bearings, the divergence guard, and `answer` all
+# ignore or refuse it, and only `decide` releases it. `open --parent-owned` is
+# its read-only predicate, with the same exit codes as `open`. The merge entry
+# points (bin/fm-pr-merge.sh, bin/fm-merge-local.sh) refuse while either kind is
+# open, naming whose decision is outstanding, so splitting the owner never
+# lets a merge through that the single captain kind would have stopped.
+#
+# `decide` records the parent firstmate's decision text (a non-empty file of at
+# most 8192 bytes) as a `Parent decision:` block marked `Not a captain answer.`,
+# lifts the hold so the work item resumes without closing, and publishes the
+# matching `resolved` line on the parent channel. It refuses every hold whose
+# recorded owner is not the parent, so it can never release a captain call.
+#
+# `withdraw` is the honest release of a captain-kind hold that was never the
+# captain's. It never writes the captain's words and never completes the work
+# item: it lifts the hold, records the basis, the filed owner, the home role it
+# ran from, and the evidence file, and marks the record `Not a captain answer.`.
+# Eligibility rests on recorded facts only. `--ruling <id>` names a closed
+# captain call in this home (live or archived) that carries the captain's
+# recorded words, and makes this call moot; it works on any captain hold.
+# `--parent-routed` is accepted only in a secondmate home, only for a hold filed
+# before owners were recorded (an `unrecorded` owner), and only when this home's
+# parent channel carries the hold's `needs-decision [key=captain-hold-<id>-<n>]`
+# line, which shows the call was delivered to the parent. A hold whose recorded
+# owner is the captain is never withdrawn on that basis, and a main home has no
+# parent to withdraw to.
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -333,14 +372,14 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-answered-by-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
-publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
-  local id=$1 occurrence=$2 verb=$3 note=$4 rc=0
+publish_parent_hold() {  # <task-id> <occurrence> <verb> <note> [<label>]
+  local id=$1 occurrence=$2 verb=$3 note=$4 label=${5:-captain hold} rc=0
   PARENT_HOLD_PUBLISHED=0
   fm_parent_channel_report "$FM_HOME" "$STATE" \
-    "$verb [key=captain-hold-$id-$occurrence]: captain hold $id: $(fm_parent_channel_clean_note "$note")" || rc=$?
+    "$verb [key=captain-hold-$id-$occurrence]: $label $id: $(fm_parent_channel_clean_note "$note")" || rc=$?
   case "$rc" in
     0|1) PARENT_HOLD_PUBLISHED=1 ;;
-    *) printf 'actionable: task %s is held for the captain in this home but that did not reach the parent channel (rc=%s)\n' "$id" "$rc" >&2 ;;
+    *) printf 'actionable: task %s is held in this home but that did not reach the parent channel (rc=%s)\n' "$id" "$rc" >&2 ;;
   esac
 }
 
@@ -730,12 +769,24 @@ ledger_hold_filed() {  # <task-id> <repo>
 # bin/fm-answered-by-lib.sh; reconciliation is evidence, not an answer.
 resolution_block() {
   local label='Captain decision:'
-  [ "$1" != reconciled ] || label='Reconciliation evidence:'
+  case "$1" in
+    reconciled) label='Reconciliation evidence:' ;;
+    decided) label='Parent decision:' ;;
+    withdrawn) label='Withdrawal evidence:' ;;
+  esac
   printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
     "$DECISION_DIGEST" "$1"
   [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
   printf 'Resolved at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  [ "$1" = reconciled ] || printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")"
+  case "$1" in
+    reconciled) : ;;
+    decided) printf 'Decided by: parent firstmate\nNot a captain answer.\n' ;;
+    withdrawn)
+      printf 'Withdrawn by: %s\nFiled owner: %s\nRun from: %s home\nNot a captain answer.\n' \
+        "$WITHDRAW_BASIS" "$WITHDRAW_OWNER" "$WITHDRAW_RUN_ROLE"
+      ;;
+    *) printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")" ;;
+  esac
   printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
@@ -1298,6 +1349,65 @@ body_hold_origin() {  # <decoded-task-body>
   printf '%s\n' "$1" | sed -n 's/^Captain hold origin: \(.*\)$/\1/p' | head -1
 }
 
+# WHO OWNS A HOLD. A hold records, on a line of its own beneath the hold-set
+# stamp, the owner of the decision it waits on: `captain` (only the captain's
+# words close it) or `parent` (only the parent firstmate's decision closes it,
+# which exists only in a secondmate home). The owner is a fact written at
+# filing, never inferred from the reason text. A hold filed before owners were
+# recorded has no line: in a main home that is the captain, because no parent
+# exists, and in a secondmate home it is `unrecorded`, because the home's
+# parent channel was its only addressee and the record cannot say more.
+body_decision_owner() {  # <decoded-task-body>
+  printf '%s\n' "$1" | sed -n 's/^Decision owner: \(.*\)$/\1/p' | head -1
+}
+
+# main when this home has no parent firstmate, mate otherwise. An unusable
+# identity marker is a mate shape: it must never be read as a main home.
+home_decision_scope() {
+  local rc=0
+  fm_parent_channel_home_id "$FM_HOME" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 1 ]; then printf 'main'; else printf 'mate'; fi
+}
+
+effective_decision_owner() {  # <decoded-task-body>
+  local owner
+  owner=$(body_decision_owner "$1")
+  if [ -n "$owner" ]; then
+    printf '%s' "$owner"
+  elif [ "$(home_decision_scope)" = main ]; then
+    printf 'captain'
+  else
+    printf 'unrecorded'
+  fi
+}
+
+write_decision_owner() {  # <task-id> <shown-body> <owner>
+  local id=$1 body=$2 owner=$3 stamp rest new_body tmp
+  body=$(decode_shown_value "$body") \
+    || fail "could not decode the existing body for $id"
+  stamp=$(printf '%s\n' "$body" | sed -n 1p)
+  [ -n "$(body_hold_set_timestamp "$body")" ] \
+    || fail "task $id lost its hold-set stamp before its owner was recorded"
+  rest=$(printf '%s\n' "$body" | sed 1d \
+    | awk '!seen && /^Decision owner: / { seen = 1; next } { print }' \
+    | awk 'NF || started { started = 1; print }')
+  new_body=$(printf '%s\nDecision owner: %s' "$stamp" "$owner")
+  if [ -n "$rest" ]; then
+    new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
+  fi
+  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-owner.XXXXXX") \
+    || fail "cannot stage the hold owner"
+  if ! printf '%s\n' "$new_body" > "$tmp"; then
+    rm -f -- "$tmp"
+    fail "cannot stage the hold owner for $id"
+  fi
+  if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    fail "could not record the hold owner on $id"
+  fi
+  rm -f -- "$tmp"
+}
+
 task_identity() {
   local id=$1
   if task_show "$id"; then
@@ -1402,6 +1512,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
   local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 resolved_hold_set
+  local owner='' want_kind=captain existing_owner='' scope
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -1411,11 +1522,25 @@ command_hold() {
       --repo) shift; repo=${1:-} ;;
       --origin) shift; origin=${1:-} ;;
       --until) shift; until=${1:-} ;;
+      --owner) shift; owner=${1:-} ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
   done
   validate_slug task-id "$id"
+  case "$owner" in
+    ''|captain|parent) : ;;
+    *) fail "--owner must be captain or parent: $owner" ;;
+  esac
+  scope=$(home_decision_scope)
+  if [ "$scope" = main ]; then
+    [ "$owner" != parent ] \
+      || fail "this home has no parent firstmate, so no decision here can be owned by one; omit --owner or pass --owner captain"
+  else
+    [ -n "$owner" ] \
+      || fail "--owner is required in a secondmate home: pass --owner parent when the main firstmate decides this call (an ask-user finding, a retry, a hygiene call) and --owner captain only when it needs the captain's own words"
+  fi
+  [ "$owner" != parent ] || want_kind=external
   [ -n "$reason" ] || fail "reason must not be empty"
   # bin/fm-hold-reason-lib.sh owns the storage constraint and reversible encoding.
   stored_reason=$(fm_hold_reason_encode "$reason") || fail "could not encode the hold reason"
@@ -1442,7 +1567,16 @@ command_hold() {
       || fail "task $id is already closed; a new captain call needs its own task"
     existing_hold_kind=$(show_field_value "$show" hold_kind)
     existing_held=$(show_field_value "$show" held)
-    if [ "$existing_hold_kind" = captain ] && [ "$existing_held" = yes ]; then
+    if [ "$existing_held" = yes ]; then
+      existing_owner=$(effective_decision_owner "$(decode_shown_value "$(show_field "$show" body)")")
+      if [ "$existing_hold_kind" = captain ] && [ "$owner" = parent ]; then
+        fail "task $id is already held for the captain; a hold's owner is fixed while it is open, so answer it with the captain's words or withdraw it before filing it as the parent's"
+      fi
+      if [ "$existing_hold_kind" = external ] && [ "$existing_owner" = parent ] && [ "$owner" != parent ]; then
+        fail "task $id is already waiting on the parent firstmate; a hold's owner is fixed while it is open, so record the parent's decision first"
+      fi
+    fi
+    if [ "$existing_hold_kind" = "$want_kind" ] && [ "$existing_held" = yes ]; then
       preserve_hold_set=1
     fi
     if [ -n "$title" ]; then
@@ -1490,16 +1624,21 @@ command_hold() {
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id did not retain its hold-set stamp"
+  if [ -n "$owner" ] \
+    && [ "$(body_decision_owner "$(decode_shown_value "$(show_field "$show" body)")")" != "$owner" ]; then
+    write_decision_owner "$id" "$(show_field "$show" body)" "$owner"
+    task_show_or_fail "$id" "task $id disappeared while recording its owner"
+  fi
   if [ -n "$origin" ]; then
     origin=$(task_identity "$origin") || exit $?
     previous_origin=$(body_hold_origin "$(show_field_value "$show" body)")
     write_hold_origin "$id" "$(show_field "$show" body)" "$origin" || exit $?
   fi
   if [ -n "$until" ]; then
-    tasks_axi hold "$id" --reason "$stored_reason" --kind captain --until "$until" >/dev/null \
+    tasks_axi hold "$id" --reason "$stored_reason" --kind "$want_kind" --until "$until" >/dev/null \
       || hold_status=$?
   else
-    tasks_axi hold "$id" --reason "$stored_reason" --kind captain >/dev/null \
+    tasks_axi hold "$id" --reason "$stored_reason" --kind "$want_kind" >/dev/null \
       || hold_status=$?
   fi
   if [ "$hold_status" -ne 0 ]; then
@@ -1508,16 +1647,20 @@ command_hold() {
     if [ -n "$origin" ]; then
       write_hold_origin "$id" "$(show_field "$show" body)" "$previous_origin" || exit $?
     fi
-    fail "could not hold task $id for the captain"
+    fail "could not hold task $id for the $([ "$owner" = parent ] && printf 'parent firstmate' || printf 'captain')"
   fi
   task_show "$id" || fail "task $id disappeared while holding it"
   show=$TASK_SHOW_OUTPUT
   hold_kind=$(show_field_value "$show" hold_kind)
-  [ "$hold_kind" = captain ] || fail "task $id did not retain its captain hold"
+  [ "$hold_kind" = "$want_kind" ] || fail "task $id did not retain its $want_kind hold"
   occurrence=$(( $(resolution_record_count "$(show_field "$show" body)") + 1 ))
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id lost its hold-set stamp while being held"
-  publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
+  if [ "$owner" = parent ]; then
+    publish_parent_hold "$id" "$occurrence" needs-decision "$reason" "parent decision"
+  else
+    publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
+  fi
   printf '%s\n' "$id"
 }
 
@@ -1757,6 +1900,147 @@ command_answer() {
     return 0
   fi
   fail "task $id is not held for the captain; hold it first or name the right task"
+}
+
+# --- decisions the captain does not own ---------------------------------------
+
+WITHDRAW_BASIS=''
+WITHDRAW_OWNER=''
+WITHDRAW_RUN_ROLE=''
+
+# The parent firstmate's decision on a call it owns. The hold was filed with
+# `--owner parent`, so it is an external hold carrying that owner line, and only
+# this command releases it: the captain's `answer` is never involved, and this
+# command refuses every hold whose recorded owner is not the parent.
+command_decide() {
+  local id=${1:-} decision_file='' show state hold_kind held body owner occurrence
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --decision-file) shift; decision_file=${1:-} ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+  validate_slug task-id "$id"
+  load_decision "$decision_file"
+  acquire_task_control_lock "$id"
+  require_tasks_axi
+  task_show "$id" || fail "task $id is absent from this home's configured backlog (data directory $DATA)"
+  show=$TASK_SHOW_OUTPUT
+  state=$(show_field "$show" state)
+  hold_kind=$(show_field_value "$show" hold_kind)
+  held=$(show_field_value "$show" held)
+  body=$(show_field "$show" body)
+  [ "$state" != "done" ] || fail "task $id is already closed; a parent decision releases an open hold"
+  owner=$(effective_decision_owner "$(decode_shown_value "$body")")
+  occurrence=$(( $(resolution_record_count "$body") + 1 ))
+  if [ "$held" != yes ]; then
+    # Only an exact replay of the recorded parent decision is accepted.
+    if [ "$(recorded_resolution_mode "$body" || true)" = decided ] \
+      && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+      remove_interrupted_answer_stamp "$id"
+      publish_parent_hold "$id" $((occurrence - 1)) resolved "decided by the parent firstmate" "parent decision"
+      printf 'decided: %s\n' "$id"
+      return 0
+    fi
+    fail "task $id is not held; hold it with --owner parent first"
+  fi
+  if [ "$hold_kind" != external ] || [ "$owner" != parent ]; then
+    fail "task $id is not waiting on the parent firstmate (recorded owner: $owner); only the captain's own words release a captain call, so use answer for that"
+  fi
+  write_resolution_record "$id" decided "$body"
+  tasks_axi unhold "$id" >/dev/null || fail "could not release parent-held task $id"
+  remove_interrupted_answer_stamp "$id"
+  publish_parent_hold "$id" "$occurrence" resolved "decided by the parent firstmate" "parent decision"
+  printf 'decided: %s\n' "$id"
+}
+
+# True when <ruling-id> is a closed captain call carrying the captain's recorded
+# words, found in the live backlog or, failing that, the done archive.
+ruling_is_recorded_captain_answer() {  # <ruling-id>
+  local rid=$1 rbody mode resolved rc=0
+  if task_show "$rid"; then
+    [ "$(show_field "$TASK_SHOW_OUTPUT" state)" = "done" ] || return 1
+    rbody=$(show_field "$TASK_SHOW_OUTPUT" body)
+    mode=$(recorded_resolution_mode "$rbody" || true)
+    case "$mode" in answered|routed|repaired) : ;; *) return 1 ;; esac
+    case "$rbody" in *"Captain decision:"*) return 0 ;; esac
+    return 1
+  fi
+  resolved=$(resolve_entry "" "$rid" archive 2>/dev/null) || rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  case "$resolved" in *' archive') return 0 ;; esac
+  return 1
+}
+
+# An honest release of a hold that was never the captain's. It never writes the
+# captain's words and never completes the work item; it lifts the hold, records
+# who decided and why, and marks the record as not a captain answer.
+command_withdraw() {
+  local id=${1:-} evidence_file='' ruling='' parent_routed=0 show state hold_kind held body owner occurrence
+  local dest rc=0
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --evidence-file) shift; evidence_file=${1:-} ;;
+      --ruling) shift; ruling=${1:-} ;;
+      --parent-routed) parent_routed=1 ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+  validate_slug task-id "$id"
+  if [ -n "$ruling" ] && [ "$parent_routed" = 1 ]; then
+    fail "name one basis for the withdrawal: --ruling <task-id> or --parent-routed, not both"
+  fi
+  if [ -z "$ruling" ] && [ "$parent_routed" = 0 ]; then
+    fail "a withdrawal needs a recorded basis: --ruling <task-id> (a closed captain call that makes this one moot) or --parent-routed (the call was the parent firstmate's)"
+  fi
+  [ -z "$ruling" ] || validate_slug ruling-id "$ruling"
+  [ -n "$evidence_file" ] || fail "--evidence-file is required; a withdrawal records who decided and why, never an assertion"
+  load_decision "$evidence_file"
+  acquire_task_control_lock "$id"
+  require_tasks_axi
+  task_show "$id" || fail "task $id is absent from this home's configured backlog (data directory $DATA)"
+  show=$TASK_SHOW_OUTPUT
+  state=$(show_field "$show" state)
+  hold_kind=$(show_field_value "$show" hold_kind)
+  held=$(show_field_value "$show" held)
+  body=$(show_field "$show" body)
+  [ "$state" != "done" ] || fail "task $id is already closed; a withdrawal releases an open hold"
+  if [ "$held" != yes ] || [ "$hold_kind" != captain ]; then
+    fail "task $id is not held for the captain; nothing to withdraw (a hold the parent owns is released with decide)"
+  fi
+  owner=$(effective_decision_owner "$(decode_shown_value "$body")")
+  occurrence=$(( $(resolution_record_count "$body") + 1 ))
+  if [ -n "$ruling" ]; then
+    [ "$ruling" != "$id" ] || fail "a hold cannot be moot by its own record"
+    ruling_is_recorded_captain_answer "$ruling" \
+      || fail "$ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw $id"
+    WITHDRAW_BASIS="moot under the recorded captain ruling $ruling"
+  else
+    [ "$(home_decision_scope)" = mate ] \
+      || fail "this home has no parent firstmate, so no call here was ever the parent's; only a recorded captain ruling (--ruling) can withdraw $id"
+    [ "$owner" = unrecorded ] \
+      || fail "task $id records its owner as $owner; only a hold filed before owners were recorded can be shown to have been the parent's, and a recorded captain call needs the captain's words or a recorded captain ruling"
+    dest=$(fm_parent_channel_destination "$FM_HOME" "$STATE") || rc=$?
+    [ "$rc" -eq 0 ] || fail "the parent channel of this home cannot be resolved (rc=$rc); the call's delivery to the parent cannot be shown"
+    [ -f "$dest" ] && [ ! -L "$dest" ] \
+      || fail "the parent channel $dest is not a readable file; the call's delivery to the parent cannot be shown"
+    grep -F -e "[key=captain-hold-$id-$occurrence]" -- "$dest" | grep -q 'needs-decision' \
+      || fail "the parent channel $dest carries no needs-decision line for key captain-hold-$id-$occurrence; this call was never delivered to the parent, so it cannot be shown to have been the parent's"
+    WITHDRAW_BASIS="the parent firstmate, to whom this home's channel delivered the call"
+  fi
+  WITHDRAW_OWNER=$owner
+  WITHDRAW_RUN_ROLE=$(fm_answered_by_home_role "$FM_HOME" "$STATE")
+  write_resolution_record "$id" withdrawn "$body"
+  tasks_axi unhold "$id" >/dev/null || fail "could not release withdrawn task $id"
+  remove_interrupted_answer_stamp "$id"
+  publish_parent_hold "$id" "$occurrence" resolved "withdrawn, not a captain call: $WITHDRAW_BASIS"
+  printf 'withdrawn: %s\n' "$id"
 }
 
 # --- the one keyed-answer intake, and the source bindings that feed it --------
@@ -2743,12 +3027,13 @@ EOF
 # exist holds nothing. Every read failure over a record that DOES exist is a 2,
 # printed to stderr, because a mechanical closer must never read "cannot tell"
 # as permission to close.
-command_open() {  # <task-id> [--identity] [--distinguish-absent]
-  local id='' identity=0 distinguish_absent=0 data state root file backend show shown_body
+command_open() {  # <task-id> [--identity] [--distinguish-absent] [--parent-owned]
+  local id='' identity=0 distinguish_absent=0 parent_owned=0 data state root file backend show shown_body
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --identity) identity=1 ;;
       --distinguish-absent) distinguish_absent=1 ;;
+      --parent-owned) parent_owned=1 ;;
       -*) usage >&2; exit 2 ;;
       *)
         [ -z "$id" ] || { usage >&2; exit 2; }
@@ -2785,6 +3070,17 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   fm_tasks_axi_compatible || { printf 'fm-captain-hold: compatible tasks-axi is required\n' >&2; exit 2; }
   if fm_backlog_row_probe "$data" "$id"; then
     state=${FM_BACKLOG_ROW_STATE%% *}
+    if [ "$parent_owned" -eq 1 ]; then
+      # The parent's own decision, recorded as the owner at filing. It is never
+      # a captain call, so the captain predicate above answers no for it.
+      [ "$state" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = external ] || return 1
+      task_show "$id" || {
+        printf 'fm-captain-hold: parent decision %s is open but its record could not be read\n' "$id" >&2
+        exit 2
+      }
+      [ "$(body_decision_owner "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")" = parent ] || return 1
+      return 0
+    fi
     if [ "$state" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       if [ "$identity" -eq 1 ]; then
         task_show "$id" || {
@@ -2824,6 +3120,8 @@ command_open_bound() {
 
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
+  decide) shift; command_decide "$@" ;;
+  withdraw) shift; command_withdraw "$@" ;;
   answer) shift; command_answer "$@" ;;
   answers) shift; command_answers "$@" ;;
   reconcile-requests) shift; command_reconcile_requests "$@" ;;
