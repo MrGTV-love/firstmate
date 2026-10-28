@@ -7,12 +7,23 @@
 #
 # --memory-kib adds an opt-in sampled hard stop: once per second, sum the
 # command tree's resident memory and physical footprint, in KiB (1024 bytes),
-# and compare the larger sum with the positive decimal limit. Descendants are
-# tracked across process groups and sessions, including nested wrappers.
-# Crossing it STOPs and re-scans the tree before KILLing every member, then
-# exits 99 with one stderr line naming the limit and sample. This is not a
-# kernel allocation ceiling: memory can overshoot between samples.
-# A failed, malformed, or late memory sample ends the tree and exits 125.
+# and compare the larger sum with the positive decimal limit. The command stays
+# in the caller's process group. The tree is the command and each descendant a
+# sample has seen, in any process group or session, including nested wrappers.
+# A descendant orphaned before any sample has seen it (such as a background job
+# of a command that exits within its first second) escapes the stop and the
+# cleanup below. Crossing the limit STOPs and re-scans the tree before
+# KILLing every member, then exits 99 with one stderr line naming the limit and
+# sample. This is not a kernel allocation ceiling: memory can overshoot between
+# samples. A failed, malformed, or late memory sample ends the tree and exits
+# 125, as does a member of this user whose memory cannot be read, or a sample in
+# which no member's memory can be read. A member running as another user (a
+# setuid program such as ps) whose memory cannot be read is left out of the sum;
+# a 99 or 125 stderr line counts and names such members, and with
+# FM_PROC_BUDGET_DEBUG=1 each sample that leaves one out prints a debug line.
+# When the command itself exits, its remaining descendants get TERM, then KILL
+# after at most one second, and the wrapper exits with the command's status. A
+# command meant to leave a daemon running must not use this option.
 # The libproc reader is checked before launch; an unsupported host (currently
 # any non-Darwin host) or unavailable reader refuses to start with status 125.
 # No ps memory sampler or external watcher is used. Without this option the
@@ -43,6 +54,9 @@
 # Exit status: the command's own, 2 for a malformed call, and 125 when no budget
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
+# With --memory-kib, 99 is a crossed memory limit and 125 also covers a failed
+# memory sample; the command's own status comes only after its remaining
+# descendants have been ended, so a daemon it leaves behind does not survive.
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it.

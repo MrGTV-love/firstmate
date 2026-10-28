@@ -4,7 +4,8 @@
 Usage: python3 fm-proc-budget-memory.py LIMIT_KIB -- COMMAND...
 The shell wrapper owns the public interface, process limit, and exit statuses.
 Both sampling and cleanup reuse fm-proc-info.py's libproc tree identities.
-Descendants remain owned across process-group and session changes.
+The command stays in the caller's process group; a descendant stays owned
+across process-group and session changes once a sample has observed it.
 """
 import json
 import os
@@ -29,6 +30,9 @@ REPLY_SECONDS = 0.5
 # The same reply measurements leave headroom within the lint watch's cadence.
 # measured: value=1 date=2026-10-28 host=Mac-Studio.local margin=357
 SAMPLE_SECONDS = 1
+# Sixty real TERM-to-exit waits (sleep, bash, python3): maximum 0.005238 s.
+# measured: value=1 date=2026-10-28 host=Mac-Studio.local margin=190
+TERM_SECONDS = 1
 
 
 class SampleError(Exception):
@@ -48,7 +52,7 @@ class Reader:
         # response while allowing one identity tuple per possible descendant.
         self.max_bytes = max(1024, resource.getrlimit(resource.RLIMIT_NPROC)[0] * 128)
 
-    def sample(self, known):
+    def sample(self, known, uncounted):
         deadline = time.monotonic() + (STARTUP_SECONDS if self.first else REPLY_SECONDS)
         self.first = False
         try:
@@ -76,6 +80,14 @@ class Reader:
             known.update((pid, (seconds, micros)) for pid, seconds, micros in members)
             if root_identity is not None:
                 known[self.root] = root_identity
+            rows = data["uncounted"]
+            if not isinstance(rows, list) or any(
+                not isinstance(row, list) or len(row) != 2
+                or type(row[0]) is not int or row[0] <= 1 or type(row[1]) is not str
+                for row in rows
+            ):
+                raise ValueError("invalid uncounted members")
+            uncounted[:] = rows
             rss = data["rss_kib"]
             if type(rss) is not int or rss < 0:
                 raise ValueError("unreadable memory")
@@ -97,40 +109,61 @@ def reason(message):
     print(f"fm-proc-budget: {message}", file=sys.stderr)
 
 
-def end_tree(proc, root, known):
+def uncounted_note(rows):
+    if not rows:
+        return ""
+    names = ", ".join(f"{name} (pid {pid})" for pid, name in rows)
+    return f"; {len(rows)} other-user member(s) with unreadable memory not counted: {names}"
+
+
+def end_tree(proc, root, known, grace=0):
     """Freeze parents before killing them so detached children cannot orphan.
 
+    With a grace, members first get TERM and up to that many seconds to exit.
     Cleanup does not depend on the memory reader: a dead, stalled, or broken
     reader cannot prevent a fresh libproc descendant sweep. Each PID is checked
-    against its kernel start timestamp before a signal is sent.
+    against its kernel start timestamp before a signal is sent. A refused
+    signal does not stop the sweep; the first refusal is raised after it.
     """
+    errors = []
+
     def signal_member(pid, identity, number):
         try:
             if proc.process_identity(proc.kinfo(pid)) == identity:
                 os.kill(pid, number)
         except (LookupError, ProcessLookupError):
             pass
+        except OSError as error:
+            errors.append(error)
 
-    # Stop the root before discovery, not after it can fork another session.
+    def live():
+        return {pid: record for pid, record in proc.tree_snapshot(root, known).items()
+                if record[proc.P_STAT] != proc.SZOMB}
+
     try:
-        root_record = proc.kinfo(root)
-        identity = proc.process_identity(root_record)
-        if root not in known or known[root] == identity:
-            known[root] = identity
-            signal_member(root, identity, signal.SIGSTOP)
-    except LookupError:
-        pass
-    # Re-scan after STOP until every observed member is stopped or exiting;
-    # this closes the fork race without killing an ancestor prematurely.
-    deadline = time.monotonic() + STARTUP_SECONDS
-    try:
+        if grace:
+            for pid, record in live().items():
+                signal_member(pid, proc.process_identity(record), signal.SIGTERM)
+            deadline = time.monotonic() + grace
+            while not errors and live() and time.monotonic() < deadline:
+                time.sleep(0.01)
+        # Stop the root before discovery, not after it can fork another session.
+        try:
+            root_record = proc.kinfo(root)
+            identity = proc.process_identity(root_record)
+            if root not in known or known[root] == identity:
+                known[root] = identity
+                signal_member(root, identity, signal.SIGSTOP)
+        except LookupError:
+            pass
+        # Re-scan after STOP until every observed member is stopped or exiting;
+        # this closes the fork race without killing an ancestor prematurely.
+        deadline = time.monotonic() + STARTUP_SECONDS
         while True:
-            records = proc.tree_snapshot(root, known)
-            live = {pid: record for pid, record in records.items()
-                    if record[proc.P_STAT] != proc.SZOMB}
-            for pid, record in live.items():
+            members = live()
+            for pid, record in members.items():
                 signal_member(pid, proc.process_identity(record), signal.SIGSTOP)
-            if all(record[proc.P_STAT] == proc.SSTOP for record in live.values()):
+            if errors or all(record[proc.P_STAT] == proc.SSTOP for record in members.values()):
                 break
             if time.monotonic() >= deadline:
                 break
@@ -140,22 +173,25 @@ def end_tree(proc, root, known):
         # KILL works on stopped processes without a separate CONT signal.
         for pid, identity in reversed(list(known.items())):
             signal_member(pid, identity, signal.SIGKILL)
+    if errors:
+        raise errors[0]
 
 
 def run(limit, command):
     reader, child, proc = None, None, None
     known = {}
+    uncounted = []
+    debug = os.environ.get("FM_PROC_BUDGET_DEBUG") == "1"
     caught = 0
     ended = False
     cleanup_error = None
-    owner = os.getppid()
 
-    def end_child():
+    def end_child(grace=0):
         nonlocal ended, cleanup_error
         if child is not None and not ended:
             ended = True
             try:
-                end_tree(proc, child.pid, known)
+                end_tree(proc, child.pid, known, grace)
             except (OSError, LookupError) as error:
                 cleanup_error = error
             finally:
@@ -178,40 +214,43 @@ def run(limit, command):
         helper = Path(__file__).with_name("fm-proc-info.py")
         proc = SimpleNamespace(**runpy.run_path(str(helper)))
         reader = Reader(os.getpid())
-        reader.sample({})
+        reader.sample({}, [])
         reader.close()
         reader = None
         if caught:
             return 128 + caught
-        child = subprocess.Popen(command, start_new_session=True)
+        child = subprocess.Popen(command)
         reader = Reader(child.pid)
         while True:
             if caught:
                 return 128 + caught
-            if os.getppid() != owner:
-                raise SampleError("supervisor lost its parent")
-            rss = reader.sample(known)
+            rss = reader.sample(known, uncounted)
+            if debug and uncounted:
+                reason(f"debug: sample at {rss} KiB{uncounted_note(uncounted)}")
             if rss > limit:
                 end_child()
                 if cleanup_error is not None:
                     raise SampleError(f"tree cleanup failed: {cleanup_error}")
-                reason(f"command tree exceeded {limit} KiB memory limit at {rss} KiB; ended")
+                reason(f"command tree exceeded {limit} KiB memory limit at {rss} KiB; ended"
+                       + uncounted_note(uncounted))
                 return 99
-            # Do not reap a finished root while descendants remain: retaining
-            # its zombie also prevents reuse of the original PID/group id.
-            if rss == 0:
-                status = child.poll()
-                if status is not None:
-                    ended = True
-                    return status if status >= 0 else 128 - status
-            time.sleep(SAMPLE_SECONDS)
+            # The root's exit ends the run; leftover descendants get TERM,
+            # then KILL, so a lingering daemon never holds the wrapper open.
+            try:
+                status = child.wait(SAMPLE_SECONDS)
+            except subprocess.TimeoutExpired:
+                continue
+            end_child(TERM_SECONDS)
+            if cleanup_error is not None:
+                raise SampleError(f"tree cleanup failed: {cleanup_error}")
+            return status if status >= 0 else 128 - status
     except (SampleError, OSError) as error:
         if child is None:
             reason(f"cannot start memory reader ({error}); command not started")
         else:
             end_child()
             outcome = "ended" if cleanup_error is None else f"tree cleanup failed: {cleanup_error}"
-            reason(f"cannot sample command-tree memory ({error}); {outcome}")
+            reason(f"cannot sample command-tree memory ({error}); {outcome}" + uncounted_note(uncounted))
         return 125
     finally:
         if child is not None:

@@ -223,8 +223,8 @@ memory_supported() {
 }
 
 assert_memory_pid_ended() {
-  local pid=$1 state attempt
-  for attempt in {1..50}; do
+  local pid=$1 state
+  for _ in {1..50}; do
     state=$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat | while read -r candidate status; do
       [ "$candidate" != "$pid" ] || printf '%s' "$status"
     done)
@@ -271,8 +271,8 @@ PY
 
 test_memory_nested_wrapper() {
   local rc pid
-  # The inner wrapper creates another session and has a higher bound. A
-  # process-group-only outer watch misses its 192 MiB payload entirely.
+  # The inner wrapper runs its own supervisor with a higher bound. The outer
+  # stop must still count and end the inner 192 MiB payload.
   FM_MEMORY_NESTED_PID="$TMP_ROOT/nested-memory.pid" run_memory_case "$WRAP" --memory-kib 131072 -- \
     "$WRAP" --memory-kib 524288 -- python3 -c \
     'import os, time; open(os.environ["FM_MEMORY_NESTED_PID"], "w").write(str(os.getpid())); allocation = bytearray(192 * 1024 * 1024); time.sleep(4); raise SystemExit(7)' \
@@ -294,6 +294,50 @@ test_memory_normal_command() {
   pass "normal memory-bounded command retains output and status"
 }
 
+test_memory_setuid_member_is_not_counted() {
+  local rc
+  # The pipe fills, so the setuid-root ps stays alive across several samples.
+  FM_PROC_BUDGET_DEBUG=1 run_memory_case "$WRAP" --memory-kib 262144 -- \
+    bash -c '/bin/ps -axwwE -o args -o args | sleep 3; exit 7' 2>"$TMP_ROOT/setuid.err"
+  rc=$?
+  expect_code 7 "$rc" "healthy tree with a running setuid ps"
+  assert_contains "$(cat "$TMP_ROOT/setuid.err")" "not counted: ps (pid " "the unreadable setuid ps is named and left out"
+  pass "an unreadable other-user member is left out of the sum and does not end a healthy tree"
+}
+
+test_memory_root_exit_ends_leftovers() {
+  local start output rc
+  start=$SECONDS
+  # The root outlives the first sample so the background job is a seen member.
+  output=$("$WRAP" --memory-kib 262144 -- bash -c 'sleep 600 & echo "$!"; sleep 2; exit 7')
+  rc=$?
+  expect_code 7 "$rc" "root status after a leftover descendant is ended"
+  [ $((SECONDS - start)) -lt 30 ] || fail "memory stop waited for a leftover descendant"
+  assert_memory_pid_ended "$output"
+  pass "the command's exit ends its leftover descendants and returns its status at once"
+}
+
+test_memory_group_kill_reaches_command() {
+  local pid
+  python3 - "$WRAP" "$TMP_ROOT/group.pid" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'echo "$$" >"$0"; exec sleep 600', sys.argv[2]], start_new_session=True)
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+os.killpg(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r pid <"$TMP_ROOT/group.pid" || fail "memory-stopped command did not start"
+  assert_memory_pid_ended "$pid"
+  pass "a caller's group kill ends the memory-stopped command with its supervisor"
+}
+
 test_memory_reader_failure() {
   local fixture="$TMP_ROOT/memory-fixture" rc pid mode marker
   mkdir -p "$fixture"
@@ -312,7 +356,7 @@ if __name__ != "__main__":
 else:
     for line in sys.stdin:
         if not os.path.exists(os.environ["FM_MEMORY_MARKER"]):
-            print('{"rss_kib":1,"members":[]}', flush=True)
+            print('{"rss_kib":1,"members":[],"uncounted":[]}', flush=True)
             continue
         mode = os.environ["FM_MEMORY_FAILURE"]
         if mode == "exit":
@@ -369,6 +413,9 @@ if memory_supported; then
   test_memory_tree_over_limit
   test_memory_nested_wrapper
   test_memory_normal_command
+  test_memory_setuid_member_is_not_counted
+  test_memory_root_exit_ends_leftovers
+  test_memory_group_kill_reaches_command
   test_memory_reader_failure
 fi
 
