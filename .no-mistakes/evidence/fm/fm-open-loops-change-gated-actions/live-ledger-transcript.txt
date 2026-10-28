@@ -1,0 +1,372 @@
+
+=== Reset: clear the earlier exploratory wakes (no action yet, so this ack must be refused) ===
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 33985.1793221406.rytZEo
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",9105,"needs-decision: approve budget for runner pool",false
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10105,"needs-decision: production engine upgrade question",false
+  "21a335e4cfd7c0c6fe6197e8","captain","paused-lane:captain-hold","resolve the captain hold or record its next decision date",7395,"captain-ordered fleet pause",false
+[exit 1, 1s]
+
+=== S1/S2: record one action per new row (batch). Captain row escalated; engine bound to captain hold paused-lane; budget gets a bare rubber-stamp escalation ===
+{"row_id":"21a335e4cfd7c0c6fe6197e8","kind":"escalated","evidence":"escalated"}
+{"row_id":"33765b79fa2f2457a2192ce8","kind":"escalated","evidence":"escalated","hold":"paused-lane"}
+{"row_id":"22bf6a7a5641b7fc9d39ebc9","kind":"escalated","evidence":"escalated"}
+$ bin/fm-open-loops.sh action --batch /tmp/fm-lab-scripts-01M622/batch.jsonl
+results[3]{line,id,kind,result,message}:
+  1,"21a335e4cfd7c0c6fe6197e8","escalated","recorded",""
+  2,"33765b79fa2f2457a2192ce8","escalated","recorded","captain hold paused-lane; covers this row until it changes or that hold is answered, released, blocked or held again"
+  3,"22bf6a7a5641b7fc9d39ebc9","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+[exit 0]
+
+=== S1: ack after one action per row ===
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 33985.1793221406.rytZEo
+[exit 0, 3s]
+{
+ "21a335e4cfd7c0c6fe6197e8": {
+  "kind": "escalated",
+  "evidence": "escalated",
+  "at_epoch": 1793221463,
+  "sequence": 1,
+  "deferrals": 0,
+  "captain_visible": false,
+  "digest": "e94d4c3edbea2962fc39428d",
+  "cited": [],
+  "clock_start": 1793214059
+ },
+ "33765b79fa2f2457a2192ce8": {
+  "kind": "escalated",
+  "evidence": "escalated",
+  "at_epoch": 1793221463,
+  "sequence": 2,
+  "deferrals": 0,
+  "captain_visible": false,
+  "digest": "b5d8c0c56115717193c8cf87",
+  "cited": [],
+  "clock_start": 1793211349,
+  "hold": {
+   "task": "paused-lane",
+   "marker": "2026-10-28T19:00:59Z"
+  }
+ },
+ "22bf6a7a5641b7fc9d39ebc9": {
+  "kind": "escalated",
+  "evidence": "escalated",
+  "at_epoch": 1793221463,
+  "sequence": 3,
+  "deferrals": 0,
+  "captain_visible": false,
+  "digest": "96234aa27f3ec1867f09b4d3",
+  "cited": [],
+  "clock_start": 1793212349
+ }
+}
+
+=== S2: next heartbeat on unchanged rows; watcher change wake; drain + ack with zero new actions ===
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793221475
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","asker:budget","firstmate","answer or close this question, or record why it no longer applies",9126,true,"needs-decision: approve budget for runner pool"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",10126,true,"needs-decision: production engine upgrade question"
+  "unanswered_question","paused-lane:captain-hold","captain","resolve the captain hold or record its next decision date",7416,true,"captain-ordered fleet pause"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=30 bin/fm-watch.sh  (one cycle, exits on wake)
+check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+-rw-r--r--  1 charlesabrooker  staff  11 Oct 28 16:04 /Users/charlesabrooker/tmp/fm-lab.0VRIHz/state/.open-loops-resurfaced
+-rw-r--r--  1 charlesabrooker  staff  15 Oct 28 16:04 /Users/charlesabrooker/tmp/fm-lab.0VRIHz/state/.open-loops-surfaced
+$ bin/fm-wake-drain.sh
+1793221494	4	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 24323.1793221494.zKn99F
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 24323.1793221494.zKn99F
+[exit 0, 2s]
+
+=== S2b: unchanged ledger again before the resurface period -> watcher queues no ledger wake (timeout 20s expected, exit 124) ===
+$ FM_OPEN_LOOPS_RESURFACE=30 bin/fm-watch.sh  (one cycle, exits on wake)
+bin/fm-watch.sh: line 3378: 92170 Terminated: 15          sleep "$POLL"
+[exit 124]
+
+=== S3: wait past FM_OPEN_LOOPS_RESURFACE=30 -> periodic waiting-list wake; drain lists every unchanged row with status ===
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793221548
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","asker:budget","firstmate","answer or close this question, or record why it no longer applies",9199,true,"needs-decision: approve budget for runner pool"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",10199,true,"needs-decision: production engine upgrade question"
+  "unanswered_question","paused-lane:captain-hold","captain","resolve the captain hold or record its next decision date",7489,true,"captain-ordered fleet pause"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=30 bin/fm-watch.sh  (one cycle, exits on wake)
+check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+[exit 0]
+$ bin/fm-wake-drain.sh
+1793221551	5	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",9205,"needs-decision: approve budget for runner pool","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10205,"needs-decision: production engine upgrade question","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+  "21a335e4cfd7c0c6fe6197e8","captain","paused-lane:captain-hold","resolve the captain hold or record its next decision date",7495,"captain-ordered fleet pause","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 11279.1793221551.FYC9Qk
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 11279.1793221551.FYC9Qk
+[exit 0, 6s]
+
+=== S4: unpause - the resumed lane writes a new status line for key=budget; only that row returns to the gate ===
+appended: needs-decision [at=1793221572] [key=budget]: approve budget for runner pool (lane resumed; new quote attached)
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793221572
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","asker:budget","firstmate","answer or close this question, or record why it no longer applies",0,false,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",10223,true,"needs-decision: production engine upgrade question"
+  "unanswered_question","paused-lane:captain-hold","captain","resolve the captain hold or record its next decision date",7513,true,"captain-ordered fleet pause"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=30 bin/fm-watch.sh  (one cycle, exits on wake)
+signal: /Users/charlesabrooker/tmp/fm-lab.0VRIHz/state/asker.status
+[exit 0]
+$ bin/fm-wake-drain.sh
+1793221611	6	signal	asker.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.0VRIHz/state/asker.status
+wake annotation: latest wake-EVENT observed at drain, not current state: asker.status: needs-decision [at=1793221572] [key=budget]: approve budget for runner pool (lane resumed; new quote attached)
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool (lane resumed; new quote attached)
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 9832.1793221612.OUUZ4m
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+=== S4: ack refused for the changed row only ===
+$ bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 9832.1793221612.OUUZ4m
+[exit 0, 3s]
+
+=== S4/G1: digest lists the unchanged rows, never the changed row ===
+$ bin/fm-open-loops.sh --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10273,"needs-decision: production engine upgrade question","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+  "21a335e4cfd7c0c6fe6197e8","captain","paused-lane:captain-hold","resolve the captain hold or record its next decision date",7563,"captain-ordered fleet pause","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+=== S4 (cont): the changed row is not overdue yet (age 0 < 1800 s). Set config/open-loops.json unanswered_question limit to 60 s so it turns overdue quickly ===
+{"age_limits_seconds":{"unanswered_question":60}}
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793221685
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","asker:budget","firstmate","answer or close this question, or record why it no longer applies",113,true,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",10336,true,"needs-decision: production engine upgrade question"
+  "unanswered_question","paused-lane:captain-hold","captain","resolve the captain hold or record its next decision date",7626,true,"captain-ordered fleet pause"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=30 bin/fm-watch.sh  (one cycle, exits on wake)
+check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",118,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",false
+STANDING (unchanged since its last action; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10341,"needs-decision: production engine upgrade question",false
+  "21a335e4cfd7c0c6fe6197e8","captain","paused-lane:captain-hold","resolve the captain hold or record its next decision date",7631,"captain-ordered fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793221688	7	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool (lane resumed; new quote attached)
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 87208.1793221689.rcjVdU
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+=== S4: ack refused - the changed row needs a new action ===
+$ bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 87208.1793221689.rcjVdU
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",126,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",false
+[exit 1, 2s]
+
+=== S4/G1: digest lists only unchanged rows; the changed row is in the gate, not the list ===
+$ bin/fm-open-loops.sh --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10350,"needs-decision: production engine upgrade question","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+  "21a335e4cfd7c0c6fe6197e8","captain","paused-lane:captain-hold","resolve the captain hold or record its next decision date",7640,"captain-ordered fleet pause","escalated, waiting on the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793221463}
+[exit 0]
+
+=== S5 (guard): first deferral on the changed row is accepted and covers it ===
+$ bin/fm-open-loops.sh action 22bf6a7a5641b7fc9d39ebc9 deferred --evidence waiting for quote review --recheck 2026-10-28T22:08:30Z
+action: "22bf6a7a5641b7fc9d39ebc9"
+kind: deferred
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 87208.1793221689.rcjVdU
+[exit 0, 4s]
+
+=== S5 (guard): a second deferral on the same unchanged row is refused and the row becomes captain-visible ===
+$ bin/fm-open-loops.sh action 22bf6a7a5641b7fc9d39ebc9 deferred --evidence still waiting --recheck 2026-10-28T22:08:30Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",144,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+[exit 1]
+
+=== S5: a real escalation bound to the captain hold clears it ===
+$ bin/fm-open-loops.sh action 22bf6a7a5641b7fc9d39ebc9 escalated --evidence asked captain to approve the new quote --hold paused-lane
+action: "22bf6a7a5641b7fc9d39ebc9"
+kind: escalated
+standing: captain hold paused-lane; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+=== S6: the captain answers hold paused-lane through bin/fm-captain-hold.sh answer ===
+$ bin/fm-captain-hold.sh answer paused-lane --decision-file /tmp/fm-lab-scripts-01M622/decision.txt
+answered: paused-lane
+[exit 0]
+## In flight
+
+## Queued
+## Done
+- [x] paused-lane - Resume lane after fleet pause (repo: firstmate) (kind: ship) (done 2026-10-28) (hold: captain-ordered fleet pause) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 45cc88a25fcf2b02dbf4ec66f29d4ab5cfe80edb9d0eb617e5219f86051351a1
+  Resolution mode: answered
+  Resolves hold set: 2026-10-28T19:00:59Z
+  Resolved at: 2026-10-28T21:08:55Z
+  Answered by: main
+
+  Captain decision:
+  Resume the lane. Approve the new quote.
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793221738
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","asker:budget","firstmate","answer or close this question, or record why it no longer applies",166,true,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)"
+  "unanswered_question","asker:engine","firstmate","answer or close this question, or record why it no longer applies",10389,true,"needs-decision: production engine upgrade question"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+=== S6: rows bound to the answered hold now need a new action (no longer covered) ===
+$ bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",167,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10390,"needs-decision: production engine upgrade question",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",168,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10391,"needs-decision: production engine upgrade question",false
+[exit 1]
+$ bin/fm-open-loops.sh --digest
+[exit 0]
+
+=== S7 (guard): away-daemon ack bypass only while state/.afk exists; the obligation stays gated for firstmate ===
+queued wake: check: board report
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",218,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10441,"needs-decision: production engine upgrade question",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793221770	8	check	report	check: board report
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool (lane resumed; new quote attached)
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 26370.1793221771.dTitvw
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 26370.1793221771.dTitvw   (no state/.afk)
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",239,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10462,"needs-decision: production engine upgrade question",false
+[exit 1]
+touched state/.afk
+$ FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 26370.1793221771.dTitvw   (with state/.afk)
+[exit 0]
+removed state/.afk
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1793221738
+complete: true
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",242,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10465,"needs-decision: production engine upgrade question",false
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",243,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)",true
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10466,"needs-decision: production engine upgrade question",false
+[exit 1]
+
+=== S6/S2 close-out: one batch of new actions, then the next turn acks with no further work ===
+{"row_id":"22bf6a7a5641b7fc9d39ebc9","kind":"escalated","evidence":"captain approved quote; asked worker to proceed"}
+{"row_id":"33765b79fa2f2457a2192ce8","kind":"escalated","evidence":"engine question re-raised after resume"}
+results[2]{line,id,kind,result,message}:
+  1,"22bf6a7a5641b7fc9d39ebc9","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  2,"33765b79fa2f2457a2192ce8","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+$ bin/fm-wake-drain.sh
+1793221817	9	check	report	check: next turn
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+asker [key=engine] needs-decision: production engine upgrade question
+asker [key=budget] needs-decision: approve budget for runner pool (lane resumed; new quote attached)
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 26370.1793221817.SXT9ID
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 26370.1793221817.SXT9ID
+[exit 0, 3s]
+
+=== M3: rubber-stamp escalations stay labelled as having no proof in the periodic list ===
+$ bin/fm-open-loops.sh --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "22bf6a7a5641b7fc9d39ebc9","firstmate","asker:budget","answer or close this question, or record why it no longer applies",278,"needs-decision: approve budget for runner pool (lane resumed; new quote attached)","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain approved quote; asked worker to proceed", "at_epoch": 1793221816}
+  "33765b79fa2f2457a2192ce8","firstmate","asker:engine","answer or close this question, or record why it no longer applies",10501,"needs-decision: production engine upgrade question","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "engine question re-raised after resume", "at_epoch": 1793221816}
+[exit 0]
+
+=== G1: every overdue row is in the gate or in the waiting list ===
+overdue ['22bf6a7a5641b7fc9d39ebc9', '33765b79fa2f2457a2192ce8']
+gate []
+digest ['22bf6a7a5641b7fc9d39ebc9', '33765b79fa2f2457a2192ce8']
+G1 PASS

@@ -26,4 +26,41 @@ PASS: ordinary recovery adapters and source degradation
 PASS: publication suppression reset success/failure/skip
 PASS: held-gate singleflight and child cleanup
 PASS: unset and empty address overrides share shell defaults before collection
-Terminated: 15
+PASS: no-progress source failure owns resistant descendant cleanup
+PASS: no-progress expiry reports the configured interval and keeps captured output
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
+PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage
+PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates
+PASS: each actor gates only the rows its own drain presented
+PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+PASS: a parked firstmate-owned row escalation covers unchanged evidence and is listed as waiting on the captain, also on a quota-stale ledger; a changed row or an answered, released, blocked, re-held or unreadable bound hold needs a new action while a hold deferred to a date keeps covering; evidence text, other owners, reviewed PRs and other categories cannot bind holds, so their escalations are never captain waiting; the deferral limit remains enforced; one presentation reads the backlog once; an unverifiable escalation answers only the turn it followed
+PASS: a paused worker status append changes its collected row and gates acknowledgement again
+PASS: batch validates per row, preserves valid actions and uses one real snapshot
+PASS: drain and refused acknowledgement preserve unchanged recorded work
+PASS: stdin batch recovery and partial acknowledgements preserve completed actions
+PASS: every obligation identity change requires new evidence
+PASS: firstmate escalations and steers need no new action on unchanged work, only on changed work
+PASS: a free-text escalation stays listed without proof it reached the captain, not re-gated by time
+PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do
+PASS: a pane timer in any unit changes no obligation; a different task still does
+PASS: an unreadable config file never blocks the receipt gate
+PASS: second deferral requires new follow-up even after a standing escalation
+PASS: reviewed PRs keep their next-turn action requirement
+PASS: a refused batch line leaks no state into its siblings
+PASS: a hold ending or becoming unreadable restores the same-turn action requirement
+PASS: a home without a ledger acknowledges without the receipt command
+PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
+ok - open-work reconciliation reports owned obligations from live records
+bash tests/$t.test.sh  413.85s user 605.06s system 38% cpu 44:17.92 total
