@@ -1,0 +1,384 @@
+
+===== [new] S4 green PR next action  FM_HOME=/private/tmp/fm-lab.ddh_y33b
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row open_pr                  owner=firstmate              subject=https://github.com/test/project/pull/284
+  |     next_action="route the green PR's review; merge it under AGENTS.md section 7" overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+>>> RESULT S4 green PR next_action [new]: [('open_pr', "route the green PR's review; merge it under AGENTS.md section 7")]
+
+===== [old] S4 green PR next action  FM_HOME=/private/tmp/fm-lab.6n8u5blw
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row open_pr                  owner=firstmate              subject=https://github.com/test/project/pull/284
+  |     next_action="route the green PR's review and obtain merge approval" overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+>>> RESULT S4 green PR next_action [old]: [('open_pr', "route the green PR's review and obtain merge approval")]
+
+===== [new] S5 red PR waits on live task  FM_HOME=/private/tmp/fm-lab._xwq6cst
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "b16fb04fb3689e745361591b","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "dd96e0981c22f78faf1cd169","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7215,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221684	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 77611.1793221684.9a64rC
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action b16fb04fb3689e745361591b escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "b16fb04fb3689e745361591b"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action dd96e0981c22f78faf1cd169 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:08:10Z
+  | action: "dd96e0981c22f78faf1cd169"
+  | kind: waiting
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 77611.1793221684.9a64rC
+  -> exit 0
+$ $BIN/fm-wake-drain.sh
+  | 1793221698	2	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 36721.1793221698.TXlQU8
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 2 --recovery-generation 36721.1793221698.TXlQU8
+  -> exit 0
+$ $BIN/fm-open-loops.sh --report
+  | generated_epoch: 1793221681
+  | complete: false
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "b16fb04fb3689e745361591b","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "dd96e0981c22f78faf1cd169","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7237,"Behavior portable serial 17",false
+  -> exit 0
+$ $BIN/fm-open-loops.sh --check-actions   # clock=+3700s
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "dd96e0981c22f78faf1cd169","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",10900,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5 red PR wait [new]: {'record_wait': 0, 'msg': 'kind: waiting', 'ack': 0, 'ack_next_turn': 0, 'still_in_report': True, 'check_after_recheck_due': 1}
+
+===== [old] S5 red PR waits on live task  FM_HOME=/private/tmp/fm-lab.gr8n6e4o
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "45669b1d80fb8e272e9011cb","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "cabf1417821e620811b978bd","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7246,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221716	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 9316.1793221716.s5Ilkx
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-old/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action 45669b1d80fb8e272e9011cb escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "45669b1d80fb8e272e9011cb"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action cabf1417821e620811b978bd waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:08:42Z
+  | error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+>>> RESULT S5 red PR wait [old]: {'record_wait': 1, 'msg': 'error: "this obligation cannot have a standing dependency wait"'}
+
+===== [new] S5a prerequisite merges  FM_HOME=/private/tmp/fm-lab.eig3n4sh
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ad7dc2e766a46e5b831068aa","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "747d61e3040ced65d01d841f","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7259,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221729	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 65589.1793221729.vndhcu
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action ad7dc2e766a46e5b831068aa escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "ad7dc2e766a46e5b831068aa"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action 747d61e3040ced65d01d841f waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:08:54Z
+  | action: "747d61e3040ced65d01d841f"
+  | kind: waiting
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 65589.1793221729.vndhcu
+  -> exit 0
+$ $BIN/fm-open-loops.sh --check-actions
+  -> exit 0
+# recorded merge of repair-owner PR 290
+$ $BIN/fm-open-loops.sh --check-actions
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "747d61e3040ced65d01d841f","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7269,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5a resurfaces on merge [new]: {'before': 0, 'after': 1}
+
+===== [new] S5b prerequisite fails  FM_HOME=/private/tmp/fm-lab.7tigxw5x
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "b6aa2fd21dd151763541b34f","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "89461f9ed31e7746fd730c6e","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7278,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221746	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 41572.1793221746.0TAZYt
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action b6aa2fd21dd151763541b34f escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "b6aa2fd21dd151763541b34f"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action 89461f9ed31e7746fd730c6e waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:09:12Z
+  | action: "89461f9ed31e7746fd730c6e"
+  | kind: waiting
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 41572.1793221746.0TAZYt
+  -> exit 0
+$ $BIN/fm-open-loops.sh --check-actions
+  -> exit 0
+# repair-owner harness hook event: idle (exit 0)
+$ $BIN/fm-open-loops.sh --check-actions
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "89461f9ed31e7746fd730c6e","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7286,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5b resurfaces on failure [new]: {'before': 0, 'after': 1}
+
+===== [new] S5c prerequisite stalls  FM_HOME=/private/tmp/fm-lab._pd6b6tq
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "b836924a55fa43337eac93e9","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "4e74cc386a25db7a33126096","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7292,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221761	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 2572.1793221761.mOD8NK
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action b836924a55fa43337eac93e9 escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "b836924a55fa43337eac93e9"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action 4e74cc386a25db7a33126096 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:10:09Z
+  | action: "4e74cc386a25db7a33126096"
+  | kind: waiting
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 2572.1793221761.mOD8NK
+  -> exit 0
+$ $BIN/fm-open-loops.sh --check-actions
+  -> exit 0
+# published ledger now carries an overdue stalled_worker row for repair-owner
+$ $BIN/fm-open-loops.sh --check-actions
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4e74cc386a25db7a33126096","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7347,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5c resurfaces on stall [new]: {'before': 0, 'after': 1}
+
+===== [new] S5d prerequisite replaced  FM_HOME=/private/tmp/fm-lab.maf943o7
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "2bcede9c7c00eb224571e66f","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "269369ddf2adf6fad892eb45","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7356,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221826	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 8556.1793221826.SWBSVd
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action 2bcede9c7c00eb224571e66f escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "2bcede9c7c00eb224571e66f"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+$ $BIN/fm-open-loops.sh action 269369ddf2adf6fad892eb45 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:10:30Z
+  | action: "269369ddf2adf6fad892eb45"
+  | kind: waiting
+  -> exit 0
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 8556.1793221826.SWBSVd
+  -> exit 0
+$ $BIN/fm-open-loops.sh --check-actions
+  -> exit 0
+# repair-owner relaunched with a new spawn generation
+$ $BIN/fm-open-loops.sh --check-actions
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "269369ddf2adf6fad892eb45","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7394,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5d resurfaces on replacement [new]: {'before': 0, 'after': 1}
+
+===== [new] S5e refuse a prerequisite that is not live  FM_HOME=/private/tmp/fm-lab.mp_85n0p
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh --heartbeat --json   -> exit 0
+  | row coverage                 owner=firstmate              subject=ledger degraded
+  |     next_action='restore the unreadable sources and rerun the reconciler' overdue=True
+  | row missing_worker           owner=firstmate              subject=parked-job
+  |     next_action='recover the assigned worker without discarding work' overdue=False
+  | row red_check                owner=worker:parked-job      subject=https://github.com/test/project/pull/283
+  |     next_action='diagnose: code or test' overdue=True
+  | row silent_report            owner=firstmate              subject=repair-owner
+  |     next_action='check in: progress, blockers, cross-workstream dependencies' overdue=False
+$ $BIN/fm-wake-drain.sh
+  | OVERDUE:
+  | rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "c17ffd2d3c77eb8688c885d6","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+  |   "f1f383a7cd2c95321ef91fd6","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7403,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [-
+  | 1793221872	1	check	report	check: dependency followup
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 31471.1793221872.FWL9sF
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-live-driver/code-new/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  -> exit 0
+# fixture degradation row: escalate it truthfully so it does not mask the row under test
+$ $BIN/fm-open-loops.sh action c17ffd2d3c77eb8688c885d6 escalated --evidence lab fixture: worker liveness of a sleep pane is inconclusive
+  | action: "c17ffd2d3c77eb8688c885d6"
+  | kind: escalated
+  | standing: unchanged row; re-present after 14400 seconds
+  -> exit 0
+# repair-owner harness hook event: idle (exit 0)
+$ $BIN/fm-open-loops.sh action f1f383a7cd2c95321ef91fd6 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-28T22:11:17Z
+  | error: "prerequisite task is not live and working; follow up on its result or wait"
+  -> exit 1
+$ $BIN/fm-open-loops.sh action f1f383a7cd2c95321ef91fd6 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task no-such-task --recheck 2026-10-28T22:11:19Z
+  | error: "[Errno 2] No such file or directory: '/private/tmp/fm-lab.mp_85n0p/state/no-such-task.meta'"
+  -> exit 1
+$ $BIN/fm-open-loops.sh action f1f383a7cd2c95321ef91fd6 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task parked-job --recheck 2026-10-28T22:11:19Z
+  | error: "waiting requires a distinct assigned prerequisite task"
+  -> exit 1
+# repair-owner harness hook event: busy (exit 0)
+$ $BIN/fm-open-loops.sh action f1f383a7cd2c95321ef91fd6 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T03:11:20Z
+  | error: "waiting requires --recheck at a future UTC time within 24 hours"
+  -> exit 1
+$ $BIN/fm-wake-drain.sh --ack-through 1 --recovery-generation 31471.1793221872.FWL9sF
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "f1f383a7cd2c95321ef91fd6","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7410,"Behavior portable serial 17",false
+  -> exit 1
+>>> RESULT S5e refusals [new]: {'idle': 1, 'idle_msg': 'error: "prerequisite task is not live and working; follow up on its result or wait"', 'missing': 1, 'self_task': 1, 'recheck_30h': 1, 'ack_without_action': 1}
+
+HOMES /private/tmp/fm-lab.ddh_y33b /private/tmp/fm-lab.6n8u5blw /private/tmp/fm-lab._xwq6cst /private/tmp/fm-lab.gr8n6e4o /private/tmp/fm-lab.eig3n4sh /private/tmp/fm-lab.7tigxw5x /private/tmp/fm-lab._pd6b6tq /private/tmp/fm-lab.maf943o7 /private/tmp/fm-lab.mp_85n0p

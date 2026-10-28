@@ -1,0 +1,64 @@
+{
+ "S4 green PR next_action": {
+  "new": [
+   [
+    "open_pr",
+    "route the green PR's review; merge it under AGENTS.md section 7"
+   ]
+  ],
+  "old": [
+   [
+    "open_pr",
+    "route the green PR's review and obtain merge approval"
+   ]
+  ]
+ },
+ "S5 red PR wait": {
+  "new": {
+   "record_wait": 0,
+   "msg": "kind: waiting",
+   "ack": 0,
+   "ack_next_turn": 0,
+   "still_in_report": true,
+   "check_after_recheck_due": 1
+  },
+  "old": {
+   "record_wait": 1,
+   "msg": "error: \"this obligation cannot have a standing dependency wait\""
+  }
+ },
+ "S5a resurfaces on merge": {
+  "new": {
+   "before": 0,
+   "after": 1
+  }
+ },
+ "S5b resurfaces on failure": {
+  "new": {
+   "before": 0,
+   "after": 1
+  }
+ },
+ "S5c resurfaces on stall": {
+  "new": {
+   "before": 0,
+   "after": 1
+  }
+ },
+ "S5d resurfaces on replacement": {
+  "new": {
+   "before": 0,
+   "after": 1
+  }
+ },
+ "S5e refusals": {
+  "new": {
+   "idle": 1,
+   "idle_msg": "error: \"prerequisite task is not live and working; follow up on its result or wait\"",
+   "missing": 1,
+   "self_task": 1,
+   "recheck_30h": 1,
+   "ack_without_action": 1
+  }
+ }
+}

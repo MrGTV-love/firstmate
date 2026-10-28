@@ -1,0 +1,87 @@
+{
+ "S1 steer re-presented": {
+  "new": {
+   "first": 0,
+   "ack_without_action": 1,
+   "re_steer_same_record": 0,
+   "ack_after": 0
+  },
+  "old": {
+   "first": 0,
+   "ack_without_action": 1,
+   "re_steer_same_record": 1,
+   "ack_after": 1
+  }
+ },
+ "S1b steer guards": {
+  "new": {
+   "before_episode": 1,
+   "after_episode": 0,
+   "after_changed_evidence": 1,
+   "older_than_4h": 1
+  }
+ },
+ "S2 remote delivery id": {
+  "new": {
+   "undelivered": 1,
+   "foreign": 1,
+   "delivered": 0,
+   "symlink": 1,
+   "ack": 0
+  },
+  "old": {
+   "undelivered": 1,
+   "foreign": 1,
+   "delivered": 1,
+   "symlink": 1,
+   "ack": 1
+  }
+ },
+ "S3 visibility": {
+  "new": {
+   "first_defer": 0,
+   "repeat_while_standing": 1,
+   "repeat_msg": "error: \"a deferral already stands until 2026-10-28T21:13:48Z; one deferral per row, so follow up when it lapse",
+   "check_actions_while_standing": 0,
+   "printed_after_lapse": "true",
+   "second_defer": 1,
+   "stored_visible": true,
+   "check_actions": 1,
+   "after_escalation": 0
+  },
+  "old": {
+   "first_defer": 0,
+   "repeat_while_standing": 1,
+   "repeat_msg": "error: \"second deferral refused; row is captain-visible; steer, merge or escalate it\"",
+   "check_actions_while_standing": 1,
+   "printed_after_lapse": "true",
+   "second_defer": 1,
+   "stored_visible": true,
+   "check_actions": 1,
+   "after_escalation": 0
+  }
+ },
+ "S3c printed vs refusal": {
+  "new": {
+   "printed_captain_visible": "true",
+   "second_defer": 1,
+   "msg": "error: \"second deferral refused; row is captain-visible; steer, merge, wait on a named live task or escalate it\""
+  },
+  "old": {
+   "printed_captain_visible": "false",
+   "second_defer": 1,
+   "msg": "error: \"second deferral refused; row is captain-visible; steer, merge or escalate it\""
+  }
+ },
+ "S6 unhandled row": {
+  "new": {
+   "presented": true,
+   "ack": 1,
+   "check_actions": 1,
+   "in_report": true
+  }
+ },
+ "S6 old steer cannot clear it": {
+  "new": 1
+ }
+}
