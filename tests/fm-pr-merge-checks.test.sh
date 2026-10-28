@@ -1666,6 +1666,194 @@ test_github_review_required_refuses() {
   pass "fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED"
 }
 
+# Recorded 2026-10-28, PRs 287 and 188: both passed CI on a merge built on main
+# f41e945be7030bad8c65ff16e223256917d1a318, and 188 merged onto
+# b34192a213f406add8809a34224315cdc9073798, a main that already held 287, so the
+# combined tree was never checked and every later PR went red. The fixture keeps
+# that shape: the checks' workflow run was created before the base tip arrived.
+test_checks_that_ran_before_the_base_tip_arrived_refuse_naming_both_bases() {
+  local case_dir rc head old_base cur_base
+  head=6666666666666666666666666666666666666666
+  old_base=f41e945be7030bad8c65ff16e223256917d1a318
+  case_dir=$(make_case github-stale-base)
+  add_gh_mocks "$case_dir" "$head"
+  cur_base=$(cat "$case_dir/github-base")
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(workflow_check_run 'Lint 1' 2026-10-28T14:51:33Z)" \
+    "$(workflow_check_run 'Test coverage guard' 2026-10-28T14:51:33Z)" \
+    "$(workflow_check_run 'PR must be raised via no-mistakes' 2026-10-28T15:50:00Z)"
+  write_github_activity "$case_dir" \
+    "2026-10-28T15:49:29Z $cur_base" \
+    "2026-10-28T13:41:55Z $old_base"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "stale-base: checks that predate the base tip must refuse"
+  assert_grep "workflow run created at 2026-10-28T14:51:33Z tested the head merged with main at $old_base, but main is now at $cur_base (that tip arrived at 2026-10-28T15:49:29Z, after the run began): Lint 1, Test coverage guard" \
+    "$case_dir/stderr" \
+    "stale-base: the refusal did not name the base the checks used, the current base, and the checks"
+  assert_no_grep "PR must be raised via no-mistakes" "$case_dir/stderr" \
+    "stale-base: a check that ran after the base tip arrived was reported stale"
+  assert_grep 'Refresh them with a new head that includes the current main' "$case_dir/stderr" \
+    "stale-base: the refusal did not say how to refresh the checks"
+  assert_grep 'no waiver applies' "$case_dir/stderr" \
+    "stale-base: the refusal did not say that no waiver applies"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "stale-base: gh pr merge ran on checks that never saw the current base"
+  pass "fm-pr-merge refuses green checks that ran before the base tip arrived, naming both bases"
+}
+
+test_checks_that_ran_on_the_current_base_merge_with_no_extra_step() {
+  local case_dir head old_base cur_base
+  head=7777777777777777777777777777777777777777
+  old_base=f41e945be7030bad8c65ff16e223256917d1a318
+  case_dir=$(make_case github-fresh-base)
+  add_gh_mocks "$case_dir" "$head"
+  cur_base=$(cat "$case_dir/github-base")
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(workflow_check_run 'Lint 1' 2026-10-28T15:50:00Z)" \
+    "$(workflow_check_run 'Test coverage guard' 2026-10-28T15:50:00Z)"
+  write_github_activity "$case_dir" \
+    "2026-10-28T15:49:29Z $cur_base" \
+    "2026-10-28T13:41:55Z $old_base"
+
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "fresh-base: checks created after the base tip arrived must merge"$'\n'"$(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+  pass "fm-pr-merge merges checks that ran after the base tip arrived with no extra step"
+}
+
+# A re-run keeps the merge GitHub built for the original run (observed
+# 2026-10-28 on CI run 40719661158, whose second attempt checked out the same
+# merge into b34192a although main had moved three times), so the workflow
+# run's creation time is the judged time and a later startedAt proves nothing.
+# A tie is stale too: the history cannot order two events in one second.
+test_a_rerun_after_the_base_moved_does_not_refresh_the_checks() {
+  local case_dir rc head cur_base
+  head=8888888888888888888888888888888888888888
+  case_dir=$(make_case github-stale-rerun)
+  add_gh_mocks "$case_dir" "$head"
+  cur_base=$(cat "$case_dir/github-base")
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(workflow_check_run 'Lint 1' 2026-10-28T15:48:22Z 2026-10-28T17:17:05Z)" \
+    "$(workflow_check_run 'Lint 2' 2026-10-28T15:49:29Z)"
+  write_github_activity "$case_dir" "2026-10-28T15:49:29Z $cur_base"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "stale-rerun: a re-run and a tie with the base tip must refuse"
+  assert_grep "created at 2026-10-28T15:48:22Z tested the head merged with main at an older tip than the main pushes read (the oldest read arrived at 2026-10-28T15:49:29Z), but main is now at $cur_base (that tip arrived at 2026-10-28T15:49:29Z, after the run began): Lint 1" \
+    "$case_dir/stderr" \
+    "stale-rerun: the re-run was judged by its restart time, not its workflow run's creation"
+  assert_grep "created at 2026-10-28T15:49:29Z tested the head merged with main at an older tip than the main pushes read (the oldest read arrived at 2026-10-28T15:49:29Z), but main is now at $cur_base (that tip arrived at 2026-10-28T15:49:29Z, after the run began): Lint 2" \
+    "$case_dir/stderr" \
+    "stale-rerun: a run created in the second the tip arrived was not refused"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "stale-rerun: gh pr merge ran on checks that never saw the current base"
+  pass "fm-pr-merge judges a check by its workflow run's creation, so a re-run does not refresh it"
+}
+
+# Only the pull_request runs that GitHub builds on a merge are placed. Other
+# producers, other events, and runs that are not green leave the history unread.
+test_checks_with_nothing_to_place_never_read_the_push_history() {
+  local case_dir head
+  head=9999999999999999999999999999999999999999
+  case_dir=$(make_case github-no-placed-checks)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(check_run vercel COMPLETED SUCCESS 2026-10-28T14:51:33Z)" \
+    "$(status_context legacy SUCCESS)" \
+    "$(workflow_check_run 'push run' 2026-10-28T14:51:33Z 2026-10-28T14:51:33Z SUCCESS push)" \
+    "$(workflow_check_run skipped 2026-10-28T14:51:33Z 2026-10-28T14:51:33Z SKIPPED)"
+
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "no-placed-checks: checks with no pull_request merge to place must merge"$'\n'"$(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --squash
+  assert_no_grep 'activity' "$case_dir/gh.log" \
+    "no-placed-checks: the push history was read with nothing to place"
+  pass "fm-pr-merge reads the push history only when a green pull_request run needs placing"
+}
+
+# The placement is a refusal source like any other: a history that cannot be
+# read, one that has not reached the current tip, and one that has moved past it
+# all refuse, and none lets the merge run on a guess.
+test_a_push_history_that_cannot_place_the_tip_refuses() {
+  local case_dir rc head cur_base
+  head=1212121212121212121212121212121212121212
+  case_dir=$(make_case github-unplaced-tip)
+  add_gh_mocks "$case_dir" "$head"
+  cur_base=$(cat "$case_dir/github-base")
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(workflow_check_run 'Lint 1' 2026-10-28T15:50:00Z)"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "unplaced-tip: an unreadable push history must refuse"
+  assert_grep "push history of base branch main could not be read, so whether the green checks tested its current tip $cur_base cannot be told" \
+    "$case_dir/stderr" \
+    "unplaced-tip: the unreadable history was not reported"
+
+  write_github_activity "$case_dir" \
+    "2026-10-28T16:00:00Z 3333333333333333333333333333333333333333" \
+    "2026-10-28T15:49:29Z $cur_base"
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "unplaced-tip: a history that moved past the tip must refuse"
+  assert_grep 'ends at 3333333333333333333333333333333333333333, not at its current tip' \
+    "$case_dir/stderr" \
+    "unplaced-tip: the history ending elsewhere was not reported"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "unplaced-tip: gh pr merge ran on checks that could not be placed"
+  pass "fm-pr-merge refuses when the push history cannot place the current base tip"
+}
+
+# The existing waivers and override skip a verdict, not a tree: the checks
+# passed, so nothing is red to waive, and --attended-override keeps every read.
+test_no_waiver_or_override_skips_the_stale_base_refusal() {
+  local case_dir rc head old_base cur_base
+  head=1313131313131313131313131313131313131313
+  old_base=f41e945be7030bad8c65ff16e223256917d1a318
+  case_dir=$(make_case github-stale-no-waiver)
+  add_gh_mocks "$case_dir" "$head"
+  cur_base=$(cat "$case_dir/github-base")
+  write_github_rollup_json "$case_dir" "$head" \
+    "$(workflow_check_run 'Lint 1' 2026-10-28T14:51:33Z)"
+  write_github_activity "$case_dir" \
+    "2026-10-28T15:49:29Z $cur_base" \
+    "2026-10-28T13:41:55Z $old_base"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override --allow-red 'Lint 1' --allow-missing 'Lint 1' \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "stale-no-waiver: a waiver or override must not skip the stale-base refusal"
+  assert_grep "tested the head merged with main at $old_base, but main is now at $cur_base" \
+    "$case_dir/stderr" \
+    "stale-no-waiver: the refusal was skipped"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "stale-no-waiver: gh pr merge ran past the stale-base refusal"
+  pass "fm-pr-merge lets no waiver or attended override skip the stale-base refusal"
+}
+
 pr_merge_test_cases=(
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
 test_single_pr_task_with_a_local_only_head_is_still_refused
@@ -1717,5 +1905,11 @@ test_away_waiver_refusal_names_the_posture_and_the_attended_path
 test_held_task_refusal_prints_the_exact_release_command
 test_guard_events_record_the_merge_decisions_without_changing_them
 test_github_review_required_refuses
+test_checks_that_ran_before_the_base_tip_arrived_refuse_naming_both_bases
+test_checks_that_ran_on_the_current_base_merge_with_no_extra_step
+test_a_rerun_after_the_base_moved_does_not_refresh_the_checks
+test_checks_with_nothing_to_place_never_read_the_push_history
+test_a_push_history_that_cannot_place_the_tip_refuses
+test_no_waiver_or_override_skips_the_stale_base_refusal
 )
 pr_merge_run "$@"

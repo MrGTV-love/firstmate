@@ -33,6 +33,14 @@
 # Only the final attempt is reported: incomplete sources remain unreadable,
 # never evidence that a required check is missing, and exhausted UNKNOWN alone
 # reports mergeability still pending rather than unmergeable.
+# A green check also has to have tested the head merged with the base branch's
+# current tip: a GitHub Actions run on the pull_request event tests the merge
+# GitHub built when the run was created and keeps it across a re-run, so a tip
+# that arrived after the run began was never combined with the head by any
+# check. github_stale_base_check below owns how that is placed from the base
+# branch's push history, the refusal, and why no waiver applies. The head
+# binding below does not extend to the base, so a tip that arrives between that
+# last read and the forge command is a limit this script cannot close.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -839,7 +847,7 @@ github_read_check_rollup() {
   local head=$1 pages
   # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
   pages=$(gh api graphql --paginate \
-    -f query='query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt} ... on StatusContext{id context state}}}}}}}}' \
+    -f query='query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt checkSuite{workflowRun{createdAt event}}} ... on StatusContext{id context state}}}}}}}}' \
     -F "owner=$PR_OWNER" -F "repo=$PR_REPO" -F "head=$head" 2>/dev/null) || return 1
   printf '%s' "$pages" | jq -sce --arg head "$head" '
     if length == 0 or any(.[]; (.errors // [] | length) != 0
@@ -1044,6 +1052,107 @@ github_required_checks_missing() {
   ' 2>/dev/null || return 1
 }
 
+# Whether the green pull_request checks tested the head merged with the base
+# branch's current tip. A GitHub Actions run on the pull_request event tests the
+# merge of the head with the base as GitHub built it when that workflow run was
+# created, and a re-run or a reopen of the pull request keeps that same merge.
+# GitHub names that base in no API field, so it is placed from the base
+# branch's own push history: a run whose creation is not after the arrival of
+# the current tip cannot have included the tip, and the combined tree it did not
+# include was never checked. Only completed SUCCESS or NEUTRAL runs of that
+# event are judged, each check name by its newest run; a red, pending, skipped,
+# or other-producer check is judged by the rules above and below, and a check
+# name with no such run leaves nothing to place. No waiver applies, because
+# there is no verdict to waive: the checks passed, on a different tree.
+# A run created in the same second as the tip cannot be ordered against it, so it
+# is stale and its tested base is reported as the tip before that second.
+#
+# Sets FM_PR_STALE_LINES (refusal lines) and FM_PR_STALE_NAMES (stale check
+# names). Returns 0 when nothing is stale, 1 when a green check is stale, and 4
+# when the push history cannot place the current tip: unreadable, malformed, or
+# not ending at base_oid, which also covers the base moving mid-read and a
+# history that has not caught up, so the bounded retry owns both.
+FM_PR_STALE_LINES=
+FM_PR_STALE_NAMES=
+github_stale_base_check() {
+  local json=$1 base=$2 base_oid=$3 judged history verdict ref line kind a b c
+  local tip_ts='' oldest_ts='' lines='' names=''
+  FM_PR_STALE_LINES=
+  FM_PR_STALE_NAMES=
+  if ! judged=$(printf '%s' "$json" | jq -c '
+      def iso: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+               then . else error("undated workflow run") end;
+      if (.statusCheckRollup | type) != "array" then error("no check rollup") else . end
+      | [ .statusCheckRollup[]
+          | select(.__typename == "CheckRun" and .status == "COMPLETED"
+              and (.conclusion == "SUCCESS" or .conclusion == "NEUTRAL")
+              and .checkSuite.workflowRun.event == "pull_request")
+          | {name: (if (.name // "") == "" then "(unnamed check)" else .name end),
+             at: (.checkSuite.workflowRun.createdAt | iso)} ]
+      | group_by(.name) | map({name: .[0].name, at: (map(.at) | max)})' 2>/dev/null); then
+    FM_PR_STALE_LINES="  - the workflow runs behind the green checks could not be dated, so whether they tested the current $base cannot be told
+"
+    return 4
+  fi
+  [ "$judged" != '[]' ] || return 0
+
+  ref=$(github_urlencode_path_segment "refs/heads/$base")
+  if ! history=$(gh api "repos/$PR_OWNER/$PR_REPO/activity?ref=$ref&per_page=100" 2>/dev/null) \
+    || ! history=$(printf '%s' "$history" | jq -c '
+      if type != "array" then error("activity payload is unreadable") else . end
+      | [ .[]
+          | select(type == "object" and (.after | type) == "string" and (.after | test("^[0-9a-f]{40}$")))
+          | if (.timestamp | type) == "string"
+               and (.timestamp | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))
+            then {ts: .timestamp, sha: .after} else error("undated push") end ]
+      | sort_by(.ts) | reverse' 2>/dev/null); then
+    FM_PR_STALE_LINES="  - the push history of base branch $base could not be read, so whether the green checks tested its current tip $base_oid cannot be told
+"
+    return 4
+  fi
+  verdict=$(jq -rn --argjson judged "$judged" --argjson history "$history" --arg oid "$base_oid" '
+    ($history | first // null) as $newest
+    | if $newest == null or $newest.sha != $oid then
+        "unreadable\t" + ($newest.sha // "none")
+      else
+        "tip\t" + $newest.ts,
+        "oldest\t" + ($history | last | .ts),
+        ( $judged | map(select(.at <= $newest.ts)) | group_by(.at)[]
+          | .[0].at as $at
+          | "group\t" + $at + "\t"
+            + (($history | map(select(.ts < $at)) | first // {sha: "-"}) | .sha)
+            + "\t" + (map(.name) | sort | join(", ")) )
+      end' 2>/dev/null) || verdict=
+  if [ -z "$verdict" ]; then
+    FM_PR_STALE_LINES="  - the push history of base branch $base could not be read, so whether the green checks tested its current tip $base_oid cannot be told
+"
+    return 4
+  fi
+  while IFS=$'\t' read -r kind a b c; do
+    case "$kind" in
+      unreadable)
+        FM_PR_STALE_LINES="  - the push history of base branch $base ends at ${a}, not at its current tip $base_oid, so whether the green checks tested that tip cannot be told yet
+"
+        return 4
+        ;;
+      tip) tip_ts=$a ;;
+      oldest) oldest_ts=$a ;;
+      group)
+        [ "$b" != - ] || b="an older tip than the $base pushes read (the oldest read arrived at $oldest_ts)"
+        lines="$lines  - pull_request checks from the workflow run created at $a tested the head merged with $base at $b, but $base is now at $base_oid (that tip arrived at $tip_ts, after the run began): $c
+"
+        names="${names:+$names, }$c"
+        ;;
+    esac
+  done <<VERDICT
+$verdict
+VERDICT
+  [ -n "$names" ] || return 0
+  FM_PR_STALE_LINES=$lines
+  FM_PR_STALE_NAMES=$names
+  return 1
+}
+
 # Pre-merge conditions from a live PR view, complete head rollup, base
 # requirements, and head producers. Sets FM_PR_MERGE_HEAD on success. Returns 3
 # for UNKNOWN alone, or 4 for an unreadable source or missing-check visibility
@@ -1055,6 +1164,7 @@ github_verify_mergeable() {
   local state='' draft='' review_decision='' mergeable='' merge_state='' live_head='' base=''
   local kind action req_text required_known=true
   local any_pending=false any_failed=false
+  local base_oid stale_status=0 stale_names=''
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
@@ -1227,6 +1337,22 @@ $missing
 EOF
   fi
 
+  # Every green pull_request check must have run on the head merged with the
+  # base branch's current tip; github_stale_base_check owns how that is placed.
+  base_oid=$(printf '%s' "$json" | jq -r '.baseRefOid // ""' 2>/dev/null) || base_oid=
+  github_stale_base_check "$json" "$base" "$base_oid" || stale_status=$?
+  case "$stale_status" in
+    0) ;;
+    1)
+      refusals="$refusals$FM_PR_STALE_LINES"
+      stale_names=$FM_PR_STALE_NAMES
+      ;;
+    *)
+      source_unreadable=true
+      refusals="$refusals$FM_PR_STALE_LINES"
+      ;;
+  esac
+
   if [ -n "$mergeable_refusal" ]; then
     if [ -z "$refusals" ] && [ "$mergeable" = UNKNOWN ]; then
       return 3
@@ -1238,13 +1364,19 @@ EOF
     # One event per green-check decision: a denial needs a definite check it
     # read, while a refusal whose source could not be read carries no verdict
     # to report.
-    if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
+    if [ -n "$uncovered" ] || [ -n "$unreported" ] || [ -n "$stale_names" ]; then
       FM_PR_GREEN_HEAD_BLOCKED=true
     fi
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
+    if [ -n "$stale_names" ]; then
+      printf 'error: these checks passed on a merge built before the current tip of base branch %s arrived, so the head merged with that tip was never checked: %s\n' \
+        "$base" "$stale_names" >&2
+      printf 'Refresh them with a new head that includes the current %s (rebase onto it or merge it into the branch, then push): that starts a new pull_request run on a merge GitHub builds against the current %s. Re-running the jobs or reopening the pull request does not rebuild that merge, and no waiver applies. When the new run passes, re-run this merge: %s %s %s\n' \
+        "$base" "$base" "$0" "$ID" "$URL" >&2
+    fi
     if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
       if [ "$any_pending" = true ]; then
         printf 'Wait for the pending or unreported check to report, then re-run this merge: %s %s %s\n' \

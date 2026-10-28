@@ -145,6 +145,31 @@ check_run() {
     "$name" "$status" "$conclusion_json" "$started_json" "$completed_json"
 }
 
+# One CheckRun rollup entry from a GitHub Actions run on the pull_request event,
+# the way GitHub reports it: the entry carries the creation time of the workflow
+# run, which a re-run keeps while its own startedAt moves on. Args: name
+# run_created_at [started_at] [conclusion] [event]
+workflow_check_run() {
+  local name=$1 created=$2 started=${3:-$2} conclusion=${4:-SUCCESS} event=${5:-pull_request}
+  printf '{"__typename":"CheckRun","name":"%s","status":"COMPLETED","conclusion":"%s","startedAt":"%s","completedAt":"%s","checkSuite":{"workflowRun":{"createdAt":"%s","event":"%s"}}}' \
+    "$name" "$conclusion" "$started" "$started" "$created" "$event"
+}
+
+# The base branch's push history as GitHub's activity API lists it, newest
+# first. Each argument is "<timestamp> <sha>": the tip the push left behind.
+# Args: case_dir [timestamp sha]...
+write_github_activity() {
+  local case_dir=$1 entry='' ts sha before=0000000000000000000000000000000000000000
+  shift
+  while [ "$#" -gt 0 ]; do
+    ts=${1%% *}
+    sha=${1#* }
+    entry="${entry:+$entry,}{\"timestamp\":\"$ts\",\"activity_type\":\"pr_merge\",\"ref\":\"refs/heads/main\",\"before\":\"$before\",\"after\":\"$sha\"}"
+    shift
+  done
+  printf '[%s]\n' "$entry" > "$case_dir/github-activity.json"
+}
+
 status_context() {
   local name=$1 state=$2
   printf '{"__typename":"StatusContext","context":"%s","state":"%s"}' "$name" "$state"
@@ -291,6 +316,11 @@ case "${1:-} ${2:-}" in
     # The required-check reads: the branch itself, and its rules read without
     # the merge-queue filter the queue reader below applies.
     case " $* " in
+      *" repos/"*"/activity?"*)
+        [ -f "${FM_TEST_GH_ACTIVITY:-}" ] || exit 1
+        cat "$FM_TEST_GH_ACTIVITY"
+        exit 0
+        ;;
       *" repos/"*"/commits/"*"/check-runs"*)
         case "$*" in
           *"/commits/$(cat "$FM_TEST_GH_HEAD")/check-runs"*) ;;
@@ -758,6 +788,7 @@ run_pr_merge() {
   FM_TEST_GH_HEAD="$case_dir/github-head" \
   FM_TEST_GH_RUNS="$case_dir/github-runs.json" \
   FM_TEST_GH_RUNS_FIRST="$case_dir/github-runs-first.json" \
+  FM_TEST_GH_ACTIVITY="$case_dir/github-activity.json" \
   FM_TEST_GH_RUNS_CALLS="$case_dir/github-runs-calls" \
   FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \

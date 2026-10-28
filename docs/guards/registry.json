@@ -414,11 +414,11 @@
       "sites": [
         {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny"}
       ],
-      "invariant": "a PR is never merged while a required check is red or has not reported at that head",
+      "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while a green pull_request check ran on a merge built before the base branch's current tip arrived",
       "layer": "runtime-block",
       "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
-      "trigger": "any unwaived required check at the current head is not green",
-      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports",
+      "trigger": "any unwaived required check at the current head is not green, or a green pull_request workflow run was created at or before the arrival of the base branch's current tip",
+      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a green check that ran on an older base clears only by a new head that includes the current base, and no waiver applies",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
