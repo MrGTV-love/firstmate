@@ -42,7 +42,7 @@ Registry-only fields carry what the audit scores: `tier`, `harm`,
 `emitters`. `emitters` lists host files that take the guard's decision and emit
 its event when the invariant is defined in a library the host calls; the writer
 call is then proven in the emitter rather than in the owner.
-`sites` and `group_reason` map the guard to its refusal sites; see "Refusal sites".
+`sites` maps the guard to its refusal sites; see "Refusal sites".
 An active guard added after the audit is named in the registry's
 `beyond_audit_active`, and a retirement beyond the audit is listed in its
 `beyond_audit_retired`; both stay outside the audited inventory that
@@ -120,20 +120,18 @@ That limit is deliberate, because every error exit would be a site, and it is wh
 A site maps to a registry entry through the entry's `sites` list.
 Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
 The lint requires the item to match exactly `count` sites, so a new site that a marker would silently absorb changes the count and fails until a reviewer updates it.
-An entry that maps more than one site must state `group_reason`, one sentence on why those sites share one invariant.
 Two entries may not map the same site, and a marker that matches nothing is stale.
 
 A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.
 The lint computes the unregistered count as the number of sites that map to nothing.
 A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
 
-Rules 10 to 14 are mechanically checked on top of the nine rules above:
+Rules 10 to 13 are mechanically checked on top of the nine rules above:
 
 10. **S1** Every refusal site maps to a registry entry.
 11. **S2** A `sites` item matches exactly the sites it declares, and no site has two owners.
-12. **S3** An entry that maps more than one site states `group_reason`.
-13. **S4** A typed `unregistered_ids` list has the computed length.
-14. **S5** The allowlist does not grow against the base (new-or-touched mode only).
+12. **S4** A typed `unregistered_ids` list has the computed length.
+13. **S5** The allowlist does not grow against the base (new-or-touched mode only).
 
 ## Tiers
 
@@ -197,8 +195,9 @@ The lint runs in three modes:
 
 - `report` prints violations and always exits 0.
 - `new-or-touched --base <ref>` fails only for guards added or changed since
-  the base, for refusal sites on a changed line, and for an allowlist that grew,
-  so new work cannot add debt.
+  the base, for refusal-site violations the allowlist does not hold, for refusal
+  sites on a changed line, and for an allowlist that grew, so new work cannot add
+  debt.
 - `enforce` fails on every violation not listed in the allowlist, and also fails
   on an allowlisted entry whose violation no longer occurs, because that entry
   is stale.

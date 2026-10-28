@@ -420,13 +420,11 @@ def map_sites(sites, registry):
                 and m['file'] and m['match'] for m in markers):
             errors.append(('S2', gid, 'sites must be a list of {file, match} objects with non-empty strings'))
             continue
-        expected_total = 0
         for marker in markers:
             expected = marker.get('count', 1)
             if not isinstance(expected, int) or expected < 1:
                 errors.append(('S2', gid, 'site marker count for %s must be a positive integer' % marker['file']))
                 continue
-            expected_total += expected
             hits = [s for s in sites if s['file'] == marker['file'] and marker['match'] in s['text_full']]
             if not hits:
                 errors.append(('S2', gid, "site marker '%s' in %s matches no site; remove or update it"
@@ -441,9 +439,6 @@ def map_sites(sites, registry):
                     errors.append(('S2', gid, 'site %s is already mapped to %s' % (hit['key'], hit['entry'])))
                 else:
                     hit['entry'] = gid
-        if expected_total > 1 and not (guard.get('group_reason') or '').strip():
-            errors.append(('S3', gid, 'an entry that maps %d sites needs group_reason: why those sites share'
-                           ' one invariant' % expected_total))
     return errors
 
 

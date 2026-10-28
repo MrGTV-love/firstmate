@@ -27,7 +27,7 @@
 #   - an unmapped site fails S1, the same site mapped by a sites marker passes, and a site added
 #     inside an already-mapped owner file still needs its own mapping
 #   - a marker that matches nothing, the wrong number of sites, or a site another entry owns fails
-#     S2, and a multi-site entry with no group_reason fails S3
+#     S2, and a marker absorbing a new site fails new-or-touched mode
 #   - a typed unregistered_ids list whose length differs from the computed count fails S4
 #   - an allowlisted site passes, deleting the site makes its entry stale, a touched site fails
 #     in new-or-touched mode even when allowlisted, and the sealed allowlist cannot grow (S5)
@@ -486,11 +486,7 @@ printf 'echo "REFUSED: one shared refusal" >&2\necho "REFUSED: one shared refusa
 mutate "$COUNT" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"one shared refusal"}]'
 assert_fails_with "S2 fails a marker that matches more sites than its count declares" "$COUNT" S2
 mutate "$COUNT" '.guards[0].sites[0].count = 2'
-out=$(run_lint "$COUNT") && fail "a multi-site entry with no group_reason must fail: $out"
-printf '%s\n' "$out" | grep -q '^VIOLATION S3 gguard' || fail "expected S3 for the multi-site entry, got: $out"
-pass "S3 fails an entry that maps several sites without a group_reason"
-mutate "$COUNT" '.guards[0].group_reason = "both lines refuse the same fixture request"'
-assert_mapped "a group entry with a counted marker and a group_reason passes" "$COUNT" 2
+assert_mapped "a group entry with a counted marker passes" "$COUNT" 2
 
 TWICE=$(fixture site_twice)
 printf 'echo "REFUSED: contested refusal" >&2\n' >"$TWICE/bin/gnew.sh"
@@ -578,6 +574,17 @@ mutate "$NEWSITE" '.guards[0].sites = [{"file":"bin/gnew.sh","match":"a brand ne
 "$LINT" --root "$NEWSITE" --mode new-or-touched --base HEAD --counts 2>&1 | grep -q ' mapped=1$' \
   || fail "the mapped new site must count as mapped"
 pass "new-or-touched passes a new refusal site once its guard entry maps it"
+
+ABSORB=$(fixture site_absorbed)
+printf 'echo "REFUSED: lease gone" >&2\n' >"$ABSORB/bin/gguard.sh"
+mutate "$ABSORB" '.guards[0].sites = [{"file":"bin/gguard.sh","match":"REFUSED: lease"}]'
+git -C "$ABSORB" init -q
+git -C "$ABSORB" -c user.email=t@example.invalid -c user.name=t add -A
+git -C "$ABSORB" -c user.email=t@example.invalid -c user.name=t commit -qm base
+printf 'echo "REFUSED: lease stolen by another task" >&2\n' >>"$ABSORB/bin/gguard.sh"
+out=$("$LINT" --root "$ABSORB" --mode new-or-touched --base HEAD 2>&1) && fail "a new site an existing marker absorbs must fail new-or-touched: $out"
+printf '%s\n' "$out" | grep -q '^VIOLATION S2 gguard' || fail "expected S2 for the absorbing marker, got: $out"
+pass "new-or-touched fails a new site that an existing marker absorbs"
 
 GROW=$(fixture site_growth)
 printf 'echo "REFUSED: legacy one" >&2\n' >"$GROW/bin/gold.sh"

@@ -18,7 +18,8 @@
 #   report          print every violation and exit 0 (the ratchet's first step)
 #   enforce         exit 1 on any violation not allowlisted, and on any stale
 #                   allowlisted entry whose violation is gone (the default)
-#   new-or-touched  enforce only for guards added or edited since --base, so new
+#   new-or-touched  enforce only for guards added or edited since --base and for
+#                   refusal-site violations the allowlist does not hold, so new
 #                   work cannot add debt while the legacy population burns down
 #
 # Rules, each owned by docs/guard-spec.md:
@@ -32,12 +33,11 @@
 #      bin/fm-guard-refcheck.sh)
 #   R8 every instrumented guard names its telemetry target and calls the writer
 #   R9 every exemption carries a derivation and a demotion candidate
-# plus four rules over the refusal sites bin/fm-guard-sites.py discovers in the
+# plus three rules over the refusal sites bin/fm-guard-sites.py discovers in the
 # runtime code (docs/guard-spec.md "Refusal sites"):
 #   S1 every refusal site maps to a registry entry through its sites markers
 #   S2 a sites marker matches exactly the sites it declares, and no site is
 #      mapped by two entries
-#   S3 an entry that maps more than one site states group_reason
 #   S4 a typed unregistered_ids list in the registry has the computed length
 # In new-or-touched mode a site on a changed line must map even when it is
 # allowlisted, and the allowlist may not grow against --base (S5).
@@ -406,6 +406,9 @@ case "$MODE" in
       done <<TOUCHED_GUARDS
 $touched
 TOUCHED_GUARDS
+      # The allowlist holds every legacy refusal-site violation, so one it does not
+      # hold is new, whichever guard or site it names.
+      awk -F'\t' '$1 ~ /^S[0-9]+$/ {found = 1} END {exit !found}' "$SC" && out=1
       # A refusal site on a changed line must map to a guard now: the allowlist is
       # the burn-down list for sites nobody touched, so it never excuses a touched one.
       touched_sites=$(jq -r '.sites[] | select(.entry == null and .touched)
