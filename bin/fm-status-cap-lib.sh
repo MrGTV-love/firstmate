@@ -49,7 +49,10 @@
 # URLs cost them nothing; a line the pass keeps without being an event is still walked.
 # The watcher reads a log's event history no further than one tail window
 # (_fm_status_event_scan_start), because it reads it for every window on every poll, and
-# its event scans call the cap tick on every line they walk.
+# its event scans call the cap tick on every line they walk. The one exception is the
+# declared-wait identity walk: an episode still open at the window's start is walked back
+# to its first line, up to the read limit from the log's end, and the watcher caches the
+# answer so a later poll classifies only the bytes appended since.
 # The cap and the reserve can be overridden by the environment (FM_STATUS_CAP_BYTES,
 # FM_STATUS_CAP_RESERVE_BYTES) for a test or a deliberate site choice, and a value
 # that is not a positive integer falls back to the default. The window and the line

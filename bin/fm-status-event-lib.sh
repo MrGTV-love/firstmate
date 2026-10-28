@@ -421,11 +421,27 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # it, so the walk continues back through the log a tail window at a time to the real
 # first line (_fm_status_wait_episode_before), never further than a whole-log read
 # would: the identity is the same in both modes and does not move as the window does.
+# The watcher keeps a keyed wait's identity in a cache beside the log
+# (_fm_status_wait_identity_cached), so a later poll classifies only the bytes appended
+# since it and does not walk the episode again.
 status_declared_wait_identity() {  # <status-file>
   local f=$1 declared verb key resolve legacy_re rec idx text endpoint snapshot start numbered taken
+  local cache='' fid='' ended='' sum
   [ -f "$f" ] && [ -r "$f" ] || return 1
+  if [ "${FM_STATUS_EVENT_SCAN_TAIL:-0}" = 1 ]; then
+    _fm_open_decisions_cursor_path "$f" cache
+    cache="${cache%.open-decisions-cursor}.wait-identity"
+    _FM_STATUS_STAT_BATCH='' _fm_open_decisions_file_ident "$f" fid 2>/dev/null || fid=
+  fi
   endpoint=$(_fm_status_file_size "$f") || return 1
   endpoint=${endpoint//[[:space:]]/}
+  if [ -n "$cache" ]; then
+    if [ -n "$fid" ] && rec=$(_fm_status_wait_identity_cached "$f" "$cache" "$fid" "$endpoint"); then
+      printf '%s' "$rec"
+      return 0
+    fi
+    [ ! -e "$cache" ] || rm -f "$cache"
+  fi
   _fm_status_event_scan_start "$endpoint" start
   snapshot="$(_fm_status_span_scratch "$f").wait"
   if [ "$start" -eq 0 ]; then
@@ -436,6 +452,7 @@ status_declared_wait_identity() {  # <status-file>
   fi
   _fm_status_file_size "$snapshot" taken || { rm -f "$snapshot"; return 1; }
   taken=${taken//[[:space:]]/}
+  [ -n "$(tail -c 1 "$snapshot")" ] || ended=1
   declared=$(status_declared_wait_line "$snapshot")
   [ -n "$declared" ] || { rm -f "$snapshot"; return 1; }
   status_line_verb "$declared" verb
@@ -455,7 +472,89 @@ status_declared_wait_identity() {  # <status-file>
   rec=${rec#*$'\t'}
   idx=${rec%%$'\t'*}
   text=${rec#*$'\t'}
-  printf '%s:%s:%s' "${key:--}" "$(printf '%s' "$text" | cksum | cut -d' ' -f1)" "$idx"
+  sum=$(printf '%s' "$text" | cksum | cut -d' ' -f1)
+  if [ -n "$fid" ] && [ -n "$key" ] && [ -n "$ended" ]; then
+    _fm_status_wait_identity_store "$cache" "$fid" "$endpoint" "$idx" "$(printf '%s' "$text" | wc -c | tr -d ' ')" "$sum" "$verb" "$key"
+  fi
+  printf '%s:%s:%s' "${key:--}" "$sum" "$idx"
+}
+
+# The identity of a keyed declared wait that the watcher's <cache> still proves for
+# <status-file>, whose identity is <file-identity> and size <endpoint>, printed; or
+# status 1, and the caller takes the exact walk. The cache is one line: the log's
+# identity, the endpoint it was taken at (which ended a line), the episode's first line
+# (its byte offset, byte length and checksum), the wait's verb and key, and a checksum
+# of those fields. It proves the identity only when the log is the same file and has
+# not shrunk, the fields match their checksum, the declared wait is still that verb and
+# key, the first line is still those bytes on a line of its own, it opened after the
+# read limit back from the log's end (the bound the exact walk keeps), and every event
+# appended since the endpoint keeps the episode open. Only the appended bytes are
+# classified, and the cache moves to the new endpoint when they end a line.
+_fm_status_wait_identity_cached() {  # <status-file> <cache> <file-identity> <endpoint>
+  local f=$1 cache=$2 size=$4 fid end opener len sum verb key check extra limit declared got from scratch numbered
+  _fm_status_sidecar_fits "$cache" || return 1
+  IFS=$'\t' read -r fid end opener len sum verb key check extra < "$cache" 2>/dev/null || return 1
+  [ -z "$extra" ] && [ -n "$key" ] && [ "$fid" = "$3" ] || return 1
+  case "$end:$opener:$len:$sum:$check" in *[!0-9:]*|*::*|:*|*:) return 1 ;; esac
+  [ "$check" = "$(printf '%s\t' "$fid" "$end" "$opener" "$len" "$sum" "$verb" "$key" | cksum | cut -d' ' -f1)" ] || return 1
+  [ "$size" -ge "$end" ] && [ $((opener + len)) -lt "$end" ] || return 1
+  fm_status_read_limit_bytes limit
+  [ "$size" -le "$limit" ] || [ "$opener" -gt $((size - limit)) ] || return 1
+  declared=$(status_declared_wait_line "$f")
+  [ -n "$declared" ] || return 1
+  status_line_verb "$declared" got
+  [ "$got" = "$verb" ] || return 1
+  got=$(_fm_decision_key "$declared" '') || got=
+  [ "$got" = "$key" ] || return 1
+  from=$opener
+  [ "$opener" -eq 0 ] || from=$((opener - 1))
+  scratch="$(_fm_status_span_scratch "$f").cached"
+  _fm_status_read_span "$f" "$from" $((opener + len + 1 - from)) 0 > "$scratch" 2>/dev/null || { rm -f "$scratch"; return 1; }
+  if [ -n "$(tail -c 1 "$scratch")" ] || { [ "$opener" -gt 0 ] && [ -n "$(head -c 1 "$scratch")" ]; } \
+    || [ "$(tail -c +$((opener - from + 1)) "$scratch" | head -c "$len" | cksum | cut -d' ' -f1)" != "$sum" ]; then
+    rm -f "$scratch"
+    return 1
+  fi
+  if [ "$size" -gt "$end" ]; then
+    _fm_status_read_span "$f" "$end" $((size - end)) 0 > "$scratch" 2>/dev/null || { rm -f "$scratch"; return 1; }
+    numbered=$(_fm_status_episode_candidates "$key" "$end" < "$scratch") || { rm -f "$scratch"; return 1; }
+    printf '%s\n' "$numbered" | _fm_status_wait_episode_continues "${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}" \
+      "^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})" "$verb" "$key" || { rm -f "$scratch"; return 1; }
+    [ -n "$(tail -c 1 "$scratch")" ] || _fm_status_wait_identity_store "$cache" "$fid" "$size" "$opener" "$len" "$sum" "$verb" "$key"
+  fi
+  rm -f "$scratch"
+  printf '%s:%s:%s' "$key" "$sum" "$opener"
+}
+
+# Replace the watcher's wait-identity <cache> with one line of these fields and their
+# checksum (_fm_status_wait_identity_cached). A cache that cannot be written is left
+# absent, and the next poll takes the exact walk.
+_fm_status_wait_identity_store() {  # <cache> <file-identity> <endpoint> <opener> <length> <sum> <verb> <key>
+  local row tmp="$1.tmp.$$"
+  row=$(printf '%s\t' "$2" "$3" "$4" "$5" "$6" "$7" "$8")
+  if ! { printf '%s%s\n' "$row" "$(printf '%s' "$row" | cksum | cut -d' ' -f1)" > "$tmp" && mv -f "$tmp" "$1"; } 2>/dev/null; then
+    rm -f "$tmp" "$1"
+  fi
+}
+
+# 0 when every event among the numbered status lines on stdin (`<byte offset>\t<line>`)
+# keeps an open episode of <verb> and <key> open, as _fm_status_wait_episode_scan walks
+# one: a restatement of that wait, or a resolved line for another key.
+_fm_status_wait_episode_continues() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
+  local line verb key
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "${FM_STATUS_SPAN_TICK:-}" ] || "$FM_STATUS_SPAN_TICK"
+    line=${line#*$'\t'}
+    case "$line" in *[![:space:]]*) ;; *) continue ;; esac
+    _fm_status_line_is_event "$line" "$2" || continue
+    status_line_verb "$line" verb
+    _fm_decision_key_into "$line" '' key || key=
+    if [ "$verb" = "$1" ]; then
+      [ "$key" != "$4" ] || return 1
+      continue
+    fi
+    [ "$verb" = "$3" ] && [ "$key" = "$4" ] || return 1
+  done
 }
 
 # Walk the numbered status lines on stdin (`<byte offset>\t<line>`) back from the newest

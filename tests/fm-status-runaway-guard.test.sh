@@ -1396,8 +1396,98 @@ test_a_wait_episode_opened_before_the_tail_window_keeps_its_identity() {
   pass "a wait episode that opens before the tail window keeps its first record as its identity as the window slides; a re-declaration and a replacement get new ones"
 }
 
+# Distinct restatements of one open wait that span more than two tail windows: the
+# watcher's walk back through the log crosses window boundaries and still names the
+# episode's first record, the whole-log identity. The watcher keeps that identity in its
+# cache, so after more restatements slide the window its next poll classifies only the
+# bytes appended since and walks a few hundred lines, not the episode again.
+test_a_distinct_wait_episode_across_windows_is_walked_once() {
+  local dir status ticks prefix first expect id walked
+  dir=$(make_case identity-episode-distinct); status="$dir/state/d.status"; ticks="$dir/ticks"
+  prefix='working: before the wait'
+  first=$(perl -e 'my $l = "paused [key=ext] [at=0]: waiting"; print $l, " " x (1023 - length $l)')
+  perl -e 'my ($pre, $from, $n) = @ARGV; print "$pre\n" if length $pre; for my $i ($from .. $from + $n - 1) { my $l = "paused [key=ext] [at=$i]: waiting"; print $l, " " x (1023 - length $l), "\n" }' \
+    "$prefix" 0 9216 > "$status"
+  [ "$(file_size "$status")" -eq $((${#prefix} + 1 + 9216 * 1024)) ] || fail "the distinct episode fixture is not 9216 records of 1024 bytes after one line"
+  expect="ext:$(printf '%s' "$first" | cksum | cut -d' ' -f1):$((${#prefix} + 1))"
+  id=$(wait_identity_ticks "$status" "$ticks") || fail "the watcher read gave the distinct episode no identity"
+  [ "$id" = "$expect" ] || fail "the watcher walk across windows did not name the episode's first record: $id vs $expect"
+  [ "$(wait_identity_in 0 "$status")" = "$expect" ] || fail "the whole-log identity is not the episode's first record: $(wait_identity_in 0 "$status") vs $expect"
+  walked=$(file_size "$ticks")
+  [ "$walked" -ge 9216 ] || fail "the first watcher read walked $walked lines, fewer than the episode's 9216"
+  perl -e 'my ($pre, $from, $n) = @ARGV; for my $i ($from .. $from + $n - 1) { my $l = "paused [key=ext] [at=$i]: waiting"; print $l, " " x (1023 - length $l), "\n" }' \
+    '' 9216 64 >> "$status"
+  id=$(wait_identity_ticks "$status" "$ticks") || fail "the watcher read lost the identity after the window slid"
+  [ "$id" = "$expect" ] || fail "restatements that slid the window moved the watcher's identity: $id vs $expect"
+  [ "$(wait_identity_in 0 "$status")" = "$expect" ] || fail "restatements moved the whole-log identity"
+  walked=$(file_size "$ticks")
+  [ "$walked" -lt 1000 ] || fail "the next watcher read walked $walked lines for 64 appended records; it walked the episode again"
+  pass "distinct restatements across more than two tail windows keep the episode's first record as the identity, and the next poll walks only the appended lines"
+}
+
+# The watcher's wait-identity cache never outlives the bytes it proved: a log truncated
+# and rewritten in place, a log replaced by another file, and a corrupt or altered cache
+# each fall back to the exact walk, which gives the whole-log identity. Each fixture keeps
+# the cached first line's bytes where the cache points, so a cache that skipped the check
+# would name the wrong line.
+test_a_stale_or_corrupt_wait_identity_cache_falls_back_to_the_exact_walk() {
+  local dir status cache id
+  dir=$(make_case identity-cache-stale); status="$dir/state/c.status"; cache="$dir/state/.c.wait-identity"
+  printf 'working: xxxxxxxxx\npaused [key=k]: a1\npaused [key=k]: a2\n' > "$status"
+  id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the wait no identity"
+  [ "${id##*:}" = 19 ] || fail "the wait's identity is not its first line at byte 19: $id"
+  [ -s "$cache" ] || fail "the watcher kept no wait-identity cache"
+  printf 'paused [key=k]: ab\npaused [key=k]: a1\n' > "$status"
+  id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the truncated log no identity"
+  [ "${id##*:}" = 0 ] && [ "$id" = "$(wait_identity_in 0 "$status")" ] || fail "a truncated log kept the cached identity: $id"
+  printf 'working: xxxxxxxxx\npaused [key=k]: a1\n' > "$status"
+  id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the rewritten log no identity"
+  [ "${id##*:}" = 19 ] || fail "a log rewritten in place kept the cached first line: $id"
+  printf 'paused [key=k]: ab\npaused [key=k]: a1\npaused [key=k]: a2\n' > "$status.new"
+  mv -f "$status.new" "$status"
+  id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the replaced log no identity"
+  [ "${id##*:}" = 0 ] && [ "$id" = "$(wait_identity_in 0 "$status")" ] || fail "a replaced log kept the cached identity: $id"
+  printf 'garbage\n' > "$cache"
+  [ "$(wait_identity_in 1 "$status")" = "$id" ] || fail "a corrupt cache changed the identity: $(wait_identity_in 1 "$status") vs $id"
+  printf 'paused [key=k]: a1\npaused [key=k]: a1\n' > "$status.new"
+  mv -f "$status.new" "$status"
+  id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the repeated wait no identity"
+  [ "${id##*:}" = 0 ] || fail "the repeated wait's identity is not its first line: $id"
+  awk -F '\t' -v OFS='\t' '{ $3 = 19; print }' "$cache" > "$cache.new" && mv -f "$cache.new" "$cache"
+  [ "$(wait_identity_in 1 "$status")" = "$id" ] || fail "an altered cache moved the identity to a later restatement: $(wait_identity_in 1 "$status") vs $id"
+  pass "a truncated, rewritten or replaced log and a corrupt or altered cache fall back to the exact walk's identity"
+}
+
+# An episode that opened further back than the read limit from the log's end has no
+# identity in the watcher, with or without a cache from an earlier, larger limit, and
+# declared_wait_scope falls back to the log's signature as for any refused read.
+test_a_wait_episode_older_than_the_read_limit_has_no_identity() {
+  local dir state status record out
+  dir=$(make_case identity-episode-floor); state="$dir/state"; status="$state/g.status"
+  record=$(perl -e 'my $l = "paused [key=ext]: waiting"; print $l, " " x (1023 - length $l)')
+  { printf 'working: before the wait\n'; perl -e 'print "$ARGV[0]\n" x 6144' "$record"; } > "$status"
+  [ "$(wait_identity_in 1 "$status")" = "$(wait_identity_in 0 "$status")" ] || fail "under the default limit the watcher and whole-log identities differ"
+  case "$(wait_identity_in 1 "$status")" in "ext:"*":25") ;; *) fail "under the default limit the identity is not the first record at byte 25" ;; esac
+  out=$(FM_STATE_OVERRIDE="$state" FM_ROOT_OVERRIDE="$ROOT" FM_STATUS_CAP_BYTES=4194304 FM_STATUS_CAP_RESERVE_BYTES=1 bash -c '
+      # shellcheck source=/dev/null
+      . "$1/bin/fm-watch.sh"
+      if status_declared_wait_identity "$2" > /dev/null; then printf "identity\n"; else printf "none\n"; fi
+      printf "%s\n%s\n" "$(declared_wait_scope "$2")" "declared:$(fm_wake_signal_sig "$2")"
+    ' _ "$ROOT" "$status" 2>&1) || fail "the watcher could not be loaded: $out"
+  [ "$(printf '%s\n' "$out" | sed -n 1p)" = none ] || fail "an episode older than the read limit got an identity: $out"
+  [ "$(printf '%s\n' "$out" | sed -n 2p)" = "$(printf '%s\n' "$out" | sed -n 3p)" ] || fail "declared_wait_scope did not fall back to the log's signature: $out"
+  pass "an episode older than the read limit has no watcher identity, even with a cache, and the scope falls back to the signature"
+}
+
 wait_identity_in() {  # <tail-mode 0|1> <status-file>
   FM_STATUS_EVENT_SCAN_TAIL=$1 bash -c '. "$1/fm-classify-lib.sh"; status_declared_wait_identity "$2"' _ "$ROOT/bin" "$2"
+}
+
+# The watcher's identity of <status-file>, with one byte in <tick-file> for every line its
+# walks pass to the cap tick.
+wait_identity_ticks() {  # <status-file> <tick-file>
+  : > "$2"
+  FM_STATUS_EVENT_SCAN_TAIL=1 bash -c 'ticks=$3; count_tick() { printf . >> "$ticks"; }; . "$1/fm-classify-lib.sh"; FM_STATUS_SPAN_TICK=count_tick; status_declared_wait_identity "$2"' _ "$ROOT/bin" "$1" "$2"
 }
 
 # The watcher's window read starts one tail window before the end. When the byte before
@@ -1852,6 +1942,9 @@ tests=(
   test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk
   test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window
   test_a_wait_episode_opened_before_the_tail_window_keeps_its_identity
+  test_a_distinct_wait_episode_across_windows_is_walked_once
+  test_a_stale_or_corrupt_wait_identity_cache_falls_back_to_the_exact_walk
+  test_a_wait_episode_older_than_the_read_limit_has_no_identity
   test_the_watcher_window_keeps_a_whole_first_line
   test_a_declaration_with_a_colon_in_its_tag_is_found_past_the_tail
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read

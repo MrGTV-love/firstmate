@@ -1616,7 +1616,7 @@ remote_secondmate_teardown() {
     "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
     "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
     "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-    "$STATE/.session-launch-refused-$ID"
+    "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
   printf 'teardown %s complete (remote %s:%s)\n' "$ID" "$remote_host" "$remote_home"
   return "$rc"
 }
@@ -5592,7 +5592,7 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
       "$sub_state/$child_id.cursor-session" "$sub_state/$child_id.reconcile-nudged" \
       "$sub_state/$child_id.claude-settings.json" "$sub_state/$child_id.devin-config.json" \
-      "$sub_state/.$child_id.branch-outcome-index"
+      "$sub_state/.$child_id.branch-outcome-index" "$sub_state/.$child_id.wait-identity"
     chmod u+w "$sub_state/$child_id.git-hooks" 2>/dev/null || true
     rm -rf "$sub_state/$child_id.git-hooks"
   done
@@ -6149,7 +6149,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$STATE/.$ID.branch-outcome-index" \
   "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
   "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-  "$STATE/.session-launch-refused-$ID"
+  "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
 # The steering inbox (bin/fm-task-inbox-lib.sh) is runtime state for the
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.

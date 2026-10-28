@@ -2919,8 +2919,11 @@ FM_STATUS_SPAN_TICK=status_cap_span_tick
 # The stale loop and the declared-wait checks read a lane's latest event and declared
 # wait for every window on every poll. When the tail of a log holds no event, those
 # reads widen to the log's history; here that is never more than the last tail window
-# (_fm_status_event_scan_start, bin/fm-status-event-lib.sh), so a log held at the cap
-# cannot make one poll read it whole.
+# (_fm_status_event_scan_start, bin/fm-status-event-lib.sh). One read goes further: the
+# declared-wait identity walk of an episode still open at the window's start reads back
+# to its first line, up to the read limit (cap plus reserve) from the log's end, so a log
+# at the cap holding one such wait is read whole once. Its cache (state/.<id>.wait-identity)
+# then lets each later poll classify only the bytes appended since.
 # shellcheck disable=SC2034 # Read by the status-event library sourced above.
 FM_STATUS_EVENT_SCAN_TAIL=1
 
