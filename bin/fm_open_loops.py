@@ -1637,9 +1637,8 @@ def ledger_action(args, state, now, batch=()):
             if action.get("kind") == "waiting" or (action and not same_work(action, by_id[ident], now)):
                 return False
             return ident not in pending or action_answers(action, by_id[ident], pending[ident], now, waits)
-        presented = {ident for marked in controls["presentations"].values() for ident in marked}
         missing = [row for ident, row in by_id.items()
-                   if (ident in presented or ident in actions)
+                   if (ident in pending or ident in actions)
                    and not needs_no_action(actions.get(ident, {}), row, now, waits)
                    and not ((row.get("category") == "review_pass_not_merged"
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
@@ -1797,7 +1796,7 @@ def record_action(args, state, now, report, waits, waits_error):
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=prior_deferrals
                          + int(args.kind == "deferred"), captain_visible=visible,
-                         digest=row_digest(by_id[ident]), cited=cited, ledger_epoch=report["generated_epoch"])
+                         digest=row_digest(by_id[ident]), cited=cited)
     if by_id[ident].get("age_seconds") is not None:
         actions[ident]["clock_start"] = now - by_id[ident]["age_seconds"]
     if wait_history:

@@ -2086,7 +2086,7 @@ _, boundary = drain()
 clock['now'] = now + 300
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
 recorded = json.loads(ledger.read_text())['handling']['actions'][row['id']]
-assert recorded['clock_start'] == now - 7200 and recorded['ledger_epoch'] == now, recorded
+assert recorded['clock_start'] == now - 7200, recorded
 assert ack(boundary).returncode == 0
 pushed = now + 100
 clock['now'] = pushed + 7200
@@ -2112,6 +2112,18 @@ del record['handling']['actions'][row['id']]['clock_start']
 ledger.write_text(json.dumps(record))
 assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a legacy action lost its cover'
 clock['now'] = now
+# One actor's acknowledgement is never gated by a row only the other actor's later drain presented.
+home, ledger, row, call, ok, drain, ack = case('cross-actor-gate', empty=True)
+assert loops_as(home, 'branch', '--present-overdue').stdout == ''
+record = json.loads(ledger.read_text())
+record['rows'].append(row)
+ledger.write_text(json.dumps(record))
+assert row['id'] in loops_as(home, 'main', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 0, "another actor's presentation gated the branch ack"
+assert loops_as(home, 'main', '--check-actions').returncode == 1
+assert row['id'] in loops_as(home, 'branch', '--present-overdue').stdout
+assert loops_as(home, 'branch', '--check-actions').returncode == 1, "the branch actor's next drain did not gate the row"
+print('PASS: each actor gates only the rows its own drain presented')
 
 # A resurface wake reserved by a live branch grant belongs to that branch's drain, not to main's.
 home, ledger, row, call, ok, drain, ack = case('resurface-reserved', owner='captain')
