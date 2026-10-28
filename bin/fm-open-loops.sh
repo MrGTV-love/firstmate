@@ -13,7 +13,7 @@
 # Each input line produces one result row (line,id,kind,result,message); valid actions
 # persist even when siblings refuse. Any refusal exits 1; malformed CLI arguments exit 2.
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
-#        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
+#        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg|REASON --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
@@ -31,14 +31,16 @@
 # acknowledgement (internal integration, not for direct use).
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
-# action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
+# action records follow-up evidence with --evidence: for steered, an inbox record (NNN.msg), or a remote
+# secondmate's delivered pending-reply id, sent after the row's overdue episode began and within four hours,
 # the row's PR URL for merged, or free text for escalated/deferred.
 # --hold TASK_ID, valid only with escalated, names the one task held for the captain that a firstmate-owned
 # open_pr, unanswered_question or unlanded_commit row waits on; omitted, the documentation below owns which task binds.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
-# --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence names its new
-# inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`.
+# --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence is either its new
+# inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`, or the reason for the wait,
+# which stands while that task is live and working (a red_check row may take this form).
 # docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
 # verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
 # resolves the obligation.
