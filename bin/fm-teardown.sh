@@ -652,6 +652,17 @@
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# BEGIN temporary phase diagnostic definition
+fm_teardown_phase_mark() {
+  local acknowledgement
+  [ "${BASHPID:-}" = "$$" ] && [ "$PPID" = "${FM_TEARDOWN_CPU_PHASE_HELPER_PID:-}" ] || return 0
+  [ "${FM_TEARDOWN_CPU_CHILD:-0}" = 1 ] || return 0
+  [ -n "${FM_TEARDOWN_CPU_MARK_FD:-}" ] && [ -n "${FM_TEARDOWN_CPU_ACK_FD:-}" ] || return 0
+  printf 'phase|%s|%s|%s|%s|%s\n' "$1" "${BASHPID:-}" "$PPID" "$2" "${3:-}" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
+  IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+}
+# END temporary phase diagnostic definition
+fm_teardown_phase_mark product entry
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
@@ -800,6 +811,7 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
   exit "$FM_LEASE_REFUSE_EXIT"
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
+fm_teardown_phase_mark product startup.end
 teardown_friction_outcome retried
 
 # The pool slot of <project> that encloses a record's current copy without
@@ -1840,6 +1852,7 @@ fi
 # be readable before the first destructive step. --force does not override
 # this. A forced descendant is proved in validate_firstmate_home_children_removal.
 teardown_require_backend_prerequisites "$BACKEND" "$ID" || exit 1
+fm_teardown_phase_mark product backend.end
 if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
   "$FM_ROOT/bin/fm-guard.sh" || true
 fi
@@ -6077,7 +6090,9 @@ if [ -n "$X_REQUEST" ]; then
   echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
 fi
 
+fm_teardown_phase_mark product safety.start
 require_worktree_teardown_safety
+fm_teardown_phase_mark product safety.end
 
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
@@ -6200,6 +6215,8 @@ if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
   teardown_release_misdirected_leases "$PROJ" "$ID" "$TEARDOWN_SLOT_SUPERSEDED_NAME"
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
 fi
+# The lease release above stays in the unmeasured safety.end-runtime.start gap.
+fm_teardown_phase_mark product runtime.start
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
@@ -6213,6 +6230,7 @@ elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
 fi
+fm_teardown_phase_mark product runtime.end
 if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend" ]; then
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/fm-pipeline-spend.sh" record "$ID" >/dev/null \
@@ -6221,10 +6239,12 @@ fi
 
 # Fix 4 (see script header): keep task identity records and the worktree until
 # Docker cleanup succeeds, so a partial removal can be retried.
+fm_teardown_phase_mark product docker.start
 if [ "$KIND" != secondmate ] && ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
   echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
   exit 1
 fi
+fm_teardown_phase_mark product docker.end
 
 if [ "$BACKEND" = herdr ]; then
   teardown_herdr_reacquire_meta "$META" "$ID" "$STATE" || {

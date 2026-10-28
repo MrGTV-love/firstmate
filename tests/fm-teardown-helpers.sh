@@ -165,7 +165,24 @@ PERL
 #   $CASE/project/      - clone of origin; acts as the firstmate project dir
 #   $CASE/wt/           - a worktree of the project (the task worktree)
 # Echoes the case dir.
+# BEGIN temporary phase diagnostic definition
+fm_teardown_phase_selected() {
+  case "${test_case:-}" in
+    test_local_only_force_overrides_unpushed|test_docker_all_failure_channels_retain_forced_tasks_until_retry) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+fm_teardown_phase_mark() {
+  local acknowledgement
+  fm_teardown_phase_selected || return 0
+  [ "${FM_TEARDOWN_CPU_CHILD:-0}" = 1 ] || return 0
+  [ -n "${FM_TEARDOWN_CPU_MARK_FD:-}" ] && [ -n "${FM_TEARDOWN_CPU_ACK_FD:-}" ] || return 0
+  printf 'phase|%s|%s|%s|%s|%s\n' "$1" "${BASHPID:-}" "$PPID" "$2" "${3:-}" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
+  IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+}
+# END temporary phase diagnostic definition
 make_case() {
+  fm_teardown_phase_mark helper setup.start
   local name=$1 case_dir fakebin
   case_dir="$TMP_ROOT/$name"
   fakebin="$case_dir/fakebin"
@@ -319,6 +336,7 @@ SH
   # Fresh watcher beacon so fm-guard stays quiet.
   touch "$case_dir/state/.last-watcher-beat"
 
+  fm_teardown_phase_mark helper setup.end
   printf '%s\n' "$case_dir"
 }
 
@@ -921,6 +939,15 @@ SH
 
 # Run teardown with PATH mocking. Args: case_dir [extra args...]
 run_teardown() {
+# BEGIN temporary phase diagnostic definition
+  local FM_TEARDOWN_CPU_PHASE_HELPER_PID=
+  if fm_teardown_phase_selected; then
+    FM_TEARDOWN_CPU_PHASE_HELPER_PID=${BASHPID:-}
+  fi
+  export FM_TEARDOWN_CPU_PHASE_HELPER_PID
+# END temporary phase diagnostic definition
+  fm_teardown_phase_mark helper cli.start
+  local fm_phase_status
   local case_dir=$1; shift
   # FM_DATA_OVERRIDE is pinned to the case dir because teardown closes this
   # home's backlog item itself; without it $DATA would resolve to the real
@@ -933,6 +960,9 @@ run_teardown() {
   NM_HOME="$case_dir/nm" \
   PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
+  fm_phase_status=$?
+  fm_teardown_phase_mark helper cli.end "$fm_phase_status"
+  return "$fm_phase_status"
 }
 
 # Seed a real backlog carrying task-x1 as In flight, so a teardown in this case
