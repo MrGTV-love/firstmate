@@ -1,0 +1,11 @@
+diff --git a/cli.js b/cli.js
+index 454b97b..8113364 100644
+--- a/cli.js
++++ b/cli.js
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
+ const a = process.argv.slice(2);
+-if (a[0] === '--help') { console.log('usage: demo [--help]'); process.exit(0); }
++if (a[0] === '--help') { console.log('usage: demo [--help|--version]'); process.exit(0); }
++if (a[0] === '--version') { console.log(require('./package.json').version); process.exit(0); }
+ if (a.length) { console.error('unknown flag: ' + a[0]); process.exit(2); }

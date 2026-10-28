@@ -1,0 +1,1 @@
+147:- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.

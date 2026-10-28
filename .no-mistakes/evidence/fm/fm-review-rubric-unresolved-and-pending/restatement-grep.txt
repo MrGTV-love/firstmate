@@ -1,0 +1,6 @@
+$ git grep -n -i -E "pass or fail|pass/fail|pass-or-fail" -- . ":!tests"
+bin/fm-guard-refcheck.sh:5:# and runs nothing. The audit's Stage 0 turns "scan carefully" into a pass/fail
+bin/fm-review-record.py:213:        raise RecordError("verdict must be PASS or FAIL")
+
+$ git grep -n -E "Mandatory items are pass"
+(exit 1)
