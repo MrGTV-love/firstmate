@@ -319,7 +319,8 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
-                        'status_own_open_decisions "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        'own=$(status_own_open_decisions "$2") || exit 1; '
+                        'printf "%s\\n" "$own" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
                         '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
                         'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
@@ -558,7 +559,7 @@ class Collector:
         pane = [re.sub(r"[0-9]+", "#", line.strip())
                 for line in self.run([BIN / "fm-peek.sh", task["id"], "80"]).splitlines()]
         signatures = [line for line in pane if SIGNATURE.search(line)]
-        declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
+        declaration = self.bash('. "$1"; last_status_line "$2" || :', BIN / "fm-status-event-lib.sh",
                                 self.state / (task["id"] + ".status")).strip()
         waits = [line for line in pane if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
         wait = (waits[-1] if waits else declaration)[:150]
@@ -804,9 +805,10 @@ class Collector:
                 continue
             if path.is_symlink():
                 raise ValueError("review lane status must not be a symbolic link")
-            events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
+            events = self.bash('. "$1"; text=$(fm_status_cat "$2" | _fm_status_event_candidates; exit "${PIPESTATUS[0]}") || exit 1; '
+                               'while IFS= read -r line || [ -n "$line" ]; do '
                                'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
-                               'then printf "%s\\n" "$line"; fi; done < "$2"',
+                               'then printf "%s\\n" "$line"; fi; done <<< "$text"',
                                BIN / "fm-status-event-lib.sh", path)
             # Exact URL tokens, not prefix matches on PR numbers.
             lines = [line for line in events.splitlines()
@@ -955,7 +957,7 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('cat "$2" >/dev/null || exit 1; '
+                out = self.bash('[ -r "$2" ] || exit 1; '
                                 '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
@@ -1349,7 +1351,8 @@ class WaitVerifier:
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
             status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                            'if crew_is_provably_working "$3"; then last_status_line "$2" || '
+                            '{ echo "prerequisite status is past the read limits and cannot be verified" >&2; exit 2; }; fi',
                             BIN, path, task).strip()
             if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")

@@ -71,7 +71,7 @@ install_scripts() {
   mkdir -p "$dir/bin" "$dir/docs"
   for f in fm-turnend-guard-cursor.sh fm-turnend-guard.sh fm-sessionstart-cursor.sh \
            fm-sessionstart-run.sh fm-sessionstart-nudge.sh fm-arm-pretool-check.sh \
-           fm-cd-pretool-check.sh fm-claude-stop-autoarm.sh fm-hook-host-lib.sh \
+           fm-claude-stop-autoarm.sh fm-hook-host-lib.sh \
            fm-primary-scope-lib.sh fm-supervision-lib.sh fm-supervision-liveness-lib.sh \
            fm-wake-lib.sh fm-path-lib.sh fm-secondmate-parent-lib.sh \
            fm-guard-event.sh \
@@ -82,7 +82,6 @@ install_scripts() {
     cp "$ROOT/bin/$f" "$dir/bin/$f"
   done
   cp "$ROOT/bin/fm-arm-command-policy.mjs" "$dir/bin/fm-arm-command-policy.mjs"
-  cp "$ROOT/bin/fm-cd-command-policy.mjs" "$dir/bin/fm-cd-command-policy.mjs"
   cp -R "$ROOT/docs/supervision-protocols" "$dir/docs/supervision-protocols"
   chmod +x "$dir"/bin/*.sh
 }
@@ -253,18 +252,6 @@ test_pretool_guards_deduplicate_and_render_cursor_deny() {
   printf '%s' "$out" | jq -e '.user_message | type == "string" and length > 0' >/dev/null 2>&1 \
     || fail "Cursor's deny object must carry a user_message reason, got: $out"
   pass "fm-arm-pretool-check: Cursor duplicate allows, --cursor denies in Cursor's own shape"
-}
-
-test_cd_guard_renders_cursor_deny() {
-  local dir payload out decision
-  dir=$(make_primary_dir "$TMP_ROOT/host-cd")
-  payload='{"tool_name":"Shell","tool_input":{"command":"cd projects/example"},"cursor_version":"2026.08.11-e8db854"}'
-  out=$(printf '%s' "$payload" | FM_HOME="$dir" FM_CD_GUARD_MODE=deny bash "$dir/bin/fm-cd-pretool-check.sh" --cursor 2>/dev/null)
-  decision=$(printf '%s' "$out" | jq -r '.permission // empty' 2>/dev/null)
-  [ "$decision" = deny ] || fail "expected a Cursor deny object from the cd guard, got: $out"
-  out=$(printf '%s' "$payload" | FM_HOME="$dir" bash "$dir/bin/fm-cd-pretool-check.sh" 2>&1)
-  [ -z "$out" ] || fail "the cd guard's Claude-settings duplicate produced output under Cursor: $out"
-  pass "fm-cd-pretool-check: Cursor duplicate allows, --cursor denies in Cursor's own shape"
 }
 
 # --- PARK --------------------------------------------------------------------
@@ -804,7 +791,6 @@ test_turnend_guard_still_blocks_for_claude_payload
 test_autoarm_stands_down_on_cursor_payload
 test_sessionstart_run_stands_down_on_cursor_payload
 test_pretool_guards_deduplicate_and_render_cursor_deny
-test_cd_guard_renders_cursor_deny
 test_park_silent_when_nothing_in_flight
 test_park_delivers_actionable_wake_as_followup
 test_park_never_exits_two
