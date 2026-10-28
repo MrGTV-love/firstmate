@@ -1238,7 +1238,7 @@ A line the loop repeats is written like any other until the cap refuses it, so a
 Only a decision or terminal line may use the reserve: one whose verb is `needs-decision`, `blocked`, `done` or `failed`, or the resolve, paused or captain-held verb (`resolved`, `paused` and `captain-held` unless configured), read as the status readers read a verb.
 Every other line stops at the cap, `working:`, `note:` and a line with no verb such as the incident's `text` included, so a loop through the helper cannot use up the reserve and a worker at the cap can still report `done:` or `blocked:`.
 A log already past the cap plus the reserve, such as the three incident logs left in place, refuses every line with exit status 75, terminal lines included, and each refusal names the file on stderr.
-The helper takes the log's lock without blocking and retries it for at most 10 s, about 4.6 times the 2.15 s one call appending a full cap and reserve held it on 2026-10-27.
+The helper takes the log's lock without blocking and retries it for at most 10 s, about 7.8 times the 1.28 s that one call filling the whole cap with 100-byte lines held it on 2026-10-28.
 When the lock stays held longer, for example by a writer stopped while it held it, the call is refused with exit status 75, the refusal names the file on stderr, and nothing is written, so no sanctioned writer waits on the lock without end.
 A burst of distinct events is never dropped below the cap.
 A remote or secondmate clone must run the current Firstmate release before its workers use the guarded append: on an older clone the charter's status command fails with `No such file or directory` (exit 127) because `bin/fm-status-append.sh` is not there, and the worker's replies never reach the parent's status log.

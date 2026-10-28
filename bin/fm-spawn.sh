@@ -5742,7 +5742,7 @@ dsh_wait_for_start() {
 }
 
 dsh_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
