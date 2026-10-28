@@ -1,0 +1,73 @@
+# scenario s6_deferral_allowance_resets_on_changed_work
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.d74Afm
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d1","worker:lane9","lane9","follow up on the recorded wait",7200,"waiting for CI run 1",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187959	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 19303.1793187959.GZgHAO
+
+# G1 check: overdue=['d1'] gate=['d1'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 19303.1793187959.GZgHAO
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d1","worker:lane9","lane9","follow up on the recorded wait",7202,"waiting for CI run 1",false
+
+$ bin/fm-open-loops.sh action d1 deferred --evidence 'CI run 1 still going' --recheck 2026-10-28T12:46:01Z
+[exit 0]
+action: "d1"
+kind: deferred
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 19303.1793187959.GZgHAO
+[exit 0]
+
+$ bin/fm-open-loops.sh action d1 deferred --evidence 'still going' --recheck 2026-10-28T12:46:01Z
+[exit 1]
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d1","worker:lane9","lane9","follow up on the recorded wait",7203,"waiting for CI run 1",true
+
+$ bin/fm-open-loops.sh action d1 escalated --evidence 'asked the captain about CI run 1'
+[exit 0]
+action: "d1"
+kind: escalated
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+# lane resumed: new CI run
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d1","worker:lane9","lane9","follow up on the recorded wait",7203,"waiting for CI run 2",true
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187962	2	check	open-loop-ledger	check: open-loop-ledger
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 25609.1793187962.WqPClz
+
+$ bin/fm-open-loops.sh action d1 deferred --evidence 'waiting for CI run 2' --recheck 2026-10-28T12:46:01Z
+[exit 0]
+action: "d1"
+kind: deferred
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 25609.1793187962.WqPClz
+[exit 0]
+
+# RESULT: PASS

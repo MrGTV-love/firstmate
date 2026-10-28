@@ -1,0 +1,141 @@
+# scenario s1_unchanged_rows_need_no_fresh_actions
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.EptUQF
+# repo=/Users/charlesabrooker/tmp/fm-base.1kh2ml (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[12]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80000,"",false
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80000,"",false
+  "commit1","firstmate","lane3","land or drop the commit",70000,"abc123 not in default branch",false
+  "silent1","worker:lane4","lane4","request a progress report",60000,"no report since pause",false
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50000,"paused by captain; last progress at 1",false
+  "cov1","firstmate","forge","restore coverage",40000,"forge read degraded",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793189144	1	check	open-loop-ledger	check: open-loop-ledger (12 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 35521.1793189144.ZR1Fwg
+
+# G1 check: overdue=['commit1', 'cov1', 'pr1', 'pr2', 'q1-firstmate', 'q2-firstmate', 'q3-firstmate', 'q4-firstmate', 'q5-captain', 'q6-captain', 'silent1', 'stalled1'] gate=['commit1', 'cov1', 'pr1', 'pr2', 'q1-firstmate', 'q2-firstmate', 'q3-firstmate', 'q4-firstmate', 'q5-captain', 'q6-captain', 'silent1', 'stalled1'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 35521.1793189144.ZR1Fwg
+[exit 1]
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[12]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80002,"",false
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80002,"",false
+  "commit1","firstmate","lane3","land or drop the commit",70002,"abc123 not in default branch",false
+  "silent1","worker:lane4","lane4","request a progress report",60002,"no report since pause",false
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50002,"paused by captain; last progress at 1",false
+  "cov1","firstmate","forge","restore coverage",40002,"forge read degraded",false
+
+$ bin/fm-open-loops.sh action q1-firstmate escalated --evidence 'asked the captain about lane1:decision during the pause'
+[exit 0]
+action: "q1-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q2-firstmate escalated --evidence 'asked the captain about lane2:decision during the pause'
+[exit 0]
+action: "q2-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q3-firstmate escalated --evidence 'asked the captain about lane3:decision during the pause'
+[exit 0]
+action: "q3-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q4-firstmate escalated --evidence 'asked the captain about lane4:decision during the pause'
+[exit 0]
+action: "q4-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q5-captain escalated --evidence 'asked the captain about lane5:decision during the pause'
+[exit 0]
+action: "q5-captain"
+kind: escalated
+
+$ bin/fm-open-loops.sh action q6-captain escalated --evidence 'asked the captain about lane6:decision during the pause'
+[exit 0]
+action: "q6-captain"
+kind: escalated
+
+$ bin/fm-open-loops.sh action pr1 escalated --evidence 'asked the captain about https://github.com/test/p/pull/1 during the pause'
+[exit 0]
+action: "pr1"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action pr2 escalated --evidence 'asked the captain about https://github.com/test/p/pull/2 during the pause'
+[exit 0]
+action: "pr2"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action commit1 escalated --evidence 'asked the captain about lane3 during the pause'
+[exit 0]
+action: "commit1"
+kind: escalated
+standing: no; no task held for the captain was named, so this receipt answers only the turn it followed (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action silent1 escalated --evidence 'asked the captain about lane4 during the pause'
+[exit 0]
+action: "silent1"
+kind: escalated
+
+$ bin/fm-open-loops.sh action stalled1 escalated --evidence 'asked the captain about lane5 during the pause'
+[exit 0]
+action: "stalled1"
+kind: escalated
+
+$ bin/fm-open-loops.sh action cov1 escalated --evidence 'asked the captain about forge during the pause'
+[exit 0]
+action: "cov1"
+kind: escalated
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 35521.1793189144.ZR1Fwg
+[exit 0]
+
+# queued wake: check report
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[10]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80005,"",false
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80005,"",false
+  "commit1","firstmate","lane3","land or drop the commit",70005,"abc123 not in default branch",false
+  "silent1","worker:lane4","lane4","request a progress report",60005,"no report since pause",false
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50005,"paused by captain; last progress at 1",false
+  "cov1","firstmate","forge","restore coverage",40005,"forge read degraded",false
+STANDING (a receipt stands; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90005,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793189149	2	check	report	check: unrelated worker report 1
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 49563.1793189149.kLkRWh
+
+# RESULT: FAIL turn 1: unchanged rows were gated again

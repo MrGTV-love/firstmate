@@ -1,0 +1,9 @@
+PASS: s1_unchanged_rows_need_no_fresh_actions
+PASS: s2_periodic_digest_lists_unchanged_rows
+PASS: s3_rubber_stamp_is_not_captain_waiting
+PASS: s4_unpause_changes_regate_with_no_manual_revert
+PASS: s5_bound_captain_hold_is_proof_and_its_end_regates
+PASS: s6_deferral_allowance_resets_on_changed_work
+PASS: s7_unpresented_new_row_waits_for_next_drain
+PASS: s8_away_daemon_ack_does_not_bypass_firstmate
+PASS: s9_watcher_change_vs_periodic_wake

@@ -1,0 +1,82 @@
+# scenario s9_watcher_change_vs_periodic_wake
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.x7PDXd
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+$ FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600 timeout 60 bin/fm-watch.sh
+[exit 0]
+check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+# queue: open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187973	1	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 55085.1793187973.w0Urpg
+
+$ bin/fm-open-loops.sh action q1-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q1-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q2-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q2-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q3-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q3-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 55085.1793187973.w0Urpg
+[exit 0]
+
+# resurface marker backdated 3700s (interval 3600s); ledger unchanged
+
+$ FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600 timeout 60 bin/fm-watch.sh
+[exit 0]
+check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+# queue: open-loop-ledger-resurface	check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+1793187978	2	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187975}
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187975}
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187975}
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 65458.1793187978.Fl8uad
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 65458.1793187978.Fl8uad
+[exit 0]
+
+# one row changed after the unpause
+
+$ FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600 timeout 60 bin/fm-watch.sh
+[exit 0]
+check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+# queue: open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90010,"resumed: new status line",false
+STANDING (unchanged since its last action; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90010,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90010,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187982	3	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 71003.1793187982.gG2FSb
+
+# RESULT: PASS

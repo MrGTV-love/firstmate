@@ -1,0 +1,72 @@
+# scenario s5_bound_captain_hold_is_proof_and_its_end_regates
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.GE1DZL
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "qheld","firstmate","held-job:ci-control","answer or close this question, or record why it no longer applies",7200,"blocked: supported recovery control is missing",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187952	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 98504.1793187952.N9dN83
+
+# G1 check: overdue=['qheld'] gate=['qheld'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 98504.1793187952.N9dN83
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "qheld","firstmate","held-job:ci-control","answer or close this question, or record why it no longer applies",7201,"blocked: supported recovery control is missing",false
+
+$ bin/fm-open-loops.sh action qheld escalated --evidence 'asked the captain about the recovery control'
+[exit 0]
+action: "qheld"
+kind: escalated
+standing: captain hold held-job; covers this row until it changes or that hold is answered, released, blocked or held again
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 98504.1793187952.N9dN83
+[exit 0]
+
+# queued wake: check open-loop-ledger-resurface
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+1793187955	2	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface
+WAITING OPEN WORK (periodic list for the captain):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "qheld","firstmate","held-job:ci-control","answer or close this question, or record why it no longer applies",7203,"blocked: supported recovery control is missing","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain about the recovery control", "at_epoch": 1793187954}
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 6349.1793187955.3jfSMI
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 6349.1793187955.3jfSMI
+[exit 0]
+
+# the captain answered: held-job moved to Done
+
+# queued wake: check report
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "qheld","firstmate","held-job:ci-control","answer or close this question, or record why it no longer applies",7205,"blocked: supported recovery control is missing",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187957	3	check	report	check: report
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 13208.1793187957.epUqWe
+
+# G1 check: overdue=['qheld'] gate=['qheld'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 13208.1793187957.epUqWe
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "qheld","firstmate","held-job:ci-control","answer or close this question, or record why it no longer applies",7207,"blocked: supported recovery control is missing",false
+
+$ bin/fm-open-loops.sh --digest
+[exit 0]
+
+# RESULT: PASS

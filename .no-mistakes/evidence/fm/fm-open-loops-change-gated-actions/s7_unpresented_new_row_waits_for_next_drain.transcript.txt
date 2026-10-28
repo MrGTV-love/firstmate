@@ -1,0 +1,85 @@
+# scenario s7_unpresented_new_row_waits_for_next_drain
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xqmhUk
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187964	1	check	open-loop-ledger	check: open-loop-ledger (2 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 31231.1793187964.7kdvDD
+
+# G1 check: overdue=['q1-firstmate', 'q2-firstmate'] gate=['q1-firstmate', 'q2-firstmate'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 31231.1793187964.7kdvDD
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+
+$ bin/fm-open-loops.sh action q1-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q1-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q2-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q2-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+# queued wake: check report
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+1793187964	1	check	open-loop-ledger	check: open-loop-ledger (2 overdue)
+1793187966	2	check	report	check: report
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 31231.1793187964.7kdvDD
+
+# heartbeat published a new overdue row 'late' after this drain
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 31231.1793187964.7kdvDD
+[exit 0]
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "late","firstmate","late-lane:decision","answer or close this question, or record why it no longer applies",90001,"blocked: waiting on the fleet pause",false
+STANDING (unchanged since its last action; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90004,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90004,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187968	3	check	open-loop-ledger	check: open-loop-ledger
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 43572.1793187968.3qyh57
+
+# G1 check: overdue=['late', 'q1-firstmate', 'q2-firstmate'] gate=['late'] digest=['q1-firstmate', 'q2-firstmate'] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 43572.1793187968.3qyh57
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "late","firstmate","late-lane:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+
+$ bin/fm-open-loops.sh action late escalated --evidence 'asked the captain'
+[exit 0]
+action: "late"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 43572.1793187968.3qyh57
+[exit 0]
+
+# RESULT: PASS

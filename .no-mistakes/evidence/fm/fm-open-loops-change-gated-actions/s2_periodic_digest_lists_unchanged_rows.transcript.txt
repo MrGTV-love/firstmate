@@ -1,0 +1,151 @@
+# scenario s2_periodic_digest_lists_unchanged_rows
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.4YbmQ7
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[12]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80000,"",false
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80000,"",false
+  "commit1","firstmate","lane3","land or drop the commit",70000,"abc123 not in default branch",false
+  "silent1","worker:lane4","lane4","request a progress report",60000,"no report since pause",false
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50000,"paused by captain; last progress at 1",false
+  "cov1","firstmate","forge","restore coverage",40000,"forge read degraded",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187930	1	check	open-loop-ledger	check: open-loop-ledger (12 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27184.1793187930.HfN0nT
+
+# G1 check: overdue=['commit1', 'cov1', 'pr1', 'pr2', 'q1-firstmate', 'q2-firstmate', 'q3-firstmate', 'q4-firstmate', 'q5-captain', 'q6-captain', 'silent1', 'stalled1'] gate=['commit1', 'cov1', 'pr1', 'pr2', 'q1-firstmate', 'q2-firstmate', 'q3-firstmate', 'q4-firstmate', 'q5-captain', 'q6-captain', 'silent1', 'stalled1'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27184.1793187930.HfN0nT
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[12]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80002,"",false
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80002,"",false
+  "commit1","firstmate","lane3","land or drop the commit",70002,"abc123 not in default branch",false
+  "silent1","worker:lane4","lane4","request a progress report",60002,"no report since pause",false
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50002,"paused by captain; last progress at 1",false
+  "cov1","firstmate","forge","restore coverage",40002,"forge read degraded",false
+
+$ bin/fm-open-loops.sh action q1-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q1-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q2-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q2-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q3-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q3-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q4-firstmate escalated --evidence 'asked the captain'
+[exit 0]
+action: "q4-firstmate"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action q5-captain escalated --evidence 'asked the captain'
+[exit 0]
+action: "q5-captain"
+kind: escalated
+
+$ bin/fm-open-loops.sh action q6-captain escalated --evidence 'asked the captain'
+[exit 0]
+action: "q6-captain"
+kind: escalated
+
+$ bin/fm-open-loops.sh action pr1 escalated --evidence 'asked the captain'
+[exit 0]
+action: "pr1"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action pr2 escalated --evidence 'asked the captain'
+[exit 0]
+action: "pr2"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action commit1 escalated --evidence 'asked the captain'
+[exit 0]
+action: "commit1"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+
+$ bin/fm-open-loops.sh action silent1 escalated --evidence 'asked the captain'
+[exit 0]
+action: "silent1"
+kind: escalated
+
+$ bin/fm-open-loops.sh action stalled1 escalated --evidence 'asked the captain'
+[exit 0]
+action: "stalled1"
+kind: escalated
+
+$ bin/fm-open-loops.sh action cov1 escalated --evidence 'asked the captain'
+[exit 0]
+action: "cov1"
+kind: escalated
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 27184.1793187930.HfN0nT
+[exit 0]
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+1793187935	2	check	open-loop-ledger	check: open-loop-ledger (12 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 41946.1793187935.PzK1cX
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 41946.1793187935.PzK1cX
+[exit 0]
+
+# queued wake: check open-loop-ledger-resurface
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+1793187936	3	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (12 overdue; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[12]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187932}
+  "q2-firstmate","firstmate","lane2:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187932}
+  "q3-firstmate","firstmate","lane3:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187932}
+  "q4-firstmate","firstmate","lane4:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187933}
+  "q5-captain","captain","lane5:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187933}
+  "q6-captain","captain","lane6:decision","answer or close this question, or record why it no longer applies",90007,"blocked: waiting on the fleet pause","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187933}
+  "pr1","firstmate","https://github.com/test/p/pull/1","route the green PR's review",80007,"","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187933}
+  "pr2","firstmate","https://github.com/test/p/pull/2","route the green PR's review",80007,"","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187934}
+  "commit1","firstmate","lane3","land or drop the commit",70007,"abc123 not in default branch","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187934}
+  "silent1","worker:lane4","lane4","request a progress report",60007,"no report since pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187934}
+  "stalled1","worker:lane5","lane5","follow up on the recorded wait",50007,"paused by captain; last progress at 1","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187934}
+  "cov1","firstmate","forge","restore coverage",40007,"forge read degraded","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain", "at_epoch": 1793187934}
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 46891.1793187936.fVmGk2
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 46891.1793187936.fVmGk2
+[exit 0]
+
+# RESULT: PASS

@@ -1,0 +1,44 @@
+# scenario s8_away_daemon_ack_does_not_bypass_firstmate
+# lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.CF4bQh
+# repo=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61267PMM9BG0H3K6YEQVC9B (gate worktree at target commit)
+
+# queued wake: check open-loop-ledger
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90000,"blocked: waiting on the fleet pause",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+1793187970	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue)
+[stderr] WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 48830.1793187970.BN3gMG
+
+# G1 check: overdue=['q1-firstmate'] gate=['q1-firstmate'] digest=[] -> ok
+
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 48830.1793187970.BN3gMG
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+
+$ FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 48830.1793187970.BN3gMG
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+
+# captain away: state/.afk written
+
+$ FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 48830.1793187970.BN3gMG
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 1]
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "q1-firstmate","firstmate","lane1:decision","answer or close this question, or record why it no longer applies",90002,"blocked: waiting on the fleet pause",false
+
+# RESULT: PASS
