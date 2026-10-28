@@ -63,8 +63,11 @@ Bearings reads the resulting structured state and must never compensate by scrap
 A captain call can be written down twice - as the keyed status decision the fold reads, and as the backlog task held for the captain - and those two records can disagree without either surface saying so.
 `bin/fm-captain-hold.sh diverged` reports that contradiction and the wake drain prints it as `RECORD DIVERGENCE`; it closes nothing, because a captain call closed wrongly leaves review entirely, which is worse than the noise.
 Read such a line as "these two records disagree", never as "the captain ruled and someone forgot to file it": a call can dissolve because its premise was false, or turn out to have been a question of fact rather than the captain's to answer.
-Reconcile it with what actually happened - `answer` when the captain's own words exist to record, `withdraw` when the call was never the captain's or a recorded captain ruling made it moot, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
-`withdraw` records who decided and why as a non-captain resolution, never as the captain's words, and leaves the work item open.
+Reconcile it with what actually happened - `answer` when the captain's own words exist to record, `withdraw` when a recorded captain ruling made it moot, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
+`withdraw` records the ruling and why as a non-captain resolution, never as the captain's words, and leaves the work item open.
+A call's delivery to a mate's parent channel is true of a genuine captain call too, so delivery never frees a hold.
+A hold filed before owners were recorded has no owner on record; Main settles it once with `bin/fm-captain-hold.sh classify <id> --owner parent|captain --by main --evidence-file <path> --reason "<why>"`, which records Main's classification and never the captain's words.
+A hold whose owner was recorded at filing is never reclassified, and the captain reverses a parent classification by re-holding with `--owner captain`.
 The absence of a routed work item is not a divergence and the guard never requires one: when the decision IS the deliverable there is nothing to route.
 
 ## Operating sequence
