@@ -1365,6 +1365,37 @@ test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window() {
   pass "past the tail window the declared-wait identity is the episode's byte offset in the log: kept by a restatement and an unrelated line, changed by a replacement, the same in the watcher"
 }
 
+# A wait restated so often that its episode opens before the watcher's tail window keeps
+# the episode's real first line as its identity: the watcher reads back past the window
+# for it, so the identity neither slides with the window nor names the first restatement
+# the window shows. A resolve and a re-declaration, or a different wait, still start a new
+# episode with a new identity, the same in the watcher and outside it.
+test_a_wait_episode_opened_before_the_tail_window_keeps_its_identity() {
+  local dir status record tail_id whole_id next
+  dir=$(make_case identity-episode-window); status="$dir/state/e.status"
+  record=$(perl -e 'my $l = "paused [key=ext]: waiting"; print $l, " " x (1023 - length $l)')
+  perl -e 'print "$ARGV[0]\n" x 4097' "$record" > "$status"
+  [ "$(file_size "$status")" -eq $((4097 * 1024)) ] || fail "the episode fixture is not 4097 records of 1024 bytes"
+  tail_id=$(wait_identity_in 1 "$status") || fail "the watcher read gave the long episode no identity"
+  whole_id=$(wait_identity_in 0 "$status") || fail "the whole-log read gave the long episode no identity"
+  case "$whole_id" in "ext:"*":0") ;; *) fail "the whole-log identity is not the episode's first record at byte 0: $whole_id" ;; esac
+  [ "$tail_id" = "$whole_id" ] || fail "the watcher named a restatement inside its window as the episode's opening: $tail_id vs $whole_id"
+  printf '%s\n' "$record" >> "$status"
+  next=$(wait_identity_in 1 "$status") || fail "the watcher read lost the identity after one more restatement"
+  [ "$next" = "$tail_id" ] || fail "one more restatement slid the watcher's identity with its window: $next vs $tail_id"
+  [ "$(wait_identity_in 0 "$status")" = "$whole_id" ] || fail "one more restatement moved the whole-log identity"
+  printf 'resolved [key=ext]: the vendor answered\n%s\n' "$record" >> "$status"
+  next=$(wait_identity_in 1 "$status") || fail "the watcher read gave the re-declared wait no identity"
+  [ "$next" != "$tail_id" ] || fail "a wait re-declared after its own resolve kept the old episode's identity"
+  [ "$next" = "$(wait_identity_in 0 "$status")" ] || fail "the re-declared wait's watcher and whole-log identities differ"
+  tail_id=$next
+  printf 'paused [key=other]: a different wait\n' >> "$status"
+  next=$(wait_identity_in 1 "$status") || fail "the watcher read gave the replacement wait no identity"
+  [ "$next" != "$tail_id" ] || fail "a replacement wait kept the earlier identity"
+  [ "$next" = "$(wait_identity_in 0 "$status")" ] || fail "the replacement's watcher and whole-log identities differ"
+  pass "a wait episode that opens before the tail window keeps its first record as its identity as the window slides; a re-declaration and a replacement get new ones"
+}
+
 wait_identity_in() {  # <tail-mode 0|1> <status-file>
   FM_STATUS_EVENT_SCAN_TAIL=$1 bash -c '. "$1/fm-classify-lib.sh"; status_declared_wait_identity "$2"' _ "$ROOT/bin" "$2"
 }
@@ -1820,6 +1851,7 @@ tests=(
   test_history_readers_read_a_healthy_log_of_many_lines
   test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk
   test_declared_wait_identity_is_an_absolute_offset_past_the_tail_window
+  test_a_wait_episode_opened_before_the_tail_window_keeps_its_identity
   test_the_watcher_window_keeps_a_whole_first_line
   test_a_declaration_with_a_colon_in_its_tag_is_found_past_the_tail
   test_a_saved_cursor_never_advances_past_bytes_that_were_not_read

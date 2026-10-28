@@ -417,8 +417,10 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # takes the last window of them first and widens to all of them when it finds no opener
 # or the episode remains open at the window's start. In the watcher the snapshot is the
 # log's last tail window (_fm_status_event_scan_start); the offset is still counted from
-# the start of the log, so the identity is the same in both modes and does not move as
-# the window does.
+# the start of the log. An episode still open at the start of that window opened before
+# it, so the walk continues back through the log a tail window at a time to the real
+# first line (_fm_status_wait_episode_before), never further than a whole-log read
+# would: the identity is the same in both modes and does not move as the window does.
 status_declared_wait_identity() {  # <status-file>
   local f=$1 declared verb key resolve legacy_re rec idx text endpoint snapshot start numbered taken
   [ -f "$f" ] && [ -r "$f" ] || return 1
@@ -440,12 +442,15 @@ status_declared_wait_identity() {  # <status-file>
   key=$(_fm_decision_key "$declared" '') || key=
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   legacy_re="^[[:space:]]*(${FM_CAPTAIN_RE:-$FM_CLASSIFY_CAPTAIN_RE_DEFAULT})"
-  numbered=$(_fm_status_event_candidates numbered "$((endpoint - taken))" < "$snapshot") || { rm -f "$snapshot"; return 1; }
+  numbered=$(_fm_status_episode_candidates "$key" "$((endpoint - taken))" < "$snapshot") || { rm -f "$snapshot"; return 1; }
   rm -f "$snapshot"
   rec=$(printf '%s\n' "$numbered" | tail -n "$FM_CLASSIFY_EVENT_WINDOW_LINES" \
     | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || rec=
   if [ -z "$rec" ] || [ "${rec%%$'\t'*}" = open ]; then
     rec=$(printf '%s\n' "$numbered" | _fm_status_wait_episode_scan "$resolve" "$legacy_re" "$verb" "$key") || return 1
+  fi
+  if [ "${rec%%$'\t'*}" = open ] && [ "$((endpoint - taken))" -gt 0 ]; then
+    rec=$(_fm_status_wait_episode_before "$f" "$endpoint" "$((endpoint - taken))" "$resolve" "$legacy_re" "$verb" "$key" "${rec#*$'\t'}") || return 1
   fi
   rec=${rec#*$'\t'}
   idx=${rec%%$'\t'*}
@@ -458,9 +463,12 @@ status_declared_wait_identity() {  # <status-file>
 # `<state>\t<byte offset>\t<line>`, where <state> is `open` when the episode reached the
 # start of the input without a closing event, so a caller reading a bounded window must
 # widen it, and `closed` otherwise. Returns 1 when the stream holds no declared wait.
-_fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key>
+# Given the `<byte offset>\t<line>` an earlier, later span ended on, the walk continues
+# that open episode back through the lines on stdin instead of starting a new one.
+_fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <key> [<offset>\t<line>]
   local resolve=$1 legacy_re=$2 want_verb=$3 want_key=$4 line verb key i=0 first='' first_line='' state=open
   local -a _fm_wait_scan_lines=() _fm_wait_scan_numbers=()
+  if [ -n "${5-}" ]; then first=${5%%$'\t'*}; first_line=${5#*$'\t'}; fi
   while IFS= read -r line || [ -n "$line" ]; do
     _fm_wait_scan_numbers[i]=${line%%$'\t'*}
     _fm_wait_scan_lines[i]=${line#*$'\t'}
@@ -473,7 +481,7 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac
     _fm_status_line_is_event "$line" "$legacy_re" || continue
     status_line_verb "$line" verb
-    key=$(_fm_decision_key "$line" '') || key=
+    _fm_decision_key_into "$line" '' key || key=
     if [ -z "$first" ]; then
       [ "$verb" != "$resolve" ] || continue
       [ "$verb" = "$want_verb" ] || return 1
@@ -494,4 +502,55 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
   done
   [ -n "$first" ] || return 1
   printf '%s\t%s\t%s\n' "$state" "$first" "$first_line"
+}
+
+# The numbered candidate event lines (_fm_status_event_candidates) of the span on stdin
+# that starts at byte <base>, for the episode walk of a keyed wait. A run of identical
+# lines keeps only its first: identical lines classify alike, and an episode reaching
+# into a run opens at its first line, so the walk's answer is the same and a wait
+# restated thousands of times costs one classified line. A keyless wait is its own
+# newest line, so its lines are kept as they are.
+_fm_status_episode_candidates() {  # <key> <base>
+  local -a rc
+  if [ -z "$1" ]; then
+    _fm_status_event_candidates numbered "$2"
+    return
+  fi
+  _fm_status_event_candidates numbered "$2" | LC_ALL=C awk '{ t = $0; sub(/^[^\t]*\t/, "", t); if (NR == 1 || t != prev) print; prev = t }'
+  rc=("${PIPESTATUS[@]}")
+  [ "${rc[0]}" -eq 0 ] && [ "${rc[1]}" -eq 0 ]
+}
+
+# Continue an episode still open at byte <start> of the log back through the bytes before
+# it, one tail window at a time, and print its `closed\t<byte offset>\t<line>`: the
+# episode's real first line, which a bounded window must not mistake for a restatement it
+# happens to begin with. The walk stops at the closing event or the log's start, and
+# never reads before the read limit back from <endpoint>, the bound a whole-log read
+# keeps: an episode that opened further back than that has no identity here (status 1),
+# and declared_wait_scope falls back as for any refused read.
+_fm_status_wait_episode_before() {  # <status-file> <endpoint> <start> <resolve-verb> <legacy-captain-re> <verb> <key> <offset>\t<line>
+  local f=$1 end=$3 rec="open"$'\t'$8 window floor start chunk taken numbered
+  fm_status_window_bytes window
+  fm_status_read_limit_bytes floor
+  floor=$(($2 > floor ? $2 - floor : 0))
+  chunk="$(_fm_status_span_scratch "$f").episode"
+  while [ "${rec%%$'\t'*}" = open ] && [ "$end" -gt 0 ]; do
+    [ "$end" -gt "$floor" ] || { rm -f "$chunk"; return 1; }
+    start=$((end > window ? end - window : 0))
+    [ "$start" -ge "$floor" ] || start=$floor
+    if [ "$start" -eq 0 ]; then
+      _fm_status_read_span "$f" 0 "$end" 0 > "$chunk" 2>/dev/null || { rm -f "$chunk"; return 1; }
+    else
+      _fm_status_read_span "$f" "$((start - 1))" "$((end - start + 1))" 0 2>/dev/null | tail -n +2 > "$chunk"
+      [ "${PIPESTATUS[0]}" -eq 0 ] || { rm -f "$chunk"; return 1; }
+    fi
+    _fm_status_file_size "$chunk" taken || { rm -f "$chunk"; return 1; }
+    taken=${taken//[[:space:]]/}
+    numbered=$(_fm_status_episode_candidates "$7" "$((end - taken))" < "$chunk") || { rm -f "$chunk"; return 1; }
+    rec=$(printf '%s\n' "$numbered" | _fm_status_wait_episode_scan "$4" "$5" "$6" "$7" "${rec#*$'\t'}") || { rm -f "$chunk"; return 1; }
+    # A line longer than the window holds no line start in it; step past it whole.
+    if [ "$taken" -gt 0 ]; then end=$((end - taken)); else end=$start; fi
+  done
+  rm -f "$chunk"
+  printf 'closed\t%s\n' "${rec#*$'\t'}"
 }
