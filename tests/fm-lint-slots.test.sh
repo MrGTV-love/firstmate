@@ -1565,9 +1565,10 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # shim logs how many processes each call listed to FM_TEST_PS_LOG; the python3 shim logs each
 # call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
 # and with FM_TEST_PY_MEMORY set answers each line a mem-tree reader is sent
-# with that value instead of reading memory; with FM_TEST_PY_STALL_ONCE=<file>
-# too, the first such reader to find <file> missing creates it and answers its
-# first line 2 s late.
+# with that value instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
+# the Nth mem-tree reader started follows line N of <file>: stall answers its
+# first line 2 s late, exit exits before any reply, and anything else (or no
+# such line) answers at once.
 fm_lint_write_rss_shims() {  # <dir>
   local guard
   guard=$(cat <<'SH'
@@ -1594,9 +1595,12 @@ SH
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
 [ "${FM_TEST_PY_REFUSE:-0}" = 0 ] || exit 1
 if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = mem-tree ]; then
+  plan=
+  [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c mem-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
+  [ "$plan" != exit ] || exit 1
   while read -r _; do
-    if [ -n "${FM_TEST_PY_STALL_ONCE:-}" ] && [ ! -e "$FM_TEST_PY_STALL_ONCE" ]; then
-      : > "$FM_TEST_PY_STALL_ONCE"
+    if [ "$plan" = stall ]; then
+      plan=answer
       sleep 2
     fi
     printf '%s\n' "$FM_TEST_PY_MEMORY"
@@ -1759,12 +1763,12 @@ test_resident_watch_bounds_footprint_beyond_resident() {
 test_resident_watch_replaces_a_stalled_reader() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-stall)
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_STALL_ONCE="$tmp/stalled"; then
+  printf 'stall\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan"; then
     pass "SKIP (the resident-memory watch runs only on macOS): stalled reader check"
     return
   fi
   out=$(cat "$tmp/out")
-  [ -e "$tmp/stalled" ] || fail "the fake reader never stalled"
   [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root over the bound after a stalled reply did not pass its narrower retry (exit $(cat "$tmp/rc"))"$'\n'"$out"
   [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
     || fail "a root over the bound by footprint after one stalled reply was not ended and retried narrower"$'\n'"$(cat "$tmp/flags.log")"
@@ -1774,6 +1778,53 @@ test_resident_watch_replaces_a_stalled_reader() {
   [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the stalled reader was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
   pass "a reader that misses one deadline is replaced and footprint ends the root on the next tick"
+}
+
+# A replacement reader that exits before its first reply is one failed restart,
+# not a reader that exited at start: the next replacement answers and the
+# footprint it reports still ends the root.
+test_resident_watch_retries_a_replacement_that_exits() {
+  local tmp out samples
+  tmp=$(fm_test_tmproot fm-lint-rss-replacement-exit)
+  printf 'stall\nexit\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=8; then
+    pass "SKIP (the resident-memory watch runs only on macOS): failed replacement check"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root over the bound after a failed replacement did not pass its narrower retry (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
+    || fail "a replacement that exited before replying gave the footprint up for the root"$'\n'"$(cat "$tmp/flags.log")"
+  samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
+  [ "$samples" = libproc:1,ps:2 ] \
+    || fail "the failed replacement's tick did not fall back to ps alone with footprint used after it: $samples"
+  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 3 ] \
+    || fail "the failed replacement was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
+  pass "a replacement reader that exits before replying is retried and footprint still ends the root"
+}
+
+# Three failed replacements in a row give the reader up for the rest of the
+# root, with that reason recorded once in the roots log.
+test_resident_watch_gives_up_after_three_failed_restarts() {
+  local tmp out samples
+  tmp=$(fm_test_tmproot fm-lint-rss-restarts-failed)
+  printf 'stall\nexit\nexit\nexit\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=7; then
+    pass "SKIP (the resident-memory watch runs only on macOS): restarts-failed check"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root whose readers kept failing did not pass (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/flags.log")" = yes ] \
+    || fail "a root no reader answered for was not left to its one attempt"$'\n'"$(cat "$tmp/flags.log")"
+  samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
+  case "$samples" in
+    libproc:0,ps:[1-9]*,reader-unavailable:restarts-failed) ;;
+    *) fail "three failed replacements did not give the reader up as restarts-failed: $samples" ;;
+  esac
+  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 4 ] \
+    || fail "the watch did not stop starting readers after three failed replacements"$'\n'"$(cat "$tmp/py.log")"
+  pass "three failed replacement readers in a row give the reader up as restarts-failed"
 }
 
 fm_lint_test_cases=(
@@ -1802,6 +1853,8 @@ test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_replaces_a_stalled_reader
+test_resident_watch_retries_a_replacement_that_exits
+test_resident_watch_gives_up_after_three_failed_restarts
 test_cache_key_wait_preserves_root_retry_budget
 )
 fm_lint_run "$@"

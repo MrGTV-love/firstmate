@@ -214,11 +214,13 @@ if (($ARGV[0] // '') eq 'gate') {
 # a long-lived libproc reader (fm-proc-info.py mem-tree) started at the first
 # tick, so a command that ends sooner starts none. A tick whose reply is late
 # (over 0.5 s) or malformed is sampled by ps, which gives resident size alone;
-# that reply is discarded and a new reader starts for the next tick. The reader
-# is given up for the rest of the command only when libproc cannot read the
-# command, a reader exits before its first reply, or three replacements in a
-# row fail; the reason is then appended to <rss-file> once as
-# rss_reader_unavailable=<reason>. Crossing the limit ends the group with
+# that reply is discarded and a new reader starts for the next tick. A
+# replacement that cannot start, or that fails before it replies, is one failed
+# restart, and the next tick tries again. The reader is given up for the rest
+# of the command, with ps sampling every later tick, only when libproc cannot
+# read the command, the command's first reader exits before its first reply,
+# or three restarts in a row fail; a good reply resets that count. The reason
+# is then appended to <rss-file> once as rss_reader_unavailable=<reason>. Crossing the limit ends the group with
 # KILL, records the peak sampled as max_rss_kib=<KiB> in <rss-file> (the file
 # /usr/bin/time would have written), names the bound on stderr, and exits 98,
 # which fm-lint.sh reports as a memory failure so the root takes its narrower
@@ -260,10 +262,12 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         my ($root_pid) = @_;
         require IPC::Open2;
         no warnings 'exec';
+        my $first = !defined $reader_fresh;
         $reader_pid = -r $helper
             ? eval { IPC::Open2::open2($from_reader, $to_reader, 'python3', $helper, 'mem-tree', $root_pid) } : undef;
-        $reader_fresh = 1;
-        $reader_down = 'exited-at-start' unless $reader_pid;
+        $reader_fresh = $first && $reader_pid ? 1 : 0;
+        return if $reader_pid;
+        $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
     # KiB of the group leader <pid> and its live descendants in its group, the
     # larger of footprint and resident size, or undef when unreadable.
