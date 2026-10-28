@@ -1540,7 +1540,7 @@ scn_partial_process_table_proves_no_agent_gone() {
   [ ! -s "$W/control.log" ] || why "the live agent was stopped on a partial process table: $(cat "$W/control.log")" || return 1
   rec_field t1 reason | grep -Eq 'automatic reap ineligible|terminal pane failed' || why "the prune did not back off on the failed read: $(rec_field t1 reason)" || return 1
   # The reap admission's own proof, asked directly: the pane's shell row alone is not "no agent".
-  if PATH="$W/bin:$PATH" bash -c '. "$1/fm-merge-prune-lib.sh"; fm_mp_pane_pid() { printf %s "$2"; }; fm_mp_pane_agent_gone "$3"' _ "$BIN_DIR" "$(cat "$W/pane.pid")" "$STATE/t1.meta" 2>/dev/null; then
+  if PATH="$W/bin:$PATH" bash -c '. "$1/fm-merge-prune-lib.sh"; test_pane_pid=$2; fm_mp_pane_pid() { printf %s "$test_pane_pid"; }; fm_mp_pane_agent_gone "$3"' _ "$BIN_DIR" "$(cat "$W/pane.pid")" "$STATE/t1.meta" 2>/dev/null; then
     why "the reap admission took a partly read process table for an agent that is gone" || return 1
   fi
   make_world
