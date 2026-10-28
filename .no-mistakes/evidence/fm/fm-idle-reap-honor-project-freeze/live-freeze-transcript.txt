@@ -1,0 +1,196 @@
+
+### S0 baseline: no hold -> reaper selects the Vernant task
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+reap	graft-stop-coalesce	ship	7202	finished and idle
+reap	vernant-b10-u4-register	ship	7202	finished and idle
+reap	vernant-probe-scout	scout	7203	finished and idle
+reap	vernant-sibling	ship	7203	finished and idle
+[exit 0]
+
+### S1 captain files the freeze hold (plain hold, no declaration yet)
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt hold vernant-freeze-20261023 --title Vernant freeze --reason captain froze the Vernant lanes: nothing dispatches until main is green --repo vernant
+vernant-freeze-20261023
+[exit 0]
+
+### S1 plain hold of the vernant repo declares no project -> still reap (scope is declared, not inferred)
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+reap	graft-stop-coalesce	ship	7208	finished and idle
+reap	vernant-b10-u4-register	ship	7211	finished and idle
+reap	vernant-probe-scout	scout	7213	finished and idle
+reap	vernant-sibling	ship	7215	finished and idle
+[exit 0]
+
+### S2 captain declares the freeze
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt freeze vernant-freeze-20261023 --project vernant
+vernant-freeze-20261023
+[exit 0]
+task:
+  id: vernant-freeze-20261023
+  title: Vernant freeze
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: yes
+  hold_reason: "fm-hold-v1:Y2FwdGFpbiBmcm96ZSB0aGUgVmVybmFudCBsYW5lczogbm90aGluZyBkaXNwYXRjaGVzIHVudGlsIG1haW4gaXMgZ3JlZW4="
+  hold_kind: captain
+  hold_until: "-"
+  kind: captain
+  repo: vernant
+  priority: "-"
+  created: 2026-10-28
+  closed: "-"
+  deps: none
+  links: none
+  body: "Captain hold set: 2026-10-28T21:58:11Z\nCaptain hold freezes project: vernant"
+
+### S2 frozen predicate
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt frozen vernant-b10-u4-register
+vernant-freeze-20261023
+[exit 0]
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt frozen graft-stop-coalesce
+vernant-freeze-20261023
+[exit 0]
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt frozen vernant-sibling
+[exit 1]
+
+### S2 scan with open freeze
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+parked	graft-stop-coalesce	ship	7221	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-b10-u4-register	ship	7223	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-probe-scout	scout	7227	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+reap	vernant-sibling	ship	7233	finished and idle
+[exit 0]
+
+### S3 base (main @7b9e555) reaper, same home, same open freeze hold
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt /Users/charlesabrooker/tmp/fm-base-bin.h7YuVe/bin/fm-idle-session-reap.sh
+reap	graft-stop-coalesce	ship	7243	finished and idle
+reap	vernant-b10-u4-register	ship	7246	finished and idle
+reap	vernant-probe-scout	scout	7247	finished and idle
+reap	vernant-sibling	ship	7249	finished and idle
+[exit 0]
+
+### S4 real reap sweep with the freeze open (real fm-teardown.sh)
+parked	graft-stop-coalesce	ship	7250	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-b10-u4-register	ship	7253	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-probe-scout	scout	7255	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+teardown-refused	vernant-sibling	-	-	error: task vernant-sibling's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-sibling.meta has 0 spawn generation fields; exactly one is required); refusing a...
+[exit 0]
+--- state/idle-sessions.report
+# fm-idle-session-reap 1793224736
+parked	graft-stop-coalesce	ship	7250	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-b10-u4-register	ship	7253	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-probe-scout	scout	7255	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+teardown-refused	vernant-sibling	-	-	error: task vernant-sibling's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-sibling.meta has 0 spawn generation fields; exactly one is required); refusing a...
+--- remaining metas
+graft-stop-coalesce.meta
+vernant-b10-u4-register.meta
+vernant-probe-scout.meta
+vernant-sibling.meta
+--- refusal memos
+vernant-sibling.refused
+
+### S5 automatic teardown admission refuses the frozen task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+REFUSED: automatic reap ineligible: parked: frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+[exit 1]
+
+### S6 adversarial: --until revisit date passes, freeze still holds
+vernant-freeze-20261023
+[exit 0]
+count: 0
+tasks: 0 held tasks in this backlog
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt frozen vernant-b10-u4-register
+vernant-freeze-20261023
+[exit 0]
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+parked	graft-stop-coalesce	ship	7280	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-b10-u4-register	ship	7282	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+parked	vernant-probe-scout	scout	7286	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+refused	vernant-sibling	ship	7288	error: task vernant-sibling's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-sibling.meta has 0 spawn generation fields; exactly one is required); refusing a...
+[exit 0]
+
+### S7 captain releases the hold
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt answer vernant-freeze-20261023 --decision-file /Users/charlesabrooker/tmp/fm-lab.yE1GXt/release.txt --release
+released: vernant-freeze-20261023
+[exit 0]
+$ hold /Users/charlesabrooker/tmp/fm-lab.yE1GXt frozen vernant-b10-u4-register
+[exit 1]
+$ scan /Users/charlesabrooker/tmp/fm-lab.yE1GXt
+reap	graft-stop-coalesce	ship	7294	finished and idle
+reap	vernant-b10-u4-register	ship	7295	finished and idle
+reap	vernant-probe-scout	scout	7296	finished and idle
+refused	vernant-sibling	ship	7298	error: task vernant-sibling's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-sibling.meta has 0 spawn generation fields; exactly one is required); refusing a...
+[exit 0]
+
+### S7 real reap sweep after release: teardown is attempted again
+reap	vernant-sibling	ship	7309	finished and idle
+teardown-refused	graft-stop-coalesce	-	-	error: task graft-stop-coalesce's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/graft-stop-coalesce.meta has 0 spawn generation fields; exactly one is required); re...
+teardown-refused	vernant-b10-u4-register	-	-	error: task vernant-b10-u4-register's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-b10-u4-register.meta has 0 spawn generation fields; exactly one is requi...
+teardown-refused	vernant-probe-scout	-	-	error: task vernant-probe-scout's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-probe-scout.meta has 0 spawn generation fields; exactly one is required); re...
+[exit 0]
+--- state/idle-sessions.report
+# fm-idle-session-reap 1793224785
+reap	vernant-sibling	ship	7309	finished and idle
+teardown-refused	graft-stop-coalesce	-	-	error: task graft-stop-coalesce's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/graft-stop-coalesce.meta has 0 spawn generation fields; exactly one is required); re...
+teardown-refused	vernant-b10-u4-register	-	-	error: task vernant-b10-u4-register's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-b10-u4-register.meta has 0 spawn generation fields; exactly one is requi...
+teardown-refused	vernant-probe-scout	-	-	error: task vernant-probe-scout's record has no spawn_gen that identifies one exact incarnation (task record /Users/charlesabrooker/tmp/fm-lab.yE1GXt/state/vernant-probe-scout.meta has 0 spawn generation fields; exactly one is required); re...
+
+### S8 secondmate + grandchild before any freeze
+$ scan /Users/charlesabrooker/tmp/fm-lab.PA4gMo
+reap	sample-mate-merged	ship	7321	finished and idle
+reap	vernant-provision-adopt-existing-branch	ship	7321	finished and idle
+[exit 0]
+$ scan /Users/charlesabrooker/tmp/fm-lab.ujq2Ki
+reap	vernant-claude-guard-policy-probe-scope	ship	7322	finished and idle
+[exit 0]
+
+### S8 captain freezes vernant once, in the root home only
+$ hold /Users/charlesabrooker/tmp/fm-lab.BhYrRh hold vernant-freeze-20261023 --title Vernant freeze --reason captain froze the Vernant lanes --repo vernant
+vernant-freeze-20261023
+[exit 0]
+$ hold /Users/charlesabrooker/tmp/fm-lab.BhYrRh freeze vernant-freeze-20261023 --project vernant
+vernant-freeze-20261023
+[exit 0]
+
+### S8 secondmate (mid) and grandchild scans
+$ scan /Users/charlesabrooker/tmp/fm-lab.PA4gMo
+reap	sample-mate-merged	ship	7327	finished and idle
+parked	vernant-provision-adopt-existing-branch	ship	7329	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+[exit 0]
+$ scan /Users/charlesabrooker/tmp/fm-lab.ujq2Ki
+parked	vernant-claude-guard-policy-probe-scope	ship	7330	frozen by captain hold vernant-freeze-20261023: project vernant is frozen until the captain releases it
+[exit 0]
+
+### S8 base reaper in the secondmate home
+$ scan /Users/charlesabrooker/tmp/fm-lab.PA4gMo /Users/charlesabrooker/tmp/fm-base-bin.h7YuVe/bin/fm-idle-session-reap.sh
+reap	sample-mate-merged	ship	7332	finished and idle
+reap	vernant-provision-adopt-existing-branch	ship	7332	finished and idle
+[exit 0]
+
+### S9 adversarial: parent backlog unreadable
+$ scan /Users/charlesabrooker/tmp/fm-lab.PA4gMo
+parked	sample-mate-merged	ship	7333	captain freeze unreadable: the captain holds of parent home /Users/charlesabrooker/tmp/fm-lab.BhYrRh cannot be read; cleanup ineligible
+parked	vernant-provision-adopt-existing-branch	ship	7333	captain freeze unreadable: the captain holds of parent home /Users/charlesabrooker/tmp/fm-lab.BhYrRh cannot be read; cleanup ineligible
+[exit 0]
+
+### S9 adversarial: middle binding missing (marker kept)
+$ scan /Users/charlesabrooker/tmp/fm-lab.ujq2Ki
+parked	vernant-claude-guard-policy-probe-scope	ship	7334	captain freeze unreadable: the parent binding of secondmate home /Users/charlesabrooker/tmp/fm-lab.PA4gMo cannot be read; cleanup ineligible
+[exit 0]
+
+### S9 adversarial: binding loops back
+$ scan /Users/charlesabrooker/tmp/fm-lab.ujq2Ki
+parked	vernant-claude-guard-policy-probe-scope	ship	7335	captain freeze unreadable: the parent binding of /Users/charlesabrooker/tmp/fm-lab.PA4gMo loops back to /Users/charlesabrooker/tmp/fm-lab.ujq2Ki; cleanup ineligible
+[exit 0]
+
+### S10 root releases: mate and grandchild eligible again
+$ hold /Users/charlesabrooker/tmp/fm-lab.BhYrRh answer vernant-freeze-20261023 --decision-file /Users/charlesabrooker/tmp/fm-lab.BhYrRh/release.txt --release
+released: vernant-freeze-20261023
+[exit 0]
+$ scan /Users/charlesabrooker/tmp/fm-lab.PA4gMo
+reap	sample-mate-merged	ship	7340	finished and idle
+reap	vernant-provision-adopt-existing-branch	ship	7341	finished and idle
+[exit 0]
+$ scan /Users/charlesabrooker/tmp/fm-lab.ujq2Ki
+reap	vernant-claude-guard-policy-probe-scope	ship	7342	finished and idle
+[exit 0]
