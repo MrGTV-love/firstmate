@@ -530,8 +530,12 @@
 #   Only after this isolation check, every fresh ship or scout requires a clean
 #   task worktree. When an origin configuration is detected, spawn fetches it,
 #   resolves the current remote default branch (or uses --base-branch, described
-#   above), and resets to its tip. When none is detected, spawn skips that remote freshness check and launches from the
-#   clean worktree's current HEAD. Relaunch reuses the recorded worktree without
+#   above), and resets to its tip. A fresh local-only ship instead compares that
+#   immutable tip with the qualified named local default and selects the descendant
+#   containing both histories; missing, ambiguous, moved or divergent local defaults
+#   refuse under project custody before copy preparation. Local commits are never
+#   relabeled as origin. When no origin is detected, spawn skips that comparison
+#   and launches from the clean worktree's current HEAD. Relaunch reuses the recorded worktree without
 #   fetching or resetting its base. An unreachable detected origin, unresolved
 #   default branch, or non-clean worktree refuses a fresh spawn rather than
 #   risking a PR based on stale history or discarding local work.
@@ -1875,6 +1879,9 @@ SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
 SPAWN_BASE_SHA=
+SPAWN_SELECTED_BASE_SHA=
+SPAWN_LOCAL_DEFAULT=
+SPAWN_LOCAL_SHA=
 SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
 SPAWN_BASE_ERROR=
@@ -4411,6 +4418,44 @@ spawn_fetch_base_evidence() {
     return 0
   }
   SPAWN_BASE_DEFAULT=$default
+  if [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ -z "$BASE_BRANCH" ]; then
+    SPAWN_LOCAL_DEFAULT=$(default_branch "$PROJ_ABS") || SPAWN_LOCAL_DEFAULT=
+    if [ "$SPAWN_LOCAL_DEFAULT" != "$default" ] ||
+      git -C "$PROJ_ABS" symbolic-ref --quiet "refs/heads/$default" >/dev/null 2>&1 ||
+      ! SPAWN_LOCAL_SHA=$(git -C "$PROJ_ABS" rev-parse --verify --quiet "refs/heads/$default^{commit}"); then
+      SPAWN_BASE_ERROR='local-only baseline is missing or ambiguous; reconcile the named local and remote default branches'
+    fi
+  fi
+}
+
+# The local-only plan pins the named default, never the primary's arbitrary HEAD
+# or working tree. Validate it under project custody before assigning a copy and
+# again before preparation; neither divergent history nor a changed plan is safe.
+spawn_validate_local_base() {
+  local default current
+  [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ "$RELAUNCH" -eq 0 ] && [ -z "$BASE_BRANCH" ] || return 0
+  [ "$BACKEND" != orca ] || return 0
+  spawn_worktree_has_origin_config "$PROJ_ABS" || return 0
+  if [ -n "$SPAWN_BASE_ERROR" ]; then
+    echo "error: $SPAWN_BASE_ERROR; local-only source selection refused" >&2
+    return 1
+  fi
+  default=$(default_branch "$PROJ_ABS") || default=
+  current=$(git -C "$PROJ_ABS" rev-parse --verify --quiet "refs/heads/$SPAWN_LOCAL_DEFAULT^{commit}") || current=
+  if [ -z "$SPAWN_LOCAL_SHA" ] || [ "$default" != "$SPAWN_LOCAL_DEFAULT" ] ||
+    [ "$current" != "$SPAWN_LOCAL_SHA" ] ||
+    git -C "$PROJ_ABS" symbolic-ref --quiet "refs/heads/$SPAWN_LOCAL_DEFAULT" >/dev/null 2>&1; then
+    echo 'error: qualified local-only default changed or is ambiguous; refusing the stale source plan' >&2
+    return 1
+  fi
+  if git -C "$PROJ_ABS" merge-base --is-ancestor "$SPAWN_BASE_SHA" "$SPAWN_LOCAL_SHA"; then
+    SPAWN_SELECTED_BASE_SHA=$SPAWN_LOCAL_SHA
+  elif git -C "$PROJ_ABS" merge-base --is-ancestor "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_SHA"; then
+    SPAWN_SELECTED_BASE_SHA=$SPAWN_BASE_SHA
+  else
+    echo 'error: local-only local and remote defaults diverge; reconcile them before assigning a task copy' >&2
+    return 1
+  fi
 }
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   { [ "$BACKEND" != orca ] || [ -n "$SPAWN_PROJECT_CAPACITY_ANY" ]; }; then
@@ -4428,6 +4473,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+  spawn_validate_local_base || exit 1
 fi
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   spawn_take_task_set_lock
@@ -4897,6 +4943,14 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
       echo "error: '$target' is not a commit for pooled worktree '$worktree'; refusing to launch from a potentially stale base" >&2
       return 1
     }
+  fi
+  if [ -n "$SPAWN_SELECTED_BASE_SHA" ]; then
+    expected=$SPAWN_SELECTED_BASE_SHA
+    if [ "$expected" != "$SPAWN_BASE_SHA" ]; then
+      target="refs/heads/$SPAWN_LOCAL_DEFAULT"
+    fi
+    printf 'local-only source: local=%s@%s origin=%s@%s selected=%s@%s\n' \
+      "$SPAWN_LOCAL_DEFAULT" "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_DEFAULT" "$SPAWN_BASE_SHA" "$target" "$expected"
   fi
   if ! git -C "$worktree" reset --hard "$expected" >/dev/null; then
     echo "error: could not reset pooled worktree '$worktree' to '$target'; refusing to launch from a potentially stale base" >&2
@@ -6156,6 +6210,7 @@ spawn_slot_refused() {
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
+spawn_validate_local_base || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
