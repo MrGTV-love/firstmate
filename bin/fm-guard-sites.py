@@ -253,8 +253,11 @@ def scan_file(root, rel, helpers, hook_names):
         message = case_arm_text(line) if eff == 'sh' else line
         if emits_refusal(message):
             sig.append('B')
-        if calls and calls.search(line) and not (eff == 'sh' and SH_DEF.match(line)) \
-                and not (eff == 'py' and PY_DEF.match(line)) and not (eff == 'js' and JS_DEF.match(line)):
+        # A definition header names a function and calls nothing; a one-line body after it still can.
+        header = {'sh': SH_DEF, 'py': PY_DEF, 'js': JS_DEF}.get(eff)
+        header = header.match(line) if header else None
+        body = line[header.end():] if header else line
+        if calls and calls.search(body):
             sig.append('C')
         if DENY_PERMISSION.search(line) or DENY_DECISION.search(line) or DENY_BLOCK.search(line) \
                 or (hook and eff == 'sh' and EXIT_TWO.search(stripped)
@@ -262,8 +265,7 @@ def scan_file(root, rel, helpers, hook_names):
                     and '$#' not in (lines[number - 2] if stripped == 'exit 2' and number > 1 else stripped)) \
                 or (opencode and re.search(r'\bthrow new Error\(', line)):
             sig.append('D')
-        if GUARD_EVENT.search(line) and not re.search(r'\b(?:grep|sed|awk|allow)\b', line) \
-                and not (eff == 'sh' and SH_DEF.match(line)) and not (eff == 'py' and PY_DEF.match(line)):
+        if GUARD_EVENT.search(body) and not re.search(r'\b(?:grep|sed|awk|allow)\b', line):
             sig.append('E')
         if sig:
             sites.append((number, ','.join(sig), stripped))

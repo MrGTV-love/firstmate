@@ -315,6 +315,18 @@ assert_site "S1 finds a call to a refuse helper whose message has no refusal wor
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "the helper definition must not count as a site: $(site_ids "$SIG")"
 pass "a helper definition is not a site, only its call"
 
+SIG=$(fixture sig_oneline_wrapper)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'refuse() { echo "$*" >&2; exit 1; }\nprobe() { [ -n "$1" ] || refuse "no task named"; }\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a refuse helper call inside a one-line function definition" "$SIG" 'C'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the wrapper's call must count as a site: $(site_ids "$SIG")"
+pass "a one-line wrapper's helper call is a site, the helper's own definition is not"
+
+SIG=$(fixture sig_oneline_event)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a guard event deny inside a one-line function definition" "$SIG" 'E'
+
 SIG=$(fixture sig_python_helper)
 printf 'def refuse(reason):\n    raise SystemExit(reason)\n\nrefuse("no task named")\n' >"$SIG/bin/a.py"
 assert_site "S1 finds a call to a Python refuse helper" "$SIG" 'C'
