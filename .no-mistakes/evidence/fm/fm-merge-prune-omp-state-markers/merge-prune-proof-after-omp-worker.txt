@@ -1,0 +1,36 @@
+=== new code (529e9e4e9), omp worker with FM_TASK_ID=fm-live-task
+== prune-new state listing
+find: state: No such file or directory
+ls: stub-arm-ran.txt: No such file or directory
+prove_ignored: PASS (copy is removable by ignored-file rule) preserve=[]
+
+=== old code (7b9e555b2), omp worker with FM_TASK_ID=fm-live-task
+== prune-old state listing
+state
+state/.omp-watch-extension-loaded
+state/.lock
+state/.guard-pass-checked
+state/.startup-network.status
+state/.inactive-outcome-reconcile
+state/home-summary.json
+state/.session-start-agents-baseline
+state/extensions
+state/extensions/omp-primary-watch
+state/extensions/omp-primary-watch/lifecycle.log
+state/terminal-outcomes
+state/.startup-network.report
+state/.omp-turnend-extension-loaded
+state/procevent
+state/procevent/proc-guard.source
+state/procevent/.owner-lease
+state/.startup-network.delivered
+state/.wake-queue
+state/.trace-context-effective
+state/.session-start-complete
+state/.startup-network.timings
+state/.omp-live-model
+ls: stub-arm-ran.txt: No such file or directory
+!! config/
+!! state/
+prove_ignored: keep - /private/tmp/fm-omp-live2.lNs5LF/old/copy holds an ignored file that is neither scratch nor on the preserve list: config
+

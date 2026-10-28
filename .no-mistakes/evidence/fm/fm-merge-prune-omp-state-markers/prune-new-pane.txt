@@ -1,0 +1,50 @@
+
+                                                                                    ████████████
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.12.6
+
+                                                                Tip: With default keybindings, ⌃D deletes the character under the cursor
+                                                                    instead of quitting your draft — see /hotkeys for your exit key
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.13.3 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run exactly this bash command with your bash tool and then report what happened in one line: bin/fm-watch-arm.sh &
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-watch-arm.sh &                                                                                                                                                                              │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or       │
+│ through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line"}    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the command was blocked by the safety hook because protected watchers cannot run in the background; it did not execute.
+
+╭── π > ◑ GPT-6.1 Sol 🙈 > 🗑 fm-omp-live2.lNs5LF/new/copy > ⑂ main > S0.04 + 👁 0.03 ▶──4%──────────────────────────────────────────╎───┃────────500K─◀ 👁️ WATCH: Run watch arm command < 🆔 01a18432 ──╮
+╰─                                                                                                                                                                                                    ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

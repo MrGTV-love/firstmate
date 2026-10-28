@@ -1,0 +1,5 @@
+== worker-new state listing
+find: state: No such file or directory
+ls: stub-arm-ran.txt: No such file or directory
+ M bin/fm-watch-arm.sh
+!! tests/fixtures/slack/config/

@@ -1,0 +1,3 @@
+$ FM_TEST_ONLY=test_primary_extensions_leave_a_task_worker_copy_clean FM_TASK_ID=fm-outer-worker bash tests/fm-omp-harness.test.sh   # at 529e9e4e9
+ok - .omp primary extensions: a task worker copy stays clean and keeps the arm seatbelt, a home still writes its four paths
+exit=0

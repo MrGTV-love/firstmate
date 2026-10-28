@@ -1,0 +1,12 @@
+FM_TEST_BEGIN 2026-10-28T20:25:41Z tests/fm-omp-harness.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - launch-model history preserves both families across relaunch
+ok - omp ship native fallback stand-ins are ship author evidence
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op
+ok - omp explicit shutdown logs its retirement expiry; readiness has no wall-clock cutoff
+ok - fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry
+ok - session lock and tmux liveness: omp is anchored, decoys stay out
+ok - fm-spawn refuses omp openai and openrouter routes before any worker launches

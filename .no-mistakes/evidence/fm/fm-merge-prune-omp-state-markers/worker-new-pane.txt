@@ -1,0 +1,50 @@
+
+                                                                                    ████████████
+                                                                                       ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                       ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                       ▒▒  ██                  █
+                                                                                           ██       v18.12.6
+
+                                                                           Tip: Tired of typing "keep going"? Just send a '.'
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.13.3 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ Run exactly this bash command with your bash tool and then report what happened in one line: bin/fm-watch-arm.sh &
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ bin/fm-watch-arm.sh &                                                                                                                                                                              │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[watcher-background] a protected watcher command cannot run in an asynchronous shell list or       │
+│ through nohup/disown; run it in the foreground with bin/fm-watch-checkpoint.sh --seconds <n>, or use the harness-native repair line printed by bin/fm-supervision-instructions.sh --repair-line"}    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Captain, the command was blocked by the watcher-background guard because protected watcher commands cannot run in an asynchronous shell list.
+
+╭── π > ◑ GPT-6.1 Sol 🙈 > 🗑 fm-omp-live.oMA2dW/new/copy > ⑂ main *1 > S0.04 + 👁 0.03 ▶──4%─────────────────────────────────────────╎──┃────────500K─◀ 👁️ WATCH: Run watch arm command < 🆔 01a18421 ──╮
+╰─                                                                                                                                                                                                    ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

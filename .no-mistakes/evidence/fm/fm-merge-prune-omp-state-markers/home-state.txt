@@ -1,0 +1,24 @@
+== lab home state after
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.omp-watch-extension-loaded
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.lock
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.guard-pass-checked
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.startup-network.status
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.inactive-outcome-reconcile
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/home-summary.json
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.session-start-agents-baseline
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/extensions
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/extensions/omp-primary-watch
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/extensions/omp-primary-watch/lifecycle.log
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.fm-lab-tmux-dir
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/terminal-outcomes
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.startup-network.report
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.omp-turnend-extension-loaded
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.startup-network.delivered
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.wake-queue
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.trace-context-effective
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.session-start-complete
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.startup-network.timings
+/Users/charlesabrooker/tmp/fm-lab.hrBbYp/state/.omp-live-model
+== copy state
+find: state: No such file or directory

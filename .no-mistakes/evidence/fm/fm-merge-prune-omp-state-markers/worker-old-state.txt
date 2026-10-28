@@ -1,0 +1,29 @@
+== worker-old state listing
+state
+state/.omp-watch-extension-loaded
+state/.lock
+state/.guard-pass-checked
+state/.startup-network.status
+state/.inactive-outcome-reconcile
+state/home-summary.json
+state/.session-start-agents-baseline
+state/extensions
+state/extensions/omp-primary-watch
+state/extensions/omp-primary-watch/lifecycle.log
+state/terminal-outcomes
+state/.startup-network.report
+state/.omp-turnend-extension-loaded
+state/procevent
+state/procevent/proc-guard.source
+state/procevent/.owner-lease
+state/.startup-network.delivered
+state/.wake-queue
+state/.trace-context-effective
+state/.session-start-complete
+state/.startup-network.timings
+state/.omp-live-model
+ls: stub-arm-ran.txt: No such file or directory
+ M bin/fm-watch-arm.sh
+!! config/
+!! state/
+!! tests/fixtures/slack/config/
