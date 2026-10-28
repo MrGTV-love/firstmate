@@ -16,8 +16,9 @@
 #                        through fm_backlog_relaunch_admission without mutation
 #   bin/fm-teardown.sh   meta removed => `tasks-axi done`, or `tasks-axi reopen`
 #                        with the deliverable recorded when the row is still an
-#                        open captain call (bin/fm-captain-hold.sh `open`), so
-#                        cleanup never retires the captain's own question
+#                        open captain call or parent decision
+#                        (bin/fm-captain-hold.sh `open --any-owner`), so
+#                        cleanup never retires a decision still owed
 #   bin/fm-bootstrap.sh  replays whatever a crash left behind, THIS HOME ONLY.
 # bin/fm-fleet-snapshot.sh's classifier and bin/fm-secondmate-reconcile.sh's
 # cross-home nudge stay defense in depth, not the primary mechanism.
@@ -60,8 +61,9 @@
 # the evidence that the row is owed a start.
 # A captain-held row uses the same record with a `mode=retain` line. Replay
 # records the deliverable and reopens the row only while it remains an open
-# captain call, never closing it. If the hold was released before replay, the
-# finished row closes instead of reopening unheld work. If an answer already
+# captain call or parent decision (FM_BACKLOG_ROW_OPEN_DECISION), never
+# closing it. If the hold was released before replay, the finished row closes
+# instead of reopening unheld work. If an answer already
 # closed a retained row, replay simply retires the satisfied record.
 
 # Set by fm_backlog_transition_applies for a return-1 exemption.

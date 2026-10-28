@@ -41,7 +41,7 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `withdraw` | Releases a captain-kind hold that a recorded captain ruling made moot, without writing captain words. | [Decision owner and honest release](#decision-owner-and-honest-release) |
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
-| `open` | Read-only check of whether a row is still an open captain call, or with `--parent-owned` an open parent decision. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
+| `open` | Read-only check of whether a row is still an open captain call, with `--parent-owned` an open parent decision, or with `--any-owner` either. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
@@ -146,13 +146,13 @@ The `--force` path remains the explicit captain-approved discard escape hatch.
 The policy prefers holding the very work item a question gates.
 So the backlog row a finished task's cleanup is about to close is routinely the captain's own call.
 
-An ordinary `bin/fm-teardown.sh` invocation therefore asks the read-only `open` subcommand before its automatic backlog close:
+An ordinary `bin/fm-teardown.sh` invocation therefore asks the read-only `open --any-owner` subcommand before its automatic backlog close:
 The finished-session sweep's stricter admission is owned by [`bin/fm-idle-session-reap.sh`](../bin/fm-idle-session-reap.sh)'s header, not this retention path.
 
 | `open` exit | Meaning | What ordinary teardown does |
 | --- | --- | --- |
-| 0 | The row is still an open captain call (not Done, `hold_kind: captain`). | Retains the row, as described below. |
-| 1 | The row is not an open captain call. | Proceeds with its automatic close. |
+| 0 | The row is still an open captain call (not Done, `hold_kind: captain`) or an open [parent decision](#decision-owner-and-honest-release). | Retains the row, as described below. |
+| 1 | The row is neither. | Proceeds with its automatic close. |
 | 2 | The answer could not be established. | Treats it as a refusal before any destructive step, never as permission to close. |
 
 ### Retaining the row on exit 0
@@ -433,6 +433,7 @@ By default, each outcome requires both the pending board-created request and the
 
 `reconcile list` is the read-only enumeration of pending requests filed by board answers.
 A successful normal answer also retires any pending request, because an answered call has no remaining re-check obligation.
+`withdraw` and `classify` retire it too, because each releases the captain-kind hold the request was filed against, and a stale request would otherwise let a later `reconcile close` pass for a new call on the same task.
 
 Every retirement is checked.
 If request removal fails after an answer, close, or note is already durable, the durable outcome stands, but the command fails and leaves the pending request visible for retry.
@@ -766,6 +767,10 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
   A legacy hold that is the captain's is marked so by `hold --owner captain`, which keeps it an open captain call and leaves nothing for `classify` to change.
   The classified hold reads as Main's classification in the held listing, leaves Bearings and the divergence check, and the captain's re-hold with `--owner captain` takes it back and makes `decide` refuse it.
 - The retired `fm-decision-hold.sh` shim refuses a secondmate hold that names no owner or `--owner parent`, keeps `--owner captain`, and leaves a main home alone.
+- `open --any-owner` reads both kinds of open decision, the completion gate accepts a parent decision and a withdrawal as durable, and a withdrawal retires the call's board reconcile request.
+- A `decide` or `withdraw` retried after an injected failed release finishes it without a second record or channel key.
+- The completion gate accepts a parent decision whose row retention archived, and `complete` lists it apart from answered calls.
+- `decide` and `withdraw` release a dated hold whose date has passed, and a plain `done` refuses a row while the parent's decision is open.
 - The merge gate refuses an open parent decision with a message naming the parent, proceeds after `decide`, and refuses a captain-owned hold after a `decide` attempt.
 
 ### Reconcile coverage

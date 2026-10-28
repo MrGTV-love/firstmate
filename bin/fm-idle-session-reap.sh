@@ -20,8 +20,9 @@
 #     canonical status_declared_wait_line reader and predicates;
 #   - its newest status event is `done` and the keyed decision fold has nothing
 #     open;
-#   - the durable captain-hold `open` predicate confirms no open captain call
-#     (an open call or an inconclusive read is parked, not reaped);
+#   - the durable captain-hold `open --any-owner` predicate confirms no open
+#     captain call or parent decision (an open one or an inconclusive read is
+#     parked, not reaped);
 #   - landing evidence exists locally, without any forge call: a scout needs a
 #     nonempty regular data/<id>/report.md, and a ship needs the merge poll's
 #     state/<id>.pr-poll-merge-notified marker for the PR recorded in its meta;
