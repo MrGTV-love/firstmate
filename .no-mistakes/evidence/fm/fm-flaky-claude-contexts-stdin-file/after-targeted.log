@@ -1,0 +1,10 @@
+warning: re-init: ignored --initial-branch=main
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.rYPCfl/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.rYPCfl/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.rYPCfl/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.rYPCfl/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+warning: re-init: ignored --initial-branch=main
+ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+warning: re-init: ignored --initial-branch=main
+ok - Claude tools: helpers excluded, exact Bash/Read surface, watcher-arm denial retained and directory changes allowed
