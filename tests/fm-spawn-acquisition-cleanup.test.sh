@@ -191,6 +191,8 @@ SH
   chmod +x "$FAKEBIN/herdr"
 fi
 load_acquisition_herdr() {
+  # The adapter is not followed from this test; bin/backends/herdr.sh is still linted as its own root.
+  # shellcheck source=/dev/null
   . "$ROOT/bin/backends/herdr.sh"
 }
 
