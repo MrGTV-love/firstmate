@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # tests/git-config-helpers.sh - fixture Git isolation from the host's global and
-# system configuration and from an inherited repository location.
+# system configuration, from an inherited GIT_CONFIG_COUNT core.hooksPath entry
+# (a launcher-injected hooks directory), and from an inherited repository
+# location.
 #
 # Source this before a fixture's first Git operation:
 #   # shellcheck source=tests/git-config-helpers.sh
@@ -9,10 +11,11 @@
 # Fixture Git processes must not inherit host signing, hooks, or other global and
 # system preferences: with commit.gpgsign=true set globally and no secret key for
 # the fixture identities, every fixture commit fails before its assertion.
-# Isolation is limited to those two layers on purpose, so repository-local config,
-# inline `git -c`, GIT_CONFIG_COUNT, and a GIT_CONFIG_GLOBAL the caller supplies
-# after sourcing all stay authoritative - the Git-config suites assert on them.
-# The one inherited GIT_CONFIG_COUNT entry dropped is core.hooksPath, below.
+# Config isolation covers those two layers plus the inherited GIT_CONFIG_COUNT
+# core.hooksPath entry, below, on purpose: repository-local config, inline
+# `git -c`, every other inherited GIT_CONFIG_COUNT entry, and a GIT_CONFIG_COUNT
+# or GIT_CONFIG_GLOBAL the caller supplies after sourcing all stay authoritative
+# - the Git-config suites assert on them.
 # The export reaches only the sourcing shell and its children, so the developer's
 # own config files are never written and real project commits made outside the
 # fixtures keep their configuration and signing.

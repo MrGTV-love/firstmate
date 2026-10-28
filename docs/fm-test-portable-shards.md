@@ -32,7 +32,7 @@ The per-shard packing check below then refused eighteen and nineteen shards, bec
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
 On 2026-10-24 the four unhinted `tests/fm-retired-jev-write-*.test.sh` retirement suites, packed at the 45000 ms default weight, join main's twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=10 serial_max_ms=1155486`); the packing target and job timeout are unchanged.
 They were left at the default because the change that added them read the refcheck guard as forbidding retired ids in the hint table; that guard masks a file which names the retirement test's path before matching the retired id, so the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) measured and hinted them.
-On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-one serial shards then, which passed `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`); the [2026-10-28 refresh](#refresh-the-hints-and-shard-count) measured both and moved the lane to twenty-three shards.
+On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-one serial shards then, which passed `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`); the [2026-10-28 refresh](#refresh-the-hints-and-shard-count) measured both and moved the lane to twenty-four shards.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
 So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
 `tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
@@ -326,12 +326,14 @@ No green main run yet carries the suites that landed after them, so five members
 The other 55 members have no successful ungated sample in these runs and keep their hints.
 The serial hints then sum to 27464684 ms, against 25312015 ms before (the 330 members with the 45000 ms default for the six that had no hint), and `serial_unhinted` is 0.
 
-Against that table `--check-coverage` refuses twenty-one shards (`portable serial shard 1 of 21 packs 1307844ms`) and twenty-two (`portable serial shard 1 of 22 packs 1248539ms`), and passes twenty-three (`serial_shards=23 serial_unhinted=0 serial_max_ms=1194350 serial_budget_ms=1200000`), so twenty-three is the fewest serial shards that pass.
+Against that table `--check-coverage` refuses twenty-one shards (`portable serial shard 1 of 21 packs 1307844ms`) and twenty-two (`portable serial shard 1 of 22 packs 1248539ms`).
+It passes twenty-three (`serial_shards=23 serial_unhinted=0 serial_max_ms=1194350 serial_budget_ms=1200000`), but twenty-three leave 135316 ms of lane slack (23 x 1200000 - 27464684), less than one 1200000 ms target, so the [shard-count rule](#portable-serial-ci-shards) refuses them.
+Twenty-four leave 1335316 ms and pass (`serial_shards=24 serial_unhinted=0 serial_max_ms=1144680 serial_budget_ms=1200000`), so twenty-four is the fewest serial shards that pass and keep one target of slack.
 The packing target, the parallel budget, and the 60-minute job timeout are unchanged, and no test was skipped, removed, or loosened.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-three.
-Replaying each of the three main runs' own per-script durations through the twenty-three-shard assignment puts the slowest shard at 1188526, 1183517, and 1170514 ms, with 4 members filled from their hints; the model reads 7 to 9 percent high in aggregate (27464684 ms modeled against 25243431 to 25697152 ms replayed).
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-four.
+Replaying each of the three main runs' own per-script durations through the earlier twenty-three-shard assignment puts the slowest shard at 1188526, 1183517, and 1170514 ms, with 4 members filled from their hints; the model reads 7 to 9 percent high in aggregate (27464684 ms modeled against 25243431 to 25697152 ms replayed).
 The same replay through the newer pull-request runs gives a slowest shard of 1209920, 1316807, and 1834041 ms, where run 40691163806 shows a shard far above the others whose cause this refresh did not investigate; the target bounds the model, not every real shard, as the 2026-10-26 note above already states.
-The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`.
+The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`; the twenty-four-shard assignment has not been replayed.
 
 ## Portable serial remainder
 
@@ -366,6 +368,8 @@ Balance is still worth keeping current, because enough unmeasured scripts let on
 `bin/fm-test-run.sh --check-coverage` reports the unmeasured share as `serial_unhinted=` and refuses past `PORTABLE_SERIAL_MAX_UNHINTED_PERCENT`.
 That catches missing hints, not stale existing hints: the host suite still had a 41512 ms hint after growing to over 1000 seconds in CI, so the old split placed it beside another 12 minutes of work while passing the guard.
 Refresh the hints whenever a serial member grows materially or the lane gains scripts, rather than waiting for missing-hint coverage to trip.
+Choose the fewest shard count that passes and leaves lane slack of at least one shard target (`PORTABLE_SERIAL_MAX_WEIGHT_MS`): the shard count times the target, minus the serial hint sum, is at least the target.
+A count that passes with less slack is refused, because the next unhinted member or upward refresh pushes every packing of it over the target.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
 Its header and `--help` own the modeled-budget check and output fields; read the current estimates from `--check-coverage` instead of retaining copied lane sums here.
@@ -483,7 +487,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses twenty-nine long-lived Linux jobs (twenty-three serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty long-lived Linux jobs (twenty-four serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

@@ -268,7 +268,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=23
+PORTABLE_SERIAL_SHARDS=24
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -338,10 +338,10 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # tests/fm-watch-triage-waits.test.sh and tests/fm-control-relaunch.test.sh, are
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
-# The 2026-10-28 hint refresh moves to twenty-three shards, the fewest that
-# pass, and packs them at serial_max_ms 1194350 ms; replaying the three
-# refresh runs' own per-script durations through that assignment puts the
-# slowest shard between 1170514 ms and 1188526 ms
+# The shard count is the fewest that pass and leave lane slack of at least one
+# target. The 2026-10-28 hint refresh sums to 27464684 ms, so twenty-three
+# shards pass with only 135316 ms of slack and are refused by that rule;
+# twenty-four leave 1335316 ms and pack at serial_max_ms 1144680 ms
 # (docs/fm-test-portable-shards.md, "Refresh the hints and shard count").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
