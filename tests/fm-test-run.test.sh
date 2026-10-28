@@ -493,10 +493,12 @@ test_captain_hold_groups_share_helper_changed_selection() {
 # calls smaller cases by name: a defined case that is not registered must then
 # be called from another line of its file, because a case nothing runs is the
 # loss, while one a registered case runs is not. Definitions inside a heredoc
-# are fixture text for another script, never cases. In calls mode the cases
-# live in <helper> and each listed script calls its share by bare name,
-# optionally followed by "|| exit $?"; the helper's definitions are then the
-# inventory and every one of them must be called by exactly one listed script.
+# are fixture text for another script, never cases; a heredoc opener whose
+# terminator never comes would hide the rest of its file, so it is a problem
+# named by file and line. In calls mode the cases live in <helper> and each
+# listed script calls its share by bare name, optionally followed by
+# "|| exit $?"; the helper's definitions are then the inventory and every one
+# of them must be called by exactly one listed script.
 partition_registered() {
   awk -v var="$2" '
     $0 ~ ("^[[:space:]]*" var "=\\(\\)") { next }
@@ -517,14 +519,16 @@ partition_called() {
 }
 
 partition_defined() {
-  awk '
+  awk -v label="$2" '
     hd != "" { line = $0; sub(/^\t+/, "", line); if (line == hd) hd = ""; next }
     match($0, /^test_[A-Za-z0-9_]+\(\)/) { print substr($0, 1, RLENGTH - 2) }
     match($0, /<<-?[[:space:]]*["\047]?[A-Za-z_][A-Za-z0-9_]*["\047]?/) && substr($0, RSTART - 1, 1) != "<" {
       tag = substr($0, RSTART, RLENGTH)
       gsub(/^<<-?[[:space:]]*["\047]?|["\047]$/, "", tag)
       hd = tag
+      hdline = NR
     }
+    END { if (hd != "") printf "%s:%d: heredoc <<%s never closes, so the rest of the file is unjudged\n", label, hdline, hd }
   ' "$1" | LC_ALL=C sort
 }
 
@@ -537,7 +541,11 @@ partition_called_elsewhere() {
 partition_problems() {
   local root=$1 mode=$2 registry=$3 helper=$4 group file registered defined helper_defined seen='' dup name stray listed=''
   shift 4
-  [ "$mode" != calls ] || helper_defined=$(partition_defined "$root/tests/$helper")
+  if [ "$mode" = calls ]; then
+    helper_defined=$(partition_defined "$root/tests/$helper" "tests/$helper")
+    printf '%s\n' "$helper_defined" | grep -vE '^(test_|$)' || true
+    helper_defined=$(printf '%s\n' "$helper_defined" | grep '^test_' || true)
+  fi
   for group in "$@"; do
     file=$root/tests/$group.test.sh
     listed=$(printf '%s\n%s' "$listed" "$file")
@@ -550,7 +558,9 @@ partition_problems() {
       defined=$helper_defined
     else
       registered=$(partition_registered "$file" "$registry")
-      defined=$(partition_defined "$file")
+      defined=$(partition_defined "$file" "tests/$group.test.sh")
+      printf '%s\n' "$defined" | grep -vE '^(test_|$)' || true
+      defined=$(printf '%s\n' "$defined" | grep '^test_' || true)
     fi
     if [ -z "$registered" ]; then
       printf 'tests/%s.test.sh registers no cases\n' "$group"
@@ -690,6 +700,17 @@ test_partition_checks_judge_loss_and_duplication() {
   printf '%s\n' "cat <<'SH'" 'test_fixture_only() { :; }' 'SH' >> "$root/tests/demo-one.test.sh"
   [ -z "$(array_problems)" ] || { rm -rf "$root"; fail "a definition inside a heredoc was counted as a case: $(array_problems)"; }
 
+  # A "<<WORD" in a comment or a string opens no heredoc, so a scan that treats
+  # it as one must fail closed rather than skip the cases after it.
+  array_base
+  printf '%s\n' '# feed it with <<EOF when needed' 'test_hidden() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh:7: heredoc <<EOF never closes" "a comment heredoc opener must not hide a case"
+  array_base
+  printf '%s\n' 'echo "use <<DONE here"' 'test_hidden() { :; }' >> "$root/tests/demo-two.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-two.test.sh:5: heredoc <<DONE never closes" "a string heredoc opener must not hide a case"
+
   calls_problems() { partition_problems "$root" calls '' demo-helpers.sh demo-one demo-two; }
   calls_base() {
     rm -rf "$root/tests"
@@ -721,6 +742,11 @@ test_partition_checks_judge_loss_and_duplication() {
   partition_fixture_calls "$root" demo-two 'test_c test_a'
   problems=$(calls_problems)
   assert_contains "$problems" "registered in more than one group: test_a" "a case called by two scripts must fail"
+
+  calls_base
+  printf '%s\n' '# see <<EOF' 'test_z() { :; }' >> "$root/tests/demo-helpers.sh"
+  problems=$(calls_problems)
+  assert_contains "$problems" "tests/demo-helpers.sh:4: heredoc <<EOF never closes" "a helper heredoc opener must not hide a case"
 
   calls_base
   partition_fixture_calls "$root" demo-three 'test_a'
@@ -3511,10 +3537,9 @@ test_pr_merge_groups_partition_one_inventory() {
 test_pr_merge_groups_partition_one_inventory
 
 # The four fm-lint groups partition one former suite: every case a group file
-# defines is registered by that file or run by name from a registered case, and
-# no case is registered by two groups.
+# defines is registered by that file, and no case is registered by two groups.
 test_fm_lint_groups_partition_one_inventory() {
-  assert_partition_exact fm-lint array-nested fm_lint_test_cases '' fm-lint fm-lint-policy fm-lint-slots fm-lint-report
+  assert_partition_exact fm-lint array fm_lint_test_cases '' fm-lint fm-lint-policy fm-lint-slots fm-lint-report
   pass "the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it"
 }
 
