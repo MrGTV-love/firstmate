@@ -480,7 +480,8 @@ test_captain_hold_groups_share_helper_changed_selection() {
 # derived from the files themselves: a case a group defines but does not
 # register never runs, a case a group registers but does not define cannot
 # run, and a case registered by two groups runs twice and hides a copy that
-# should have moved. A group file missing from the list, or a stray script
+# should have moved. A case defined twice in one file loses its first body, so
+# that is judged too. A group file missing from the list, or a stray script
 # that declares the same registry, is the same loss one level up. A total
 # added nothing to these and failed every PR that legitimately added a test;
 # a deliberate deletion removes the definition and the registration together,
@@ -538,7 +539,7 @@ partition_defined() {
     match($0, /^test_[A-Za-z0-9_]+\(\)/) { print substr($0, 1, RLENGTH - 2) }
     (tag = opener()) != "" { hd = tag; hdline = NR }
     END { if (hd != "") printf "%s:%d: heredoc <<%s never closes, so the rest of the file is unjudged\n", label, hdline, hd }
-  ' "$1" | LC_ALL=C sort -u
+  ' "$1" | LC_ALL=C sort
 }
 
 # partition_called_elsewhere <file> <case>: true when a non-comment line of the
@@ -554,6 +555,10 @@ partition_problems() {
     helper_defined=$(partition_defined "$root/tests/$helper" "tests/$helper")
     printf '%s\n' "$helper_defined" | grep -vE '^(test_|$)' || true
     helper_defined=$(printf '%s\n' "$helper_defined" | grep '^test_' || true)
+    for name in $(printf '%s\n' "$helper_defined" | uniq -d); do
+      printf 'tests/%s defines %s twice\n' "$helper" "$name"
+    done
+    helper_defined=$(printf '%s\n' "$helper_defined" | uniq)
   fi
   for group in "$@"; do
     file=$root/tests/$group.test.sh
@@ -570,6 +575,10 @@ partition_problems() {
       defined=$(partition_defined "$file" "tests/$group.test.sh")
       printf '%s\n' "$defined" | grep -vE '^(test_|$)' || true
       defined=$(printf '%s\n' "$defined" | grep '^test_' || true)
+      for name in $(printf '%s\n' "$defined" | uniq -d); do
+        printf 'tests/%s.test.sh defines %s twice\n' "$group" "$name"
+      done
+      defined=$(printf '%s\n' "$defined" | uniq)
     fi
     if [ -z "$registered" ]; then
       printf 'tests/%s.test.sh registers no cases\n' "$group"
@@ -685,6 +694,11 @@ test_partition_checks_judge_loss_and_duplication() {
   assert_contains "$problems" "registered in more than one group: test_b" "a case registered in two groups must fail"
 
   array_base
+  printf '%s\n' 'test_b() { :; }' >> "$root/tests/demo-one.test.sh"
+  problems=$(array_problems)
+  assert_contains "$problems" "tests/demo-one.test.sh defines test_b twice" "a case defined twice in one file must fail"
+
+  array_base
   rm "$root/tests/demo-two.test.sh"
   problems=$(array_problems)
   assert_contains "$problems" "missing group file: tests/demo-two.test.sh" "a missing group file must fail"
@@ -767,6 +781,11 @@ test_partition_checks_judge_loss_and_duplication() {
   partition_fixture_calls "$root" demo-two 'test_c test_a'
   problems=$(calls_problems)
   assert_contains "$problems" "registered in more than one group: test_a" "a case called by two scripts must fail"
+
+  calls_base
+  printf '%s() { :; }\n' test_a >> "$root/tests/demo-helpers.sh"
+  problems=$(calls_problems)
+  assert_contains "$problems" "tests/demo-helpers.sh defines test_a twice" "a helper case defined twice must fail"
 
   calls_base
   printf '%s\n' '# see <<EOF' 'test_z() { :; }' >> "$root/tests/demo-helpers.sh"
