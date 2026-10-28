@@ -130,7 +130,13 @@ fresh = task_copy('fresh', commit_age=0)
 merged = task_copy('merged', commit_age=50)
 covered = task_copy('covered', commit_age=50)
 review_author = task_copy('review-author')
-(home / 'state/review-author.meta').write_text(f'model=anthropic/claude-sonnet-5\nspawn_gen=s{now - 7200}.1.1\n')
+# The record owner derives PR authors from the owning task's commits outside the
+# live base, so PR 9's head is a real commit in that task's copy (no ref moves).
+review_base = git(review_author, 'rev-parse', 'HEAD')
+review_head = git(review_author, 'commit-tree', git(review_author, 'rev-parse', 'HEAD^{tree}'),
+                  '-p', review_base, '-m', 'review work')
+author_meta_text = lambda model, gen: f'model={model}\nspawn_gen={gen}\nworktree={review_author}\nmode=direct-PR\n'
+(home / 'state/review-author.meta').write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
 merged_head = git(merged, 'rev-parse', 'HEAD')
 covered_head = git(covered, 'rev-parse', 'HEAD')
 for name, path in (('stalled', stalled), ('fresh', fresh)):
@@ -167,14 +173,14 @@ double = dict(
     pulls=[dict(number=7, html_url=PR_URL + '7', head=dict(sha=covered_head), state='open', draft=False, updated_at=iso(hours(3))),
            dict(number=8, html_url=PR_URL + '8', head=dict(sha='b' * 40), draft=False, updated_at=iso(hours(2)),
                 requested_reviewers=[dict(login='reviewer')]),
-           dict(number=9, html_url=PR_URL + '9', head=dict(sha='c' * 40), draft=False, updated_at=iso(hours(1)))],
+           dict(number=9, html_url=PR_URL + '9', head=dict(sha=review_head), draft=False, updated_at=iso(hours(1)))],
     checks={covered_head: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4)))],
             'b' * 40: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4))),
                        dict(id=2, name='unit', app=dict(id=3), status='completed', conclusion='success',
                            completed_at=iso(hours(3)))],
-            'c' * 40: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
+            review_head: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
     single={'5': dict(merged_at=iso(hours(1)), head=dict(sha=merged_head)), '7': dict(merged_at=None)})
 (world / 'gh.json').write_text(json.dumps(double))
 
@@ -231,16 +237,16 @@ print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 # bin/fm-review-record.py once for the live head and consumes one atomic
 # fm-review-verification.v1 object. Typed not-qualified is ordinary absence;
 # unreadable or corrupt history degrades coverage instead of reading as unreviewed.
-review_url, review_head = PR_URL + '9', 'c' * 40
+review_url = PR_URL + '9'
 review_report = world / 'review.md'
 review_records = home / 'state/review-records.jsonl'
 config_path = home / 'config/open-loops.json'
 author_meta = home / 'state/review-author.meta'
-author_meta.write_text(f'model=anthropic/claude-sonnet-5\nspawn_gen=s{now - 7200}.1.1\n')
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
 # The lane ids are only discovery hints: no status or metadata file exists for them.
 config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane', 'second-lane']},
                                      age_limits_seconds={'review_pass_not_merged': 600})))
-double['pulls'][2]['base'] = dict(ref='main')
+double['pulls'][2]['base'] = dict(ref='main', sha=review_base)
 double['checks'][review_head][0]['completed_at'] = iso(now - 700)
 (world / 'gh.json').write_text(json.dumps(double))
 
@@ -333,11 +339,14 @@ assert unreadable['complete'] is False, unreadable
 assert 'review record' in rows(unreadable, 'coverage')['ledger degraded']['evidence'], unreadable
 review_records.unlink()
 
-# Record-time evidence is immutable: mutable task metadata, a changed report and
-# a relaunch cannot convert the old review into a different family.
+# Authors are re-derived from the owning task at every read: a relaunch in the
+# reader's family withdraws the qualifying review. The recorded review itself is
+# immutable, so a later report edit does not change it.
 record_review()
 set_review_age(601)
-author_meta.write_text(f'model=openai/gpt-6.1-sol\nspawn_gen=s{now - 1}.1.1\n')
+author_meta.write_text(author_meta_text('openai/gpt-6.1-sol', f's{now - 1}.1.1'))
+assert_no_qualifying_review('a same-family relaunch must withdraw the independent review')
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
 review_report.write_text(f'VERDICT: PASS head={review_head}\nA later, unrelated edit.\n')
 invariant = rows(ledger(), 'review_pass_not_merged')[review_url]
 assert invariant['overdue'] and 'openai reviewing anthropic' in invariant['evidence'], invariant

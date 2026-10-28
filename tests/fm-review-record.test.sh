@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests for bin/fm-review-record.py: immutable review-time evidence,
 # --review-only verification and the fm-review-verification.v1 JSON contract.
-# Every case drives the real CLI over synthetic local reports; no forge, model
-# or merge operation happens.
+# Every case drives the real CLI over synthetic local reports and a local git
+# fixture holding the PR base and head; no forge, model or merge operation
+# happens.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -12,8 +13,18 @@ RECORD="$ROOT/bin/fm-review-record.py"
 JQ_BIN=$(command -v jq) || fail "test needs jq"
 TMP_ROOT=$(fm_test_tmproot fm-review-record-tests)
 URL=https://github.com/example/repo/pull/9
-HEAD1=1111111111111111111111111111111111111111
 HEAD2=2222222222222222222222222222222222222222
+NM_FIXTURE="$TMP_ROOT/nm-home"
+fm_test_empty_pipeline_db "$NM_FIXTURE"
+
+# verify derives authors from the task's commits outside the PR base, so every
+# case copies one fixture worktree whose tip is HEAD1 and whose base is BASE.
+TEMPLATE_WT="$TMP_ROOT/template-wt"
+fm_git_init_commit "$TEMPLATE_WT"
+BASE=$(git -C "$TEMPLATE_WT" rev-parse HEAD)
+git -C "$TEMPLATE_WT" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  commit -q --allow-empty -m 'ship implementation'
+HEAD1=$(git -C "$TEMPLATE_WT" rev-parse HEAD)
 
 sha256_of() {
   if command -v shasum >/dev/null 2>&1; then
@@ -23,10 +34,13 @@ sha256_of() {
   fi
 }
 
-make_case() {
-  local name=$1 case_dir
+make_case() {  # <name> [ship author model]
+  local name=$1 author=${2:-gpt-5.1} case_dir
   case_dir="$TMP_ROOT/$name"
-  mkdir -p "$case_dir/home"
+  mkdir -p "$case_dir/home/state"
+  cp -R "$TEMPLATE_WT" "$case_dir/wt"
+  fm_write_meta "$case_dir/home/state/task-x1.meta" \
+    "worktree=$case_dir/wt" "kind=ship" "model=$author" "branch=fm/fixture" "mode=direct-PR"
   printf '%s\n' "$case_dir"
 }
 
@@ -48,7 +62,8 @@ record_word() {  # <case_dir> <head> <words>
 run_verify() {  # <case_dir> <head> [flags...]
   local case_dir=$1 head=$2
   shift 2
-  FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$head" "$@"
+  NM_HOME="$NM_FIXTURE" FM_HOME="$case_dir/home" "$RECORD" verify --pr "$URL" --head "$head" \
+    --task task-x1 --base "$BASE" "$@"
 }
 
 expect_not_qualified() {  # <json> <message needle> <label>
@@ -66,7 +81,7 @@ test_review_only_json_is_immutable_record_time_evidence() {
   local case_dir out rc=0 digest at ledger before after
   case_dir=$(make_case independent-json)
   record_review "$case_dir" "$HEAD1" PASS sonnet \
-    '{"initial":["gpt-5.1-codex"],"fixes":["Gemini-3-Pro","deepseek-v3"]}' >/dev/null \
+    '{"ship":["gpt-5.1"],"fixes":["Gemini-3-Pro","deepseek-v3"]}' >/dev/null \
     || fail "record independent PASS"
   digest=$(sha256_of "$case_dir/report.md")
   ledger="$case_dir/home/state/review-records.jsonl"
@@ -88,7 +103,7 @@ test_review_only_json_is_immutable_record_time_evidence() {
     .schema == "fm-review-verification.v1" and .ok == true
     and .basis == "independent-review" and .pr == $pr and .head == $head
     and .at == $at and .reader_model == "sonnet" and .reader_family == "anthropic"
-    and .author_groups == {"initial":[{model:"gpt-5.1-codex",family:"openai"}],
+    and .author_groups == {"ship":[{model:"gpt-5.1",family:"openai"}],
                            "fixes":[{model:"Gemini-3-Pro",family:"google"},
                                     {model:"deepseek-v3",family:"deepseek"}]}
     and .report == $report and .report_sha256 == $digest' <<<"$out" >/dev/null \
@@ -169,26 +184,26 @@ test_review_only_rejections_are_typed_not_qualified() {
   expect_code 1 "$rc" "default verify must still refuse FAIL"
   assert_contains "$out" "error: verdict is FAIL" "default FAIL text must stay actionable"
 
-  case_dir=$(make_case reject-same-family)
+  case_dir=$(make_case reject-same-family claude-opus-4)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["claude-opus-4"]}' >/dev/null || fail "record same-family PASS"
   rc=0
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "same family must not qualify"
-  expect_not_qualified "$out" "matches author_groups" "same family"
+  expect_not_qualified "$out" "uncovered commit group ship, family anthropic" "same family"
 
   case_dir=$(make_case reject-unknown-reader)
   record_review "$case_dir" "$HEAD1" PASS mystery-9 '{"all":["gpt-5.1"]}' >/dev/null || fail "record unknown-reader PASS"
   rc=0
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "unknown reader must not qualify"
-  expect_not_qualified "$out" "model family unknown for mystery-9" "unknown reader"
+  expect_not_qualified "$out" "model family unknown for newest reader mystery-9" "unknown reader"
 
-  case_dir=$(make_case reject-unknown-author)
+  case_dir=$(make_case reject-unknown-author mystery-9)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["mystery-9"]}' >/dev/null || fail "record unknown-author PASS"
   rc=0
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "unknown author must not qualify"
-  expect_not_qualified "$out" "model family unknown for mystery-9" "unknown author"
+  expect_not_qualified "$out" "uncovered commit group ship, family unknown" "unknown author"
 
   case_dir=$(make_case reject-trigger)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["gpt-5.1"]}' --widens-guard yes >/dev/null \
@@ -213,18 +228,18 @@ test_native_claude_aliases_are_anthropic() {
       <<<"$out" >/dev/null || fail "bare $alias must map to anthropic: $out"
     rc=0
   done
-  case_dir=$(make_case alias-same-family)
+  case_dir=$(make_case alias-same-family claude-opus-4)
   record_review "$case_dir" "$HEAD1" PASS haiku '{"all":["claude-opus-4"]}' >/dev/null || fail "record alias same-family"
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "bare Claude aliases share the anthropic family"
-  expect_not_qualified "$out" "matches author_groups" "bare alias vs claude id"
-  case_dir=$(make_case alias-same-family-bare)
+  expect_not_qualified "$out" "uncovered commit group ship, family anthropic" "bare alias vs claude id"
+  case_dir=$(make_case alias-same-family-bare opus)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["opus"]}' >/dev/null || fail "record bare alias same-family"
   rc=0
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
   expect_code 1 "$rc" "two bare Claude aliases share anthropic"
-  expect_not_qualified "$out" "matches author_groups" "bare alias vs bare alias"
-  case_dir=$(make_case alias-provider-qualified)
+  expect_not_qualified "$out" "uncovered commit group ship, family anthropic" "bare alias vs bare alias"
+  case_dir=$(make_case alias-provider-qualified openai/gpt-5.1)
   record_review "$case_dir" "$HEAD1" PASS anthropic/claude-sonnet-4 '{"all":["openai/gpt-5.1"]}' >/dev/null \
     || fail "record provider-qualified PASS"
   rc=0
@@ -235,16 +250,14 @@ test_native_claude_aliases_are_anthropic() {
   pass "bare opus, sonnet and haiku ids map to anthropic while unknown ids stay untrusted"
 }
 
-test_stored_family_metadata_cannot_retroactively_change_independence() {
+test_stored_family_fields_cannot_retroactively_change_independence() {
   local case_dir out ledger
-  case_dir=$(make_case mutable-metadata)
+  case_dir=$(make_case mutable-metadata claude-opus-4)
   record_review "$case_dir" "$HEAD1" PASS gpt-5.1 '{"all":["claude-opus-4"]}' >/dev/null \
     || fail "record cross-family PASS"
   out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || fail "cross-family PASS must verify: $out"
   "$JQ_BIN" -e '.reader_family == "openai" and .author_groups.all[0].family == "anthropic"' <<<"$out" >/dev/null \
     || fail "families must derive from the recorded model ids: $out"
-  printf 'reader_model=claude-opus-4\nauthor_model=claude-opus-4\nfamily=anthropic\n' \
-    > "$case_dir/home/state/task-x1.meta"
   ledger="$case_dir/home/state/review-records.jsonl"
   "$JQ_BIN" -c 'if .kind == "review" then
       .reader_family = "anthropic"
@@ -255,7 +268,7 @@ test_stored_family_metadata_cannot_retroactively_change_independence() {
     || fail "stale stored family metadata must not decide independence: $out"
   "$JQ_BIN" -e '.ok == true and .reader_family == "openai" and .author_groups.all[0].family == "anthropic"' \
     <<<"$out" >/dev/null || fail "verification must re-derive families from model ids: $out"
-  pass "stored family fields and task metadata cannot retroactively change recorded independence"
+  pass "stored family fields cannot retroactively change recorded independence"
 }
 
 test_typed_failures_distinguish_unavailable_and_invalid_input() {
@@ -273,8 +286,19 @@ test_typed_failures_distinguish_unavailable_and_invalid_input() {
   out=$(run_verify "$case_dir" "$HEAD1") || rc=$?
   expect_code 1 "$rc" "default text on corrupt history keeps exit 1"
   assert_contains "$out" "error: review record history is invalid" "default corrupt-history text stays actionable"
+  case_dir=$(make_case missing-author-evidence)
+  record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["gpt-5.1"]}' >/dev/null || fail "record PASS"
+  rm "$case_dir/home/state/task-x1.meta"
+  rc=0
+  out=$(run_verify "$case_dir" "$HEAD1" --review-only --json) || rc=$?
+  expect_code 1 "$rc" "unreadable author evidence is unavailable"
+  "$JQ_BIN" -e '.ok == false and .error.kind == "unavailable"
+    and (.error.message | contains("task metadata"))' <<<"$out" >/dev/null \
+    || fail "unreadable task metadata must produce a typed unavailable envelope: $out"
   case_dir=$(make_case invalid-input)
-  out=$(FM_HOME="$case_dir/home" "$RECORD" verify --pr nonsense --head "$HEAD1" --review-only --json) || rc=$?
+  rc=0
+  out=$(FM_HOME="$case_dir/home" "$RECORD" verify --pr nonsense --head "$HEAD1" \
+    --task task-x1 --base "$BASE" --review-only --json) || rc=$?
   expect_code 2 "$rc" "an unparseable PR is invalid input"
   "$JQ_BIN" -e '.schema == "fm-review-verification.v1" and .ok == false
     and .error.kind == "invalid-input" and (.error.message | contains("pr"))' <<<"$out" >/dev/null \
@@ -282,7 +306,7 @@ test_typed_failures_distinguish_unavailable_and_invalid_input() {
   pass "not-qualified, unavailable and invalid-input failures stay distinguishable without parsing prose"
 }
 
-test_default_fail_after_captain_word_precedence_is_unchanged() {
+test_default_fail_after_captain_word_precedence_holds() {
   local case_dir out rc=0
   case_dir=$(make_case fail-after-word)
   record_review "$case_dir" "$HEAD1" PASS sonnet '{"all":["gpt-5.1"]}' >/dev/null || fail "record PASS"
@@ -299,8 +323,8 @@ test_default_fail_after_captain_word_precedence_is_unchanged() {
   rc=0
   out=$(run_verify "$case_dir" "$HEAD1") || rc=$?
   expect_code 1 "$rc" "a FAIL appended after the captain-word must re-refuse default verification"
-  assert_contains "$out" "appended after the captain-word" "later FAIL must name the captain-word order"
-  pass "default captain-word/FAIL precedence is unchanged"
+  assert_contains "$out" "error: verdict is FAIL at live head $HEAD1" "later FAIL must refuse the captain-word"
+  pass "default captain-word/FAIL precedence holds"
 }
 
 test_legacy_record_without_report_digest_omits_the_field() {
@@ -324,7 +348,7 @@ test_default_text_and_captain_word_json
 test_review_only_cannot_be_satisfied_by_captain_word
 test_review_only_rejections_are_typed_not_qualified
 test_native_claude_aliases_are_anthropic
-test_stored_family_metadata_cannot_retroactively_change_independence
+test_stored_family_fields_cannot_retroactively_change_independence
 test_typed_failures_distinguish_unavailable_and_invalid_input
-test_default_fail_after_captain_word_precedence_is_unchanged
+test_default_fail_after_captain_word_precedence_holds
 test_legacy_record_without_report_digest_omits_the_field

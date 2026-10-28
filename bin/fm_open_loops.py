@@ -343,7 +343,8 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
-                        'status_own_open_decisions "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        'own=$(status_own_open_decisions "$2") || exit 1; '
+                        'printf "%s\\n" "$own" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
                         '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
                         'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
@@ -581,7 +582,7 @@ class Collector:
             return
         pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
         signatures = [line.strip() for line in pane.splitlines() if SIGNATURE.search(line)]
-        declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
+        declaration = self.bash('. "$1"; last_status_line "$2" || :', BIN / "fm-status-event-lib.sh",
                                 self.state / (task["id"] + ".status")).strip()
         waits = [line.strip() for line in pane.splitlines()
                  if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
@@ -817,7 +818,7 @@ class Collector:
             statuses.setdefault(status["context"], status)  # newest first
         return list(newest.values()), list(statuses.values())
 
-    def review_pass(self, slug, url, sha):
+    def review_pass(self, slug, pr, task):
         """The record owner's verified independent-review evidence at this live head.
 
         review_lanes is only a discovery hint: a repository absent from it is
@@ -826,14 +827,17 @@ class Collector:
         authority, asked once for the exact live head and consumed as one
         atomic fm-review-verification.v1 object. A typed not-qualified answer is
         ordinary absence of qualifying review; unreadable or corrupt history and
-        invalid input degrade coverage instead of reading as unreviewed.
+        invalid input degrade coverage instead of reading as unreviewed. The
+        record owner derives authors from the owning task and the PR's live
+        base, so a PR no task owns is not checked.
         """
-        if slug.casefold() not in self.review_lanes:
+        if slug.casefold() not in self.review_lanes or task is None:
             return None
-        script = ('"$1" verify --pr "$2" --head "$3" --review-only --json; '
+        url, sha, base = pr["html_url"], pr["head"]["sha"], pr["base"]["sha"]
+        script = ('"$1" verify --pr "$2" --head "$3" --task "$4" --base "$5" --review-only --json; '
                   'rc=$?; printf "\\n__FM_REVIEW_EXIT=%s\\n" "$rc"; exit 0')
         try:
-            out = self.bash(script, BIN / "fm-review-record.py", url, sha)
+            out = self.bash(script, BIN / "fm-review-record.py", url, sha, task["id"], base)
         except SOURCE_ERRORS as error:
             self.degraded.append(f"review record for {url}: {str(error)[:160]}")
             return None
@@ -918,7 +922,7 @@ class Collector:
             return
         pending = (not checks and not statuses) or any(c.get("status") != "completed" for c in checks) \
             or any(s["state"] == "pending" for s in statuses)
-        review = self.review_pass(slug, url, sha)
+        review = self.review_pass(slug, pr, task)
         green = not pending and all(c.get("conclusion") in ("success", "neutral", "skipped") for c in checks) \
             and all(s.get("state") == "success" for s in statuses)
         if review and green and not pr.get("draft") and self.required_checks_green(slug, pr, checks, statuses):
@@ -1003,7 +1007,7 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('cat "$2" >/dev/null || exit 1; '
+                out = self.bash('[ -r "$2" ] || exit 1; '
                                 '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
@@ -1397,7 +1401,8 @@ class WaitVerifier:
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
             status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                            'if crew_is_provably_working "$3"; then last_status_line "$2" || '
+                            '{ echo "prerequisite status is past the read limits and cannot be verified" >&2; exit 2; }; fi',
                             BIN, path, task).strip()
             if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")

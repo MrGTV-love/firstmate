@@ -110,6 +110,21 @@ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
 # deadline. A case that verifies the override sets it itself.
 unset FM_ARM_CONFIRM_TIMEOUT
 
+# Clear the operator's no-mistakes home. An inherited NM_HOME outranks a
+# fixture's HOME, so author-evidence cases would read the operator's live
+# pipeline database instead of their own. A case that needs one sets it itself.
+unset NM_HOME
+
+# fm_test_empty_pipeline_db <nm-home>: an existing, readable no-mistakes home
+# whose pipeline database records no run. Author evidence treats a missing
+# database as unknown for a no-mistakes task, so merge fixtures point NM_HOME
+# (or HOME/.no-mistakes) here rather than at whatever the host happens to hold.
+fm_test_empty_pipeline_db() {  # <nm-home>
+  mkdir -p "$1"
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$1/state.sqlite"
+}
+
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
 # there (for example a beads backend at its live backlog), so a copy points the
@@ -1153,6 +1168,28 @@ EOF
   cat > "$copy/graft/.graph/wiring.json" <<'EOF'
 {"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
 EOF
+}
+
+# fm_fake_ship_review_history <fakebin>: legacy forge/hold fixtures have symbolic
+# heads, not Git objects. Mock only the author-history query shapes with one ship
+# commit; real attribution regressions must NOT install this adapter.
+fm_fake_ship_review_history() {
+  local fakebin=$1
+  printf '#!/usr/bin/env bash\nREAL_GIT=%q\n' "$(command -v git)" > "$fakebin/git"
+  cat >> "$fakebin/git" <<'SH'
+if [ "${GIT_NO_REPLACE_OBJECTS:-}" = 1 ] && [ "${1:-}" = -C ]; then
+  case "${3:-} ${4:-}" in
+    'cat-file -e') exit 0 ;;
+    'rev-parse --verify')
+      case "${5:-}" in *'^{commit}') printf '%040d\n' 0; exit 0 ;; esac ;;
+    'merge-base '*)
+      if [ "${5:-}" = 0000000000000000000000000000000000000000 ]; then printf '%040d\n' 0; exit 0; fi ;;
+    'log --format=%H%x00%s') printf '%s\000ship fixture implementation\n' "${5##*..}"; exit 0 ;;
+  esac
+fi
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$fakebin/git"
 }
 
 # --- state/<id>.meta writers ------------------------------------------------

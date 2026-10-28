@@ -1124,7 +1124,6 @@ bin/fm-brief.sh	21315
 bin/fm-busy-event.sh	918
 bin/fm-busy-lib.sh	668
 bin/fm-captain-hold.sh	24125
-bin/fm-cd-pretool-check.sh	215
 bin/fm-check-lib.sh	217
 bin/fm-check-register.sh	2121
 bin/fm-check-unregister.sh	2020
@@ -1396,7 +1395,6 @@ tests/fm-captain-hold-lifecycle-helpers.sh	438
 tests/fm-captain-hold-lifecycle.test.sh	2388
 tests/fm-captain-hold-reconcile.test.sh	2543
 tests/fm-captain-hold-sweep.test.sh	1481
-tests/fm-cd-pretool-check.test.sh	1067
 tests/fm-check-unregister.test.sh	868
 tests/fm-ci-workflow.test.sh	867
 tests/fm-classify-corr-token.test.sh	10038

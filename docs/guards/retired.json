@@ -137,5 +137,16 @@
     "evidence": "data/fm-jev-guard-e2e/report.md sections 3.6 (O3, O7-O10, O14-O17), 7.6 (D9) and 9 (T3)",
     "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py; write/edit input and audit failures keep jev-pretool-deny",
     "retirement_test": "tests/fm-retired-jev-write-judgment-unavailable.test.sh"
+  },
+  {
+    "id": "persistent-cd-guard",
+    "system": "firstmate",
+    "invariant": "a persistent top-level cd never moves this session out of its home",
+    "retired": "2026-10-27",
+    "tier": "C",
+    "why": "agents will always type cd, so refusing or warning on it guarded an uncontrollable condition; the incident it named was a cwd-relative firstmate-owned write, and cd is only one way the shell folder changes, so blocking cd never prevented that harm",
+    "evidence": "data/fm-cd-guard-warn-not-block/harm-reassessment-inbox018.md; data/fm-remove-cd-guard-fix-cwd-writes/pr-evidence.md (cwd-relative writer harm analysis)",
+    "replaced_by": "home-resolving writers: bin/fm-tasks-axi.sh resolves a relative home against the starting folder before any backlog write, and tests/fm-home-writes.test.sh runs firstmate-owned writes from a foreign folder and asserts they land in the home",
+    "retirement_test": "tests/fm-retired-persistent-cd-guard.test.sh"
   }
 ]

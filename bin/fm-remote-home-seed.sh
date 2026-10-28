@@ -148,11 +148,15 @@ REG_EXISTED=0
 [ -f "$REG" ] && { cp "$REG" "$TMP/registry.before"; REG_EXISTED=1; }
 
 # Keep the parent charter as its durable source, but publish a remote copy whose
-# status path is the remote append-only relay log and whose steering-inbox path
-# is the host-local parent-route inbox the remote control plane writes to,
-# rather than local Mac paths. The two parents differ only by suffix, so the
-# two whole-string rewrites are order-independent and every mention - bare
-# path, /*.msg listing, and handled/ acknowledgement - lands host-local.
+# status path is the remote append-only relay log, whose steering-inbox path
+# is the host-local parent-route inbox the remote control plane writes to, and
+# whose helper commands run from the remote code clone, rather than local Mac
+# paths. The two parents differ only by suffix, so the two whole-string rewrites
+# are order-independent and every mention - bare path, /*.msg listing, and
+# handled/ acknowledgement - lands host-local. The bin/ rewrite maps every helper the
+# charter tells the worker to run (the status append, the fleet ledger, the process
+# budget) to the same script in <remote-root>, which the remote host has and the
+# parent's own code root is not.
 # Each rewrite stays its own plain assignment: on stock macOS bash a quoted
 # substitution nested inside a double-quoted argument leaks literal quotes
 # into the replacement text.
@@ -160,9 +164,12 @@ PARENT_STATUS="$STATE/$ID.status"
 REMOTE_STATUS="$REMOTE_HOME/state/parent-replies.status"
 PARENT_INBOX="$STATE/$ID.inbox"
 REMOTE_INBOX="$REMOTE_HOME/state/parent-route/$ID.inbox"
+PARENT_BIN="$FM_ROOT/bin/"
+REMOTE_BIN="$REMOTE_ROOT/bin/"
 while IFS= read -r line || [ -n "$line" ]; do
   line=${line//"$PARENT_STATUS"/"$REMOTE_STATUS"}
   line=${line//"$PARENT_INBOX"/"$REMOTE_INBOX"}
+  line=${line//"$PARENT_BIN"/"$REMOTE_BIN"}
   printf '%s\n' "$line"
 done < "$BRIEF" > "$TMP/charter.remote"
 

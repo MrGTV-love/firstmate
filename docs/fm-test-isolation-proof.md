@@ -22,6 +22,9 @@ This record owns concurrent isolation evidence for the portable parallel candida
 
 ## Candidate set
 
+The historical summary and raw JSON above include one since-retired suite; the candidate and duration lists below omit it.
+The original count and wall duration remain historical measurements, not a new run of the retained suites.
+
 - `tests/fm-arm-pretool-check.test.sh`
 - `tests/fm-backend-herdr.test.sh`
 - `tests/fm-brief.test.sh`
@@ -31,7 +34,6 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-captain-hold-lifecycle.test.sh`
 - `tests/fm-captain-hold-reconcile.test.sh`
 - `tests/fm-captain-hold-sweep.test.sh`
-- `tests/fm-cd-pretool-check.test.sh`
 - `tests/fm-composer-ghost.test.sh`
 - `tests/fm-composer-lib.test.sh`
 - `tests/fm-crew-state.test.sh`
@@ -104,7 +106,6 @@ The portable parallel lanes are the confirmation for the three new paths, and a 
 | 27529 | 0 | 1 | `tests/fm-arm-pretool-check.test.sh` |
 | 20922 | 0 | 21 | `tests/fm-test-run.test.sh` |
 | 17558 | 0 | 8 | `tests/fm-crew-state.test.sh` |
-| 16582 | 0 | 5 | `tests/fm-cd-pretool-check.test.sh` |
 | 9766 | 0 | 12 | `tests/fm-lint.test.sh` |
 | 9562 | 0 | 11 | `tests/fm-herdr-lab.test.sh` |
 | 6768 | 0 | 10 | `tests/fm-grok-harness.test.sh` |

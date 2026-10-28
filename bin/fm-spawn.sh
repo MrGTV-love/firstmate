@@ -100,6 +100,19 @@
 #   kind and project or home come from the task's validated state/<id>.meta,
 #   so --backend, --scout, --secondmate, a project positional, and batch pairs
 #   are refused. Harness, model, and effort may change explicitly.
+#   Every launch appends its exact model (or default) as a tab-separated
+#   <spawn_gen> <prior spawn_gen> <model> line to state/<id>.launch-models under
+#   the task metadata lock, before publishing replacement metadata. A fresh
+#   spawn leaves the prior field empty; relaunch names the replaced spawn_gen and
+#   also appends the prior meta model under the new spawn_gen. An omp launch
+#   also appends each native fallback model of its state/<id>.omp-fallback.yml
+#   chain under the same spawn_gen, because the session can switch to it without
+#   a relaunch; the worker-owned live-model record is never author evidence.
+#   History is never truncated or unwound on launch failure.
+#   fm-review-record.py counts only the lines reached from the current meta's
+#   spawn_gen through prior links, so a reused task id never inherits an
+#   earlier incarnation's authors. A confined
+#   worker cannot write this history; fm-write-confinement.py denies it.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
@@ -798,6 +811,15 @@
 # active without a markdown file; any active automatic backend without
 # compatible tasks-axi refuses before creating lifecycle state.
 # On success prints: spawned <id> harness=<name> kind=<ship|scout|secondmate> [mode=<mode> yolo=<on|off>] window=<backend-target> worktree=<path>
+# Remote secondmates report already-running instead when the host reused a live
+# agent, or running when the host confirmed the route without a launch
+# disposition this parent recognizes (an older host sends none). Neither outcome
+# claims a replacement. Only a spawned launch must carry the requested harness.
+# The recorded profile is the endpoint's confirmed harness/model/effort, not the
+# requested launch profile. Only a confirmed spawned launch of the requested
+# harness keeps the requested model or effort when the host omits that key; an
+# omitted key on an already-running or running route is recorded empty
+# (unknown), and a key the host reports empty stays empty.
 # A ship task records the explicit mode/yolo it was passed; a secondmate spawn records
 # mode=secondmate, yolo=off, home=, and projects=; a scout records neither, and both the
 # success line and state/<id>.meta omit them.
@@ -968,6 +990,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
@@ -1439,6 +1463,7 @@ fi
 spawn_remote_secondmate() {
   local id=$1 remote host root home harness positional model effort backend out rc meta tmp
   local remote_backend remote_target remote_harness remote_herdr_session registry_lock remote_lock remote_generation
+  local remote_launch remote_outcome
   local remote_traceparent remote_recorded_traceparent sm_primary_head sync_out sync_rc
   local -a launch_args
   id=${POS[0]:-}
@@ -1671,7 +1696,23 @@ spawn_remote_secondmate() {
     echo "error: remote launch returned backend '${remote_backend:-missing}', expected herdr; preserving the remote route for reconciliation" >&2
     return 1
   fi
-  [ -n "$remote_target" ] && [ "$remote_harness" = "$harness" ] || {
+  remote_launch=$(printf '%s\n' "$out" | sed -n 's/^launch=//p' | tail -1)
+  case "$remote_launch" in
+    spawned | already-running) remote_outcome=$remote_launch ;;
+    *) remote_outcome=running ;;
+  esac
+  # Only a fresh launch must carry the requested harness. A reused or
+  # unconfirmed endpoint can legitimately run another verified one.
+  case "$remote_outcome" in
+    spawned) [ "$remote_harness" = "$harness" ] || remote_harness= ;;
+    *)
+      case "$remote_harness" in
+        claude | codex | opencode | pi | pi-signed | omp | grok | kimi | cursor) ;;
+        *) remote_harness= ;;
+      esac
+      ;;
+  esac
+  [ -n "$remote_target" ] && [ -n "$remote_harness" ] || {
     fm_lock_release "$remote_lock" || true
     fm_lock_release "$registry_lock" || true
     fm_lock_release "$SPAWN_TASK_LOCK" || true
@@ -1684,6 +1725,22 @@ spawn_remote_secondmate() {
     fm_lock_release "$SPAWN_TASK_LOCK" || true
     echo "error: remote launch returned Herdr session '${remote_herdr_session:-missing}', expected 'fm-remote'; preserving the remote route for reconciliation" >&2
     return 1
+  fi
+  # An alive endpoint is deliberately reused. Its profile can differ from the
+  # requested one, so record and report what actually runs, not the request.
+  harness=$remote_harness
+  # Only a confirmed fresh spawn proves the requested profile was applied.
+  # Reuse has no incarnation proof for a cached profile, so absent fields are
+  # unknown rather than inherited from either the request or the old record.
+  if grep -q '^model=' <<<"$out"; then
+    model=$(printf '%s\n' "$out" | sed -n 's/^model=//p' | tail -1)
+  elif [ "$remote_outcome" != spawned ]; then
+    model=
+  fi
+  if grep -q '^effort=' <<<"$out"; then
+    effort=$(printf '%s\n' "$out" | sed -n 's/^effort=//p' | tail -1)
+  elif [ "$remote_outcome" != spawned ]; then
+    effort=
   fi
   # Record what the remote endpoint ACTUALLY carries, read back from its own
   # launch, rather than what this side hoped to deliver. That keeps the #995
@@ -1738,8 +1795,12 @@ spawn_remote_secondmate() {
     echo "error: remote secondmate $id launched, but its reply source could not be armed; endpoint metadata is preserved" >&2
     return 1
   fi
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
-  echo "spawned $id harness=$harness kind=secondmate mode=secondmate yolo=off window=remote:$id worktree=$home remote=$host backend=$remote_backend"
+  [ ! -e "$CONFIG/fleet-ledger" ] || [ "$remote_outcome" != spawned ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$id" secondmate "" "$harness" "${model#-}" || true
+  echo "$remote_outcome $id harness=$harness kind=secondmate mode=secondmate yolo=off window=remote:$id worktree=$home remote=$host backend=$remote_backend"
+  case "$remote_outcome" in
+    already-running) echo "notice: the existing remote agent was kept running; no replacement was performed" ;;
+    running) echo "notice: the host confirmed its route but did not report a recognized launch outcome; replacement is not confirmed" ;;
+  esac
   return 0
 }
 
@@ -2946,8 +3007,8 @@ launch_template() {
   # release that drops this flag fails the launch loudly instead of silently
   # restoring the modal.
   # A secondmate is a firstmate PRIMARY in its own home, and its turn-end guard,
-  # session-start digest, and cd/arm seatbelts are exactly those project hooks
-  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/cd-guard.md), so the
+  # session-start digest, and watcher-arm seatbelt are exactly those project hooks
+  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/arm-pretool-check.md), so the
   # secondmate launch deliberately keeps hooks on.
   codex)
     if [ "$kind" = secondmate ]; then
@@ -5543,9 +5604,21 @@ kimi_wait_for_delivery() {
   return 1
 }
 
+# Record one event in this task's status log through the capped writer
+# (bin/fm-status-cap-lib.sh). A refusal is never dropped silently: the writer names
+# the file and the limit on stderr, and the warning here repeats the file and the
+# exit status, so a lane's failed: or blocked: report that could not land is
+# visible to whoever runs the spawn. A spawn failure path goes on either way.
+spawn_status_append() { # <status-line>
+  local rc=0
+  fm_status_append_line "$STATE/$ID.status" "$1" || rc=$?
+  [ "$rc" -eq 0 ] || echo "warning: could not record the status line in $STATE/$ID.status (exit $rc): $1" >&2
+  return 0
+}
+
 kimi_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
 }
 
@@ -5614,7 +5687,7 @@ rovo_wait_for_delivery() {
 
 rovo_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5687,7 +5760,7 @@ agy_wait_for_working() {
 }
 
 agy_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5728,7 +5801,7 @@ dsh_wait_for_start() {
 }
 
 dsh_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5767,7 +5840,7 @@ claude_confirm_start() {
   done
   [ "$parked" -ge 2 ] || return 0
   dialog=$(printf '%s' "$pane" | fm_busy_claude_launch_prompt_name)
-  printf '%s\n' "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")"
   echo "warning: claude worker $ID is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; send no keys, a person must answer it in window $T" >&2
   return 0
 }
@@ -6337,6 +6410,7 @@ BUSY_GEN=
     fi
     ;;
   esac
+  native_fallback='[]'
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
@@ -6592,7 +6666,6 @@ EOF
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
-    native_fallback='[]'
     while IFS= read -r candidate; do
       fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
       candidate_harness=$(jq -r .harness <<<"$candidate")
@@ -6984,6 +7057,29 @@ preserve_relaunch_meta() {
   fi
 } >"$SPAWN_META_PATH" || {
   echo "error: task record for $ID could not be prepared at $SPAWN_META_PATH" >&2
+  exit 1
+}
+# Append-only author evidence shares the per-task metadata lock. Preserve the
+# prior launch before replacing legacy metadata, including failed relaunches:
+# over-attribution fails closed, while losing a prior author would widen merges.
+SPAWN_MODEL_HISTORY="$STATE/$ID.launch-models"
+if [ -L "$SPAWN_MODEL_HISTORY" ] || { [ -e "$SPAWN_MODEL_HISTORY" ] && [ ! -f "$SPAWN_MODEL_HISTORY" ]; }; then
+  echo "error: launch-model history is not an ordinary file: $SPAWN_MODEL_HISTORY" >&2
+  exit 1
+fi
+SPAWN_PRIOR_GEN=
+if [ "$RELAUNCH" -eq 1 ]; then
+  SPAWN_PRIOR_GEN=$(fm_meta_get "$RELAUNCH_META" spawn_gen)
+  SPAWN_PRIOR_MODEL=$(fm_meta_get "$RELAUNCH_META" model)
+fi
+{
+  if [ "$RELAUNCH" -eq 1 ]; then
+    printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${SPAWN_PRIOR_MODEL:-unknown}"
+  fi
+  printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${MODEL:-default}"
+  jq -r --arg gen "$SPAWN_GEN" --arg prior "$SPAWN_PRIOR_GEN" '.[] | [$gen, $prior, .model] | join("\t")' <<<"$native_fallback"
+} >> "$SPAWN_MODEL_HISTORY" || {
+  echo "error: could not append launch-model history: $SPAWN_MODEL_HISTORY" >&2
   exit 1
 }
 if [ "$RELAUNCH" -eq 0 ]; then
@@ -7752,7 +7848,7 @@ SPAWN_ACCOUNT=
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 if [ "$DISPATCH_SWITCHED" = true ]; then
-  printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  spawn_status_append "$(printf 'working [at=%s]: model-matrix fallback launched %s %s for %s' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}")"
 fi
 # Shadow model picker (observe only): the launch is already delivered, so this can
 # only append routing evidence to the picker's private store. It runs detached with
