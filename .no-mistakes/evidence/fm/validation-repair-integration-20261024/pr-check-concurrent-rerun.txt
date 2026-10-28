@@ -1,0 +1,6 @@
+ok - concurrent watchers observe only complete private poll publications
+[run 1 exit 0]
+ok - concurrent watchers observe only complete private poll publications
+[run 2 exit 0]
+ok - concurrent watchers observe only complete private poll publications
+[run 3 exit 0]

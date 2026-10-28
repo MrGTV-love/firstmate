@@ -1,0 +1,25 @@
+$ bin/fm-lint.sh --check-version   (live GitHub release API)
+shellcheck: pinned 0.11.0, latest 0.11.0 (current)
+actionlint: pinned 1.7.12, latest 1.7.12 (current)
+fm-lint.sh: version check: 0 behind, 0 unknown, 2 current
+[exit 0]
+
+$ curl unreachable (bogus proxy) -> unknown, exit 2
+shellcheck: pinned 0.11.0, latest UNKNOWN (could not read https://api.github.com/repos/koalaman/shellcheck/releases/latest)
+actionlint: pinned 1.7.12, latest UNKNOWN (could not read https://api.github.com/repos/rhysd/actionlint/releases/latest)
+fm-lint.sh: version check: 0 behind, 2 unknown, 0 current
+[exit 2]
+
+=== the lint-currency.yml run step body, executed as the workflow runs it (bash -e)
+schedule: [{'cron': '17 6 * * 1'}] dispatch
+--- live network
+shellcheck: pinned 0.11.0, latest 0.11.0 (current)
+actionlint: pinned 1.7.12, latest 1.7.12 (current)
+fm-lint.sh: version check: 0 behind, 0 unknown, 2 current
+[step exit 0]
+--- network blocked
+shellcheck: pinned 0.11.0, latest UNKNOWN (could not read https://api.github.com/repos/koalaman/shellcheck/releases/latest)
+actionlint: pinned 1.7.12, latest UNKNOWN (could not read https://api.github.com/repos/rhysd/actionlint/releases/latest)
+fm-lint.sh: version check: 0 behind, 2 unknown, 0 current
+::warning::the release check could not complete; inspect the log and rerun
+[step exit 0]

@@ -1,0 +1,10 @@
+ok - review-only --json reports immutable record-time independent evidence
+ok - default verify text and JSON preserve captain-word precedence
+ok - captain-word alone cannot satisfy review-only
+ok - stale head, FAIL, same family, unknown families and triggers are typed not-qualified
+ok - bare opus, sonnet and haiku ids map to anthropic while unknown ids stay untrusted
+ok - stored family fields and task metadata cannot retroactively change recorded independence
+ok - not-qualified, unavailable and invalid-input failures stay distinguishable without parsing prose
+ok - default captain-word/FAIL precedence is unchanged
+ok - a legacy record without report_sha256 omits the digest instead of fabricating it
+rc=0 secs=36

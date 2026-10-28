@@ -1,0 +1,12 @@
+=== real `no-mistakes axi status` (this gate run, read-only), first lines:
+run:
+  id: "01M61GS6YX29TEYW4JPYNM9W8X"
+  branch: fm/validation-repair-integration-20261024
+  status: running
+  head: 84a47ac2
+  head_sha: 84a47ac2810385a2c71fd5ad2fe47e9879788c6e
+  verification_plan: none
+  findings: 1 awaiting
+
+$ fm_nm_evidence_problem "$PWD" "$out" "" ""
+refused (rc 0): the run exposes no verification-plan snapshot, so its review coverage cannot be accounted for

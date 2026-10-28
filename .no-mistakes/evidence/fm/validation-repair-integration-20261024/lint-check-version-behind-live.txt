@@ -1,0 +1,11 @@
+=== disposable copy of bin/ with the ShellCheck pin set back to 0.10.0, live GitHub API
+$ /tmp/fm-behind.3tQeMb/bin/fm-lint.sh --check-version
+shellcheck: pinned 0.10.0, latest 0.11.0 (BEHIND; bump REQUIRED_SHELLCHECK in bin/fm-lint.sh and the SHA table in bin/fm-install-shellcheck.sh)
+actionlint: pinned 1.7.12, latest 1.7.12 (current)
+fm-lint.sh: version check: 1 behind, 0 unknown, 1 current
+[exit 1]
+--- workflow step body against the behind copy
+shellcheck: pinned 0.10.0, latest 0.11.0 (BEHIND; bump REQUIRED_SHELLCHECK in bin/fm-lint.sh and the SHA table in bin/fm-install-shellcheck.sh)
+actionlint: pinned 1.7.12, latest 1.7.12 (current)
+fm-lint.sh: version check: 1 behind, 0 unknown, 1 current
+[step exit 1]

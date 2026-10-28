@@ -1,0 +1,46 @@
+ok - held replacement admission refuses before touching the live owner
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+ok - reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority
+ok - all supported worker harnesses share pre-stop blocked replacement admission
+ok - Herdr shares pre-stop held admission and recovery-only exited-owner preservation
+ok - continuation authorization refuses missing, foreign, dead, worker, and attended/away branch authority without side effects
+ok - continuation clearance accepts no relaunch options, arbitrary text, or non-allowlisted verbs
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation authorization requires current automatic backlog, local unambiguous recovery records, and no pending close
+ok - unblocked ship/scout clearance changes only recovery, sends no endpoint input, and permits later live/exited ordinary relaunch
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
+ok - tmux: a gone recorded endpoint is proven and reclaimed while unrelated tmux servers run
+ok - tmux: real lsof permits worktree-local exit, relaunch, reconciliation and direct replacement
+ok - tmux: an answering window or an agent holding the worktree refuses both verbs
+ok - tmux: an unreadable process table or tmux answer refuses both verbs
+ok - tmux: two missing tasks reclaim sequentially onto Herdr, preserving work, note and poll
+ok - tmux: a proven-gone endpoint refuses every configured backend other than Herdr
+ok - reclaim: an unclassifiable endpoint is still refused, so two agents cannot share one
+ok - relocation: a vanished copy rebinds to a fresh copy of its branch, keeping identity, endpoint, status and note
+ok - relocation: every surviving recorded head must be contained, and no evidence refuses
+ok - relocation: a present copy, a wrong branch, unaccounted heads, a shared or foreign copy and every other unsafe destination refuse
+ok - relocation: unreadable registrations, reflogs and journals refuse without discarding evidence
+ok - relocation: every registered local home's records are checked, an unavailable home refuses, and the exact own record is excluded
+ok - relocation: a destination's own harness files are never overwritten or deleted
+ok - relocation: the vanished path and recorded head survive every failure journal rewrite and judge the retry
+ok - relocation: proof survives ordinary launch failures and proves a later destination
+ok - relocation: a newer ordinary relaunch checkpoint cannot be hidden by preserved relocation evidence
+ok - relocation: a pool slot claimed by another task refuses, and an unclaimed one is claimed for the task
+ok - relocation: a hand-made linked worktree refuses, in or out of the pool layout, unless the pool state records it, and an unreadable state names its own remedy
+ok - concurrent relocations refuse while the shared project lock is held, and two homes publish and launch exactly one pool owner
+ok - unpublished relocation aborts release new claims; pre-existing and published claims survive
+ok - relocation: --worktree belongs to relaunch only, and the launch owner repeats the proof itself
+ok - fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration
+ok - reclaim: a herdr pane that outlived its stopped server is adopted, never orphaned beside a new tab
+ok - fm-control exit: a herdr pane that outlived its stopped server is already-stopped, not gone
+ok - herdr recovery: a failed status or an accepting socket refuses exit and relaunch without launching a server
+ok - reclaim: a herdr rebind is created in the session the record names, never the ambient one
+ok - reclaim: a herdr agent that came back with its server refuses, so one worktree keeps one agent
+ok - reclaim: a herdr reclaim rebinds the endpoint and leaves the whole rest of the task alone
+ok - reclaim: a herdr secondmate whose endpoint is gone is sent to its own respawn owner
+ok - reclaim: a rebind refused from a plain shell reports the real cause, not a fabricated session mismatch
+ok - recovery fixture cleanup preserves preexisting task/launch directories and removes only its own claims
+rc=0 secs=1069

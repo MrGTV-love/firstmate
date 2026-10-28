@@ -1,0 +1,86 @@
+=== A: independent PASS (gpt reader, claude-opus author) ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"1111111111111111111111111111111111111111","at":1793208659,"reader_model":"gpt-5.5","reader_family":"openai","author_groups":{"c1":[{"model":"claude-opus-5-5","family":"anthropic"}]},"report":"/tmp/fm-rr-lab.MgQyuw/report-PASS-1111111111111111111111111111111111111111.md","report_sha256":"35838787903b841e9c0da3566b1496357382b4b1f326540021dc47bf1f473975"}
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+review: PASS
+[exit 0]
+
+=== B: no history at all -> typed not-qualified absence ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"no independent review record at live head 1111111111111111111111111111111111111111; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute"}}
+[exit 1]
+
+=== C: corrupt history -> unavailable (degraded), not absence ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"unavailable","message":"review record history is incomplete; preserve and reconcile it before retrying"}}
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"unavailable","message":"review record history is invalid (Expecting value: line 1 column 1 (char 0)); preserve and reconcile it before retrying"}}
+[exit 1]
+
+=== D: invalid input -> invalid-input, exit 2 ===
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr not-a-url --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"invalid-input","message":"pr must be a parseable canonical PR URL; supply --pr URL"}}
+[exit 2]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head abc --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"no independent review record at live head abc; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute"}}
+[exit 1]
+
+=== E: captain-word at head: default accepts, --review-only refuses ===
+recorded: captain-word
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"captain-word","pr":"https://github.com/example/repo/pull/9","head":"1111111111111111111111111111111111111111","at":1793208661,"words":"Merge PR 9 now"}
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"no independent review record at live head 1111111111111111111111111111111111111111; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute"}}
+[exit 1]
+
+=== F: later FAIL after captain-word: default refuses (FAIL precedence) ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader gpt-5.5, at 1793208661, report /tmp/fm-rr-lab.MgQyuw/report-FAIL-1111111111111111111111111111111111111111.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge"}}
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111
+error: verdict is FAIL at live head 1111111111111111111111111111111111111111 in the review appended after the captain-word (reader gpt-5.5, at 1793208661, report /tmp/fm-rr-lab.MgQyuw/report-FAIL-1111111111111111111111111111111111111111.md); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head 1111111111111111111111111111111111111111 --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+=== G: independent PASS with escalation trigger yes: default PASS, --review-only refuses ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"1111111111111111111111111111111111111111","at":1793208662,"reader_model":"gpt-5.5","reader_family":"openai","author_groups":{"c1":[{"model":"claude-opus-5-5","family":"anthropic"}]},"report":"/tmp/fm-rr-lab.MgQyuw/report-PASS-1111111111111111111111111111111111111111.md","report_sha256":"35838787903b841e9c0da3566b1496357382b4b1f326540021dc47bf1f473975"}
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"widens_guard is yes at live head 1111111111111111111111111111111111111111; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute"}}
+[exit 1]
+
+=== H: same-family reader is not independent ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"reader_family anthropic (claude-sonnet-5-5) matches author_groups c1 (claude-opus-5-5); --review-only requires a PASS from a reader outside every author family, and a captain-word is not a substitute"}}
+[exit 1]
+
+=== I: bare native Claude names opus/sonnet/haiku are anthropic ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"1111111111111111111111111111111111111111","at":1793208663,"reader_model":"gpt-5.5","reader_family":"openai","author_groups":{"c1":[{"model":"opus","family":"anthropic"},{"model":"sonnet","family":"anthropic"},{"model":"haiku","family":"anthropic"}]},"report":"/tmp/fm-rr-lab.MgQyuw/report-PASS-1111111111111111111111111111111111111111.md","report_sha256":"35838787903b841e9c0da3566b1496357382b4b1f326540021dc47bf1f473975"}
+[exit 0]
+
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 1111111111111111111111111111111111111111 --review-only --json
+{"schema":"fm-review-verification.v1","ok":true,"basis":"independent-review","pr":"https://github.com/example/repo/pull/9","head":"1111111111111111111111111111111111111111","at":1793208664,"reader_model":"opus","reader_family":"anthropic","author_groups":{"c1":[{"model":"gpt-5.5","family":"openai"}]},"report":"/tmp/fm-rr-lab.MgQyuw/report-PASS-1111111111111111111111111111111111111111.md","report_sha256":"35838787903b841e9c0da3566b1496357382b4b1f326540021dc47bf1f473975"}
+[exit 0]
+
+=== J: PASS at stale head -> not-qualified at live head ===
+recorded: review
+$ /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61GS6YX29TEYW4JPYNM9W8X/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/9 --head 2222222222222222222222222222222222222222 --review-only --json
+{"schema":"fm-review-verification.v1","ok":false,"error":{"kind":"not-qualified","message":"head mismatch: review names 1111111111111111111111111111111111111111, live head is 2222222222222222222222222222222222222222; review the live head and record its PASS with fm-review-record.py review, then retry the merge"}}
+[exit 1]
+

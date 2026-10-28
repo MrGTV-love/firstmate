@@ -1,0 +1,154 @@
+$ bash bin/fm-dod-lib.sh --shape
+id=[A-Za-z][A-Za-z0-9_.-]*
+lead=Source
+fields=Expected|Verify|Edge/negative|Evidence place|Authority
+authority_field=Authority
+authorities=agent|gate|grader
+item=<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+rule=Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 0]
+
+=== well-formed item -> plan built
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+The badge updates after a refresh.
+### Mandatory items
+- C1 Source: captain intent. Expected: badge refreshes. Verify: reload page. Edge/negative: failed refresh keeps last value. Evidence place: PR body. Authority: grader.
+
+## Out-of-scope list
+- Do not redesign the dashboard.
+
+# Shared review rubric
+
+This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+It does not change the selected delivery path, review authority, or merge policy.
+
+- Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
+- Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+- Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
+[exit 0]
+
+=== numbered list marker
+--- 1. C1 marker
+error: verification plan refuses the task Definition Of Done: no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== missing Verify field
+--- missing
+error: verification plan refuses the task Definition Of Done: mandatory item C1 is missing Verify
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== invalid Authority
+--- auth
+error: verification plan refuses the task Definition Of Done: mandatory item C1 has Authority captain, not agent, gate, or grader
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== duplicate id
+--- dup
+error: verification plan refuses the task Definition Of Done: mandatory item id C1 is duplicated
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== empty item list
+--- empty
+error: verification plan refuses the task Definition Of Done: no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== trailing prose after last item must not pollute Authority
+--- trail
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+The badge updates after a refresh.
+### Mandatory items
+- C1 Source: captain intent. Expected: badge refreshes. Verify: reload page. Edge/negative: failed refresh keeps last value. Evidence place: PR body. Authority: grader.
+This trailing note is ordinary prose.
+
+## Out-of-scope list
+- Do not redesign the dashboard.
+
+# Shared review rubric
+
+This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+It does not change the selected delivery path, review authority, or merge policy.
+
+- Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
+- Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+- Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
+
+## Review outcomes
+
+Each finding takes one of these outcomes:
+
+- A failed DoD mandatory item: block.
+- A real defect that breaks the stated intent, even when no DoD item names it: block.
+- An improvement outside the DoD: a follow-up note, never a block.
+- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
+- Removing a guard rule that such a recorded reassessment recommends: not a block.
+- A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+
+## PR body claims
+
+- Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+- When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely re-word it.
+[exit 0]
+
+=== heading-marked item line is a heading, never an item
+--- heading
+error: verification plan refuses the task Definition Of Done: no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== label line with no item id
+--- noid
+error: verification plan refuses the task Definition Of Done: mandatory item C1 repeats Verify
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+[exit 1]
+
+=== legacy brief with no DoD section still builds
+--- legacy
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+Task Definition Of Done: absent from this brief.
+
+## Out-of-scope list
+Out-of-scope list: no recognized `### Out of scope` subsection or column-0 `Out of scope:` paragraph was found in this brief; check the Firstmate spec for inline exclusions.
+
+# Shared review rubric
+
+This file owns the review criteria for Firstmate-dispatched no-mistakes runs and independent review lanes.
+It does not change the selected delivery path, review authority, or merge policy.
+
+- Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
+- Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
+- Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
+
+## Review outcomes
+
+Each finding takes one of these outcomes:
+
+- A failed DoD mandatory item: block.
+- A real defect that breaks the stated intent, even when no DoD item names it: block.
+- An improvement outside the DoD: a follow-up note, never a block.
+- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
+- Removing a guard rule that such a recorded reassessment recommends: not a block.
+- A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+
+## PR body claims
+
+- Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+- When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely re-word it.
+[exit 0]
+

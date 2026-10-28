@@ -1,0 +1,55 @@
+=== ShellCheck 0.10.0 first on PATH (pin 0.11.0), file bin/fm-lint-workflows.sh
+$ [old shellcheck, local] env PATH=/tmp/fm-sc-old/bin:$PATH bin/fm-lint.sh bin/fm-lint-workflows.sh
+fm-lint.sh: ShellCheck 0.10.0 (pinned 0.11.0)
+fm-lint.sh: WARNING: ShellCheck 0.10.0 differs from the CI pin 0.11.0; local findings may differ. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to refuse.
+fm-lint.sh: full ShellCheck extended analysis enabled
+[exit 0]
+
+$ [old shellcheck, --strict-version] env PATH=/tmp/fm-sc-old/bin:$PATH bin/fm-lint.sh --strict-version bin/fm-lint-workflows.sh
+fm-lint.sh: ShellCheck 0.10.0 (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found 0.10.0. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+[exit 1]
+
+$ [old shellcheck, CI=true] env PATH=/tmp/fm-sc-old/bin:$PATH CI=true bin/fm-lint.sh bin/fm-lint-workflows.sh
+fm-lint.sh: ShellCheck 0.10.0 (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found 0.10.0. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+[exit 1]
+
+$ [old shellcheck, GITHUB_ACTIONS=true] env PATH=/tmp/fm-sc-old/bin:$PATH GITHUB_ACTIONS=true bin/fm-lint.sh bin/fm-lint-workflows.sh
+fm-lint.sh: ShellCheck 0.10.0 (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found 0.10.0. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+[exit 1]
+
+=== control: pinned ShellCheck 0.11.0
+$ [pinned shellcheck, local] bin/fm-lint.sh bin/fm-lint-workflows.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+[exit 0]
+
+=== actionlint 1.7.11 first on PATH (pin 1.7.12), file .github/workflows/lint-currency.yml
+$ [old actionlint, local] env PATH=/tmp/fm-sc-old/bin:$PATH bin/fm-lint-workflows.sh .github/workflows/lint-currency.yml
+fm-lint-workflows.sh: actionlint 1.7.11 (pinned 1.7.12)
+fm-lint-workflows.sh: WARNING: actionlint 1.7.11 differs from the CI pin 1.7.12; local workflow findings may differ. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to refuse.
+fm-lint-workflows.sh: 1 workflow files valid
+[exit 0]
+
+$ [old actionlint, --strict-version] env PATH=/tmp/fm-sc-old/bin:$PATH bin/fm-lint-workflows.sh --strict-version .github/workflows/lint-currency.yml
+fm-lint-workflows.sh: actionlint 1.7.11 (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 1.7.11. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+[exit 1]
+
+$ [old actionlint, GITHUB_ACTIONS=true] env PATH=/tmp/fm-sc-old/bin:$PATH GITHUB_ACTIONS=true bin/fm-lint-workflows.sh .github/workflows/lint-currency.yml
+fm-lint-workflows.sh: actionlint 1.7.11 (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 1.7.11. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+[exit 1]
+
+$ [old actionlint, FM_LINT_STRICT_VERSION=1] env PATH=/tmp/fm-sc-old/bin:$PATH FM_LINT_STRICT_VERSION=1 bin/fm-lint-workflows.sh .github/workflows/lint-currency.yml
+fm-lint-workflows.sh: actionlint 1.7.11 (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 1.7.11. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+[exit 1]
+
+$ [pinned actionlint, local] bin/fm-lint-workflows.sh .github/workflows/lint-currency.yml
+fm-lint-workflows.sh: actionlint 1.7.12 (pinned 1.7.12)
+fm-lint-workflows.sh: 1 workflow files valid
+[exit 0]
+

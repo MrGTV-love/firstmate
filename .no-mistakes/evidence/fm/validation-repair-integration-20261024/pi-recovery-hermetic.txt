@@ -1,0 +1,4 @@
+PATH without ~/.npm-global/bin; command -v pi -> none
+$ bash tests/fm-control-relaunch-recovery.test.sh test_herdr_relaunch_resumes_only_the_registered_pi_session
+ok - fm-spawn --relaunch: resumes the bound Pi session only for a Pi registration
+[exit 0]
