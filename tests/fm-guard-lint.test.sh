@@ -327,6 +327,31 @@ SIG=$(fixture sig_case_arm)
 printf 'refuse() { echo "$*" >&2; exit 1; }\ncase "$1" in\n  ""|*[!a-z]*) refuse "no task named" ;;\nesac\n' >"$SIG/bin/a.sh"
 assert_site "S1 finds a refuse helper call after a case-arm pattern" "$SIG" 'C'
 
+SIG=$(fixture sig_runtime_multiline)
+printf 'def go(x):\n    raise RuntimeError("""\nrefusing to continue\n""")\n' >"$SIG/bin/example.py"
+assert_site "S1 finds a refusal inside a runtime multiline string" "$SIG" 'B'
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/example.py","match":"refusing to continue"}]'
+assert_mapped "a runtime multiline refusal passes once a registered entry maps it" "$SIG" 1
+
+SIG=$(fixture sig_docstring_multiline)
+printf 'def go(x):\n    """\n    This function refuses nothing.\n    """\n    return x\n\nclass Thing:\n    """\n    Thing refuses nothing either.\n    """\n\nraise RuntimeError("""\nrefusing the one real thing\n""")\n' >"$SIG/bin/example.py"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the runtime string may be a site, not the function and class docstrings: $(site_ids "$SIG")"
+pass "multiline docstrings are not sites while the runtime multiline string beside them is"
+
+SIG=$(fixture sig_event_id_allow)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" deployment-allow-check deny --source-ok true\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a deny event whose guard id contains the word allow" "$SIG" 'E'
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/a.sh","match":"deployment-allow-check deny"}]'
+assert_mapped "a deny event with allow in its guard id passes once a registered entry maps it" "$SIG" 1
+
+SIG=$(fixture sig_event_comment_allow)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" some-guard deny --source-ok true # not allow\n"$DIR/fm-guard-event.sh" other-guard allow --cleared-by retry # deny\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a deny event whose trailing comment says allow" "$SIG" 'E'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "the allow event with a deny comment must not count as a site: $(site_ids "$SIG")"
+pass "the event's own decision argument decides, not the words around it"
+
 SIG=$(fixture sig_oneline_event)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"

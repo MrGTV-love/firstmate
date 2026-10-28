@@ -181,6 +181,29 @@ def is_comment(stripped, kind):
     return stripped.startswith(('//', '*', '/*'))
 
 
+def is_docstring_open(stripped, prev_code):
+    """A triple-quoted string opening a block (first statement after a header) documents; any other runs."""
+    if not stripped.startswith(('"""', "'''")):
+        return False
+    return prev_code is None or prev_code.endswith(':')
+
+
+def event_denies(body):
+    """True when a guard event call records a decision other than allow.
+
+    The decision is the event's own argument: one of the first two words after the
+    writer, which are the guard id and the decision, or the decision alone for a
+    wrapper. A word elsewhere on the line, a hyphenated guard id or a comment says nothing.
+    """
+    match = GUARD_EVENT.search(body)
+    if not match:
+        return False
+    if re.search(r'\b(?:grep|egrep|sed|awk)\b', body[:match.start()]):
+        return False  # a search for the writer's name, not a call to it
+    words = re.findall(r'"[^"]*"|\'[^\']*\'|\S+', body[match.end() - 1:])[:2]
+    return 'allow' not in [w.strip('"\'') for w in words]
+
+
 def embedded_kind(opener_line):
     """The language of a heredoc body when the opener feeds an interpreter, else None (text)."""
     if re.search(r'\b(?:python3?|py)\b', opener_line):
@@ -201,7 +224,8 @@ def scan_file(root, rel, helpers, hook_names):
     heredoc = None
     heredoc_stderr = False
     body_kind = None
-    in_triple = False
+    triple = None
+    prev_code = None
     sites = []
     for number, line in enumerate(lines, 1):
         stripped = line.strip()
@@ -211,7 +235,8 @@ def scan_file(root, rel, helpers, hook_names):
             if stripped == heredoc:
                 heredoc = None
                 body_kind = None
-                in_triple = False
+                triple = None
+                prev_code = None
                 continue
             if body_kind is None:
                 # A text heredoc is data: only a marker, or a message it prints to stderr, is a site.
@@ -225,21 +250,35 @@ def scan_file(root, rel, helpers, hook_names):
             eff = body_kind  # an interpreter heredoc is code in that interpreter's language
         if eff == 'py':
             quotes = len(re.findall(r'"""|\'\'\'', line))
-            if in_triple:
+            if triple == 'doc':
                 if quotes % 2 == 1:
-                    in_triple = False
+                    triple = None
                 if MARKER.search(line):
                     sites.append((number, 'A', stripped))
+                continue
+            if triple == 'run':
+                if quotes % 2 == 1:
+                    triple = None
+                sig = ['A'] if MARKER.search(line) else (['B'] if WORD.search(line) else [])
+                if sig:
+                    sites.append((number, ','.join(sig), stripped))
                 continue
             if quotes % 2 == 1:
-                in_triple = True
-                if MARKER.search(line):
-                    sites.append((number, 'A', stripped))
-                continue
+                if is_docstring_open(stripped, prev_code):
+                    triple = 'doc'
+                    if MARKER.search(line):
+                        sites.append((number, 'A', stripped))
+                    continue
+                triple = 'run'  # a string expression that runs: scan its body like any message
+                opener_tail = re.split(r'"""|\'\'\'', line)[-1]
+                if WORD.search(opener_tail):
+                    sig.append('B')
         if is_comment(stripped, eff) or not stripped:
             continue
-        if eff == 'py' and stripped.startswith(('"""', "'''")):
+        if eff == 'py' and triple is None and is_docstring_open(stripped, prev_code):
             continue  # a one-line docstring describes; it does not emit
+        if eff == 'py' and triple is None:
+            prev_code = stripped
         if eff == 'sh' and heredoc is None:
             opener = HEREDOC.search(line)
             # An opener with no terminator below it is a shift or an awk string, not a heredoc.
@@ -248,10 +287,10 @@ def scan_file(root, rel, helpers, hook_names):
                 heredoc_stderr = '>&2' in line
                 body_kind = embedded_kind(line)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
-        if MARKER.search(line):
+        if MARKER.search(line) and 'A' not in sig:
             sig.append('A')
         message = case_arm_text(line) if eff == 'sh' else line
-        if emits_refusal(message):
+        if emits_refusal(message) and 'B' not in sig:
             sig.append('B')
         # A definition header names a function and calls nothing; a one-line body after it still can.
         header = {'sh': SH_DEF, 'py': PY_DEF, 'js': JS_DEF}.get(eff)
@@ -265,7 +304,7 @@ def scan_file(root, rel, helpers, hook_names):
                     and '$#' not in (lines[number - 2] if stripped == 'exit 2' and number > 1 else stripped)) \
                 or (opencode and re.search(r'\bthrow new Error\(', line)):
             sig.append('D')
-        if GUARD_EVENT.search(body) and not re.search(r'\b(?:grep|sed|awk|allow)\b', line):
+        if event_denies(body):
             sig.append('E')
         if sig:
             sites.append((number, ','.join(sig), stripped))

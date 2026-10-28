@@ -97,7 +97,8 @@ cannot be checked mechanically belongs in the reviewer's checklist, not here.
 A guard that lives only inside a script never got these fields, because nothing noticed it existed.
 `bin/fm-guard-sites.py` therefore enumerates the refusal sites of the runtime code, and `bin/fm-guard-lint.sh` requires every one to map to a registry entry.
 The scan covers `bin/`, `.claude/`, `.codex/`, `.cursor/`, `.dsh/`, `.grok/`, `.omp/`, `.opencode/` and `.pi/` (skipping test directories), plus every owner file the registry names.
-A site is one code line that matches a signature outside comments, heredoc bodies and docstrings:
+A site is one code line that matches a signature outside comments, heredoc bodies and docstrings.
+A docstring is a triple-quoted string that opens a block, as the first statement after a `def` or `class` header or at the top of a file; a triple-quoted string anywhere else, such as an exception message, is runtime text and is scanned line by line:
 
 - `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
   The marker is a site even inside a heredoc body or a Python triple-quoted string.
@@ -107,7 +108,8 @@ A site is one code line that matches a signature outside comments, heredoc bodie
   The scan derives these names from the definitions in the code and prints them under `helpers`.
 - `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script outside a usage or argument-count check, or a `throw` in an opencode plugin.
   A hook script is a script a hook registration file names, or one whose file name says hook, pretool, posttool or turnend.
-- `E` guard event: a call to `bin/fm-guard-event.sh` (or its `guard_event` wrappers) that records a decision other than `allow`.
+- `E` guard event: a call to `bin/fm-guard-event.sh` (or its `guard_event` wrappers) whose own decision argument is not `allow`.
+  The decision is one of the first two words after the writer, so an `allow` inside a guard id or a comment does not hide a deny.
 
 A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun` or `deno`, in which case the body is scanned as that language.
 A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
