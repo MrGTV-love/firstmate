@@ -1693,12 +1693,13 @@ handle_wake() {  # <reason> <state>
 
 # Away mode records no ledger action of its own, and its acknowledgement never
 # waits on the ledger gate: firstmate's own --ack-through keeps that gate. Each
-# new or changed overdue row joins the escalation digest for firstmate once per
-# row id and evidence identity, and again only after FM_OPEN_LOOPS_RESURFACE
-# seconds (default 21600), as state/.subsuper-open-work-forwarded records for the
-# rows still needing an action; a row that becomes covered or leaves the ledger
-# loses its entry, so it is forwarded again when it returns to the gate. The
-# drain's periodic WAITING OPEN WORK list joins the same digest.
+# overdue row still needing an action joins the escalation digest for firstmate
+# once per row id and evidence identity, and again only after
+# FM_OPEN_LOOPS_RESURFACE seconds (default 21600, invalid or zero values use the
+# default), as state/.subsuper-open-work-forwarded records; a row that becomes
+# covered or leaves the ledger loses its entry, so it is forwarded again when it
+# returns to the gate. The drain's periodic WAITING OPEN WORK list joins the
+# same digest.
 forward_overdue_rows() {  # <state> <drain-output>
   local state=$1 out=$2 report='' line id identity seen now readable=1
   local marker="$state/.subsuper-open-work-forwarded" resurface=${FM_OPEN_LOOPS_RESURFACE:-21600}

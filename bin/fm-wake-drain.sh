@@ -883,8 +883,9 @@ if [ "$REEMIT" = true ]; then
   fi
 fi
 # The same ledger receipt boundary applies to main, the supervision-host's
-# branch actor, and secondmate homes. New or changed overdue obligations require
-# an action; unchanged evidence remains visible through the periodic digest.
+# branch actor, and secondmate homes. New, changed, or no-longer-covered overdue
+# obligations require an action; covered rows remain visible through the
+# periodic digest.
 # The away supervise daemon (FM_WAKE_ACK_AWAY_DAEMON=1 while state/.afk exists)
 # records no action and acknowledges only the wakes it handled; the obligation
 # stays gated in the ledger for firstmate's own acknowledgement.
@@ -1132,7 +1133,7 @@ if [ -n "$RAW_ROWS" ]; then
   printf '%s\n' "$RAW_ROWS" || exit "$?"
 fi
 # Only a periodic resurface wake this actor owns carries the full waiting list;
-# a change wake presents just the new or changed OVERDUE rows.
+# a change wake presents only the OVERDUE rows that still need an action.
 if printf '%s\n' "$RAW_ROWS" | awk -F '\t' '
   $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
   END { exit !found }
