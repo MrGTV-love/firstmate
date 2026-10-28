@@ -175,6 +175,22 @@ class Collector:
         return {int(pid): (int(parent), identity.strip())
                 for pid, parent, identity in (line.split(None, 2) for line in done.stdout.splitlines())}
 
+    def group_state(self, pgid):
+        """States of the collector-created command group's members, or None when unknown."""
+        done = subprocess.run(["ps", "-A", "-o", "pid=", "-o", "pgid=", "-o", "stat="],
+                              env=self.env, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL)
+        if done.returncode:
+            return None
+        members = []
+        for line in done.stdout.splitlines():
+            fields = line.split()
+            if len(fields) != 3 or not (fields[0].isdigit() and fields[1].isdigit()):
+                return None
+            if int(fields[1]) == pgid:
+                members.append(fields[2])
+        return members
+
     def signal_command_group(self, child, sig):
         if child.poll() is not None:
             return
@@ -183,8 +199,16 @@ class Collector:
         except ProcessLookupError:
             pass
         except PermissionError:
-            if child.poll() is None:
-                raise
+            # Darwin can refuse a group signal while the leader is becoming
+            # defunct. The signal is unnecessary only when the child has
+            # completed or the collector-created group holds no live member;
+            # live, unreadable, or unknown groups keep the refusal.
+            if child.poll() is not None:
+                return
+            members = self.group_state(child.pid)
+            if members is not None and all(state.startswith(("Z", "X")) for state in members):
+                return
+            raise
 
     def stop_command(self, child):
         descendants = {}
@@ -791,33 +815,56 @@ class Collector:
             statuses.setdefault(status["context"], status)  # newest first
         return list(newest.values()), list(statuses.values())
 
-    def review_pass(self, slug, url, sha, task):
-        for lane in self.review_lanes.get(slug.casefold(), []):
-            if task and lane == task["id"]:
-                continue  # a worker's own PASS is not an independent review
-            path = self.state / (lane + ".status")
-            if not path.exists():
-                continue
-            if path.is_symlink():
-                raise ValueError("review lane status must not be a symbolic link")
-            events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
-                               'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
-                               'then printf "%s\\n" "$line"; fi; done < "$2"',
-                               BIN / "fm-status-event-lib.sh", path)
-            # Exact URL tokens, not prefix matches on PR numbers.
-            lines = [line for line in events.splitlines()
-                     if any(match[0] == url for match in GITHUB_PR.finditer(line))]
-            if not lines:
-                continue
-            line = lines[-1]
-            if not re.search(r"\bPASS\b", line) or re.search(r"\b(?:FAIL|REJECTED)\b", line):
-                continue
-            if not re.search(r"(?<![0-9a-f])" + re.escape(sha) + r"(?![0-9a-f])", line):
-                continue
-            stamp = re.search(r"\[at=([0-9]+)\]", line.split(":", 1)[0])
-            if not stamp or int(stamp[1]) > self.now:
-                continue
-            return int(stamp[1]), lane
+    def review_pass(self, slug, url, sha):
+        """The record owner's verified independent-review evidence at this live head.
+
+        review_lanes is only a discovery hint: a repository absent from it is
+        not checked for review readiness, and the lane ids themselves supply no
+        verdict or model metadata. bin/fm-review-record.py is the sole
+        authority, asked once for the exact live head and consumed as one
+        atomic fm-review-verification.v1 object. A typed not-qualified answer is
+        ordinary absence of qualifying review; unreadable or corrupt history and
+        invalid input degrade coverage instead of reading as unreviewed.
+        """
+        if slug.casefold() not in self.review_lanes:
+            return None
+        script = ('"$1" verify --pr "$2" --head "$3" --review-only --json; '
+                  'rc=$?; printf "\\n__FM_REVIEW_EXIT=%s\\n" "$rc"; exit 0')
+        try:
+            out = self.bash(script, BIN / "fm-review-record.py", url, sha)
+        except SOURCE_ERRORS as error:
+            self.degraded.append(f"review record for {url}: {str(error)[:160]}")
+            return None
+        lines = out.splitlines()
+        code = next((int(line.split("=", 1)[1]) for line in lines
+                     if line.startswith("__FM_REVIEW_EXIT=") and line.split("=", 1)[1].isdigit()), None)
+        payload = next((line for line in lines
+                        if line.strip() and not line.startswith("__FM_REVIEW_EXIT=")), "")
+        try:
+            evidence = json.loads(payload) if payload else None
+        except ValueError:
+            evidence = None
+        if code is None or not isinstance(evidence, dict) \
+                or evidence.get("schema") != "fm-review-verification.v1":
+            self.degraded.append(f"review record for {url}: the verifier did not return one typed fm-review-verification.v1 object")
+            return None
+        error = evidence.get("error") if isinstance(evidence.get("error"), dict) else {}
+        if evidence.get("ok") is True and evidence.get("basis") == "independent-review":
+            at, reader_model = evidence.get("at"), evidence.get("reader_model")
+            reader_family, groups = evidence.get("reader_family"), evidence.get("author_groups")
+            families = {author.get("family") for authors in groups.values()
+                        for author in authors} if isinstance(groups, dict) else set()
+            if type(at) is not int or at < 0 or not isinstance(reader_model, str) \
+                    or not isinstance(reader_family, str) or not families \
+                    or evidence.get("head") != sha:
+                self.degraded.append(f"review record for {url}: a success envelope is not this exact head's independent review evidence")
+                return None
+            authors = "+".join(sorted(str(family) for family in families))
+            return at, reader_model, reader_family, authors
+        if evidence.get("ok") is False and error.get("kind") == "not-qualified":
+            return None
+        reason = error.get("message") or "no typed failure reason"
+        self.degraded.append(f"review record for {url}: {error.get('kind') or 'unexpected result'}: {str(reason)[:140]}")
         return None
 
     def required_checks_green(self, slug, pr, checks, statuses):
@@ -867,7 +914,7 @@ class Collector:
             return
         pending = (not checks and not statuses) or any(c.get("status") != "completed" for c in checks) \
             or any(s["state"] == "pending" for s in statuses)
-        review = self.review_pass(slug, url, sha, task)
+        review = self.review_pass(slug, url, sha)
         green = not pending and all(c.get("conclusion") in ("success", "neutral", "skipped") for c in checks) \
             and all(s.get("state") == "success" for s in statuses)
         if review and green and not pr.get("draft") and self.required_checks_green(slug, pr, checks, statuses):
@@ -875,7 +922,8 @@ class Collector:
                 + [epoch(s.get("updated_at") or s.get("created_at")) for s in statuses]
             since = max([review[0]] + [stamp for stamp in finished if stamp is not None])
             self.add("review_pass_not_merged", url, "merge with existing authority or escalate for approval", since,
-                     evidence=f"independent review PASS by {review[1]} at live head {sha}; required checks green")
+                     evidence=(f"independent review PASS by {review[1]} ({review[2]} reviewing {review[3]}) "
+                               f"at live head {sha}; required checks green"))
             return
         if pr.get("draft"):
             owner, action = worker, "finish the PR and mark it ready"

@@ -42,9 +42,12 @@
 # recorded pr=, which bin/fm-pr-check.sh writes only after this gate accepted it
 # at arming, and otherwise only when forge reads are enabled and a live read shows
 # the change's current patch set carrying the worker copy's HEAD tree.
-# FM_CREW_STATE_NO_FORGE=1 preserves recorded local proof but refuses an unrecorded
-# Gerrit publication before any live completion query; callers must not treat that
-# refusal as working or completed. Ordinary forge-backed proof is unchanged when unset.
+# FM_CREW_STATE_NO_FORGE=1 keeps locally recorded proof and refuses an unrecorded
+# Gerrit publication before any live completion query: a recorded Gerrit pr= lets a
+# direct-PR done pass without a forge read, while a no-mistakes done still owes the
+# task-bound verification-plan evidence below because publication alone never
+# certifies validation. Callers must not treat that refusal as working or completed.
+# Ordinary forge-backed proof is unchanged when unset.
 # A published-for-review report whose URL is not a canonical Gerrit change is refused outright. A squash is a new commit on the
 # server's base, so the tree rather than the commit is what names the published
 # content. In no-mistakes mode that live read is preceded by
@@ -325,7 +328,10 @@ If the criteria live in a finished file instead, an unfenced line `DoD file: <ab
 Capability in plain words: {DOD_CAPABILITY}
 
 ### Mandatory items
-Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+Write at least one item, each on its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`.
+The id is unique within this section; Authority is exactly agent, gate, or grader.
+A fresh spawn checks this shape and refuses an empty item list, a missing or duplicate id, or a missing, empty, or invalid field.
+The shape check is mechanical: the independent grader still decides whether each item is true and complete.
 {DOD_MANDATORY_ITEMS}
 
 ### Supporting items
@@ -396,6 +402,233 @@ fm_dod_text_problem_list() {  # <text>
   return "$remaining"
 }
 
+# The body of the `### Mandatory items` subsection in <text>, or the whole
+# <text> when that heading is absent. The caller decides whether the heading is
+# required: an inline Definition of Done requires it, while a separate DoD file
+# may hold only the item list.
+fm_dod_mandatory_body() {  # <text> <inline|file>
+  local text=$1 scope=$2 end='### Supporting items'
+  if [ "$scope" = inline ] \
+    || printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" present >/dev/null; then
+    end=''
+    if printf '%s\n' "$text" | fm_brief_heading_parse - "### Supporting items" present >/dev/null; then
+      end='### Supporting items'
+    elif printf '%s\n' "$text" | fm_brief_heading_parse - "### Hard gates" present >/dev/null; then
+      end='### Hard gates'
+    elif printf '%s\n' "$text" | fm_brief_heading_parse - "### Honesty rule" present >/dev/null; then
+      end='### Honesty rule'
+    fi
+    printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" body "$end"
+    return 0
+  fi
+  printf '%s\n' "$text"
+}
+
+# Print every structural problem in one mandatory-items body and return 0 when
+# at least one exists; return 1 and print nothing when the body has at least one
+# well-formed item. This is an objective shape check, not a judgment that the
+# criteria are semantically adequate: a reviewer still grades whether each item
+# is true and complete.
+#
+# Each item starts its own line as `<ID> Source: ...` (an optional list marker
+# and ATX heading marker are allowed), where <ID> matches
+# [A-Za-z][A-Za-z0-9_.-]*. The remaining five fields follow as `Expected:`,
+# `Verify:`, `Edge/negative:`, `Evidence place:`, and `Authority:` labels with
+# nonempty values, either on the item line or on continuation lines up to the
+# next label, item, or heading. Authority is agent, gate, or grader. Ids are
+# unique. Text outside an item, such as the scaffold's own instruction line, is
+# not itself a criterion and is ignored; a label-led line with no item id is
+# reported instead of silently accepted.
+fm_dod_criteria_problem() {  # <mandatory-items-body>
+  local body=$1 out
+  out=$(printf '%s\n' "$body" | awk '
+    function trim(s) {
+      sub(/^[ \t]+/, "", s)
+      sub(/[ \t]+$/, "", s)
+      return s
+    }
+    function clear() {
+      for (k in seen) delete seen[k]
+      for (k in value) delete value[k]
+    }
+    # Split inline `Label: value` fields out of <text>, appending the untagged
+    # leading segment to the current field. The field labels are fixed, so a
+    # newline inserted after each recognized label is an unambiguous separator.
+    function consume(text,   work, parts, m, j, part, q, label, val, labels, n) {
+      labels = "Expected|Verify|Edge/negative|Evidence place|Authority"
+      n = split(labels, fn, "|")
+      work = text
+      for (j = 1; j <= n; j++) gsub("([ \t])" fn[j] ":", "\n&", work)
+      m = split(work, parts, "\n")
+      if (field != "") value[field] = trim(value[field] " " parts[1])
+      for (j = 2; j <= m; j++) {
+        part = trim(parts[j])
+        q = index(part, ":")
+        if (q < 2) continue
+        label = trim(substr(part, 1, q - 1))
+        val = trim(substr(part, q + 1))
+        if (label in seen) {
+          print "mandatory item " id " repeats " label
+          bad = 1
+        }
+        seen[label] = 1
+        value[label] = val
+        field = label
+      }
+    }
+    function finish() {
+      if (id == "") return
+      count++
+      if (id in seen_id) {
+        print "mandatory item id " id " is duplicated"
+        bad = 1
+      } else {
+        seen_id[id] = 1
+      }
+      required = "Source|Expected|Verify|Edge/negative|Evidence place|Authority"
+      n = split(required, req, "|")
+      for (i = 1; i <= n; i++) {
+        f = req[i]
+        if (!(f in seen)) {
+          print "mandatory item " id " is missing " f
+          bad = 1
+        } else if (trim(value[f]) == "") {
+          print "mandatory item " id " has an empty " f
+          bad = 1
+        }
+      }
+      auth = trim(value["Authority"])
+      gsub(/[.;,]+$/, "", auth)
+      authtext = auth
+      auth = tolower(auth)
+      if (auth != "" && auth != "agent" && auth != "gate" && auth != "grader") {
+        print "mandatory item " id " has Authority " authtext ", not agent, gate, or grader"
+        bad = 1
+      }
+      id = ""
+      field = ""
+      clear()
+    }
+    {
+      line = $0
+      sub(/\r$/, "", line)
+      if (line ~ /^[ \t]*$/) next
+      s = trim(line)
+
+      # A fenced example is never parsed as an item, a field label, or a
+      # heading. Its nonblank content still belongs to the current field, so a
+      # legitimate command fence under Verify is not discarded.
+      scan = line
+      spaces = 0
+      while (spaces < 3 && substr(scan, 1, 1) == " ") {
+        scan = substr(scan, 2)
+        spaces++
+      }
+      marker = substr(scan, 1, 1)
+      marker_len = 0
+      if (marker == "`" || marker == "~") {
+        while (substr(scan, marker_len + 1, 1) == marker) marker_len++
+      }
+      if (marker_len >= 3) {
+        rest = substr(scan, marker_len + 1)
+        if (!in_fence) {
+          in_fence = 1
+          fence_marker = marker
+          fence_len = marker_len
+        } else if (marker == fence_marker && marker_len >= fence_len && rest ~ /^[[:space:]]*$/) {
+          in_fence = 0
+        }
+        next
+      }
+      if (in_fence) {
+        if (id != "" && field != "") value[field] = value[field] " " s
+        next
+      }
+
+      if (s ~ /^#{1,6}([ \t]|$)/) { finish(); next }
+      # An item header carries its id and the Source field on one line.
+      p = index(s, "Source:")
+      if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/ && s !~ /^Source:/) {
+        prefix = trim(substr(s, 1, p - 1))
+        sub(/^[-*+][ \t]+/, "", prefix)
+        sub(/^#+[ \t]+/, "", prefix)
+        candidate = trim(prefix)
+        sub(/[.:)]+$/, "", candidate)
+        # The scaffold instruction line mentions `Source:` too; only a lone id
+        # token starts an item, and other prose is ignored.
+        if (candidate !~ /^[A-Za-z][A-Za-z0-9_.-]*$/) next
+        finish()
+        id = candidate
+        field = "Source"
+        seen[field] = 1
+        value[field] = ""
+        consume(substr(s, p + 7))
+        next
+      }
+      if (s ~ /^(Source|Expected|Verify|Edge\/negative|Evidence[ \t]+place|Authority):/) {
+        if (id == "") {
+          print "mandatory item has no id: " s
+          bad = 1
+          next
+        }
+        q = index(s, ":")
+        label = trim(substr(s, 1, q - 1))
+        if (label ~ /^Evidence[ \t]+place$/) label = "Evidence place"
+        if (label in seen) {
+          print "mandatory item " id " repeats " label
+          bad = 1
+        }
+        seen[label] = 1
+        value[label] = ""
+        field = label
+        consume(substr(s, q + 1))
+        next
+      }
+      if (id != "" && field != "") value[field] = value[field] " " s
+    }
+    END {
+      finish()
+      if (count == 0) {
+        print "no mandatory item with an id and the six required fields"
+        bad = 1
+      }
+      exit !bad
+    }
+  ')
+  [ -z "$out" ] && return 1
+  printf '%s\n' "$out"
+  return 0
+}
+
+# Print the first structural mandatory-items problem in <text> and return 0;
+# return 1 when the items are well formed. <require-heading> is `inline` for a
+# Definition of Done section, which must carry the `### Mandatory items`
+# heading, and `file` for a separate criteria file, which may hold only items.
+fm_dod_criteria_text_problem() {  # <text> <inline|file>
+  local text=$1 scope=$2 body first
+  if [ "$scope" = inline ] \
+    && ! printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" present >/dev/null; then
+    printf '### Mandatory items is missing\n'
+    return 0
+  fi
+  body=$(fm_dod_mandatory_body "$text" "$scope")
+  first=$(fm_dod_criteria_problem "$body") || return 1
+  printf '%s\n' "${first%%$'\n'*}"
+}
+
+# Print every structural mandatory-items problem in <text>, one line each, and
+# return 0 when at least one exists; return 1 when the items are well formed.
+fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
+  local text=$1 scope=$2 body
+  if [ "$scope" = inline ] \
+    && ! printf '%s\n' "$text" | fm_brief_heading_parse - "### Mandatory items" present >/dev/null; then
+    printf '### Mandatory items is missing\n'
+    return 0
+  fi
+  body=$(fm_dod_mandatory_body "$text" "$scope")
+  fm_dod_criteria_problem "$body"
+}
+
 # Print every reason a ship or scout brief cannot be dispatched, one line per
 # problem, and return 0 when at least one exists; return 1 when none does.
 # Covers, in the order an operator fills them, unfenced standalone {TASK} and
@@ -456,9 +689,20 @@ $more
 EOF
       return 0
     fi
+    if more=$(fm_dod_criteria_text_problem_list "$(cat "$dod_file")" file); then
+      while IFS= read -r line; do
+        printf 'DoD file %s: %s\n' "$dod_file" "$line"
+      done <<EOF
+$more
+EOF
+      problems=0
+    fi
     return "$problems"
   fi
   if more=$(fm_dod_text_problem_list "$span"); then
+    printf '%s\n' "$more"
+    problems=0
+  elif more=$(fm_dod_criteria_text_problem_list "$span" inline); then
     printf '%s\n' "$more"
     problems=0
   fi
@@ -495,7 +739,7 @@ $task" | awk '
 }
 
 fm_brief_verification_plan() {  # <brief>
-  local brief=$1 rubric dod scope dod_file problem context=''
+  local brief=$1 rubric dod scope dod_file problem context='' promoted=0
   rubric="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}/.." && pwd)/docs/review-rubric.md"
   [ -f "$brief" ] && [ -r "$brief" ] || {
     printf 'error: verification-plan brief is not a readable file: %s\n' "$brief" >&2
@@ -511,6 +755,10 @@ fm_brief_verification_plan() {  # <brief>
   fi
   dod=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   dod_file=$(fm_brief_task_dod_file "$brief")
+  # A promoted scout's Definition Of Done is scout-time context, not current
+  # ship acceptance criteria. Its shape is owned by the scout brief/promotion,
+  # and the plan labels it as context, so do not re-read it as ship criteria.
+  fm_brief_heading_present "$brief" "# Current ship Firstmate spec" && promoted=1
   if [ -n "$dod_file" ]; then
     [ -f "$dod_file" ] && [ -r "$dod_file" ] || {
       printf 'error: verification-plan DoD file is not a readable file: %s\n' "$dod_file" >&2
@@ -521,6 +769,17 @@ fm_brief_verification_plan() {  # <brief>
       return 1
     fi
     dod=$(awk '{ sub(/\r$/, ""); print }' "$dod_file")
+    if [ "$promoted" = 0 ] && problem=$(fm_dod_criteria_text_problem "$dod" file); then
+      printf 'error: verification plan refuses %s: %s\n' "$dod_file" "$problem" >&2
+      return 1
+    fi
+  elif [ "$promoted" = 0 ] && fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE"; then
+    # A present but empty section is not the intentional legacy absence: it is
+    # an unfinished DoD and must refuse rather than emit a plan with no items.
+    if problem=$(fm_dod_criteria_text_problem "$dod" inline); then
+      printf 'error: verification plan refuses the task Definition Of Done: %s\n' "$problem" >&2
+      return 1
+    fi
   fi
   scope=$(fm_brief_out_of_scope "$brief")
   printf '# Verification plan\nAuthor-supplied verification evidence, not captain intent or authorization to broaden scope.\n\n'
@@ -576,9 +835,17 @@ fm_brief_task_dod_problem() {  # <brief>
       printf 'DoD file %s: %s\n' "$dod_file" "$found"
       return 0
     fi
+    if found=$(fm_dod_criteria_text_problem "$(cat "$dod_file")" file); then
+      printf 'DoD file %s: %s\n' "$dod_file" "$found"
+      return 0
+    fi
     return 1
   fi
-  fm_dod_text_placeholder "$span"
+  if found=$(fm_dod_text_placeholder "$span"); then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  fm_dod_criteria_text_problem "$span" inline
 }
 
 fm_brief_intent_overlay() {  # <captain-intent> <brief>
@@ -1095,6 +1362,47 @@ fm_dod_gerrit_change_carries_head() {  # <worktree> <url>
   [ -n "$head_tree" ] && [ "$head_tree" = "$revision_tree" ]
 }
 
+# The task's durable verification-plan source, as the no-mistakes plan block
+# writes it beside the brief: <data>/<task-id>/verification-plan.md.
+fm_dod_nm_expected_plan() {  # <state> <task-id>
+  local data=${FM_DATA_OVERRIDE:-}
+  [ -n "$data" ] || data=$(cd "$(dirname "$1")" 2>/dev/null && pwd)/data
+  printf '%s/%s/verification-plan.md\n' "$data" "$2"
+}
+
+# Single owner of the bounded `axi status` read used by the custody and
+# completion-evidence checks. It reuses the existing custody read's
+# grandfathered bound rather than introducing a second time limit.
+fm_dod_nm_status_out() {  # <worktree>
+  local wt=$1 out
+  if ! out=$(fm_nm_run_checked "$wt" 15 axi status) || ! printf '%s\n' "$out" | grep -q '^run:'; then
+    return 1
+  fi
+  printf '%s\n' "$out"
+}
+
+# 0 when the run for this copy exposes usable revision-bound verification-plan
+# evidence bound to this task's own plan source; 1 with a reason otherwise.
+# This proves the plan and revision were accounted for, never that the reviewer
+# graded every item correctly.
+fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id>
+  local wt=$1 state=$2 id=$3 out expected reason
+  if [ -z "$state" ] || [ -z "$id" ]; then
+    printf '%s\n' "the task data path is unavailable, so its verification-plan evidence cannot be bound"
+    return 1
+  fi
+  expected=$(fm_dod_nm_expected_plan "$state" "$id")
+  if ! out=$(fm_dod_nm_status_out "$wt"); then
+    printf '%s\n' "the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable"
+    return 1
+  fi
+  if reason=$(fm_nm_evidence_problem "$wt" "$out" "$expected"); then
+    printf '%s\n' "$reason"
+    return 1
+  fi
+  return 0
+}
+
 # 0 when the worker copy holds the result of its own passed no-mistakes run:
 # the run's outcome is passed, passed-with-skips or passed-with-override (the
 # passing set bin/fm-crew-state.sh reads), that pipeline owns no unreturned work (branch_sync.next_action.code is neither
@@ -1108,7 +1416,7 @@ fm_dod_gerrit_change_carries_head() {  # <worktree> <url>
 # change does. 1 when refused; stdout then holds a one-line reason.
 fm_dod_nm_custody_returned() {  # <worktree>
   local wt=$1 out outcome code pipeline_head head_tree pipeline_tree
-  if ! out=$(fm_nm_run_checked "$wt" 15 axi status) || ! printf '%s\n' "$out" | grep -q '^run:'; then
+  if ! out=$(fm_dod_nm_status_out "$wt"); then
     printf '%s\n' "the no-mistakes run for this copy could not be read, so its fixes cannot be proven recovered"
     return 1
   fi
@@ -1148,20 +1456,38 @@ fm_dod_named_head_reachable_outside_worktree() {  # <worktree> <project> <mode> 
   [ "$mode" = local-only ] && fm_dod_ref_contains "$project" refs/heads "$sha"
 }
 
+# 0 only for an actually merged PR this task recorded, never for a merely
+# recorded open PR head. Used by the narrow already-landed cleanup path when a
+# review re-read is impossible because the worker copy is gone.
+fm_dod_pr_merged_on_forge() {  # <state> <id> <url>
+  [ -n "$1" ] && [ -n "$2" ] && [ -n "$3" ] || return 1
+  ( fm_pr_url_parse "$3" \
+    && fm_pr_poll_merge_already_notified "$1" "$2" \
+      "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER" )
+}
+
 # Completion eligibility, including local-only reconciliation, is owned by this file's header.
 # There is no free-text SHA scan: a SHA that happens to appear in the note is
-# not the named head. Returns 0 for an accepted or ungated claim, or 1 when refused;
+# not the named head. A final mode=no-mistakes ready report requires the run's
+# task-bound verification-plan snapshot even when a recorded PR/head exists;
+# only an actually merged PR whose worker copy is gone skips that re-read. A
+# merge-time registration call (scope=registration) is not a ready report: the
+# merge's own live checks authorize it, so it does not re-read completion.
+# Returns 0 for an accepted or ungated claim, or 1 when refused;
 # only refusal prints a one-line reason. <state> <id> <meta> supply pr=,
 # pr_head=, and the merge-notified marker; <meta> may be a captured copy
 # (bin/fm-fleet-snapshot.sh), so the marker is read from <state>.
-fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta>]
-  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} url sha gerrit
+fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta> [<scope>]]
+  local kind=$1 mode=$2 wt=$3 project=$4 line=$5 state=${6:-} id=${7:-} meta=${8:-} scope=${9:-} url sha gerrit recorded
   fm_dod_should_gate_ship_done "$kind" "$mode" "$line" || return 0
-  if url=$(fm_dod_pr_url_from_done_note "$(status_line_note "$line")") \
-    && fm_dod_recorded_pr_on_forge "$state" "$id" "$meta" "$mode" "$url"; then
-    return 0
-  fi
+  url=$(fm_dod_pr_url_from_done_note "$(status_line_note "$line")") || url=''
   if [ -z "$wt" ] || [ ! -d "$wt" ]; then
+    # The one evidence-free final acceptance: the PR is actually merged and
+    # this copy is gone, so no review re-read is possible. A recorded open PR
+    # head never qualifies.
+    if fm_dod_pr_merged_on_forge "$state" "$id" "$url"; then
+      return 0
+    fi
     printf '%s\n' "named head cannot be verified: worktree missing"
     return 1
   fi
@@ -1175,12 +1501,19 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
   }
   gerrit=0
   [ -n "$url" ] && fm_pr_url_parse "$url" && [ "$FM_PR_PROVIDER" = gerrit ] && gerrit=1
-  if [ "$gerrit" = 0 ] && fm_dod_note_reports_published_change "$(status_line_note "$line")"; then
-    printf '%s\n' "the published-for-review report does not name a Gerrit change in the canonical https://<host>/c/<project>/+/<number> form"
-    return 1
-  fi
+  # Gerrit can publish before the pipeline's fix commits are recovered. The
+  # actionable custody refusal must come first: the run result it names is not
+  # in this copy yet, so plan/head evidence cannot be validated until recovery.
   if [ "$gerrit" = 1 ]; then
-    if [ "${FM_CREW_STATE_NO_FORGE:-0}" = 1 ]; then
+    recorded=0
+    if [ -n "$url" ] && fm_dod_recorded_pr_on_forge "$state" "$id" "$meta" "$mode" "$url"; then
+      recorded=1
+    fi
+    # A recorded Gerrit pr= is written only after the live published-tree check
+    # accepted it, so it can avoid a later forge read; it never skips the local
+    # custody and task-bound validation evidence below. An unrecorded change
+    # still refuses while the forge read is skipped.
+    if [ "${FM_CREW_STATE_NO_FORGE:-0}" = 1 ] && [ "$recorded" != 1 ]; then
       printf '%s\n' "named head $sha cannot be verified locally: forge read skipped"
       return 1
     fi
@@ -1188,6 +1521,22 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
       no-mistakes|'')
         fm_dod_nm_custody_returned "$wt" || return 1 ;;
     esac
+  fi
+  # A final no-mistakes ready report always needs the run's task-bound plan
+  # evidence, even when a recorded PR head exists: publication is not
+  # validation of this task's plan. On Gerrit the custody check above runs
+  # first so recovery remains the prerequisite, never an evidence-path error.
+  if [ "$mode" = no-mistakes ] && [ -n "$state" ] && [ -n "$id" ] && [ "$scope" != registration ]; then
+    fm_dod_nm_evidence_required "$wt" "$state" "$id" || return 1
+  fi
+  if [ -n "$url" ] && fm_dod_recorded_pr_on_forge "$state" "$id" "$meta" "$mode" "$url"; then
+    return 0
+  fi
+  if [ "$gerrit" = 0 ] && fm_dod_note_reports_published_change "$(status_line_note "$line")"; then
+    printf '%s\n' "the published-for-review report does not name a Gerrit change in the canonical https://<host>/c/<project>/+/<number> form"
+    return 1
+  fi
+  if [ "$gerrit" = 1 ]; then
     if fm_dod_gerrit_change_carries_head "$wt" "$url"; then
       return 0
     fi
@@ -1210,7 +1559,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     -h|--help)
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state absent criteria and unrecognized exclusions.'
+        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry uniquely identified mandatory items with six nonempty fields and a known Authority; legacy briefs with no DoD state absent criteria and unrecognized exclusions.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief> (or --help)' >&2; exit 2 ;;
   esac

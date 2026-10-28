@@ -189,6 +189,17 @@ The teardown split added `fm-teardown-pool` and `fm-teardown-cleanup` to the fam
 The three teardown groups ran in that proof at 426064 ms for `fm-teardown-cleanup`, 229022 ms for `fm-teardown-pool`, and 150181 ms for `fm-teardown`.
 Each worker got a private mode-0700 temporary root with ambient `FM_HOME` and `FM_*_OVERRIDE` cleared.
 
+`tests/fm-review-record.test.sh` joined this family after that date, so the thirteen-member result does not cover it.
+The family was re-proved at its then-current fourteen-member membership.
+
+- Date: 2026-10-27
+- Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4`, local macOS arm64
+- Result: one run, 14 candidates, 0 failures, summary `duration_ms=1185292`, artifact `fm_test_run_jobs_enabled=true`.
+
+The run began with the one-minute load average near 14 and finished near 7, so it is recorded with that elevated start load disclosed rather than as a load-below-6 clean measurement.
+`tests/fm-review-record.test.sh` ran concurrently in 4018 ms on worker 10, and `tests/fm-pr-check-security.test.sh` passed in 347937 ms.
+An earlier 2026-10-27 attempt at fourteen members failed one pre-existing timing-sensitive assertion (`tests/fm-pr-check-security.test.sh`'s `concurrent watcher observed a partial artifact error`) at a load average near 35 while an unrelated live validation and lint shared the host; that attempt is disclosed here, not recorded as a proof.
+
 ### secondmate: admitted
 
 - Date: 2026-09-03

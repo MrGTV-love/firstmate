@@ -135,6 +135,13 @@
 #      also a passing outcome (publication or CI verification was
 #      automatically skipped, no-mistakes' own vocabulary), read as done but
 #      with that skip kept visible in the detail, unlike a clean passed.
+#      A passing run on a mode=no-mistakes task also needs the supported
+#      revision-bound evidence `no-mistakes axi status` exposes: the immutable
+#      verification-plan snapshot, its bytes still hashing to the recorded
+#      sha256, and the run head tree equal to this copy's HEAD tree. Missing or
+#      mismatched evidence reads unknown with the exact reason; a coarse
+#      inventory word cannot supply it. That proves the plan and revision were
+#      accounted for, never that the reviewer graded every item correctly.
 #      EXCEPT: while
 #      the active step is ci, `axi status` alone cannot tell "still waiting on
 #      checks" from "checks green, waiting on merge" (see nm_ci_checks_state) -
@@ -300,11 +307,12 @@ meta_value_to() {  # <output-variable> <key>
   record_value_to "$1" "$META" "$2"
 }
 
-WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
+WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT='' RUN_MODE=''
 meta_value_to WT worktree
 meta_value_to KIND kind
 meta_value_to HARNESS harness
 meta_value_to REMOTE_HOST remote_host
+meta_value_to RUN_MODE mode
 [ -n "$KIND" ] || KIND=ship
 
 # Live-model components for a local omp task. A secondmate publishes into its
@@ -1288,7 +1296,16 @@ if [ "$HAVE_RUN" = 1 ]; then
     # supervisor through fm-classify-lib.sh's status_span_first_actionable.
     case "$COARSE_STATUS" in
       running) RUN_STATE=working; RUN_DETAIL="validating (background run)" ;;
-      completed) RUN_STATE="done";  RUN_DETAIL="run completed" ;;
+      completed)
+        if [ "$RUN_MODE" = no-mistakes ]; then
+          # The coarse ledger has no verification-plan snapshot. A passing
+          # no-mistakes run cannot be accounted for from an inventory word
+          # alone, so it stays explicitly unverified rather than done.
+          RUN_STATE=unknown
+          RUN_DETAIL="run completed without readable verification-plan evidence; review coverage unverified"
+        else
+          RUN_STATE="done";  RUN_DETAIL="run completed"
+        fi ;;
       failed)
         # The ledger row is terminal but the coarse path has no steps table
         # and no ci log, so the orphaned-monitor shape cannot be recognized
@@ -1387,6 +1404,19 @@ if [ "$HAVE_RUN" = 1 ]; then
             CI_LOG_STATE=not-ready
             ;;
         esac
+      fi
+    fi
+    # A passing no-mistakes run is completion evidence, not a bare claim: the
+    # run must expose the immutable verification-plan snapshot that axi status
+    # renders for it, the snapshot bytes must still hash to the recorded sha256,
+    # and the run head tree must equal this copy's HEAD tree. This proves the
+    # plan and revision were the ones accounted for; it never claims the
+    # reviewer graded the items correctly.
+    if [ "$RUN_STATE" = "done" ] && [ "$RUN_MODE" = no-mistakes ]; then
+      evidence_plan="${FM_DATA_OVERRIDE:-$(dirname "$STATE")/data}/$ID/verification-plan.md"
+      if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan"); then
+        RUN_STATE=unknown
+        RUN_DETAIL="run evidence unverified: $reason"
       fi
     fi
   fi

@@ -92,9 +92,11 @@ add_dod_file_line() {  # <brief> <path>
 
 fill_whole_dod() {  # <file>
   local token
-  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+  for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
     fill_dod_placeholder "$1" "$token" "Filled for the test."
   done
+  fill_dod_placeholder "$1" '{DOD_MANDATORY_ITEMS}' \
+    "- M1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: a failure is refused. Evidence place: this test output. Authority: grader."
 }
 
 # A ship or scout spawn refuses a leftover task Definition of Done placeholder,
@@ -159,14 +161,14 @@ test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_position
   IFS='|' read -r home proj fakebin <<EOF
 $rec
 EOF
-  quote="Edge/negative: a brief that still holds {DOD_HARD_GATES} is refused, as is one ending {DOD_CAPABILITY}."
+  quote="A brief that still holds {DOD_HARD_GATES} is refused, as is one ending {DOD_CAPABILITY}."
 
   id=dod-heading
   FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
   brief="$home/data/$id/brief.md"
   fill_task_subsections "$brief" "Fix the thing." "Keep it small."
   fill_dod_placeholder "$brief" '{DOD_CAPABILITY}' "The thing works."
-  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' $'## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\nSource: the intent.'
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' $'## M1 The thing works\n- C1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: a failure is refused. Evidence place: this test output. Authority: grader.\n\n## M2 It stays working\n- C2 Source: the intent. Expected: it stays working. Verify: this test. Edge/negative: a regression is refused. Evidence place: this test output. Authority: grader.'
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "### Supporting items still holds {DOD_SUPPORTING_ITEMS}" "a ## heading inside the mandatory items hid a later placeholder"
   fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
@@ -181,7 +183,7 @@ EOF
   fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
   fill_dod_placeholder "$brief" '{DOD_HARD_GATES}' "None."
   fill_dod_placeholder "$brief" '{DOD_HONESTY_RULE}' "Report only what ran."
-  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "$quote"
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "- C1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: $quote Evidence place: this test output. Authority: grader."
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a finished section that quotes a placeholder mid-sentence was refused"
   assert_present "$home/data/$id/launch-brief.md" "a finished section that quotes a placeholder did not get past the check"
@@ -192,10 +194,10 @@ EOF
   fill_task_subsections "$brief" "Fix the thing." "Keep it small."
   criteria="$home/data/$id/criteria.md"
   add_dod_file_line "$brief" "$criteria"
-  printf '## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\n\n{DOD_HARD_GATES}\n' > "$criteria"
+  printf '## M1 The thing works\n- C1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: a failure is refused. Evidence place: this test output. Authority: grader.\n\n## M2 It stays working\n\n{DOD_HARD_GATES}\n' > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "$criteria: ### Hard gates still holds {DOD_HARD_GATES}" "a ## heading in a DoD file hid a later placeholder"
-  printf '## M1 The thing works\n%s\n' "$quote" > "$criteria"
+  printf '## M1 The thing works\n- C1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: %s Evidence place: this test output. Authority: grader.\n' "$quote" > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a DoD file that quotes a placeholder mid-sentence was refused"
   assert_present "$home/data/$id/launch-brief.md" "a DoD file that quotes a placeholder did not get past the check"
@@ -257,7 +259,7 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" "DoD file $criteria is empty" "an empty DoD file was not refused"
 
-  printf 'Mandatory: the thing works.\n' > "$criteria"
+  printf '%s\n' '- C1 Source: the intent. Expected: the thing works. Verify: this test. Edge/negative: a failure is refused. Evidence place: this test output. Authority: grader.' > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a finished DoD file was refused though the brief's own placeholders remain"
   assert_present "$home/data/$id/launch-brief.md" "a finished DoD file did not get past the check"

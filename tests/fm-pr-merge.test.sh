@@ -3136,7 +3136,7 @@ test_review_record_derives_model_families() {
   record_review "$case_dir" "$url" "$head" --reader-model openrouter/x-ai/grok-4 --author-groups '{
     "a":["claude-opus-5-5[1m]","anthropic/claude-haiku-5-5"],"o":["gpt-5.1-codex","chatgpt-4o","o4-mini","codex-mini"],
     "g":["gemini-3-pro","gemma-3"],"d":["deepseek-v4"],"m":["kimi-k2","moonshot-v1"],"l":["llama-4-maverick"],
-    "u":["mistral-large","opus-5"]}' > /dev/null || fail "record every family"
+    "u":["mistral-large","mystery-9"]}' > /dev/null || fail "record every family"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read derived families"
   "$JQ_BIN" -e '.review | .reader_family == "xai" and (.author_groups | map_values(map(.family))) ==
     {a:["anthropic","anthropic"],o:["openai","openai","openai","openai"],g:["google","google"],
@@ -3425,21 +3425,24 @@ test_captain_fail_triggered_pass_refuses() {
   done
 }
 
-test_captain_fail_triggered_pass_refuses
-test_review_record_requires_matching_local_report
-test_late_fail_before_away_hold_refuses
-test_attended_override_without_review_refuses
-test_missing_review_record_refuses
-test_gitlab_and_forgejo_missing_review_record_refuse
-test_captain_word_refused_while_away
-test_review_record_validation_and_latest
-test_review_record_derives_model_families
-test_review_record_survives_a_later_family_change
-test_recorded_review_merge_conditions
-test_github_zero_exit_queue_required_refuses_with_exact_retry
-test_github_closed_unqueued_outcome_omits_retry_flags
-test_github_agreeing_queue_rules_keep_retry_guidance
-test_github_conflicting_queue_rules_report_ambiguity
+if [ -z "${FM_TEST_ONLY:-}" ]; then
+  test_captain_fail_triggered_pass_refuses
+  test_review_record_requires_matching_local_report
+  test_late_fail_before_away_hold_refuses
+  test_attended_override_without_review_refuses
+  test_missing_review_record_refuses
+  test_gitlab_and_forgejo_missing_review_record_refuse
+  test_captain_word_refused_while_away
+  test_review_record_validation_and_latest
+  test_review_record_derives_model_families
+  test_review_record_survives_a_later_family_change
+  test_recorded_review_merge_conditions
+  test_github_zero_exit_queue_required_refuses_with_exact_retry
+  test_github_closed_unqueued_outcome_omits_retry_flags
+  test_github_agreeing_queue_rules_keep_retry_guidance
+  test_github_conflicting_queue_rules_report_ambiguity
+fi
+
 test_github_review_required_refuses() {
   local case_dir rc head
   head=5555555555555555555555555555555555555555
@@ -3465,68 +3468,70 @@ test_github_review_required_refuses() {
   pass "fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED"
 }
 
-test_verified_merge_records_pr_and_head
-test_pr_metadata_is_recorded_before_the_forge_call
-test_merge_failure_propagates_after_recording
-test_github_open_unqueued_outcome_refuses
-test_github_mergeable_unknown_retries_then_succeeds
-test_github_mergeable_unknown_exhausts_bound_and_reports_pending
-test_github_mergeable_unknown_retry_rechecks_checks
-test_github_mergeable_conflicting_is_not_retried
-test_github_unreadable_outcome_keeps_pr_bookkeeping
-test_github_refusal_quotes_the_forge_output
-test_github_unreadable_outcome_refusal_quotes_the_forge_output
-test_github_accepted_queue_flags_do_not_echo_back_the_same_command
-test_github_mismatched_queue_flags_still_name_the_retry
-test_github_unrecognised_queue_method_still_names_the_queue
-test_github_unreadable_queue_rules_are_not_reported_as_no_queue
-test_github_plan_gated_403_reads_as_no_queue
-test_github_no_queue_rule_says_nothing_about_a_queue
-test_github_unmerged_fallback_cannot_replace_queue_aware_read
-test_github_auto_merge_without_queue_refuses_legibly
-test_github_failed_merge_never_claims_armed_auto_merge
-test_github_failed_merge_with_queue_flags_never_claims_acceptance
-test_github_failed_gh_read_falls_back_to_gh_axi
-test_github_failed_merge_names_an_observed_landed_state
-test_github_without_gh_still_uses_gh_axi_merge
-test_github_without_gh_failed_read_keeps_bookkeeping
-test_github_merged_outcome_is_verified
-test_github_verified_merge_requires_poll_recording
-test_github_queued_outcome_is_verified
-test_github_queue_required_refusal_names_retry_flags
-test_extra_merge_args_forwarded
-test_missing_meta_refuses_before_merge
-test_malformed_url_refuses_before_merge
-test_rejects_unsafe_url_segments_before_recording
-test_repo_override_args_refuse_before_recording
-test_bundled_repo_override_args_refuse_before_recording
-test_explicit_merge_method_not_overridden
-test_method_equals_merge_method_not_overridden
-test_parses_pr_url_for_gh_axi
-test_github_still_forwards_sha_arg
-test_gitlab_url_resolves_and_merges
-test_gitlab_host_comes_from_the_url
-test_gitlab_imposes_no_merge_method
-test_gitlab_extra_args_forwarded
-test_gitlab_merge_failure_propagates
-test_gitlab_each_condition_refuses_independently
-test_gitlab_reports_every_failing_condition
-test_gitlab_stale_recorded_head_is_reported
-test_gitlab_unreadable_state_refuses
-test_gitlab_invalid_head_refuses
-test_gitlab_missing_tool_refuses_before_recording
-test_forgejo_url_resolves_and_merges
-test_forgejo_login_resolves_from_the_host
-test_forgejo_refuses_when_login_is_ambiguous
-test_forgejo_each_condition_refuses_independently
-test_forgejo_unconfigured_ci_refuses_as_none
-test_forgejo_combined_status_reads_every_page
-test_forgejo_stale_recorded_head_is_reported
-test_forgejo_invalid_head_refuses
-test_forgejo_missing_tool_refuses_before_recording
-test_forgejo_rejected_merge_is_never_trusted_by_exit_status
-test_forgejo_transient_confirm_read_failure_still_persists_authority
-test_forgejo_merge_method_and_extra_args
+if [ -z "${FM_TEST_ONLY:-}" ]; then
+  test_verified_merge_records_pr_and_head
+  test_pr_metadata_is_recorded_before_the_forge_call
+  test_merge_failure_propagates_after_recording
+  test_github_open_unqueued_outcome_refuses
+  test_github_mergeable_unknown_retries_then_succeeds
+  test_github_mergeable_unknown_exhausts_bound_and_reports_pending
+  test_github_mergeable_unknown_retry_rechecks_checks
+  test_github_mergeable_conflicting_is_not_retried
+  test_github_unreadable_outcome_keeps_pr_bookkeeping
+  test_github_refusal_quotes_the_forge_output
+  test_github_unreadable_outcome_refusal_quotes_the_forge_output
+  test_github_accepted_queue_flags_do_not_echo_back_the_same_command
+  test_github_mismatched_queue_flags_still_name_the_retry
+  test_github_unrecognised_queue_method_still_names_the_queue
+  test_github_unreadable_queue_rules_are_not_reported_as_no_queue
+  test_github_plan_gated_403_reads_as_no_queue
+  test_github_no_queue_rule_says_nothing_about_a_queue
+  test_github_unmerged_fallback_cannot_replace_queue_aware_read
+  test_github_auto_merge_without_queue_refuses_legibly
+  test_github_failed_merge_never_claims_armed_auto_merge
+  test_github_failed_merge_with_queue_flags_never_claims_acceptance
+  test_github_failed_gh_read_falls_back_to_gh_axi
+  test_github_failed_merge_names_an_observed_landed_state
+  test_github_without_gh_still_uses_gh_axi_merge
+  test_github_without_gh_failed_read_keeps_bookkeeping
+  test_github_merged_outcome_is_verified
+  test_github_verified_merge_requires_poll_recording
+  test_github_queued_outcome_is_verified
+  test_github_queue_required_refusal_names_retry_flags
+  test_extra_merge_args_forwarded
+  test_missing_meta_refuses_before_merge
+  test_malformed_url_refuses_before_merge
+  test_rejects_unsafe_url_segments_before_recording
+  test_repo_override_args_refuse_before_recording
+  test_bundled_repo_override_args_refuse_before_recording
+  test_explicit_merge_method_not_overridden
+  test_method_equals_merge_method_not_overridden
+  test_parses_pr_url_for_gh_axi
+  test_github_still_forwards_sha_arg
+  test_gitlab_url_resolves_and_merges
+  test_gitlab_host_comes_from_the_url
+  test_gitlab_imposes_no_merge_method
+  test_gitlab_extra_args_forwarded
+  test_gitlab_merge_failure_propagates
+  test_gitlab_each_condition_refuses_independently
+  test_gitlab_reports_every_failing_condition
+  test_gitlab_stale_recorded_head_is_reported
+  test_gitlab_unreadable_state_refuses
+  test_gitlab_invalid_head_refuses
+  test_gitlab_missing_tool_refuses_before_recording
+  test_forgejo_url_resolves_and_merges
+  test_forgejo_login_resolves_from_the_host
+  test_forgejo_refuses_when_login_is_ambiguous
+  test_forgejo_each_condition_refuses_independently
+  test_forgejo_unconfigured_ci_refuses_as_none
+  test_forgejo_combined_status_reads_every_page
+  test_forgejo_stale_recorded_head_is_reported
+  test_forgejo_invalid_head_refuses
+  test_forgejo_missing_tool_refuses_before_recording
+  test_forgejo_rejected_merge_is_never_trusted_by_exit_status
+  test_forgejo_transient_confirm_read_failure_still_persists_authority
+  test_forgejo_merge_method_and_extra_args
+fi
 
 # The merge gate asks whether the task is still held for the captain. A home
 # that carries no backlog records no captain calls at all, so nothing can be
@@ -5512,6 +5517,11 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     "guard-events: the allow did not record cleared-by retry"
   pass "fm-pr-merge emits one guard event per merge decision and never lets telemetry decide the merge"
 }
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit "$?"
+fi
 
 test_gitlab_head_override_args_refuse_before_recording
 test_secondmate_merge_reports_upward_once

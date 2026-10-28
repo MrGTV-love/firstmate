@@ -12,7 +12,9 @@
 #
 # Candidates: the single rule in config/crew-dispatch.json whose `when` starts
 # with "Isolated independent quality review". Zero or several matching rules is
-# an error, never a guess. Roles and retired ids resolve through
+# an error, never a guess. A review rule that declares `projects` is refused:
+# this dry run has no launch project to bind, so the hard restriction cannot be
+# honored here. Roles and retired ids resolve through
 # bin/fm-model-index.sh profiles, and each chosen profile is preflighted through
 # its check verb under the pinned worker account, exactly as
 # bin/fm-dispatch-resolve.sh does for a dispatch.
@@ -160,7 +162,9 @@ RULE=$(printf '%s\n' "$RESOLVED" | jq -c --arg prefix "$REVIEW_WHEN_PREFIX" \
     $found[0] as $e | $e.value as $r |
     (profiles($r.use)) as $use |
     ($r.fallback // []) as $fallback |
-    if ($use | length) == 0 then {error: "the review rule has no use profiles"}
+    if ($r | has("projects")) then
+      {error: "the review rule declares projects, but review-agent selection has no launch project; declare that field only on worker dispatch rules that a launch can bind"}
+    elif ($use | length) == 0 then {error: "the review rule has no use profiles"}
     elif any($use[]; profile_bad(.) != null) then {error: ("review rule: " + ([$use[] | profile_bad(.) | select(. != null)] | first))}
     elif (($use | map([.harness, .model, (.effort // null)] | @json)) | (length != (unique | length))) then
       {error: "review rule use must not contain duplicate harness, model, and effort profiles"}

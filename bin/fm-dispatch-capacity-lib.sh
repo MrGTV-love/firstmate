@@ -6,11 +6,16 @@
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
-# prints {rule, fallback}; only rules containing the profile must resolve and
-# satisfy the fallback schema. A recorded rule also contains its configured
-# harness and model at a raised effort, as typed resolution emits them; one that
-# no longer contains the profile counts as none, and differing unlabeled lists
-# permit no fallback. rule is set only for a fallback policy.
+# prints {rule, fallback, requested_rule_match, authorizing_rules}; only rules
+# containing the profile must resolve and satisfy the fallback schema. A
+# recorded rule also contains its configured harness and model at a raised
+# effort, as typed resolution emits them; one that no longer contains the
+# profile counts as none, and differing unlabeled lists permit no fallback. rule
+# is set only for a fallback policy. requested_rule_match is null when no rule
+# was named, else whether the named rule authorizes the profile.
+# authorizing_rules lists every rule (and "default") whose use or fallback holds
+# the profile at an equal or raised effort, so a caller can require that at
+# least one of them permits the launch without reimplementing the match.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # [evidence] [routing-config] [route] prints the original profile unless it is
 # proven exhausted, then the first permitted, supported, non-exhausted fallback.
@@ -150,12 +155,16 @@ fm_dispatch_fallbacks() {
     . as $rules |
     [$rules[] | select($rule != "" and .rule == $rule and holds(same or raised))] as $recorded |
     (if ($recorded | length) > 0 then $recorded else [$rules[] | select(holds(same))] end) as $matches |
+    ([$rules[] | select(holds(same or raised)) | .rule] | unique) as $authorizing |
+    (if $rule == "" then null else ($recorded | length) > 0 end) as $requested_match |
     if any($matches[]; .fallback != null and (.fallback | valid_fallback | not)) then error(fallback_error)
     elif any($matches[]; .resolved | not) then
       error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")
-    elif ($matches | map(.fallback // []) | unique | length) != 1 then {rule: "", fallback: []}
+    elif ($matches | map(.fallback // []) | unique | length) != 1 then
+      {rule: "", fallback: [], requested_rule_match: $requested_match, authorizing_rules: $authorizing}
     else ($matches[0].fallback // []) as $fallback |
-      {rule: (if ($matches | length) == 1 and ($fallback | length) > 0 then $matches[0].rule else "" end), fallback: $fallback} end
+      {rule: (if ($matches | length) == 1 and ($fallback | length) > 0 then $matches[0].rule else "" end),
+       fallback: $fallback, requested_rule_match: $requested_match, authorizing_rules: $authorizing} end
   ' <<<"$rules" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
   printf '%s\n' "$result"
 }

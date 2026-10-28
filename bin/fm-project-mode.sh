@@ -81,6 +81,11 @@
 # tell a conditional policy apart from a flat mode sees "no-mistakes-prod-only"
 # itself. Not combined with --branch-prefix, which has no conditional-policy leg.
 #
+# --names prints every registered project name, one per line, and nothing when
+# the registry is absent. It takes no project name. Project identity consumers
+# (bin/fm-dispatch-eligibility-lib.sh) ask here instead of parsing
+# data/projects.md themselves, so the registry format keeps one owner.
+#
 # An unknown/missing project or unknown mode falls back to "no-mistakes off" (or
 # "fm/" under --branch-prefix) and warns to stderr, so a typo never silently
 # drops the gate. Other annotation tokens are ignored, as they always were, keyed
@@ -110,11 +115,33 @@ REG="$DATA/projects.md"
 RAW=0
 BRANCH_PREFIX_QUERY=0
 WANT_FORGE=0
+NAMES=0
 case "${1:-}" in
   --raw) RAW=1; shift ;;
   --branch-prefix) BRANCH_PREFIX_QUERY=1; shift ;;
   --forge) WANT_FORGE=1; shift ;;
+  --names) NAMES=1; shift ;;
 esac
+if [ "$NAMES" -eq 1 ]; then
+  [ "$#" -eq 0 ] || {
+    echo 'error: --names takes no project name' >&2
+    exit 2
+  }
+  [ -f "$REG" ] || exit 0
+  # The name ends at the same literal " [" or " - " boundary the posture parser
+  # uses below, so both queries read one registry contract.
+  awk '
+    /^- / {
+      line = substr($0, 3); cut = 0
+      a = index(line, " ["); b = index(line, " - ")
+      if (a > 0 && (b == 0 || a < b)) cut = a
+      else if (b > 0) cut = b
+      if (cut > 0) line = substr(line, 1, cut - 1)
+      if (length(line) > 0) print line
+    }
+  ' "$REG"
+  exit 0
+fi
 NAME=${1:?usage: fm-project-mode.sh [--raw|--branch-prefix|--forge] <project-name>}
 
 if [ ! -f "$REG" ]; then

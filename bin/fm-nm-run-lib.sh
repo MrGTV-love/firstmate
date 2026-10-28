@@ -412,12 +412,12 @@ fm_nm_branch_sync_state() {  # <toon-output>
 # Indentation bounds each block, so a same-named key in a sibling sub-block
 # (every sub-block of branch_sync carries its own `head`-like keys) is never
 # read in its place.
-fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
+fm_nm_nested_in_block() {  # <toon-output> <parent-block> <sub-block> <key>
   local s
-  s=$(printf '%s\n' "$1" | awk -v sub_block="$2" -v key="$3" '
+  s=$(printf '%s\n' "$1" | awk -v parent="$2" -v sub_block="$3" -v key="$4" '
     function indent(line) { match(line, /[^ ]/); return RSTART - 1 }
-    /^[^[:space:]]/ { in_sync = ($0 ~ /^branch_sync:[[:space:]]*$/); in_sub = 0; next }
-    !in_sync { next }
+    /^[^[:space:]]/ { in_parent = ($0 ~ ("^" parent ":[[:space:]]*$")); in_sub = 0; next }
+    !in_parent { next }
     {
       ind = indent($0)
       if (in_sub && ind <= sub_ind) in_sub = 0
@@ -429,6 +429,126 @@ fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
       }
     }')
   fm_nm_strip_quotes "$s"
+}
+
+fm_nm_branch_sync_nested() {  # <toon-output> <sub-block> <key>
+  fm_nm_nested_in_block "$1" branch_sync "$2" "$3"
+}
+
+# sha256 of regular file $1, with the same tool preference as the rest of the
+# fleet: shasum when present, else sha256sum.
+fm_nm_sha256_file() {  # <file>
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" 2>/dev/null | awk '{print $1}'
+  else
+    return 1
+  fi
+}
+
+# Print why a terminal passing run's revision-bound verification-plan evidence
+# is unusable and return 0; return 1 when the evidence is present and matches
+# the run's captured snapshot.
+#
+# The supported source is the `verification_plan` block that `no-mistakes axi
+# status` renders for a run: path, sha256, source_path, and captured_at. That
+# snapshot is immutable for the run and was captured before any branch
+# mutation. Re-hashing the file proves the bytes at that path are still the
+# captured bytes, and the run head tree must match this copy's HEAD tree so the
+# evidence belongs to the code being completed. This proves review accounting
+# inputs, never that an item was semantically graded or passed.
+fm_nm_evidence_problem() {  # <worktree> <toon-output> [expected-source-path]
+  local wt=$1 out=$2 expected_source=${3:-} path sha source expected_sha captured run_head head_tree run_tree actual now
+  path=$(fm_nm_nested_in_block "$out" run verification_plan path)
+  sha=$(fm_nm_nested_in_block "$out" run verification_plan sha256)
+  source=$(fm_nm_nested_in_block "$out" run verification_plan source_path)
+  captured=$(fm_nm_nested_in_block "$out" run verification_plan captured_at)
+  if [ -z "$path" ]; then
+    printf '%s\n' "the run exposes no verification-plan snapshot, so its review coverage cannot be accounted for"
+    return 0
+  fi
+  case "$path" in
+    /*) ;;
+    *)
+      printf '%s\n' "the run's verification-plan path is not absolute: $path"
+      return 0 ;;
+  esac
+  [ -f "$path" ] && [ -r "$path" ] || {
+    printf '%s\n' "the run's verification-plan snapshot is not a readable file: $path"
+    return 0
+  }
+  [ ! -L "$path" ] || {
+    printf '%s\n' "the run's verification-plan snapshot is a symbolic link: $path"
+    return 0
+  }
+  [ -n "$source" ] || {
+    printf '%s\n' "the run's verification-plan snapshot names no source path"
+    return 0
+  }
+  if [ -n "$expected_source" ]; then
+    [ "$source" = "$expected_source" ] || {
+      printf '%s\n' "the run's verification-plan snapshot source $source is not this task's plan $expected_source"
+      return 0
+    }
+    [ -f "$expected_source" ] && [ -r "$expected_source" ] || {
+      printf '%s\n' "this task's verification-plan source is not a readable file: $expected_source"
+      return 0
+    }
+    [ ! -L "$expected_source" ] || {
+      printf '%s\n' "this task's verification-plan source is a symbolic link: $expected_source"
+      return 0
+    }
+    expected_sha=$(fm_nm_sha256_file "$expected_source") || {
+      printf '%s\n' "this task's verification-plan source could not be hashed: $expected_source"
+      return 0
+    }
+    [ "$expected_sha" = "$sha" ] || {
+      printf '%s\n' "this task's verification-plan source bytes do not match the run's captured snapshot: $expected_source"
+      return 0
+    }
+  fi
+  case "$sha" in
+    ''|*[!0-9a-fA-F]*)
+      printf '%s\n' "the run's verification-plan snapshot carries no valid sha256"
+      return 0 ;;
+  esac
+  actual=$(fm_nm_sha256_file "$path") || {
+    printf '%s\n' "the run's verification-plan snapshot could not be hashed: $path"
+    return 0
+  }
+  [ "$actual" = "$sha" ] || {
+    printf '%s\n' "the run's verification-plan snapshot hash does not match the file: $path"
+    return 0
+  }
+  case "$captured" in
+    ''|*[!0-9]*)
+      printf '%s\n' "the run's verification-plan snapshot carries no captured_at timestamp"
+      return 0 ;;
+  esac
+  now=$(date +%s)
+  [ "$captured" -le "$((now + 300))" ] || {
+    printf '%s\n' "the run's verification-plan snapshot captured_at is in the future"
+    return 0
+  }
+  run_head=$(fm_nm_strip_quotes "$(fm_nm_field "$out" head_sha)")
+  [[ $run_head =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || {
+    printf '%s\n' "the run exposes no full head sha to bind its verification-plan evidence"
+    return 0
+  }
+  head_tree=$(git -C "$wt" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null) || {
+    printf '%s\n' "this copy's HEAD tree could not be read, so the run evidence cannot be bound to it"
+    return 0
+  }
+  run_tree=$(git -C "$wt" rev-parse --verify --quiet "$run_head^{tree}" 2>/dev/null) || {
+    printf '%s\n' "the run head $run_head is not an object in this copy, so its evidence cannot be bound to HEAD"
+    return 0
+  }
+  [ "$head_tree" = "$run_tree" ] || {
+    printf '%s\n' "this copy's HEAD tree is not the run head $run_head tree, so the run evidence does not describe the completed code"
+    return 0
+  }
+  return 1
 }
 
 # 0 if the run in captured `axi status` TOON $1 is still in flight: no

@@ -99,14 +99,16 @@ set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_9 omp openai-codex/gpt-6-lun
 assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "a missing recorded rule counts as no recorded rule"
 cp "$TMP_ROOT/config/crew-dispatch.json" "$TMP_ROOT/identical.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp ollama/qwen3:8b high) || fail "an edited recorded rule must not refuse"
-assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule that no longer contains the profile counts as absent"
+assert_equals '{"rule":"","fallback":[]}' "$(jq -c '{rule,fallback}' <<<"$set")" "a recorded rule that no longer contains the profile counts as absent"
+assert_equals false "$(jq -r '.requested_rule_match' <<<"$set")" "a requested rule that does not hold the profile is reported as a mismatch"
+assert_equals '[]' "$(jq -c '.authorizing_rules' <<<"$set")" "no rule authorizes an unrelated profile"
 jq '.rules[0].fallback=[]' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high) || fail "differing unlabeled lists must not refuse"
-assert_equals '{"rule":"","fallback":[]}' "$set" "differing unlabeled lists permit no fallback"
+assert_equals '{"rule":"","fallback":[]}' "$(jq -c '{rule,fallback}' <<<"$set")" "differing unlabeled lists permit no fallback"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high)
-assert_equals '{"rule":"","fallback":[]}' "$set" "an explicit rule retains its own no-fallback policy"
+assert_equals '{"rule":"","fallback":[]}' "$(jq -c '{rule,fallback}' <<<"$set")" "an explicit rule retains its own no-fallback policy"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" default omp openai-codex/gpt-6-luna high)
-assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"default",fallback:$f}')" "$set" "an explicit rule with a fallback policy is reported"
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"default",fallback:$f}')" "$(jq -c '{rule,fallback}' <<<"$set")" "an explicit rule with a fallback policy is reported"
 jq '.rules[0].fallback=[{harness:"claude",model:"opus",effort:"high"}]' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/bad.json"
 mv "$TMP_ROOT/bad.json" "$TMP_ROOT/config/crew-dispatch.json"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -116,10 +118,11 @@ fi
 # recorded rule must still carry its fallback policy into spawn and recovery.
 jq '.rules[0].use.effort="low"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a raised effort must not refuse"
-assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"rule_1",fallback:$f}')" "$set" "a recorded rule contains its profile at a raised effort"
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"rule_1",fallback:$f}')" "$(jq -c '{rule,fallback}' <<<"$set")" "a recorded rule contains its profile at a raised effort"
 jq '.rules[0].use.effort="max" | .default.effort="max"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a lowered effort must not refuse"
-assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule never contains its profile at a lowered effort"
+assert_equals '{"rule":"","fallback":[]}' "$(jq -c '{rule,fallback}' <<<"$set")" "a recorded rule never contains its profile at a lowered effort"
+assert_equals '[]' "$(jq -c '.authorizing_rules' <<<"$set")" "a lowered effort is not an authorizing profile"
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
 cat > "$TMP_ROOT/config/model-index.json" <<'JSON'

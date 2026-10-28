@@ -1520,6 +1520,137 @@ test_terminal_passed_with_skips() {
   pass "terminal passed-with-skips run reads done with the skip kept visible"
 }
 
+# A passing no-mistakes run is completion evidence only with its supported
+# verification-plan snapshot: the run must expose the snapshot, its bytes must
+# still hash to the recorded sha256, and the run head tree must equal HEAD.
+test_no_mistakes_pass_requires_verification_plan_evidence() {
+  reset_fakes
+  local d head plan_source plan_snapshot sha out saved_status
+  d=$(new_case no-mistakes-evidence)
+  make_repo_on_branch "$d/wt" fm/feat-evidence
+  head=$(git -C "$d/wt" rev-parse HEAD)
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-evidence.meta" "window=fm:fm-feat-evidence" \
+    "worktree=$d/wt" "kind=ship" "mode=no-mistakes"
+  mkdir -p "$d/data/feat-evidence"
+  plan_source="$d/data/feat-evidence/verification-plan.md"
+  plan_snapshot="$d/data/feat-evidence/verification-plan.txt"
+  printf 'author-supplied verification plan\n' > "$plan_source"
+  cp "$plan_source" "$plan_snapshot"
+  sha=$(shasum -a 256 "$plan_source" | awk '{print $1}')
+
+  # No snapshot at all.
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-evidence
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+  verification_plan: none
+outcome: passed
+EOF
+)"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "a passing run without plan evidence must not read done"
+  assert_contains "$out" "verification-plan snapshot" "the refusal did not name the missing evidence"
+  assert_not_contains "$out" "state: done" "missing plan evidence was promoted to done"
+
+  # Snapshot and source plan bound to this head.
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-evidence
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/1"
+  findings: none
+  verification_plan:
+    path: $plan_snapshot
+    sha256: $sha
+    source_path: $plan_source
+    captured_at: $(date +%s)
+outcome: passed
+EOF
+)"
+  # A same-head snapshot from another task's plan is not this task's plan.
+  saved_status=$FM_FAKE_AXI_STATUS
+  FM_FAKE_AXI_STATUS=${saved_status//$plan_source/$d/data/other/verification-plan.md}
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "another task's plan snapshot must not read done"
+  assert_contains "$out" "is not this task's plan" "the refusal did not name the plan binding"
+  FM_FAKE_AXI_STATUS=$saved_status
+
+  # Replacement of the durable plan at the same path is observed by comparing
+  # the expected source bytes with the snapshot hash.
+  printf 'replacement criteria at the same path\n' > "$plan_source"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "replaced plan source bytes must not read done"
+  assert_contains "$out" "bytes do not match" "the refusal did not name the source-byte mismatch"
+  printf 'author-supplied verification plan\n' > "$plan_source"
+
+  # A changed captured snapshot is still caught by its own hash.
+  printf 'rewritten snapshot\n' > "$plan_snapshot"
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: unknown" "a changed plan snapshot must not read done"
+  assert_contains "$out" "hash does not match" "the refusal did not name the snapshot hash mismatch"
+  cp "$plan_source" "$plan_snapshot"
+
+  out=$(run_crew_state "$d" feat-evidence)
+  assert_contains "$out" "state: done" "matching plan evidence must complete the run"
+  assert_not_contains "$out" "state: unknown" "matching plan evidence must not be unverified"
+  pass "no-mistakes completion consumes revision-bound verification-plan evidence"
+}
+
+# A final status-log `done: PR ... checks green` on a no-mistakes task is also
+# an acceptance boundary: it must carry the same task-bound plan evidence.
+test_no_mistakes_status_log_done_requires_plan_evidence() {
+  reset_fakes
+  local d head plan sha out
+  d=$(new_case no-mistakes-status-evidence)
+  make_repo_on_branch "$d/wt" fm/feat-status
+  head=$(git -C "$d/wt" rev-parse HEAD)
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-status.meta" "window=fm:fm-feat-status" \
+    "worktree=$d/wt" "project=$d/wt" "kind=ship" "mode=no-mistakes" "harness=claude"
+  printf 'done: PR https://github.com/o/r/pull/4 checks green\n' > "$d/state/feat-status.status"
+  arm_idle_record "$d/state" feat-status
+
+  FM_FAKE_AXI_STATUS=""
+  out=$(run_crew_state "$d" feat-status)
+  assert_contains "$out" "state: blocked" "a final status-log done without plan evidence must not read done"
+  assert_contains "$out" "verification-plan evidence" "the refusal did not name the missing evidence"
+  assert_not_contains "$out" "state: done" "missing plan evidence was promoted to done"
+
+  mkdir -p "$d/data/feat-status"
+  plan="$d/data/feat-status/verification-plan.md"
+  printf 'author-supplied verification plan\n' > "$plan"
+  sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+  FM_FAKE_AXI_STATUS="$(cat <<EOF
+run:
+  id: "01RUN"
+  branch: fm/feat-status
+  status: completed
+  head: "${head:0:7}"
+  head_sha: $head
+  pr: "https://github.com/o/r/pull/4"
+  findings: none
+  verification_plan:
+    path: $plan
+    sha256: $sha
+    source_path: $plan
+    captured_at: $(date +%s)
+outcome: passed
+EOF
+)"
+  out=$(run_crew_state "$d" feat-status)
+  assert_contains "$out" "state: done" "matching task-bound plan evidence must allow the final done"
+  pass "a no-mistakes status-log final done consumes task-bound plan evidence"
+}
+
 test_terminal_passed_uses_matching_retirement_receipt_without_forge() {
   reset_fakes
   local d url read_log out
@@ -2618,9 +2749,11 @@ test_unpushed_ship_done_is_blocked() {
   make_fakebin "$d" >/dev/null
   fm_write_meta "$d/state/unpushed.meta" \
     "window=fm:fm-unpushed" "worktree=$d/wt" "project=$d/wt" \
-    "kind=ship" "mode=no-mistakes" "harness=claude"
+    "kind=ship" "mode=direct-PR" "harness=claude"
   printf 'done: PR https://example.test/o/r/pull/9 checks green\n' \
     > "$d/state/unpushed.status"
+  # Publication-only fallback: no attributed no-mistakes run, so the
+  # status-log done reaches the named-head reachability gate directly.
   FM_FAKE_AXI_STATUS=""
   FM_FAKE_RUNS_LIST=""
   FM_FAKE_BUSY=0
@@ -6031,6 +6164,8 @@ test_top_level_fixing_done_log_stays_working
 test_terminal_passed
 test_terminal_passed_with_override
 test_terminal_passed_with_skips
+test_no_mistakes_pass_requires_verification_plan_evidence
+test_no_mistakes_status_log_done_requires_plan_evidence
 test_terminal_passed_uses_matching_retirement_receipt_without_forge
 test_terminal_passed_no_forge_switch_skips_read_but_keeps_receipt
 test_terminal_passed_with_open_pr_does_not_claim_merged

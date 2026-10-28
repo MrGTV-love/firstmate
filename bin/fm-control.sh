@@ -302,6 +302,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+# shellcheck source=bin/fm-dispatch-eligibility-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-eligibility-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
@@ -2297,7 +2299,10 @@ resolve_relaunch_profile() {
     fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
   fi
   if [ "$KIND" != secondmate ]; then
-    local dispatch_set dispatch_profile dispatch_result config_dir
+    local dispatch_set dispatch_profile dispatch_result config_dir dispatch_verdict
+    local dispatch_recorded dispatch_rules_to_check dispatch_check_rule
+    local dispatch_requested_match dispatch_authorizing dispatch_hard_projects dispatch_authorized
+    local dispatch_rules_file
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
     TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
     TARGET_DISPATCH_ROUTE=$(fm_meta_get "$META" dispatch_route)
@@ -2305,9 +2310,62 @@ resolve_relaunch_profile() {
       TARGET_DISPATCH_RULE=
       TARGET_DISPATCH_ROUTE=
     fi
+    dispatch_recorded=$TARGET_DISPATCH_RULE
     dispatch_set=$(fm_dispatch_fallbacks "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_RULE" \
       "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
     TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+    dispatch_rules_file="${RELAUNCH_PAIR_DIR:-${FM_CONFIG_OVERRIDE:-$FM_HOME/config}}/crew-dispatch.json"
+    dispatch_requested_match=$(jq -r '.requested_rule_match | if . == null then "none" else tostring end' <<<"$dispatch_set")
+    dispatch_authorizing=$(jq -c '.authorizing_rules // []' <<<"$dispatch_set")
+    dispatch_hard_projects=0
+    fm_dispatch_projects_configured "$dispatch_rules_file" && dispatch_hard_projects=1
+    # A recorded rule that does not authorize the recorded profile must refuse
+    # under hard projects rather than letting another rule's fallback list
+    # stand in for it.
+    if [ "$dispatch_hard_projects" -eq 1 ] && [ -n "$dispatch_recorded" ] &&
+       [ "$dispatch_requested_match" = false ]; then
+      die "$ID cannot relaunch: recorded dispatch rule $dispatch_recorded does not authorize the recorded profile $TARGET_HARNESS:${TARGET_MODEL:-default}:${TARGET_EFFORT:-default} under hard project eligibility; refusing to infer another rule (docs/configuration.md \"Crew dispatch profiles\")"
+    fi
+    # The recorded rule and any rule inferred from the recorded profile must
+    # both still be eligible for THIS project before the old agent is stopped
+    # or a stand-in is chosen, so a config edit after the launch cannot silently
+    # widen the captain's restriction on recovery. An identity that no longer
+    # resolves refuses: its restriction cannot be verified.
+    dispatch_rules_to_check=$dispatch_recorded
+    if [ -n "$TARGET_DISPATCH_RULE" ] && [ "$TARGET_DISPATCH_RULE" != "$dispatch_recorded" ]; then
+      dispatch_rules_to_check="${dispatch_rules_to_check}${dispatch_rules_to_check:+$'\n'}$TARGET_DISPATCH_RULE"
+    fi
+    while IFS= read -r dispatch_check_rule; do
+      [ -n "$dispatch_check_rule" ] || continue
+      dispatch_verdict=0
+      fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
+        "$dispatch_check_rule" "$(basename "$(fm_meta_get "$META" project)")" || dispatch_verdict=$?
+      case "$dispatch_verdict" in
+        0) ;;
+        *) die "$ID cannot relaunch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to replace the running agent for an incompatible or unverifiable dispatch rule (docs/configuration.md \"Crew dispatch profiles\")" ;;
+      esac
+    done <<<"$dispatch_rules_to_check"
+    # Without a recorded identity, the recorded profile must be authorized by
+    # at least one rule this project allows; an empty authorizing set is a
+    # manual profile outside the rule matrix.
+    if [ "$dispatch_hard_projects" -eq 1 ] && [ -z "$dispatch_recorded" ] &&
+       [ "$(jq 'length' <<<"$dispatch_authorizing")" -gt 0 ]; then
+      dispatch_authorized=0
+      while IFS= read -r dispatch_check_rule; do
+        [ -n "$dispatch_check_rule" ] || continue
+        dispatch_verdict=0
+        fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
+          "$dispatch_check_rule" "$(basename "$(fm_meta_get "$META" project)")" || dispatch_verdict=$?
+        case "$dispatch_verdict" in
+          0) dispatch_authorized=1 ;;
+          1) ;;
+          *) die "$ID cannot relaunch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to replace the running agent for an unauthorized profile (docs/configuration.md \"Crew dispatch profiles\")" ;;
+        esac
+      done < <(jq -r '.[]' <<<"$dispatch_authorizing")
+      if [ "$dispatch_authorized" -ne 1 ]; then
+        die "$ID cannot relaunch: the recorded profile $TARGET_HARNESS:${TARGET_MODEL:-default}:${TARGET_EFFORT:-default} is not authorized by any dispatch rule eligible for project $(basename "$(fm_meta_get "$META" project)"); refusing to infer around the hard project restriction (docs/configuration.md \"Crew dispatch profiles\")"
+      fi
+    fi
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
        || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \

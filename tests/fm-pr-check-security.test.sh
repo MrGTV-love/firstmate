@@ -265,8 +265,14 @@ SH
 [ "${FM_TEST_NM_FAIL:-0}" = 0 ] || exit 1
 head=$(git rev-parse HEAD 2>/dev/null) || exit 1
 pipeline=${FM_TEST_NM_PIPELINE_HEAD:-$head}
-printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\noutcome: %s\n' \
-  "$pipeline" "${FM_TEST_NM_OUTCOME-passed}"
+task=${FM_TEST_NM_TASK_ID:-task-a}
+plan_dir="${FM_HOME:-$(dirname "$(pwd)")/home}/data/$task"
+mkdir -p "$plan_dir" || exit 1
+plan="$plan_dir/verification-plan.md"
+[ -f "$plan" ] || printf 'fixture verification plan\n' > "$plan"
+plan_sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\n  verification_plan:\n    path: %s\n    sha256: %s\n    source_path: %s\n    captured_at: %s\noutcome: %s\n' \
+  "$pipeline" "$plan" "$plan_sha" "$plan" "$(date +%s)" "${FM_TEST_NM_OUTCOME-passed}"
 printf 'branch_sync:\n  state: %s\n  local:\n    head: %s\n  pipeline:\n    current_head: %s\n' \
   "${FM_TEST_NM_SYNC_STATE:-synchronized}" "$head" "$pipeline"
 if [ -n "${FM_TEST_NM_NEXT_ACTION:-}" ]; then
@@ -309,9 +315,10 @@ write_poll_meta() {
 
 
 run_check_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -330,7 +337,7 @@ seed_merge_review() {
 }
 
 run_merge_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
   # Valid merge fixtures satisfy the separate independent-review prerequisite;
   # malformed-input fixtures still reach the merge entrypoint's own parser.
@@ -338,6 +345,7 @@ run_merge_entry() {
     seed_merge_review "$dir" "$2" >/dev/null || fail "valid merge fixture could not record its review"
   fi
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -1983,6 +1991,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
   : > "$dir/gerrit-axi.log"
   set +e
   out=$(FM_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 \
+    FM_TEST_NM_TASK_ID=task-published \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/fm-timeout-lib.sh"; . "$1/bin/fm-dod-lib.sh"
       fm_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4" "$5" task-published "$6"' \

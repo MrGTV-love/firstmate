@@ -43,6 +43,18 @@ case "${1:-}" in
   capture-pane) printf 'idle\n> \n' ;;
 esac
 SH
+  cat > "$fake/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "axi status" ] || exit 2
+id=$(basename "$PWD")
+home=$(dirname "$(dirname "$PWD")")
+plan="$home/data/$id/verification-plan.md"
+[ -f "$plan" ] || exit 1
+head=$(git rev-parse HEAD 2>/dev/null) || exit 1
+sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+printf 'run:\n  id: "INACTIVE"\n  branch: fixture\n  status: completed\n  head_sha: %s\n  verification_plan:\n    path: %s\n    sha256: %s\n    source_path: %s\n    captured_at: %s\noutcome: passed\n' \
+  "$head" "$plan" "$sha" "$plan" "$(date +%s)"
+SH
   local tool
   for tool in gh gh-axi curl; do
     cat > "$fake/$tool" <<'SH'
@@ -93,6 +105,8 @@ write_child() { # <home> <id> <status> [spawn-gen]
     'harness=codex' 'kind=ship' 'mode=no-mistakes' 'yolo=off' \
     "spawn_gen=$spawn_gen" 'pr=https://example.test/owner/repo/pull/1' \
     "pr_head=$sha"
+  mkdir -p "$home/data/$id"
+  printf 'inactive fixture verification plan\n' > "$home/data/$id/verification-plan.md"
   printf '%s\n' "$status" > "$home/state/$id.status"
   : > "$home/state/$id.turn-ended"
   age "$home/state/$id.meta" "$home/state/$id.status" "$home/state/$id.turn-ended"

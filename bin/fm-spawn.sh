@@ -137,8 +137,11 @@
 #   OPENCODE_CONFIG_CONTENT JSON its launch already carries (config schema
 #   verified on opencode 1.18.32); without a model the axis is recorded but omitted.
 #   --dispatch-rule <rule_N|default> names the crew-dispatch rule whose declared
-#   fallback list this task may use; docs/configuration.md "Crew dispatch
-#   profiles" owns that policy and the stand-in switch on proven exhaustion.
+#   fallback list this task may use and whose `projects` eligibility binds to the
+#   project actually being launched; docs/configuration.md "Crew dispatch
+#   profiles" owns that policy, the eligibility refusal, and the stand-in switch
+#   on proven exhaustion. A restricted rule is recorded with the task so
+#   recovery rechecks it before stopping the running agent.
 #   --dispatch-route <fast|powerful>:<low|high> is the typed Level 5 verdict that
 #   resolution records beside it; fm_dispatch_select refuses stand-ins below a
 #   powerful class and clamps stand-in effort to it. Absent means unrestricted.
@@ -1007,6 +1010,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-claude-memory-lib.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+# shellcheck source=bin/fm-dispatch-eligibility-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-eligibility-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -3307,9 +3312,20 @@ if [ -n "$DISPATCH_ROUTE" ] && ! [[ "$DISPATCH_ROUTE" =~ $FM_DISPATCH_ROUTE_RE ]
   exit 1
 fi
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
+  # The typed resolver names the rule it selected; keep that identity for the
+  # project-eligibility rebind after the launch project is resolved below.
+  DISPATCH_RULE_SELECTED=$DISPATCH_RULE
   dispatch_set=$(fm_dispatch_fallbacks "$SPAWN_ROUTING_PAIR" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
   DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
   DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
+  DISPATCH_REQUESTED_MATCH=$(jq -r '.requested_rule_match | if . == null then "none" else tostring end' <<<"$dispatch_set")
+  DISPATCH_AUTHORIZING=$(jq -c '.authorizing_rules // []' <<<"$dispatch_set")
+  # A restricted rule must stay named even without a fallback policy, so its
+  # record carries the policy into a later recovery relaunch.
+  if [ -z "$DISPATCH_RULE" ] && [ -n "$DISPATCH_RULE_SELECTED" ] &&
+     fm_dispatch_rule_restricted "${SPAWN_ROUTING_PAIR:-$CONFIG}/crew-dispatch.json" "$DISPATCH_RULE_SELECTED"; then
+    DISPATCH_RULE=$DISPATCH_RULE_SELECTED
+  fi
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
     dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
     dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR" "$DISPATCH_ROUTE") || exit 1
@@ -4202,6 +4218,70 @@ else
   PROJ_ABS="$(cd "$(resolve_project_dir_arg "$PROJ")" && pwd)"
   WT=""
   BRIEF="$DATA/$ID/brief.md"
+fi
+# Hard project eligibility travels to the actual launch project
+# (bin/fm-dispatch-eligibility-lib.sh owns the verdict and the identity rules).
+# The explicitly selected rule, any fallback-policy rule the resolver inferred,
+# and the set of rules authorizing the launched profile are all checked, so
+# omitting --dispatch-rule cannot bypass a restriction, including a restricted
+# rule that declares no fallback. Under hard projects a supplied rule that does
+# not authorize the requested profile refuses instead of inferring another
+# rule. An identity that is no longer present cannot be verified and refuses.
+# The identity is the project directory's basename, matched exactly against the
+# registry's names: firstmate has no separate origin-to-registry-name mapping,
+# so a clone whose directory name differs from its registered name cannot
+# satisfy a restricted rule.
+if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
+  dispatch_rules_file="${SPAWN_ROUTING_PAIR:-$CONFIG}/crew-dispatch.json"
+  dispatch_hard_projects=0
+  fm_dispatch_projects_configured "$dispatch_rules_file" && dispatch_hard_projects=1
+  if [ "$dispatch_hard_projects" -eq 1 ] && [ -n "${DISPATCH_RULE_SELECTED:-}" ] &&
+     [ "${DISPATCH_REQUESTED_MATCH:-none}" = false ]; then
+    echo "error: $ID cannot launch: dispatch rule $DISPATCH_RULE_SELECTED does not authorize the requested profile $HARNESS:${MODEL:-default}:${EFFORT:-default} under hard project eligibility; refusing to infer another rule (docs/configuration.md \"Crew dispatch profiles\")" >&2
+    exit 1
+  fi
+  dispatch_rules_to_check=${DISPATCH_RULE_SELECTED:-}
+  if [ -n "$DISPATCH_RULE" ] && [ "$DISPATCH_RULE" != "${DISPATCH_RULE_SELECTED:-}" ]; then
+    dispatch_rules_to_check="${dispatch_rules_to_check}${dispatch_rules_to_check:+$'\n'}$DISPATCH_RULE"
+  fi
+  while IFS= read -r dispatch_check_rule; do
+    [ -n "$dispatch_check_rule" ] || continue
+    dispatch_verdict=0
+    fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
+      "$dispatch_check_rule" "$(basename "$PROJ_ABS")" || dispatch_verdict=$?
+    case "$dispatch_verdict" in
+      0) ;;
+      *)
+        echo "error: $ID cannot launch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to launch an incompatible or unverifiable dispatch rule for this project (docs/configuration.md \"Crew dispatch profiles\")" >&2
+        exit 1
+        ;;
+    esac
+  done <<<"$dispatch_rules_to_check"
+  # Without an explicit or fallback-policy identity, the launched profile must
+  # be authorized by at least one rule the project allows. An empty authorizing
+  # set is a manual profile outside the rule matrix and keeps prior behavior.
+  if [ "$dispatch_hard_projects" -eq 1 ] && [ -z "${DISPATCH_RULE_SELECTED:-}" ] &&
+     [ "$(jq 'length' <<<"${DISPATCH_AUTHORIZING:-[]}")" -gt 0 ]; then
+    dispatch_authorized=0
+    while IFS= read -r dispatch_check_rule; do
+      [ -n "$dispatch_check_rule" ] || continue
+      dispatch_verdict=0
+      fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
+        "$dispatch_check_rule" "$(basename "$PROJ_ABS")" || dispatch_verdict=$?
+      case "$dispatch_verdict" in
+        0) dispatch_authorized=1 ;;
+        1) ;;
+        *)
+          echo "error: $ID cannot launch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to launch an unauthorized profile for this project (docs/configuration.md \"Crew dispatch profiles\")" >&2
+          exit 1
+          ;;
+      esac
+    done < <(jq -r '.[]' <<<"$DISPATCH_AUTHORIZING")
+    if [ "$dispatch_authorized" -ne 1 ]; then
+      echo "error: $ID cannot launch: the profile $HARNESS:${MODEL:-default}:${EFFORT:-default} is not authorized by any dispatch rule eligible for project $(basename "$PROJ_ABS"); refusing to infer around the hard project restriction (docs/configuration.md \"Crew dispatch profiles\")" >&2
+      exit 1
+    fi
+  fi
 fi
 # Project capacity admission (bin/fm-project-capacity-lib.sh owns the
 # declaration, what holds a place, and why this is race-safe). A fresh worker

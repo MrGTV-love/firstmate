@@ -4,6 +4,9 @@
 #
 # Usage:
 #   fm-dispatch-resolve.sh <brief-file> [--project <name>]
+#   --project is free text unless a rule declares `projects`. Then it must be
+#   the exact registered name in data/projects.md; an empty, malformed, or
+#   unregistered name exits 2 instead of silently widening the policy.
 #
 # Opt-in gate: fm_typesafe_key in bin/fm-typesafe-lib.sh owns credential
 #   resolution and precedence.
@@ -18,7 +21,18 @@
 #
 # What it does when on with at least one rule: one JevClient.systemOne call
 #   combines the vendored Level 5 agent and model questions with ONE rule Choice
-#   whose options are every rule's `when` plus one fixed neutral none option.
+#   whose options are every ELIGIBLE rule's `when` plus one fixed neutral none
+#   option. A rule's optional `projects` allow/exclude lists are hard captain
+#   restrictions: an ineligible rule is removed from the Choice before the model
+#   sees it, and a provider answer that still names one is rejected rather than
+#   applied. When any rule declares `projects`, --project must be the exact
+#   registered name in the home's data/projects.md; an empty, malformed, or
+#   unregistered name is an exit-2 configuration error, never normalized. The
+#   declared names themselves must resolve the same way. Without any `projects`
+#   declaration the project stays free text and `when` alone carries project
+#   suitability as before; arbitrary English conditions are never parsed here.
+#   bin/fm-dispatch-eligibility-lib.sh owns the field and the verdict, and
+#   bin/fm-spawn.sh rebinds the selected rule to the actual launch project.
 #   The state is the project name and the brief's task-specific text.
 #   bin/fm-dispatch-level5.ts owns this adaptation, the neutral option text, and
 #   reasoning-effort floors; bun runs it when installed, otherwise node with type
@@ -83,7 +97,10 @@
 #       quota_score=.. parts=.. weights=.. common=.. bounds=..
 #       -> eligible [warning: ..] | eligible, quota-scored; economic rank unknown: <reason>
 #          | eligible, unranked: <reason> | not eligible: <reason>
-#     profile: --harness <h> [--model <m>] [--effort <e>] [--dispatch-rule <r> --dispatch-route <class:effort>]     (status clear only)
+#     profile: --harness <h> [--model <m>] [--effort <e>] [--dispatch-rule <r>] [--dispatch-route <class:effort>]     (status clear only)
+#   The profile line names the selected rule whenever one matched, so launch and
+#   recovery can rebind it to the actual project; --dispatch-route accompanies
+#   it only when the rule declares a fallback policy.
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, unverifiable rule floor, high ambiguity, an
@@ -94,8 +111,10 @@
 #                preflight failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
-#   existing unreadable rules file, malformed rules, model-index/profile
-#   resolution failure, or missing jq), which is actionable, never selected around.
+#   existing unreadable rules file, malformed rules, a malformed or unregistered
+#   project identity while a rule declares `projects`, a declared project name
+#   that is not registered, model-index/profile resolution failure, or missing
+#   jq), which is actionable, never selected around.
 #   A malformed or unresolvable rules error names the offending field, the rules
 #   file, the model index it resolves against, and the rerun command, so the
 #   intake can repair the file without guessing.
@@ -134,6 +153,8 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-control-lib.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+# shellcheck source=bin/fm-dispatch-eligibility-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-eligibility-lib.sh"
 # shellcheck source=bin/fm-env-lib.sh
 . "$SCRIPT_DIR/fm-env-lib.sh"
 # shellcheck source=bin/fm-timing-lib.sh
@@ -147,6 +168,7 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 
 CONFIDENCE_FLOOR=0.6
 TS_INPUT_USD_PER_MILLION=0.042
+DISPATCH_DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 RESOLVE_LOG="${FM_DATA_OVERRIDE:-$FM_HOME/data}/dispatch-resolve.jsonl"
 
 # Append one record per finished resolve to the private result log, so the
@@ -305,6 +327,26 @@ jq -e "$FM_DISPATCH_VALID_FALLBACK_JQ"'all((.rules // [])[]; (has("fallback") | 
   ((has("default_fallback") | not) or (.default_fallback | valid_fallback))' "$RULES" >/dev/null 2>&1 \
   || die_rules "invalid fallback configuration"
 
+# ---- hard project eligibility -------------------------------------------------
+# `projects` allow/exclude lists are captain restrictions the model can never
+# waive. They are only meaningful with an identity that resolves to an exact
+# registered name, so a typo fails here instead of silently widening the policy.
+PROJECT_ELIGIBILITY=''
+ELIGIBILITY_ARGS=()
+if fm_dispatch_projects_configured "$RULES"; then
+  project_problem=$(fm_dispatch_project_identity_problem "$DISPATCH_DATA" "$PROJECT")
+  if [ -n "$project_problem" ]; then
+    die "$project_problem; pass --project with the exact registered name (rules declare hard project eligibility, so dispatch cannot guess one); rerun bin/fm-dispatch-resolve.sh <brief> --project <registered-name>"
+  fi
+  projects_problem=$(fm_dispatch_projects_config_problem "$DISPATCH_DATA" "$RULES")
+  [ -z "$projects_problem" ] || die_rules "$projects_problem"
+  eligible_rules=$(fm_dispatch_eligible_rules "$DISPATCH_DATA" "$RULES" "$PROJECT") \
+    || die_rules "${FM_DISPATCH_ELIGIBILITY_ERROR:-project eligibility could not be resolved}"
+  PROJECT_ELIGIBILITY=$(jq -cn --arg project "$PROJECT" --argjson rules "$eligible_rules" \
+    '{project: $project, rules: $rules}') || die "could not encode project eligibility"
+  ELIGIBILITY_ARGS=("$PROJECT_ELIGIBILITY")
+fi
+
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
   ((.rules // [])[] | profiles(.use)[] | select(has("provider") | not) | "use\t\(.harness)"),
@@ -460,7 +502,7 @@ elif command -v node >/dev/null 2>&1; then
 else
   emit_error "neither bun nor node installed"
 fi
-"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" > "$MODEL_CONFIG/level5-request.json" \
+"${LEVEL5[@]}" prepare "$RULES" "$TASK_TEXT" "$PROJECT" ${ELIGIBILITY_ARGS[@]+"${ELIGIBILITY_ARGS[@]}"} > "$MODEL_CONFIG/level5-request.json" \
   || emit_error "Level 5 request preparation failed"
 REQUEST=$(cat "$MODEL_CONFIG/level5-request.json")
 DEFAULT_WHEN=$(jq -r '.questions.rule.criteria.default' <<<"$REQUEST")
@@ -490,7 +532,7 @@ done < <(jq -r '[(.rules[].use | if type == "array" then .[] else . end),
 # This is a private derived snapshot, not a rewrite of the captain's policy.
 chmod 600 "$RULES"
 NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$allowed_harnesses" \
-  "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE") \
+  "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE" ${ELIGIBILITY_ARGS[@]+"${ELIGIBILITY_ARGS[@]}"}) \
   || emit_error "Level 5 response or mapping failed"
 DISPATCH_ROUTE=$(jq -r '.route.model | "\(.model):\(.effort)"' <<<"$NORMALIZED")
 [[ "$DISPATCH_ROUTE" =~ $FM_DISPATCH_ROUTE_RE ]] || emit_error "Level 5 route is not a typed class and effort"
@@ -842,7 +884,9 @@ TEXT=$(jq -r '
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end)
-      + (if .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg) --dispatch-route \(.dispatch_route | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
+      + (if .selected and .selected != "default" then " --dispatch-rule \(.selected | shell_arg)"
+         elif .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg)" else "" end)
+      + (if .dispatch_rule then " --dispatch-route \(.dispatch_route | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 log_result "$(jq -r '.status' <<<"$RESULT")" "$(jq -r '.reason // ""' <<<"$RESULT")" "$RESULT"
 printf '%s\n' "$TEXT"
 emit_telemetry

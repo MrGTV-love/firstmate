@@ -214,6 +214,120 @@ for project in firstmate vernant; do
 done
 pass 'the rule Choice decides project-scoped and Claude-only rules without local text pre-checks'
 
+# Explicit `projects` allow/exclude lists are hard captain restrictions: an
+# ineligible rule never reaches the model's Choice, and a provider answer that
+# still names one is rejected. Names are exact registered identities from the
+# home's data/projects.md, never normalized.
+mkdir -p "$HOME_DIR/data"
+printf '%s\n' '# Projects' '- firstmate - repair tree [local-only]' '- vernant - customer app [no-mistakes]' > "$HOME_DIR/data/projects.md"
+jq '.rules[1].projects={"allow":["vernant"]} | .rules[2].projects={"exclude":["vernant"]}' \
+  "$TMP_ROOT/base-rules.json" > "$RULES"
+printf '%s\n' '{"rule":"rule_3"}' > "$SETTINGS"
+run firstmate
+assert_not_contains "$(last_request)" '"rule_2"' 'a Vernant-only rule is withheld from the firstmate Choice'
+assert_contains "$(last_request)" '"rule_3"' 'the eligible non-Vernant rule is still offered'
+assert_contains "$OUT" 'rule: rule_3' 'the eligible rule resolves'
+assert_contains "$OUT" "--dispatch-rule 'rule_3'" 'the selected rule is named for launch and recovery'
+printf '%s\n' '{"rule":"rule_2"}' > "$SETTINGS"
+run vernant
+assert_not_contains "$(last_request)" '"rule_3"' 'a non-Vernant rule is withheld from the vernant Choice'
+assert_contains "$(last_request)" '"rule_2"' 'the eligible Vernant rule is still offered'
+assert_contains "$OUT" 'rule: rule_2' 'the eligible Vernant rule resolves'
+assert_contains "$OUT" "--dispatch-rule 'rule_2'" 'the selected Vernant rule is named'
+# A structurally valid answer naming a withheld rule must not become an
+# authorized profile. The withheld rule is absent from the request contract, so
+# the real client rejects the answer and no profile is produced.
+before=$(count)
+printf '%s\n' '{"rule":"rule_2"}' > "$SETTINGS"
+run firstmate
+assert_equals "$((before + 1))" "$(count)" 'the incompatible answer reaches the real adapter'
+assert_contains "$OUT" 'status: error' 'an answer naming a withheld rule is a hard rejection'
+assert_contains "$(cat "$TMP_ROOT/error")" 'invalid provider answer contract' 'the withheld rule is not part of the offered contract'
+assert_not_contains "$OUT" '  profile:' 'no profile line is emitted for the rejected rule'
+# The adapter itself rejects a contract-valid answer naming a withheld rule,
+# so a stale request/response pair cannot bypass that project eligibility. The
+# request is prepared from the unrestricted rules file because the adapter now
+# refuses to prepare a rules file that declares projects without eligibility.
+node --experimental-strip-types --no-warnings "$ROOT/bin/fm-dispatch-level5.ts" \
+  prepare "$TMP_ROOT/base-rules.json" "$BRIEF" firstmate > "$TMP_ROOT/all-rules-request.json" \
+  || fail 'adapter prepare failed for the eligibility boundary case'
+node - "$TMP_ROOT/all-rules-request.json" "$TMP_ROOT/ineligible-response.json" <<'JS' \
+  || fail 'could not build a contract-valid response'
+const fs = require("fs");
+const request = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const answers = {};
+for (const [id, q] of Object.entries(request.questions)) {
+  if (q.type === "choice") {
+    const choice = id === "rule" ? "rule_2" : Object.keys(q.criteria)[0];
+    answers[id] = { type: "choice", choice, confidence: 0.95,
+      probabilities: Object.fromEntries(Object.keys(q.criteria).map(k => [k, k === choice ? 1 : 0])) };
+  } else if (q.type === "score") {
+    answers[id] = { type: "score", score: 0, confidence: 0.95,
+      probabilities: Object.fromEntries(q.criteria.map((_, i) => [i, i === 0 ? 1 : 0])),
+      legend: Object.fromEntries(q.criteria.map((s, i) => [i, s])) };
+  } else answers[id] = { type: "noul", noul: 0 };
+}
+fs.writeFileSync(process.argv[3], JSON.stringify({ model: "jev-1.13.0", answers, usage: { input_tokens: 1, output_tokens: 1 } }));
+JS
+adapter_rc=0
+node --experimental-strip-types --no-warnings "$ROOT/bin/fm-dispatch-level5.ts" apply \
+  "$RULES" "$TMP_ROOT/ineligible-response.json" "$TMP_ROOT/all-rules-request.json" \
+  '["claude"]' 'haiku|luna' 'haiku' '{"project":"firstmate","rules":["rule_3"]}' \
+  >/dev/null 2> "$TMP_ROOT/adapter-eligibility.err" || adapter_rc=$?
+expect_code 1 "$adapter_rc" 'a contract-valid ineligible rule selection must be rejected'
+assert_contains "$(cat "$TMP_ROOT/adapter-eligibility.err")" 'rule rule_2 is not eligible for project firstmate' \
+  'the adapter rejection names the rule and project'
+# A direct adapter call cannot silently waive a declared hard constraint by
+# omitting the eligibility argument.
+adapter_rc=0
+node --experimental-strip-types --no-warnings "$ROOT/bin/fm-dispatch-level5.ts" \
+  prepare "$RULES" "$BRIEF" firstmate >/dev/null 2> "$TMP_ROOT/adapter-required.err" || adapter_rc=$?
+expect_code 1 "$adapter_rc" 'prepare must refuse declared projects without resolved eligibility'
+assert_contains "$(cat "$TMP_ROOT/adapter-required.err")" 'rules declare projects but no project eligibility was supplied' \
+  'the prepare refusal names the missing eligibility'
+adapter_rc=0
+node --experimental-strip-types --no-warnings "$ROOT/bin/fm-dispatch-level5.ts" apply \
+  "$RULES" "$TMP_ROOT/ineligible-response.json" "$TMP_ROOT/all-rules-request.json" \
+  '["claude"]' 'haiku|luna' 'haiku' >/dev/null 2> "$TMP_ROOT/adapter-required.err" || adapter_rc=$?
+expect_code 1 "$adapter_rc" 'apply must refuse declared projects without resolved eligibility'
+assert_contains "$(cat "$TMP_ROOT/adapter-required.err")" 'rules declare projects but no project eligibility was supplied' \
+  'the apply refusal names the missing eligibility'
+pass 'explicit project eligibility withholds ineligible rules and rejects an incompatible answer'
+
+# Identity resolution is exact and fails closed while a rule declares projects.
+cfg_run() {  # <project-name> -> CFG_RC/CFG_ERR
+  CFG_RC=0
+  PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" TYPESAFE_API_KEY=synthetic-key \
+    bash "$ROOT/bin/fm-dispatch-resolve.sh" "$BRIEF" --project "$1" >/dev/null 2> "$TMP_ROOT/error" || CFG_RC=$?
+  CFG_ERR=$(cat "$TMP_ROOT/error")
+}
+before=$(count)
+cfg_run Vernant
+assert_equals 2 "$CFG_RC" 'a differently cased unregistered project is a configuration error'
+assert_contains "$CFG_ERR" 'project "Vernant" is not registered in' 'the error names the unresolved identity and registry'
+assert_contains "$CFG_ERR" 'projects.md' 'the error names the registry file'
+assert_equals "$before" "$(count)" 'an unresolved identity makes no provider request'
+cfg_run ' vernant'
+assert_equals 2 "$CFG_RC" 'leading whitespace is malformed, not trimmed'
+assert_contains "$CFG_ERR" 'leading or trailing whitespace' 'the malformed-name error names the problem'
+cfg_run ''
+assert_equals 2 "$CFG_RC" 'an empty project name is a configuration error'
+assert_contains "$CFG_ERR" 'project name is empty' 'the empty-name error names the problem'
+jq '.rules[1].projects.allow=["nowhere"]' "$TMP_ROOT/base-rules.json" > "$RULES"
+cfg_run firstmate
+assert_equals 2 "$CFG_RC" 'an unregistered name declared by a rule is a configuration error'
+assert_contains "$CFG_ERR" 'rule_2 projects name "nowhere"' 'the error names the rule and the invalid name'
+assert_equals "$before" "$(count)" 'an invalid declaration makes no provider request'
+# Compatibility control: without any `projects` declaration the project stays
+# free text and the model still judges the rules, as before.
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+printf '%s\n' '{"rule":"rule_3"}' > "$SETTINGS"
+before=$(count)
+run scratch-project
+assert_equals "$((before + 1))" "$(count)" 'an unrestricted configuration still resolves an unregistered project name'
+assert_contains "$OUT" 'status: clear' 'the unrestricted route is accepted'
+pass 'project identity is exact and unrestricted configurations keep free-text projects'
+
 # The session launch policy filters the selected rule after the answer; it
 # never removes the rule before judgment, so a weaker rule cannot replace it.
 printf '%s\n' omp-or-tc > "$HOME_DIR/config/session-launch-policy"
@@ -911,9 +1025,11 @@ assert_equals 1 "$(grep -c '^  profile:' <<<"$OUT")" 'dynamic fields cannot inje
 assert_not_contains "$OUT" $'\n  profile: injected' 'control characters are flattened in line output'
 profile_line=$(grep '^  profile:' <<<"$OUT")
 eval "set -- ${profile_line#  profile: }"
-assert_equals 4 "$#" 'shell-safe profile output preserves four argument boundaries'
+assert_equals 6 "$#" 'shell-safe profile output preserves six argument boundaries'
 assert_equals claude "$2" 'shell-safe profile output preserves the selected harness'
 assert_equals 'foo --harness grok   profile: injected' "$4" 'shell-safe profile output keeps model flags inside one argument'
+assert_equals '--dispatch-rule' "$5" 'shell-safe profile output names the selected rule'
+assert_equals rule_3 "$6" 'shell-safe profile output keeps the rule identity inside one argument'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 pass 'rules snapshots and shell quoting preserve the profile protocol'
 
@@ -1576,7 +1692,8 @@ assert_contains "$OUT" "--dispatch-rule 'rule_4'" 'the launch carries the select
 jq 'del(.rules[3].fallback)' "$TMP_ROOT/pool-rules.json" > "$RULES"
 keyed -- "$BRIEF"
 assert_contains "$OUT" "--model 'openai-codex/gpt-6-luna'" 'a rule without a fallback policy still resolves'
-assert_not_contains "$OUT" '--dispatch-rule' 'a rule without a fallback policy emits no rule identifier'
+assert_contains "$OUT" "--dispatch-rule 'rule_4'" 'every selected rule is named so launch can bind project eligibility'
+assert_not_contains "$OUT" '--dispatch-route' 'a rule without a fallback policy carries no route constraint'
 cp "$TMP_ROOT/pool-rules.json" "$RULES"
 jq '.reports[].metadata.meterStates.chat = {allowed:false,limitReached:true}' "$POOL" > "$TMP_ROOT/all-empty.json"
 cp "$POOL" "$TMP_ROOT/mixed-pool.json"

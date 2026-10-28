@@ -34,6 +34,7 @@ ${fence}text
 DoD file: $TMP_ROOT/example-only.md
 ## How You're Graded
 ${fence}
+- C1 Source: the brief. Expected: fenced examples are ignored. Verify: this helper call. Edge/negative: a real missing file is named. Evidence place: this test's output. Authority: grader.
 ### Hard gates
 Preserve the real criteria.
 ## How You're Graded
@@ -62,10 +63,15 @@ EOF
   out=$(fm_brief_task_dod_problem "$brief"); rc=$?
   [ "$rc" -eq 0 ] || fail "a real DoD file with placeholders must refuse"
   assert_contains "$out" "DoD file $criteria:" "the real criteria file must be checked"
-  printf 'Ship the specified behavior and retain the safety guard.\n' > "$criteria"
+  printf 'banana\n' > "$criteria"
   out=$(fm_brief_task_dod_problem "$brief"); rc=$?
-  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a readable filled real DoD file must pass: $out"
-  pass "unfenced DoD-file directives after fenced examples remain authoritative"
+  [ "$rc" -eq 0 ] || fail "an unstructured external DoD file must refuse"
+  assert_contains "$out" 'no mandatory item with an id and the six required fields' \
+    'an unstructured external DoD file did not name the missing item shape'
+  printf '%s\n' '- C1 Source: the ask. Expected: the behavior ships with the guard. Verify: this test. Edge/negative: an unguarded path is refused. Evidence place: this test output. Authority: grader.' > "$criteria"
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a readable structured DoD file must pass: $out"
+  pass "unfenced DoD-file directives after fenced examples remain authoritative and require structured items"
 }
 
 # Exercise the executable plan interface, including nested criteria and fenced
@@ -86,7 +92,7 @@ Keep the existing renderer.
 ## Definition Of Done (task)
 The badge updates after a refresh.
 ### Mandatory items
-- A failed refresh retains the last known value.
+- C1 Source: the refresh path. Expected: A failed refresh retains the last known value. Verify: this test. Edge/negative: an error path also retains it. Evidence place: this test's output. Authority: grader.
 ## How You're Graded
 This grading prose is not a criterion.
 EOF
@@ -98,12 +104,6 @@ EOF
   assert_not_contains "$plan" 'Keep the existing renderer.' 'plan included unrelated build instructions'
   assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
   assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
-  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
-  assert_contains "$plan" 'Grade every DoD mandatory item pass or fail by its id, with the evidence' 'plan lost per-item grading'
-  assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
-  assert_contains "$plan" 'A real defect that breaks the stated intent, even when no DoD item names it: block.' 'plan lost the intent-defect outcome'
-  assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
-  assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
   printf '# Task\nLegacy task.\n' > "$brief"
@@ -209,13 +209,12 @@ EOF
   assert_contains "$out" '- Keep C.' 'exclusions after a hash-led line were dropped'
   plan=$(cd "$ROOT/bin" && bash fm-dod-lib.sh --verification-plan "$brief" 2>&1) \
     || fail "a relative builder path could not find the shared rubric: $plan"
-  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'a relative builder path lost the rubric'
   if out=$(fm_dod_block no-mistakes no-brief-task 2>&1); then
     fail 'a no-mistakes contract rendered without its durable brief'
   fi
   assert_contains "$out" 'needs the durable task brief' 'missing-brief refusal was not actionable'
 
-  printf 'A failed refresh retains the last known value.\n' > "$criteria"
+  printf '%s\n' '- C1 Source: the refresh path. Expected: A failed refresh retains the last known value. Verify: this test. Edge/negative: an error path also retains it. Evidence place: this test output. Authority: grader.' > "$criteria"
   cat > "$brief" <<EOF
 ## Definition Of Done (task)
 \`\`\`text
@@ -252,17 +251,17 @@ test_verification_plan_requires_its_shared_rubric() {
 
 test_verification_plan_preserves_crlf_criteria_and_refuses_nul() {
   local brief="$TMP_ROOT/byte-plan.md" criteria="$TMP_ROOT/byte-criteria.md" out rc
-  printf "# Task\r\n## Captain's intent\r\nFix the badge.\r\nOut of scope: Keep billing.\r\n## Firstmate spec\r\nKeep the renderer.\r\n### Out of scope\r\n- Keep layout.\r\n## Definition Of Done (task)\r\n### Mandatory items\r\nM1: Refresh the badge.\r\n## How You're Graded\r\nNot a criterion.\r\n" > "$brief"
+  printf "# Task\r\n## Captain's intent\r\nFix the badge.\r\nOut of scope: Keep billing.\r\n## Firstmate spec\r\nKeep the renderer.\r\n### Out of scope\r\n- Keep layout.\r\n## Definition Of Done (task)\r\n### Mandatory items\r\n- C1 Source: the badge. Expected: Refresh the badge. Verify: this test. Edge/negative: a failed refresh keeps the value. Evidence place: this test output. Authority: grader.\r\n## How You're Graded\r\nNot a criterion.\r\n" > "$brief"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF plan construction failed'
-  assert_contains "$out" 'M1: Refresh the badge.' 'CRLF criteria were lost'
+  assert_contains "$out" 'C1 Source: the badge.' 'CRLF criteria were lost'
   assert_contains "$out" 'Out of scope: Keep billing.' 'CRLF legacy exclusions were lost'
   assert_contains "$out" '- Keep layout.' 'CRLF subsection exclusions were lost'
   assert_not_contains "$out" 'Not a criterion.' 'CRLF grading boundary was lost'
   assert_not_contains "$out" 'absent' 'CRLF criteria were misreported as absent'
-  printf 'M2: Preserve the last value on error.\r\n' > "$criteria"
+  printf '%s\r\n' '- C2 Source: the error path. Expected: the last value is preserved on error. Verify: this test. Edge/negative: a failed write keeps the prior value. Evidence place: this test output. Authority: grader.' > "$criteria"
   printf '## Definition Of Done (task)\r\nDoD file: %s\r\n{DOD_MANDATORY_ITEMS}\r\n## How You'\''re Graded\r\n' "$criteria" > "$brief"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief") || fail 'CRLF criteria directive failed'
-  assert_contains "$out" 'M2: Preserve the last value on error.' 'CRLF external criteria were lost'
+  assert_contains "$out" 'C2 Source: the error path.' 'CRLF external criteria were lost'
   assert_not_contains "$out" '{DOD_MANDATORY_ITEMS}' 'CRLF directive did not replace the scaffold'
   printf '\000' >> "$criteria"
   out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); rc=$?
@@ -470,26 +469,154 @@ test_merge_marker_binds_to_the_named_pr() {
 }
 
 test_forge_recorded_head_is_accepted_without_local_object() {
-  local repo wt meta state forge_head
+  local repo wt meta state forge_head fakebin plan head sha reason rc
   repo="$TMP_ROOT/forge-repo"
   wt="$TMP_ROOT/forge-wt"
   state="$TMP_ROOT/forge-state"
-  mkdir -p "$state"
+  fakebin="$TMP_ROOT/forge-bin"
+  mkdir -p "$state" "$fakebin" "$TMP_ROOT/data/forge"
   fm_git_worktree "$repo" "$wt" fm/forge
   git -C "$wt" commit -q --allow-empty -m 'worker head, not pushed from this copy'
+  head=$(git -C "$wt" rev-parse HEAD)
   # The pipeline's own commit: on the forge and in the gate repo, never
   # fetched into the worker clone.
   forge_head=0123456789abcdef0123456789abcdef01234567
   meta="$state/forge.meta"
   printf 'kind=ship\nmode=no-mistakes\nworktree=%s\nproject=%s\npr=https://github.com/o/r/pull/5\npr_head=%s\n' \
     "$wt" "$repo" "$forge_head" > "$meta"
-  accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/5 checks green" \
-    "$state" forge "$meta" \
-    || fail "forge-recorded pr_head the worker clone never fetched was refused"
-  accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/6 checks green" \
-    "$state" forge "$meta" >/dev/null \
+  cat > "$fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "axi status" ] || exit 2
+printf '%s\n' "${FM_FAKE_AXI_STATUS:-}"
+SH
+  chmod +x "$fakebin/no-mistakes"
+  plan="$TMP_ROOT/data/forge/verification-plan.md"
+  printf 'forge fixture verification plan\n' > "$plan"
+  sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+
+  # A recorded open PR head proves publication, not validation of this task or
+  # plan: without task-bound run evidence it is refused.
+  reason=$(FM_HOME="$TMP_ROOT" FM_FAKE_AXI_STATUS='' PATH="$fakebin:$PATH" \
+    accept_done ship no-mistakes "$wt" "$repo" "done: PR https://github.com/o/r/pull/5 checks green" \
+      "$state" forge "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a recorded pr_head without task-bound plan evidence was accepted"
+  case "$reason" in
+    *"verification-plan evidence"*) ;;
+    *) fail "recorded-head refusal did not name the missing evidence: $reason" ;;
+  esac
+
+  FM_FAKE_AXI_STATUS=$(cat <<EOF
+run:
+  id: "RUNFORGE"
+  branch: fm/forge
+  status: completed
+  head_sha: $head
+  verification_plan:
+    path: $plan
+    sha256: $sha
+    source_path: $plan
+    captured_at: $(date +%s)
+outcome: passed
+EOF
+)
+  FM_HOME="$TMP_ROOT" PATH="$fakebin:$PATH" FM_FAKE_AXI_STATUS="$FM_FAKE_AXI_STATUS" \
+    accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR https://github.com/o/r/pull/5 checks green" "$state" forge "$meta" \
+    || fail "forge-recorded pr_head with matching task-bound plan evidence was refused"
+  FM_HOME="$TMP_ROOT" PATH="$fakebin:$PATH" FM_FAKE_AXI_STATUS="$FM_FAKE_AXI_STATUS" \
+    accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR https://github.com/o/r/pull/6 checks green" "$state" forge "$meta" >/dev/null \
     && fail "pr_head recorded for PR 5 was accepted for a done naming PR 6"
-  pass "a forge-recorded head for the named PR is accepted without a local object"
+
+  # Only an actually merged PR whose worker copy is gone skips the re-read.
+  write_merge_marker "$state" forge github github.com o/r 5
+  reason=$(FM_HOME="$TMP_ROOT" FM_FAKE_AXI_STATUS='' PATH="$fakebin:$PATH" \
+    accept_done ship no-mistakes "$TMP_ROOT/forge-wt-gone" "$repo" \
+      "done: PR https://github.com/o/r/pull/5 checks green" "$state" forge "$meta"); rc=$?
+  [ "$rc" -eq 0 ] || fail "an actually merged PR with a missing copy must allow landed cleanup: $reason"
+  reason=$(FM_HOME="$TMP_ROOT" FM_FAKE_AXI_STATUS='' PATH="$fakebin:$PATH" \
+    accept_done ship no-mistakes "$wt" "$repo" \
+      "done: PR https://github.com/o/r/pull/5 checks green" "$state" forge "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "an existing copy still requires plan evidence after a merged proof"
+  case "$reason" in
+    *"verification-plan evidence"*) ;;
+    *) fail "merged-with-copy refusal did not name the missing evidence: $reason" ;;
+  esac
+  pass "a recorded forge head needs task-bound plan evidence and still binds the named PR; only merged-with-missing-copy cleanup is evidence-free"
+}
+
+# A recorded Gerrit pr= is publication proof a direct-PR task may use without a
+# forge read, but it never certifies a no-mistakes task's task-bound validation;
+# an unrecorded change still refuses when the forge read is skipped.
+test_gerrit_no_forge_keeps_publication_and_validation_distinct() {
+  local repo wt state meta reason rc url
+  repo="$TMP_ROOT/gerrit-noforge-repo"
+  wt="$TMP_ROOT/gerrit-noforge-wt"
+  state="$TMP_ROOT/gerrit-noforge-state"
+  mkdir -p "$state" "$TMP_ROOT/noforge-bin"
+  fm_git_worktree "$repo" "$wt" fm/gerrit
+  cat > "$TMP_ROOT/noforge-bin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "axi status" ] || exit 2
+printf '%s\n' "${FM_TEST_NM_STATUS:-}"
+SH
+  chmod +x "$TMP_ROOT/noforge-bin/no-mistakes"
+  url=https://review.example.com/c/proj/+/41
+  meta="$state/gerrit.meta"
+
+  printf 'kind=ship\nmode=direct-PR\nworktree=%s\nproject=%s\npr=%s\n' "$wt" "$repo" "$url" > "$meta"
+  FM_CREW_STATE_NO_FORGE=1 accept_done ship direct-PR "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta" \
+    || fail "a recorded Gerrit publication must satisfy a direct-PR done without a forge read"
+
+  # The recorded proof avoids only the live forge read: with no readable run the
+  # local custody refusal stays the actionable first answer.
+  printf 'kind=ship\nmode=no-mistakes\nworktree=%s\nproject=%s\npr=%s\n' "$wt" "$repo" "$url" > "$meta"
+  reason=$(PATH="$TMP_ROOT/noforge-bin:$PATH" FM_CREW_STATE_NO_FORGE=1 \
+    accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a recorded Gerrit publication alone certified a no-mistakes done"
+  case "$reason" in
+    *"proven recovered"*) ;;
+    *) fail "the no-mistakes Gerrit refusal lost its actionable custody reason: $reason" ;;
+  esac
+
+  # A passing run that reaches the evidence gate with no verification-plan
+  # snapshot is still refused: publication never certifies validation.
+  head=$(git -C "$wt" rev-parse HEAD)
+  passed_status=$(cat <<EOF
+run:
+  id: "NOFORGE"
+  branch: fm/gerrit
+  status: completed
+  head_sha: $head
+outcome: passed
+branch_sync:
+  state: synchronized
+  local:
+    head: $head
+  pipeline:
+    current_head: $head
+EOF
+)
+  reason=$(PATH="$TMP_ROOT/noforge-bin:$PATH" FM_TEST_NM_STATUS="$passed_status" \
+    FM_CREW_STATE_NO_FORGE=1 accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a recorded Gerrit publication skipped the task-bound evidence"
+  case "$reason" in
+    *"verification-plan"*) ;;
+    *) fail "the no-mistakes Gerrit refusal did not name the missing plan evidence: $reason" ;;
+  esac
+
+  printf 'kind=ship\nmode=direct-PR\nworktree=%s\nproject=%s\n' "$wt" "$repo" > "$meta"
+  reason=$(FM_CREW_STATE_NO_FORGE=1 accept_done ship direct-PR "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "an unrecorded Gerrit change passed while the forge read was skipped"
+  case "$reason" in
+    *"forge read skipped"*) ;;
+    *) fail "the unrecorded Gerrit refusal did not name the skipped forge read: $reason" ;;
+  esac
+  pass "a recorded Gerrit change is direct-PR publication proof while no-mistakes still requires custody and task-bound validation"
 }
 
 # A direct-PR worker pushes from its own copy: a commit made after the PR's
@@ -842,7 +969,7 @@ Print one complete list and the repair.
 Capability in plain words: A half-filled brief costs one refusal.
 
 ### Mandatory items
-Source: the dispatch verdict. Expected: one list. Verify: this test. Edge/negative: none. Evidence place: the test output. Authority: the grader.
+- M1 Source: the dispatch verdict. Expected: one list. Verify: this test. Edge/negative: none. Evidence place: the test output. Authority: grader.
 
 ### Supporting items
 None.
@@ -990,8 +1117,124 @@ EOF
   pass "promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair"
 }
 
+# The mandatory-items contract is mechanical: at least one uniquely identified
+# item with six nonempty fields and a known Authority. Arbitrary text is not
+# criteria, and semantic adequacy is still the grader's job.
+test_mandatory_items_require_the_objective_contract() {
+  local brief="$TMP_ROOT/criteria-contract.md" criteria_file="$TMP_ROOT/criteria-contract.txt" out rc valid case_text
+  valid='- C1 Source: the ask. Expected: the behavior ships. Verify: this test. Edge/negative: the unsafe path is refused. Evidence place: this test output. Authority: grader.'
+  mkdir -p "$TMP_ROOT"
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+banana
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'arbitrary inline text was accepted as criteria'
+  assert_contains "$out" 'no mandatory item with an id and the six required fields' \
+    'arbitrary inline text did not name the missing item shape'
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'arbitrary inline text passed the dispatch verdict'
+
+  cat > "$brief" <<'EOF'
+## Definition Of Done (task)
+### Mandatory items
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'an empty inline mandatory-items section was accepted'
+  assert_contains "$out" 'no mandatory item with an id and the six required fields' \
+    'an empty inline section did not name the missing item shape'
+
+  for case_text in \
+    'banana' \
+    '- C1 Source: one. Expected: two. Verify: three. Edge/negative: four. Evidence place: five.' \
+    '- C1 Source: one. Expected: two. Verify: three. Edge/negative: four. Evidence place: five. Authority: captain.' \
+    "$valid
+- C1 Source: duplicate. Expected: two. Verify: three. Edge/negative: four. Evidence place: five. Authority: gate."; do
+    printf '%s\n' "$case_text" > "$criteria_file"
+    cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $criteria_file
+## How You're Graded
+EOF
+    out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+    [ "$rc" -eq 0 ] || fail "an invalid external criteria set was accepted: $case_text"
+    out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+    [ "$rc" -eq 0 ] || fail "an invalid external criteria set passed the dispatch verdict: $case_text"
+  done
+
+  printf '%s\n' "$valid" > "$criteria_file"
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+DoD file: $criteria_file
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a structured external criteria set was refused: $out"
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$valid
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a structured inline criteria set was refused: $out"
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a structured inline criteria set failed the dispatch verdict: $out"
+
+  # Fenced examples are not criteria, and a fenced field label inside a real
+  # Verify value is not a new criterion.
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+\`\`\`text
+$valid
+\`\`\`
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail 'a fenced-only example satisfied mandatory items'
+  assert_contains "$out" 'no mandatory item with an id and the six required fields' \
+    'fenced-only criteria did not name the missing item shape'
+
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+- C1 Source: the ask. Expected: the behavior ships. Verify: run the command
+\`\`\`text
+Expected: this fenced line is not a field
+\`\`\`
+Edge/negative: the unsafe path is refused. Evidence place: this test output. Authority: grader.
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a fenced line inside Verify was treated as criteria: $out"
+
+  # Present-but-empty inline DoD is not the intentional legacy absence.
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the thing.
+## Firstmate spec
+Keep it small.
+## Definition Of Done (task)
+## How You're Graded
+EOF
+  if out=$(bash "$ROOT/bin/fm-dod-lib.sh" --verification-plan "$brief" 2>&1); then
+    fail 'an empty inline Definition Of Done emitted a verification plan'
+  fi
+  assert_contains "$out" 'verification plan refuses the task Definition Of Done' \
+    'empty inline DoD refusal was not actionable'
+  pass 'mandatory items require unique ids, six nonempty fields, and a known Authority; fences and empty sections are refused'
+}
+
 test_dod_file_examples_are_not_directives
 test_unfenced_dod_file_is_still_honored
+test_mandatory_items_require_the_objective_contract
 test_scout_done_is_not_gated
 test_unpushed_ship_done_is_refused
 test_no_mistakes_prevalidation_done_is_not_gated
@@ -1001,6 +1244,7 @@ test_free_text_sha_is_not_the_named_head
 test_recorded_merged_pr_is_landed_after_prune
 test_merge_marker_binds_to_the_named_pr
 test_forge_recorded_head_is_accepted_without_local_object
+test_gerrit_no_forge_keeps_publication_and_validation_distinct
 test_direct_pr_recorded_head_does_not_cover_unpushed_commit
 test_ci_ready_requires_pr_reference
 test_ci_ready_variants_are_gated

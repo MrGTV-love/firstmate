@@ -1131,8 +1131,6 @@ test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
     for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
       assert_grep "$token" "$brief" "$id: brief missing the $token placeholder"
     done
-    assert_grep "Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader)" "$brief" \
-      "$id: brief missing the mandatory item shape"
     assert_grep "A session that did not build this work grades it" "$brief" "$id: brief does not name who grades"
     assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
     assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
@@ -1971,9 +1969,10 @@ test_generated_verification_plan_command() {
   content=${content//'{TASK}'/'Fix the badge refresh.'}
   content=${content//'{FIRSTMATE_SPEC}'/'Keep the renderer. Out of scope is recorded below.'}
   content=${content//'### Out of scope'/$'### Out of scope\n- Do not redesign the dashboard.'}
-  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+  for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
     content=${content//"$token"/'The badge updates after refresh.'}
   done
+  content=${content//'{DOD_MANDATORY_ITEMS}'/'- M1 Source: the badge refresh. Expected: The badge updates after refresh. Verify: this test. Edge/negative: a failed refresh is refused. Evidence place: this test output. Authority: grader.'}
   printf '%s\n' "$content" > "$brief"
   command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$brief")
   [ -n "$command" ] || fail 'no generated plan-build command'

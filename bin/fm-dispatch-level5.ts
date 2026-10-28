@@ -1,6 +1,14 @@
 // Firstmate policy around the vendored Level 5 questions and pure decisions.
-// CLI: prepare <rules> <task> <project>, call (request on stdin, key on fd 3),
-// apply <rules> <response> <request> <allowed-harnesses-json> <cheap-class-re> <max-effort-re>.
+// CLI: prepare <rules> <task> <project> [<eligibility-json>],
+//      call (request on stdin, key on fd 3),
+//      apply <rules> <response> <request> <allowed-harnesses-json> <cheap-class-re> <max-effort-re> [<eligibility-json>].
+// <eligibility-json> is {"project": "<registered name>", "rules": ["rule_1", ...]}.
+// The resolver computes it from explicit rule `projects` fields and the
+// registered project identity; prepare omits every other rule from the Choice,
+// and apply rejects an answer naming one. When a rule declares `projects`, the
+// argument is REQUIRED: a direct call that omits it fails rather than silently
+// waiving the declaration. A rules file with no `projects` declaration keeps
+// the pre-eligibility behavior, offering every rule.
 import { readFileSync, writeFileSync } from "node:fs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { choice } from "./ten-levels/src/core/helpers.ts";
@@ -16,10 +24,36 @@ type Rule = Record<string, unknown> & { when: string; use: Profile[] };
 type Config = Record<string, unknown> & { rules: Rule[]; default: Profile[] };
 type Route = { agent: AgentRoute; model: ModelRoute; effort_score: number; escalate?: string };
 type Filtered = { profile: Profile; reason: string };
+type Eligibility = { project: string; rules: string[] };
 const [action, ...args] = process.argv.slice(2);
 const levels = ["low", "medium", "high", "xhigh", "max"];
+class EligibilityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EligibilityError";
+  }
+}
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+// The resolver owns the verdict; this adapter only receives the rule ids it
+// already proved eligible for the project. When the rules declare `projects`,
+// an absent argument is an error rather than a silent waiver: a direct caller
+// must resolve the project first, exactly as the resolver does. A rules file
+// with no such declaration keeps the pre-eligibility behavior.
+function eligibility(value: string | undefined, configured: boolean): Eligibility | null {
+  if (value === undefined) {
+    if (configured) {
+      throw new EligibilityError("rules declare projects but no project eligibility was supplied; refusing to offer or apply a rule without resolving the project");
+    }
+    return null;
+  }
+  const parsed: unknown = JSON.parse(value);
+  if (!object(parsed) || typeof parsed.project !== "string" || !Array.isArray(parsed.rules) ||
+    !parsed.rules.every((rule: unknown) => typeof rule === "string" && /^rule_[1-9][0-9]*$/.test(rule))) {
+    throw new Error("eligibility");
+  }
+  return { project: parsed.project, rules: parsed.rules as string[] };
 }
 function profiles(value: unknown): Profile[] {
   const entries: unknown[] = Array.isArray(value) ? value : value === undefined ? [] : [value];
@@ -40,8 +74,14 @@ function config(path: string): Config {
     return { ...r, when: r.when, use: profiles(r.use) };
   }), default: profiles(value.default) };
 }
-function prepare(cfg: Config, task: string, project: string): SystemOneRequest {
-  const criteria: Record<string, string> = Object.fromEntries(cfg.rules.map((rule, i) => [`rule_${i + 1}`, rule.when]));
+function prepare(cfg: Config, task: string, project: string, eligible: Eligibility | null): SystemOneRequest {
+  // Rule ids stay bound to their rules-file index; an ineligible rule is absent
+  // from the Choice rather than renumbered, so apply still reads the same rule.
+  const criteria: Record<string, string> = Object.fromEntries(cfg.rules.flatMap((rule, i) => {
+    const id = `rule_${i + 1}`;
+    if (eligible && !eligible.rules.includes(id)) return [];
+    return [[id, rule.when]];
+  }));
   criteria.default = "No listed rule applies to this task.";
   return { model: "jev-latest", state: { task, repository: project }, questions: {
     rule: choice("Which ONE dispatch rule best fits `task` in `repository`? Pick default when no listed condition is met, including exemptions.", criteria),
@@ -50,8 +90,10 @@ function prepare(cfg: Config, task: string, project: string): SystemOneRequest {
 }
 try {
   if (action === "prepare") {
-    const [rulesPath, taskPath, project] = args;
-    console.log(JSON.stringify(prepare(config(rulesPath), readFileSync(taskPath, "utf8"), project)));
+    const [rulesPath, taskPath, project, eligibleArg] = args;
+    const cfg = config(rulesPath);
+    const declaresProjects = cfg.rules.some(rule => rule !== null && typeof rule === "object" && "projects" in rule);
+    console.log(JSON.stringify(prepare(cfg, readFileSync(taskPath, "utf8"), project, eligibility(eligibleArg, declaresProjects))));
   } else if (action === "call") {
     const request: unknown = JSON.parse(readFileSync(0, "utf8"));
     validateRequest(request);
@@ -62,7 +104,7 @@ try {
         ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
     console.log(JSON.stringify(await client.systemOne(request.state, request.questions, { model: request.model })));
   } else if (action === "apply") {
-    const [rulesPath, responsePath, requestPath, allowedJson, cheapPattern, maxEffortPattern] = args;
+    const [rulesPath, responsePath, requestPath, allowedJson, cheapPattern, maxEffortPattern, eligibleArg] = args;
     if (!cheapPattern || !maxEffortPattern) throw new Error("classes");
     const cheapClass = new RegExp(cheapPattern, "i");
     const maxEffort = new RegExp(maxEffortPattern, "i");
@@ -71,7 +113,17 @@ try {
     validateRequest(request);
     const allowed: unknown = JSON.parse(allowedJson);
     if (!Array.isArray(allowed) || !allowed.every((h: unknown) => typeof h === "string")) throw new Error("allowed");
+    const eligible = eligibility(eligibleArg, cfg.rules.some(rule => rule !== null && typeof rule === "object" && "projects" in rule));
     const response: unknown = JSON.parse(readFileSync(responsePath, "utf8"));
+    // A provider answer that names a rule the resolver withheld is rejected
+    // before any profile is applied, even when another response field is
+    // missing: project eligibility is a hard restriction, not model judgment.
+    if (eligible && object(response) && object(response.answers) && object(response.answers.rule)) {
+      const named = response.answers.rule.choice;
+      if (typeof named === "string" && /^rule_[1-9][0-9]*$/.test(named) && !eligible.rules.includes(named)) {
+        throw new EligibilityError(`rule ${named} is not eligible for project ${eligible.project}`);
+      }
+    }
     validateResponse(response, request.questions);
     const a = response.answers;
     if (a.profile.type !== "choice" || a.ambiguity.type !== "score" || a.needs_desktop.type !== "noul" ||
@@ -105,6 +157,7 @@ try {
   // Never echo arbitrary API bodies, request text, credentials, or fetch URLs.
   const http = error instanceof Error ? error.message.match(/^typesafe HTTP ([0-9]{3})\./)?.[1] : undefined;
   const category = http ? `TypeSafe HTTP ${http}` : error instanceof ContractError ? "invalid provider answer contract"
+    : error instanceof EligibilityError ? error.message
     : error instanceof Error && error.name === "TimeoutError" ? "request deadline exceeded" : "request or local policy failure";
   console.error(`dispatch-level5: ${category}`);
   process.exitCode = 1;

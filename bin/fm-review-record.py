@@ -8,7 +8,7 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
     --customer-data-billing-spend yes|no --report PATH
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py latest --pr URL
-  fm-review-record.py verify --pr URL --head SHA
+  fm-review-record.py verify --pr URL --head SHA [--review-only] [--json]
 
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
@@ -20,7 +20,8 @@ Author groups name commit ranges/groups with their exact author model ids. Each
 model's family is derived from its id (any provider route prefix ending in / is
 dropped; the leading name, case-insensitive, selects it) into the closed set
 anthropic, openai, google, deepseek, xai, moonshot, meta (aliases claude, gpt,
-chatgpt, codex, oN, gemini, gemma, grok, kimi, llama) and stored beside the model.
+chatgpt, codex, oN, gemini, gemma, grok, kimi, llama, and the exact native Claude
+names opus, sonnet, haiku) and stored beside the model.
 A model outside them records family unknown, which is never independent. Reads
 accept any stored known family or unknown; verify derives every family again from
 the stored model ids, so a later family change neither invalidates history nor
@@ -41,6 +42,24 @@ holds an away-posture record (fm_afk_contract_away_present in fm-afk-contract.sh
 so away words are never recorded as captain-word and the captain gives the word
 after return; a quiet record does not refuse, because the captain is present, and
 a captain-word recorded before /afk stays valid.
+By default verify also accepts that captain-word precedence; --review-only does
+not. It requires the independently valid newest PASS itself at the exact head,
+applies the same head, reader/author dependence and trigger checks, and never
+treats a captain-word as a substitute.
+verify --json prints one fm-review-verification.v1 object built from the same
+lock-held read that decides the result: success carries ok true, and either basis
+independent-review (pr, exact head, review epoch at, reader_model, both families
+re-derived from the recorded model ids, the recorded author groups with families
+re-derived, report, and report_sha256 when the record carries that digest) or
+basis captain-word (pr, head, at, words). Failures carry ok false and
+error {kind, message}, where kind not-qualified means no recorded evidence
+satisfies the request, unavailable means stored history or state cannot be read,
+and invalid-input means a caller field, URL or path is invalid. Missing review
+history is not-qualified; corrupt or unreadable history is unavailable. Failure
+JSON keeps the existing exit status (1 evidence/unavailable, 2 input) and never
+looks like a success object. Without --json, a successful verify prints exactly
+review: PASS or review: captain-word; a refusal prints an error: line and exits
+1.
 latest emits the complete newest review and captain-word as JSON for relay reads.
 Missing/invalid input exits 2; missing/mismatched evidence or unreadable history
 exits 1. Corrupt/partial history is preserved for reconciliation, never repaired.
@@ -65,6 +84,7 @@ import time
 BIN = Path(__file__).resolve().parent
 TRIGGERS = ("loosens_deny_allow_list", "widens_guard", "customer_data_billing_spend")
 FAMILIES = {"anthropic": "anthropic", "claude": "anthropic",
+            "opus": "anthropic", "sonnet": "anthropic", "haiku": "anthropic",
             "openai": "openai", "gpt": "openai", "chatgpt": "openai", "codex": "openai",
             "google": "google", "gemini": "google", "gemma": "google",
             "deepseek": "deepseek", "xai": "xai", "grok": "xai",
@@ -74,6 +94,14 @@ RECORDED_FAMILIES = set(FAMILIES.values()) | {"unknown"}
 
 class RecordError(Exception):
     """An actionable invalid field or unavailable record."""
+
+
+class VerificationError(RecordError):
+    """No qualifying recorded evidence satisfies the verification request."""
+
+
+class UnavailableError(RecordError):
+    """The record store or a required evidence field cannot be read."""
 
 
 def nonempty(value, field):
@@ -204,7 +232,7 @@ def ledger(write, home):
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-            raise RecordError("review record history must be an ordinary single-link file")
+            raise UnavailableError("review record history must be an ordinary single-link file")
         fcntl.flock(fd, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
         yield fd
     finally:
@@ -219,36 +247,40 @@ def newest(fd, pr):
     with os.fdopen(os.dup(fd), "rb") as stream:
         for line in stream:
             if not line.endswith(b"\n"):
-                raise RecordError("review record history is incomplete; preserve and reconcile it before retrying")
+                raise UnavailableError("review record history is incomplete; preserve and reconcile it before retrying")
             try:
                 row = json.loads(line)
                 validate(row)
             except (ValueError, TypeError, RecordError) as exc:
-                raise RecordError(f"review record history is invalid ({exc}); preserve and reconcile it before retrying") from exc
+                raise UnavailableError(f"review record history is invalid ({exc}); preserve and reconcile it before retrying") from exc
             if row["pr"] == pr:
                 result[row["kind"]] = row
                 rows.append(row)
     return result, rows
 
 
-def dependence(review, head):
+def dependence(review, head, review_only=False):
     reader = model(review["reader_model"], "reader_model")
     authors = [(group, a["model"], model(a["model"], "author_groups model"))
                for group, models in review["author_groups"].items() for a in models]
     unknown = [review["reader_model"]] if reader == "unknown" else []
     unknown += [name for _, name, family in authors if family == "unknown"]
     if unknown:
+        if review_only:
+            return f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so --review-only cannot pass before a review records exact known model ids, and a captain-word is not a substitute"
         return f"model family unknown for {', '.join(unknown)}; an unknown family is never independent, so obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge"
     for group, name, family in authors:
         if family == reader:
+            if review_only:
+                return f"reader_family {reader} ({review['reader_model']}) matches author_groups {group} ({name}); --review-only requires a PASS from a reader outside every author family, and a captain-word is not a substitute"
             return f"reader_family {reader} ({review['reader_model']}) matches author_groups {group} ({name}); record a PASS from a reader outside every author family with fm-review-record.py review, then retry the merge"
     return None
 
 
-def verify(records, rows, head):
+def verify(records, rows, head, review_only=False):
     word = records["captain-word"]
     review = records["review"]
-    if word is not None and word["head"] == head:
+    if not review_only and word is not None and word["head"] == head:
         failed = None
         for row in rows:
             if row["kind"] == "captain-word":
@@ -259,21 +291,51 @@ def verify(records, rows, head):
                 elif failed is not None and dependence(row, head) is None and all(row[t] == "no" for t in TRIGGERS):
                     failed = None
         if failed is not None:
-            raise RecordError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {failed['reader_model']}, at {failed['at']}, report {failed['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
-        return "captain-word"
+            raise VerificationError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {failed['reader_model']}, at {failed['at']}, report {failed['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+        return "captain-word", word
     if review is None:
-        raise RecordError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
+        if review_only:
+            raise VerificationError(f"no independent review record at live head {head}; --review-only requires a PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
+        raise VerificationError("review record is missing; relay the review with fm-review-record.py review --pr URL, or record explicit captain merge words at the live head with fm-review-record.py captain-word (see --help), then retry the merge")
     if review["verdict"] != "PASS":
-        raise RecordError("verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge")
+        if review_only:
+            raise VerificationError(f"verdict is FAIL at live head {head}; --review-only requires a new independent PASS recorded with fm-review-record.py review, and a captain-word is not a substitute")
+        raise VerificationError("verdict is FAIL; obtain and record a new PASS with fm-review-record.py review, then retry the merge")
     if review["head"] != head:
-        raise RecordError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
-    problem = dependence(review, head)
+        raise VerificationError(f"head mismatch: review names {review['head']}, live head is {head}; review the live head and record its PASS with fm-review-record.py review, then retry the merge")
+    problem = dependence(review, head, review_only)
     if problem is not None:
-        raise RecordError(problem)
+        raise VerificationError(problem)
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
     if yes:
-        raise RecordError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
-    return "PASS"
+        if review_only:
+            raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
+        raise VerificationError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+    return "independent-review", review
+
+
+def verification_json(pr, head, basis, row):
+    evidence = {"schema": "fm-review-verification.v1", "ok": True, "basis": basis,
+                "pr": pr, "head": head, "at": row["at"]}
+    if basis == "captain-word":
+        evidence["words"] = row["words"]
+        return evidence
+    evidence.update(
+        reader_model=row["reader_model"],
+        reader_family=model(row["reader_model"], "reader_model"),
+        author_groups={group: [{"model": author["model"],
+                                "family": model(author["model"], "author_groups model")}
+                               for author in authors]
+                       for group, authors in row["author_groups"].items()},
+        report=row["report"])
+    if isinstance(row.get("report_sha256"), str) and row["report_sha256"]:
+        evidence["report_sha256"] = row["report_sha256"]
+    return evidence
+
+
+def failure_json(kind, message):
+    return {"schema": "fm-review-verification.v1", "ok": False,
+            "error": {"kind": kind, "message": message}}
 
 
 def main():
@@ -289,7 +351,11 @@ def main():
                 command.add_argument("--" + flag, required=True)
         if name == "captain-word":
             command.add_argument("--words", required=True)
+        if name == "verify":
+            command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
+            command.add_argument("--json", action="store_true", help="print one fm-review-verification.v1 object built from the same locked read")
     args = parser.parse_args()
+    emit_json = getattr(args, "json", False)
     try:
         home = task_home()
         pr = canonical_pr(args.pr)
@@ -314,7 +380,10 @@ def main():
         if args.command == "captain-word":
             refuse_away(state_dir(home))
     except RecordError as exc:
-        print(f"error: {exc}")
+        if emit_json:
+            print(json.dumps(failure_json("invalid-input", str(exc)), separators=(",", ":")))
+        else:
+            print(f"error: {exc}")
         return 2
     try:
         with ledger(write, home) as fd:
@@ -322,15 +391,28 @@ def main():
             if write:
                 data = (json.dumps(row, separators=(",", ":"), ensure_ascii=True) + "\n").encode("ascii")
                 if os.write(fd, data) != len(data):
-                    raise RecordError("partial review record append; preserve history for reconciliation before retrying")
+                    raise UnavailableError("partial review record append; preserve history for reconciliation before retrying")
                 os.fsync(fd)
                 print(f"recorded: {args.command}")
             elif args.command == "latest":
                 print(json.dumps(records, separators=(",", ":")))
             else:
-                print(f"review: {verify(records, rows, args.head)}")
-    except (RecordError, OSError) as exc:
-        print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
+                basis, evidence = verify(records, rows, args.head, args.review_only)
+                if emit_json:
+                    print(json.dumps(verification_json(pr, args.head, basis, evidence), separators=(",", ":")))
+                else:
+                    print(f"review: {'PASS' if basis == 'independent-review' else basis}")
+    except VerificationError as exc:
+        if emit_json:
+            print(json.dumps(failure_json("not-qualified", str(exc)), separators=(",", ":")))
+        else:
+            print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
+        return 1
+    except (UnavailableError, RecordError, OSError) as exc:
+        if emit_json:
+            print(json.dumps(failure_json("unavailable", str(exc)), separators=(",", ":")))
+        else:
+            print(f"error: {exc}; inspect review-records.jsonl in the PR task home before retrying")
         return 1
     return 0
 

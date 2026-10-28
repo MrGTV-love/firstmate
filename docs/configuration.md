@@ -880,7 +880,10 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
-For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
+The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
+For a configured repository, the ledger asks `bin/fm-review-record.py verify --review-only --json` once for the PR's exact live head and consumes that single atomic owner output.
+That owner is the only authority: it requires the newest recorded PASS at that exact head with a known reader family outside every recorded author commit-group family and no escalation trigger, and its record fields are immutable review-time evidence, so a later reviewer or author relaunch, or a mutable `state/*.meta` edit, cannot convert an old review into an independent one.
+A missing, stale-head, FAIL, same-family, unknown-family, or yes-trigger record is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
@@ -1606,9 +1609,16 @@ The address selects the existing shared server; it does not authorize starting o
 ## Task Definition of Done (ship and scout briefs)
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
-Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items, supporting items, hard gates, and the honesty rule.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with a unique id and every field nonempty; Authority is exactly agent, gate, or grader.
 The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
+It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
+A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
+A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head tree equals the copy's `HEAD` tree, and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
+A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
+The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check. This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
 A filled section may quote a placeholder inside a sentence.
@@ -1981,10 +1991,11 @@ The header also owns the closeout-script liveness dependency and the proposed Ve
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
-`config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
+`config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules, with an optional explicit project restriction, that firstmate reads before dispatching a crewmate or scout.
 When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `dispatch-profile-intake`, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` when the rule has a fallback policy.
+Firstmate resolves the rule's profile object or array under `dispatch-profile-intake`, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` naming the selected rule when it declares a fallback policy or hard project eligibility.
+Typed resolution names every selected rule, so launch and recovery can rebind it to the project actually being launched.
 
 **Spawn requirements**
 
@@ -1996,12 +2007,14 @@ Firstmate resolves the rule's profile object or array under `dispatch-profile-in
 
 This section is the single owner of the canonical schema and its per-field semantics.
 `dispatch-profile-intake` owns the dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
+`bin/fm-dispatch-eligibility-lib.sh` owns the `projects` verdict and the identity rules every consumer applies.
 
 ```json
 {
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
+      "projects": { "allow": ["<registered project name>"], "exclude": ["<registered project name>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2028,6 +2041,54 @@ This section is the single owner of the canonical schema and its per-field seman
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
 | Rule `fallback` and top-level `default_fallback` | Optional ordered arrays of explicit stand-ins; an empty or absent list permits none. |
+| Rule `projects` | Optional hard project eligibility: an object with a non-empty `allow` and/or `exclude` array of exact names registered in `data/projects.md`, and no other keys. |
+
+**Hard project eligibility (rule `projects`)**
+
+A rule without `projects` is unrestricted and keeps every existing configuration unchanged.
+A rule with it is eligible only for a project named in `allow` (when present) and absent from `exclude` (when present).
+There is no other shape: `allow` and `exclude` are both optional, at least one must be present, and both are non-empty arrays of registered names when present.
+One line can carry both, for example `"projects": {"allow": ["vernant", "acme"], "exclude": ["vernant-archive"]}`.
+
+Names are exact registered identities from the home's `data/projects.md`, the same identity owner that answers project delivery posture.
+Case, spacing, aliases, and partial matches are never normalized or guessed: a rule name that is not registered, or a `--project` value that is empty, malformed, or unregistered while some rule declares `projects`, is an actionable configuration error rather than a silently widened policy.
+A name with leading or trailing whitespace is a typo, not a different identity.
+The launch identity is the project directory's basename: typed resolution receives that name as `--project`, and launch matches the same basename against the registry.
+Firstmate has no separate origin-to-registry-name mapping, so a clone whose directory name differs from its registered name cannot satisfy a restricted rule; that is reported as an unregistered identity rather than guessed around.
+
+`bin/fm-dispatch-eligibility-lib.sh` owns the verdict and every consumer applies it:
+
+- Typed resolution removes an ineligible rule from the Choice the model sees and rejects a provider answer that still names one.
+- The Level 5 adapter refuses to prepare or apply a rules file that declares `projects` without the resolved eligibility argument, so an internal direct call cannot silently waive the declaration.
+- `fm-spawn.sh` rechecks the selected rule, and any rule the fallback resolver infers from the launched profile, against the project actually being launched before any worktree, endpoint, or task record exists; a profile can also be authorized by a restricted rule that declares no fallback, so the launched profile must be held by at least one rule this project allows.
+- Under hard project eligibility, a supplied rule that does not hold the requested profile refuses instead of letting another rule's authorization stand in for it; the explicit `--harness`/`--model` override remains the deliberate manual route.
+- A profile that no rule holds is such an explicit manual route outside the rule matrix; the required explicit harness authorizes it, while a profile at least one rule holds must be permitted by an eligible one.
+- An identity that no longer resolves refuses rather than acting unrestricted.
+- `fm-control.sh relaunch` rechecks a recorded rule, its inferred fallback rule, and the recorded profile's authorizing rules before the running agent is stopped, so a later config edit cannot silently widen the restriction; a recorded identity that no longer resolves, or that does not authorize the recorded profile, refuses.
+- A rule's declared `fallback` and `default_fallback` are reachable only through a selected eligible rule, so project policy is not lost in stand-in selection.
+
+`when` remains natural-language judgment about task suitability and is never parsed for a project restriction.
+An arbitrary English condition such as "only when the project is Vernant" is not a hard guarantee: declare the restriction here when it must be enforced.
+`projects` is a rule field only; the top-level `default` profile array names no project scope and remains the generic fallback when no rule applies.
+The model cannot waive a declared restriction by choosing that rule.
+
+```json
+{
+  "rules": [
+    {
+      "when": "Vernant design work that changes the customer-facing model",
+      "projects": { "allow": ["vernant"] },
+      "use": [{ "harness": "claude", "model": "<opus-class id>", "effort": "high" }]
+    },
+    {
+      "when": "Routine implementation work outside Vernant",
+      "projects": { "exclude": ["vernant"] },
+      "use": [{ "harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high", "provider": "codex" }]
+    }
+  ],
+  "default": { "harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high", "provider": "codex" }
+}
+```
 
 **Pooled OMP capacity and declared stand-ins**
 
@@ -2055,9 +2116,10 @@ A `powerful` route never selects a Haiku/Luna stand-in from `fallback` or `defau
 A launch without `--dispatch-route`, such as a manual route, keeps each stand-in exactly as declared.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
-When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+When the matched rule has a fallback policy or declares hard project eligibility, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+Launch rechecks that identifier against the project actually being launched, and recovery rechecks it before stopping the running agent, so an incompatible rule or an unregistered project identity refuses in both paths.
 A recorded rule still contains the task's profile when typed resolution raised its effort above the configured one for the same harness and model.
-A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
+A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent for fallback matching, but it refuses launch and recovery because the project restriction it may have carried can no longer be verified; relaunch with an explicit harness or model override to accept a manual route deliberately.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
 OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task; `fm-spawn.sh --fixed-family` empties those chains for a scout task, including an independent review reader, so a provider error stops the reader instead of switching its model family.
@@ -2157,6 +2219,7 @@ The script header owns flags, the output block, and exit status.
 - Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
 - A `use` profile's `effort`, when present, is one of `low`, `medium`, `high`, `xhigh`, or `max`; any other value is an error.
 - A malformed rule, duplicate profile, invalid fallback, unreadable rules file, failed quota read, or invalid quota snapshot is reported as an error; the selector never selects around it.
+- A review rule that declares `projects` is refused: this dry run has no launch project to bind, so dropping the hard restriction silently would be worse than stopping. Declare `projects` only on worker dispatch rules.
 
 **Procedure**
 
@@ -2186,6 +2249,9 @@ Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFI
 bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>        # TOON block on stdout
 ```
 
+When any rule declares `projects`, `<name>` must be the project's exact registered identity in the home's `data/projects.md`; an empty, malformed, or unregistered name exits 2 with an actionable diagnostic instead of guessing or normalizing it.
+Without such a declaration the project stays free text, as before.
+
 **When firstmate invokes the resolver**
 
 Firstmate invokes the resolve path directly after writing the brief, without a preflight; the absent-key off line is handled exactly like every other non-clear outcome.
@@ -2193,8 +2259,10 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 **What the model receives**
 
 When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
-That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every rule's `when` plus the fixed neutral option for no matching rule.
-The rule Choice alone decides which rule applies, including project-scoped and Claude-only rules; no local text pre-check selects or removes a rule.
+That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every eligible rule's `when` plus the fixed neutral option for no matching rule.
+The rule Choice alone decides which offered rule applies, including task-suitability and Claude-only rules.
+Explicit hard project eligibility is the one pre-choice filter: a rule whose declared `projects` allow/exclude lists exclude the project is withheld before judgment, and an answer that still names it is rejected rather than applied.
+No text pre-check parses `when`, selects among the remaining rules, or removes one for any other reason.
 The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
 The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
 The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
@@ -2271,7 +2339,7 @@ When no cheap candidate passes, the whole rule ranks as usual: an exhausted or f
 This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
 `powerful` excludes Haiku/Luna candidates and declared stand-ins, from `fallback` and `default_fallback` alike, and a selected stand-in takes the same route effort clamp as `use` candidates, Haiku at `max`.
 When only such stand-ins remain, the result is `escalate`.
-The resolver's profile line carries `--dispatch-route` beside `--dispatch-rule`, so launch and recovery apply the same class and effort.
+The resolver's profile line names the selected rule as `--dispatch-rule`, so launch and recovery rebind it to the project actually being launched; `--dispatch-route` accompanies it when the rule declares a fallback policy, so launch and recovery apply the same class and effort.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
 These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.

@@ -481,6 +481,118 @@ test_active_dispatch_profile_allows_raw_launch_command() {
   pass "active crew-dispatch profile allows the raw launch-command escape hatch"
 }
 
+# A selected rule that declares hard project eligibility is rebound to the
+# project actually being launched. The resolver checked the caller's project
+# name; this is the boundary that catches a mismatch, a mistyped identity, or a
+# config edit between resolution and launch.
+test_selected_rule_project_eligibility_binds_to_the_launch_project() {
+  local rec id out status meta
+  id=profile-eligibility-z16
+  rec=$(make_spawn_case profile-eligibility claude "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/data"
+  printf '%s\n' '# Projects' '- project - this case' '- other - another project' > "$HOME_DIR/data/projects.md"
+  mkdir -p "$HOME_DIR/config"
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 1 "$status" "a rule restricted to another project must refuse this launch"
+  assert_contains "$out" "rule rule_1 is not eligible for project project" "the refusal names the rule and the launch project"
+  assert_absent "$HOME_DIR/state/$id.meta" "the eligibility refusal happens before meta is written"
+  assert_no_grep 'codex' "$LAUNCH_LOG" "the eligibility refusal sends no launch"
+
+  # Control: an eligible rule for the same project launches and is recorded so
+  # recovery can re-check it, even though it declares no fallback policy.
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}},{"when":"this project","projects":{"allow":["project"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_2)
+  status=$?
+  expect_code 0 "$status" "an eligible project rule must launch: $out"
+  meta="$HOME_DIR/state/$id.meta"
+  assert_grep 'dispatch_rule=rule_2' "$meta" "the restricted rule must be recorded for recovery"
+  rm -f "$meta"
+
+  # An unregistered launch identity fails closed while the rule is restricted.
+  rm -f "$HOME_DIR/data/projects.md"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_2)
+  status=$?
+  expect_code 1 "$status" "a restricted rule with an unregistered project must refuse"
+  assert_contains "$out" 'is not registered in' "the refusal names the unresolved project identity"
+  assert_absent "$HOME_DIR/state/$id.meta" "the identity refusal happens before meta is written"
+
+  # Compatibility control: without a `projects` declaration a launch keeps its
+  # previous behavior, records no rule identifier, and needs no registry.
+  printf '%s\n' '{"rules":[{"when":"any work","use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 0 "$status" "an unrestricted rule must launch without a registry: $out"
+  assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "an unrestricted rule records no fallback identifier"
+  pass "spawn binds a selected restricted rule to the actual launch project"
+}
+
+# Omitting --dispatch-rule must not bypass a restriction on the rule the
+# fallback resolver infers from the launched profile, and a rule identity that
+# no longer resolves must refuse rather than act unrestricted.
+test_inferred_or_unverifiable_dispatch_rules_cannot_bypass_eligibility() {
+  local rec id out status
+  id=profile-eligibility-inferred-z17
+  rec=$(make_spawn_case profile-eligibility-inferred claude "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/data" "$HOME_DIR/config"
+  printf '%s\n' '# Projects' '- project - this case' '- other - another project' > "$HOME_DIR/data/projects.md"
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high)
+  status=$?
+  expect_code 1 "$status" "a rule inferred from the profile must still enforce its project restriction"
+  assert_contains "$out" "rule rule_1 is not eligible for project project" "the inferred-rule refusal names the rule and project"
+  assert_absent "$HOME_DIR/state/$id.meta" "the inferred-rule refusal happens before meta is written"
+  assert_no_grep 'codex' "$LAUNCH_LOG" "the inferred-rule refusal sends no launch"
+
+  printf '%s\n' '{"rules":[{"when":"any work","use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_9)
+  status=$?
+  expect_code 1 "$status" "a rule identity that no longer resolves must refuse the launch"
+  assert_contains "$out" 'dispatch rule rule_9 is not present in' "the refusal names the unverifiable rule identity"
+  assert_absent "$HOME_DIR/state/$id.meta" "the unverifiable-rule refusal happens before meta is written"
+
+  # A restricted rule without any fallback produces no fallback identity to
+  # infer, so the profile-authorization check itself must refuse it.
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high)
+  status=$?
+  expect_code 1 "$status" "a restricted rule without fallback must still refuse the matching profile"
+  assert_contains "$out" 'is not authorized by any dispatch rule eligible for project project' \
+    "the no-fallback refusal names the missing project authorization"
+  assert_absent "$HOME_DIR/state/$id.meta" "the no-fallback refusal happens before meta is written"
+
+  # A supplied rule that does not hold the requested profile refuses instead of
+  # letting another rule's authorization stand in for it.
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}},{"when":"second","use":{"harness":"codex","model":"gpt-5-mini","effort":"high"}}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
+    > "$HOME_DIR/config/crew-dispatch.json"
+  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness codex --model gpt-5-mini --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 1 "$status" "an explicit rule that does not authorize the profile must refuse"
+  assert_contains "$out" 'does not authorize the requested profile' \
+    "the mismatch refusal names the requested rule"
+  assert_absent "$HOME_DIR/state/$id.meta" "the mismatch refusal happens before meta is written"
+  pass "spawn refuses an inferred ineligible rule, an unverifiable identity, a no-fallback restriction, and a rule/profile mismatch"
+}
+
 test_chained_raw_launch_strips_ai_trailer_in_every_step() {
   local rec id out status launch body
   id=chained-raw-z15
@@ -2061,9 +2173,10 @@ test_worker_launch_delivers_role_scope() {
       content=$(cat "$brief")
       content=${content//'{TASK}'/brief for $id}
       content=${content//'{FIRSTMATE_SPEC}'/Exercise the spawn behavior under test.}
-      for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+      for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
         content=${content//"$token"/Filled for the test.}
       done
+      content=${content//'{DOD_MANDATORY_ITEMS}'/- M1 Source: the intent. Expected: the spawn behavior works. Verify: this test. Edge/negative: a refused spawn is reported. Evidence place: this test output. Authority: grader.}
       printf '%s\n' "$content" > "$brief"
     fi
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"
@@ -2350,6 +2463,8 @@ test_active_dispatch_profile_requires_explicit_harness_for_scout
 test_active_dispatch_profile_allows_explicit_harness
 test_active_dispatch_profile_allows_positional_harness
 test_active_dispatch_profile_allows_raw_launch_command
+test_selected_rule_project_eligibility_binds_to_the_launch_project
+test_inferred_or_unverifiable_dispatch_rules_cannot_bypass_eligibility
 test_chained_raw_launch_strips_ai_trailer_in_every_step
 test_claude_threads_model_and_effort
 test_codex_threads_model_and_effort

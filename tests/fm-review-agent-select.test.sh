@@ -299,6 +299,9 @@ assert_error 'a malformed provider id' 'provider must match' --dry-run
 write_rules "[$(jq -c '.harness = "omp" | .model = "xai/grok-9"' <<<"$SONNET"),$SOL]"
 assert_error 'an omp candidate with no provider family' 'declare provider' --dry-run
 write_rules "$DEFAULT_USE"
+jq '.rules[1].projects = {"allow": ["vernant"]}' "$RULES" > "$RULES.tmp" && mv "$RULES.tmp" "$RULES"
+assert_error 'a project-scoped review rule' 'review rule declares projects' --dry-run
+write_rules "$DEFAULT_USE"
 jq '.rules += [.rules[1]]' "$RULES" > "$RULES.tmp" && mv "$RULES.tmp" "$RULES"
 assert_error 'two matching review rules' 'more than one rule starts with' --dry-run
 write_rules "$DEFAULT_USE"

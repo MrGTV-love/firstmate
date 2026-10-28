@@ -949,6 +949,18 @@ test_herdr_relaunch_resumes_only_the_registered_pi_session() {
       return 0
     }
     dir=$HERDR_CASE_DIR id=$HERDR_CASE_ID
+    # The harness probe needs a pi executable, but no real Pi runs: the launch
+    # is captured by the fake launcher, so this only answers resolve_pi_executable
+    # and the --help feature probes. It does not weaken either assertion below.
+    cat > "$dir/fakebin/pi" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  --version|-version) printf 'pi 0.86.1\n' ;;
+  --help|-help) printf 'Pi\n  --tui-mode regular\n  --approve\n  --session <path-or-id>\n' ;;
+esac
+exit 0
+SH
+    chmod +x "$dir/fakebin/pi"
     rm -f "$dir/fake/herdr-stopped"
     sed 's/^harness=claude$/harness=pi/' "$dir/home/state/$id.meta" > "$dir/pi.meta" \
       || fail 'could not prepare Pi relaunch metadata'

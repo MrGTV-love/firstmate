@@ -1552,20 +1552,53 @@ test_retiring_omp_removes_only_its_generated_configuration() {
 }
 
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
-  local dir out rc recorded id
-  for recorded in none stale; do
-    id=rl-unlabeled-$recorded
-    dir=$(new_case "unlabeled-$recorded" "$id")
-    add_ship_task "$dir" "$id" claude
-    [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
-    mkdir -p "$dir/home/config"
-    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
-    out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
-    expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
-    assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
-    assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
-  done
-  pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
+  local dir out rc id
+  id=rl-unlabeled-none
+  dir=$(new_case unlabeled-none "$id")
+  add_ship_task "$dir" "$id" claude
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+  out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+  expect_code 0 "$rc" "no recorded rule with an ambiguous match must relaunch as before: $out"
+  assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
+  assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
+
+  # A recorded identity that no longer resolves cannot prove the project
+  # restriction it may have carried, so recovery refuses before stopping the
+  # running agent instead of silently treating it as unrestricted.
+  id=rl-unlabeled-stale
+  dir=$(new_case unlabeled-stale "$id")
+  add_ship_task "$dir" "$id" claude
+  printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+  out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+  expect_code 1 "$rc" "a recorded rule that no longer exists must refuse the relaunch: $out"
+  assert_contains "$out" 'dispatch rule rule_7 is not present in' "the refusal names the unverifiable recorded rule"
+  assert_equals claude "$(cat "$dir/fake/command")" "the refusal must leave the old agent running"
+  assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent for an unverifiable recorded rule"
+  pass "relaunch treats an ambiguous match as no fallback and refuses an unverifiable recorded rule"
+}
+
+# A recorded rule is rechecked against the recorded project before the old agent
+# is stopped, so a config edit cannot silently widen a hard project restriction.
+test_relaunch_rechecks_a_recorded_rule_project_eligibility() {
+  local dir out rc id
+  id=rl-project-eligibility
+  dir=$(new_case project-eligibility "$id")
+  add_ship_task "$dir" "$id" claude
+  mkdir -p "$dir/home/config" "$dir/home/data"
+  printf '%s\n' '# Projects' '- proj - this case' '- other - another project' > "$dir/home/data/projects.md"
+  printf 'dispatch_rule=rule_1\n' >> "$dir/home/state/$id.meta"
+  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"claude"}}],"default":{"harness":"claude"}}' \
+    > "$dir/home/config/crew-dispatch.json"
+  out=$(run_control "$dir" "$id" relaunch --note "resume after the policy edit"); rc=$?
+  expect_code 1 "$rc" "an ineligible recorded rule must refuse the relaunch: $out"
+  assert_contains "$out" "rule rule_1 is not eligible for project proj" "the refusal names the rule and project"
+  assert_equals claude "$(cat "$dir/fake/command")" "the refused relaunch must leave the old agent running"
+  assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the recorded rule is ineligible"
+  assert_equals claude "$(meta_field "$dir" "$id" harness)" "the refusal must preserve the recorded harness"
+  pass "relaunch rechecks a recorded rule's hard project eligibility before stopping the agent"
 }
 
 control_relaunch_test_cases=(
@@ -1576,6 +1609,7 @@ test_exit_and_relaunch_remove_the_dialog_file
 test_exit_removes_the_dialog_file_before_releasing_the_lock
 test_retiring_omp_removes_only_its_generated_configuration
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
+test_relaunch_rechecks_a_recorded_rule_project_eligibility
 test_quota_exhaustion_relaunches_only_a_permitted_route
 test_quota_recovery_keeps_the_typed_route_class
 test_secondmate_relaunch_checkpoints_child_work_and_spares_the_charter

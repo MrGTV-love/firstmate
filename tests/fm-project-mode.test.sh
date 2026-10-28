@@ -83,4 +83,16 @@ pass "fm-project-mode: a value outside none|gerrit|forgejo is refused and the re
   || fail "an absent registry file must default --forge to none"
 pass "fm-project-mode: a missing project or absent registry defaults --forge to none"
 
+# --names is the identity query dispatch eligibility uses; it must share this
+# file's name boundary and take no project argument.
+expected_names=$(printf '%s\n' legacy flagged lab lead kept colon glabbed)
+actual_names=$(FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" --names 2>/dev/null)
+assert_equals "$expected_names" "$actual_names" "--names did not print every registered name at the registry name boundary"
+absent_names=$(FM_DATA_OVERRIDE="$TMP_ROOT/no-such-dir" "$PROJECT_MODE" --names 2>/dev/null)
+assert_equals '' "$absent_names" "--names printed output for an absent registry"
+status=0
+FM_DATA_OVERRIDE="$DATA" "$PROJECT_MODE" --names legacy >/dev/null 2>&1 || status=$?
+expect_code 2 "$status" "--names must refuse a project-name argument"
+pass "fm-project-mode: --names prints the registered identities and takes no project name"
+
 echo "# fm-project-mode.test.sh: all assertions passed"
