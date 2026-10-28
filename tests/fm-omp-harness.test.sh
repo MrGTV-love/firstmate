@@ -1931,7 +1931,8 @@ EOF
 # no FM_HOME, so the copy itself reads as the home. Run both extensions the way
 # a session does, from a copy with no FM_HOME: with FM_TASK_ID (the worker
 # marker bin/fm-spawn.sh exports) the copy must stay clean, and without it (a
-# primary or secondmate home) the four home paths are still written.
+# primary or secondmate home) the four home paths are still written. Both keep
+# the watcher-arm seatbelt: a backgrounded arm is denied either way.
 run_omp_primary_extensions() {  # <repo> [FM_TASK_ID value]
   local repo=$1 task=${2:-}
   (
@@ -1954,6 +1955,9 @@ const ctx = { sessionManager: { getSessionId: () => "s1" }, model: { provider: "
 for (const name of ["session_start", "before_agent_start", "agent_start", "session_stop", "agent_end"]) {
   for (const handler of handlers.get(name) ?? []) await handler({ type: name }, ctx);
 }
+const seatbelt = await Promise.all((handlers.get("tool_call") ?? []).map((handler) =>
+  handler({ type: "tool_call", toolName: "bash", input: { command: "bin/fm-watch-arm.sh &" } }, {})));
+if (!seatbelt.some((result) => result?.block === true)) console.log(`the watcher-arm seatbelt did not deny a backgrounded arm: ${JSON.stringify(seatbelt)}`);
 for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
 process.exit(0);
 EOF
@@ -1985,7 +1989,7 @@ SH
   for path in state/.omp-live-model state/.omp-turnend-extension-loaded state/.omp-watch-extension-loaded state/extensions/omp-primary-watch; do
     [ -e "$repo/$path" ] || fail "a home must still write $path"
   done
-  pass ".omp primary extensions: a task worker copy stays clean, a home still writes its four paths"
+  pass ".omp primary extensions: a task worker copy stays clean and keeps the arm seatbelt, a home still writes its four paths"
 }
 
 test_watch_extension_reads_durable_payloads() {

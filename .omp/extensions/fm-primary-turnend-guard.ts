@@ -93,7 +93,7 @@ function lockOwnership(): LockOwnership {
 // next restart. Writes only on a change, and only for the lock owner or while
 // no live session holds the lock.
 function markLoaded(): void {
-  if (!existsSync(state) || lockOwnership() === "other") return;
+  if (taskWorkerSession() || !existsSync(state) || lockOwnership() === "other") return;
   const record = `${extensionVersion}\n${process.pid}\n`;
   try {
     if (readFileSync(marker, "utf8") === record) return;
@@ -506,7 +506,40 @@ function runPretoolCheck(command: string): Promise<{ code: number; stderr: strin
 }
 
 export default function (pi: ExtensionAPI) {
-  // A task worker is not a home: it writes no home marker and guards no turn.
+  pi.on?.("tool_call", async (event) => {
+    if (!event || event.type !== "tool_call" || event.toolName !== "bash") return {};
+    const command = String((event.input as { command?: unknown })?.command ?? "");
+    if (!command) return {};
+    const result = await runPretoolCheck(command);
+    if (result.code !== 2) return {};
+    return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };
+  });
+
+  // The blocking turn boundary. Returning undefined lets the session settle;
+  // returning { continue: true, additionalContext } compels one more agent
+  // loop with the guard text attached (verified on omp 18.1.2 and 18.1.11).
+  pi.on?.("session_stop", async (event) => {
+    markLoaded();
+    const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
+    const result = await runGuard(stopHookActive);
+    if (result.code !== 2) return undefined;
+    let content: string;
+    try {
+      content = encodeFirstmateOperationalInput(
+        "turn-end-guard",
+        "TURN WOULD END BLIND - supervision is off. " +
+          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
+          result.stderr,
+      );
+    } catch {
+      content = "TURN WOULD END BLIND - supervision is off. " +
+        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
+        result.stderr;
+    }
+    return { continue: true, additionalContext: content };
+  });
+
+  // A task worker is not a home: it publishes no home state and gets no home digest.
   if (taskWorkerSession()) return;
   let sessionstartGeneration: SessionstartGeneration | null = null;
   let sessionstartExitListenerRegistered = false;
@@ -595,39 +628,6 @@ export default function (pi: ExtensionAPI) {
       if (sessionstartGeneration === generation) sessionstartGeneration = null;
       removeSessionstartExitListener();
     }
-  });
-
-  pi.on?.("tool_call", async (event) => {
-    if (!event || event.type !== "tool_call" || event.toolName !== "bash") return {};
-    const command = String((event.input as { command?: unknown })?.command ?? "");
-    if (!command) return {};
-    const result = await runPretoolCheck(command);
-    if (result.code !== 2) return {};
-    return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };
-  });
-
-  // The blocking turn boundary. Returning undefined lets the session settle;
-  // returning { continue: true, additionalContext } compels one more agent
-  // loop with the guard text attached (verified on omp 18.1.2 and 18.1.11).
-  pi.on?.("session_stop", async (event) => {
-    markLoaded();
-    const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
-    const result = await runGuard(stopHookActive);
-    if (result.code !== 2) return undefined;
-    let content: string;
-    try {
-      content = encodeFirstmateOperationalInput(
-        "turn-end-guard",
-        "TURN WOULD END BLIND - supervision is off. " +
-          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-          result.stderr,
-      );
-    } catch {
-      content = "TURN WOULD END BLIND - supervision is off. " +
-        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-        result.stderr;
-    }
-    return { continue: true, additionalContext: content };
   });
 
   markLoaded();

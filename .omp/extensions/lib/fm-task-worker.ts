@@ -6,7 +6,9 @@
 // directory they were loaded from, which in a task copy is the copy itself, so
 // the worker session wrote the home's markers and the primary watch state into
 // the copy. The worker's own supervision comes from its per-task extension
-// (bin/fm-spawn.sh), so the primary extensions stand down for it.
+// (bin/fm-spawn.sh), so the primary extensions skip every home write, the home
+// watch, and the home digest for it; the watcher-arm seatbelt and the turn-end
+// guard (which exempts task worktrees itself) stay registered.
 //
 // bin/fm-spawn.sh exports FM_TASK_ID into every ship and scout pane, keeps it
 // through the filtered launch environment, and never sets it for a primary or
