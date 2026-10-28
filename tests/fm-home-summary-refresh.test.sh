@@ -1270,6 +1270,152 @@ sleep 1
   || fail "the follow-up refresh left the trigger marker behind"
 pass "triggers during a refresh coalesce into exactly one follow-up refresh"
 
+# --- fixture cleanup waits for detached writers -------------------------------
+#
+# A detached refresh keeps writing its home after the foreground caller returned;
+# its worker's first act, sourcing fm-wake-lib.sh, recreates state/. A fixture
+# root removed under it is recreated afterwards. tests/lib.sh therefore exports
+# FM_TEST_PROCESS_REGISTRY, the refresh parent and its worker publish their own
+# identities there before any write, and cleanup waits for those exact
+# identities and the groups they lead to be gone.
+
+registry_pidfiles() {  # <registry>
+  awk -F '\t' '$3 == "wait" { print $1 }' "$1"
+}
+
+# Every identity recorded in <copy> (pidfile copies made before waiting) is gone
+# and leads no remaining process group.
+assert_recorded_writers_gone() {  # <label> <pidfile>...
+  local label=$1 pidfile pid start
+  shift
+  for pidfile in "$@"; do
+    IFS=$'\t' read -r pid start < "$pidfile" || fail "$label: unreadable writer record $pidfile"
+    ! fm_test_process_alive "$pidfile" fm-home-summary-refresh.sh \
+      || fail "$label: writer $pid ($start) is still running after the wait"
+    ! kill -0 -- "-$pid" 2>/dev/null \
+      || fail "$label: process group $pid still has members after the wait"
+  done
+}
+
+copy_pidfiles() {  # <registry> <dest-dir> -> prints the copies
+  local pidfile
+  mkdir -p "$2"
+  while IFS= read -r pidfile; do
+    cp "$pidfile" "$2/${pidfile##*.}" || return 1
+    printf '%s\n' "$2/${pidfile##*.}"
+  done < <(registry_pidfiles "$1")
+}
+
+# A held refresh in a fixture root: cleanup keeps the root and fails at its
+# bound, naming the running writers; once the read is released, the same
+# registry drains only after real publication and actual exit.
+LIFE_HOLD="$TMP_ROOT/lifetime-hold"
+LIFE_INFO="$TMP_ROOT/lifetime-child.info"
+: > "$LIFE_HOLD"
+life_rc=0
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_TEST_NM_HOLD="$LIFE_HOLD" \
+  FM_TEST_PROCESS_WAIT_SECONDS=1 bash -c '
+    . "$1/tests/lib.sh"
+    root=$(fm_test_tmproot fm-lifetime-child) || exit 3
+    cp -R "$2" "$root/home" && rm -f "$root/home/state/home-summary.json" || exit 3
+    printf "%s\n%s\n%s\n" "$root" "$FM_TEST_PROCESS_REGISTRY" "$FM_TEST_CLEANUP_REGISTRY" > "$3"
+    FM_HOME="$root/home" "$1/bin/fm-home-summary-refresh.sh" --detach || exit 4
+    fm_test_wait_until 60 test -e "$FM_TEST_NM_HOLD.entered" || exit 5
+  ' _ "$ROOT" "$COALESCE_HOME" "$LIFE_INFO" > "$TMP_ROOT/lifetime-child.out" 2>&1 || life_rc=$?
+{ IFS= read -r LIFE_ROOT; IFS= read -r LIFE_REG; IFS= read -r LIFE_CLEANUP_REG; } < "$LIFE_INFO" \
+  || fail "the lifetime child published no fixture paths"
+[ "$life_rc" -eq 1 ] \
+  || fail "cleanup under a running writer exited $life_rc, expected 1: $(cat "$TMP_ROOT/lifetime-child.out")"
+assert_grep "owned writers still running after 1s" "$TMP_ROOT/lifetime-child.out" \
+  "the bounded wait did not name the running writers"
+[ -d "$LIFE_ROOT/home/state" ] || fail "cleanup removed a fixture root while its writer was running"
+[ -f "$LIFE_REG" ] || fail "the bounded wait discarded the writer registry"
+[ "$(registry_pidfiles "$LIFE_REG" | wc -l | tr -d '[:space:]')" -ge 2 ] \
+  || fail "the held refresh did not register both its parent and its worker: $(cat "$LIFE_REG")"
+life_copies=$(copy_pidfiles "$LIFE_REG" "$TMP_ROOT/lifetime-records") || fail "could not copy the writer records"
+for pidfile in $life_copies; do
+  fm_test_process_alive "$pidfile" fm-home-summary-refresh.sh \
+    || fail "a writer named by the failed wait was not running: $(cat "$pidfile")"
+done
+rm -f "$LIFE_HOLD"
+fm_test_wait_processes "$LIFE_REG" || fail "the released refresh never drained its registry"
+jq -e '.schema == "fm-secondmate-home-summary.v1"' "$LIFE_ROOT/home/state/home-summary.json" >/dev/null \
+  || fail "the drained refresh never published"
+# shellcheck disable=SC2086 # One record path per line, none with spaces.
+assert_recorded_writers_gone "held refresh" $life_copies
+while IFS= read -r life_dir; do
+  [ -n "$life_dir" ] && fm_test_remove_tree "$life_dir"
+done < "$LIFE_CLEANUP_REG"
+rm -f "$LIFE_CLEANUP_REG"
+pass "fixture cleanup keeps a root while its detached writer runs and fails at the bound"
+
+# Concurrent detached triggers each return only after their own parent has
+# registered, and the registry drains to actual exit and publication.
+CONC_HOME=$(new_bare_home concurrent-home)
+CONC_REG=$(mktemp "$TMP_ROOT/.concurrent-registry.XXXXXX")
+conc_pids=
+for _ in 1 2 3 4; do
+  PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$CONC_HOME" \
+    FM_TEST_PROCESS_REGISTRY="$CONC_REG" "$WRITER" --detach &
+  conc_pids="$conc_pids $!"
+done
+for pid in $conc_pids; do
+  wait "$pid" || fail "a concurrent detached trigger failed"
+done
+[ "$(registry_pidfiles "$CONC_REG" | sort -u | wc -l | tr -d '[:space:]')" -ge 4 ] \
+  || fail "four concurrent triggers returned before four refresh parents registered: $(cat "$CONC_REG")"
+conc_copies=$(copy_pidfiles "$CONC_REG" "$TMP_ROOT/concurrent-records") || fail "could not copy the writer records"
+fm_test_wait_processes "$CONC_REG" || fail "concurrent detached refreshes never drained"
+jq -e '.schema == "fm-secondmate-home-summary.v1"' "$CONC_HOME/state/home-summary.json" >/dev/null \
+  || fail "concurrent detached refreshes never published"
+[ ! -e "$CONC_HOME/state/.home-summary-refresh.pending" ] \
+  || fail "concurrent detached refreshes left a trigger marker behind"
+[ ! -e "$CONC_REG" ] || fail "a drained registry was kept"
+# shellcheck disable=SC2086 # One record path per line, none with spaces.
+assert_recorded_writers_gone "concurrent refreshes" $conc_copies
+pass "concurrent detached triggers register before returning and drain to actual exit"
+
+# A refresh that finishes at once (the lock is held, so its worker skips) is
+# still registered when its trigger returns.
+FAST_HOME=$(new_bare_home fast-home)
+FAST_REG=$(mktemp "$TMP_ROOT/.fast-registry.XXXXXX")
+hold_refresh_lock "$FAST_HOME" 120
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$FAST_HOME" \
+  FM_TEST_PROCESS_REGISTRY="$FAST_REG" "$WRITER" --detach \
+  || fail "a fast-completing detached trigger failed"
+[ "$(registry_pidfiles "$FAST_REG" | wc -l | tr -d '[:space:]')" -ge 1 ] \
+  || fail "a fast-completing detached refresh was not registered when its trigger returned"
+fast_copies=$(copy_pidfiles "$FAST_REG" "$TMP_ROOT/fast-records") || fail "could not copy the writer records"
+fm_test_wait_processes "$FAST_REG" || fail "a fast-completing detached refresh never drained"
+release_refresh_lock
+# shellcheck disable=SC2086 # One record path per line, none with spaces.
+assert_recorded_writers_gone "fast refresh" $fast_copies
+pass "a fast-completing detached refresh is registered when its trigger returns"
+
+# Registration failure starts no work: the trigger reports it, and neither the
+# refresh parent nor a directly started worker touches the home.
+UNREG_HOME="$TMP_ROOT/unregistered-home"
+mkdir -p "$UNREG_HOME/data"
+printf 'unregistered-home\n' > "$UNREG_HOME/.fm-secondmate-home"
+unreg_rc=0
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$UNREG_HOME" \
+  FM_TEST_PROCESS_REGISTRY="$TMP_ROOT/absent-registry" "$WRITER" --detach \
+  2> "$TMP_ROOT/unregistered.err" || unreg_rc=$?
+[ "$unreg_rc" -eq 1 ] || fail "an unregistered detached refresh returned $unreg_rc, expected 1"
+assert_grep "did not register with the fixture process registry" "$TMP_ROOT/unregistered.err" \
+  "the trigger did not report the registration failure"
+[ ! -e "$UNREG_HOME/state" ] || fail "an unregistered detached refresh wrote its home"
+unreg_rc=0
+PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$UNREG_HOME" FM_HOME_SUMMARY_PARENT_PID=$$ \
+  FM_TEST_PROCESS_REGISTRY="$TMP_ROOT/absent-registry" "$WRITER" --_worker \
+  2> "$TMP_ROOT/unregistered-worker.err" || unreg_rc=$?
+[ "$unreg_rc" -eq 1 ] || fail "an unregistered worker returned $unreg_rc, expected 1"
+assert_grep "could not register with the fixture process registry" "$TMP_ROOT/unregistered-worker.err" \
+  "the worker did not report the registration failure"
+[ ! -e "$UNREG_HOME/state" ] || fail "an unregistered worker created its state directory"
+[ ! -e "$TMP_ROOT/absent-registry" ] || fail "a failed registration created the registry"
+pass "a refresh that cannot register starts no work and reports the failure"
+
 SERIALBIN="$TMP_ROOT/serialbin"
 mkdir -p "$SERIALBIN"
 cat > "$SERIALBIN/jq" <<'SH'

@@ -450,9 +450,12 @@ fm_test_reap_watchers() {
 # their PID and start time with fm_test_record_process before blocking.
 # Reaping requires that birth identity and the registered command needle to
 # match, so a reused PID cannot authorize killing an unrelated process.
+# A `wait` entry (third field) is an owned writer that cleanup waits for
+# instead; see fm_test_wait_processes.
 
 FM_TEST_PROCESS_REGISTRY="$FM_TEST_SHELL_DIR/process"
 : > "$FM_TEST_PROCESS_REGISTRY" || return 1
+export FM_TEST_PROCESS_REGISTRY
 
 fm_test_track_process() {  # <pidfile> <command-needle>
   [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
@@ -491,9 +494,10 @@ fm_test_process_alive() {  # <pidfile> <command-needle>
 }
 
 fm_test_reap_processes() {
-  local pidfile needle pid pgid
+  local pidfile needle mode pid pgid
   [ -f "$FM_TEST_PROCESS_REGISTRY" ] || return 0
-  while IFS=$'\t' read -r pidfile needle; do
+  while IFS=$'\t' read -r pidfile needle mode; do
+    [ -z "$mode" ] || continue
     fm_test_process_alive "$pidfile" "$needle" || continue
     pid=$FM_TEST_PROCESS_PID
     pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
@@ -504,7 +508,48 @@ fm_test_reap_processes() {
     fi
     kill -KILL "$pid" 2>/dev/null || true
   done < "$FM_TEST_PROCESS_REGISTRY"
-  rm -f "$FM_TEST_PROCESS_REGISTRY"
+}
+
+# --- owned writer waiting ---------------------------------------------------
+#
+# A detached product process that can still write fixture state after its
+# foreground caller returned (bin/fm-home-summary-refresh.sh --detach and its
+# progress worker) publishes its own pidfile here as a `wait` entry before any
+# fixture write; its launcher returns only once that entry exists, and one that
+# cannot publish starts no work. Removing a root under such a writer lets it
+# recreate the root afterwards, so cleanup waits instead of signalling: it
+# rereads the registry until every entry's exact identity is gone and the
+# process group that pid leads is empty, which covers entries published by a
+# writer that was still running at the previous pass. A finished entry's
+# pidfile is removed so it is not probed again. At the bound the still-running
+# identities are named, the registry and its remaining pidfiles are kept as
+# evidence, and the wait fails. Group membership is probed with signal 0 only.
+FM_TEST_PROCESS_WAIT_SECONDS=${FM_TEST_PROCESS_WAIT_SECONDS:-150}
+
+fm_test_wait_processes() {  # [registry]
+  local registry=${1:-$FM_TEST_PROCESS_REGISTRY} pidfile needle mode pid start live ticks=0
+  [ -f "$registry" ] || return 0
+  while :; do
+    live=
+    while IFS=$'\t' read -r pidfile needle mode; do
+      [ "$mode" = wait ] || continue
+      IFS=$'\t' read -r pid start 2>/dev/null < "$pidfile" || continue
+      if fm_test_process_alive "$pidfile" "$needle" || kill -0 -- "-$pid" 2>/dev/null; then
+        live="$live $pid ($start)"
+      else
+        rm -f "$pidfile"
+      fi
+    done < "$registry"
+    [ -n "$live" ] || break
+    if [ "$ticks" -ge $((FM_TEST_PROCESS_WAIT_SECONDS * 10)) ]; then
+      printf 'fm_test_wait_processes: owned writers still running after %ss:%s; kept %s\n' \
+        "$FM_TEST_PROCESS_WAIT_SECONDS" "$live" "$registry" >&2
+      return 1
+    fi
+    ticks=$((ticks + 1))
+    sleep 0.1
+  done
+  rm -f "$registry"
 }
 
 # Default ceiling for blocking fixtures that use this exported setting.
@@ -565,6 +610,11 @@ fm_test_cleanup() {
   fm_test_reap_jobs
   fm_test_reap_processes
   fm_test_reap_procevent_homes
+  # A writer still running keeps every root, as evidence, and fails the run.
+  if [ "${FM_TEST_WAIT_FAILED:-0}" = 1 ] || ! fm_test_wait_processes; then
+    FM_TEST_WAIT_FAILED=1
+    exit 1
+  fi
   fm_test_reap_fixture_processes
   for d in "${FM_TEST_CLEANUP_DIRS[@]:-}"; do
     [ -n "$d" ] && fm_test_remove_tree "$d"

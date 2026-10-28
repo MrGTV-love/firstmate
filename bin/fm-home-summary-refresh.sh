@@ -125,6 +125,49 @@ case "$HOME_SUMMARY_IF_IDLE" in
   *) HOME_SUMMARY_IF_IDLE=0 ;;
 esac
 
+# Test fixtures export FM_TEST_PROCESS_REGISTRY (tests/lib.sh), whose cleanup
+# waits for every `wait` entry before it removes a fixture home. The refresh
+# parent and its progress worker each publish their own pid and start time there
+# before any state write (the worker's first is fm-wake-lib.sh's source-time
+# mkdir), and one that cannot publish starts no work. --detach returns only
+# after its parent has published. Unset, nothing is published.
+home_summary_register() {
+  local registry=${FM_TEST_PROCESS_REGISTRY:-} record ps_bin=/bin/ps start
+  [ -n "$registry" ] || return 0
+  [ -f "$registry" ] || return 1
+  record="$registry.$$"
+  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
+  start=$(LC_ALL=C "$ps_bin" -o lstart= -p "$$" 2>/dev/null) && [ -n "$start" ] \
+    && printf '%s\t%s\n' "$$" "$start" > "$record.tmp" 2>/dev/null \
+    && mv -f -- "$record.tmp" "$record" 2>/dev/null \
+    && printf '%s\t%s\twait\n' "$record" fm-home-summary-refresh.sh >> "$registry" 2>/dev/null \
+    && return 0
+  rm -f -- "$record.tmp" "$record" 2>/dev/null || true
+  return 1
+}
+
+# The registration entry, or the registering process's exit without one.
+home_summary_await_registration() {  # <pid>
+  local entry ticks=0
+  entry="$FM_TEST_PROCESS_REGISTRY.$1"$'\t'fm-home-summary-refresh.sh$'\t'wait
+  while ! grep -Fqx -- "$entry" "$FM_TEST_PROCESS_REGISTRY" 2>/dev/null; do
+    if ! kill -0 "$1" 2>/dev/null || [ "$ticks" -ge 600 ]; then
+      grep -Fqx -- "$entry" "$FM_TEST_PROCESS_REGISTRY" 2>/dev/null
+      return
+    fi
+    ticks=$((ticks + 1))
+    sleep 0.05
+  done
+}
+
+if [ "$HOME_SUMMARY_MODE" = worker ] || { [ "$HOME_SUMMARY_MODE" = parent ] && [ "$DETACH" -eq 0 ]; }; then
+  if ! home_summary_register; then
+    printf 'fm-home-summary-refresh: could not register with the fixture process registry %s\n' \
+      "$FM_TEST_PROCESS_REGISTRY" >&2
+    exit 1
+  fi
+fi
+
 if [ "$HOME_SUMMARY_MODE" != parent ]; then
   # shellcheck source=bin/fm-wake-lib.sh
   # shellcheck disable=SC1091
@@ -398,7 +441,13 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
     set -m 2>/dev/null || true
     FM_HOME_SUMMARY_IF_IDLE=1 nohup "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort \
       >/dev/null 2>&1 </dev/null &
+    detached_pid=$!
     [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
+    if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && ! home_summary_await_registration "$detached_pid"; then
+      printf 'fm-home-summary-refresh: detached refresh %s did not register with the fixture process registry %s\n' \
+        "$detached_pid" "$FM_TEST_PROCESS_REGISTRY" >&2
+      exit 1
+    fi
     exit 0
   fi
   while :; do
