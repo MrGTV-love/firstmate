@@ -9,6 +9,15 @@
 # HEAD-continuity guard; see docs/architecture.md "No-mistakes gate authority boundary."
 disable_project_settings: true
 
+# The rebase step integrates newer main into a run by merge instead of rewriting
+# the submitted commits, so that step keeps the submitted head an ancestor of the
+# published head. CI merge-conflict repair does not read this setting and can
+# still rewrite history (tracked as nm-ci-fix-conflict-repair-merge-strategy).
+# Trusted-only: honored from the default-branch copy of this file.
+# docs/architecture.md "Event-driven supervision" owns the run-binding rule.
+rebase:
+  strategy: merge
+
 # Trusted documentation placement policy for the Document step.
 # The audience inventory and coding guideline own the detail; keep this as a
 # pointer so gate instructions cannot become a second prose policy.

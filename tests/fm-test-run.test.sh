@@ -476,7 +476,7 @@ test_captain_hold_groups_share_helper_changed_selection() {
 
 # The three teardown groups partition one former suite. This is the checked
 # inventory the split is judged against: the union of the group lists must be the
-# same 338 cases, each registered by the one file that defines it, with no case
+# same 340 cases, each registered by the one file that defines it, with no case
 # twice. A dropped or duplicated case is exactly what a partition loses while
 # every remaining assertion still passes.
 test_teardown_groups_register_each_case_once() {
@@ -498,9 +498,9 @@ test_teardown_groups_register_each_case_once() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a teardown case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 338 ] \
-    || fail "the teardown groups register $total cases, not the 338-case inventory they partition"
-  pass "the teardown groups are a duplicate-free 338-case cover, each case registered by the file that defines it"
+  [ "$total" = 340 ] \
+    || fail "the teardown groups register $total cases, not the 340-case inventory they partition"
+  pass "the teardown groups are a duplicate-free 340-case cover, each case registered by the file that defines it"
 }
 
 # Each group must stay independently runnable and keep its lane coverage: the
@@ -909,6 +909,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     fm-status-event-lib.sh \
     fm-status-wake-lib.sh \
     fm-status-io-lib.sh \
+    fm-file-identity-lib.sh \
     fm-utc-lib.sh; do
     printf '\n' >>"$repo/bin/$owner"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
@@ -954,7 +955,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
   done
   rm -rf "$tmp"
-  pass "all six status and UTC owner-only changes select consuming families and exact additional consumers"
+  pass "all status, identity, and UTC owner-only changes select consuming families and exact additional consumers"
 }
 
 # A direct test reference is per-script evidence. Widening it to the referencing

@@ -165,6 +165,7 @@ handle_push_transition() {  # <backend> <session> <record>
     fm_backend_commit_transition "$backend" "$STATE" "$session" "$record" || exit 1
     return
   fi
+  status_presentation_marker_adopt_device "$(_hb_surfaced_path "$task")" "$STATE/$task.status" || true
   span_record=$(status_span_first_actionable_record "$STATE/$task.status" \
     "$(hb_surfaced_offset "$task")")
   case $? in

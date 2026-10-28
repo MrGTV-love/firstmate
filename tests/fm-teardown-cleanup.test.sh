@@ -3990,6 +3990,71 @@ test_a_forced_close_preserves_and_releases_a_foreign_copy_with_unique_ignored_fi
   pass "a forced close preserves a foreign copy's unique ignored file with its SHA-256 and releases the copy, as the held-copy rule never applies to it"
 }
 
+# graft's generated output (tests/lib.sh fm_test_graft_output) is not unique
+# work: alone it neither holds a foreign copy nor is preserved from a released
+# own copy. A custom .ignore or a clone below graft/ beside it keeps the existing
+# protection on both paths (data/fm-merge-prune-graft-scratch/report.md).
+graft_output_variant() {  # <copy> <generated|custom-ignore|nested-git>
+  fm_test_graft_output "$1"
+  case "$2" in
+    custom-ignore) printf 'project-private/\n' >> "$1/.ignore" ;;
+    nested-git) git init -q "$1/graft/n1" ;;
+  esac
+}
+
+test_graft_output_alone_does_not_hold_a_foreign_copy() {
+  local rc variant label entry
+  for variant in generated custom-ignore nested-git; do
+    label=held-graft-$variant
+    make_held_case "$label"
+    graft_output_variant "$FOREIGN_COPY" "$variant"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "$label: the landed task did not close: $(cat "$FOREIGN_CASE/stderr")"
+    assert_absent "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" "$label: a released or held copy's graft output was copied to task data"
+    case "$variant" in
+      generated)
+        assert_absent "$FOREIGN_COPY" "$label: a foreign copy holding only graft output was not released: $(cat "$FOREIGN_CASE/stdout")"
+        assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "$label: graft output alone held the foreign copy"
+        ;;
+      *)
+        case "$variant" in custom-ignore) entry=.ignore ;; *) entry=graft ;; esac
+        assert_present "$FOREIGN_COPY/graft" "$label: the held copy lost its graft directory"
+        assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it holds ignored files that exist nowhere else: $entry." \
+          "$FOREIGN_CASE/stdout" "$label: the copy was not held for $entry: $(cat "$FOREIGN_CASE/stdout")"
+        ;;
+    esac
+  done
+  pass "graft output alone does not hold a foreign copy; a custom .ignore or a clone below graft/ still does"
+}
+
+test_graft_output_is_not_preserved_from_a_released_own_nested_copy() {
+  local rc variant label root
+  for variant in generated custom-ignore nested-git; do
+    label=own-locked-graft-$variant
+    dead_launcher_pid
+    make_own_locked_copy_case "$label" enclosing "$FOREIGN_DEAD_PID"
+    graft_output_variant "$FOREIGN_COPY" "$variant"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "$label: the copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+    assert_absent "$FOREIGN_COPY" "$label: the copy survived"
+    root=$FOREIGN_CASE/data/task-x1/nested-copy-preserved
+    case "$variant" in
+      generated)
+        assert_absent "$root" "$label: graft output was copied to task data"
+        ;;
+      custom-ignore)
+        [ -n "$(find "$root" -path '*/.ignore' -type f 2>/dev/null)" ] || fail "$label: the custom .ignore was not preserved"
+        [ -z "$(find "$root" -path '*/graft' 2>/dev/null)" ] || fail "$label: graft output was copied to task data"
+        ;;
+      nested-git)
+        [ -n "$(find "$root" -path '*/graft/n1/.git' 2>/dev/null)" ] || fail "$label: the clone below graft/ was not preserved"
+        [ -z "$(find "$root" -path '*/.ignore' 2>/dev/null)" ] || fail "$label: graft's generated .ignore was copied to task data"
+        ;;
+    esac
+  done
+  pass "a released own nested copy preserves none of its graft output; a custom .ignore or a clone below graft/ is still preserved"
+}
+
 test_a_foreign_copy_inside_an_own_nested_copy_with_unique_ignored_files_is_preserved_and_released() {
   local rc inner
   dead_launcher_pid
@@ -6082,6 +6147,8 @@ test_a_foreign_copy_with_only_unique_ignored_files_is_held_and_the_slot_is_not_r
 test_the_next_step_for_a_copy_held_for_ignored_files_never_names_a_removal
 test_held_copy_notices_and_record_show_no_control_character_and_quote_the_command
 test_a_forced_close_preserves_and_releases_a_foreign_copy_with_unique_ignored_files
+test_graft_output_alone_does_not_hold_a_foreign_copy
+test_graft_output_is_not_preserved_from_a_released_own_nested_copy
 test_a_foreign_copy_inside_an_own_nested_copy_with_unique_ignored_files_is_preserved_and_released
 test_the_held_record_dedupe_matches_a_name_holding_a_backslash
 test_foreign_copy_regenerable_ignored_files_need_no_preservation

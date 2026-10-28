@@ -2,7 +2,8 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | mem-tree PID | table FIELDS
+       lstart PID | identity PID | cpu-tree PID | mem-tree PID | rss-tree PID |
+       table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -25,12 +26,32 @@ whole KiB of resident memory and of physical footprint (which also counts
 compressed pages) held right now by PID and its live descendants in PID's
 process group, reading only that group's processes and summed from libproc's
 ri_resident_size and ri_phys_footprint; it prints `-` for a sample that cannot
-be read and exits at the end of stdin. Facts come from sysctl KERN_PROC
+be read and exits at the end of stdin. rss-tree is the strict streaming reader
+for fm-proc-budget.sh: each input line requests a JSON object with rss_kib (the
+larger of resident memory and footprint), members (PID, kernel start seconds,
+kernel start microseconds) and uncounted (PID, short name). The tree is PID's
+process group (while PID or its group still holds that id), except the reader
+itself, plus PID's descendants in any process group or session; it keeps each
+member it has observed by start identity after that member is orphaned. A
+process that leaves the group and is orphaned before any read observed it is
+never found. A live member whose
+memory cannot be read is left out of the sum and listed in uncounted when its
+effective user is not this process's; one of this user makes rss_kib null, as
+does a read in which no live member was readable. A failed tree read prints
+`-`. An empty tree has rss_kib zero. The supervisor uses these identities for
+fail-closed cleanup. A reader started inside PID's group by another parent
+ignores HUP, INT and TERM; when its stdin ends or its reply cannot be written
+(its supervisor died) it sends that group and every member it has seen TERM,
+then KILL after at most TERM_SECONDS, and so ends too.
+Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
 """
 import ctypes
+import json
+import os
+import signal
 import struct
 import sys
 import time
@@ -40,6 +61,8 @@ KERN_PROC_ALL, KERN_PROC_PID, KERN_PROC_PGRP, KERN_PROC_RUID = 0, 1, 2, 6
 # struct kinfo_proc on 64-bit Darwin: kp_proc.p_pid, kp_proc.p_comm,
 # kp_proc.p_flag, kp_proc.p_stat, kp_eproc.e_ppid and kp_eproc.e_pgid.
 KINFO_SIZE, P_START, P_PID, P_COMM, P_FLAG, P_STAT, E_PPID, E_PGID = 648, 0, 40, 243, 32, 36, 560, 564
+# kp_eproc.e_ucred.cr_uid: the effective user id.
+E_UID = 420
 # sys/proc.h P_WEXIT and the p_stat values SSTOP and SZOMB.
 P_WEXIT, SSTOP, SZOMB = 0x2000, 4, 5
 # proc_pidinfo PROC_PIDTASKINFO: struct proc_taskinfo and its pti_numrunning.
@@ -48,6 +71,9 @@ DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 TABLE_FIELDS = ("pid", "ppid", "pgid", "stat", "lstart", "command")
 RUSAGE_INFO_V2 = 2
+# Sixty real TERM-to-exit waits (sleep, bash, python3): maximum 0.005238 s.
+# measured: value=1 date=2026-10-28 host=Mac-Studio.local margin=190
+TERM_SECONDS = 1
 
 libc = ctypes.CDLL(None, use_errno=True)
 
@@ -198,10 +224,109 @@ def mem_tree(root):
     return f"{resident // 1024} {footprint // 1024}"
 
 
-def mem_watch(root):
+def process_identity(record):
+    return struct.unpack_from("qq", record, P_START)
+
+
+def tree_snapshot(root, known, skip=()):
+    """Find descendants across sessions and retain observed orphans by identity.
+
+    The root's own process group also catches children reparented before the
+    first snapshot. Start timestamps prevent retaining a recycled PID. The
+    calling process and any PID in skip are never members.
+    """
+    records = {struct.unpack_from("i", record, P_PID)[0]: record for record in kinfos()}
+    for pid in (os.getpid(), *skip):
+        records.pop(pid, None)
+    children = {}
+    queue = []
+    group_owned = (root not in records or root not in known
+                   or process_identity(records[root]) == known[root])
+    for pid, record in records.items():
+        children.setdefault(struct.unpack_from("i", record, E_PPID)[0], []).append(pid)
+        identity = process_identity(record)
+        if (known.get(pid) == identity
+                or pid == root and (root not in known or known[root] == identity)
+                or group_owned and struct.unpack_from("i", record, E_PGID)[0] == root):
+            queue.append(pid)
+    selected = {}
+    while queue:
+        pid = queue.pop()
+        if pid in selected:
+            continue
+        selected[pid] = records[pid]
+        queue.extend(children.get(pid, []))
+    original_root = known.get(root)
+    known.clear()
+    known.update((pid, process_identity(record)) for pid, record in selected.items())
+    if original_root is not None:
+        known[root] = original_root
+    return selected
+
+
+def rss_tree(root, known):
+    """Strict libproc sample of the full tracked tree, not just its group."""
+    records = tree_snapshot(root, known)
+    resident, footprint = 0, 0
+    readable, counted, uncounted = True, False, []
+    for pid, record in records.items():
+        if record[P_STAT] == SZOMB or struct.unpack_from("i", record, P_FLAG)[0] & P_WEXIT:
+            continue
+        try:
+            more_resident, more_footprint = memory(pid)
+        except LookupError:
+            try:
+                current = kinfo(pid)
+            except LookupError:
+                continue
+            if (process_identity(current) != process_identity(record)
+                    or current[P_STAT] == SZOMB
+                    or struct.unpack_from("i", current, P_FLAG)[0] & P_WEXIT):
+                continue
+            if struct.unpack_from("I", current, E_UID)[0] == os.geteuid():
+                readable = False
+            else:
+                uncounted.append([pid, shown(current[P_COMM:P_COMM + 17].split(b"\0", 1)[0])])
+            continue
+        counted = True
+        resident += more_resident
+        footprint += more_footprint
+    return json.dumps({
+        "rss_kib": max(resident, footprint) // 1024 if readable and (counted or not uncounted) else None,
+        "members": [[pid, *process_identity(record)] for pid, record in records.items()],
+        "uncounted": uncounted,
+    }, separators=(",", ":"))
+
+
+def end_group(root, known):
+    """TERM, then KILL after TERM_SECONDS, the tree of root's group, which this
+    process is in; members seen outside the group are matched by identity."""
+    def live():
+        return [pid for pid, record in tree_snapshot(root, known).items() if record[P_STAT] != SZOMB]
+
+    try:
+        for pid in live():
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
+        deadline = time.monotonic() + TERM_SECONDS
+        while time.monotonic() < deadline and live():
+            time.sleep(0.01)
+    finally:
+        for pid, identity in list(known.items()):
+            try:
+                if process_identity(kinfo(pid)) == identity:
+                    os.kill(pid, signal.SIGKILL)
+            except (OSError, LookupError):
+                pass
+        os.killpg(root, signal.SIGKILL)
+
+
+def mem_watch(root, reader=mem_tree):
     while sys.stdin.readline():
         try:
-            answer = mem_tree(root)
+            answer = reader(root)
         except (OSError, LookupError, struct.error, IndexError):
             answer = "-"
         print(answer, flush=True)
@@ -217,6 +342,17 @@ def main(argv_):
     number = 0 if fields else int(argv_[2])
     if command == "mem-tree":
         return mem_watch(number)
+    if command == "rss-tree":
+        known = {}
+        guard = os.getpgrp() == number != os.getppid()
+        if guard:
+            for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+                signal.signal(signum, signal.SIG_IGN)
+        try:
+            return mem_watch(number, lambda root: rss_tree(root, known))
+        finally:
+            if guard:
+                end_group(number, known)
     try:
         if command == "table":
             value = table(fields)
