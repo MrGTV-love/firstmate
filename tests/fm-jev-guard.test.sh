@@ -867,6 +867,7 @@ test_friction_refusal_ledger() {
     || fail "a raw path, content or credential reached the friction ledger"
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
+const { readGuardAudit } = await import(process.env.FM_GUARD_AUDIT_READER);
 import { existsSync, mkdirSync, readFileSync, renameSync, rmdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
@@ -876,7 +877,7 @@ const handlers = {};
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'friction', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
 const ctx = { cwd: process.env.WT };
 const events = () => (existsSync(ledger) ? readFileSync(ledger, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : []);
-const audit = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const audit = () => JSON.parse(readGuardAudit(`${home}/state`).trim().split('\n').at(-1));
 // Every typed refusal branch becomes the event rule, taken from the audit row itself.
 // (No apostrophes in this block: stock Bash 3.2 balances quotes inside a heredoc under $(...).)
 for (const [toolName, input] of [
