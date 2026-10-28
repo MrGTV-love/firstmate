@@ -107,7 +107,8 @@
 #   also appends the prior meta model under the new spawn_gen. History is never
 #   truncated or unwound on launch failure. fm-review-record.py counts only the
 #   lines reached from the current meta's spawn_gen through prior links, so a
-#   reused task id never inherits an earlier incarnation's authors.
+#   reused task id never inherits an earlier incarnation's authors. A confined
+#   worker cannot write this history; fm-write-confinement.py denies it.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
