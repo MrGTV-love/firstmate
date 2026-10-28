@@ -2907,6 +2907,10 @@ for producer, consumer in (('main','branch'),('branch','main')):
                 event=(f'working [at={now}]: changed prerequisite scope\n' if transition=='changed'
                        else f'done [at={now}]: delivered prerequisite\n')
                 (home/'state/repair-owner.status').write_text(event)
+            assert ack(boundary).returncode==0,(producer,dependency,transition,'an unpresented lapsed wait gated the ack')
+            if consumer=='branch':
+                ok(code/'bin/fm-wake-grant.sh','deactivate',os.getpid(),'wait-turn')
+            boundary=drain()
             queued=(home/'state/.wake-queue').read_bytes()
             refused=ack(boundary)
             assert refused.returncode==1 and obligation['id'] in refused.stdout,(producer,dependency,transition,refused)
