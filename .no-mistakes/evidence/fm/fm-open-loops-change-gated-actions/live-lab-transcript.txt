@@ -1,0 +1,1010 @@
+# Live lab transcript: open-work ledger change-gated acks (lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.WK8qt3)
+# Fixture: 7 captain holds, 39 firstmate needs-decision lanes, 1 question (worker-q:q-1) whose key q-1 is a captain-held task. Ledger published by real fm-open-loops.sh --heartbeat; first wake from real fm-watch.sh.
+## S1: first drain presents all 48 new overdue rows; ack refused until each has an action
+
+$ fm-wake-drain.sh  (first drain, output head)
+OVERDUE:
+rows[48]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758392,"approve item 1",false
+rows presented in OVERDUE: 48
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 40 --recovery-generation 55654.1793212763.kSdKCL
+
+
+$ fm-wake-drain.sh --ack-through 40 --recovery-generation 55654.1793212763.kSdKCL   (no actions yet)
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[48]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758437,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 39 paused by captain; decide resume order",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 5 paused by captain; decide resume order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 8 paused by captain; decide resume order",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7363,"needs-decision: lane 9 paused by captain; decide resume order",false
+  "8b216091ba323ca1e5637674","captain","q-1:captain-hold","resolve the captain hold or record its next decision date",153637,"pick option for q-1",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7363,"needs-decision: which option for q-1",false
+exit=1
+## S1b: Main records one action per new row (one batch), then the ack succeeds
+
+$ fm-open-loops.sh action --batch - < batch.jsonl   (48 lines)
+results[48]{line,id,kind,result,message}:
+  1,"2137bf53030db23086ce45c6","escalated","recorded",""
+  2,"537c8edb8445d633844f7b44","escalated","recorded",""
+  3,"7e46af3a506e627e855111c6","escalated","recorded",""
+  4,"5b603566445e2587175f9929","escalated","recorded",""
+  5,"b90ef43edfbddbd8d7a0aca1","escalated","recorded",""
+  6,"bd7d2c9089f34cef5da1f409","escalated","recorded",""
+  7,"a09ab25ac491455a108e9048","escalated","recorded",""
+  8,"af0dc6c26246abf39fb30073","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  9,"183d24d04071e9d8f632059e","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  10,"4cec69cfc7009751bf268289","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  11,"c9bf694d90979c351f5fdcf2","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  12,"8572b520bd033002831a35cf","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  13,"4234800ab3c99adfa63933f2","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  14,"3cdcbd45a4979accd5d5b207","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  15,"ae7c296ed825f58eb96eda3f","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  16,"776a71065c05f2fe31230a3a","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  17,"63eb21be40ea8715b896a897","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  18,"50475c6b2bdd96725dbae98d","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  19,"850f5d91938cdb3e439e7149","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  20,"a539b7453bacf5a469b9946b","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  21,"bdce3269e2e296d069d53f2e","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  22,"fb3c8683a14ab834fc6b8f5d","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  23,"1681cc07d97ae1171a31c958","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  24,"0c67dee1598cb192944d806f","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  25,"23af9e82076890cef2e36321","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  26,"6d9cd59dd5fe91a857d828af","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  27,"8a52be0a4371e7bb813ca606","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  28,"a8f3e61bde29c7a4164b4da5","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  29,"68460bf290dd724a08cba24a","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  30,"baec31dc0255a3d33b144251","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  31,"cab0540c4b9ef8d064fab731","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  32,"4a159d0aae3da1c9345bc94c","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  33,"aab688952ad05de79acec9ba","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  34,"f1f431a2b61f015e8f15ec18","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  35,"74002910592334342f5fd302","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  36,"e91da55c566d40321d2c0383","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  37,"4556bdf00171abce33292bd4","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  38,"ddc0f41fcfb8047adffc9c0a","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  39,"f61ffcad134c20ae6d3a94bd","deferred","recorded",""
+  40,"1ac2508bca97fe3728c05821","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  41,"bbbdb20f4847453ab4672fd0","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  42,"7f87c051979adbc9744a2960","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  43,"6f79b3cf42314435dfd40834","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  44,"a42583ca1c2b4512d83c7155","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  45,"28150d5caec3a031934c7610","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  46,"c92e22f0db9952f1c442c7fa","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  47,"8b216091ba323ca1e5637674","escalated","recorded",""
+  48,"2d8db6be117e27b7cc1ab946","escalated","recorded","captain hold q-1; covers this row until it changes or that hold is answered, released, blocked or held again"
+exit=0
+
+$ fm-wake-drain.sh --ack-through 40 --recovery-generation 55654.1793212763.kSdKCL
+exit=0
+
+## S2: next turn with all 48 rows unchanged: real watcher queues no ledger change wake; an ordinary wake drains with no OVERDUE block and acks with zero new actions
+
+$ fm-watch.sh (timeout 45s; unchanged ledger)
+exit=0 (124 = watcher still waiting, nothing to wake)
+check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+
+$ bash bin/fm-wake-drain.sh --queued
+1793212858	41	check	open-loop-ledger	check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+exit=0
+
+$ fm_wake_append check report "check: board report from lane 3"
+
+$ fm-wake-drain.sh
+exit=0
+1793212858	41	check	open-loop-ledger	check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+1793212860	42	check	report	check: board report from lane 3
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 paused by captain; decide resume order
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane5 [key=k5] needs-decision: lane 5 paused by captain; decide resume order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 paused by captain; decide resume order
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 42 --recovery-generation 17820.1793212858.js2oig
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ fm-wake-drain.sh --ack-through 42 --recovery-generation 17820.1793212858.js2oig
+exit=0
+ack wall time: 1.75s
+
+## S2b: watcher run again on the unchanged ledger queues nothing
+
+$ fm-watch.sh (timeout 40s)
+exit=124 (124 = watcher kept waiting; no wake)
+bin/fm-watch.sh: line 3378: 11802 Terminated: 15          sleep "$POLL"
+
+$ bash bin/fm-wake-drain.sh --queued
+exit=0
+
+## S3: periodic resurface wake (FM_OPEN_LOOPS_RESURFACE=1) prints one WAITING OPEN WORK list of all unchanged rows; ack needs no new action
+
+$ FM_OPEN_LOOPS_RESURFACE=1 fm-watch.sh (timeout 60s)
+exit=0
+check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting list)
+
+$ fm-wake-drain.sh
+exit=0
+1793212920	43	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[48]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 1","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 2","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 3","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 4","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 5","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 6","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758522,"approve item 7","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 10 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 11 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 12 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 13 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 14 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 15 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 16 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 17 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 18 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 19 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 1 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 20 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 21 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 22 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 23 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 24 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 25 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 26 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 27 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 28 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 29 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 2 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 30 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 31 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 32 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 33 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 34 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 35 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 36 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 37 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 38 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 39 paused by captain; decide resume order","deferred",{"kind": "deferred", "evidence": "lane 39 resumes after CI window", "at_epoch": 1793212844}
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 3 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 4 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 5 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 6 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 7 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 8 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7448,"needs-decision: lane 9 paused by captain; decide resume order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "8b216091ba323ca1e5637674","captain","q-1:captain-hold","resolve the captain hold or record its next decision date",153722,"pick option for q-1","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain paused the fleet; asked about resume order", "at_epoch": 1793212844}
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7448,"needs-decision: which option for q-1","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain which option for q-1", "at_epoch": 1793212844}
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 paused by captain; decide resume order
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane5 [key=k5] needs-decision: lane 5 paused by captain; decide resume order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 paused by captain; decide resume order
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 43 --recovery-generation 69933.1793212920.RefgGT
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ fm-wake-drain.sh --ack-through 43 --recovery-generation 69933.1793212920.RefgGT
+exit=0
+
+## S4: unpause - lane5 posts a new status line (changed question, stamped 1900s ago so it is already overdue). Real watcher queues a change wake; drain gates ONLY lane5; no full waiting list on a change wake; ack refused until lane5 has a new action
+lane5 row id before: 7f87c051979adbc9744a2960
+
+$ append to state/lane5.status: needs-decision [at=1793211048] [key=k5]: lane 5 resumed; approve merge order
+
+$ FM_OPEN_LOOPS_INTERVAL=1 fm-watch.sh (timeout 90s)
+exit=0
+signal: /Users/charlesabrooker/tmp/fm-lab.WK8qt3/state/lane5.status
+
+$ fm-wake-drain.sh
+exit=0
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",1935,"needs-decision: lane 5 resumed; approve merge order",false
+STANDING (unchanged since its last action; no action needed):
+rows[47]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758583,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 39 paused by captain; decide resume order",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 8 paused by captain; decide resume order",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7509,"needs-decision: lane 9 paused by captain; decide resume order",false
+  "8b216091ba323ca1e5637674","captain","q-1:captain-hold","resolve the captain hold or record its next decision date",153783,"pick option for q-1",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7509,"needs-decision: which option for q-1",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793212981	44	signal	lane5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.WK8qt3/state/lane5.status
+wake annotation: latest wake-EVENT observed at drain, not current state: lane5.status: needs-decision [at=1793211048] [key=k5]: lane 5 resumed; approve merge order
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 paused by captain; decide resume order
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane5 [key=k5] needs-decision: lane 5 resumed; approve merge order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 paused by captain; decide resume order
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 44 --recovery-generation 83556.1793212982.XRTD4E
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+CHECK: change wake printed no WAITING OPEN WORK list (good)
+CHECK: rows in OVERDUE block: 1
+
+$ fm-wake-drain.sh --ack-through 44 --recovery-generation 83556.1793212982.XRTD4E
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",1942,"needs-decision: lane 5 resumed; approve merge order",false
+exit=1
+
+$ fm-open-loops.sh action <lane5> steered? no inbox -> escalate with a fresh note
+
+$ bash bin/fm-open-loops.sh action 7f87c051979adbc9744a2960 escalated --evidence lane 5 resumed; asked captain to approve merge order
+action: "7f87c051979adbc9744a2960"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+$ fm-wake-drain.sh --ack-through 44 --recovery-generation 83556.1793212982.XRTD4E
+exit=0
+
+## S5: the captain answers bound hold q-1 (hold removed from backlog). The escalation bound to it stops covering worker-q:q-1; next drain gates it
+
+$ edit data/backlog.md: drop (hold: ...) (hold-kind: captain) from q-1
+- [ ] q-1 - Firstmate question bound to captain (repo: firstmate) (kind: ship)
+
+$ fm-open-loops.sh --heartbeat --json > /dev/null
+exit=0
+
+$ fm_wake_append check report "check: board report"
+
+$ fm-wake-drain.sh
+exit=0
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7537,"needs-decision: which option for q-1",false
+STANDING (unchanged since its last action; no action needed):
+rows[46]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758611,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 39 paused by captain; decide resume order",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",1963,"needs-decision: lane 5 resumed; approve merge order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 8 paused by captain; decide resume order",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7537,"needs-decision: lane 9 paused by captain; decide resume order",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793213010	45	check	report	check: board report
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 paused by captain; decide resume order
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane5 [key=k5] needs-decision: lane 5 resumed; approve merge order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 paused by captain; decide resume order
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 45 --recovery-generation 28442.1793213010.VSeR8C
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+CHECK: OVERDUE block rows: "q-1" "worker-q:q-1" 
+
+$ fm-wake-drain.sh --ack-through 45 --recovery-generation 28442.1793213010.VSeR8C
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7544,"needs-decision: which option for q-1",false
+exit=1
+
+$ bash bin/fm-open-loops.sh action 2d8db6be117e27b7cc1ab946 escalated --evidence captain answered: option B; relaying to worker-q
+action: "2d8db6be117e27b7cc1ab946"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+$ fm-wake-drain.sh --ack-through 45 --recovery-generation 28442.1793213010.VSeR8C
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+exit=1
+
+## S6: one deferral per unchanged row - lane39 was deferred once in S1; a second deferral on the unchanged row is refused and marks it captain_visible
+
+$ bash bin/fm-open-loops.sh action f61ffcad134c20ae6d3a94bd deferred --evidence still waiting --recheck 2026-10-28T20:43:40Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+exit=1
+
+$ bash bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",7546,"needs-decision: lane 39 paused by captain; decide resume order",true
+exit=1
+
+$ jq .handling.actions[lane39] state/open-loops.json
+{"kind":"deferred","deferrals":1,"captain_visible":true,"requires_followup":true}
+
+$ lane39 resumes: new question line -> changed row gets a fresh deferral allowance
+
+$ fm_wake_append check report "check: lane39 resumed"
+
+$ fm-wake-drain.sh
+exit=0
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",1903,"needs-decision: lane 39 resumed; pick reviewer",true
+STANDING (unchanged since its last action; no action needed):
+rows[46]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758623,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",1975,"needs-decision: lane 5 resumed; approve merge order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 8 paused by captain; decide resume order",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7549,"needs-decision: lane 9 paused by captain; decide resume order",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7549,"needs-decision: which option for q-1",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793213023	46	check	report	check: lane39 resumed
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 resumed; pick reviewer
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane5 [key=k5] needs-decision: lane 5 resumed; approve merge order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 paused by captain; decide resume order
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 46 --recovery-generation 28442.1793213010.VSeR8C
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bash bin/fm-open-loops.sh action f61ffcad134c20ae6d3a94bd deferred --evidence reviewer pool busy --recheck 2026-10-28T20:43:49Z
+action: "f61ffcad134c20ae6d3a94bd"
+kind: deferred
+exit=0
+
+$ fm-wake-drain.sh --ack-through 46 --recovery-generation 28442.1793213010.VSeR8C
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+exit=1
+
+## S5b: moving q-1 back to In flight without a hold surfaced a new missing_worker row (fixture side effect); it is new work, so it gates. Main records an action and the ack succeeds
+
+$ bash bin/fm-open-loops.sh action a34cf58d9cdff61d2f225166 escalated --evidence q-1 has no worker after the captain answered; asked captain whether to dispatch
+action: "a34cf58d9cdff61d2f225166"
+kind: escalated
+exit=0
+
+$ fm-wake-drain.sh --ack-through 46 --recovery-generation 28442.1793213010.VSeR8C
+exit=0
+
+## S7 (G1 adversarial): every overdue row in the published ledger is in the gate (--check-actions) or in the periodic list (--digest); none is in neither
+overdue=48 check-actions rc=0 in_gate=0 in_digest=48 in_neither=[] in_both=[]
+digest status counts: {'escalated, waiting on the captain': 7, 'escalated, no proof it reached the captain': 40, '"deferred"': 2}
+
+## S7b (G1 with a changed row): lane8 changes; before any action it is in the gate and not in the digest
+lane8 in gate: 1  lane8 in digest: 0  other overdue rows in gate: 1
+
+$ bash bin/fm-open-loops.sh action 28150d5caec3a031934c7610 escalated --evidence lane 8 CI red; asked captain
+action: "28150d5caec3a031934c7610"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+## S8 (cross-actor, decision 028): a row only main presented never gates the branch actor ack; the branch actor next drain presents and gates it
+new row lane40 id=348ac7936d2a2c86b6d6ab78
+
+$ FM_SUPERVISION_ACTOR=main fm-open-loops.sh --present-overdue | grep lane40
+lines naming lane40: 1
+
+$ FM_SUPERVISION_ACTOR=branch fm-open-loops.sh --check-actions
+exit=0
+
+$ FM_SUPERVISION_ACTOR=main fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "348ac7936d2a2c86b6d6ab78","firstmate","lane40:k40","answer or close this question, or record why it no longer applies",1904,"needs-decision: lane 40 new question",false
+exit=1
+
+$ FM_SUPERVISION_ACTOR=branch fm-open-loops.sh --present-overdue | grep -c lane40
+1
+
+$ FM_SUPERVISION_ACTOR=branch fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "348ac7936d2a2c86b6d6ab78","firstmate","lane40:k40","answer or close this question, or record why it no longer applies",1904,"needs-decision: lane 40 new question",false
+exit=1
+
+$ FM_SUPERVISION_ACTOR=main action lane40 escalated
+action: "348ac7936d2a2c86b6d6ab78"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+$ FM_SUPERVISION_ACTOR=main --check-actions
+exit=0
+
+$ FM_SUPERVISION_ACTOR=branch --check-actions
+exit=0
+
+## S9: away-daemon ack bypass is bounded: FM_WAKE_ACK_AWAY_DAEMON=1 only bypasses the ledger gate while state/.afk exists; the row stays gated for firstmate own ack
+
+$ fm_wake_append check report "check: board report while away"
+
+$ fm-wake-drain.sh
+exit=0
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "46ddf3f5dc088dd55c3005a2","firstmate","lane41:k41","answer or close this question, or record why it no longer applies",1903,"needs-decision: lane 41 new question",false
+STANDING (unchanged since its last action; no action needed):
+rows[49]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758710,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",1990,"needs-decision: lane 39 resumed; pick reviewer",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "348ac7936d2a2c86b6d6ab78","firstmate","lane40:k40","answer or close this question, or record why it no longer applies",1928,"needs-decision: lane 40 new question",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",2062,"needs-decision: lane 5 resumed; approve merge order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",1935,"needs-decision: lane 8 resumed; CI red on main",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7636,"needs-decision: lane 9 paused by captain; decide resume order",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7636,"needs-decision: which option for q-1",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793213109	47	check	report	check: board report while away
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 resumed; pick reviewer
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane40 [key=k40] needs-decision: lane 40 new question
+lane41 [key=k41] needs-decision: lane 41 new question
+lane5 [key=k5] needs-decision: lane 5 resumed; approve merge order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 resumed; CI red on main
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 47 --recovery-generation 22555.1793213109.4ToOLJ
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+drain OVERDUE rows: "lane41:k41" 
+
+$ (no state/.afk) FM_WAKE_ACK_AWAY_DAEMON=1 fm-wake-drain.sh --ack-through 47 --recovery-generation 22555.1793213109.4ToOLJ
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "46ddf3f5dc088dd55c3005a2","firstmate","lane41:k41","answer or close this question, or record why it no longer applies",1912,"needs-decision: lane 41 new question",false
+exit=1
+
+$ touch state/.afk; FM_WAKE_ACK_AWAY_DAEMON=1 fm-wake-drain.sh --ack-through 47 --recovery-generation 22555.1793213109.4ToOLJ
+exit=0
+
+$ rm state/.afk (captain back)
+
+$ bash bin/fm-wake-drain.sh --queued
+exit=0
+
+$ fm_wake_append check report "check: captain back"
+
+$ fm-wake-drain.sh
+exit=0
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "46ddf3f5dc088dd55c3005a2","firstmate","lane41:k41","answer or close this question, or record why it no longer applies",1914,"needs-decision: lane 41 new question",false
+STANDING (unchanged since its last action; no action needed):
+rows[49]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a34cf58d9cdff61d2f225166","firstmate","q-1","recover the assigned worker without discarding work",null,"",false
+  "2137bf53030db23086ce45c6","captain","cap-1:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 1",false
+  "537c8edb8445d633844f7b44","captain","cap-2:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 2",false
+  "7e46af3a506e627e855111c6","captain","cap-3:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 3",false
+  "5b603566445e2587175f9929","captain","cap-4:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 4",false
+  "b90ef43edfbddbd8d7a0aca1","captain","cap-5:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 5",false
+  "bd7d2c9089f34cef5da1f409","captain","cap-6:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 6",false
+  "a09ab25ac491455a108e9048","captain","cap-7:captain-hold","resolve the captain hold or record its next decision date",758721,"approve item 7",false
+  "af0dc6c26246abf39fb30073","firstmate","lane10:k10","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 10 paused by captain; decide resume order",false
+  "183d24d04071e9d8f632059e","firstmate","lane11:k11","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 11 paused by captain; decide resume order",false
+  "4cec69cfc7009751bf268289","firstmate","lane12:k12","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 12 paused by captain; decide resume order",false
+  "c9bf694d90979c351f5fdcf2","firstmate","lane13:k13","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 13 paused by captain; decide resume order",false
+  "8572b520bd033002831a35cf","firstmate","lane14:k14","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 14 paused by captain; decide resume order",false
+  "4234800ab3c99adfa63933f2","firstmate","lane15:k15","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 15 paused by captain; decide resume order",false
+  "3cdcbd45a4979accd5d5b207","firstmate","lane16:k16","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 16 paused by captain; decide resume order",false
+  "ae7c296ed825f58eb96eda3f","firstmate","lane17:k17","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 17 paused by captain; decide resume order",false
+  "776a71065c05f2fe31230a3a","firstmate","lane18:k18","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 18 paused by captain; decide resume order",false
+  "63eb21be40ea8715b896a897","firstmate","lane19:k19","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 19 paused by captain; decide resume order",false
+  "50475c6b2bdd96725dbae98d","firstmate","lane1:k1","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 1 paused by captain; decide resume order",false
+  "850f5d91938cdb3e439e7149","firstmate","lane20:k20","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 20 paused by captain; decide resume order",false
+  "a539b7453bacf5a469b9946b","firstmate","lane21:k21","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 21 paused by captain; decide resume order",false
+  "bdce3269e2e296d069d53f2e","firstmate","lane22:k22","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 22 paused by captain; decide resume order",false
+  "fb3c8683a14ab834fc6b8f5d","firstmate","lane23:k23","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 23 paused by captain; decide resume order",false
+  "1681cc07d97ae1171a31c958","firstmate","lane24:k24","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 24 paused by captain; decide resume order",false
+  "0c67dee1598cb192944d806f","firstmate","lane25:k25","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 25 paused by captain; decide resume order",false
+  "23af9e82076890cef2e36321","firstmate","lane26:k26","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 26 paused by captain; decide resume order",false
+  "6d9cd59dd5fe91a857d828af","firstmate","lane27:k27","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 27 paused by captain; decide resume order",false
+  "8a52be0a4371e7bb813ca606","firstmate","lane28:k28","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 28 paused by captain; decide resume order",false
+  "a8f3e61bde29c7a4164b4da5","firstmate","lane29:k29","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 29 paused by captain; decide resume order",false
+  "68460bf290dd724a08cba24a","firstmate","lane2:k2","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 2 paused by captain; decide resume order",false
+  "baec31dc0255a3d33b144251","firstmate","lane30:k30","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 30 paused by captain; decide resume order",false
+  "cab0540c4b9ef8d064fab731","firstmate","lane31:k31","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 31 paused by captain; decide resume order",false
+  "4a159d0aae3da1c9345bc94c","firstmate","lane32:k32","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 32 paused by captain; decide resume order",false
+  "aab688952ad05de79acec9ba","firstmate","lane33:k33","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 33 paused by captain; decide resume order",false
+  "f1f431a2b61f015e8f15ec18","firstmate","lane34:k34","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 34 paused by captain; decide resume order",false
+  "74002910592334342f5fd302","firstmate","lane35:k35","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 35 paused by captain; decide resume order",false
+  "e91da55c566d40321d2c0383","firstmate","lane36:k36","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 36 paused by captain; decide resume order",false
+  "4556bdf00171abce33292bd4","firstmate","lane37:k37","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 37 paused by captain; decide resume order",false
+  "ddc0f41fcfb8047adffc9c0a","firstmate","lane38:k38","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 38 paused by captain; decide resume order",false
+  "f61ffcad134c20ae6d3a94bd","firstmate","lane39:k39","answer or close this question, or record why it no longer applies",2001,"needs-decision: lane 39 resumed; pick reviewer",false
+  "1ac2508bca97fe3728c05821","firstmate","lane3:k3","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 3 paused by captain; decide resume order",false
+  "348ac7936d2a2c86b6d6ab78","firstmate","lane40:k40","answer or close this question, or record why it no longer applies",1939,"needs-decision: lane 40 new question",false
+  "bbbdb20f4847453ab4672fd0","firstmate","lane4:k4","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 4 paused by captain; decide resume order",false
+  "7f87c051979adbc9744a2960","firstmate","lane5:k5","answer or close this question, or record why it no longer applies",2073,"needs-decision: lane 5 resumed; approve merge order",false
+  "6f79b3cf42314435dfd40834","firstmate","lane6:k6","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 6 paused by captain; decide resume order",false
+  "a42583ca1c2b4512d83c7155","firstmate","lane7:k7","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 7 paused by captain; decide resume order",false
+  "28150d5caec3a031934c7610","firstmate","lane8:k8","answer or close this question, or record why it no longer applies",1946,"needs-decision: lane 8 resumed; CI red on main",false
+  "c92e22f0db9952f1c442c7fa","firstmate","lane9:k9","answer or close this question, or record why it no longer applies",7647,"needs-decision: lane 9 paused by captain; decide resume order",false
+  "2d8db6be117e27b7cc1ab946","firstmate","worker-q:q-1","answer or close this question, or record why it no longer applies",7647,"needs-decision: which option for q-1",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793213120	48	check	report	check: captain back
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane1 [key=k1] needs-decision: lane 1 paused by captain; decide resume order
+lane10 [key=k10] needs-decision: lane 10 paused by captain; decide resume order
+lane11 [key=k11] needs-decision: lane 11 paused by captain; decide resume order
+lane12 [key=k12] needs-decision: lane 12 paused by captain; decide resume order
+lane13 [key=k13] needs-decision: lane 13 paused by captain; decide resume order
+lane14 [key=k14] needs-decision: lane 14 paused by captain; decide resume order
+lane15 [key=k15] needs-decision: lane 15 paused by captain; decide resume order
+lane16 [key=k16] needs-decision: lane 16 paused by captain; decide resume order
+lane17 [key=k17] needs-decision: lane 17 paused by captain; decide resume order
+lane18 [key=k18] needs-decision: lane 18 paused by captain; decide resume order
+lane19 [key=k19] needs-decision: lane 19 paused by captain; decide resume order
+lane2 [key=k2] needs-decision: lane 2 paused by captain; decide resume order
+lane20 [key=k20] needs-decision: lane 20 paused by captain; decide resume order
+lane21 [key=k21] needs-decision: lane 21 paused by captain; decide resume order
+lane22 [key=k22] needs-decision: lane 22 paused by captain; decide resume order
+lane23 [key=k23] needs-decision: lane 23 paused by captain; decide resume order
+lane24 [key=k24] needs-decision: lane 24 paused by captain; decide resume order
+lane25 [key=k25] needs-decision: lane 25 paused by captain; decide resume order
+lane26 [key=k26] needs-decision: lane 26 paused by captain; decide resume order
+lane27 [key=k27] needs-decision: lane 27 paused by captain; decide resume order
+lane28 [key=k28] needs-decision: lane 28 paused by captain; decide resume order
+lane29 [key=k29] needs-decision: lane 29 paused by captain; decide resume order
+lane3 [key=k3] needs-decision: lane 3 paused by captain; decide resume order
+lane30 [key=k30] needs-decision: lane 30 paused by captain; decide resume order
+lane31 [key=k31] needs-decision: lane 31 paused by captain; decide resume order
+lane32 [key=k32] needs-decision: lane 32 paused by captain; decide resume order
+lane33 [key=k33] needs-decision: lane 33 paused by captain; decide resume order
+lane34 [key=k34] needs-decision: lane 34 paused by captain; decide resume order
+lane35 [key=k35] needs-decision: lane 35 paused by captain; decide resume order
+lane36 [key=k36] needs-decision: lane 36 paused by captain; decide resume order
+lane37 [key=k37] needs-decision: lane 37 paused by captain; decide resume order
+lane38 [key=k38] needs-decision: lane 38 paused by captain; decide resume order
+lane39 [key=k39] needs-decision: lane 39 resumed; pick reviewer
+lane4 [key=k4] needs-decision: lane 4 paused by captain; decide resume order
+lane40 [key=k40] needs-decision: lane 40 new question
+lane41 [key=k41] needs-decision: lane 41 new question
+lane5 [key=k5] needs-decision: lane 5 resumed; approve merge order
+lane6 [key=k6] needs-decision: lane 6 paused by captain; decide resume order
+lane7 [key=k7] needs-decision: lane 7 paused by captain; decide resume order
+lane8 [key=k8] needs-decision: lane 8 resumed; CI red on main
+lane9 [key=k9] needs-decision: lane 9 paused by captain; decide resume order
+worker-q [key=q-1] needs-decision: which option for q-1
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 48 --recovery-generation 66206.1793213120.YXXdr6
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+firstmate drain OVERDUE rows: "lane41:k41" 
+
+$ fm-wake-drain.sh --ack-through 48 --recovery-generation 66206.1793213120.YXXdr6
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "46ddf3f5dc088dd55c3005a2","firstmate","lane41:k41","answer or close this question, or record why it no longer applies",1919,"needs-decision: lane 41 new question",false
+exit=1
+
+$ bash bin/fm-open-loops.sh action 46ddf3f5dc088dd55c3005a2 escalated --evidence asked captain about lane 41
+action: "46ddf3f5dc088dd55c3005a2"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+exit=0
+
+$ fm-wake-drain.sh --ack-through 48 --recovery-generation 66206.1793213120.YXXdr6
+exit=0
