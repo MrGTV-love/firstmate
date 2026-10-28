@@ -1,0 +1,10 @@
+2026-10-28T11:04:19.892Z pid=1493 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-28T11:04:19.893Z pid=1493 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-28T11:04:19.893Z pid=1493 instance=1 event=factory-bind generation=1
+2026-10-28T11:04:20.172Z pid=1493 instance=1 event=session_start generation=1 stopping=false
+2026-10-28T11:04:20.172Z pid=1493 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-28T11:07:54.823Z pid=1493 instance=1 event=bound-expired waiter=omp-watch-extension waited-on=arm-output-drain bound=1000ms actual=1016ms
+2026-10-28T11:08:49.806Z pid=1493 instance=2 event=generation-create generation=2 cause=factory-bind
+2026-10-28T11:08:49.806Z pid=1493 instance=2 event=factory-bind generation=2 waiting=primary-session
+2026-10-28T11:08:49.831Z pid=1493 instance=2 event=session_start-ignored reason=not-primary-session
+2026-10-28T11:08:53.665Z pid=1493 instance=2 event=arm-forwarded to=1

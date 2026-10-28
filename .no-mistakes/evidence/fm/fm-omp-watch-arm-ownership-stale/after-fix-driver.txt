@@ -1,0 +1,20 @@
+omp=11778 arm=74665
+watcher=74782
+bash    74782 charlesabrooker    1w   REG               1,17        0           929553847 /Users/charlesabrooker/tmp/fm-lab.dj1LEZ/state/.watch-arm-output.IRVEJj
+bash    74782 charlesabrooker    2u  unix 0x7b8f319bd62197a5      0t0                     ->0x79b8b643cc2b345e
+after kill: arm alive? no
+arm children of omp now:
+(none)
+== repair-call result in pane:
+ watcher: started omp extension arm child 4; future ordinary re-arms are automatic; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+ watcher: started omp extension arm child 4; future ordinary re-arms are automatic; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+== arm children of omp after repair:
+75759 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6122TV4ZRDN5XE6AT06QGZR/bin/fm-watch-arm.sh --restart
+== lifecycle tail:
+2026-10-28T11:10:21.475Z pid=11778 instance=1 event=home-claimed cause=session_start
+2026-10-28T11:10:21.475Z pid=11778 instance=1 event=session_start generation=1 stopping=false
+2026-10-28T11:10:21.476Z pid=11778 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-28T11:10:42.906Z pid=11778 instance=1 event=self-heal-requested generation=1 cause=arm-call
+2026-10-28T11:10:42.906Z pid=11778 instance=1 event=generation-activate generation=1 cause=arm-call
+2026-10-28T11:12:00.316Z pid=11778 instance=1 event=arm-owner-stale pid=74665 exit=SIGKILL
+lab torn down: /Users/charlesabrooker/tmp/fm-lab.dj1LEZ

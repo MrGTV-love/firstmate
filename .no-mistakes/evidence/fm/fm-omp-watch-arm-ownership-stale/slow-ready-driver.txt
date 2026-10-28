@@ -1,0 +1,21 @@
+omp=11927 arm=30845
+== wake lines in pane:
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: successor pid=17742 still starting; it keeps running and reports its own result
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: successor pid=30845 still starting; it keeps running and reports its own result
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: successor pid=11316 still starting; it keeps running and reports its own result
+== arm children of omp now:
+11316 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6122TV4ZRDN5XE6AT06QGZR/bin/fm-watch-arm.sh --restart
+== cycle exits:
+arm_pid=93393	watcher_pid=93820	exit_code=0	signal=none	reason=actionable-check	beacon_age=3
+arm_pid=17742	watcher_pid=18286	exit_code=0	signal=none	reason=actionable-check	beacon_age=1
+arm_pid=30845	watcher_pid=31108	exit_code=0	signal=none	reason=actionable-signal	beacon_age=1
+== repair-call result in pane:
+ watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy
+== arm children of omp after repair call:
+11316 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6122TV4ZRDN5XE6AT06QGZR/bin/fm-watch-arm.sh --restart
+== lifecycle:
+2026-10-28T11:18:59.712Z pid=11927 instance=1 event=factory-bind generation=1 waiting=primary-session
+2026-10-28T11:18:59.738Z pid=11927 instance=1 event=home-claimed cause=session_start
+2026-10-28T11:18:59.738Z pid=11927 instance=1 event=session_start generation=1 stopping=false
+2026-10-28T11:19:24.582Z pid=11927 instance=1 event=self-heal-requested generation=1 cause=arm-call
+lab torn down: /Users/charlesabrooker/tmp/fm-lab.39znse

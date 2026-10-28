@@ -1,0 +1,8 @@
+2026-10-28T11:10:21.456Z pid=11778 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-28T11:10:21.456Z pid=11778 instance=1 event=factory-bind generation=1 waiting=primary-session
+2026-10-28T11:10:21.475Z pid=11778 instance=1 event=home-claimed cause=session_start
+2026-10-28T11:10:21.475Z pid=11778 instance=1 event=session_start generation=1 stopping=false
+2026-10-28T11:10:21.476Z pid=11778 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-28T11:10:42.906Z pid=11778 instance=1 event=self-heal-requested generation=1 cause=arm-call
+2026-10-28T11:10:42.906Z pid=11778 instance=1 event=generation-activate generation=1 cause=arm-call
+2026-10-28T11:12:00.316Z pid=11778 instance=1 event=arm-owner-stale pid=74665 exit=SIGKILL

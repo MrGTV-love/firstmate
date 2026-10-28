@@ -1,0 +1,10 @@
+2026-10-28T11:12:58.186Z pid=614 instance=1 event=generation-create generation=1 cause=factory-bind
+2026-10-28T11:12:58.187Z pid=614 instance=1 event=generation-activate generation=1 cause=factory-bind
+2026-10-28T11:12:58.187Z pid=614 instance=1 event=factory-bind generation=1
+2026-10-28T11:12:58.207Z pid=614 instance=1 event=session_start generation=1 stopping=false
+2026-10-28T11:12:58.207Z pid=614 instance=1 event=generation-activate generation=1 cause=session_start
+2026-10-28T11:15:35.205Z pid=614 instance=2 event=generation-create generation=2 cause=factory-bind
+2026-10-28T11:15:35.205Z pid=614 instance=2 event=generation-activate generation=2 cause=factory-bind
+2026-10-28T11:15:35.205Z pid=614 instance=2 event=factory-bind generation=2 superseded=1
+2026-10-28T11:15:35.206Z pid=614 instance=1 event=instance-retired generation=1 by=2
+2026-10-28T11:15:35.227Z pid=614 instance=2 event=session_start generation=2 stopping=false
