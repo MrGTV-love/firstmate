@@ -1,0 +1,9 @@
+### test_a_head_that_lacks_the_live_base_tip_refuses_naming_both_bases
+not ok - head-lacks-tip: a head without the live base tip must refuse: expected exit 1, got 0
+rc=1
+### test_a_head_that_contains_the_live_base_tip_merges_with_no_extra_step
+not ok - head-contains-tip: the verified line did not name the live tip the head contains
+rc=1
+### test_fresh_green_runs_and_waivers_do_not_pass_a_head_that_lacks_the_tip
+not ok - reopen-lacks-tip: fresh green runs on a head without the tip must refuse: expected exit 1, got 0
+rc=1

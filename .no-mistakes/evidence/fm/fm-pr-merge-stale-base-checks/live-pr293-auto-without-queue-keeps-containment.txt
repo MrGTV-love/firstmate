@@ -1,0 +1,57 @@
+live read: gh api graphql repository.mergeQueue(branch:"main") -> {"data":{"repository":{"mergeQueue":null}}}
+$ bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --attended-override -- --auto --squash   # fixed script, --auto on a base with no merge queue
+exit=1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/live-292-auto.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/293
+  - check 'Behavior portable parallel 1' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 1' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 11' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 12' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 13' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 14' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 15' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 16' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 17' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 19' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 2' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 21' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 3' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 4' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 5' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 7' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 8' is not green: it failed, and it is not required by base branch main
+  - check 'Behavior portable serial 9' is not green: it failed, and it is not required by base branch main
+  - check 'Test coverage guard' is not green: it failed, and it is not required by base branch main
+  - head be633e326488094e34f144b22854c8c939adcd98 lacks the current tip 7b9e555b2a55e8c69a9d3522ffedf7b8c2375595 of base branch main (3 commits behind): it was built on main at 8e1f3bf0e1f17b06f14eb4c43862f46795ddcec2, so no check ran on the tree this merge would land
+error: these checks are not green: Behavior portable parallel 1, Behavior portable serial 1, Behavior portable serial 11, Behavior portable serial 12, Behavior portable serial 13, Behavior portable serial 14, Behavior portable serial 15, Behavior portable serial 16, Behavior portable serial 17, Behavior portable serial 19, Behavior portable serial 2, Behavior portable serial 21, Behavior portable serial 3, Behavior portable serial 4, Behavior portable serial 5, Behavior portable serial 7, Behavior portable serial 8, Behavior portable serial 9, Test coverage guard
+Update the branch so its head contains main at 7b9e555b2a55e8c69a9d3522ffedf7b8c2375595 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293
+A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable parallel 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 1
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 11
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 12
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 13
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 14
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 15
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 16
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 17
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 19
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 2
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 21
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 3
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 4
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 5
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 7
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 8
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Behavior portable serial 9
+Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292-auto https://github.com/MrGTV-love/firstmate/pull/293 --allow-red Test coverage guard
+
+--- gh calls (read-only guard log) ---
+gh pr view https://github.com/MrGTV-love/firstmate/pull/293 --json headRefOid -q .headRefOid
+gh pr view https://github.com/MrGTV-love/firstmate/pull/293 --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName,baseRefOid
+gh api graphql --paginate -f query=query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt} ... on StatusContext{id context state}}}}}}}} -F owner=MrGTV-love -F repo=firstmate -F head=be633e326488094e34f144b22854c8c939adcd98
+gh api repos/MrGTV-love/firstmate/branches/main
+gh api --paginate repos/MrGTV-love/firstmate/rules/branches/main
+gh api --paginate repos/MrGTV-love/firstmate/rules/branches/main --jq .[] | select(.type == "merge_queue") | "merge_method=" + (.parameters.merge_method // "")
+gh api repos/MrGTV-love/firstmate/compare/main...be633e326488094e34f144b22854c8c939adcd98?per_page=1

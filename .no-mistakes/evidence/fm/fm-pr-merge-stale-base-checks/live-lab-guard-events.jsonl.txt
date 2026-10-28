@@ -1,0 +1,8 @@
+# lab FM_HOME state/guard-events.jsonl after the four live runs (fixed 292, pre-fix 292, fixed 293 waiver, fixed 293 --auto)
+{"ts":"2026-10-28T20:48:03Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-58071","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-28T20:48:09Z","guard":"merge-green-head","version":"1","system":"firstmate","session":"pid-86919","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-28T20:48:43Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-34011","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-28T20:49:17Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-78853","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-28T20:49:20Z","guard":"merge-green-head","version":"1","system":"firstmate","session":"pid-94048","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}
+{"ts":"2026-10-28T20:49:51Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-25658","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-28T20:50:19Z","guard":"merge-green-head","version":"1","system":"firstmate","session":"pid-61161","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

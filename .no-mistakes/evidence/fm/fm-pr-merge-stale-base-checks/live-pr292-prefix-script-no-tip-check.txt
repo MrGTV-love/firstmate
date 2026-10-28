@@ -1,0 +1,9 @@
+$ <base 9ae26125e>/bin/fm-pr-merge.sh live-292-base https://github.com/MrGTV-love/firstmate/pull/292   # pre-fix script, same lab, same read-only gh guard
+exit=1
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+armed: state/live-292-base.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/292
+  - mergeStateStatus is DIRTY (conflicts)
+  - mergeable is "CONFLICTING", not MERGEABLE
+
+Note: no base-tip line and no compare read. The pre-fix script refuses only for the merge conflict, not for the missing main tip.

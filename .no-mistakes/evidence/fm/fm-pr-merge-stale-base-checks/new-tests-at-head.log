@@ -1,0 +1,9 @@
+ok - fm-pr-merge refuses a head that lacks the live base tip, naming both bases
+ok - fm-pr-merge merges a head that contains the live base tip with no extra step
+ok - fm-pr-merge refuses a head that lacks the tip however fresh its green runs, with no waiver
+ok - fm-pr-merge refuses when the base tip moves between the verify read and the merge
+ok - fm-pr-merge refuses and records a deny when the base tip cannot be re-read before the merge
+ok - fm-pr-merge refuses a head that lacks the tip at once, even beside an unreported check
+ok - fm-pr-merge skips only the tip containment for an --auto merge into the base's merge queue
+ok - fm-pr-merge keeps the tip containment for a direct merge, no queue, or an unreadable queue
+ok - fm-pr-merge refuses when whether the head contains the base tip cannot be read

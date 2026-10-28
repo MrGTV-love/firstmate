@@ -1,0 +1,25 @@
+$ bin/fm-pr-merge.sh live-292 https://github.com/MrGTV-love/firstmate/pull/292   # fixed script (9f96aec7b), lab FM_HOME, read-only gh guard
+live main tip read just before: 7b9e555b2a55e8c69a9d3522ffedf7b8c2375595
+PR 292 baseRefOid (GitHub, stale): 44153f63d79abd5cf9ca40c42a9e8d76dfe14263
+exit=1
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  5 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+armed: state/live-292.check.sh
+error: refusing to merge https://github.com/MrGTV-love/firstmate/pull/292
+  - mergeStateStatus is DIRTY (conflicts)
+  - head 8deeff8d42fd8e57b6c298b4de467e7ff80d3793 lacks the current tip 7b9e555b2a55e8c69a9d3522ffedf7b8c2375595 of base branch main (18 commits behind): it was built on main at 7c64d0d1e2188ac8cf76c6c10475af67c6a401ab, so no check ran on the tree this merge would land
+  - mergeable is "CONFLICTING", not MERGEABLE
+Update the branch so its head contains main at 7b9e555b2a55e8c69a9d3522ffedf7b8c2375595 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh live-292 https://github.com/MrGTV-love/firstmate/pull/292
+
+--- every gh call the script made (read-only guard log; no BLOCKED lines, no pr merge) ---
+gh pr view https://github.com/MrGTV-love/firstmate/pull/292 --json headRefOid -q .headRefOid
+gh pr view https://github.com/MrGTV-love/firstmate/pull/292 --json state,isDraft,reviewDecision,mergeable,mergeStateStatus,headRefOid,baseRefName,baseRefOid
+gh api graphql --paginate -f query=query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt} ... on StatusContext{id context state}}}}}}}} -F owner=MrGTV-love -F repo=firstmate -F head=8deeff8d42fd8e57b6c298b4de467e7ff80d3793
+gh api repos/MrGTV-love/firstmate/branches/main
+gh api --paginate repos/MrGTV-love/firstmate/rules/branches/main
+gh api repos/MrGTV-love/firstmate/compare/main...8deeff8d42fd8e57b6c298b4de467e7ff80d3793?per_page=1
