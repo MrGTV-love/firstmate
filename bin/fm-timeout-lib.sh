@@ -94,7 +94,8 @@
 # Test fixtures export FM_TEST_PROCESS_REGISTRY (tests/lib.sh), whose cleanup
 # waits for every `wait` record before it removes a fixture root. A registered
 # tree is one whose root exported FM_TEST_PROCESS_RECORD as well (only
-# bin/fm-home-summary-refresh.sh starts one). Inside it, every group this file
+# bin/fm-home-summary-refresh.sh starts one; bin/fm-watch.sh reserves the root
+# record of each refresh it launches). Inside it, every group this file
 # creates - fm_run_progress and all four fm_run_timed mechanisms - is reserved
 # by its launcher BEFORE the launch as a fresh record file (one per launch,
 # never a reused name) and filled with the group's leader pid once the group

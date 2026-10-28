@@ -1537,7 +1537,7 @@ escape_case() {
   root="$TMP_ROOT/$label"
   # The stopped worker's own scratch lands in the fixture root, not the shared TMPDIR.
   mkdir -p "$root/tmp"
-  cp -R "$COALESCE_HOME" "$root/home" && rm -f "$root/home/state/home-summary.json" \
+  { cp -R "$COALESCE_HOME" "$root/home" && rm -f "$root/home/state/home-summary.json"; } \
     || fail "$label: could not copy the fixture home"
   reg=$(mktemp "$TMP_ROOT/.$label-registry.XXXXXX")
   hold="$TMP_ROOT/$label-hold"
@@ -1554,7 +1554,7 @@ escape_case() {
   wpid=$(cat "$root/worker.pid")
   case "$wpid" in ''|*[!0-9]*) fail "$label: the worker published no pid" ;; esac
   kill -KILL -- "-$wpid" 2>/dev/null || fail "$label: could not stop the worker's own group $wpid"
-  fm_test_wait_until 60 bash -c '! kill -0 "$1" 2>/dev/null' _ "$pid" \
+  fm_test_wait_until 60 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$pid" \
     || fail "$label: the refresh parent did not finish after its worker was stopped"
   wait "$pid" 2>/dev/null || true
   ! kill -0 -- "-$wpid" 2>/dev/null || fail "$label: the worker's group still has members"
@@ -1569,6 +1569,53 @@ escape_case() {
   [ -e "$root/home/state/.late-read" ] || fail "$label: the released read never wrote its home"
 }
 
+# The real watcher's detached refresh is held at its first command (dirname),
+# before it could register itself; the watcher is then stopped.
+watcher_launch_case() {
+  local label=watcher-launch home reg hold real_dirname
+  real_dirname=$(command -v dirname)
+  home=$(new_bare_home "$label-home")
+  reg=$(mktemp "$TMP_ROOT/.$label-registry.XXXXXX")
+  hold="$TMP_ROOT/$label-hold"
+  : > "$hold"
+  LIFE_REGISTRIES="$LIFE_REGISTRIES $reg"
+  LIFE_HOLDS="$LIFE_HOLDS $hold"
+  mkdir -p "$TMP_ROOT/launchbin"
+  cat > "$TMP_ROOT/launchbin/dirname" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  */fm-home-summary-refresh.sh)
+    if [ -e "$FM_TEST_LAUNCH_HOLD" ]; then
+      printf '%s\n' "$PPID" > "$FM_TEST_LAUNCH_HOLD.entered"
+      while [ -e "$FM_TEST_LAUNCH_HOLD" ]; do sleep 0.1; done
+    fi
+    ;;
+esac
+exec "$FM_TEST_REAL_DIRNAME" "$@"
+SH
+  chmod +x "$TMP_ROOT/launchbin/dirname"
+  PATH="$TMP_ROOT/launchbin:$FAKEBIN:$PATH" FM_TEST_REAL_DIRNAME="$real_dirname" \
+    FM_TEST_LAUNCH_HOLD="$hold" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_TEST_PROCESS_REGISTRY="$reg" FM_POLL=1 FM_SIGNAL_GRACE=0 \
+    FM_CHECK_INTERVAL=9999999 FM_HEARTBEAT=9999999 \
+    "$WATCH" > "$TMP_ROOT/$label.out" 2> "$TMP_ROOT/$label.err" &
+  WATCH_PID=$!
+  fm_test_wait_until 60 test -s "$hold.entered" \
+    || fail "$label: the watcher never launched its refresh: $(cat "$TMP_ROOT/$label.err" 2>/dev/null)"
+  kill "$WATCH_PID" 2>/dev/null || true
+  wait "$WATCH_PID" 2>/dev/null || true
+  WATCH_PID=
+  rm -rf "$home/state"
+  if FM_TEST_PROCESS_WAIT_SECONDS=1 fm_test_wait_processes "$reg" 2> "$TMP_ROOT/$label.wait.err"; then
+    fail "$label: cleanup found no running writer while the watcher's refresh was held"
+  fi
+  assert_grep "owned writers still running after 1s" "$TMP_ROOT/$label.wait.err" \
+    "$label: the bounded wait did not name the running refresh"
+  rm -f "$hold"
+  fm_test_wait_processes "$reg" || fail "$label: the released refresh never drained"
+  [ -s "$home/state/home-summary.json" ] || fail "$label: the released refresh never published, so nothing was proven"
+}
+
 nested_mode_case bash
 if command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1; then
   nested_mode_case default
@@ -1578,6 +1625,8 @@ held_worker_case
 pass "cleanup waits for a worker launched but not yet running when its refresh parent is killed"
 escape_case
 pass "cleanup waits for groups started below a worker that outlive the worker's own group"
+watcher_launch_case
+pass "cleanup waits for a watcher-launched refresh not yet running when the watcher is stopped"
 
 SERIALBIN="$TMP_ROOT/serialbin"
 mkdir -p "$SERIALBIN"

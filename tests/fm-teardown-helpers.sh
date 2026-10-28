@@ -2415,7 +2415,7 @@ make_ownership_table_case() {  # <name> <claimant> <shape> <landing>
   fi
   case "$claimant" in
     this) holder=task-x1 ;;
-    visible) holder=live-task ;;
+    visible) holder='live-task' ;;
     unregistered) holder=ghost-task ;;
   esac
   if [ "$claimant" != this ]; then

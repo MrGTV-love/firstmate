@@ -131,7 +131,8 @@ esac
 # bin/fm-timeout-lib.sh): --detach reserves a record before it starts its
 # refresh and fills it with that refresh's group before returning; any other
 # mode records its own pid before its first state write (fm-wake-lib.sh's
-# source-time mkdir). Either root exports FM_TEST_PROCESS_RECORD, so every
+# source-time mkdir) unless its launcher already reserved it (bin/fm-watch.sh).
+# Either root exports FM_TEST_PROCESS_RECORD, so every
 # worker, failure-logging, accounting and release child below it is recorded by
 # its launcher before it starts. One that cannot record starts no work. Unset,
 # nothing is recorded.
