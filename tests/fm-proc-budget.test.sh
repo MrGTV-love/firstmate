@@ -297,11 +297,10 @@ test_memory_normal_command() {
 test_memory_setuid_member_is_not_counted() {
   local rc
   # The pipe fills, so the setuid-root ps stays alive across several samples.
-  FM_PROC_BUDGET_DEBUG=1 run_memory_case "$WRAP" --memory-kib 262144 -- \
-    bash -c '/bin/ps -axwwE -o args -o args | sleep 3; exit 7' 2>"$TMP_ROOT/setuid.err"
+  run_memory_case "$WRAP" --memory-kib 262144 -- \
+    bash -c '/bin/ps -axwwE -o args -o args | sleep 3; exit 7'
   rc=$?
   expect_code 7 "$rc" "healthy tree with a running setuid ps"
-  assert_contains "$(cat "$TMP_ROOT/setuid.err")" "not counted: ps (pid " "the unreadable setuid ps is named and left out"
   pass "an unreadable other-user member is left out of the sum and does not end a healthy tree"
 }
 
@@ -370,16 +369,90 @@ PY
   pass "an ignored HUP stays ignored by the supervisor and the command"
 }
 
-test_memory_command_cannot_start() {
-  local rc
-  "$WRAP" --memory-kib 262144 -- "$TMP_ROOT/no-such-command" 2>"$TMP_ROOT/missing.err"
-  rc=$?
-  expect_code 127 "$rc" "missing command"
-  assert_contains "$(cat "$TMP_ROOT/missing.err")" "no-such-command: No such file or directory" "missing command is named"
+test_memory_out_of_group_member_ends_with_supervisor() {
+  local pid
+  python3 - "$WRAP" "$TMP_ROOT/setsid.pid" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+child = ('import subprocess, sys, time\n'
+         'p = subprocess.Popen(["sleep", "600"], start_new_session=True)\n'
+         'open(sys.argv[1], "w").write("%d\\n" % p.pid)\n'
+         'time.sleep(600)\n')
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", sys.executable, "-c", child, sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+# Let at least one one-second sample see the new session's member.
+time.sleep(2)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r pid <"$TMP_ROOT/setsid.pid" || fail "memory-stopped command did not start its setsid child"
+  assert_memory_pid_ended "$pid"
+  pass "a seen member in another session is ended by the dead-man link"
+}
+
+test_memory_supervisor_death_before_reader_ready() {
+  local fixture="$TMP_ROOT/startup-fixture" root_pid
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import os
+from pathlib import Path
+import runpy
+import sys
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ != "__main__" or int(sys.argv[2]) == os.getppid():
+    globals().update(runpy.run_path(real, run_name=__name__))
+else:
+    # The command's reader never answers its first sample.
+    with open(os.environ["FM_MEMORY_MARKER"], "w") as handle:
+        handle.write(sys.argv[2] + "\n")
+    sys.stdin.read()
+PY
+  python3 - "$fixture/fm-proc-budget.sh" "$TMP_ROOT/startup.root" "$TMP_ROOT/startup-payload" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+os.environ["FM_MEMORY_MARKER"] = sys.argv[2]
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'touch "$0"; exec sleep 600', sys.argv[3]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.01)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r root_pid <"$TMP_ROOT/startup.root" || fail "the command's reader never started"
+  assert_memory_pid_ended "$root_pid"
+  assert_absent "$TMP_ROOT/startup-payload" "a supervisor killed before its reader answered must not run the command"
+  pass "a supervisor killed before its reader is ready leaves no command run or running"
+}
+
+test_memory_group_kill_idiom_keeps_status() {
+  "$WRAP" --memory-kib 262144 -- bash -c "trap 'kill 0' EXIT; sleep 0.003"
+  expect_code 0 $? "a command that signals its own group keeps its own status"
+  pass "a command's kill 0 does not kill its memory reader"
+}
+
+test_memory_command_start_matches_exec() {
+  local target plain memory
+  printf 'echo ran-as-script\n' >"$TMP_ROOT/no-shebang"
+  chmod +x "$TMP_ROOT/no-shebang"
   : >"$TMP_ROOT/not-executable"
-  "$WRAP" --memory-kib 262144 -- "$TMP_ROOT/not-executable" 2>/dev/null
-  expect_code 126 $? "non-executable command"
-  pass "a command that cannot start exits 127 or 126 as exec does"
+  for target in "$TMP_ROOT/no-such-command" fm-proc-budget-no-such-command "$TMP_ROOT/not-executable" "$TMP_ROOT/no-shebang"; do
+    plain=$("$WRAP" -- "$target" 2>/dev/null; echo "rc=$?")
+    memory=$("$WRAP" --memory-kib 262144 -- "$target" 2>/dev/null; echo "rc=$?")
+    assert_equals "$plain" "$memory" "memory stop starts $target as exec does"
+  done
+  assert_equals $'ran-as-script\nrc=0' "$memory" "a script without a shebang runs under the shell"
+  pass "a command that cannot start, or a script without a shebang, behaves as without the option"
 }
 
 test_memory_reader_failure() {
@@ -461,7 +534,10 @@ if memory_supported; then
   test_memory_root_exit_ends_leftovers
   test_memory_supervisor_kill_ends_tree
   test_memory_ignored_hangup_passes_through
-  test_memory_command_cannot_start
+  test_memory_out_of_group_member_ends_with_supervisor
+  test_memory_supervisor_death_before_reader_ready
+  test_memory_group_kill_idiom_keeps_status
+  test_memory_command_start_matches_exec
   test_memory_reader_failure
 fi
 

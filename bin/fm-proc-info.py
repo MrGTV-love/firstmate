@@ -40,8 +40,9 @@ effective user is not this process's; one of this user makes rss_kib null, as
 does a read in which no live member was readable. A failed tree read prints
 `-`. An empty tree has rss_kib zero. The supervisor uses these identities for
 fail-closed cleanup. A reader started inside PID's group by another parent
-ignores HUP, INT and TERM; at the end of its stdin (its supervisor died) it
-sends that group TERM, then KILL after at most TERM_SECONDS, and so ends too.
+ignores HUP, INT and TERM; when its stdin ends or its reply cannot be written
+(its supervisor died) it sends that group and every member it has seen TERM,
+then KILL after at most TERM_SECONDS, and so ends too.
 Facts come from sysctl KERN_PROC
 and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
@@ -296,17 +297,29 @@ def rss_tree(root, known):
     }, separators=(",", ":"))
 
 
-def end_group(group):
-    """Send TERM, then KILL after TERM_SECONDS, to a group this process is in."""
+def end_group(root, known):
+    """TERM, then KILL after TERM_SECONDS, the tree of root's group, which this
+    process is in; members seen outside the group are matched by identity."""
+    def live():
+        return [pid for pid, record in tree_snapshot(root, known).items() if record[P_STAT] != SZOMB]
+
     try:
-        os.killpg(group, signal.SIGTERM)
+        for pid in live():
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except OSError:
+                pass
         deadline = time.monotonic() + TERM_SECONDS
-        while time.monotonic() < deadline and any(
-                struct.unpack_from("i", record, P_PID)[0] != os.getpid() and record[P_STAT] != SZOMB
-                for record in kinfos(KERN_PROC_PGRP, group)):
+        while time.monotonic() < deadline and live():
             time.sleep(0.01)
     finally:
-        os.killpg(group, signal.SIGKILL)
+        for pid, identity in list(known.items()):
+            try:
+                if process_identity(kinfo(pid)) == identity:
+                    os.kill(pid, signal.SIGKILL)
+            except (OSError, LookupError):
+                pass
+        os.killpg(root, signal.SIGKILL)
 
 
 def mem_watch(root, reader=mem_tree):
@@ -334,10 +347,11 @@ def main(argv_):
         if guard:
             for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
                 signal.signal(signum, signal.SIG_IGN)
-        status = mem_watch(number, lambda root: rss_tree(root, known))
-        if guard:
-            end_group(number)
-        return status
+        try:
+            return mem_watch(number, lambda root: rss_tree(root, known))
+        finally:
+            if guard:
+                end_group(number, known)
     try:
         if command == "table":
             value = table(fields)

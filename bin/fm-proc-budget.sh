@@ -10,24 +10,26 @@
 # and compare the larger sum with the positive decimal limit. The command runs
 # in a new process group that it leads, so the tree is that whole group, even
 # a background job orphaned before the first sample, plus each descendant a
-# sample has seen in another group or session, including nested wrappers. A
-# process that leaves the group (setsid or setpgid, as a daemon's double fork
-# does) and is orphaned before a sample has seen it is not tracked: it escapes
-# the stop and every cleanup below. Being outside the caller's group, the
-# command is a background job for a terminal: Ctrl-C reaches the supervisor,
-# which ends the tree, and a command that reads the terminal is stopped.
+# sample has seen in another group or session, including nested wrappers. The
+# only gap: a process that leaves the group (setsid or setpgid, as a daemon's
+# double fork does) and that no sample has seen before its parent exits is not
+# tracked; it escapes the stop and every cleanup below. Being outside the
+# caller's group, the command is a background job for a terminal: Ctrl-C
+# reaches the supervisor, which ends the tree, and a command that reads the
+# terminal is stopped.
 # The memory reader joins the command's group and reads a pipe that only the
 # supervisor writes; if the supervisor dies (for example SIGKILL from a kill of
-# the caller's group), the reader sends the group TERM, then KILL after at most
-# one second. Crossing the limit STOPs and re-scans the tree before
-# KILLing every member, then exits 99 with one stderr line naming the limit and
-# sample. This is not a kernel allocation ceiling: memory can overshoot between
-# samples. A failed, malformed, or late memory sample ends the tree and exits
-# 125, as does a member of this user whose memory cannot be read, or a sample in
+# the caller's group), the reader sends the group and every member a sample has
+# seen TERM, then KILL after at most one second. The command itself starts only
+# after the reader has answered a first sample; a supervisor that dies sooner
+# leaves no command running. Crossing the limit STOPs and re-scans the tree
+# before KILLing every member, then exits 99 with one stderr line naming the
+# limit and sample. This is not a kernel allocation ceiling: memory can
+# overshoot between samples. A failed, malformed, or late memory sample ends the
+# tree and exits 125, as does a member of this user whose memory cannot be read, or a sample in
 # which no member's memory can be read. A member running as another user (a
 # setuid program such as ps) whose memory cannot be read is left out of the sum;
-# a 99 or 125 stderr line counts and names such members, and with
-# FM_PROC_BUDGET_DEBUG=1 each sample that leaves one out prints a debug line.
+# a 99 or 125 stderr line counts and names such members.
 # When the command itself exits, its remaining tree gets TERM, then KILL after
 # at most one second, and the wrapper exits with the command's status. A
 # command meant to leave a daemon running must not use this option. HUP, INT
@@ -65,9 +67,10 @@
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
 # With --memory-kib, 99 is a crossed memory limit, 125 also covers a failed
-# memory sample, and 127 (not found) or 126 (cannot run) a command that cannot
-# start, as with exec. The command's own status comes after its remaining tree
-# is ended; only an untracked process (above) survives it. A tree that cannot be
+# memory sample, and a command that cannot start gets bash's own exec status
+# and message (127 or 126), as without the option. The command's own status
+# comes after its remaining tree is ended; only an untracked process (above)
+# survives it. A tree that cannot be
 # fully ended keeps that status and says so on its one stderr line.
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed

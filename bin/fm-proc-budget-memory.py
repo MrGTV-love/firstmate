@@ -7,7 +7,10 @@ Both sampling and cleanup reuse fm-proc-info.py's libproc tree identities.
 The command leads its own process group, which the cleanup always covers; a
 descendant outside it stays owned once a sample has observed it. The reader
 joins that group as a dead-man link: if this supervisor dies, the reader sees
-the end of its stdin and ends the group.
+the end of its stdin and ends the group and every member it has seen. A bash
+gate holds the command until the reader has answered a first sample, then
+runs `exec "$@"` as the plain wrapper does; if this supervisor dies first, the
+gate sees the end of its release pipe and exits without running the command.
 """
 import json
 import os
@@ -38,13 +41,19 @@ class SampleError(Exception):
     pass
 
 
+def join_group(group):
+    os.setpgid(0, group)
+    for number in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
+        signal.signal(number, signal.SIG_IGN)
+
+
 class Reader:
     def __init__(self, root, group=None):
         helper = Path(__file__).with_name("fm-proc-info.py")
         self.process = subprocess.Popen(
             [sys.executable, str(helper), "rss-tree", str(root)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            preexec_fn=None if group is None else lambda: os.setpgid(0, group),
+            preexec_fn=None if group is None else lambda: join_group(group),
         )
         self.first = True
         self.root = root
@@ -178,10 +187,9 @@ def end_tree(proc, root, known, grace=0):
 
 
 def run(limit, command):
-    reader, child, proc = None, None, None
+    reader, child, proc, release = None, None, None, None
     known = {}
     uncounted = []
-    debug = os.environ.get("FM_PROC_BUDGET_DEBUG") == "1"
     caught = 0
     ended = False
     cleanup_error = None
@@ -226,18 +234,24 @@ def run(limit, command):
         reader = None
         if caught:
             return 128 + caught
+        gate, release = os.pipe()
         try:
-            child = subprocess.Popen(command, preexec_fn=os.setpgrp)
-        except OSError as error:
-            reason(f"{command[0]}: {error.strerror}; command not started")
-            return 127 if isinstance(error, FileNotFoundError) else 126
+            child = subprocess.Popen(
+                ["/bin/bash", "-c", f'read -r _ <&{gate} || exit 125; exec {gate}<&-; exec "$@"',
+                 "fm-proc-budget", *command],
+                preexec_fn=os.setpgrp, pass_fds=(gate,),
+            )
+        finally:
+            os.close(gate)
         reader = Reader(child.pid, child.pid)
+        reader.sample(known, uncounted)
+        os.write(release, b"\n")
+        os.close(release)
+        release = None
         while True:
             if caught:
                 return 128 + caught
             rss = reader.sample(known, uncounted)
-            if debug and uncounted:
-                reason(f"debug: sample at {rss} KiB{uncounted_note(uncounted)}")
             if rss > limit:
                 end_child()
                 reason(f"command tree exceeded {limit} KiB memory limit at {rss} KiB; {outcome()}"
@@ -266,6 +280,8 @@ def run(limit, command):
             child.wait()
         if reader is not None:
             reader.close()
+        if release is not None:
+            os.close(release)
 
 
 if __name__ == "__main__":
