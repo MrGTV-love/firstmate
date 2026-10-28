@@ -182,7 +182,6 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
 # holder that keeps it longer (a writer stopped while it held it) refuses the call
 # with exit 75, said on stderr naming the file, and nothing is written; no writer
 # waits on the lock without end.
-# measured: value=10 date=2026-10-27 host=Mac-Studio.local margin=4.6 (one call appending a full cap and reserve of 100-byte lines held the lock 2.15 s)
 # stdout stays empty: the exit status and stderr are the whole contract. A repeated
 # line is written like any other; the cap is what stops a loop, and it stops it
 # loudly. The program's first line is a marker comment, so the watcher guard can tell
@@ -218,6 +217,7 @@ sub ends_with_newline {
 
 sysopen(my $fh, $path, O_RDWR | O_APPEND | O_CREAT | O_NOFOLLOW, 0644)
     or do { print STDERR "fm-status-append: cannot open $path: $!\n"; exit 1 };
+# measured: value=10 date=2026-10-28 host=Mac-Studio.local margin=7.8 (longest lock hold was 1.28 s, one call filling the whole cap with 100-byte lines; 8 concurrent 1000-line batches waited at most 0.07 s)
 my $lock_secs = 10;
 my $lock_deadline = time + $lock_secs;
 until (flock($fh, LOCK_EX | LOCK_NB)) {
