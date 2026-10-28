@@ -110,7 +110,8 @@ A docstring is a triple-quoted string that opens a block, as the first statement
   A hook script is a script a hook registration file names, or one whose file name says hook, pretool, posttool or turnend.
 - `E` guard event: a call to `bin/fm-guard-event.sh` (or its `guard_event` wrappers) whose decision is not exactly `allow`.
   The decision is the writer's second argument (`<guard-id> <decision>`), or the first argument of a wrapper that takes the decision first.
-  The call is split with shell argument rules and ends at `;`, `&`, `|`, a redirection, a parenthesis, a closing brace, or a comment, so the guard id, a later option and a following command never decide.
+  The call is split with shell quoting rules and ends at an unquoted `;`, `&`, `|`, `<`, `>`, parenthesis, lone closing brace, or `#` that starts a word.
+  A quoted `}` or `|`, and a `#` inside a word, are literal arguments, so the guard id, a later option and a following command never decide.
 
 A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun` or `deno`, in which case the body is scanned as that language.
 A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.

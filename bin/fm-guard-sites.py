@@ -21,7 +21,6 @@ import hashlib
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -191,18 +190,56 @@ def is_docstring_open(stripped, prev_code):
 
 
 def command_words(text):
-    """The words of one shell command: quoting is honored, and the command ends at ; & | ) } or a comment."""
-    try:
-        lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
-        lexer.whitespace_split = True
-        words = []
-        for word in lexer:
-            if word.startswith('}') or set(word) <= set(';&|()<>'):
-                break
-            words.append(word)
-        return words
-    except ValueError:
-        return text.split()  # unbalanced quotes: the plain split still keeps the order of the arguments
+    """The words of one shell command, with quote provenance.
+
+    Quoting is honored as bash does: a quoted character is part of a word and never syntax.
+    The command ends at an unquoted ; & | ( ) < >, at an unquoted } that stands alone as a
+    word, or at an unquoted # that starts a word (a # inside a word is literal).
+    """
+    words = []
+    word = []
+    started = False  # a word is open, even an empty quoted one
+    quote = None
+    index = 0
+    while index < len(text):
+        char = text[index]
+        index += 1
+        if quote == "'":
+            if char == "'":
+                quote = None
+            else:
+                word.append(char)
+        elif quote == '"':
+            if char == '"':
+                quote = None
+            elif char == '\\' and index < len(text) and text[index] in '"\\$`':
+                word.append(text[index])
+                index += 1
+            else:
+                word.append(char)
+        elif char in '"\'':
+            quote = char
+            started = True
+        elif char == '\\' and index < len(text):
+            word.append(text[index])
+            index += 1
+            started = True
+        elif char in ' \t':
+            if started:
+                words.append(''.join(word))
+            word, started = [], False
+        elif char in ';&|()<>':
+            break
+        elif char == '#' and not started:
+            break
+        elif char == '}' and not started and (index >= len(text) or text[index] in ' \t;&|)'):
+            break
+        else:
+            word.append(char)
+            started = True
+    if started and quote is None:
+        words.append(''.join(word))
+    return words
 
 
 def event_denies(body):

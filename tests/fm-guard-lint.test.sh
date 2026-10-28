@@ -378,6 +378,26 @@ assert_site "S1 finds a deny wrapper call beside an allow wrapper call" "$SIG" '
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the deny wrapper call may be a site: $(site_ids "$SIG")"
 pass "a wrapper that takes the decision first is judged by that decision"
 
+# Shell syntax is judged with quote provenance: a # inside a word and a quoted } or | are literal
+# arguments of the event, so each allow line below is an allow event and only the control line denies.
+SIG=$(fixture sig_event_hash_in_id)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" deployment#1 allow\n"$DIR/fm-guard-event.sh" control-guard deny\n' >"$SIG/bin/a.sh"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "a # inside a word is not a comment, so deployment#1 allow is an allow event: $(site_ids "$SIG")"
+pass "a hash inside a guard id does not start a comment"
+
+SIG=$(fixture sig_event_quoted_brace)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" "}" allow\n"$DIR/fm-guard-event.sh" control-guard deny\n' >"$SIG/bin/a.sh"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "a quoted } is a literal guard id, so it is an allow event: $(site_ids "$SIG")"
+pass "a quoted closing brace is an argument, not a command boundary"
+
+SIG=$(fixture sig_event_quoted_pipe)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" "|" allow\n"$DIR/fm-guard-event.sh" control-guard deny\n' >"$SIG/bin/a.sh"
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "a quoted | is a literal guard id, so it is an allow event: $(site_ids "$SIG")"
+pass "a quoted pipe is an argument, not an operator"
+
 SIG=$(fixture sig_oneline_event)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"
