@@ -141,7 +141,9 @@
 #      A passing run on a mode=no-mistakes task also needs the supported
 #      revision-bound evidence `no-mistakes axi status` exposes: the immutable
 #      verification-plan snapshot, its bytes still hashing to the recorded
-#      sha256, and the run head tree equal to this copy's HEAD tree. Missing or
+#      sha256, and the run head being the task's recorded pr_head or
+#      attributing to this copy's HEAD (fm_nm_evidence_problem in
+#      bin/fm-nm-run-lib.sh). Missing or
 #      mismatched evidence reads unknown with the exact reason; a coarse
 #      inventory word cannot supply it. That proves the plan and revision were
 #      accounted for, never that the reviewer graded every item correctly.
@@ -1412,12 +1414,14 @@ if [ "$HAVE_RUN" = 1 ]; then
     # A passing no-mistakes run is completion evidence, not a bare claim: the
     # run must expose the immutable verification-plan snapshot that axi status
     # renders for it, the snapshot bytes must still hash to the recorded sha256,
-    # and the run head tree must equal this copy's HEAD tree. This proves the
-    # plan and revision were the ones accounted for; it never claims the
-    # reviewer graded the items correctly.
+    # and the run head must be the recorded pr_head or attribute to this copy's
+    # HEAD (fm_nm_evidence_problem). This proves the plan and revision were the
+    # ones accounted for; it never claims the reviewer graded the items
+    # correctly.
     if [ "$RUN_STATE" = "done" ] && [ "$RUN_MODE" = no-mistakes ]; then
       evidence_plan="${FM_DATA_OVERRIDE:-$(dirname "$STATE")/data}/$ID/verification-plan.md"
-      if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan"); then
+      meta_value_to evidence_head pr_head
+      if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan" "$evidence_head"); then
         RUN_STATE=unknown
         RUN_DETAIL="run evidence unverified: $reason"
       fi

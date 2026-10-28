@@ -1972,7 +1972,7 @@ test_generated_verification_plan_command() {
   for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
     content=${content//"$token"/'The badge updates after refresh.'}
   done
-  content=${content//'{DOD_MANDATORY_ITEMS}'/'- M1 Source: the badge refresh. Expected: The badge updates after refresh. Verify: this test. Edge/negative: a failed refresh is refused. Evidence place: this test output. Authority: grader.'}
+  content=${content//'{DOD_MANDATORY_ITEMS}'/"$(fm_test_dod_item M1)"}
   printf '%s\n' "$content" > "$brief"
   command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$brief")
   [ -n "$command" ] || fail 'no generated plan-build command'

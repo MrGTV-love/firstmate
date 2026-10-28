@@ -347,6 +347,9 @@ set_review_age(599)
 assert not rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'one interval grace boundary'
 set_review_age(601)
 assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'past the interval boundary'
+set_review_age(-60)
+assert_no_qualifying_review('a review recorded after the sweep began must not read as overdue')
+set_review_age(601)
 double['rules'] = [dict(type='required_status_checks', parameters=dict(required_status_checks=[
     dict(context='missing', integration_id=3)]))]
 (world / 'gh.json').write_text(json.dumps(double))
@@ -1591,6 +1594,30 @@ finally:
         pass
     live.wait()
 print('PASS: live process-group EPERM still refuses and leaves the process running', flush=True)
+
+# The Darwin race the seam exists for: EPERM arrives while poll() has not yet
+# observed the exit. A group whose members are all zombies, or a group that is
+# already gone, needs no signal, so the refusal is swallowed for exactly those.
+class RacingChild:
+    def __init__(self, pid):
+        self.pid = pid
+    def poll(self):
+        return None
+zombie = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+try:
+    deadline = time.monotonic() + 30
+    while not (states := seam_collector.group_state(zombie.pid)) \
+            or not all(state.startswith(('Z', 'X')) for state in states):
+        assert time.monotonic() < deadline, 'the unreaped leader never became a zombie'
+        time.sleep(0.05)
+    with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+        seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+finally:
+    zombie.wait()
+assert seam_collector.group_state(zombie.pid) == [], 'a reaped group must read as having no members'
+with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+    seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+print('PASS: an all-zombie or vanished process group swallows the Darwin EPERM race', flush=True)
 
 interval_home = world / 'interval-home'
 for name in ('state', 'data', 'config', 'projects'):

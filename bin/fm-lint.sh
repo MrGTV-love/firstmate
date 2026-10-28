@@ -595,7 +595,7 @@ fi
 # upstream release visible before the pin silently diverges from CI; it uses
 # only the public release API and never needs a local linter installed.
 fm_lint_release_url() {  # <owner/repo>
-  printf '%s/%s/releases/latest' "${FM_LINT_RELEASE_API_BASE:-https://api.github.com/repos}" "$1"
+  printf 'https://api.github.com/repos/%s/releases/latest' "$1"
 }
 
 fm_lint_latest_tag() {  # <owner/repo>; prints the tag without a leading v, or returns 2

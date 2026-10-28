@@ -306,7 +306,9 @@ test_local_wrong_shellcheck_warns_and_proceeds() {
 }
 
 test_check_version_reports_current_behind_and_unknown() {
-  local tmp fakebin sc al out rc
+  local tmp fakebin sc al out rc actionlint_pin
+  actionlint_pin=$("$ROOT/bin/fm-lint-workflows.sh" --required-version)
+  [ -n "$actionlint_pin" ] || fail "fm-lint-workflows.sh --required-version printed nothing"
   tmp=$(fm_test_tmproot fm-lint-currency)
   fakebin=$(fm_fakebin "$tmp")
   sc="$tmp/shellcheck.json"
@@ -328,17 +330,17 @@ SH
 exit 99
 SH
   chmod +x "$fakebin/shellcheck"
-  printf '%s\n' '{"tag_name":"v0.11.0"}' > "$sc"
-  printf '%s\n' '{"tag_name":"v1.7.12"}' > "$al"
+  printf '{"tag_name":"v%s"}\n' "$REQUIRED" > "$sc"
+  printf '{"tag_name":"v%s"}\n' "$actionlint_pin" > "$al"
   rc=0
   out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
   expect_code 0 "$rc" "current pins must pass the currency check: $out"
   assert_contains "$out" "shellcheck: pinned $REQUIRED, latest $REQUIRED (current)" \
     "current ShellCheck pin was not reported"
-  assert_contains "$out" "actionlint: pinned 1.7.12, latest 1.7.12 (current)" \
+  assert_contains "$out" "actionlint: pinned $actionlint_pin, latest $actionlint_pin (current)" \
     "current actionlint pin was not reported"
 
-  printf '%s\n' '{"tag_name":"v0.12.0"}' > "$sc"
+  printf '%s\n' '{"tag_name":"v99.0.0"}' > "$sc"
   rc=0
   out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
   expect_code 1 "$rc" "a behind ShellCheck pin must fail the currency check: $out"
@@ -346,8 +348,8 @@ SH
   assert_contains "$out" "REQUIRED_SHELLCHECK" "behind ShellCheck did not name the pin to bump"
   assert_contains "$out" "fm-install-shellcheck.sh" "behind ShellCheck did not name the installer"
 
-  printf '%s\n' '{"tag_name":"v0.11.0"}' > "$sc"
-  printf '%s\n' '{"tag_name":"v1.8.0"}' > "$al"
+  printf '{"tag_name":"v%s"}\n' "$REQUIRED" > "$sc"
+  printf '%s\n' '{"tag_name":"v99.0.0"}' > "$al"
   rc=0
   out=$(PATH="$fakebin:$PATH" SC_JSON="$sc" AL_JSON="$al" "$LINT" --check-version 2>&1) || rc=$?
   expect_code 1 "$rc" "a behind actionlint pin must fail the currency check: $out"

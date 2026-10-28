@@ -2106,7 +2106,7 @@ test_worker_launch_delivers_role_scope() {
       for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
         content=${content//"$token"/Filled for the test.}
       done
-      content=${content//'{DOD_MANDATORY_ITEMS}'/- M1 Source: the intent. Expected: the spawn behavior works. Verify: this test. Edge/negative: a refused spawn is reported. Evidence place: this test output. Authority: grader.}
+      content=${content//'{DOD_MANDATORY_ITEMS}'/"$(fm_test_dod_item M1)"}
       content=${content//$'\n### Out of scope'/$'\n### Out of scope\nNone.'}
       printf '%s\n' "$content" > "$brief"
     fi

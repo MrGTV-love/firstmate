@@ -455,11 +455,15 @@ fm_nm_sha256_file() {  # <file>
 # status` renders for a run: path, sha256, source_path, and captured_at. That
 # snapshot is immutable for the run and was captured before any branch
 # mutation. Re-hashing the file proves the bytes at that path are still the
-# captured bytes, and the run head tree must match this copy's HEAD tree so the
-# evidence belongs to the code being completed. This proves review accounting
-# inputs, never that an item was semantically graded or passed.
-fm_nm_evidence_problem() {  # <worktree> <toon-output> [expected-source-path]
-  local wt=$1 out=$2 expected_source=${3:-} path sha source expected_sha captured run_head head_tree run_tree actual now
+# captured bytes. The run head must be the validated revision of this copy's
+# work: it is the task's recorded forge pr_head, or it attributes to this copy
+# by fm_nm_head_matches_worktree (HEAD equals the run head or is an ancestor of
+# it, as when a fix round commits past the worker copy), or its tree is HEAD's
+# tree (a Gerrit copy whose recovered fixes were restamped on publish). This
+# proves review accounting inputs, never that an item was semantically graded
+# or passed.
+fm_nm_evidence_problem() {  # <worktree> <toon-output> [expected-source-path] [recorded-pr-head]
+  local wt=$1 out=$2 expected_source=${3:-} recorded_head=${4:-} path sha source expected_sha captured run_head head_tree run_tree actual now
   path=$(fm_nm_nested_in_block "$out" run verification_plan path)
   sha=$(fm_nm_nested_in_block "$out" run verification_plan sha256)
   source=$(fm_nm_nested_in_block "$out" run verification_plan source_path)
@@ -536,19 +540,13 @@ fm_nm_evidence_problem() {  # <worktree> <toon-output> [expected-source-path]
     printf '%s\n' "the run exposes no full head sha to bind its verification-plan evidence"
     return 0
   }
-  head_tree=$(git -C "$wt" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null) || {
-    printf '%s\n' "this copy's HEAD tree could not be read, so the run evidence cannot be bound to it"
-    return 0
-  }
-  run_tree=$(git -C "$wt" rev-parse --verify --quiet "$run_head^{tree}" 2>/dev/null) || {
-    printf '%s\n' "the run head $run_head is not an object in this copy, so its evidence cannot be bound to HEAD"
-    return 0
-  }
-  [ "$head_tree" = "$run_tree" ] || {
-    printf '%s\n' "this copy's HEAD tree is not the run head $run_head tree, so the run evidence does not describe the completed code"
-    return 0
-  }
-  return 1
+  [ "$run_head" != "$recorded_head" ] || return 1
+  fm_nm_head_matches_worktree "$wt" "$run_head" && return 1
+  head_tree=$(git -C "$wt" rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null) || head_tree=
+  run_tree=$(git -C "$wt" rev-parse --verify --quiet "$run_head^{tree}" 2>/dev/null) || run_tree=
+  [ -z "$head_tree" ] || [ "$head_tree" != "$run_tree" ] || return 1
+  printf '%s\n' "the run head $run_head is not this task's recorded PR head and does not attribute to this copy's HEAD, so the run evidence does not describe the completed work"
+  return 0
 }
 
 # 0 if the run in captured `axi status` TOON $1 is still in flight: no

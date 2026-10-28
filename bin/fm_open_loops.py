@@ -861,6 +861,8 @@ class Collector:
                     or evidence.get("head") != sha:
                 self.degraded.append(f"review record for {url}: a success envelope is not this exact head's independent review evidence")
                 return None
+            if at > self.now:
+                return None
             authors = "+".join(sorted(str(family) for family in families))
             return at, reader_model, reader_family, authors
         if evidence.get("ok") is False and error.get("kind") == "not-qualified":
