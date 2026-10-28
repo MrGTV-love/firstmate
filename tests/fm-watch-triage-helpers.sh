@@ -8185,7 +8185,7 @@ test_long_status_scan_keeps_beacon_fresh() (
   local dir state out pid reader i beat now first last padding
   dir=$(make_case long-scan-beat); state="$dir/state"; out="$dir/watch.out"; reader="$dir/slow-span"
   # A 1.6 MB existing log needs full classification; the reader deliberately
-  # takes longer than WATCHER_STALE_GRACE=3, with production bounds unchanged.
+  # takes longer than WATCHER_STALE_GRACE=3, with the derived stall bound.
   printf -v padding '%04000d' 0
   for i in {1..400}; do printf 'working: historical progress %s %s\n' "$i" "$padding"; done > "$state/task.status"
   printf 'done: new result\n' >> "$state/task.status"
@@ -8196,10 +8196,8 @@ test_long_status_scan_keeps_beacon_fresh() (
 exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
 SH
   chmod +x "$reader"
-  # Keep a production-sized hard bound while shortening only the stale grace:
-  # the injected read plus real classification can exceed the derived 9s bound.
-  local FM_STATUS_SPAN_READER="$reader" FM_WATCHER_STALE_GRACE=3 FM_WATCHER_STALL_BOUND=300
-  export FM_STATUS_SPAN_READER FM_WATCHER_STALE_GRACE FM_WATCHER_STALL_BOUND
+  local FM_STATUS_SPAN_READER="$reader" FM_WATCHER_STALE_GRACE=3
+  export FM_STATUS_SPAN_READER FM_WATCHER_STALE_GRACE
   watch_bg "$state" "$dir/fakebin" "$out" bash
   pid=$!
   i=0
@@ -8222,6 +8220,64 @@ SH
   [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$state/task.status")" = "$(size_of "$state/task.status")" ] \
     || fail "long classification reported an error instead of committing the complete result"
   pass "slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3"
+)
+
+# The stall bound limits inactivity, not total time: a first classification
+# still burning CPU well past FM_WATCHER_STALL_BOUND=2 commits its endpoint and
+# signals, so a slow full read can never loop unclassified on every append.
+test_progressing_status_read_outlives_stall_bound() (
+  local dir state out pid reader
+  dir=$(make_case progressing-read); state="$dir/state"; out="$dir/watch.out"; reader="$dir/busy-span"
+  printf 'done: delivered\n' > "$state/task.status"
+  cat > "$reader" <<'SH'
+#!/usr/bin/env bash
+if [ ! -e "$FM_STATE_OVERRIDE/.test-busy-read" ]; then
+  : > "$FM_STATE_OVERRIDE/.test-busy-read"
+  perl -e '$e = time + 6; 1 while time < $e'
+fi
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
+SH
+  chmod +x "$reader"
+  local FM_STATUS_SPAN_READER="$reader" FM_WATCHER_STALL_BOUND=2
+  export FM_STATUS_SPAN_READER FM_WATCHER_STALL_BOUND
+  watch_bg "$state" "$dir/fakebin" "$out" bash
+  pid=$!
+  wait_for_exit "$pid" 300 || { reap "$pid"; fail "progressing classification never delivered the result"; }
+  [ -e "$state/.test-busy-read" ] || fail "the busy read was not exercised"
+  grep -F $'\tsignal\ttask.status\t' "$state/.wake-queue" >/dev/null || fail "progressing classification lost the result"
+  [ "$(status_presentation_marker_offset "$state/.seen-task_status" "$state/task.status")" = "$(size_of "$state/task.status")" ] \
+    || fail "a read still making progress was cut off at FM_WATCHER_STALL_BOUND=2"
+  pass "a classification still making progress past FM_WATCHER_STALL_BOUND commits its endpoint and signals"
+)
+
+# A span read with no CPU progress for the stall bound is still stopped as
+# stalled and stays unclassified, and its capture leaves no scratch behind.
+test_idle_status_read_is_stalled() (
+  local dir state script out
+  dir=$(make_case idle-read); state="$dir/state"; script="$dir/idle.sh"
+  mkdir -p "$dir/home"
+  printf '#!/bin/sh\nexec /bin/sleep 60\n' > "$state/idle-span"
+  chmod +x "$state/idle-span"
+  cat > "$script" <<'SH'
+root=$1 state=$2 home=$3
+export FM_STATE_OVERRIDE="$state" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" FM_WATCHER_STALL_BOUND=2
+. "$root/bin/fm-watch.sh"
+STATE=$state
+rec='' nd=''
+printf 'done: delivered\n' > "$STATE/task.status"
+started=$SECONDS
+FM_STATUS_SPAN_READER="$STATE/idle-span" watcher_status_span "$STATE/task.status" 0 rec nd
+rc=$?
+elapsed=$((SECONDS - started))
+[ "$elapsed" -ge 2 ] && [ "$elapsed" -lt 30 ] && elapsed=bounded
+echo "rc=$rc status=$FM_CHECK_STATUS record=[$rec] elapsed=$elapsed"
+SH
+  out=$(bash "$script" "$ROOT" "$state" "$dir/home" 2>/dev/null) || fail "the idle-read probe failed: $out"
+  [ "$out" = "rc=2 status=124 record=[] elapsed=bounded" ] \
+    || fail "a read with no progress for FM_WATCHER_STALL_BOUND=2 was not stalled: $out"
+  ! find "$state" -maxdepth 1 -name '.fm-check-output.*' -print | grep . >/dev/null \
+    || fail "the stalled capture left scratch files behind"
+  pass "a status read with no progress for FM_WATCHER_STALL_BOUND is stopped as stalled"
 )
 
 # A crew log torn down after a scan listed it but before its span is read is an

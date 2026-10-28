@@ -68,6 +68,8 @@ test_status_device_shift_keeps_owned_appends || exit $?
 test_status_marker_adoption_follows_each_field_device || exit $?
 test_signal_rescan_deduplicates_pending || exit $?
 test_long_status_scan_keeps_beacon_fresh || exit $?
+test_progressing_status_read_outlives_stall_bound || exit $?
+test_idle_status_read_is_stalled || exit $?
 test_vanished_status_log_is_a_quiet_empty_span || exit $?
 test_actionable_signal_surfaced
 test_done_and_keyed_lines_surface_between_and_during_cycles

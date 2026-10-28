@@ -2261,7 +2261,7 @@ fm_check_output_cleanup() {
   fi
   [ -z "$FM_CHECK_WAIT_FIFO" ] || rm -f -- "$FM_CHECK_WAIT_FIFO"
   FM_CHECK_WAIT_FIFO=
-  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT"
+  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.progress"
   FM_CHECK_OUTPUT=
 }
 
@@ -2336,8 +2336,13 @@ run_check_capture() {
   FM_CHECK_OWNED_GROUP=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
 }
 
+# With FM_CAPTURE_PROGRESS=1 the timeout is an inactivity bound, not a
+# wall-clock one: from the second liveness tick, fm_progress_check samples the
+# capture's process tree, and only a tree with no CPU progress for the timeout
+# is stopped as stalled (124). Without a POSIX python3 nothing is proven stalled.
 run_owned_capture() {
   local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
+  local progress_rc progress_sampled=
   shift 3
   fm_check_output_cleanup
   FM_CHECK_RESULT=
@@ -2380,7 +2385,18 @@ run_owned_capture() {
   # read, without spawning a timer on each tick.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
-    if [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
+    if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
+      progress_rc=0
+      [ -z "$progress_sampled" ] \
+        || fm_progress_check "$FM_CHECK_OUTPUT.progress" "$FM_ACTIVE_CHECK_PID" "$capture_timeout" \
+        || progress_rc=$?
+      progress_sampled=1
+    elif [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
+      progress_rc=124
+    else
+      progress_rc=0
+    fi
+    if [ "$progress_rc" = 124 ]; then
       FM_CHECK_STATUS=124
       fm_active_check_stop || return 1
       break
@@ -2442,11 +2458,13 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
   return "$rc"
 }
 
-# Status reclassification uses the same owned, deadline-bounded capture as
-# checks. The existing WATCHER_STALL_BOUND caps one classification; meanwhile
-# the main poll shell refreshes its beacon through run_owned_capture, including
-# a slow span reader or decision fold. A failed/expired read remains unclassified
-# and surfaces conservatively instead of committing a partial endpoint.
+# Status reclassification uses the same owned capture as checks, bounded by
+# inactivity rather than total time: a read that keeps making CPU progress runs
+# to completion however long it takes, and only one with no progress for
+# WATCHER_STALL_BOUND is stalled. Meanwhile the main poll shell refreshes its
+# beacon through run_owned_capture, including a slow span reader or decision
+# fold. A failed/stalled read remains unclassified and surfaces conservatively
+# instead of committing a partial endpoint.
 watcher_status_span_output() {
   local span_record='' span_needs=0 span_rc
   status_span_first_actionable_record "$1" "$2" span_record span_needs
@@ -2480,7 +2498,7 @@ watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
     return
   fi
   FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
-  run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
+  FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
     || { watcher_status_span_cleanup; return 2; }
   span_rc=$FM_CHECK_STATUS
   watcher_status_span_cleanup
