@@ -357,6 +357,27 @@ assert_site "S1 finds a deny event whose trailing comment says allow" "$SIG" 'E'
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "the allow event with a deny comment must not count as a site: $(site_ids "$SIG")"
 pass "the event's own decision argument decides, not the words around it"
 
+SIG=$(fixture sig_event_id_is_allow)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '"$DIR/fm-guard-event.sh" allow deny --source-ok true\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a deny event whose guard id is the word allow" "$SIG" 'E'
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/a.sh","match":"allow deny --source-ok"}]'
+assert_mapped "a deny event whose guard id is allow passes once a registered entry maps it" "$SIG" 1
+
+SIG=$(fixture sig_event_allow_punctuation)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'probe() { "$DIR/fm-guard-event.sh" some-guard allow; }\nprobe2() { "$DIR/fm-guard-event.sh" some-guard allow || true; }\nprobe3() { "$DIR/fm-guard-event.sh" other-guard deny; }\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds the deny event among allow events that end in shell punctuation" "$SIG" 'E'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the deny event may be a site; allow; and allow || true are allow events: $(site_ids "$SIG")"
+pass "a shell separator after the decision does not turn an allow event into a deny"
+
+SIG=$(fixture sig_event_wrapper)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'guard_event allow --source-ok true --cleared-by continue\nguard_event deny --source-ok true --repeat 1\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a deny wrapper call beside an allow wrapper call" "$SIG" 'E'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "only the deny wrapper call may be a site: $(site_ids "$SIG")"
+pass "a wrapper that takes the decision first is judged by that decision"
+
 SIG=$(fixture sig_oneline_event)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf 'probe() { "$DIR/fm-guard-event.sh" some-guard deny --source-ok true; }\n' >"$SIG/bin/a.sh"

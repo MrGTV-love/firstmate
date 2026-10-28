@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -39,7 +40,8 @@ HELPER_EXACT = ('deny', 'block_stop')
 DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\']')
 DENY_PERMISSION = re.compile(r'permissionDecisio[n].*deny')
 DENY_BLOCK = re.compile(r'\bblock\s*:\s*true\s*,')
-GUARD_EVENT = re.compile(r'(?:^|[\s"/(])(?:fm-guard-event\.sh|fm_guard_event|guard_event)"?\s+[a-z$]')
+GUARD_EVENT = re.compile(r'(?:^|[\s"/(])(?P<cmd>fm-guard-event\.sh|fm_guard_event|guard_event)"?\s+(?=[a-z$"\'])')
+DECISIONS = ('deny', 'warn', 'allow', 'error')
 EXIT_TWO = re.compile(r'^(?:.*(?:&&|\|\|)\s*)?exit 2\s*$')
 HEREDOC = re.compile(r'<<-?([\'"]?)([A-Z_][A-Z0-9_]*)\1')
 SH_DEF = re.compile(r'^\s*(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{?')
@@ -188,20 +190,40 @@ def is_docstring_open(stripped, prev_code):
     return prev_code is None or STRING.sub('S', prev_code).split('#', 1)[0].rstrip().endswith(':')
 
 
+def command_words(text):
+    """The words of one shell command: quoting is honored, and the command ends at ; & | ) } or a comment."""
+    try:
+        lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        words = []
+        for word in lexer:
+            if word.startswith('}') or set(word) <= set(';&|()<>'):
+                break
+            words.append(word)
+        return words
+    except ValueError:
+        return text.split()  # unbalanced quotes: the plain split still keeps the order of the arguments
+
+
 def event_denies(body):
     """True when a guard event call records a decision other than allow.
 
-    The decision is the event's own argument: one of the first two words after the
-    writer, which are the guard id and the decision, or the decision alone for a
-    wrapper. A word elsewhere on the line, a hyphenated guard id or a comment says nothing.
+    The writer takes <guard-id> <decision>, so its decision is its second argument
+    (bin/fm-guard-event.sh). A wrapper that takes the decision first is judged by
+    that first argument. The guard id, a later option, a comment or a following
+    command never decides: only a decision that is exactly allow is an allow event.
     """
     match = GUARD_EVENT.search(body)
     if not match:
         return False
     if re.search(r'\b(?:grep|egrep|sed|awk)\b', body[:match.start()]):
         return False  # a search for the writer's name, not a call to it
-    words = re.findall(r'"[^"]*"|\'[^\']*\'|\S+', body[match.end() - 1:])[:2]
-    return 'allow' not in [w.strip('"\'') for w in words]
+    args = command_words(body[match.end():])
+    if match.group('cmd') == 'fm-guard-event.sh':
+        decision = args[1] if len(args) > 1 else None
+    else:
+        decision = args[0] if args and args[0] in DECISIONS else (args[1] if len(args) > 1 else None)
+    return decision != 'allow'
 
 
 def embedded_kind(opener_line):
