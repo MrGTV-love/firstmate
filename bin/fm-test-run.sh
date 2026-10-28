@@ -457,7 +457,8 @@ family_for_basename() {
     fm-watch-triage-waits-declared.test.sh|fm-watch-triage-waits-pauses.test.sh|\
     fm-watch-triage-waits-away.test.sh|\
     fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
-    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh)
+    fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh|fm-work-progress.test.sh|\
+    fm-status-runaway-guard.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
     fm-afk-inject-herdr-e2e.test.sh|fm-afk-launch.test.sh|fm-backend-autodetect-smoke.test.sh|\
@@ -529,7 +530,8 @@ family_for_basename() {
     fm-secondmate-busy-contract-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
     fm-calm-pi-queue-retention-live-e2e.test.sh|\
-    fm-herdr-submit-confirm-live-e2e.test.sh|fm-task-docker-live-e2e.test.sh)
+    fm-herdr-submit-confirm-live-e2e.test.sh|fm-remote-secondmate-stay-live-e2e.test.sh|\
+    fm-task-docker-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
@@ -1137,6 +1139,7 @@ tests/fm-spawn-worktree-settle.test.sh 16334
 tests/fm-startup-growth-check.test.sh 7791
 tests/fm-startup-memory-budget.test.sh 13301
 tests/fm-startup-network.test.sh 103836
+tests/fm-status-runaway-guard.test.sh 199417
 tests/fm-stat-shadowing.test.sh 831
 tests/fm-stow-cascade.test.sh 4450
 tests/fm-supervision-events.test.sh 26115
@@ -1904,7 +1907,8 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-status-record-lib.sh|bin/fm-status-decision-lib.sh|\
-    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-file-identity-lib.sh|bin/fm-utc-lib.sh)
+    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-file-identity-lib.sh|bin/fm-utc-lib.sh|\
+    bin/fm-status-cap-lib.sh|bin/fm-status-cap-guard.sh|bin/fm-status-append.sh)
       printf '%s\n' pure-contract-unit
       printf '%s\n' standalone
       printf '%s\n' secondmate

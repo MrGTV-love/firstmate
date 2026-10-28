@@ -106,6 +106,9 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-task-inbox-lib.sh`   | Single owner of durable steering-inbox records, acknowledgement, doorbells, and the delivery-attempt ladder |
 | `fm-pending-reply-lib.sh` | Parent-owned secondmate pending-reply expectations, recovery, and keyed escalation lifecycle |
 | `fm-secondmate-report.sh` | Optional helper that resolves the parent channel itself and appends a correlated status or document-pointer report |
+| `fm-status-append.sh`    | Sanctioned worker append to a task status log: size-capped, refusing loudly with exit 75 at the cap or when the log stays locked past its 10 s lock wait |
+| `fm-status-cap-lib.sh`   | Single owner of the status-log size cap, the read limits and tail window, the capped append, and over-cap detection |
+| `fm-status-cap-guard.sh` | Investigate a status log or sidecar over the cap once: name its writer and growth, and stop each process holding it open for writing with SIGSTOP |
 | `fm-extension.mjs`       | Bind, inspect, verify, and strictly invoke trusted external process-event adapter packages |
 | `fm-extension-launch-barrier.mjs` | Publish one exact static core-owned invocation group before package code runs |
 | `fm-extension.sh`        | Expose extension binding commands through the tracked shell and remote-home command boundary |
@@ -175,7 +178,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pr-check.sh`         | Record validated task `pr=` and `pr_head=` values, then atomically arm a static merge poll; refuses GitHub drafts and persistent secondmate records (see [architecture.md](architecture.md)) |
 | `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a ten-second full ci log reading skipped for that pass when slower, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
 | `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions for GitHub, GitLab, or Forgejo, refuse Gerrit submission, then refuse an outcome it cannot prove landed or queued |
-| `fm-review-record.py`    | Append independent review evidence or explicit captain merge words to the PR task home; its header and `--help` own the record and relay interface |
+| `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |

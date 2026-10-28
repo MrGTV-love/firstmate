@@ -631,7 +631,10 @@ if [ -n "$RESOLVE_KEYS" ]; then
   fi
   RESOLVE_TASK_ID=$(fm_send_id_from_meta "$TARGET_META")
   RESOLVE_STATUS_FILE="$STATE/$RESOLVE_TASK_ID.status"
-  resolve_open_set=$(status_open_decisions "$RESOLVE_STATUS_FILE")
+  resolve_open_set=$(status_open_decisions "$RESOLVE_STATUS_FILE") || {
+    echo "error: --resolve-key cannot tell which decisions are open: $RESOLVE_STATUS_FILE is past the status read limits (bin/fm-status-cap-lib.sh), so an empty answer would be a guess; nothing was sent." >&2
+    exit 1
+  }
   for k in $RESOLVE_KEYS; do
     case "$resolve_open_set" in
     "$k"$'\t'* | *$'\n'"$k"$'\t'*)
@@ -718,7 +721,10 @@ fm_send_close_resolved_keys() { # <answer-text>
     echo "error: the answer was delivered to $T, but the close for decision key(s) '$RESOLVE_STATUS_KEYS' could not be appended to $RESOLVE_STATUS_FILE. Close it manually with: $manual_close_cmd - do not resend the answer." >&2
     return 1
   fi
-  still=$(status_open_decisions "$RESOLVE_STATUS_FILE")
+  still=$(status_open_decisions "$RESOLVE_STATUS_FILE") || {
+    echo "error: the answer was delivered to $T and the close for decision key(s) '$RESOLVE_STATUS_KEYS' was appended to $RESOLVE_STATUS_FILE, but that log is past the status read limits (bin/fm-status-cap-lib.sh), so whether the key(s) closed cannot be verified - do not resend the answer." >&2
+    return 1
+  }
   for k in $RESOLVE_STATUS_KEYS; do
     case "$still" in
     "$k"$'\t'* | *$'\n'"$k"$'\t'*)

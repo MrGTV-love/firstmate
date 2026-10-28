@@ -258,10 +258,10 @@ That factor is a local estimate, not a CI measurement, and it predates the other
 
 `tests/fm-pr-merge.test.sh` was the parallel lane's longest single script (1117958 ms in run 40121241146), so it set that lane's wall no matter how the rest packed.
 It is now a shared helpers module plus three groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
-The first group (50) is the review and captain-word authority with the GitHub outcome cases.
+The first group (50 at the split) is the review and captain-word authority with the GitHub outcome cases.
 The second group (49) is the GitLab, Forgejo, reporting, and backlog cases, plus the argument/URL and multi-PR edge cases that fell in that slice.
 The third group (50) is the check-run, rollup, waiver, and away-authority matrix.
-Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the 149-case cover.
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the exact case count of that cover.
 Only `tests/fm-pr-merge.test.sh` stays in the proven-isolated parallel set, with its hint first apportioned from the former hint by case share (370000 ms) pending the first measured artifact for it; the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced that estimate with a measured 401410 ms.
 `tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` stay in the `pr-forge` family but run in the portable serial remainder, because the 2026-10-24 portable-pool proof that would admit them did not pass cleanly ([isolation proof](fm-test-isolation-proof.md#fm-pr-merge-split-re-check)); their serial hints were apportioned estimates pending measurement, so the packer did not model them at the 45000 ms default, and the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced them with measured 196785 ms and 282357 ms.
 Both derive from 461903 ms, the former file's serial-era measurement in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843), where the parallel jobs ran their scripts serially: `fm-pr-merge-forges` takes its 49-of-148 case share, from before the former file's 149th case landed (152927 ms, rounded to 153000), and `fm-pr-merge-checks` takes its share of the three groups' 2026-10-24 portable-proof time, 302702 of 730151 ms (191493 ms, rounded to 191000), because its cases run longer than the case count suggests.
@@ -311,6 +311,10 @@ So the refreshed table reads 7 percent high in aggregate on that run, 24842598 m
 The 1200000 ms target therefore bounds the model, not the slowest real shard: it keeps the packing even and the workflow far inside the 60 minute job tier, and it does not claim that every shard finishes under 20 minutes.
 Bounding real shard walls instead would take the mean of several runs plus a variance term rather than the slowest sample, which is a change to the weight basis and not to this table.
 The seven-way concurrent evidence for the fm-lint groups in [fm-test-isolation-proof.md](fm-test-isolation-proof.md#fm-lint-split-re-check) still stands, and a full portable-pool isolation proof remains outstanding.
+
+The serial member `tests/fm-status-runaway-guard.test.sh` (199417 ms, one local run of `bin/fm-test-run.sh`, not a CI measurement) joins main's twenty-one serial shards with no shard change.
+On 2026-10-27, `bin/fm-test-run.sh --check-coverage` on that branch reported `serial_shards=21` and `serial_max_ms=1196944`, inside the 1200000 ms packing target.
+The packing target, the shard count and the 60-minute job timeout are unchanged.
 
 ## Portable serial remainder
 

@@ -423,6 +423,16 @@ The primary then takes these steps:
 4. It asks the remote host to launch on Herdr in `fm-remote`.
 
 All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+A live agent is retained, not restarted, even when its running profile differs from the requested profile.
+The parent reconciles its record to the host's confirmed harness and endpoint, retaining requested model and effort only for a confirmed fresh launch and leaving unreported reused-agent profile fields unknown.
+The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns the launch-outcome labels, including the conservative report for a host whose launch disposition is missing or unrecognized.
+
+### Release a background-task exit picker
+
+Use the ordinary [`stay` lifecycle command](agent-control.md#exit-and-the-background-task-picker) for a remote Claude second mate parked on that picker.
+The parent delegates to the owning host's local control plane, so the same picker, launch-ownership, and agent-alive proofs run beside the actual endpoint.
+This preserves the agent, its background work, the route, and unread steering; it does not perform a relaunch.
+Other parent-side lifecycle verbs retain their remote-placement refusal.
 
 ### Refused and unsupported launches
 
@@ -513,6 +523,7 @@ The remote charter appends replies to `state/parent-replies.status` in the remot
 The remote home's own outcome publishers append there too, through the channel contract in `bin/fm-parent-channel-lib.sh` ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
 The remote charter also names its steering inbox as `state/parent-route/<id>.inbox` in the remote home.
 That inbox is the record surface the routed transport writes to, so a steer never lands on a parent-home path the remote host cannot reach.
+The seed also rewrites every helper path under the parent's code root to the same script under `<remote-root>/bin`, so the status command in the charter runs the remote clone's `bin/fm-status-append.sh`, which is the size-capped writer, and never a path that exists only on the parent machine.
 
 ### How remote lines are mirrored
 
