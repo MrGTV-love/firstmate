@@ -1321,7 +1321,7 @@ test_a_log_at_the_read_limit_of_tiny_lines_costs_no_line_walk() {
   printf 'window=test:fm-a\nkind=secondmate\n' > "$state/a.meta"
   printf 'idle' > "$dir/pane.txt"
   printf 'working: a healthy lane\n' > "$other"
-  prime_status_seen "$state" "$status" && prime_status_seen "$state" "$other" || fail "could not record the logs as already seen"
+  { prime_status_seen "$state" "$status" && prime_status_seen "$state" "$other"; } || fail "could not record the logs as already seen"
   while IFS= read -r line; do env+=("$line"); done < <(stale_lane_env "$dir" a)
   watch_cap "$state" "$dir/first.out" FM_STATUS_CAP_BYTES="$FM_STATUS_CAP_BYTES" "${env[@]}"
   watch_pid=$!

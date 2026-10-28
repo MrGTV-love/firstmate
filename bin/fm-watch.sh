@@ -2853,12 +2853,14 @@ status_cap_tick() {
   # tick scans the file again, keeps its own writer and action, puts the held rate in
   # place of the near-zero one a stopped writer now shows, queues it and wakes.
   if [ "$BASH_SUBSHELL" -ne 0 ]; then
-    {
+    if ! {
       printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
       [ ! -f "$handoff" ] || awk '{ print "H\t" $0 }' "$handoff"
       printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
     } | status_cap_handoff_merge hold "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$handoff.tmp" \
-      && mv -f "$handoff.tmp" "$handoff" || rm -f "$handoff.tmp"
+      || ! mv -f "$handoff.tmp" "$handoff"; then
+      rm -f "$handoff.tmp"
+    fi
     return 0
   fi
   if [ -n "$held" ]; then
