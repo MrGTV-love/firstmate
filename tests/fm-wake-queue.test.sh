@@ -4291,11 +4291,7 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
-  "$FM_TEST_ONLY"
-  exit $?
-fi
+fm_test_only
 
 test_queued_preserves_rows_and_state_until_acknowledgement
 test_queued_empty_and_missing_state_succeed_without_writes

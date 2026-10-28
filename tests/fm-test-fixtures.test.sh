@@ -428,6 +428,148 @@ SH
   pass "fixture timing defaults off, preserves production evidence, and explicitly isolated samples survive re-sourcing"
 )
 
+# A throwaway test file that sources tests/lib.sh and selects cases the way the
+# real suites do, so the helper is exercised as a separate process with an exit
+# status, never read from source.
+write_selector_file() {  # <path> <env|positional|registered>
+  local path=$1 mode=$2
+  {
+    printf '#!/usr/bin/env bash\nset -u\n. "%s/tests/lib.sh"\n' "$ROOT"
+    cat <<'SH'
+test_alpha() { printf 'ran-alpha\n'; }
+test_beta() { printf 'ran-beta\n'; }
+test_returns_seven() { printf 'ran-returns-seven\n'; return 7; }
+test_calls_fail() { fail 'the case failed'; }
+test_unregistered() { printf 'ran-unregistered\n'; }
+helper_not_a_case() { printf 'ran-helper\n'; }
+SH
+    # shellcheck disable=SC2016 # The generated file expands these when it runs.
+    case "$mode" in
+      env) printf 'fm_test_only\ntest_alpha\ntest_beta\n' ;;
+      positional) printf 'if [ "$#" -gt 0 ]; then fm_test_run_cases -- "$@"; exit 0; fi\ntest_alpha\ntest_beta\n' ;;
+      registered) printf 'fm_test_before_case() { printf "before-%%s\\n" "$1"; }\ncases=(${FM_FIXTURE_CASES:-test_alpha test_beta})\nfm_test_run_cases "${cases[@]}" -- "$@"\n' ;;
+    esac
+  } >"$path"
+}
+
+test_single_case_selection() (
+  local dir="$TMP_ROOT/select" out err rc
+  mkdir -p "$dir"
+  write_selector_file "$dir/env.test.sh" env
+  write_selector_file "$dir/positional.test.sh" positional
+  write_selector_file "$dir/registered.test.sh" registered
+  run_file() {  # <env assignments...> -- <file> [args...]
+    local -a assignments=()
+    while [ "$1" != -- ]; do assignments+=("$1"); shift; done
+    shift
+    out=$(env "${assignments[@]}" bash "$@" 2>"$dir/err"); rc=$?
+    err=$(cat "$dir/err")
+  }
+
+  # An unknown name is refused, names the case, and runs nothing.
+  run_file FM_TEST_ONLY=test_renamed_away -- "$dir/env.test.sh"
+  [ "$rc" -eq 2 ] || fail "an unknown FM_TEST_ONLY case exited $rc, expected 2: $out $err"
+  case "$err" in *'Unknown test case: test_renamed_away'*) ;; *) fail "the refusal did not name the unknown case: $err" ;; esac
+  [ -z "$out" ] || fail "a refused selection still ran a case: $out"
+  run_file X=1 -- "$dir/positional.test.sh" test_alpha test_renamed_away
+  [ "$rc" -eq 2 ] || fail "an unknown positional case exited $rc, expected 2: $out $err"
+  [ -z "$out" ] || fail "a refused positional selection ran test_alpha before refusing: $out"
+  pass "an unknown case name is refused with a message naming it, exit 2, and no case runs"
+
+  # A name that is not a test_ function is never run as a command.
+  for name in helper_not_a_case rm test_ 'test_alpha;printf pwned' 'test alpha'; do
+    run_file "FM_TEST_ONLY=$name" -- "$dir/env.test.sh"
+    [ "$rc" -eq 2 ] || fail "FM_TEST_ONLY='$name' exited $rc, expected 2: $out $err"
+    [ -z "$out" ] || fail "FM_TEST_ONLY='$name' ran something: $out"
+  done
+  pass "a name that is not a defined test_ function is refused rather than executed"
+
+  # A known case runs alone and its own status is the file's status.
+  run_file FM_TEST_ONLY=test_beta -- "$dir/env.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = ran-beta ] || fail "a known passing case did not run alone and pass: rc=$rc out=$out"
+  run_file FM_TEST_ONLY=test_returns_seven -- "$dir/env.test.sh"
+  [ "$rc" -eq 7 ] || fail "a case returning 7 made the file exit $rc: $out"
+  run_file FM_TEST_ONLY=test_calls_fail -- "$dir/env.test.sh"
+  [ "$rc" -eq 1 ] || fail "a case calling fail made the file exit $rc: $out"
+  run_file FM_TEST_ONLY= -- "$dir/env.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = $'ran-alpha\nran-beta' ] || fail "an empty FM_TEST_ONLY did not run the whole file: rc=$rc out=$out"
+  pass "the selected case's own status is the file's status, and an empty selector runs everything"
+
+  # Positional selection without a registry runs the named test_ functions in the order given.
+  run_file X=1 -- "$dir/positional.test.sh" test_beta test_unregistered
+  [ "$rc" -eq 0 ] && [ "$out" = $'ran-beta\nran-unregistered' ] || fail "positional cases did not run in the order given: rc=$rc out=$out"
+  run_file X=1 -- "$dir/positional.test.sh" test_returns_seven test_alpha
+  [ "$rc" -eq 7 ] && [ "$out" = ran-returns-seven ] || fail "the first failing positional case did not end the file: rc=$rc out=$out"
+
+  # With a registry, only registered names are cases and they run in registration order.
+  run_file X=1 -- "$dir/registered.test.sh" test_beta test_alpha
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "registered cases did not run in registration order with the before hook: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh"
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "no request did not run every registered case: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh" test_unregistered
+  [ "$rc" -eq 2 ] && [ -z "$out" ] || fail "a defined but unregistered case was not refused: rc=$rc out=$out"
+  run_file FM_FIXTURE_CASES='test_alpha test_returns_seven test_beta' -- "$dir/registered.test.sh"
+  [ "$rc" -eq 7 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_returns_seven\nran-returns-seven' ] \
+    || fail "a registered case returning 7 did not end the full run: rc=$rc out=$out"
+  pass "a registry limits the cases, keeps registration order, runs the before hook, and stops at the first failing case"
+)
+
+# Every test file that selects cases refuses an unknown name. The list is
+# explicit because a file reaches the helper by calling it, which only running
+# the file can show; a new selecting file is added here.
+test_every_selector_refuses_an_unknown_case() (
+  local dir="$TMP_ROOT/selector-sweep" file kind rc count failures=''
+  local -a env_files=(
+    fm-arm-pretool-check fm-backend fm-fork-free-helpers fm-launch-proof fm-omp-harness
+    fm-procevent fm-public-followup fm-supervision-fork-budget fm-test-run
+    fm-wake-drain-open-decisions-cursor fm-wake-queue fm-watcher-lock fm-watch-triage
+    fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses
+    fm-watch-triage-waits-away
+  )
+  local -a positional_files=(
+    fm-backend-orca fm-backlog-atomicity fm-tasks-axi fm-teardown-endpoint-safety
+    fm-teardown fm-teardown-cleanup fm-teardown-pool fm-merge-prune fm-status-runaway-guard
+    fm-watch-open-loops fm-captain-hold-archive fm-captain-hold-cleanup
+    fm-captain-hold-keyed-answers fm-captain-hold-lifecycle fm-captain-hold-reconcile
+    fm-captain-hold-sweep fm-control-relaunch fm-control-relaunch-backends
+    fm-control-relaunch-recovery fm-lint fm-lint-policy fm-lint-report fm-lint-slots
+    fm-pr-merge fm-pr-merge-checks fm-pr-merge-forges
+  )
+  mkdir -p "$dir"
+  # Probe the files in batches: each run only sources its setup and refuses, so
+  # it has no orphans for the exit sweep to reap.
+  probe() {  # <kind> <file>
+    local rc
+    if [ "$1" = env ]; then
+      FM_TEST_SKIP_ORPHAN_REAP=1 FM_TEST_ONLY=no_such_case_xyz bash "$ROOT/tests/$2.test.sh" >"$dir/$2.out" 2>"$dir/$2.err" && rc=0 || rc=$?
+    else
+      FM_TEST_SKIP_ORPHAN_REAP=1 bash "$ROOT/tests/$2.test.sh" no_such_case_xyz >"$dir/$2.out" 2>"$dir/$2.err" && rc=0 || rc=$?
+    fi
+    printf '%s\n' "$rc" >"$dir/$2.rc"
+  }
+  count=0
+  for file in "${env_files[@]}"; do
+    probe env "$file" &
+    count=$((count + 1)); [ $((count % 8)) -ne 0 ] || wait
+  done
+  for file in "${positional_files[@]}"; do
+    probe positional "$file" &
+    count=$((count + 1)); [ $((count % 8)) -ne 0 ] || wait
+  done
+  wait
+  for file in "${env_files[@]}" "${positional_files[@]}"; do
+    kind=ok
+    rc=$(cat "$dir/$file.rc" 2>/dev/null || echo missing)
+    [ "$rc" = 2 ] || kind="exit $rc"
+    grep -q 'Unknown test case: no_such_case_xyz' "$dir/$file.err" || kind="$kind, no refusal message"
+    [ "$kind" = ok ] || failures="$failures $file ($kind);"
+  done
+  [ -z "$failures" ] || fail "these test files did not refuse an unknown case name with exit 2:$failures"
+  pass "all ${#env_files[@]} FM_TEST_ONLY files and all ${#positional_files[@]} positional-selector files refuse an unknown case name"
+)
+
 test_duration_fixture_isolation || fail "Fixture duration isolation"
 test_git_config_isolation || fail "Git fixture config isolation"
 test_inherited_git_location_isolation || fail "Git fixture location isolation"
@@ -439,3 +581,5 @@ test_fake_gh_and_gh_axi
 test_spawn_tmux_and_fakebin
 test_send_stubs_and_ssh
 test_spawn_home_layout
+test_single_case_selection || fail "Single-case selection"
+test_every_selector_refuses_an_unknown_case || fail "Selector sweep"

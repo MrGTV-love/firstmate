@@ -1353,13 +1353,7 @@ test_dispatcher_sources_orca_and_routes_primitives() {
 
 # Optional positional test function names select cases without changing the default suite.
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
-    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
-  done
-  for selected_test in "$@"; do
-    "$selected_test" || exit "$?"
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 

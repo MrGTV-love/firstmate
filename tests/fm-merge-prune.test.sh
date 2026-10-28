@@ -2941,11 +2941,7 @@ ALL_TESTS=(
   test_over_strict_mutations_are_caught
 )
 if [ "$#" -gt 0 ]; then
-  for name in "$@"; do
-    declare -F "$name" >/dev/null || fail "unknown test case: $name"
-  done
-  ALL_TESTS=("$@")
+  fm_test_run_cases -- "$@"
+else
+  fm_test_run_cases "${ALL_TESTS[@]}" --
 fi
-for name in "${ALL_TESTS[@]}"; do
-  "$name"
-done
