@@ -2176,23 +2176,21 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
 Its engine header owns the measured signals and every derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Every fresh spawn, including a new secondmate, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher, a required reading is unavailable, or the host's measured headroom is too small.
+Every fresh spawn, including a new secondmate, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher or a required reading is unavailable.
 A relaunch, or a respawn of a secondmate whose task record the home still holds, is recovery of existing work and is never refused.
 An unexpected native pressure level below 1 is an unreadable measurement, not a healthy one.
 
-The headroom test admits a start only when available memory (free, file-backed and purgeable pages, never compressed or swapped memory) minus this host's measured one-run peak stays at or above its measured headroom margin.
-A non-fleet outlier such as a leaking system daemon therefore refuses new work only by shrinking available memory, never by itself.
-Both numbers come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
-The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure, so a start that would leave less memory than the host already had while under pressure is refused.
-Until the host has recorded both, admission reports the headroom test as uncalibrated, the root home wakes once with the missing inputs, and only pressure and unreadable facts refuse; Firstmate never seeds or guesses either number and ships no universal cap.
-A run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
+Each reading also records available memory (free, file-backed and purgeable pages, never compressed or swapped memory) and shows this host's measured one-run peak and headroom margin, but neither refuses work yet.
+They come only from this host's own records: the root home's watcher probe records, in `state/.memory-calibration.json`, the largest resident process-tree total of every real run it observes, either a Firstmate task or a no-mistakes run, with its sample count, first and last time, largest gap between samples and samples with unreadable resident sizes, and the most available memory it has seen at native pressure 2 or higher.
+The one-run peak is the largest peak of any run seen in at least two readings, and the margin is that most available memory under pressure; until both exist the reading names the missing inputs, and Firstmate never seeds or guesses either number or ships a universal cap.
+These are recordings, not an admission statistic: one pressured sample sets the margin until the host name or RAM size changes, and a run's processes that cannot be attributed or read, such as pipeline work outside the run's worktree or another user's unreadable resident size, are omissions, so a recorded peak is a lower bound.
 No exhaustion experiment or stress run is needed or recommended; the records come from real work.
 
 The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and the root home reports that missing calibration once as a check wake.
 A reading with unreadable facts judges neither the baseline nor the headroom record, so a transient read failure is reported only as unavailable measurements.
 Only the root local home's watcher runs the periodic probe and publishes memory alarms; every home, including a confined worker's secondmate home, records its own admission readings in its own state and writes no other home's state.
 Before running `baseline` from the root home, let its watcher record readings over a known-healthy representative workload.
-The command derives the alarm boundary from those readings and records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings it names that missing input instead of writing a baseline.
+The command derives the alarm boundary from those readings and records how many there were, their time span and spread, and how many were incomplete; with fewer than two healthy readings, or readings whose largest non-fleet resident size never varies, it names that missing input instead of writing a baseline, so the alarm waits for real spread.
 An alarm starts when a non-fleet process exceeds the largest non-fleet resident size observed across those readings, and the episode lasts until that process is at or below the smallest per-reading maximum, the low end of the same measured variation, so a process moving around the boundary wakes once.
 The boundary is an observed envelope, not proof that every resident process is healthy, so investigate any already-oversized process before accepting it as normal.
 A matching baseline is never silently replaced as usage grows; an invalid baseline, or one recorded for a different host name or RAM size, is replaced by the next `baseline`.

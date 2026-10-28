@@ -29,13 +29,13 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
     most available memory seen at native pressure 2 or higher. Processes of
     a run outside both identities, such as other users' unreadable RSS, are
     omissions. A different host or RAM size starts a new record.
-  - Admission derives this host's one-run peak (the largest peak of any run
+  - Every reading shows this host's one-run peak (the largest peak of any run
     seen in at least two readings) and headroom margin (the most available
-    memory recorded under pressure) from that record, and defers a start when
-    available minus the peak is below the margin. A non-fleet outlier vetoes
-    admission only through that test. Until both inputs are recorded the host
-    is reported uncalibrated and only pressure and unreadable facts defer; no
-    peak or margin is ever seeded or guessed.
+    memory recorded under pressure) derived from that record, or the missing
+    inputs. They are recorded only and never refuse work: one pressured
+    sample sets the margin until the host or RAM size changes, so no
+    admission statistic is chosen from them yet. No peak or margin is ever
+    seeded or guessed.
   - The non-fleet RSS alarm is separate from admission: a missing, invalid or
     other-host baseline never defers work and is reported as calibration.
     A reading with errors judges neither record.
@@ -43,13 +43,15 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
     baseline file with no errors, native pressure 1, and this host/RAM/fixture:
     the boundary is the largest non-fleet RSS observed across them, and the
     record keeps the sample count, time span, smallest per-reading maximum,
-    share of RAM, and readings with unreadable RSS (lower bounds). At least two
-    such readings are required to observe any variation; fewer returns that
-    missing input. An alarm episode starts above the boundary and holds until
-    the process is at or below the smallest per-reading maximum, the low end of
-    the same measured variation. No RSS fraction, multiplier, hysteresis, swap
-    cutoff, or unused-memory cutoff is guessed. A matching baseline is retained
-    unchanged; an invalid or other-host baseline is replaced.
+    share of RAM, and readings with unreadable RSS (lower bounds). The
+    readings must show variation: fewer than two, or maxima that are all
+    equal, return that missing input, and a baseline without spread is
+    unusable, so the alarm waits for real spread. An alarm episode starts above
+    the boundary and holds until the process is at or below the smallest
+    per-reading maximum, the low end of the same measured variation. No RSS
+    fraction, multiplier, hysteresis, swap cutoff, or unused-memory cutoff is
+    guessed. A matching baseline is retained unchanged; an invalid, spreadless
+    or other-host baseline is replaced.
   - Readings must cover a known-healthy workload. A process already oversized
     when measured is part of the envelope; it is empirical, not a safe
     allocation bound, and an alarm is an observation, not a leak diagnosis.
@@ -501,17 +503,11 @@ def headroom_derive(path, report):
         return None, f"calibration {path} unusable: {exc}"
 
 
-def admission_evaluate(report, baseline, headroom):
-    """Pressure, unreadable facts or measured headroom defer new work; the RSS alarm never does."""
+def admission_evaluate(report, baseline):
+    """Pressure or unreadable facts defer new work; the recorded margin and RSS alarm never do."""
     reasons = list(report["errors"])
     if (report.get("pressure_level") or 0) >= 2:
         reasons.append(f"native memory pressure level {report['pressure_level']} (2 or higher defers)")
-    if headroom is not None:
-        spare = report["available_bytes"] - headroom["run_peak_bytes"]
-        if spare < headroom["headroom_bytes"]:
-            reasons.append(f"available {report['available_bytes']} bytes minus the measured one-run peak "
-                           f"{headroom['run_peak_bytes']} bytes leaves {spare} bytes, below this host's "
-                           f"measured headroom margin {headroom['headroom_bytes']} bytes")
     alarms, hold = [], []
     if baseline is not None:
         for p in report["processes"]:
@@ -545,6 +541,9 @@ def baseline_derive(report, readings_path):
         return None, (f"baseline needs at least two readings with no errors, native pressure 1, a readable "
                       f"non-fleet RSS and this host/RAM; {readings_path} plus this reading has {len(rows)}")
     maxima = [row["non_fleet_max_bytes"] for row in rows]
+    if min(maxima) == max(maxima):
+        return None, (f"baseline needs healthy readings whose largest non-fleet RSS varies; all {len(rows)} "
+                      f"readings in {readings_path} plus this reading show {maxima[0]} bytes")
     return {"schema": "fm-memory-baseline.v1", "checked_at": report["checked_at"],
             "host": report["host"], "total_bytes": report["total_bytes"],
             "non_fleet_max_bytes": max(maxima), "non_fleet_max_share": max(maxima) / report["total_bytes"],
@@ -573,8 +572,10 @@ def admission_main(argv):
         calibration_record(args.calibration, report)
     baseline, calibration = host_record(args.baseline, report, "baseline", "fm-memory-baseline.v1",
                                         ("non_fleet_max_bytes", "smallest_reading_max_bytes", "samples"))
+    if baseline is not None and baseline["smallest_reading_max_bytes"] >= baseline["non_fleet_max_bytes"]:
+        baseline, calibration = None, f"baseline {args.baseline} unusable: its readings show no spread"
     headroom, headroom_calibration = headroom_derive(args.calibration, report)
-    reasons, alarms, hold = admission_evaluate(report, baseline, headroom)
+    reasons, alarms, hold = admission_evaluate(report, baseline)
     # Only an explicit baseline operation writes the envelope; a matching one is
     # never silently re-learned, so a growing process cannot hide in it.
     if args.mode == "baseline" and not reasons:

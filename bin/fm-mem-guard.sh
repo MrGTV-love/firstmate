@@ -4,13 +4,12 @@
 #        fm-mem-guard.sh sample|baseline|admit|probe
 #        fm-mem-guard.sh run -- <new-run command...>
 # Legacy flags retain the fail-open diagnostic contract in the engine header.
-# sample records facts only; admit returns 75 if native pressure is 2 or higher,
-# required facts are unreadable, or this host's recorded run peaks and pressured
-# readings show that available memory minus one run's peak is below the margin.
-# No new work runs after that return, and no existing work is stopped. The
-# non-fleet RSS alarm baseline never affects that result. baseline derives the
-# alarm envelope from recorded healthy readings; the engine header owns every
-# record's contents and derivation.
+# sample records facts only; admit returns 75 if native pressure is 2 or higher
+# or required facts are unreadable. No new work runs after that return, and no
+# existing work is stopped. Neither the recorded one-run peak and headroom
+# margin shown in each reading nor the non-fleet RSS alarm baseline affects
+# that result. baseline derives the alarm envelope from recorded healthy
+# readings; the engine header owns every record's contents and derivation.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
 # cannot prevent supervising existing work. admit, run and sample only record a
 # reading in the invoking home's state.
@@ -18,8 +17,8 @@
 # nothing. It records the host's run and pressure calibration and queues
 # identifying check wakes through fm-wake-lib.sh in the root home's own queue.
 # An alarm episode is keyed by process name; an outlier is not a leak diagnosis
-# or restart authority. Unavailable facts and unavailable alarm or headroom
-# calibration each wake once per episode; a reading with errors cannot end one.
+# or restart authority. Unavailable facts and unavailable alarm calibration
+# each wake once per episode; a reading with errors cannot end one.
 # The invoking home's state owns memory-readings.jsonl; the root local home's
 # state owns .memory-alarmed, .memory-calibration.json, and the one host
 # .memory-baseline.json, which only the baseline command writes.
@@ -82,13 +81,6 @@ if [ "$mode" = probe ]; then
       active+='uncalibrated'$'\n'
       if ! printf '%s\n' "$previous" | grep -Fx uncalibrated >/dev/null; then
         fm_wake_append check memory-health-uncalibrated "check: memory-health: the non-fleet RSS alarm is uncalibrated ($calibration); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in $root." || exit 75
-      fi
-    fi
-    headroom_calibration=$(jq -r '.headroom_calibration // empty' <<<"$reading")
-    if [ -n "$headroom_calibration" ]; then
-      active+='headroom-uncalibrated'$'\n'
-      if ! printf '%s\n' "$previous" | grep -Fx headroom-uncalibrated >/dev/null; then
-        fm_wake_append check memory-health-headroom-uncalibrated "check: memory-health: the admission headroom test is uncalibrated ($headroom_calibration); new work is admitted on native pressure and readable facts alone until real runs and a pressured reading are recorded. See docs/configuration.md \"Host memory admission\"." || exit 75
       fi
     fi
     while IFS= read -r alarm; do

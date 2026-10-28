@@ -219,14 +219,16 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     assert report["headroom"] is None and report["available_bytes"] == 8*gib and queue() == ""
     call("probe")
     call("probe")
-    assert rows("memory-health-uncalibrated") == 1 and rows("memory-health-headroom-uncalibrated") == 1
-    assert "admission is unaffected" in queue() and "no reading at native pressure 2" in queue()
+    assert rows("memory-health-uncalibrated") == 1 and "admission is unaffected" in queue()
+    report = call("baseline",code=75)
+    assert any("varies" in r for r in report["reasons"]), report
+    assert not (state / ".memory-baseline.json").exists()
     facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
     call("sample")
     facts()
     baseline = call("baseline")["baseline"]
     assert baseline["non_fleet_max_bytes"] == gib and baseline["smallest_reading_max_bytes"] == gib//2, baseline
-    assert baseline["samples"] == 6 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
+    assert baseline["samples"] == 7 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
     report = call("admit")
     assert report["anonymous_bytes"] == 16*gib and report["compressor_bytes"] == gib//2
     assert report["unused_bytes"] == 1100*16384 and report["swap_used_bytes"] > 0
@@ -234,7 +236,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     original = (state / ".memory-baseline.json").read_bytes()
     call("baseline",code=75)
     assert (state / ".memory-baseline.json").read_bytes() == original
-    print("ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs two healthy readings and never silently grows")
+    print("ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs varying healthy readings and never silently grows")
 
     worker = subprocess.Popen(["sleep","120"])
     try:
@@ -266,7 +268,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     report = call("probe")
     assert len(report["alarms"]) == 1 and report["alarms"][0]["pid"] == 101
     assert rows("memory-health") == before+1
-    assert "xprotectd PID 101" in queue() and "across 6 healthy readings" in queue()
+    assert "xprotectd PID 101" in queue() and "across 7 healthy readings" in queue()
     assert "restarting any system daemon requires" in queue()
     facts(rss=[{**daemon,"pid":102,"started":"start-102","rss_bytes":gib+2},dict(fleet),dict(child)])
     call("probe")
@@ -299,6 +301,9 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     (state / ".memory-baseline.json").write_text('{"invalid":true}')
     report = call("admit")
     assert "unusable" in report["calibration"] and report["admission"] == "admit"
+    (state / ".memory-baseline.json").write_text(json.dumps({**baseline, "smallest_reading_max_bytes":gib}))
+    report = call("admit")
+    assert "no spread" in report["calibration"] and report["alarms"] == []
     (state / ".memory-baseline.json").write_text(json.dumps({**baseline, "host":"other-host"}))
     report = call("admit")
     assert "not host" in report["calibration"] and report["admission"] == "admit"
@@ -353,25 +358,28 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     record = json.loads((calib / "state/.memory-calibration.json").read_text())
     assert record["runs"]["task:a"]["first_seen"] < record["runs"]["task:a"]["last_seen"]
     assert record["runs"]["task:a"]["max_gap_seconds"] > 0 and record["pressured"]["highest_level"] == 2
-    facts(rss=run_rows(gib), available=6*gib + gib*7//2 - 1)
-    report = call("admit",code=75,environ=calib_env)
-    assert any("below this host's measured headroom margin" in r for r in report["reasons"]), report
-    facts(rss=run_rows(gib), available=6*gib + gib*7//2)
-    call("admit",environ=calib_env)
-    print("ok - probes record each run's resident-tree peak, samples, span, gaps and omissions, and derive the one-run peak and pressured margin used by admission")
+    facts(rss=run_rows(gib), available=gib)
+    report = call("admit",environ=calib_env)
+    assert report["reasons"] == [] and report["headroom"]["headroom_bytes"] == 6*gib, report
+    print("ok - probes record each run's resident-tree peak, samples, span, gaps and omissions; the derived peak and margin are shown but never refuse normal-pressure work")
 
     # Studio fixture from JetsamEvent-2026-10-27-113941.ips (sha256
     # 907ef8e738586a5434f9884c3f928dcadc8c075711de979db5bc75614684d8f7),
     # 16384-byte pages. Recorded there: xprotectd 2910176 resident pages; all
     # listed processes 6586830; the terminal coalition holding the 12 runs
-    # 701024; wired 450714; compressor 440477; 7912 low-swap kills. It does not
-    # record RAM size (128 GiB is from the incident report), a native pressure
-    # level, process parents, run identity, or any run's peak. So this fixture
-    # splits that coalition evenly into 12 runs, estimates available memory
-    # before the kills as RAM minus all listed resident, wired and compressor
-    # pages (shared pages make that a lower bound), and represents the kills as
-    # level-4 readings. It proves the incident-shaped decision only; it is not
-    # recorded whole-run telemetry or a deployed calibration.
+    # 701024; wired 450714; compressor 440477; 7912 low-swap kills; and
+    # memoryStatus.memoryPages free 4488434, fileBacked 1306749, purgeable
+    # 73987, anonymous 1831731 and speculative 181265. The report does not say
+    # when memoryPages was taken relative to the kills, and those counters give
+    # about 89.6 GiB available by this code's formula, so this fixture does not
+    # use them. It does not record RAM size (128 GiB is from the incident
+    # report), a native pressure level, process parents, run identity, or any
+    # run's peak. So this fixture splits that coalition evenly into 12 runs,
+    # ESTIMATES available memory before the kills as RAM minus all listed
+    # resident, wired and compressor pages (shared pages make that a lower
+    # bound), and represents the kills as level-4 readings. The estimate is not
+    # the report's own available-memory reading, and nothing here is recorded
+    # whole-run telemetry, a calibrated refusal, or live target-host proof.
     page = 16384
     studio = home / "studio"
     (studio / "state").mkdir(parents=True)
@@ -380,29 +388,23 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     available = (128*gib//page - 6586830 - 450714 - 440477)*page
     runs = [{"pid":300+n, "ppid":1, "comm":"no-mistakes", "started":f"start-{300+n}",
              "rss_bytes":run_bytes, "fleet":True, "run":f"no-mistakes:studio/run-{n}"} for n in range(12)]
-    def studio_facts(outlier, pressure=1):
-        facts(pressure=pressure, total=128*gib, available=available + 2910176*page - outlier,
-              rss=[{**daemon,"rss_bytes":outlier}] + [dict(row) for row in runs])
-    studio_facts(2910176*page)
-    report = call("admit",environ=studio_env)
-    assert report["admission"] == "admit" and "no calibration" in report["headroom_calibration"]
-    studio_facts(2910176*page, pressure=4)
+    def studio_facts(pressure=1):
+        facts(pressure=pressure, total=128*gib, available=available,
+              rss=[{**daemon,"rss_bytes":2910176*page}] + [dict(row) for row in runs])
+    studio_facts(pressure=4)
     call("probe",environ=studio_env)
     call("probe",environ=studio_env)
-    studio_facts(2910176*page)
-    report = call("admit",code=75,environ=studio_env)
-    assert report["headroom"]["run_peak_bytes"] == run_bytes and report["headroom"]["headroom_bytes"] == available
-    assert any("below this host's measured headroom margin" in r for r in report["reasons"]), report
+    studio_facts()
     ran = home / "studio-run"
     launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
-    call("run",*launch,code=75,environ=studio_env)
-    assert not ran.exists()
-    # The daily reports put xprotectd at 0.01 GiB on 2026-10-21.
-    studio_facts(gib//100)
-    assert call("admit",environ=studio_env)["reasons"] == []
+    report = call("admit",environ=studio_env)
+    assert report["headroom"]["run_peak_bytes"] == run_bytes and report["headroom"]["headroom_bytes"] == available
+    assert report["reasons"] == [], report
     call("run",*launch,environ=studio_env)
     assert ran.exists()
-    studio_facts(gib//100, pressure=2)
-    call("admit",code=75,environ=studio_env)
-    print("ok - 113941 Studio fixture: uncalibrated admits on pressure alone; once recorded, the 44 GiB outlier refuses the 13th start only through headroom; ample headroom admits; pressure 2 still refuses")
+    ran.unlink()
+    studio_facts(pressure=2)
+    call("run",*launch,code=75,environ=studio_env)
+    assert not ran.exists()
+    print("ok - estimated 113941 Studio shape: the margin is recorded and shown but a normal-pressure 13th start is admitted; pressure 2 still refuses")
 PY
