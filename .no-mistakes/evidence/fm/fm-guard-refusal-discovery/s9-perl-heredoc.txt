@@ -1,0 +1,18 @@
+=== S9 perl heredoc refusals: before (HEAD^ scanner) vs after (HEAD scanner), same tree
+before:
+  bin/fm-status-cap-lib.sh:126 entry=status-log-size-cap
+  bin/fm-status-cap-lib.sh:163 entry=status-log-size-cap
+after:
+  bin/fm-status-cap-lib.sh:126 entry=status-log-size-cap
+  bin/fm-status-cap-lib.sh:163 entry=status-log-size-cap
+  bin/fm-status-cap-lib.sh:229 entry=status-log-size-cap
+  bin/fm-status-cap-lib.sh:242 entry=status-log-size-cap
+
+=== S9b adversarial: a new perl heredoc refusal in a new file (tag not PERL, opener names perl) is a site and fails the lint
+  site bin/fm-lab-perl.sh:3 sig=B :: print STDERR "fm-lab: refused: lab lock held\n";
+VIOLATION S1 site:bin/fm-lab-perl.sh:659a7f13f9: bin/fm-lab-perl.sh:3 [B] print STDERR "fm-lab: refused: lab lock held\\n"; maps to no registry entry: add a sites marker to the guard that owns it
+new-or-touched exit=0
+lab clean:        0 changes
+perl -e "$(cat <<'BODY'
+S9b new-or-touched exit=1
+lab clean:        0 changes

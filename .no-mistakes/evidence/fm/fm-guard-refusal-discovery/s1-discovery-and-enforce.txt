@@ -1,0 +1,41 @@
+$ python3 bin/fm-guard-sites.py | jq (both guards from the intent)
+exit=0
+bin/fm-task-copy-lib.sh:672 sig=B entry=null :: echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+bin/fm-teardown.sh:4017 sig=A,B entry=null :: echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociati
+bin/fm-teardown.sh:4049 sig=A,B entry=null :: echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
+
+$ perl heredoc sites in bin/fm-status-cap-lib.sh
+bin/fm-status-append.sh:44 sig=B entry=status-log-size-cap :: echo "fm-status-append: refusing a symbolic link: $FILE" >&2
+bin/fm-status-cap-lib.sh:126 sig=B entry=status-log-size-cap :: echo "fm-status: refused to read ${1##*/}: a span of $2 bytes is past the read limit of $__fm_ra_limit bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, o
+bin/fm-status-cap-lib.sh:163 sig=B entry=status-log-size-cap :: echo "fm-status: refused to read ${f##*/}: a span of more than $lines lines is past the line-by-line read limit; nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane 
+bin/fm-status-cap-lib.sh:229 sig=B entry=status-log-size-cap :: print STDERR "fm-status-append: refused: $path stayed locked by another writer for $lock_secs s; nothing was written\n";
+bin/fm-status-cap-lib.sh:242 sig=B entry=status-log-size-cap :: print STDERR "fm-status-append: refused: $path is $size bytes and this line would pass the limit of $limit bytes (cap $cap, reserve $reserve for decision and terminal lines)\n";
+
+$ sed -n 225,245p bin/fm-status-cap-lib.sh
+my $lock_deadline = time + $lock_secs;
+until (flock($fh, LOCK_EX | LOCK_NB)) {
+    ($!{EWOULDBLOCK} || $!{EAGAIN}) or do { print STDERR "fm-status-append: cannot lock $path: $!\n"; exit 1 };
+    if (time >= $lock_deadline) {
+        print STDERR "fm-status-append: refused: $path stayed locked by another writer for $lock_secs s; nothing was written\n";
+        exit 75;
+    }
+    sleep 0.01;
+}
+
+my $rc = 0;
+for my $line (@lines) {
+    my $size = (stat($fh))[7];
+    my $frame = ($size > 0 && !ends_with_newline($fh, $size)) ? "\n" : '';
+    my $out = $frame . $line . "\n";
+    my $limit = $reserve_verb{line_verb($line)} ? $cap + $reserve : $cap;
+    if ($size + length($out) > $limit) {
+        print STDERR "fm-status-append: refused: $path is $size bytes and this line would pass the limit of $limit bytes (cap $cap, reserve $reserve for decision and terminal lines)\n";
+        $rc = 75;
+        next;
+    }
+
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=37 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=10 sites=893 mapped=50
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+exit=0

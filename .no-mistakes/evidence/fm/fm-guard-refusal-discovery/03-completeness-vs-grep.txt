@@ -1,0 +1,148 @@
+independent git grep 'REFUSED:' lines in code files under default dirs: 199
+not reported as a site by fm-guard-sites.py: 0
+--- sample of misses ---
+
+independent case-insensitive word grep refuse/refuses/refused/refusing in code files: 1826
+not reported as a site: 1067
+  of which comment lines: 927 other: 140
+--- non-comment misses ---
+.pi/extensions/fm-primary-pi-watch.ts:728: lifecycle("arm-refused", { reason: "superseded-instance", current: instance.current()?.id });
+bin/backends/herdr-server-start.py:17: start or absence proof is refused (unknown status, live process or socket, or
+bin/backends/herdr-server-start.py:22: Unknown status, process inventory, socket identity, or socket errors refuse.
+bin/backends/herdr.sh:1077: refuse)
+bin/fm-afk-contract.sh:317: if (version != "1" || ($0 != "clauses:" && $0 != "refused:" && $0 != "merge_grants:")) {
+bin/fm-afk-contract.sh:641: clauses|flags|refused|grants)
+bin/fm-branch-prompt.sh:52: A refused claim means MAIN is acting on that task right now: do not work around it; report the event with what you observed and let the next wake retry.
+bin/fm-branch-prompt.sh:69: Claim the task's lease and run `bin/fm-teardown.sh <task>` with no flags: the script proves the work landed and refuses otherwise, so a refusal is reported with its exact
+bin/fm-branch-prompt.sh:72: A second mate's status log is a relay channel for its child work, not a record of its own completion: a `done:` or merged-PR line there is a child's outcome, never the se
+bin/fm-branch-prompt.sh:106: - merge a PR or land local-only work (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh` refuse your actor);
+bin/fm-branch-prompt.sh:107: - spawn new tasks or workers (`bin/fm-spawn.sh` refuses your actor);
+bin/fm-branch-prompt.sh:108: - answer a decision or an ask-user finding (`bin/fm-send.sh --resolve-key` refuses your actor for a decision key), approve anything, or exercise any captain authority;
+bin/fm-branch-prompt.sh:124: A red pull request, or one with a required check that has not reported, is never merged while away, whatever the words say, and `--allow-red` and `--allow-missing` are re
+bin/fm-branch-prompt.sh:128: - `bin/fm-merge-local.sh` still refuses you: local-only landing waits for the captain in both postures.
+bin/fm-branch-prompt.sh:131: The never-set is absolute for every actor in every posture: credential entry, legal or financial acceptance, an attended prompt, any discard the captain did not name, and
+bin/fm-branch-prompt.sh:142: The report surface refuses a task the wake being handled did not name, fleet included (a heartbeat review is not scoped by task); a refusal means you reached for a task f
+bin/fm-branch-report.sh:61: refuse() {
+bin/fm-brief.sh:512: In Claude Code that `until` loop in a single Bash call is the sanctioned foreground wait: when the harness refuses a sleep-then-check command and points you at background
+bin/fm-brief.sh:648: '   It re-checks refuse-default immediately before stop and again immediately before delete, and fails closed on ambiguity.' \
+bin/fm-brief.sh:649: '4. If an experiment requires a deliberate mid-run session stop, use only `"$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION"`; it performs the same immediate refuse-default c
+bin/fm-brief.sh:689: `no-mistakes axi status`. If the daemon socket refuses connections or is missing, append
+bin/fm-claude-stop-autoarm.sh:313: [ "$1" != refused ] || recovery=$HELD_CLOSE_RECOVERY
+bin/fm-claude-stop-autoarm.sh:613: autoarm_record refused
+bin/fm-claude-trust.sh:261: . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/fm-gate-refuse-lib.sh"
+bin/fm-contributions.sh:230: shift # REST reads are conditional, record the quota headers, and refuse below the floor
+bin/fm-control.sh:286: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-copy-sweep.sh:320: . "$SCRIPT_DIR/fm-refuse-lib.sh"
+bin/fm-dod-lib.sh:776: ${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - that is not a failure: reattach at onc
+bin/fm-dod-lib.sh:782: ${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - reattach at once by re-running \`no-mi
+bin/fm-dod-lib.sh:821: 1. Run \`git fetch origin\` so the server's branch tip is in this repository; \`gerrit-axi\` reads its base off the server and refuses when that tip is not here.
+bin/fm-dod-lib.sh:831: A \`done:\` whose URL is not the canonical \`https://<host>/c/<project>/+/<number>\` change URL is refused.
+bin/fm-dod-lib.sh:908: Your ready report is refused while the run still holds your branch, while its outcome is missing or not passing, or while your HEAD's tree differs from the run's result.
+bin/fm-dsh.py:49: check HARNESS MODEL [PROVIDER] requires dsh for DeepSeek and refuses dsh
+bin/fm-duration.py:25: confined worker's sandbox refuses to execute setuid ps, the process table, the
+bin/fm-duration.py:59: change a project copy. A refused location prints one stderr line, records
+bin/fm-duration.py:160: FM_TEST_KEY_SLOTS or FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit
+bin/fm-duration.py:229: REFUSED = []
+bin/fm-duration.py:274: def refuse(reason):
+bin/fm-duration.py:276: REFUSED.append(reason)
+bin/fm-duration.py:592: sandbox refuses to execute setuid ps; the flag is True when ps ran."""
+bin/fm-fleet-snapshot.sh:739: fm_status_read_allowed "$source" "$size" || { : > "$destination.refused"; return 0; }
+bin/fm-fleet-snapshot.sh:749: : > "$destination.refused"
+bin/fm-fleet-snapshot.sh:970: [ ! -e "$status_log.refused" ] || open_decisions_unreadable=true
+bin/fm-gate-refuse-lib.sh:176: echo "fm-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
+bin/fm-git-secrets.py:14: commit, so its lines are inspected and can be falsely refused. Pre-push
+bin/fm-git-secrets.py:25: refused. Exit 1 refuses the Git operation, including when inspection fails;
+bin/fm-git-secrets.py:138: def refused(added):
+bin/fm-git-secrets.py:212: for path, fingerprint in refused(added):
+bin/fm-git-strip-ai-trailers.sh:176: echo "fm-git-strip-ai-trailers: cannot resolve this repository's hooks directory; refusing to skip its \$name hook" >&2
+bin/fm-guard-sites.py:175: """The message part of a shell case arm; a pattern such as *"connection refused"*) tests text and does not emit it."""
+bin/fm-herdr-lab-viewer.py:6: refuse-default checks still apply.
+bin/fm-herdr-lab-viewer.py:18: ``SCRUBBED_ENV`` below. Herdr refuses to launch a nested viewer inside one of
+bin/fm-idle-reap-lib.sh:39: [ "$version" = fm-idle-reap-refused-v1 ] || return 1
+bin/fm-idle-reap-lib.sh:108: && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+bin/fm-idle-reap-lib.sh:109: IDLE_REAP_CLASS=refused
+bin/fm-idle-reap-lib.sh:203: && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+bin/fm-idle-reap-lib.sh:204: IDLE_REAP_CLASS=refused
+bin/fm-idle-session-reap.sh:132: tmp=$(mktemp "$REAP_DIR/.refused.XXXXXX" 2>/dev/null) || return 0
+bin/fm-idle-session-reap.sh:133: if printf 'fm-idle-reap-refused-v1\n%s\n%s\n%s\n' "$NOW" "$2" "$(clean_detail "$3")" > "$tmp" \
+bin/fm-idle-session-reap.sh:134: && chmod 0600 "$tmp" && mv -f -- "$tmp" "$REAP_DIR/$1.refused"; then
+bin/fm-idle-session-reap.sh:145: for memo in "$REAP_DIR"/*.refused; do
+bin/fm-idle-session-reap.sh:148: id=${id%.refused}
+bin/fm-idle-session-reap.sh:222: REFUSED*|error:*|refused*)
+bin/fm-idle-session-reap.sh:238: rm -f -- "$REAP_DIR/$id.refused"
+bin/fm-idle-session-reap.sh:262: add_row teardown-refused "$id" - - "$reason"
+bin/fm-inbox.sh:527: emit_note_json refused "$id" "" 1 unknown "$path"
+bin/fm-jev-guard.ts:234: if (device.effect === "refused") {
+bin/fm-kimi-turnend-hook.sh:99: def refuse(reason: str) -> None:
+bin/fm-lab-home.sh:43: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-lint.sh:1078: bin/fm-gate-refuse-lib.sh	167
+bin/fm-lint.sh:1364: tests/fm-gate-refuse.test.sh	1419
+bin/fm-live-lab.sh:140: load_lab() {  # <root>: refuse anything up did not build, then load its record
+bin/fm-merge-prune.sh:284: REFUSED*|error:*|refused*) printf '%s' "$line"; return 0 ;;
+bin/fm-merge-prune.sh:317: REFUSED*|error:*|refused*) ;;
+bin/fm-model-index.sh:126: check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
+bin/fm-pr-ready-reconcile.sh:83: local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
+bin/fm-pr-ready-reconcile.sh:145: || fm_wake_append check "pr-ready-refused:$id" \
+bin/fm-proc-budget-memory.py:143: against its kernel start timestamp before a signal is sent. A refused
+bin/fm-proc-guard.py:5: The kernel refuses fork() with EAGAIN once the user's process count reaches
+bin/fm-proc-info.py:2: """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
+bin/fm-public-followup.sh:480: Replace each placeholder with its exact value; the emit command refuses any
+bin/fm-public-followup.sh:783: reason=${reason:-tasks-axi refused the event}
+bin/fm-raw-launch.py:24: Command/process substitutions, here-strings and shell control structures refuse
+bin/fm-raw-launch.py:25: with a remedy rather than guessing; unterminated quotes/documents also refuse.
+bin/fm-raw-launch.py:30: refuses, because it can name a program this check cannot see. Expansion flags,
+bin/fm-raw-launch.py:31: a forced pattern and the forced `$~`, `$=` or `$^` forms refuse everywhere,
+bin/fm-raw-launch.py:34: [...] bracket pattern or brace characters) or that sets its own --session-id refuses too,
+bin/fm-raw-launch.py:119: def refuse(construct):
+bin/fm-raw-launch.py:126: A forced pattern or splitting form refuses, because zsh turns such a value
+bin/fm-raw-launch.py:395: change (cd or pushd) read so far, which refuses a later claude."""
+bin/fm-reboot-recover.sh:43: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-refuse-lib.sh:35: "${FM_FRICTION_REVISION_FILE:-$FM_REFUSE_LIB_DIR/fm-refuse-lib.sh}" || true
+bin/fm-review-record.py:94: captain's own turn. captain-word itself refuses (exit 2) while the state directory
+bin/fm-review-record.py:97: after return; a quiet record does not refuse, because the captain is present, and
+bin/fm-send.sh:223: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-session-launch-policy-lib.sh:51: key="session-launch-refused-$id-$generation-${fingerprint// /-}"
+bin/fm-session-launch-policy-lib.sh:56: marker="$state/.session-launch-refused-$id"
+bin/fm-sessionstart-nudge.sh:14: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-sessionstart-run.sh:57: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-spawn.sh:1014: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-startup-network.sh:201: held_by() {  # human-readable holder of the lock the last take_lock refused
+bin/fm-status-cap-lib.sh:229: print STDERR "fm-status-append: refused: $path stayed locked by another writer for $lock_secs s; nothing was written\n";
+bin/fm-status-cap-lib.sh:242: print STDERR "fm-status-append: refused: $path is $size bytes and this line would pass the limit of $limit bytes (cap $cap, reserve $reserve for decision and terminal lin
+bin/fm-teardown.sh:660: fm-gate-refuse-lib.sh \
+bin/fm-teardown.sh:677: fm-refuse-lib.sh \
+bin/fm-teardown.sh:699: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-teardown.sh:749: . "$SCRIPT_DIR/fm-refuse-lib.sh"
+bin/fm-teardown.sh:1619: "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
+bin/fm-teardown.sh:2032: "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
+bin/fm-teardown.sh:2735: local task=$1 slot=$2 canonical_slot inventory field copy known allowed refused=0
+bin/fm-teardown.sh:2757: refused=1
+bin/fm-teardown.sh:2770: if [ "$refused" = 1 ]; then
+bin/fm-teardown.sh:6152: "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
+bin/fm-test-run.sh:492: fm-bootstrap.test.sh|fm-bootstrap-network-parallel.test.sh|fm-fleet-sync.test.sh|fm-gate-refuse.test.sh|fm-gotmp.test.sh|\
+bin/fm-test-run.sh:962: tests/fm-gate-refuse.test.sh 16047
+bin/fm-test-run.sh:1983: bin/fm-gate-refuse*|bin/fm-lock*)
+bin/fm-voice-client.py:34: --listen open-mic is accepted as a setting and REFUSES at startup. Streaming
+bin/fm-voice-client.py:40: it on later is a small change rather than a new flag, and refusing is honest
+bin/fm-voice-client.py:66: open-mic is accepted and refuses; see above.
+bin/fm-voice-client.py:505: """Open a device-backed end of the audio, or refuse in one line with a next step.
+bin/fm-voice-client.py:573: A startup that refuses part way through releases whatever it already
+bin/fm-voice-client.py:706: refused before there was an output at all.
+bin/fm-voice-relay.py:46: variable, and a missing one refuses with the path to write rather than reaching
+bin/fm-voice-relay.py:253: from, so a stale one is still the best answer available, and refusing it
+bin/fm-voice-relay.py:287: """Return (credentials, expiry) exported from an AWS profile, or refuse by name."""
+bin/fm-voice-relay.py:328: refuse for itself.
+bin/fm-voice-relay.py:1204: """Fill in what this home configures, refusing rather than guessing.
+bin/fm-wake-lib.sh:2447: if [ "$FM_AUTOARM_OUTCOME" = refused ]; then
+bin/fm-watch-arm.sh:115: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+bin/fm-write-confinement.py:18: every folder above it also refuses rename and deletion. --data is this task's
+bin/fm-x-followup.sh:90: Unknown options and extra text arguments are refused before checking the link.
+bin/fm-x-reply.sh:139: Unknown options and extra text arguments are refused before posting.
+bin/fm_model_picker/aadb.py:244: """Calibration tables FIRST, then the benchmark matrix. Idempotent; refuses a newer schema."""
+bin/fm_model_picker/embedded.py:230: taken, refused = check_objects([obj(s, "N") for s in plain + unsafe])
+bin/fm_model_picker/embedded.py:232: assert len(refused) == len(unsafe) and all("slug" in r["reason"] for r in refused), "a slug that is not a plain word is rejected with a reason"
+bin/fm_model_picker/shadow.py:243: family's creator must both match, else the projection is refused."""
+bin/fm_open_loops.py:1645: return int(any(result[3] == "refused" for result in results))
+bin/fm_slack_watch.py:488: if not pending['accepted'] and not any(line.startswith(('skipped: ', 'refused: ')) for line in lines):
+bin/fm_slack_watch.py:817: if state == 'refused' and command != 'check':
+bin/fm_voice_records.py:237: """Return a setting, or refuse naming the file to write and the variable to set."""

@@ -1,0 +1,4 @@
+# Independent search: every git-visible REFUSED: line in the default dirs (tests/fixtures excluded) vs scan sites with sig A
+independent REFUSED: lines:      199
+scan sites total:      893
+REFUSED: lines the scan does not list:

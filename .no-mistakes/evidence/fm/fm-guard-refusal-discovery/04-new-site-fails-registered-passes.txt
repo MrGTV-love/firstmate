@@ -1,0 +1,52 @@
+## S3 new unregistered refusal inside an already-registered owner file (bin/fm-status-append.sh, owner of status-log-size-cap)
+ bin/fm-status-append.sh | 1 +
+ 1 file changed, 1 insertion(+)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-status-append.sh:48ab4d70e7: bin/fm-status-append.sh:45 [A,B] echo "REFUSED: lab fixture appends a brand new unmapped refusal" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=844 allowlisted=843 stale=0 shown=1 sites=892
+exit=1
+
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S1 site:bin/fm-status-append.sh:48ab4d70e7: bin/fm-status-append.sh:45 [A,B] echo "REFUSED: lab fixture appends a brand new unmapped refusal" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=843 stale=0 shown=1 sites=892
+exit=1
+
+## S3b same site committed; CI shape: --base HEAD^1
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+VIOLATION S1 site:bin/fm-status-append.sh:48ab4d70e7: bin/fm-status-append.sh:45 [A,B] echo "REFUSED: lab fixture appends a brand new unmapped refusal" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=844 allowlisted=843 stale=0 shown=1 sites=892
+exit=1
+
+## S3c sneak: put the new site in the allowlist instead of registering it
+new site key: site:bin/fm-status-append.sh:48ab4d70e7
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=844 allowlisted=844 stale=0 shown=0 sites=892
+VIOLATION S1 site:bin/fm-status-append.sh:48ab4d70e7: bin/fm-status-append.sh:45 [A,B] echo "REFUSED: lab fixture appends a brand new unmapped refusal" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-status-append.sh:48ab4d70e7: allowlist entry S1 is not in HEAD^1; the allowlist may only shrink
+exit=1
+
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=0 shown=0 sites=892
+exit=0
+
+## S4 register the same site: sites marker on the full-spec guard status-log-size-cap
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=892
+exit=0
+
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO inventory: active=37 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=10 sites=892 mapped=49
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=892
+exit=0
+
+## S2 adversarial: a second new site that the existing marker would silently absorb
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S2 status-log-size-cap: site marker 'brand new unmapped refusal' in bin/fm-status-append.sh matches 2 sites, the entry declares 1; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=new-or-touched guards=37 violations=844 allowlisted=843 stale=0 shown=1 sites=893
+exit=1
+
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S2 status-log-size-cap: site marker 'brand new unmapped refusal' in bin/fm-status-append.sh matches 2 sites, the entry declares 1; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=843 stale=0 shown=1 sites=893
+exit=1
+
