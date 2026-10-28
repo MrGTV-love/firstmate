@@ -1770,7 +1770,7 @@ test_a_base_tip_that_moves_before_the_merge_refuses() {
   set -e
 
   expect_code 1 "$rc" "tip-moves: a base tip that moved before the merge must refuse"
-  assert_grep "base branch main moved from $verified to $moved after head $head was verified" \
+  assert_grep "base branch main is at $moved, not the tip $verified that head $head was verified to contain" \
     "$case_dir/stderr" \
     "tip-moves: the refusal did not name the verified and the moved tip"
   assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
@@ -1841,6 +1841,96 @@ test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried() {
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "lacks-tip-unreported: gh pr merge ran on a tree no check ran on"
   pass "fm-pr-merge refuses a head that lacks the tip at once, even beside an unreported check"
+}
+
+# A merge queue builds its merge group on its own tip and runs the required
+# checks on that combined tree before anything lands, so an attended --auto
+# merge into a base with one recognised merge_queue rule skips only the tip
+# containment. The green-check reads still apply on that path.
+test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment() {
+  local case_dir rc head built_on tip=b34192a213f406add8809a34224315cdc9073798
+  head=1616161616161616161616161616161616161616
+  case_dir=$(make_case github-queue-enters)
+  add_gh_mocks "$case_dir" "$head"
+  built_on=$(cat "$case_dir/github-base")
+  write_github_compare "$case_dir" "$tip" "$built_on" 3
+  printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+  write_github_outcome "$case_dir" OPEN false true main
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "queue-enters: an --auto merge into the base's merge queue must proceed"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "green at head $head, which enters the merge queue of base branch main" "$case_dir/stderr" \
+    "queue-enters: the verified line did not say the merge enters the queue"
+  assert_no_grep '/compare/' "$case_dir/gh.log" \
+    "queue-enters: the tip containment was read for a merge the queue checks itself"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --auto --squash
+  assert_grep 'verified: https://github.com/example/repo/pull/188 is queued' "$case_dir/stdout" \
+    "queue-enters: the queued outcome was not reported"
+
+  case_dir=$(make_case github-queue-enters-red)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+  write_github_compare "$case_dir" "$tip" "$built_on" 3
+  printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "queue-enters-red: the queue path must still refuse a red check"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" \
+    "queue-enters-red: the queue path skipped the green-check reads"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "queue-enters-red: gh pr merge ran with a red check"
+  pass "fm-pr-merge skips only the tip containment for an --auto merge into the base's merge queue"
+}
+
+# Each case below lacks proof that the merge enters a merge queue, so the head
+# still has to contain the live tip.
+test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
+  local case_dir rc head built_on scenario tip=b34192a213f406add8809a34224315cdc9073798
+  head=1717171717171717171717171717171717171717
+  for scenario in direct-merge-into-queue auto-without-queue auto-unreadable-queue; do
+    case_dir=$(make_case "github-lacks-tip-$scenario")
+    add_gh_mocks "$case_dir" "$head"
+    built_on=$(cat "$case_dir/github-base")
+    write_github_compare "$case_dir" "$tip" "$built_on" 3
+    case "$scenario" in
+      direct-merge-into-queue)
+        printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+        set -- -- --squash
+        ;;
+      auto-without-queue)
+        set -- --attended-override -- --auto --squash
+        ;;
+      auto-unreadable-queue)
+        : > "$case_dir/github-rules-fail"
+        set -- --attended-override -- --auto --squash
+        ;;
+    esac
+
+    set +e
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 "$@" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+
+    expect_code 1 "$rc" "$scenario: a head that lacks the tip must refuse without a proven queue merge"
+    assert_grep "head $head lacks the current tip $tip of base branch main" "$case_dir/stderr" \
+      "$scenario: the tip containment was skipped without a proven queue merge"
+    assert_no_grep 'pr merge' "$case_dir/gh.log" \
+      "$scenario: gh pr merge ran on a tree no check ran on"
+  done
+  pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, or an unreadable queue"
 }
 
 test_an_unreadable_base_comparison_refuses() {
@@ -1923,6 +2013,8 @@ test_fresh_green_runs_and_waivers_do_not_pass_a_head_that_lacks_the_tip
 test_a_base_tip_that_moves_before_the_merge_refuses
 test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses
 test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried
+test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment
+test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses
 test_an_unreadable_base_comparison_refuses
 )
 pr_merge_run "$@"
