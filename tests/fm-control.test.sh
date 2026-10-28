@@ -285,7 +285,8 @@ SH
 
 # new_case <name> -> echoes a case dir holding home/, fake/, and fakebin.
 new_case() {
-  local dir="$TMP_ROOT/$1-$RANDOM"
+  local dir
+  dir=$(mktemp -d "$TMP_ROOT/$1-XXXXXX")
   mkdir -p "$dir/home/state" "$dir/home/data" "$dir/fake"
   : > "$dir/fake/literal"
   : > "$dir/fake/keys"
