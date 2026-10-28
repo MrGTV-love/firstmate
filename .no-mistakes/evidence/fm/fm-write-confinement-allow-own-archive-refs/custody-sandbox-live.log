@@ -1,0 +1,79 @@
+lab=/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5 S=2f74cdf19445beee6db7b869a5a3089e074bf3c0 P=0c6dfb4aaff5cbb10f689f3f4e1604cb82ef121a
+
+=== base builder: custody route under sandbox-exec ===
+build profile                                              rc=0 
+step 2: git branch archive/task-a1-submitted-2f74cdf1 S    rc=128 fatal: cannot lock ref 'refs/heads/archive/task-a1-submitted-2f74cdf1': unable to create directory for /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/
+step 2: git fetch --no-tags gate recover/run1              rc=0 From /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/gate  * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+step 2: git branch archive/task-a1-pipeline-0c6dfb4a P     rc=128 fatal: cannot lock ref 'refs/heads/archive/task-a1-pipeline-0c6dfb4a': unable to create directory for /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/t
+step 2: same name again must refuse                        rc=128 fatal: cannot lock ref 'refs/heads/archive/task-a1-pipeline-0c6dfb4a': unable to create directory for /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/t
+step 4: git reset --keep archive/task-a1-pipeline-0c6dfb4a rc=128 fatal: ambiguous argument 'refs/heads/archive/task-a1-pipeline-0c6dfb4a': unknown revision or path not in the working tree. Use '--' to separate paths from revi
+  PASS: base refuses own submitted archive (the reported stuck state)
+  PASS: base refuses own pipeline archive
+
+=== head builder: custody route under sandbox-exec ===
+build profile                                              rc=0 
+step 2: git branch archive/task-a1-submitted-2f74cdf1 S    rc=0 
+step 2: git fetch --no-tags gate recover/run1              rc=0 From /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/gate  * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+step 2: git branch archive/task-a1-pipeline-0c6dfb4a P     rc=0 
+step 2: same name again must refuse                        rc=128 fatal: a branch named 'archive/task-a1-pipeline-0c6dfb4a' already exists
+step 4: git reset --keep archive/task-a1-pipeline-0c6dfb4a rc=0 
+  PASS: own submitted archive created at S
+  PASS: FETCH_HEAD resolves to P
+  PASS: own pipeline archive created at P
+  PASS: existing archive name refused
+  PASS: reset --keep adopts P on fm/task-a1
+  PASS: archive reflogs written
+
+=== head builder: adversarial writes under sandbox-exec ===
+create refs/heads/archive/task-b2-submitted-0123abcd       rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-b2-submitted-0123abcd': cannot lock ref 'refs/heads/archive/task-b2-submitted-0123abcd': Unable to cre
+  PASS: refused archive/task-b2-submitted-0123abcd
+create refs/heads/archive/task-a-submitted-0123abcd        rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-a-submitted-0123abcd': cannot lock ref 'refs/heads/archive/task-a-submitted-0123abcd': Unable to creat
+  PASS: refused archive/task-a-submitted-0123abcd
+create refs/heads/archive/task-a12-submitted-0123abcd      rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-a12-submitted-0123abcd': cannot lock ref 'refs/heads/archive/task-a12-submitted-0123abcd': Unable to c
+  PASS: refused archive/task-a12-submitted-0123abcd
+create refs/heads/archive/task-a1-other-0123abcd           rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-a1-other-0123abcd': cannot lock ref 'refs/heads/archive/task-a1-other-0123abcd': Unable to create '/pr
+  PASS: refused archive/task-a1-other-0123abcd
+create refs/heads/archive/task-a1-submitted-0123ABCD       rc=0 
+  FAIL: refused archive/task-a1-submitted-0123ABCD
+create refs/heads/archive/task-a1-submitted-0123abc        rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-a1-submitted-0123abc': cannot lock ref 'refs/heads/archive/task-a1-submitted-0123abc': Unable to creat
+  PASS: refused archive/task-a1-submitted-0123abc
+create refs/heads/archive/task-a1-submitted-0123abcd-x     rc=128 fatal: update_ref failed for ref 'refs/heads/archive/task-a1-submitted-0123abcd-x': cannot lock ref 'refs/heads/archive/task-a1-submitted-0123abcd-x': Unable to
+  PASS: refused archive/task-a1-submitted-0123abcd-x
+create refs/heads/archive/x/task-a1-submitted-0123abcd     rc=128 fatal: update_ref failed for ref 'refs/heads/archive/x/task-a1-submitted-0123abcd': cannot lock ref 'refs/heads/archive/x/task-a1-submitted-0123abcd': unable to
+  PASS: refused archive/x/task-a1-submitted-0123abcd
+create refs/heads/task-a1-submitted-0123abcd               rc=128 fatal: update_ref failed for ref 'refs/heads/task-a1-submitted-0123abcd': cannot lock ref 'refs/heads/task-a1-submitted-0123abcd': Unable to create '/private/va
+  PASS: refused task-a1-submitted-0123abcd
+move another task's branch fm/task-b2                      rc=128 fatal: update_ref failed for ref 'refs/heads/fm/task-b2': cannot lock ref 'refs/heads/fm/task-b2': Unable to create '/private/var/folders/z8/7g01lsx95d77m5k2z1q
+  PASS: fm/task-b2 unchanged
+delete another task's branch fm/task-b2                    rc=1 error: cannot delete branch 'fm/task-b2' used by worktree at '/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/wt/task-b2'
+  PASS: fm/task-b2 still exists
+repoint primary HEAD                                       rc=1 error: cannot lock ref 'HEAD': Unable to create '/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/fmhome/projects/project/.git/HEAD.lock'
+  PASS: primary HEAD unchanged
+plain file in refs/heads/archive/evil                      rc=1 touch: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/fmhome/projects/project/.git/refs/heads/archive/evil: Operation not permitted
+  PASS: refused stray file in archive folder
+rename refs/heads/archive folder                           rc=1 mv: rename /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/fmhome/projects/project/.git/refs/heads/archive to /private/var/folders/z8/7g
+  PASS: archive folder not renamed
+symlink folder refs/heads/archive2 -> fm                   rc=1 ln: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/fmhome/projects/project/.git/refs/heads/archive2: Operation not permitted
+  PASS: refused symlink in refs/heads
+own archive as symref to fm/task-b2 (teardown must keep)   rc=0 
+
+=== head builder: own deletes, then archive folders removed while the worker runs ===
+git branch -D own submitted archive                        rc=0 Deleted branch archive/task-a1-submitted-2f74cdf1 (was 2f74cdf).
+git branch -D own pipeline archive                         rc=0 Deleted branch archive/task-a1-pipeline-0c6dfb4a (was 0c6dfb4).
+  PASS: own archives deleted
+rmdir empty archive folder (worker)                        rc=1 rmdir: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA5/fmhome/projects/project/.git/refs/heads/archive: Operation not permitted
+  PASS: worker cannot delete archive folder
+git branch own submitted archive after folders gone        rc=0 
+  PASS: folders recreated and own archive created
+after recreate: other task's archive                       rc=128 fatal: cannot lock ref 'refs/heads/archive/task-b2-submitted-0123abcd': Unable to create '/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.lj3DXmQuA
+  PASS: other task's archive still refused
+
+=== head builder: project has a branch named 'archive' ===
+build profile with refs/heads/archive a file               rc=0 
+  PASS: builder succeeds
+  PASS: branch 'archive' kept
+Deleted branch archive (was 2f74cdf).
+own archive name with no grant                             rc=128 fatal: cannot lock ref 'refs/heads/archive/task-a1-submitted-2f74cdf1': unable to create directory for /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/
+  PASS: own archive refused (no grant in this profile)
+
+FAILS=1

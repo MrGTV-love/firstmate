@@ -1,0 +1,6 @@
+archive/task-a1-submitted-0123ABCD       confined rc=0  archive dir: task-a1-submitted-0123ABCD 
+archive/TASK-A1-submitted-0123abcd       confined rc=0  archive dir: TASK-A1-submitted-0123abcd 
+archive/task-a1-SUBMITTED-0123abcd       confined rc=0  archive dir: task-a1-SUBMITTED-0123abcd 
+archive/TASK-B2-submitted-0123abcd       confined rc=128  archive dir: 
+archive/task-b2-submitted-0123ABCD       confined rc=128  archive dir: 
+ARCHIVE/task-a1-submitted-0123abcd       confined rc=0  archive dir: task-a1-submitted-0123abcd 

@@ -1,0 +1,4 @@
+ok - teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash
+ok - teardown judges only the task's exact custody archive names, never another task's
+ok - unlanded edits, cherry-invisible merge edits, and checked-out archives stay named and intact
+ok - archives that link to another ref stay named and never reap the linked branch
