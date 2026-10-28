@@ -1,0 +1,30 @@
+## S3 refusal under native pressure: fixtures = real native outputs captured now; only the pressure line is edited
+existing running work: sleep PID 87733
+$ FM_MEMORY_FIXTURE_DIR=fx(pressure=2) bin/fm-mem-guard.sh run -- touch marker.2
+exit=75 new-run-executed=no
+{"fixture":true,"pressure_level":2,"admission":"defer","reasons":["native memory pressure level 2 (2 or higher defers)"],"available_bytes":10678272000,"unused_bytes":3448569856,"compressor_bytes":389513216,"swap_used_bytes":2234578370}
+$ FM_MEMORY_FIXTURE_DIR=fx(pressure=4) bin/fm-mem-guard.sh run -- touch marker.4
+exit=75 new-run-executed=no
+{"fixture":true,"pressure_level":4,"admission":"defer","reasons":["native memory pressure level 4 (2 or higher defers)"],"available_bytes":10678272000,"unused_bytes":3448569856,"compressor_bytes":389513216,"swap_used_bytes":2234578370}
+$ FM_MEMORY_FIXTURE_DIR=fx(pressure=0) bin/fm-mem-guard.sh run -- touch marker.0
+exit=75 new-run-executed=no
+{"fixture":true,"pressure_level":0,"admission":"defer","reasons":["memory: unexpected native pressure level 0"],"available_bytes":null,"unused_bytes":null,"compressor_bytes":null,"swap_used_bytes":null}
+## unreadable input: vm_stat missing
+exit=75 new-run-executed=no
+{"errors":["memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/memfx/vm_stat'"],"admission":"defer","reasons":["memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/memfx/vm_stat'"],"available_bytes":null}
+## unreadable input: process census invalid
+admit exit=75
+{"errors":["processes: invalid process census"],"admission":"defer"}
+## recovery: same fixture at pressure 1
+exit=0 new-run-executed=YES
+existing running work still alive: yes
+readings recorded in lab state (source/admission/fixture?):
+sample	admit	false	1
+admit	admit	false	1
+admit	admit	false	1
+admit	defer	true	2
+admit	defer	true	4
+admit	defer	true	0
+admit	defer	true	1
+admit	defer	true	1
+admit	admit	true	1

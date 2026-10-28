@@ -1,0 +1,151 @@
+## S1/S2 real host: lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.yOJTpz host=GTT-CB.local
+$ bin/fm-mem-guard.sh sample
+exit=0
+{
+  "schema": "fm-memory-reading.v1",
+  "host": "GTT-CB.local",
+  "fixture": null,
+  "source": "sample",
+  "errors": [],
+  "pressure_level": 1,
+  "total_bytes": 34359738368,
+  "unused_bytes": 3554541568,
+  "available_bytes": 10783932416,
+  "anonymous_bytes": 18053578752,
+  "compressor_bytes": 389447680,
+  "swap_total_bytes": 3221225472,
+  "swap_used_bytes": 2234578370,
+  "swap_free_bytes": 986647101,
+  "non_fleet_max_bytes": 2676162560,
+  "rss_unreadable_count": 1,
+  "runs": {
+    "no-mistakes:eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5": {
+      "rss_bytes": 534724608,
+      "processes": 7,
+      "unreadable": 0
+    },
+    "task:fm-memory-aware-admission": {
+      "rss_bytes": 817397760,
+      "processes": 5,
+      "unreadable": 0
+    },
+    "task:fm-host-hook-successor-watcher-race": {
+      "rss_bytes": 573505536,
+      "processes": 3,
+      "unreadable": 0
+    },
+    "task:fm-restored-claude-worker-no-recovery-path": {
+      "rss_bytes": 622133248,
+      "processes": 3,
+      "unreadable": 0
+    },
+    "task:fm-merge-prune-test-pane-pid-stub": {
+      "rss_bytes": 393904128,
+      "processes": 4,
+      "unreadable": 0
+    },
+    "task:vdc-crit-gate-2g": {
+      "rss_bytes": 270745600,
+      "processes": 2,
+      "unreadable": 0
+    },
+    "task:fm-dod-reaches-reviewer": {
+      "rss_bytes": 412696576,
+      "processes": 4,
+      "unreadable": 0
+    },
+    "task:vdc-crit-gate-2e": {
+      "rss_bytes": 238714880,
+      "processes": 2,
+      "unreadable": 0
+    },
+    "task:fm-flaky-claude-contexts-stdin-file": {
+      "rss_bytes": 382648320,
+      "processes": 4,
+      "unreadable": 0
+    },
+    "task:fm-dod-machine-checked": {
+      "rss_bytes": 325107712,
+      "processes": 3,
+      "unreadable": 0
+    },
+    "task:vernant-engine0-post-test-hang": {
+      "rss_bytes": 488816640,
+      "processes": 1,
+      "unreadable": 0
+    },
+    "task:vernant-sprint-status-lock-race": {
+      "rss_bytes": 473563136,
+      "processes": 1,
+      "unreadable": 0
+    },
+    "task:vernant-coverage-bucket-web-fallback": {
+      "rss_bytes": 507854848,
+      "processes": 1,
+      "unreadable": 0
+    },
+    "task:vernant-b12-design-first": {
+      "rss_bytes": 441581568,
+      "processes": 2,
+      "unreadable": 0
+    }
+  },
+  "admission": "admit",
+  "reasons": [],
+  "headroom": null,
+  "headroom_calibration": "no calibration at /Users/charlesabrooker/tmp/fm-lab.yOJTpz/state/.memory-calibration.json",
+  "calibration": "no baseline at /Users/charlesabrooker/tmp/fm-lab.yOJTpz/state/.memory-baseline.json",
+  "top5": [
+    {
+      "pid": 30178,
+      "comm": "2.1.306",
+      "rss_bytes": 2676162560,
+      "fleet": false,
+      "run": null
+    },
+    {
+      "pid": 59035,
+      "comm": "omp",
+      "rss_bytes": 1828388864,
+      "fleet": false,
+      "run": null
+    },
+    {
+      "pid": 10005,
+      "comm": "omp",
+      "rss_bytes": 1456046080,
+      "fleet": false,
+      "run": null
+    },
+    {
+      "pid": 2078,
+      "comm": "corespotlightd",
+      "rss_bytes": 1018658816,
+      "fleet": false,
+      "run": null
+    },
+    {
+      "pid": 85307,
+      "comm": "omp",
+      "rss_bytes": 1011908608,
+      "fleet": false,
+      "run": null
+    }
+  ]
+}
+$ bin/fm-mem-guard.sh admit
+exit=0
+{"source":"admit","pressure_level":1,"admission":"admit","reasons":[]}
+$ bin/fm-mem-guard.sh run -- echo NEW-RUN-EXECUTED
+NEW-RUN-EXECUTED
+exit=0
+$ wc -l state/memory-readings.jsonl; sources:
+       3
+sample admit admit 
+$ cross-check: native sysctl/vm_stat at same time
+1
+total = 3072.00M  used = 2131.06M  free = 940.94M  (encrypted)
+Pages free:                                   177071.
+Pages speculative:                             39213.
+Anonymous pages:                             1102490.
+Pages occupied by compressor:                  23770.

@@ -1,0 +1,14 @@
+## S4 recorded headroom margin never refuses (decision: Option A record now, gate later)
+fixtures = real native outputs captured on GTT-CB.local; edits named per step
+$ probe #1 at pressure 2 (real vm_stat, real census)
+exit=0
+{"source":"probe","pressure_level":2,"admission":"defer","headroom":null,"headroom_calibration":"calibration /Users/charlesabrooker/tmp/fm-lab.yOJTpz/state/.memory-calibration.json: no run has been recorded in at least two readings"}
+$ probe #2 at pressure 2
+exit=0
+{"source":"probe","pressure_level":2,"admission":"defer","headroom":{"run_peak_bytes":881836032,"run":"task:fm-memory-aware-admission","run_samples":2,"run_incomplete_samples":0,"runs_measured":14,"headroom_bytes":10678272000,"pressured_samples":2}}
+$ jq state/.memory-calibration.json (summary)
+{"schema":"fm-memory-calibration.v1","host":"GTT-CB.local","total_bytes":34359738368,"pressured":{"max_available_bytes":10678272000,"samples":2,"highest_level":2,"first_seen":"2026-10-28T15:37:06.045013+00:00","last_seen":"2026-10-28T15:37:06.425506+00:00"},"runs_recorded":14,"largest_run":{"key":"task:fm-memory-aware-admission","peak":881836032,"samples":2}}
+## now pressure 1 but available memory cut far BELOW margin+peak (Pages free=10, File-backed=10, purgeable=0)
+admit exit=0
+{"pressure_level":1,"available_bytes":327680,"headroom_bytes":10678272000,"run_peak_bytes":881836032,"admission":"admit","reasons":[]}
+run exit=0 new-run-executed=YES

@@ -1,0 +1,30 @@
+ok - Linux fixtures, thresholds, incomplete readings, and zero swap
+ok - macOS native pressure, swap units, RSS ordering/cutoff, and verdicts
+ok - native command failures, deadline exhaustion, and unsupported platform
+ok - fm-mem-guard.sh wrapper --json --check exits 0 with a pass verdict
+ok - actual native census independently attributes kernel home cwd and paired markers without claiming a sibling-prefix process
+ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs varying healthy readings and never silently grows
+ok - real run-start exec admits healthy work, refuses pressure 2/4 and an unreadable level with 75 and preserves existing work
+ok - a named non-fleet outlier wakes once per episode, held until it falls to the low end of measured healthy variation; fleet children never masquerade as leaks
+ok - unreadable facts fail closed and judge no calibration; an unusable or other-host baseline only reports calibration and is replaced; every observation is parseable JSONL
+ok - a secondmate home records only its own admission reading; periodic probes and alarms belong to the root home
+ok - probes record each run's resident-tree peak, samples, span, gaps and omissions; the derived peak and margin are shown but never refuse normal-pressure work
+ok - estimated 113941 Studio shape: the margin is recorded and shown but a normal-pressure 13th start is admitted; pressure 2 still refuses
+ok - the real watcher presents its named non-fleet alarm once through the existing durable wake queue
+ok - the poll loop starts the probe detached, on its interval, for this home, without a wake
+ok - a fresh watcher leaves session start alone: the first probe waits one full interval
+ok - FM_TYPESAFE_HEALTH_INTERVAL=0 turns the probe off
+ok - a failing probe is retried quietly and never stops the poll
+ok - a probe still running is never started twice, and the poll keeps running
+ok - a stale model without a pin is refused and the newer model is named
+ok - a captain pin naming the stale model admits the launch
+ok - a pin naming another model cannot admit a stale launch
+ok - a current model launches without a pin and without a stale warning
+ok - a batch forwards its one captain pin to every pair
+ok - a relaunch of a captain-pinned stale task is not refused and keeps its pin marker
+ok - a relaunch of a model that went stale after launch is not refused and records the finding
+ok - a relaunch onto a different stale model is still refused and leaves the record unchanged
+ok - a secondmate respawn on its recorded stale model is not refused and keeps its pin marker
+ok - a secondmate respawn onto a different stale model is still refused and leaves the record unchanged
+ok - native memory pressure defers a new secondmate but never its recovery respawn
+FM_TEST_SUMMARY total=3 failed=0 skipped_gate=0 duration_ms=98218

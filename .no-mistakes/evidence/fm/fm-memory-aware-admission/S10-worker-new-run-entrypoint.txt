@@ -1,0 +1,17 @@
+## S10 generated worker Definition of done (fm_dod_block no-mistakes, FM_HOME=lab): memory lines
+14:The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
+16:That path records a fresh host memory reading immediately before exec and refuses the new run with exit 75 while native memory pressure is high or its readings are unavailable; it never stops existing work.
+17:If it exits 75, do not retry it on your own: keep your branch and commits, append one `paused:` status line that quotes the printed reading's `pressure_level`, `available_bytes`, `unused_bytes`, `compressor_bytes`, `swap_used_bytes` and `reasons` as an external host-memory wait for firstmate to re-admit, then end your turn and start the run again only when firstmate tells you to.
+18:Reattach to existing runs and answer gates directly with no-mistakes; those calls must remain usable under pressure.
+37:Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - reattach at once by re-running `no-mistakes axi run` without flags, backgrounded the same way; once checks are green it returns `checks-passed` immediately, and if it refuses because no run is active, read the finished outcome from `no-mistakes axi status`.
+42:Reattach and keep going rather than reporting the pipeline blocked; rule 7 owns the checks that decide when a pipeline block is real.
+
+extracted entrypoint: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.yOJTpz /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5/bin/fm-mem-guard.sh run -- no-mistakes axi run
+
+$ [pressure 2 fixture] FM_HOME=/Users/charlesabrooker/tmp/fm-lab.yOJTpz /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5/bin/fm-mem-guard.sh run -- no-mistakes axi run --intent x --verification-plan p
+exit=75 pipeline-invoked=no
+{"pressure_level":2,"available_bytes":10678272000,"unused_bytes":3448569856,"compressor_bytes":389513216,"swap_used_bytes":2234578370,"reasons":["native memory pressure level 2 (2 or higher defers)"]}
+$ [pressure 1 fixture] same command
+exit=0
+SHIM pipeline binary invoked with: axi run --intent x --verification-plan p
+(pipeline binary is a PATH shim; a gate agent must not start a real pipeline run)

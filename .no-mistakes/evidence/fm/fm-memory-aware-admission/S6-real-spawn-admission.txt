@@ -1,0 +1,31 @@
+## S6 real bin/fm-spawn.sh in lab home /Users/charlesabrooker/tmp/fm-lab.yOJTpz (backlog item mem-demo queued; fixture = real native outputs, pressure line edited)
+$ FM_MEMORY_FIXTURE_DIR=fx(pressure=2) bin/fm-spawn.sh mem-demo <proj> --mode local-only --yolo off
+deferred: host memory admission refused new task mem-demo (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+exit=75   (captured above in this run; after refusal: backlog state=queued, no state/mem-demo.meta, last reading source=admit pressure_level=2 admission=defer)
+
+$ (from lab tmux pane) FM_MEMORY_FIXTURE_DIR=fx(pressure=1) bin/fm-spawn.sh mem-demo <proj> --mode local-only --yolo off --harness "sleep 600"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yOJTpz
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+warning: task mem-demo: /Users/charlesabrooker/tmp/fm-lab.yOJTpz/data/mem-demo/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.yOJTpz/data/mem-demo/launch-brief.md records no ship branch; defaulting to legacy branch fm/mem-demo
+notice: mem-demo ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for mem-demo: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned mem-demo harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-mem-demo worktree=/Users/charlesabrooker/.treehouse/project-95a309/1/project
+SPAWN-EXIT=0
+backlog:   state: in_flight
+task record present: yes
+lab tmux windows: primary:bash primary:fm-mem-demo 
+readings (last 2): 
+{"source":"admit","pressure_level":2,"admission":"defer","reasons":["native memory pressure level 2 (2 or higher defers)"]}
+{"source":"admit","pressure_level":1,"admission":"admit","reasons":[]}
+
+### recovery relaunch under pressure (fixture pressure line = 2), from the lab tmux pane
+$ bin/fm-spawn.sh mem-demo --relaunch --harness 'sleep 600'
+spawned mem-demo harness=sleep kind=ship mode=local-only yolo=off window=primary:fm-mem-demo worktree=/Users/charlesabrooker/.treehouse/project-95a309/1/project
+SPAWN-EXIT=0
+last reading after relaunch: {"source":"admit","pressure_level":1,"admission":"admit"}  (unchanged: the relaunch took no admission reading and was not refused)
+
+### cleanup
+bin/fm-teardown.sh mem-demo -> "teardown mem-demo complete"; backlog item closed in the lab backlog
+treehouse destroy ~/.treehouse/project-95a309 --all --yes (throwaway pool for the temp project only), then its empty pool metadata was removed

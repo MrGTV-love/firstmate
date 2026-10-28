@@ -1,0 +1,22 @@
+## S8 real kernel census + real fm-mem-guard.sh sample (no fixture) in lab root home /Users/charlesabrooker/tmp/fm-lab.YBO5W5; NM_HOME=/Users/charlesabrooker/tmp/memattr/nm
+processes: python3 holders (non-platform binaries; macOS hides env of Apple platform binaries such as /bin/sleep)
+census exit=0 rows=790
+{"case":"paired-task-markers","pid":59022,"ppid":58980,"comm":"python3.13","rss_bytes":115130368,"fleet":true,"run":"task:attr-demo"}
+{"case":"cwd-in-no-mistakes-run-worktree","pid":59023,"ppid":58980,"comm":"python3.13","rss_bytes":81608704,"fleet":true,"run":"no-mistakes:demorepo/RUN123"}
+{"case":"no-markers-plain-cwd","pid":59025,"ppid":58980,"comm":"python3.13","rss_bytes":98369536,"fleet":false,"run":null}
+{"case":"half-paired-marker(inbox-elsewhere)","pid":59026,"ppid":58980,"comm":"python3.13","rss_bytes":14417920,"fleet":false,"run":null}
+child of paired process (env cleared, PPID=59022):
+{"pid":59028,"ppid":59022,"rss_bytes":54591488,"fleet":true,"run":"task:attr-demo"}
+keys printed per row: ["comm","fleet","pid","ppid","rss_bytes","run","started"]
+census leaks env/cwd strings? FM_TASK_INBOX=0 RUN123/sub=0
+
+$ NM_HOME=<lab nm> FM_HOME=/Users/charlesabrooker/tmp/fm-lab.YBO5W5 bin/fm-mem-guard.sh sample   (real native facts; consumer applies PPID inheritance)
+exit=0
+{"fixture":null,"errors":[],"runs":{"task:attr-demo":{"rss_bytes":169721856,"processes":2,"unreadable":0},"no-mistakes:demorepo/RUN123":{"rss_bytes":81608704,"processes":1,"unreadable":0}}}
+bash: line 23: 59022 Terminated: 15          ( cd $W/plain && exec env FM_TASK_ID=attr-demo FM_TASK_INBOX=$LAB2/state/attr-demo.inbox "$PY" -c "import os,time; b=bytearray(96*1048576); b[::4096]=b\"x\"*len(b[::4096]); pid=os.fork()
+if pid==0:
+    os.environ.clear(); c=bytearray(48*1048576); c[::4096]=b\"y\"*len(c[::4096]); time.sleep(120)
+time.sleep(120)" )
+bash: line 23: 59023 Terminated: 15          ( cd $W/nm/worktrees/demorepo/RUN123/sub && exec "$PY" -c "import time; b=bytearray(64*1048576); b[::4096]=b\"x\"*len(b[::4096]); time.sleep(120)" )
+bash: line 23: 59025 Terminated: 15          ( cd $W/plain && exec "$PY" -c "import time; b=bytearray(80*1048576); b[::4096]=b\"x\"*len(b[::4096]); time.sleep(120)" )
+bash: line 23: 59026 Terminated: 15          ( cd $W/plain && exec env FM_TASK_ID=fake FM_TASK_INBOX=/tmp/elsewhere.inbox "$PY" -c "import time; time.sleep(120)" )

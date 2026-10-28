@@ -1,0 +1,10 @@
+## S9 home placement: secondmate home /Users/charlesabrooker/tmp/fm-lab.YBO5W5/projects/sm-home (local parent = root lab home /Users/charlesabrooker/tmp/fm-lab.YBO5W5)
+root state line counts before: memory-readings.jsonl:20 .memory-alarmed:1 .memory-calibration.json:0 .memory-baseline.json:0 .wake-queue:3 
+$ FM_HOME=<secondmate> bin/fm-mem-guard.sh probe
+exit=0 output-bytes-above=none expected
+secondmate state after probe: []
+$ FM_HOME=<secondmate> bin/fm-mem-guard.sh admit
+{"source":"admit","admission":"admit","baseline_from":"GTT-CB.local","alarms":[]}
+exit=0
+secondmate state after admit: [memory-readings.jsonl ] readings=1
+root state line counts after:  memory-readings.jsonl:20 .memory-alarmed:1 .memory-calibration.json:0 .memory-baseline.json:0 .wake-queue:3 

@@ -1,0 +1,57 @@
+## S5 non-fleet RSS alarm; lab root home /Users/charlesabrooker/tmp/fm-lab.YBO5W5; synthetic census, real native vm_stat/sysctl from GTT-CB.local at pressure 1
+
+### a) two healthy readings with EQUAL xprotectd maxima (0.5 GiB) then baseline
+baseline exit=75
+["baseline needs healthy readings whose largest non-fleet RSS varies; all 3 readings in /Users/charlesabrooker/tmp/fm-lab.YBO5W5/state/memory-readings.jsonl plus this reading show 536870912 bytes"]
+baseline file exists: no
+
+### b) probe while uncalibrated, twice: one calibration wake, no duplicate, no admission effect
+{"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.YBO5W5/state/.memory-baseline.json","alarms":[],"admission":"admit"}
+  wake row: key=memory-health-uncalibrated payload=check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.YBO5W5/state/.memory-baseline.json); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.YBO5W5.
+admit exit while uncalibrated=0
+
+### c) a third healthy reading with real spread (1 GiB), then baseline
+baseline exit=0
+{"non_fleet_max_bytes":1073741824,"smallest_reading_max_bytes":536870912,"samples":8,"non_fleet_max_share":0.03125,"incomplete_samples":0,"derivation":"largest non-fleet RSS observed across recorded healthy readings; incomplete samples are lower bounds"}
+second baseline exit=75 reasons=["baseline already exists for this host; retained unchanged"]
+
+### d) probe: xprotectd exactly at boundary; fleet node 8 GiB; fleet child (PPID 200, unflagged) 9 GiB
+{"alarms":[],"alarm_hold":["xprotectd"]}
+  alarm wake rows: 1
+
+### e) probe: xprotectd 8 GiB (non-fleet leak analog)
+{"alarms":[{"pid":101,"comm":"xprotectd","rss_bytes":8589934592,"boundary_bytes":1073741824,"samples":8}],"admission":"admit","reasons":[]}
+  wake row: key=memory-health-uncalibrated payload=check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.YBO5W5/state/.memory-baseline.json); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.YBO5W5.
+  wake row: key=memory-health payload=check: memory-health: non-fleet process xprotectd PID 101 RSS 8589934592 bytes exceeds the largest non-fleet RSS observed across 8 healthy readings (1073741824 bytes); see /Users/charlesabrooker/tmp/fm-lab.YBO5W5/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting any system daemon requires the captain's decision.
+
+### f) repeat probe at 8 GiB: no duplicate wake
+  alarm wake rows: 1
+
+### g) xprotectd moves around the boundary (0.9 GiB, 1.2 GiB, 0.8 GiB): episode holds, no flapping wakes
+{"alarms":[],"alarm_hold":["xprotectd"]}
+{"alarms":["xprotectd"],"alarm_hold":["xprotectd"]}
+{"alarms":[],"alarm_hold":["xprotectd"]}
+  alarm wake rows: 1
+  marker: alarm:xprotectd 
+
+### h) xprotectd falls to 0.25 GiB (<= smallest per-reading max 0.5 GiB): episode ends
+  marker: []
+
+### i) leak returns at 8 GiB: a new episode wakes again
+  alarm wake rows: 2
+
+### j) admission under the alarm at pressure 1: alarm never refuses work; process 101 untouched (synthetic)
+{"admission":"admit","reasons":[],"alarms":["xprotectd"]}
+
+### k) a reading with unreadable RSS for the alarmed process does not end the episode
+{"rss_unreadable_pids":[101],"alarm_hold":[]}
+  marker: [alarm:xprotectd ]
+
+### readings log rows (source, admission, xprotectd-alarm?)
+   1 admit	admit	
+   1 admit	admit	xprotectd
+   1 baseline	admit	
+   2 baseline	defer	
+   7 probe	admit	
+   4 probe	admit	xprotectd
+   3 sample	admit	
