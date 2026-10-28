@@ -549,8 +549,8 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 
 The default 300-second grace is unchanged.
 Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection, or for a status reclassification.
-A status reclassification has no total-time deadline: a span read that keeps making CPU progress runs to completion and commits its classified endpoint, and only a read whose process tree makes no CPU progress for `FM_WATCHER_STALL_BOUND` is stopped as stalled and left unclassified.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
+A status reclassification has no total-time deadline: a span read that keeps making CPU progress runs to completion and commits its classified endpoint, and only a read whose process tree makes no CPU progress for `FM_WATCHER_STALL_BOUND` is stopped as stalled and left unclassified.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
 It observes check completion through a private pipe using Bash's timed read, waking immediately on pipe closure and rechecking the leader once per second if a descendant retains the writer, instead of starting a sleep process on each poll tick.
 Group cleanup retains its existing grace and stop bounds, with one process per bounded wait rather than one per stop poll.
