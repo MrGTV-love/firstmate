@@ -76,6 +76,12 @@ FM_BACKLOG_ROW_ERROR=
 # the row is not held.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_ROW_HOLD_KIND=
+# Set by fm_backlog_row_probe on a found row: captain while it is an open
+# captain call, parent while it is an open hold classified as the parent
+# firstmate's (external, with a `Decision owner: parent` body line), else empty.
+# Either one is a decision still owed, so no close may complete the row.
+# shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+FM_BACKLOG_ROW_OPEN_DECISION=
 # Set by fm_backlog_close_marker_replay: closed | closed_incomplete | retained |
 # retained_incomplete | answered | stale | noop.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
@@ -525,6 +531,7 @@ fm_backlog_row_probe() {  # <data-dir> <id>
   FM_BACKLOG_ROW_RESULT=error
   FM_BACKLOG_ROW_STATE=
   FM_BACKLOG_ROW_HOLD_KIND=
+  FM_BACKLOG_ROW_OPEN_DECISION=
   FM_BACKLOG_ROW_KIND=
   FM_BACKLOG_ROW_ERROR=
   fm_backlog_source_present "$data" "$authorized_data"
@@ -566,6 +573,16 @@ fm_backlog_row_probe() {  # <data-dir> <id>
     ''|'"-"'|-) FM_BACKLOG_ROW_HOLD_KIND= ;;
     *) FM_BACKLOG_ROW_HOLD_KIND=$hold_kind ;;
   esac
+  if [ "$state" != "done" ]; then
+    case "$FM_BACKLOG_ROW_HOLD_KIND" in
+      captain) FM_BACKLOG_ROW_OPEN_DECISION=captain ;;
+      external)
+        printf '%s\n' "$out" | sed -n 's/^  body: *//p' | head -1 \
+          | grep -Eq '(^"|\\n)Decision owner: parent(\\n|"$)' \
+          && FM_BACKLOG_ROW_OPEN_DECISION=parent
+        ;;
+    esac
+  fi
   return 0
 }
 
@@ -1434,7 +1451,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
   fi
   if fm_backlog_row_probe "$data" "$id"; then
     row_state=$FM_BACKLOG_ROW_STATE
-    if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
+    if [ -n "$FM_BACKLOG_ROW_OPEN_DECISION" ]; then
       mode=retain
     elif [ "${row_state%% *}" != "done" ]; then
       if [ "$mode" = retain ] && [ "${args[0]-}" = --report ] \

@@ -10,6 +10,10 @@ set -u
 # shellcheck source=tests/fm-captain-hold-lifecycle-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-captain-hold-lifecycle-helpers.sh"
 
+# A hold-set stamp earlier than any ruling a test records afterwards, because a
+# ruling must postdate the hold it withdraws and both stamps have whole seconds.
+PAST_HOLD_SET=2026-01-01T00:00:00Z
+
 # A secondmate home bound to a local parent, with a regular backlog.
 make_mate_home() {  # <name>; prints the mate home, the parent is "<mate>-parent"
   local name=$1 parent mate
@@ -52,7 +56,7 @@ make_legacy_mate_hold() {  # <mate-home> <task-id> <reason> [<channel-line>]
   local mate=$1 id=$2 reason=$3 channel_line=${4-}
   tasks_in "$mate" add "$id" "Legacy gated work $id" --kind ship --repo sample --body 'Gated work plan.' >/dev/null \
     || fail "could not create $id"
-  in_premate_home "$mate" run_captain "$mate" hold "$id" --reason "$reason" >/dev/null \
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET in_premate_home "$mate" run_captain "$mate" hold "$id" --reason "$reason" >/dev/null \
     || fail "could not file the legacy hold on $id"
   [ -z "$channel_line" ] || printf '%s\n' "$channel_line" >> "$(mate_channel "$mate")"
 }
@@ -242,7 +246,7 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   decision="$home/ruling.txt"
   evidence="$home/evidence.txt"
   tasks_in "$home" add moot-work "Moot work" --kind ship --repo sample --body 'Gated work plan.' >/dev/null
-  run_captain "$home" hold moot-work --reason "moot-premise-choice pending" >/dev/null || fail "hold failed"
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$home" hold moot-work --reason "moot-premise-choice pending" >/dev/null || fail "hold failed"
   printf 'Ruling A: use the demand map; moot-work is moot.\n' > "$decision"
   run_captain "$home" hold ruling-a --title "Ruling A" --reason "choose the approach" --repo sample >/dev/null
   run_captain "$home" answer ruling-a --decision-file "$decision" >/dev/null || fail "could not record the ruling"
@@ -703,7 +707,7 @@ test_a_retried_decide_or_withdraw_finishes_without_a_second_record() {
   printf 'Moot under the ruling.\n' > "$evidence"
   printf 'retry-moot is moot.\n' > "$home/ruling.txt"
   tasks_in "$home" add retry-moot "Retry moot" --kind ship --repo sample >/dev/null
-  run_captain "$home" hold retry-moot --reason "pick one" >/dev/null || fail "hold failed"
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$home" hold retry-moot --reason "pick one" >/dev/null || fail "hold failed"
   run_captain "$home" hold ruling-r --title "Ruling R" --reason "choose" --repo sample >/dev/null
   run_captain "$home" answer ruling-r --decision-file "$home/ruling.txt" >/dev/null || fail "could not record the ruling"
   fail_tasks_axi_once "$home" unhold
@@ -746,6 +750,43 @@ test_the_gate_accepts_an_archived_parent_decision() {
   pass "the completion gate accepts an archived parent decision and never lists it as an answer"
 }
 
+# A dated hold whose date has passed reads `held: no` but still blocks every
+# reader, so the release commands must still reach it; and a plain completion
+# never closes a row while the parent's decision is open.
+test_an_expired_dated_hold_still_releases_and_a_parent_hold_blocks_completion() {
+  local mate home rc out
+  mate=$(make_mate_home expired-dated)
+  tasks_in "$mate" add dated-p "Dated parent" --kind ship --repo sample --body 'Gated work plan.' >/dev/null
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET in_premate_home "$mate" run_captain "$mate" hold dated-p \
+    --reason "retry or fix one red check" --until 2020-01-01 >/dev/null || fail "could not file the dated legacy hold"
+  assert_contains "$(tasks_in "$mate" show dated-p --full)" "held: no" "the fixture hold did not expire"
+  classify_as_parent "$mate" dated-p
+  [ "$(open_status "$mate" dated-p --parent-owned)" = 0 ] || fail "an expired classified hold stopped reading as open"
+  rc=0
+  out=$(PATH="$mate/fakebin:$PATH" FM_HOME="$mate" FM_STATE_OVERRIDE="$mate/state" FM_DATA_OVERRIDE="$mate/data" \
+    FM_CONFIG_OVERRIDE="$mate/config" "$ROOT/bin/fm-tasks-axi.sh" "done" dated-p --note shipped 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "a plain completion closed a row while the parent's decision was open"
+  assert_contains "$out" "waiting on the parent firstmate's decision" "the completion refusal did not name the parent's decision"
+  printf 'Retry once.\n' > "$mate/decision.txt"
+  run_captain "$mate" decide dated-p --decision-file "$mate/decision.txt" >/dev/null \
+    || fail "decide refused an expired classified hold"
+  [ "$(open_status "$mate" dated-p --parent-owned)" = 1 ] || fail "the decided expired hold still reads as open"
+
+  home=$(make_home expired-withdraw)
+  tasks_in "$home" add dated-c "Dated captain" --kind ship --repo sample >/dev/null
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$home" hold dated-c --reason "pick later" --until 2020-01-01 >/dev/null \
+    || fail "could not file the dated captain hold"
+  [ "$(open_status "$home" dated-c)" = 0 ] || fail "an expired captain hold stopped reading as open"
+  printf 'dated-c is moot.\n' > "$home/ruling.txt"
+  printf 'Moot under the ruling.\n' > "$home/evidence.txt"
+  run_captain "$home" hold ruling-d --title "Ruling D" --reason "choose" --repo sample >/dev/null
+  run_captain "$home" answer ruling-d --decision-file "$home/ruling.txt" >/dev/null || fail "could not record the ruling"
+  run_captain "$home" withdraw dated-c --evidence-file "$home/evidence.txt" --ruling ruling-d >/dev/null \
+    || fail "withdraw refused an expired captain hold"
+  [ "$(open_status "$home" dated-c)" = 1 ] || fail "the withdrawn expired hold still reads as open"
+  pass "an expired dated hold is still decided or withdrawn, and a parent hold blocks a plain completion"
+}
+
 tests=(
 test_a_mate_home_must_declare_who_owns_each_hold
 test_a_parent_owned_call_closes_on_the_parents_decision
@@ -762,5 +803,6 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
 test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records
 test_a_retried_decide_or_withdraw_finishes_without_a_second_record
 test_the_gate_accepts_an_archived_parent_decision
+test_an_expired_dated_hold_still_releases_and_a_parent_hold_blocks_completion
 )
 captain_hold_run_tests "$@"

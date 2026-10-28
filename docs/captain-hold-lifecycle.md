@@ -299,6 +299,8 @@ The merge entry points (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh`) refuse
 They read the second through `open --parent-owned` and name whose decision is outstanding.
 Splitting the owner therefore never lets through a merge that the single captain kind would have stopped.
 Teardown, the idle reaper, and the session-end relauncher read `open --any-owner`, so cleanup never closes a row while either decision is open.
+The backlog row probe (`bin/fm-backlog-transition-lib.sh`) records the same fact, so an interrupted teardown's close replay keeps the row and `bin/fm-tasks-axi.sh done` refuses it while either decision is open.
+`decide`, `withdraw`, and `classify` read an open hold from its kind, never from tasks-axi's `held` bit, so a dated hold whose date has passed is still released by them.
 The investigation completion gate (`complete` and `verify`) accepts an open classified parent hold, and a newest `decided` or `withdrawn` record, live or archived, as durable states, because each is attributed and marked `Not a captain answer.`.
 `complete` lists an archived one under its own label, never as an answered call.
 The idle reaper names an open parent decision as waiting on the parent firstmate, not on the captain.

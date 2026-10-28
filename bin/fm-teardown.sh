@@ -1170,13 +1170,20 @@ fi
 # header). Asked here, before any
 # destructive step, so "cannot tell" can refuse while everything is intact.
 TEARDOWN_BACKLOG_TRANSITION=close
+TEARDOWN_RETAIN_OWNER=captain
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   TEARDOWN_CAPTAIN_OPEN_STATUS=0
   TEARDOWN_CAPTAIN_OPEN_OUT=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --any-owner 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
   case "$TEARDOWN_CAPTAIN_OPEN_STATUS" in
-    0) TEARDOWN_BACKLOG_TRANSITION=retain ;;
+    0)
+      TEARDOWN_BACKLOG_TRANSITION=retain
+      if FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+        "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --parent-owned >/dev/null 2>&1; then
+        TEARDOWN_RETAIN_OWNER=parent
+      fi
+      ;;
     1) ;;
     *)
       echo "error: task $ID cannot be torn down because whether its backlog item is still held for the captain could not be read; fix that read and retry rather than risk closing a captain call with no recorded answer" >&2
@@ -2599,7 +2606,9 @@ backlog_refresh_reminder() {
   else
     backlog_display="${DATA%/}/backlog.md"
   fi
-  if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ]; then
+  if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ] && [ "$TEARDOWN_RETAIN_OWNER" = parent ]; then
+    printf '%s\n' "Backlog: $ID stays open in $backlog_display, still waiting on the parent firstmate's decision with its deliverable recorded. Record that decision only with bin/fm-captain-hold.sh decide."
+  elif [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = retain ]; then
     printf '%s\n' "Backlog: $ID stays open in $backlog_display, still held for the captain with its deliverable recorded. Relay the question and close it only with bin/fm-captain-hold.sh answer."
   elif [ "$BACKLOG_CLOSED" = 1 ]; then
     printf '%s\n' "Backlog: $ID is closed in $backlog_display. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due."

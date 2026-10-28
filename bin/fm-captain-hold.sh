@@ -2008,7 +2008,7 @@ WITHDRAW_RUN_ROLE=''
 # row closes on the decision, as `answer` closes one without --release; a gated
 # work item is only released.
 command_decide() {
-  local id=${1:-} decision_file='' show state hold_kind held body owner occurrence cur
+  local id=${1:-} decision_file='' show state hold_kind body owner occurrence cur
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -2026,11 +2026,10 @@ command_decide() {
   show=$TASK_SHOW_OUTPUT
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
-  held=$(show_field_value "$show" held)
   body=$(show_field "$show" body)
   owner=$(effective_decision_owner "$(decode_shown_value "$body")")
   occurrence=$(( $(resolution_record_count "$body") + 1 ))
-  if [ "$held" != yes ] || [ "$state" = "done" ]; then
+  if [ -z "$hold_kind" ] || [ "$state" = "done" ]; then
     # Only an exact replay of the recorded parent decision is accepted.
     if [ "$(recorded_resolution_mode "$body" || true)" = decided ] \
       && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
@@ -2138,7 +2137,7 @@ text_names_task() {  # <text> <task-id>
 # captain's words and never completes the work item; it lifts the hold, records
 # who decided and why, and marks the record as not a captain answer.
 command_withdraw() {
-  local id=${1:-} evidence_file='' ruling='' show state hold_kind held body owner occurrence hold_set replay=0
+  local id=${1:-} evidence_file='' ruling='' show state hold_kind body owner occurrence hold_set replay=0
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -2161,14 +2160,13 @@ command_withdraw() {
   show=$TASK_SHOW_OUTPUT
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
-  held=$(show_field_value "$show" held)
   body=$(show_field "$show" body)
   [ "$state" != "done" ] || fail "task $id is already closed; a withdrawal releases an open hold"
   owner=$(effective_decision_owner "$(decode_shown_value "$body")")
   occurrence=$(( $(resolution_record_count "$body") + 1 ))
   if [ "$(recorded_resolution_mode "$body" || true)" = withdrawn ] \
     && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
-    if [ "$held" != yes ]; then
+    if [ -z "$hold_kind" ]; then
       remove_interrupted_answer_stamp "$id"
       reconcile_request_retire "$id"
       publish_parent_hold "$id" $((occurrence - 1)) resolved \
@@ -2179,7 +2177,7 @@ command_withdraw() {
     hold_set=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
     [ -z "$hold_set" ] || [ "$(recorded_resolved_hold_set "$body")" != "$hold_set" ] || replay=1
   fi
-  if [ "$held" != yes ] || [ "$hold_kind" != captain ]; then
+  if [ "$hold_kind" != captain ]; then
     fail "task $id is not held for the captain; nothing to withdraw (a hold the parent owns is released with decide)"
   fi
   [ "$ruling" != "$id" ] || fail "a hold cannot be moot by its own record"
@@ -2215,7 +2213,7 @@ command_withdraw() {
 # Classifying files the hold as the parent's (external, so only decide releases
 # it). The captain reverses a parent classification by re-holding with --owner captain.
 command_classify() {
-  local id=${1:-} owner='' evidence_file='' reason='' show state hold_kind held body decoded orig until
+  local id=${1:-} owner='' evidence_file='' reason='' show state hold_kind body decoded orig until
   local run_role occurrence stored_reason new_reason notes
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
@@ -2242,10 +2240,9 @@ command_classify() {
   show=$TASK_SHOW_OUTPUT
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
-  held=$(show_field_value "$show" held)
   body=$(show_field "$show" body)
   [ "$state" != "done" ] || fail "task $id is already closed; nothing to classify"
-  if [ "$held" != yes ] || [ "$hold_kind" != captain ]; then
+  if [ "$hold_kind" != captain ]; then
     fail "task $id is not an open captain hold; only a captain-kind hold filed before owners were recorded can be classified"
   fi
   decoded=$(decode_shown_value "$body")
@@ -3307,13 +3304,7 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent] [--parent-owne
     if [ "$parent_owned" -eq 1 ] || [ "$any_owner" -eq 1 ]; then
       # The parent's own decision, recorded as the owner by classify. It is never
       # a captain call, so the captain predicate below answers no for it.
-      if [ "$state" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = external ]; then
-        task_show "$id" || {
-          printf 'fm-captain-hold: parent decision %s is open but its record could not be read\n' "$id" >&2
-          exit 2
-        }
-        [ "$(body_decision_owner "$(decode_shown_value "$(show_field "$TASK_SHOW_OUTPUT" body)")")" != parent ] || return 0
-      fi
+      [ "$FM_BACKLOG_ROW_OPEN_DECISION" != parent ] || return 0
       [ "$parent_owned" -eq 0 ] || return 1
     fi
     if [ "$state" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
