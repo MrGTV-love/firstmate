@@ -4178,6 +4178,317 @@ EOF
   pass ".omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool"
 }
 
+# The repair call judges ownership by a live arm child, never by a recorded one:
+# an arm child whose process ended while a descendant still holds its output
+# pipe (so "close" has not fired) is replaced, and the call reports started.
+# A live child of the current owner is left alone.
+test_watch_extension_repairs_a_stale_arm_owner() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-stale/repo"; home="$TMP_ROOT/watch-stale/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+if [ ! -e "$FM_HOME/state/.first-arm-ended" ]; then
+  : > "$FM_HOME/state/.first-arm-ended"
+  # The arm process ends, but a descendant keeps its output pipe open.
+  sleep 60 &
+  printf '%s\n' "$!" > "$FM_HOME/state/.pipe-holder"
+  exit 0
+fi
+exec sleep 60
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage() { return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, { isIdle: () => true });
+for (let i = 0; i < 100 && arms() < 1; i += 1) await sleep(50);
+await sleep(500);
+if (arms() !== 1) throw new Error(`expected one arm, saw ${arms()}`);
+const holder = Number(readFileSync(`${home}/state/.pipe-holder`, "utf8"));
+try {
+  // The first arm process ended; its pipe holder keeps "close" from firing.
+  process.kill(holder, 0);
+  const repaired = await tool.execute();
+  console.log(`repair: ${repaired.content[0].text}`);
+  if (/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`a dead arm owner was reported unchanged: ${repaired.content[0].text}`);
+  if (!/^watcher: started omp extension arm child 2;/.test(repaired.content[0].text)) throw new Error(`the repair did not start a new arm: ${repaired.content[0].text}`);
+  for (let i = 0; i < 100 && arms() < 2; i += 1) await sleep(50);
+  if (arms() !== 2) throw new Error(`the repair did not start a live arm: ${arms()} arms`);
+  const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+  if (!record.includes("event=arm-owner-stale")) throw new Error(`the lifecycle record lacks arm-owner-stale:\n${record}`);
+  // The replacement is live and belongs to the current owner: a second call leaves it alone.
+  await sleep(300);
+  const again = await tool.execute();
+  if (!/^watcher: unchanged/.test(again.content[0].text)) throw new Error(`a live arm child was replaced: ${again.content[0].text}`);
+  if (arms() !== 2) throw new Error(`a live arm child was replaced: ${arms()} arms`);
+} finally {
+  try { process.kill(holder); } catch {}
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension stale arm owner: $out"
+  case "$out" in *"repair: watcher: started omp extension arm child 2;"*) ;; *) fail "the stale-owner repair did not report started: $out" ;; esac
+  pass ".omp watch extension: a dead arm owner is replaced and reported started, a live one is left alone"
+}
+
+# A helper session that loads the extension displaces the primary instance.
+# While the helper lives it keeps the home and the delivery; when its session
+# ends the home goes back to the primary at once, and an arm call from the
+# primary never forwards to an ended instance.
+test_watch_extension_returns_the_home_to_the_primary() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-handback/repo"; home="$TMP_ROOT/watch-handback/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+# While armed for the primary, a wake is due once the test asks for one.
+while [ ! -e "$FM_HOME/state/.fire-wake" ]; do sleep 0.1; done
+rm -f "$FM_HOME/state/.fire-wake"
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-handback 'signal: omp-handback done' || exit 1
+printf 'signal: omp-handback done\n'
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const makePi = (name) => {
+  const handlers = new Map(); const box = { tool: null, sent: [] };
+  return { name, handlers, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(m) { box.sent.push(m); return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const primary = makePi("primary"); mod.default(primary.pi);
+await primary.handlers.get("session_start")({ type: "session_start" }, idle);
+await until(() => arms() === 1, "the primary arm");
+// A helper session loads the extension in the same process and takes the home.
+const helper = makePi("helper"); mod.default(helper.pi);
+await helper.handlers.get("session_start")({ type: "session_start" }, idle);
+await until(() => arms() === 2, "the helper arm");
+// A live forwarding target keeps its delivery: the primary call reaches it and arms nothing.
+const live = await primary.box.tool.execute(idle);
+if (!/^watcher: unchanged/.test(live.content[0].text)) throw new Error(`a live holder lost the home: ${live.content[0].text}`);
+await sleep(300);
+if (arms() !== 2) throw new Error(`a live holder was re-armed: ${arms()} arms`);
+// The helper session ends: the home returns to the primary without any call.
+await helper.handlers.get("session_shutdown")({}, idle);
+await until(() => arms() === 3, "the primary re-arm after the helper ended");
+writeFileSync(`${home}/state/.fire-wake`, "");
+await until(() => primary.box.sent.some((m) => m.includes("signal: omp-handback done")), "the wake on the primary");
+if (helper.box.sent.length !== 0) throw new Error(`an ended helper received a wake: ${JSON.stringify(helper.box.sent)}`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["event=home-handed-back", "event=home-reclaimed", "event=home-resumed"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+await primary.handlers.get("before_agent_start")({}, idle);
+await primary.handlers.get("message_start")({ message: { role: "user", content: primary.box.sent[0] } }, idle);
+await primary.handlers.get("session_shutdown")({}, idle);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension home handback: $out"
+  pass ".omp watch extension: a live helper keeps the home, and its end returns the home and the wakes to the primary"
+}
+
+# With no hand-back to rely on (the earlier owner's own session was between
+# sessions), the primary arm call still never forwards to an ended instance:
+# it takes the home, reports started, and the wake reaches the primary.
+test_watch_extension_arm_call_replaces_an_ended_holder() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-ended/repo"; home="$TMP_ROOT/watch-ended/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+while [ ! -e "$FM_HOME/state/.fire-wake" ]; do sleep 0.1; done
+rm -f "$FM_HOME/state/.fire-wake"
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-ended-holder 'signal: omp-ended-holder done' || exit 1
+printf 'signal: omp-ended-holder done\n'
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=60000 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const makePi = () => {
+  const handlers = new Map(); const box = { tool: null, sent: [] };
+  return { handlers, box, pi: {
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(m) { box.sent.push(m); return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const primary = makePi(); mod.default(primary.pi);
+await primary.handlers.get("session_start")({ type: "session_start" }, idle);
+await until(() => arms() === 1, "the primary arm");
+const helper = makePi(); mod.default(helper.pi);
+await helper.handlers.get("session_start")({ type: "session_start" }, idle);
+await until(() => arms() === 2, "the helper arm");
+// The primary is between sessions when the helper ends, so nothing live can take the home back.
+await primary.handlers.get("session_shutdown")({}, idle);
+await helper.handlers.get("session_shutdown")({}, idle);
+await sleep(300);
+// The primary session resumes and calls the arm tool: the holder is ended, so the call must not reach it.
+const repaired = await primary.box.tool.execute(idle);
+console.log(`repair: ${repaired.content[0].text}`);
+if (/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`the call was forwarded to an ended holder: ${repaired.content[0].text}`);
+if (!repaired.details.ok) throw new Error(`the repair failed: ${repaired.content[0].text}`);
+await until(() => arms() === 3, "the primary arm after the repair");
+writeFileSync(`${home}/state/.fire-wake`, "");
+await until(() => primary.box.sent.some((m) => m.includes("signal: omp-ended-holder done")), "the wake on the primary");
+if (helper.box.sent.length !== 0) throw new Error(`an ended helper received a wake: ${JSON.stringify(helper.box.sent)}`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+if (!record.includes("event=home-reclaimed")) throw new Error(`the lifecycle record lacks home-reclaimed:\n${record}`);
+await primary.handlers.get("session_shutdown")({}, idle);
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension ended holder: $out"
+  pass ".omp watch extension: an arm call never forwards to an ended instance and replaces it"
+}
+
+# Readiness is judged by liveness and progress, not by a fixed total time: a
+# successor that is slow to report keeps running and is reported as still
+# starting, a cycle whose process dies is reported as failed and replaced by the
+# next repair call, and a live child that is still starting is not replaced.
+test_watch_extension_judges_readiness_by_liveness() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-ready/repo"; home="$TMP_ROOT/watch-ready/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+n=$(($(wc -l < "${FM_ARM_LOG:-/dev/null}" 2>/dev/null || echo 0) + 1))
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+case "$n" in
+  1)  # The first cycle reports, then ends with a wake.
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-1\n' "$$"
+    sleep 0.3
+    . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-ready 'signal: omp-ready done' || exit 1
+printf 'signal: omp-ready done\n'
+    exit 0 ;;
+  2)  # A slow successor: it burns CPU for longer than the notice window, then reports.
+    end=$((SECONDS + 2))
+    while [ "$SECONDS" -lt "$end" ]; do :; done
+    : > "$FM_HOME/state/.slow-ready-reported"
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-2\n' "$$"
+    exec sleep 60 ;;
+  3)  # A dead successor: its process ends without ever reporting.
+    sleep 0.3
+    kill -9 "$$" ;;
+  *)
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$n"
+    exec sleep 60 ;;
+esac
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=300 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null; const sent = [];
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage(m) { sent.push(m); return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what, rounds = 200) => { for (let i = 0; i < rounds && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(sent)}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, idle);
+// The slow successor passes the 300ms notice window; the wake goes out saying so.
+await until(() => sent.some((m) => m.includes("signal: omp-ready done")) && sent.some((m) => m.includes("still starting")), "the still-starting wake");
+if (existsSync(`${home}/state/.slow-ready-reported`)) throw new Error("the wake waited for the slow successor to report");
+if (sent.some((m) => m.includes("FAILED"))) throw new Error(`a slow but progressing successor was reported failed: ${JSON.stringify(sent)}`);
+// It is still alive and starting: a repair call leaves it alone.
+const during = await tool.execute(idle);
+if (!/^watcher: unchanged/.test(during.content[0].text)) throw new Error(`a live starting successor was replaced: ${during.content[0].text}`);
+if (arms() !== 2) throw new Error(`a live starting successor was replaced: ${arms()} arms`);
+// It finishes startup well past the notice window and was never dropped.
+await until(() => existsSync(`${home}/state/.slow-ready-reported`), "the slow successor own report");
+await sleep(300);
+const after = await tool.execute(idle);
+if (!/^watcher: unchanged/.test(after.content[0].text)) throw new Error(`the slow successor lost ownership after reporting: ${after.content[0].text}`);
+if (sent.some((m) => m.includes("FAILED"))) throw new Error(`the slow successor was reported failed: ${JSON.stringify(sent)}`);
+// The running cycle dies. Its replacement dies too without ever reporting: that is reported, not hidden.
+const running = Number(readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")[1].replace("arm=", ""));
+process.kill(running, "SIGKILL");
+await until(() => sent.some((m) => m.includes("FAILED")), "the report of the dead cycle");
+await sleep(300);
+const repaired = await tool.execute(idle);
+console.log(`dead: ${repaired.content[0].text}`);
+if (/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`a dead cycle was reported owned: ${repaired.content[0].text}`);
+if (!repaired.details.ok) throw new Error(`the repair after a dead cycle failed: ${repaired.content[0].text}`);
+await until(() => arms() >= 4, "a live replacement");
+await handlers.get("session_shutdown")({}, idle);
+console.log("slow-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension readiness by liveness: $out"
+  case "$out" in *slow-ok*) ;; *) fail "the readiness test did not finish: $out" ;; esac
+  pass ".omp watch extension: a slow but progressing successor is not dropped and a live starting child is not replaced"
+}
+
 test_watch_extension_repairs_after_handoff_publication_failure() {
   local repair repo home out status
   for repair in tool command factory; do
@@ -4340,4 +4651,8 @@ test_secondmate_watch_proof_publishes_for_the_secondmate_itself
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home
+test_watch_extension_repairs_a_stale_arm_owner
+test_watch_extension_returns_the_home_to_the_primary
+test_watch_extension_arm_call_replaces_an_ended_holder
+test_watch_extension_judges_readiness_by_liveness
 test_watch_extension_repairs_after_handoff_publication_failure

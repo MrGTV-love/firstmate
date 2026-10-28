@@ -82,13 +82,20 @@ omp can repair a missing successor automatically or through an explicit arm call
 The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
 The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns predecessor-reference release after factory handoff.
 
+omp judges arm ownership by a live owner, never by a record that an owner once existed.
+An arm child owns the watch only while its process runs and its readiness has not failed, so a repair call that finds a dead recorded child replaces it and reports `started`, not `unchanged`.
+An instance is live from its factory bind until its session shuts down with no later `session_start`.
+A helper session that loads the extension in the same process takes the home while it lives; when its session ends the home returns to the newest other live instance (the primary) at once, and an arm call, `session_start`, or turn start on a displaced primary takes it back when its holder is not live.
+A call is forwarded only to a live holder, so a wake never goes to an ended instance.
+`home-handed-back`, `home-reclaimed`, `home-resumed`, and `arm-owner-stale` in the lifecycle log record each of these transitions.
+
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
 The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy. Expiry waits recheck a monotonic deadline before settling; early timer callbacks wait only the remaining duration. The `actual` field records measured monotonic elapsed milliseconds, not a value clamped to the bound, so wall-clock changes do not distort deadline evidence.
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
-`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
+`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, return of the home from an ended helper, and a slow but progressing successor that is never dropped.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
 Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp or Claude successor does not hold the wake and stays alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 
