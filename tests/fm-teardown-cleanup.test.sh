@@ -15,9 +15,9 @@ if [ "${FM_TEARDOWN_CPU_CHILD:-0}" != 1 ]; then
   exec python3 "$(dirname "${BASH_SOURCE[0]}")/fm-teardown-cpu-probe.py" "$@"
 fi
 fm_teardown_cpu_mark() {
-  local acknowledgement
+  local _
   printf '%s\n' "$1" >& "$FM_TEARDOWN_CPU_MARK_FD" || return 0
-  IFS= read -r acknowledgement <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
+  IFS= read -r _ <& "$FM_TEARDOWN_CPU_ACK_FD" || return 0
 }
 fm_teardown_cpu_mark suite.start
 
