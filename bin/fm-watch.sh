@@ -114,6 +114,14 @@
 #   check: rejected unauthenticated PR poll retirement receipts: <paths>
 #                          invalid pending retirements were preserved without
 #                          running a check or removing poll artifacts
+#   check: status-log-over-cap: file=<name> size=<bytes> (cap <bytes>) growth=<bytes/s> writer=<pid cmd|none>; <action>
+#                          a status log or per-task sidecar passed the size cap
+#                          (docs/configuration.md "Status log size bounds"); one
+#                          wake per growth step of one cap, raised within one poll
+#                          of the growth being seen, naming the writer lsof found.
+#                          Each writer holding it open for writing is stopped
+#                          with SIGSTOP; nothing is deleted or rewritten.
+#                          bin/fm-status-cap-guard.sh owns the investigation
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
 #   check: inactive-outcome bounded poll-loop reconciliation found a suspicious
@@ -262,6 +270,8 @@ command -v fm_progress_check >/dev/null 2>&1 || . "$SCRIPT_DIR/fm-timeout-lib.sh
 # and wakes (session_end_relaunch_tick below).
 # shellcheck source=/dev/null # Analyzed separately as a canonical lint root.
 . "$SCRIPT_DIR/fm-session-end-relaunch-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 
 session_end_relaunch_tick() {
   fm_session_end_relaunch_scan "$STATE" "$WATCHER_STALE_GRACE" || return 1
@@ -640,12 +650,14 @@ inbox_steer_escalate_unavailable() {  # <window> <task> <record>
 # Runs for secondmates too: their pane-staleness exemption is about quiet panes
 # being healthy, while an unacknowledged instruction can still be a stuck steer.
 inbox_steer_check() {  # <window> <task>
-  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state
+  local w=$1 task=$2 action verb rec count tail40 reason='' ring_rc backend agent_state own_open
   action=$(fm_task_inbox_due_action "$STATE" "$task") || return 0
   verb=${action%% *}
   [ "$verb" != quiet ] || return 0
-  if [ "$verb" = retry ] && [ -n "$(status_own_open_decisions "$STATE/$task.status")" ]; then
-    return 0
+  if [ "$verb" = retry ]; then
+    own_open=''
+    status_own_open_decisions "$STATE/$task.status" own_open status_cap_span_tick || return 0
+    [ -z "$own_open" ] || return 0
   fi
   rec=${action#* }
   count=
@@ -2385,6 +2397,7 @@ run_owned_capture() {
   # read, without spawning a timer on each tick.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
+    [ -z "${FM_CAPTURE_TICK:-}" ] || "$FM_CAPTURE_TICK"
     if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
       progress_rc=0
       [ -z "$progress_sampled" ] \
@@ -2463,8 +2476,10 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
 # to completion however long it takes, and only one with no progress for
 # WATCHER_STALL_BOUND is stalled. Meanwhile the main poll shell refreshes its
 # beacon through run_owned_capture, including a slow span reader or decision
-# fold. A failed/stalled read remains unclassified and surfaces conservatively
-# instead of committing a partial endpoint.
+# fold, and runs the optional <tick-command> (status_cap_span_tick) in its own
+# shell, so a writer that passes the cap during a long read is stopped and woken
+# for within a poll. A failed/stalled read remains unclassified and surfaces
+# conservatively instead of committing a partial endpoint.
 watcher_status_span_output() {
   local span_record='' span_needs=0 span_rc
   status_span_first_actionable_record "$1" "$2" span_record span_needs
@@ -2489,7 +2504,7 @@ watcher_status_span_idle() {  # <file> <offset>
   [ "$2" -ge "$idle_size" ]
 }
 
-watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
+watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out] [tick-command]
   local span_capture span_rc
   printf -v "$3" '%s' ''
   [ -z "${4-}" ] || printf -v "$4" '%s' 0
@@ -2498,7 +2513,7 @@ watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out]
     return
   fi
   FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
-  FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
+  FM_CAPTURE_TICK=${5-} FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
     || { watcher_status_span_cleanup; return 2; }
   span_rc=$FM_CHECK_STATUS
   watcher_status_span_cleanup
@@ -2541,7 +2556,7 @@ signal_files_actionable() {  # <status-file> ...
     task=$(basename "$f"); task="${task%.status}"
     record=''; needs_decision=0
     watcher_status_span "$f" \
-      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision
+      "$(fm_wake_signal_seen_size "$STATE" "$f")" record needs_decision status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
@@ -2609,7 +2624,7 @@ heartbeat_scan_finds_actionable() {
     status_heartbeat_seen_marker_path_to marker "$STATE" "$task"
     status_presentation_marker_adopt_device "$marker" "$f" || true
     record=''
-    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record
+    watcher_status_span "$f" "$(hb_surfaced_offset "$task")" record '' status_cap_span_tick
     rc=$?
     [ "$rc" -eq 1 ] && [ -z "$record" ] && continue
     if [ "$rc" -eq 2 ]; then
@@ -2762,6 +2777,160 @@ pr_ready_reconcile_tick() {
     "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
   PR_READY_RECONCILE_PID=$!
 }
+
+# A status log or sidecar over the size cap (bin/fm-status-cap-lib.sh) means a
+# writer outside the sanctioned append is running away. Detection costs one stat
+# per poll (fm_status_cap_unalerted); only a file due an alert reaches the guard
+# (bin/fm-status-cap-guard.sh), which names the writer and contains it. A file is
+# due when it first passes the cap and again each time it has grown by more than
+# one cap since its marker, so a resumed writer is caught again and an unchanged
+# file never wakes twice. The wake is queued before the marker is written, so a
+# failed append is retried on the next poll instead of being lost. It runs at the top
+# of each loop, after each poll-sized slice of the signal linger (signal_grace_linger),
+# after each poll-sized slice of a walk over a log's lines (status_cap_span_tick: the
+# signal, heartbeat, stale and push walks and the inbox-steer open-decisions fold), and
+# just before any wake exits (watch_before_wake), except one that holds the wake-queue lock.
+# Inside the wake it raised (STATUS_CAP_WAKING) it still stops and queues a file that is newly due,
+# but raises no second wake and leaves the files that wake already reported (STATUS_CAP_ALERTED).
+STATUS_CAP_TICK_AT=0
+STATUS_CAP_WAKING=0
+STATUS_CAP_ALERTED=
+STATUS_CAP_SLICE=1
+case "$POLL" in
+  ''|*[!0-9]*) ;;
+  *) [ "$((10#$POLL))" -lt 1 ] || STATUS_CAP_SLICE=$((10#$POLL)) ;;
+esac
+# The growth rate a contained-only tick hands to the watcher's own next tick: one small
+# file per watcher process, holding at most one `<identity>\t<path>\t<rate>\t<time>` line
+# per file over the cap, replaced (never appended to), removed when that tick reads it
+# and when the watcher exits.
+status_cap_handoff_path() {
+  printf '%s/.status-cap-handoff.%s' "$STATE" "${WATCHER_PID:-$$}"
+}
+
+# Merge the due rows (R), the held rates (H) and a scan's records (N), each on stdin with
+# its tag. <mode> hold prints the handoff lines; splice prints the scan's records with the
+# held rate in place of the scan's own. Only due files are kept. Of a held rate and a
+# newer one for the same file, the higher measured rate wins: a later scan of a writer
+# that was already stopped measures about zero, so the higher is the pre-stop rate.
+status_cap_handoff_merge() {  # <hold|splice> <time>
+  awk -F'\t' -v OFS='\t' -v mode="$1" -v now="$2" '
+    function grown(text) { return match(text, /growth=[^ ]* bytes\/s/) ? substr(text, RSTART + 7, RLENGTH - 15) : "" }
+    function higher(a, b) { return a ~ /^[0-9]+$/ && (b !~ /^[0-9]+$/ || a + 0 > b + 0) }
+    $1 == "R" { due[$3 SUBSEP $4] = 1; next }
+    $1 == "H" && ($2 SUBSEP $3) in due { rate[$2 SUBSEP $3] = $4; at[$2 SUBSEP $3] = $5; next }
+    $1 == "N" && $3 != "" {
+      k = $2 SUBSEP $3; r = grown($5)
+      if (mode == "hold") {
+        if (!(k in rate) || higher(r, rate[k])) { rate[k] = r; at[k] = now }
+        next
+      }
+      text = $5
+      if ((k in rate) && higher(rate[k], r)) sub(/growth=[^ ]* bytes\/s/, "growth=" rate[k] " bytes/s (measured at " at[k] ")", text)
+      print $2, $3, $4, text
+    }
+    END {
+      if (mode != "hold") exit
+      for (k in rate) { split(k, p, SUBSEP); print p[1], p[2], rate[k], at[k] }
+    }'
+}
+
+status_cap_tick() {
+  local rows records reason='' ident path size text keys='' key handoff held=''
+  STATUS_CAP_TICK_AT=$SECONDS
+  rows=$(fm_status_cap_unalerted "$STATE") || return 0
+  handoff=$(status_cap_handoff_path)
+  # The watcher's own tick reads and clears the handoff first, so a held rate never
+  # outlives its file's place in the due list.
+  if [ "$BASH_SUBSHELL" -eq 0 ] && [ -f "$handoff" ]; then
+    held=$(cat "$handoff")
+    rm -f "$handoff"
+  fi
+  [ -n "$rows" ] || return 0
+  records=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_STATUS_CAP_SKIP="$STATUS_CAP_ALERTED" "$SCRIPT_DIR/fm-status-cap-guard.sh" scan 2>/dev/null) || return 0
+  [ -n "$records" ] || return 0
+  # In a subshell (a status read the watcher captures with $(...)) a wake would print
+  # into the capture and end only that subshell. There the tick only contains: the
+  # scan stops a writer over the cap, nothing is queued or marked, and the growth
+  # rate it measured before the stop goes to the handoff file. The watcher's own next
+  # tick scans the file again, keeps its own writer and action, puts the held rate in
+  # place of the near-zero one a stopped writer now shows, queues it and wakes.
+  if [ "$BASH_SUBSHELL" -ne 0 ]; then
+    if ! {
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      [ ! -f "$handoff" ] || awk '{ print "H\t" $0 }' "$handoff"
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge hold "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$handoff.tmp" \
+      || ! mv -f "$handoff.tmp" "$handoff"; then
+      rm -f "$handoff.tmp"
+    fi
+    return 0
+  fi
+  if [ -n "$held" ]; then
+    records=$({
+      printf '%s\n' "$rows" | awk '{ print "R\t" $0 }'
+      printf '%s\n' "$held" | awk '{ print "H\t" $0 }'
+      printf '%s\n' "$records" | awk '{ print "N\t" $0 }'
+    } | status_cap_handoff_merge splice '')
+  fi
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    reason="${reason:+$reason ; }${text#check: }"
+    keys="$keys$ident:$path:$size "
+  done <<EOF
+$records
+EOF
+  [ -n "$reason" ] || return 0
+  reason="check: $reason"
+  key="status-log-over-cap-$(printf '%s' "$keys" | cksum | awk '{print $1}')"
+  fm_wake_append check "$key" "$reason" || exit 1
+  while IFS=$'\t' read -r ident path size text; do
+    [ -n "$path" ] || continue
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-status-cap-guard.sh" mark "$path" "$ident" "$size" || :
+    STATUS_CAP_ALERTED="$STATUS_CAP_ALERTED$path"$'\n'
+  done <<EOF
+$records
+EOF
+  [ "$STATUS_CAP_WAKING" -eq 0 ] || return 0
+  # wake() flushes the pending signals before it prints, and the status signal of a
+  # runaway log is pending: without this the flush would linger one more full grace and
+  # the supervisor would hear of a stop that has already happened a grace late.
+  SIGNAL_PHASE_NO_LINGER=1
+  STATUS_CAP_WAKING=1
+  wake "$reason"
+  STATUS_CAP_WAKING=0
+  STATUS_CAP_ALERTED=
+}
+
+# The classifiers loop over a log's unread lines in the shell, 2.7 to 5 ms a line, and call
+# this once per line: a span of 32,768 lines holds the watcher for 88 s or more, and a
+# runaway writer that starts during it would otherwise run unchecked until the loop ends.
+# It looks at the size cap when a poll has passed since the last look. In the watcher's own
+# shell a stop here exits the watcher with the over-cap wake; in a command substitution
+# (the status-event library's scans) it only stops the writer and hands its growth rate on, and
+# the wake follows at the watcher's next tick (status_cap_tick). The stale loop ticks in
+# its own shell at each window, so a captured read ticks only when it alone outlasts a poll.
+# The signal and heartbeat walks run in an owned capture, and the watcher's shell ticks
+# while it waits on them (watcher_status_span).
+# It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
+# because the stop appends a row under that same lock.
+status_cap_span_tick() {
+  [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || return 0
+  [ $((SECONDS - STATUS_CAP_TICK_AT)) -lt "$STATUS_CAP_SLICE" ] || status_cap_tick
+  return 0
+}
+# shellcheck disable=SC2034 # Consumed by handle_push_transition in the separately linted transition owner.
+FM_STATUS_SPAN_TICK=status_cap_span_tick
+# The stale loop and the declared-wait checks read a lane's latest event and declared
+# wait for every window on every poll. When the tail of a log holds no event, those
+# reads widen to the log's history; here that is never more than the last tail window
+# (_fm_status_event_scan_start, bin/fm-status-event-lib.sh). One read goes further: the
+# declared-wait identity walk of an episode still open at the window's start reads back
+# to its first line, up to the read limit (cap plus reserve) from the log's end, so a log
+# at the cap holding one such wait is read whole once. Its cache (state/.<id>.wait-identity)
+# then lets each later poll classify only the bytes appended since.
+# shellcheck disable=SC2034 # Read by the status-event library sourced above.
+FM_STATUS_EVENT_SCAN_TAIL=1
 
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
@@ -3214,6 +3383,7 @@ watcher_cleanup() {
   fm_capture_output_cleanup
   watcher_status_span_cleanup
   fm_custom_check_snapshot_cleanup
+  rm -f "$(status_cap_handoff_path)" "$(status_cap_handoff_path).tmp"
   if [ "$owns_lock" -eq 1 ] \
     && ! fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" "$transition" "$WATCH_LOCK" \
       downtime "$CLEANUP_LOCK_BOUND"; then
@@ -3297,6 +3467,7 @@ SIGNAL_PHASE_FIRST=0
 PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
 PRELUDE_NEXT_STEP=
 SIGNAL_PHASE_DELIVERY_ONLY=0
+SIGNAL_PHASE_NO_LINGER=0
 SIGNAL_PHASE_QUEUED_REASON=
 SIGNAL_PHASE_LATE_MARKER="$STATE/.watch-late-signals"
 
@@ -3374,6 +3545,12 @@ signal_phase_note_queued() {
 }
 
 watch_before_wake() {
+  # A wake from a tick inside an owned capture's wait ends that capture first, so the
+  # flush below and the exit never nest a capture in it or leave its group running.
+  fm_active_check_stop || exit 1
+  fm_check_output_cleanup
+  watcher_status_span_cleanup
+  [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ] || status_cap_tick
   case "$1" in
     signal:*) ;;
     *) signal_phase_flush ;;
@@ -3650,6 +3827,33 @@ EOF
   watcher_beat
 }
 
+# Sleep the signal grace in slices of one poll and look at the status size cap after
+# each. A runaway writer is the likeliest reason this linger starts: its first append
+# is the signal, the log is still under the cap when the loop-top check runs, and the
+# wake the linger ends in exits this watcher before another loop top. One sleep of the
+# whole grace (30 s) would leave the writer unchecked for twice the one-poll bound the
+# docs state, about 21 GB at the 0.7 GB/s of 2026-10-18. A fractional or zero poll or
+# grace sleeps once and looks once, which is the same check after the whole grace.
+signal_grace_linger() {
+  local left=$SIGNAL_GRACE slice=$POLL
+  case "$left" in
+    ''|*[!0-9]*) sleep "$SIGNAL_GRACE"; status_cap_tick; return 0 ;;
+    *) left=$((10#$left)) ;;
+  esac
+  case "$slice" in
+    ''|*[!0-9]*) slice=$left ;;
+    *) slice=$((10#$slice)) ;;
+  esac
+  [ "$slice" -gt 0 ] || slice=$left
+  while :; do
+    [ "$slice" -le "$left" ] || slice=$left
+    sleep "$slice"
+    left=$((left - slice))
+    status_cap_tick
+    [ "$left" -gt 0 ] || return 0
+  done
+}
+
 signal_phase() {
   local reason pending files sf sig f file_reason surface_end surface_ident signal_actionable signal_commit_error
   local signal_append=fm_wake_append
@@ -3669,7 +3873,7 @@ signal_phase() {
   # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
+    [ "$signal_append" = fm_wake_append_locked ] || [ "$SIGNAL_PHASE_NO_LINGER" -eq 1 ] || signal_grace_linger
     pending=$(printf '%s\n%s\n' "$pending" "$(scan_signals)" | LC_ALL=C awk -F '\t' '
       NF == 3 { if (!($3 in row)) order[++n] = $3; row[$3] = $0 }
       END { for (i = 1; i <= n; i++) print row[order[i]] }
@@ -3856,6 +4060,12 @@ while :; do
   pr_ready_reconcile_tick
   lock_alarm_tick
 
+  # A runaway writer makes every status signal fire first, and the fleet-ledger
+  # capture below reads status logs, so the over-cap check runs ahead of both: it is
+  # one stat when nothing is over the cap, and the stop it makes must not wait behind
+  # a slow reader or the deferral further down.
+  status_cap_tick
+
   [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture --try-lock || true
   watcher_beat
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
@@ -3891,6 +4101,7 @@ while :; do
   # crossed turn bound already handed to the away-mode daemon).
   while IFS= read -r w; do
     watcher_beat
+    status_cap_span_tick
     kind=$(window_kind "$w")
     task=$(window_to_task "$w" "$STATE")
     # Steering-inbox loss detection runs before the secondmate stale
@@ -3990,7 +4201,8 @@ while :; do
               rm -f "$ssf"
               clear_write_tracking "$key"
               stale_status="$STATE/$(window_to_task "$w" "$STATE").status"
-              stale_record=$(status_span_first_actionable_record "$stale_status" 0)
+              stale_record=''
+              status_span_first_actionable_record "$stale_status" 0 stale_record '' status_cap_span_tick
               case $? in
                 0|1) stale_end=${stale_record%%$'\t'*}; stale_rest=${stale_record#*$'\t'}; stale_ident=${stale_rest%%$'\t'*} ;;
                 *) stale_end=''; stale_ident='' ;;

@@ -1043,6 +1043,48 @@ test_completion_keep_count_and_normal_options() {
   pass "documented numeric keep forms, no-prune, note, json, and optional noun preserve ordinary completion"
 }
 
+# Relative operational roots must retain their caller meaning after the wrapper
+# changes into the backlog root. The nested home makes a mistaken second
+# resolution name a distinct, enabled decoy home rather than the original one.
+test_relative_home_and_overrides_keep_fleet_ledger() (
+  local layout dir home decoy out rows
+  for layout in home overrides; do
+    dir="$TMP_ROOT/ledger-relative-$layout"
+    home="$dir/homes/one"
+    decoy="$dir/homes/homes/one"
+    mkdir -p "$dir/project" "$home/data" "$home/state" "$home/config" \
+      "$decoy/state" "$decoy/config"
+    empty_backlog "$home/data/backlog.md"
+    fm_test_tasks_toml "$home/.tasks.toml"
+    : > "$home/config/fleet-ledger"
+    : > "$decoy/config/fleet-ledger"
+    printf 'Drop the completed addressing fixture.\n' > "$dir/words.txt"
+    unset FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE
+    if [ "$layout" = home ]; then
+      export FM_HOME=../homes/one
+    else
+      export FM_HOME="$home" FM_STATE_OVERRIDE=../homes/one/state \
+        FM_CONFIG_OVERRIDE=../homes/one/config
+    fi
+    out=$(cd "$dir/project" && "$WRAPPER" add "relative-$layout" \
+      'nested relative addressing' --kind ship --repo sample --priority 2 2>&1) \
+      || fail "$layout relative add failed: $out"
+    assert_grep "relative-$layout" "$home/data/backlog.md" "$layout add missed the home backlog"
+    assert_present "$home/state/fleet-ledger.jsonl" "$layout add missed the original home ledger after changing cwd"
+    rows=$(jq -c '[.event, .task, .repo, .kind, .priority]' "$home/state/fleet-ledger.jsonl")
+    assert_equals "[\"task.filed\",\"relative-$layout\",\"sample\",\"ship\",2]" "$rows" \
+      "$layout task.filed must reach the original home"
+    out=$(cd "$dir/project" && "$WRAPPER" 'done' "relative-$layout" \
+      --drop-file ../words.txt 2>&1) || fail "$layout relative close failed: $out"
+    rows=$(jq -c 'select(.event == "task.closed") | [.task, .evidence]' "$home/state/fleet-ledger.jsonl")
+    assert_equals "[\"relative-$layout\",\"drop_file\"]" "$rows" \
+      "$layout task.closed must reach the original home"
+    assert_absent "$decoy/state/fleet-ledger.jsonl" "$layout ledger leaked into the internally reinterpreted home"
+    assert_absent "$dir/project/state" "$layout ledger leaked into the caller's project"
+  done
+  pass "nested relative FM_HOME and caller-relative state/config keep filed and closed records in the original home"
+)
+
 # The opt-in fleet ledger (docs/fleet-ledger.md): `add` appends one task.filed
 # record for the item it created, and changes nothing else about the command.
 test_add_records_task_filed_once() {
@@ -1182,6 +1224,7 @@ if [ "$HAVE_TASKS_AXI" = 1 ]; then
   test_completion_serializes_with_a_concurrent_hold || exit "$?"
   test_restart_serializes_with_a_concurrent_body_change || exit "$?"
   test_failed_restart_reads_back_before_restoring_drop
+  test_relative_home_and_overrides_keep_fleet_ledger
   test_add_records_task_filed_once
   test_add_ledger_off_and_failing_ledger_leave_add_alone
   test_completion_records_task_closed_once_with_its_proof

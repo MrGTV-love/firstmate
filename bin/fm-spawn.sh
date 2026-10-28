@@ -968,6 +968,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
@@ -2946,8 +2948,8 @@ launch_template() {
   # release that drops this flag fails the launch loudly instead of silently
   # restoring the modal.
   # A secondmate is a firstmate PRIMARY in its own home, and its turn-end guard,
-  # session-start digest, and cd/arm seatbelts are exactly those project hooks
-  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/cd-guard.md), so the
+  # session-start digest, and watcher-arm seatbelt are exactly those project hooks
+  # (docs/turnend-guard.md, docs/sessionstart-nudge.md, docs/arm-pretool-check.md), so the
   # secondmate launch deliberately keeps hooks on.
   codex)
     if [ "$kind" = secondmate ]; then
@@ -5543,9 +5545,21 @@ kimi_wait_for_delivery() {
   return 1
 }
 
+# Record one event in this task's status log through the capped writer
+# (bin/fm-status-cap-lib.sh). A refusal is never dropped silently: the writer names
+# the file and the limit on stderr, and the warning here repeats the file and the
+# exit status, so a lane's failed: or blocked: report that could not land is
+# visible to whoever runs the spawn. A spawn failure path goes on either way.
+spawn_status_append() { # <status-line>
+  local rc=0
+  fm_status_append_line "$STATE/$ID.status" "$1" || rc=$?
+  [ "$rc" -eq 0 ] || echo "warning: could not record the status line in $STATE/$ID.status (exit $rc): $1" >&2
+  return 0
+}
+
 kimi_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
 }
 
@@ -5614,7 +5628,7 @@ rovo_wait_for_delivery() {
 
 rovo_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5687,7 +5701,7 @@ agy_wait_for_working() {
 }
 
 agy_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5728,7 +5742,7 @@ dsh_wait_for_start() {
 }
 
 dsh_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "failed: $1")"
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5767,7 +5781,7 @@ claude_confirm_start() {
   done
   [ "$parked" -ge 2 ] || return 0
   dialog=$(printf '%s' "$pane" | fm_busy_claude_launch_prompt_name)
-  printf '%s\n' "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")" >>"$STATE/$ID.status"
+  spawn_status_append "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")"
   echo "warning: claude worker $ID is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; send no keys, a person must answer it in window $T" >&2
   return 0
 }
@@ -7763,7 +7777,7 @@ SPAWN_ACCOUNT=
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 if [ "$DISPATCH_SWITCHED" = true ]; then
-  printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  spawn_status_append "$(printf 'working [at=%s]: model-matrix fallback launched %s %s for %s' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}")"
 fi
 # Shadow model picker (observe only): the launch is already delivered, so this can
 # only append routing evidence to the picker's private store. It runs detached with

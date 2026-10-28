@@ -374,7 +374,9 @@ child_terminal_ledger_line() { # <status>
   [ -f "$status" ] && [ ! -L "$status" ] && [ -s "$status" ] || return 1
   last=$(last_status_line "$status")
   case "$(status_line_verb "$last")" in done|failed) ;; *) return 1 ;; esac
-  snapshot=$(cat "$status"; printf '%s' "$marker") || return 1
+  # Only the final line matters here, so a bounded tail stands for the log: a runaway
+  # log must not be read whole into memory (bin/fm-status-cap-lib.sh).
+  snapshot=$(tail -c 65536 "$status" | head -c 65536; printf '%s' "$marker") || return 1
   case "$snapshot" in
     *$'\n'"$marker") ;;
     "$last$marker"|*$'\n'"$last$marker") return 2 ;;
@@ -430,15 +432,16 @@ report_child_ledger_locked() { # <id> <meta>
   outcome_key="child-outcome-$id-$state-${fingerprint:0:8}"
   ensure_record "$fingerprint" "$id" "$incarnation" "$state" "$outcome_key" direct upstream "$pr" || return 1
   [ -n "$RECORD_PENDING" ] || return 0
-  last_status_line "$status" previous >/dev/null
-  predecessor_head=$(sha256_text "$previous")
-  if claim_inactive_report_for_ledger "$id" "$incarnation" "$state" "$fingerprint" "$predecessor_head"; then
-    # The fallback line is already on the parent channel. This reported ledger
-    # receipt records that its richer rendering owes no second publication.
-    mark_reported "$RECORD_PENDING" || return 1
-    return 0
-  elif [ "$?" -eq 2 ]; then
-    return 1
+  if last_status_line "$status" previous >/dev/null; then
+    predecessor_head=$(sha256_text "$previous")
+    if claim_inactive_report_for_ledger "$id" "$incarnation" "$state" "$fingerprint" "$predecessor_head"; then
+      # The fallback line is already on the parent channel. This reported ledger
+      # receipt records that its richer rendering owes no second publication.
+      mark_reported "$RECORD_PENDING" || return 1
+      return 0
+    elif [ "$?" -eq 2 ]; then
+      return 1
+    fi
   fi
   note=$(clean_field "$(status_line_note "$last")")
   mode=$(clean_field "$(meta_field "$meta" mode)")
