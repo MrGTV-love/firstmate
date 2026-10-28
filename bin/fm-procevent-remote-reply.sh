@@ -657,8 +657,15 @@ EOF
   # committed: the cursor and the mirrored-source record stay where they were, so the
   # delta is re-read whole and the lines that did land are recognised as present, and one
   # keyed escalation names the log. Nothing is dropped and the log never grows unbounded.
+  # Exit 75 also covers a lock the append could not take within its wait; that refusal
+  # writes nothing, raises no escalation, and the next ingest retries the same delta.
   append_rc=0
-  fm_status_append_file "$status_file" "$status_additions" || append_rc=$?
+  fm_status_append_file "$status_file" "$status_additions" 2> "$tmp/append.err" || append_rc=$?
+  cat "$tmp/append.err" >&2
+  if [ "$append_rc" -eq 75 ] && grep -q 'stayed locked by another writer' "$tmp/append.err"; then
+    fm_lock_release "$lock"
+    die "cannot append remote reply: $status_file stayed locked by another writer past the lock wait; nothing was written, the cursor was not advanced, and the next ingest retries the delta"
+  fi
   if [ "$append_rc" -eq 75 ]; then
     line="blocked [key=remote-reply-continuity-$id-capped]: remote reply mirror stopped for $id: the parent status log is past its size limit, so the remote delta at offset ${CURSOR_OFFSET} stays unread and nothing was dropped; free the log or retire the lane and the next ingest resumes"
     if ! status_event_recorded "$status_file" "$line"; then
