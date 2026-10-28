@@ -21,6 +21,7 @@
 #   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
 #     in the default discovery paths, and comments, heredocs, docstrings and tests are not
+#   - an unmapped `|| exit 2` in a hook script fails S1, and the same site mapped passes
 #   - an unmapped site fails S1, the same site mapped by a sites marker passes, and a site added
 #     inside an already-mapped owner file still needs its own mapping
 #   - a marker that matches nothing, the wrong number of sites, or a site another entry owns fails
@@ -326,6 +327,14 @@ printf '#!/usr/bin/env bash\ncase "$1" in\n  -h) usage >&2\n    exit 2 ;;\nesac\
 assert_site "S1 finds the bare exit 2 of a hook script" "$SIG" 'D'
 [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "the usage exit 2 must not count as a deny: $(site_ids "$SIG")"
 pass "a usage exit 2 in a hook script is not a deny"
+
+SIG=$(fixture sig_hook_or_exit)
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf '#!/usr/bin/env bash\nreset_episode "$STATE" || exit 2\n' >"$SIG/bin/fm-x-turnend-check.sh"
+assert_site "S1 fails an unmapped || exit 2 of a hook script" "$SIG" 'D'
+# shellcheck disable=SC2016 # the jq filter matches literal shell source
+mutate "$SIG" '.guards[0].sites = [{"file":"bin/fm-x-turnend-check.sh","match":"reset_episode \"$STATE\" || exit 2"}]'
+assert_mapped "a || exit 2 hook site passes once a registered entry maps it" "$SIG" 1
 
 SIG=$(fixture sig_plugin)
 mkdir -p "$SIG/.opencode/plugins"

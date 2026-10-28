@@ -103,7 +103,7 @@ A site is one code line that matches a signature outside comments, heredoc bodie
 - `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word.
 - `C` helper call: a call to a function whose definition name has the word `refuse` in it, or is exactly `deny` or `block_stop`.
   The scan derives these names from the definitions in the code and prints them under `helpers`.
-- `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&`) in a hook script, or a `throw` in an opencode plugin.
+- `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script, or a `throw` in an opencode plugin.
   A hook script is a script a hook registration file names, or one whose file name says hook, pretool, posttool or turnend.
 - `E` guard event: a call to `bin/fm-guard-event.sh` (or its `guard_event` wrappers) that records a decision other than `allow`.
 

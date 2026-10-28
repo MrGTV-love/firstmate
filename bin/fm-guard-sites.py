@@ -7,7 +7,7 @@ discovery and the mapping, so the lint cannot validate only the entries it was h
 docs/guard-spec.md "Refusal sites" owns the signature set and the mapping rule.
 
 Usage:
-  fm-guard-sites.py [--root DIR] [--registry PATH] [--touched-since REF] [--signatures]
+  fm-guard-sites.py [--root DIR] [--registry PATH] [--touched-since REF]
 
 Output is one JSON object on stdout:
   paths      the scanned files, relative to the root
@@ -39,21 +39,12 @@ DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\
 DENY_PERMISSION = re.compile(r'permissionDecisio[n].*deny')
 DENY_BLOCK = re.compile(r'\bblock\s*:\s*true\s*,')
 GUARD_EVENT = re.compile(r'(?:^|[\s"/(])(?:fm-guard-event\.sh|fm_guard_event|guard_event)"?\s+[a-z$]')
-EXIT_TWO = re.compile(r'^(?:.*&&\s*)?exit 2\s*$')
+EXIT_TWO = re.compile(r'^(?:.*(?:&&|\|\|)\s*)?exit 2\s*$')
 HEREDOC = re.compile(r'<<-?([\'"]?)([A-Z_][A-Z0-9_]*)\1')
 SH_DEF = re.compile(r'^\s*(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{?')
 PY_DEF = re.compile(r'^\s*(?:async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(')
 JS_DEF = re.compile(r'^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][A-Za-z0-9_$]*)'
                     r'|^\s*(?:export\s+)?(?:const|let)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*(?:async\s*)?\(')
-
-# docs/guard-spec.md "Refusal sites" states what each signature means.
-SIGNATURES = (
-    ('A', 'marker'),
-    ('B', 'message'),
-    ('C', 'helper-call'),
-    ('D', 'hook-deny'),
-    ('E', 'guard-event'),
-)
 
 
 def kind_of(path):
@@ -308,7 +299,6 @@ def touched_lines(root, ref, rels):
 
 def map_sites(sites, registry):
     errors = []
-    owner = {}
     for guard in registry.get('guards', []):
         gid = guard.get('id', '')
         markers = guard.get('sites')
@@ -359,10 +349,6 @@ def main(argv):
             registry_path = args.pop(0)
         elif arg == '--touched-since' and args:
             touched_ref = args.pop(0)
-        elif arg == '--signatures':
-            for name, text in SIGNATURES:
-                print('%s\t%s' % (name, text))
-            return 0
         else:
             print('error: unknown argument %r' % arg, file=sys.stderr)
             return 2
