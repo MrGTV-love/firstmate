@@ -1,0 +1,56 @@
+== BASE 1f843933b: bin/fm-copy-sweep.sh (report) ==
+copy-sweep: mode=report containers=1 copies=7
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/appendignore	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/cacheonly	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/graftclone	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/graftonly	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/precious	it holds ignored files that exist nowhere else: precious.local
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/subgraft	it holds ignored files that exist nowhere else: sub sub/graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/truncignore	it holds ignored files that exist nowhere else: .ignore graft
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=7
+summary: ORPHAN-NO-RECORD=0
+budget pool <W>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <W>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+report exit=0
+== BASE 1f843933b: bin/fm-copy-sweep.sh --apply ==
+copy-sweep: mode=apply containers=1 copies=7
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/appendignore	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/cacheonly	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/graftclone	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/graftonly	it holds ignored files that exist nowhere else: .ignore graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/precious	it holds ignored files that exist nowhere else: precious.local
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/subgraft	it holds ignored files that exist nowhere else: sub sub/graft
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/truncignore	it holds ignored files that exist nowhere else: .ignore graft
+summary: REAPABLE-PROVEN=0
+summary: REAPABLE-DRIVER=0
+summary: PENDING-DRIVER=0
+summary: WAITING=0
+summary: DEFERRED=0
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=0
+summary: HELD-DIRTY=7
+summary: ORPHAN-NO-RECORD=0
+budget pool <W>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <W>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+sizes: 0 scanned copies unmeasured, 0 removed copies unmeasured
+copies=7 GiB=0.00 reaped=0 freed=0.00
+apply exit=0
+== BASE 1f843933b: copies left on disk ==
+graftonly: PRESENT
+cacheonly: PRESENT
+appendignore: PRESENT
+truncignore: PRESENT
+graftclone: PRESENT
+subgraft: PRESENT
+precious: PRESENT
+graftclone nested .git intact
+appendignore .ignore intact

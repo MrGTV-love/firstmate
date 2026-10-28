@@ -1,0 +1,9 @@
+ok - a merged copy holding only graft output is removed without a keep wake
+ok - custom .ignore content, including appended lines and newlines, keeps its existing reason
+ok - older sessions, null sync times, cache-only, stale cards, implements edges and project caches under graft/ are scratch
+ok - a .git below graft/ keeps the copy
+ok - graft/ content git tracks gets no scratch exemption
+ok - the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal
+ok - a unique ignored file outside the preserve list and the scratch patterns keeps the copy
+ok - end to end: a squash-merged copy with ignored files that teardown refuses is removed by the fallback, preserved records first, and teardown then closes the task
+EXIT=0

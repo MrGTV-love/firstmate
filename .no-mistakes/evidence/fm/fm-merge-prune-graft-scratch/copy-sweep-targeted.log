@@ -1,0 +1,6 @@
+ok - graft output alone is reaped, and a custom .ignore or a clone below graft/ still holds the copy
+ok - fm-copy-sweep
+EXIT=0
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - fm-copy-sweep
+EXIT=0

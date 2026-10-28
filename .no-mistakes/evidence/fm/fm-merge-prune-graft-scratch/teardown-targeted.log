@@ -1,0 +1,5 @@
+ok - a forced close preserves a foreign copy's unique ignored file with its SHA-256 and releases the copy, as the held-copy rule never applies to it
+ok - graft output alone does not hold a foreign copy; a custom .ignore or a clone below graft/ still does
+ok - a released own nested copy preserves none of its graft output; a custom .ignore or a clone below graft/ is still preserved
+ok - regenerable ignored caches are allow-listed and need no preservation or refusal
+EXIT=0

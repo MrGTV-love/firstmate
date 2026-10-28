@@ -1,0 +1,37 @@
+--- CHANGE 1c82b5bb4 / graft-teardown ---
+copy: removed
+treehouse destroy calls: 1
+keep wakes: 0
+task record: closed by teardown
+preserved to task data: 
+  log: 2026-10-28T08:28:31Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:40Z removed the returned copy <W>/th/pool1/1/repo (head 5270956); preserved records, if any, are in <W>/home/data/t1/merge-prune-preserved/1793176112
+  log: 2026-10-28T08:28:40Z reaped: teardown completed; removed the returned copy
+--- CHANGE 1c82b5bb4 / graft-fallback ---
+copy: removed
+treehouse destroy calls: 1
+keep wakes: 0
+task record: closed by teardown
+preserved to task data: 
+  log: 2026-10-28T08:28:41Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:47Z fallback destroyed <W>/th/pool1/1/repo (head 7300a8e); preserved records, if any, are in <W>/home/data/t1/merge-prune-preserved/1793176121
+  log: 2026-10-28T08:28:49Z reaped: removed by fallback, teardown completed
+--- CHANGE 1c82b5bb4 / custom-ignore-fallback ---
+copy: KEPT
+treehouse destroy calls: 0
+keep wakes: 1
+task record: open
+record reason: /Users/charlesabrooker/tmp/fm-merge-prune.3XUF4W/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+preserved to task data: 
+  log: 2026-10-28T08:28:50Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:52Z retained <W>/th/pool1/1/repo: <W>/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+--- CHANGE 1c82b5bb4 / nested-git-fallback ---
+copy: KEPT
+treehouse destroy calls: 0
+keep wakes: 1
+task record: open
+record reason: /Users/charlesabrooker/tmp/fm-merge-prune.3XUF4W/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: graft
+preserved to task data: 
+nested clone under graft/: intact
+  log: 2026-10-28T08:28:53Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:55Z retained <W>/th/pool1/1/repo: <W>/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: graft

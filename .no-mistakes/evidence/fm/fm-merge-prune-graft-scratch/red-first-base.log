@@ -1,0 +1,11 @@
+== red-first: changed tests run against base 1f843933b bin/ (expected: every case fails) ==
+teardown-foreign: exit=1
+  not ok - held-graft-generated: a foreign copy holding only graft output was not released: notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+teardown-own-nested: exit=1
+  not ok - own-locked-graft-generated: graft output was copied to task data
+copy-sweep: exit=1
+  not ok - copy graftonly should be REAPABLE-PROVEN, got 'HELD-DIRTY': copy-sweep: mode=report containers=1 copies=3
+merge-prune-generated: exit=1
+  not ok - a merged copy holding only graft output is removed without a keep wake: a merged copy holding only generated graft output was kept: /Users/charlesabrooker/tmp/fm-merge-prune.rSO61W/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+merge-prune-shapes: exit=1
+  not ok - older sessions, null sync times, cache-only, stale cards, implements edges and project caches under graft/ are scratch: graft output with session-without-host was kept: /Users/charlesabrooker/tmp/fm-merge-prune.hlOwFP/w1/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore

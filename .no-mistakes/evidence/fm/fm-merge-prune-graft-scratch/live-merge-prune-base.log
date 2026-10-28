@@ -1,0 +1,37 @@
+--- BASE 1f843933b / graft-teardown ---
+copy: removed
+treehouse destroy calls: 1
+keep wakes: 0
+task record: closed by teardown
+preserved to task data: 
+  log: 2026-10-28T08:28:03Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:11Z removed the returned copy <W>/th/pool1/1/repo (head c6d5f09); preserved records, if any, are in <W>/home/data/t1/merge-prune-preserved/1793176083
+  log: 2026-10-28T08:28:11Z reaped: teardown completed; removed the returned copy
+--- BASE 1f843933b / graft-fallback ---
+copy: KEPT
+treehouse destroy calls: 0
+keep wakes: 1
+task record: open
+record reason: /Users/charlesabrooker/tmp/fm-merge-prune.ct7G8c/w2/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+preserved to task data: 
+  log: 2026-10-28T08:28:12Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:14Z retained <W>/th/pool1/1/repo: <W>/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+--- BASE 1f843933b / custom-ignore-fallback ---
+copy: KEPT
+treehouse destroy calls: 0
+keep wakes: 1
+task record: open
+record reason: /Users/charlesabrooker/tmp/fm-merge-prune.ct7G8c/w3/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+preserved to task data: 
+  log: 2026-10-28T08:28:14Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:16Z retained <W>/th/pool1/1/repo: <W>/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+--- BASE 1f843933b / nested-git-fallback ---
+copy: KEPT
+treehouse destroy calls: 0
+keep wakes: 1
+task record: open
+record reason: /Users/charlesabrooker/tmp/fm-merge-prune.ct7G8c/w4/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore
+preserved to task data: 
+nested clone under graft/: intact
+  log: 2026-10-28T08:28:17Z armed for https://github.com/acme/widget/pull/7
+  log: 2026-10-28T08:28:19Z retained <W>/th/pool1/1/repo: <W>/th/pool1/1/repo holds an ignored file that is neither scratch nor on the preserve list: .ignore

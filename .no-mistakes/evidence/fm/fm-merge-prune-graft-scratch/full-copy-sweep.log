@@ -1,0 +1,91 @@
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - live nested copies are named once with lock/directory ages, below budget, without changing copies or locks
+ok - a lock probe cut by the time bound names the copy with an unknown source and age, never its directory age
+ok - a registered copy whose directory is gone is not named as a live nested copy
+ok - the wake carries the count, the oldest five live copies and a pointer to the report, as one line
+ok - a new youngest copy is named first, the wake names five copies in all, and an unchanged set stays silent
+ok - home-project nested copies are reported while their task is live, but not after closure or for a secondmate home
+ok - unreadable registered-worktree enumeration reports the gap without a directory-walk fallback
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - a live recycled launcher pid holds its copy and unchanged lock, with age and lock mtime reported
+ok - a dead-launcher locked copy with untracked work stays registered and locked, without a driver call or sweep data
+ok - a dead-launcher locked copy with a process inside stays registered and locked, without a driver call or sweep data
+ok - a locked copy whose launcher pid has finished is planned, preserved, released by the driver and removed, one run, with the net GiB freed reported
+ok - an exact env_loading missing-.env warning on stderr does not veto an allowed stdout plan, and the cap still limits executes
+ok - missing-.env stderr warnings remain visible but do not turn either temporary stdout refusal into a permanent receipt
+ok - a failed nested-registration enumeration holds a clean locked copy before any driver call
+ok - a failed post-removal registration proof reports unproved, keeps the receipt, and never reports or logs REMOVED
+ok - the default cap releases five of seven locked copies and defers two unchanged until the next run; an explicit cap of two behaves the same way
+ok - a refused plan, a failed preservation, a failed reproof and temporary driver refusals use no release slot, so five copies that refuse on every run cannot starve the clean copies behind them: one run releases five clean copies and defers two, and the next run releases those two
+ok - a post-execute enumeration that prints the candidate and then fails is unknown, uses a release slot, and limits seven untouched driver refusals to five executes with two deferred
+ok - a driver execute that reports success but leaves the copy registered, or fails after releasing its lock, uses a release slot, so a systematic partial release reaches at most five copies per run and defers the rest
+ok - a dead-launcher UUID-owner creation lock uses the same supported driver release
+ok - a dead-launcher creation lock with an owner=ppid:<pid> owner uses the same driver release, because only its launcher pid and the other proofs decide
+ok - exit-3 ignored-payload retention is KEPT, keeps its lock and source, and repeated sweeps neither preserve nor execute again
+ok - a task record appearing during the driver plan prevents preservation and release
+ok - a different but valid Vernant lock appearing during the plan is never released
+ok - extra lock lines stay byte-identical and never reach the driver
+ok - NUL bytes cannot normalize an unsupported lock into an allowed creation lock
+ok - a driver that releases its lock but fails removal leaves a durable protection against later plain removal
+ok - a retention receipt whose copy is gone or whose path now holds a different copy, locked or not, is ignored by classification, left by report, and removed and listed by apply, so a new copy at that path is judged on its own proofs
+ok - report distinguishes a local-proof candidate from a driver-approved removal without executing the driver
+ok - only a boolean positive verdict with exit zero is permission; invalid types, documents, suffixes and nonzero exit keep lock bytes unchanged
+ok - a copy whose plan the driver refuses is held with the driver's reason, nothing is copied, the run exits 0, and the next run releases it once the plan allows it
+ok - a plan that reports the driver's retain rule holds the copy with the driver's words, copies nothing, never executes, and exits 0
+ok - a failure after an allowed plan leaves the copy locked and registered, the run exits 1, and the FAILED line carries the driver's refusal lines and exit code
+ok - an execute refusal the driver names temporary (lease conflict, live or unknown tenant) that released nothing leaves no receipt and discards its own run's preserve, so repeated refusals add no preserve while the copy keeps its originals, and the next allowed run preserves once and releases the copy; an original that changed in the copy during preservation stops the release before execute, keeps the preserve of the old content and the next run still retries the copy; an original that changed during execute before the same temporary refusal keeps that preserve with no receipt and the next quiet run releases the copy; the same refusal after an unlock stays held with its preserve
+ok - a copy whose preserved content changed after its preservation reports WAITING, never HELD, with no new preserve and no driver call while its content keeps changing across runs; the first run that sees it unchanged preserves once and releases it through the driver, and no preserve is lost; content that changes back to its latest preserve is released without a duplicate preserve
+ok - ignored content that changes after the last proof, after a preserve was built or an earlier preserve was reused, stops the release before the driver's execute, uses no release slot and keeps every preserved byte, and a later quiet run preserves the new content once and releases the copy
+ok - a new ignored file that appears after preservation, with or without an earlier preservable file, stops the release before execute with no release slot and no lost bytes, records the copy's content, so the next run that still sees it changing reports WAITING with no preserve and no driver call, and the first quiet run preserves once and releases the copy
+ok - a preservable ignored directory holding a FIFO and a stale socket is compared as preservation copies it: temporary refusals discard each run's preserve with no waiting record, so preserves never accumulate, and the allowed run preserves once and releases the copy
+ok - a driver-retention receipt that cannot be written before execute stops the release, discards that run's preserve while the copy still holds its lock and originals, so repeated refusals add no preserve, and the next run that can write it preserves once and releases the copy
+ok - a driver answer whose sorted keys put its reason past 600 characters still shows that reason first in the plan hold, the KEPT or FAILED line, the receipt and the later held reason
+ok - a copy whose ignored files cannot be preserved stays locked and registered, the sweep's own FAILED line ends in a human-only question with no command and no friction event, and the run exits 1
+ok - a failed preservation removes the staging directory it built, so repeated failed sweeps leave no staging bytes behind
+ok - a copy whose creation lock became someone else's after its plan stays locked, is not released by the driver, and is reported as the sweep's own refusal
+ok - a task record or a different valid lock appearing during preservation stops the release after the copy, with no execute and no receipt; this run's preserve is discarded only while the copy keeps the plan's lock and every preserved original unchanged, and a later quiet run whose content equals that kept preserve releases the copy through the driver without preserving it again
+ok - an empty, malformed, missing, false-with-text or garbage-literal plan verdict and a plan that never answers all hold the copy locked, copy nothing, run the driver only in plan mode, leave no driver process running, and exit 0
+ok - a plan whose whole answer is the bare text allowed=true holds the copy and never executes the driver
+ok - a zero-padded plan bound is decimal: 08 holds a hung plan at 8s and 08 or 09 releases a copy whose plan allows it
+ok - a sweep stopped while its plan hangs stops the driver and its child too
+ok - new copies at the same path and HEAD retain both versions of their preserved ignored bytes
+ok - a removal whose size was not measured shows - and unmeasured, and the closing total counts it
+ok - a locked copy with an unpushed but content-equivalent commit is held, and the driver never runs
+ok - a live launcher, a lock that is not Vernant's, and a missing driver all keep their copy untouched
+ok - a copy with one untracked file and a copy whose tip is on no remote are both kept
+ok - a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule
+ok - a project clone under a Firstmate home is enumerated, budgeted as a container, and swept
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run
+ok - 6 skipped runs in a row raise one wake, none while the streak stands, and again after a sized run breaks it
+ok - du runs one at a time as nice -n 20 du -sk, with and without a deadline
+ok - sizes are cached by copy path and mtime and expire with cache-max-age
+ok - a copy nested in another copy is subtracted from the enclosing one
+ok - the budget wake names budget, total and the five largest copies with class, fires once, and fires again after a drop and a new overrun
+ok - a pool budget and a container budget that go over together raise one wake
+ok - apply raises the budget wake once through the wake queue
+ok - a scan cut at its time bound wakes only on bytes it measured and records no completed scan
+ok - a registered copy whose directory is gone counts as 0 KiB, so it never latches a budget record
+ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time
+ok - run from the root home, a lane's proven copy is reaped, its own live record holds a copy, and an unreadable lane holds every copy
+ok - an outer copy that holds a dirty inner copy is held and apply keeps both, even when git status cannot see the inner copy
+ok - an outer copy is held while an inner copy exists, reaped by the next run once it is removed, and not held by a registration whose directory is gone
+ok - a zero-padded or non-numeric FM_CHECK_TIMEOUT no longer aborts the check
+ok - a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy
+ok - graft output alone is reaped, and a custom .ignore or a clone below graft/ still holds the copy
+ok - a check whose enumeration is slow stops looking for clones at its time bound and still prints the wake for the clones it reached
+ok - a check stops looking at a home's project clones at its time bound
+ok - a cut check keeps the standing budgets it did not reach and counts toward the streak of skipped runs
+ok - a check that is cut and skipped on every poll counts once per interval and raises exactly one wake on the 6th counted run
+ok - a cut check keeps a pool budget it reached only in part, and only a complete run clears it
+ok - a cut check keeps the cached sizes of the copies it did not reach while they are fresh, and a complete run rewrites the cache
+ok - check classifies exactly the copies its wake names
+ok - check scans at most once per interval and polls inside it do nothing
+ok - check is report-only
+ok - a malformed config/copy-budget is refused with its line named and reported once by check
+ok - the host's own lsof finds a process whose working directory is inside a copy
+ok - arm binds the check to the existing watcher cadence and disarm removes it
+ok - help carries the hourly command and bad calls are refused
+ok - fm-copy-sweep
+EXIT=0 secs=801
