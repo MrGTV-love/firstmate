@@ -8,9 +8,9 @@ The predicate lives in `bin/fm-turnend-guard.sh`.
 Primary scope lives in `bin/fm-primary-scope-lib.sh`, shared with the native session-start adapters in [`sessionstart-nudge.md`](sessionstart-nudge.md).
 Harness hook files adapt each enabled primary harness integration's turn-end mechanism to that shared predicate.
 
-Related Bash PreToolUse guards deny unsafe commands before execution rather than detecting a blind turn end afterward.
-Their separate owners are [`arm-pretool-check.md`](arm-pretool-check.md) and [`cd-guard.md`](cd-guard.md).
-Do not infer this guard's scope, loop safety, or compatibility tradeoffs for those guards.
+The Bash PreToolUse guard denies unsafe watcher-arm commands before execution rather than detecting a blind turn end afterward.
+Its separate owner is [`arm-pretool-check.md`](arm-pretool-check.md).
+Do not infer this guard's scope, loop safety, or compatibility tradeoffs for that guard.
 
 ## Find a topic
 

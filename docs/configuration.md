@@ -484,7 +484,10 @@ If the target is a symlink, the write replaces it with a regular file.
 Linking the code-root copy into the home therefore forks the queue on the first write instead of keeping the copies in sync.
 
 Run every routine Firstmate backlog command through [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh).
-Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
+Like lifecycle transitions, it addresses this home's backlog, archive, and opt-in fleet ledger from any working directory, including a caller-relative `FM_HOME`.
+Changing directories is not the correctness boundary: a bare relative write still addresses the caller's directory, while home-owned entry points resolve their destinations themselves.
+[`tests/fm-home-writes.test.sh`](../tests/fm-home-writes.test.sh) exercises those write paths from a project-like foreign directory, including a negative control reproducing the bare relative-append incident.
+[`tests/fm-tasks-axi.test.sh`](../tests/fm-tasks-axi.test.sh) also covers nested relative homes and caller-relative state/config overrides with the fleet ledger enabled.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
 ## Runtime backend (config/backend / FM_BACKEND)
@@ -4314,7 +4317,6 @@ FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
-FM_CD_GUARD_MODE=warn   # warn (default) or deny for the primary checkout's persistent top-level cd guard; deny restores the block; docs/cd-guard.md owns the contract
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
