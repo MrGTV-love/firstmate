@@ -1134,7 +1134,7 @@ test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
     assert_grep "Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader)" "$brief" \
       "$id: brief missing the mandatory item shape"
     assert_grep "A session that did not build this work grades it" "$brief" "$id: brief does not name who grades"
-    assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
+    assert_grep "Each mandatory item is graded pass, fail, or unresolved" "$brief" "$id: brief missing the mandatory rule"
     assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
       "$id: brief missing the supporting rule"
     assert_grep "Your \`done:\` status line is a signal to start checking, not a pass" "$brief" \

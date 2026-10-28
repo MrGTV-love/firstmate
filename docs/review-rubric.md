@@ -4,7 +4,10 @@ This file owns the review criteria for Firstmate-dispatched no-mistakes runs and
 It does not change the selected delivery path, review authority, or merge policy.
 
 - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
-- Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Grade every DoD mandatory item by its id as pass, fail, or unresolved, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Grade an item fail only on demonstrated noncompliance; grade an item that could not be assessed unresolved, and name the missing evidence or decision.
+- Evidence that only a downstream step can produce is pending, never pass; report it as unresolved with the downstream step named.
+- A green pipeline counts only for what its checks ran; pipeline readiness is not final acceptance.
 - Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
 - Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
 
