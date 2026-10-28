@@ -1,0 +1,16 @@
+FM_TEARDOWN_CPU {"event": "launch", "monotonic_ns": 18139362080000, "outer_cpu_includes_observer": true, "platform": "darwin", "root_pid": 92044, "selectors": ["test_local_only_force_overrides_unpushed", "test_teardown_retires_the_dsh_launch_state"]}
+FM_TEARDOWN_CPU {"cpu_seconds": 0, "event": "boundary", "mark": "suite.start", "monotonic_ns": 18139459176000, "root_pid": 92044, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "suite.start", "event": "interval", "invalid_reason": "missing_endpoint", "region": "unattributed_launch", "start_mark": null, "valid": false, "wall_ns": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 5.68, "event": "boundary", "mark": "test_local_only_force_overrides_unpushed.start", "monotonic_ns": 18147360633791, "root_pid": 92044, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 5.68, "end_mark": "test_local_only_force_overrides_unpushed.start", "event": "interval", "invalid_reason": null, "region": "unattributed_startup", "start_mark": "suite.start", "valid": true, "wall_ns": 7901457791}
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+FM_TEARDOWN_CPU {"cpu_seconds": 7.88, "event": "boundary", "mark": "test_local_only_force_overrides_unpushed.end", "monotonic_ns": 18150229644416, "root_pid": 92044, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 2.2, "end_mark": "test_local_only_force_overrides_unpushed.end", "event": "interval", "invalid_reason": null, "region": "test_local_only_force_overrides_unpushed", "start_mark": "test_local_only_force_overrides_unpushed.start", "valid": true, "wall_ns": 2869010625}
+FM_TEARDOWN_CPU {"cpu_seconds": 7.89, "event": "boundary", "mark": "test_teardown_retires_the_dsh_launch_state.start", "monotonic_ns": 18150266814166, "root_pid": 92044, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 0.009999999999999787, "end_mark": "test_teardown_retires_the_dsh_launch_state.start", "event": "interval", "invalid_reason": null, "region": "unattributed_gap", "start_mark": "test_local_only_force_overrides_unpushed.end", "valid": true, "wall_ns": 37169750}
+ok - teardown retires the task's own dsh launch state and no other task's
+FM_TEARDOWN_CPU {"cpu_seconds": 10.03, "event": "boundary", "mark": "test_teardown_retires_the_dsh_launch_state.end", "monotonic_ns": 18152863299000, "root_pid": 92044, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 2.1399999999999997, "end_mark": "test_teardown_retires_the_dsh_launch_state.end", "event": "interval", "invalid_reason": null, "region": "test_teardown_retires_the_dsh_launch_state", "start_mark": "test_teardown_retires_the_dsh_launch_state.start", "valid": true, "wall_ns": 2596484834}
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "target.exit", "event": "interval", "invalid_reason": "root_reaped_no_cpu_endpoint", "region": "unattributed_tail", "start_mark": "test_teardown_retires_the_dsh_launch_state.end", "valid": false, "wall_ns": 602702250}
+FM_TEARDOWN_CPU {"boundaries_missing": false, "event": "target_exit", "monotonic_ns": 18153466001250, "partial_mark_bytes": 0, "pipe_eof_observed": true, "returncode": 0}
+exit=0

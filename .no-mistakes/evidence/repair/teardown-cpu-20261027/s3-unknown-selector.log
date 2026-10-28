@@ -1,0 +1,8 @@
+FM_TEARDOWN_CPU {"event": "launch", "monotonic_ns": 18160453373708, "outer_cpu_includes_observer": true, "platform": "darwin", "root_pid": 51278, "selectors": ["test_local_only_force_overrides_unpushed", "test_no_such_case"]}
+FM_TEARDOWN_CPU {"cpu_seconds": 0, "event": "boundary", "mark": "suite.start", "monotonic_ns": 18160487887041, "root_pid": 51278, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "suite.start", "event": "interval", "invalid_reason": "missing_endpoint", "region": "unattributed_launch", "start_mark": null, "valid": false, "wall_ns": null}
+Unknown test case: test_no_such_case
+Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "target.exit", "event": "interval", "invalid_reason": "root_reaped_no_cpu_endpoint", "region": "unattributed_tail", "start_mark": "suite.start", "valid": false, "wall_ns": 5666383709}
+FM_TEARDOWN_CPU {"boundaries_missing": false, "event": "target_exit", "monotonic_ns": 18166154270750, "partial_mark_bytes": 0, "pipe_eof_observed": true, "returncode": 2}
+exit=2

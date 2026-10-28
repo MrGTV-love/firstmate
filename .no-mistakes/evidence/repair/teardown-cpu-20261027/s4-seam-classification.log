@@ -1,0 +1,13 @@
+PASS fake None -> cpu_telemetry_unavailable :: [('suite.start', None, 'cpu_telemetry_unavailable'), ('c.start', None, 'cpu_telemetry_unavailable'), ('c.end', None, 'cpu_telemetry_unavailable')]
+PASS unavailable case interval null+invalid :: [{'cpu_seconds': None, 'end_mark': 'c.end', 'event': 'interval', 'invalid_reason': 'missing_endpoint', 'region': 'c', 'start_mark': 'c.start', 'valid': False, 'wall_ns': 84916}]
+PASS real tree_cpu + failing ps -> cpu_telemetry_unavailable :: [('suite.start', None, 'cpu_telemetry_unavailable'), ('c.start', None, 'cpu_telemetry_unavailable'), ('c.end', None, 'cpu_telemetry_unavailable')]
+PASS root missing -> root_not_observed :: [('suite.start', None, 'root_not_observed'), ('c.start', None, 'root_not_observed'), ('c.end', None, 'root_not_observed')]
+PASS nan -> nonfinite_or_negative_cpu :: [('suite.start', None, 'nonfinite_or_negative_cpu'), ('c.start', None, 'nonfinite_or_negative_cpu'), ('c.end', None, 'nonfinite_or_negative_cpu')]
+PASS inf -> nonfinite_or_negative_cpu :: [('suite.start', None, 'nonfinite_or_negative_cpu'), ('c.start', None, 'nonfinite_or_negative_cpu'), ('c.end', None, 'nonfinite_or_negative_cpu')]
+PASS negative -> nonfinite_or_negative_cpu :: [('suite.start', None, 'nonfinite_or_negative_cpu'), ('c.start', None, 'nonfinite_or_negative_cpu'), ('c.end', None, 'nonfinite_or_negative_cpu')]
+PASS exception -> error text, run completes :: [('suite.start', 'RuntimeError: sampler broke'), ('c.start', 'RuntimeError: sampler broke'), ('c.end', 'RuntimeError: sampler broke')]
+PASS real telemetry -> no error, positive case delta :: (0.53, True)
+PASS exit 7 propagated; open case reported missing_end :: (7, {'boundaries_missing': False, 'event': 'target_exit', 'monotonic_ns': 18227663815666, 'partial_mark_bytes': 0, 'pipe_eof_observed': True, 'returncode': 7}, [{'cpu_seconds': None, 'end_mark': None, 'event': 'interval', 'invalid_reason': 'missing_end', 'region': 'c', 'start_mark': 'c.start', 'valid': False}])
+PASS background pipe holder does not block (<5s) :: (0, 0.44, {'boundaries_missing': False, 'event': 'target_exit', 'monotonic_ns': 18228101259708, 'partial_mark_bytes': 0, 'pipe_eof_observed': False, 'returncode': 0})
+PASS SIGTERM child -> probe process dies by SIGTERM :: (-15, [{'boundaries_missing': True, 'event': 'target_exit', 'monotonic_ns': 18228300166750, 'partial_mark_bytes': 0, 'pipe_eof_observed': True, 'returncode': -15}])
+SUMMARY 12 / 12 passed
