@@ -1,0 +1,21 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ECqcqn writer=omp cap=262144
+writer pid 25731 comm=/Users/charlesabrooker/tmp/fm-lab.ECqcqn/bin/omp
+watcher run 1 exited after 17 s, log 280000 bytes: check: status-log-over-cap: file=d1-intake.status size=280000 bytes (cap 262144) growth=0 bytes/s writer=pid 25731 omp; stopped pid 25731 (omp) with SIGSTOP; resume it with kill -CONT 25731; nothing was deleted, truncated or rewritten 
+--- over-cap wake text ---
+check: status-log-over-cap: file=d1-intake.status size=280000 bytes (cap 262144) growth=0 bytes/s writer=pid 25731 omp; stopped pid 25731 (omp) with SIGSTOP; resume it with kill -CONT 25731; nothing was deleted, truncated or rewritten
+log size at wake: 280000 bytes (cap 262144); exists: yes
+over-cap rows in wake queue: 1
+writer pid 25731 ps state: T (T = stopped)
+firstmate/test shell state: S
+log size 3 s later: 280000 (grew: no)
+second watcher stayed quiet 15 s on the unchanged over-cap log (no second wake)
+final size 280000 ; first 2 lines: text|text|
+/Users/charlesabrooker/.no-mistakes/evidence/01M612N00M5Z7X15B7918BFGFX/s2-watcher-incident-writer.sh: line 41: 25731 Killed: 9               "$LAB/bin/$NAME" -c '
+      exec 9>>"$1"
+      r=0
+      while [ "$r" -lt 400 ]; do
+        r=$((r + 1)); i=0; s=$(date +%s)
+        while [ "$i" -lt 4000 ]; do i=$((i + 1)); printf "text\n" "$s" >&9; done
+        sleep 1 9>&-
+      done' _ "$F"
+lab removed: /Users/charlesabrooker/tmp/fm-lab.ECqcqn

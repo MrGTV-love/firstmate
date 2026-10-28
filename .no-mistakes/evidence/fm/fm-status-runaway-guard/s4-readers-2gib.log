@@ -1,0 +1,19 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.GV7wpm ; huge.status apparent size 2147483648 bytes; on-disk 4896 KiB
+| reader | wall time | exit | stderr naming the refusal |
+| --- | --- | --- | --- |
+| wake drain (cold cursor) | 1.52 s | exit 0 | fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it |
+| wake drain (warm cursor) | 1.10 s | exit 0 | fm-status: huge.status has unread status past the read limits; its presentation cursor stays at byte 0 and the drain cannot show it |
+| open-decisions fold | 0.05 s | exit 2 | fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or |
+| last_status_line | 0.25 s | exit 2 |  |
+   last_status_line printed: 
+| status_declared_wait_line | 0.24 s | exit 0 |  |
+| fleet snapshot --secondmate-home-summary | 0.89 s | exit 0 | fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or |
+   snapshot: {"schema":"fm-secondmate-home-summary.v1","counts":{"active_children":0,"decisions_open":0,"holds":0,"queued":0,"landed":0,"endpoints":1}}
+   snapshot stderr: fm-status: refused to read huge.status: a span of 2147483648 bytes is past the read limit of 34603008 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+-- killed drain --
+drain killed after 0.5 s
+non-status files over 1 MB anywhere in the lab: none
+stat: /Users/charlesabrooker/tmp/fm-lab.GV7wpm/state/.status-presentation.prepared.vN689U: stat: No such file or directory
+largest non-status files in state/: 159 .lock-monitor.hold.8XC6Vb;136 huge.meta;73 .status-presentation-lock.owner.XVZvhy/monitor-record;
+huge.status size after all readers: 2147483648 (unchanged: yes)
+lab removed: /Users/charlesabrooker/tmp/fm-lab.GV7wpm

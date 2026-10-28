@@ -1,0 +1,5 @@
+before teardown: .other-task.wait-identity .task-x1.wait-identity 
+fm-teardown.sh exit=0 ; last stdout line: Backlog: task-x1 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-teardown-tests.JIOQwr/wait-identity-teardown/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-teardown-tests.JIOQwr/wait-identity-teardown/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+after teardown:  .other-task.wait-identity 
+task-x1 cache removed: yes
+other task's cache kept: yes

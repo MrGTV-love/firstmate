@@ -1,0 +1,14 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.p2Ee2o mode=big host=Mac-Studio.local date=2026-10-28T11:58:55Z
+log: 34602725 bytes, 346028 lines, read limit 34603008
+whole-log identity (reference): deploy:2140036967:25 in 481.28 s
+poll 1 (cold, exact walk): 257.29 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal to whole-log identity: yes
+poll 2 (no change): 0.52 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes
+sanctioned append of one restatement exit=0
+poll 3 (one appended restatement): 0.59 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes
+resolved append exit=0
+poll 4 (wait resolved): 1.29 s | identity= scope=declared:r1:3334363032383235007374726f6e673a31363737373233333a3933303432353037303a313739333138383733352e33333231343238303400526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65 | cache=absent
+  identity after resolve: '' (empty = no declared wait)
+lab removed: /Users/charlesabrooker/tmp/fm-lab.p2Ee2o

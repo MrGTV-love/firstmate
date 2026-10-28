@@ -1,0 +1,23 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.ADfuff mode=small host=Mac-Studio.local date=2026-10-28T11:51:05Z
+log: 9400025 bytes (> 2 x 4 MiB window)
+whole-log identity: deploy:2140036967:25
+poll 1 (cold): 58.58 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes
+appended 45000 restatements (4.5 MB: the tail window slides past the old window)
+poll 2 (window slid): 23.50 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes
+  whole-log identity now: deploy:2140036967:25
+cache corrupted
+poll 3 (corrupt cache): 94.71 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes (fell back to the exact walk)
+cache opener offset altered (+100, checksum now wrong)
+poll 4 (altered cache): 93.30 s | identity=deploy:2140036967:25 scope=declared:deploy:2140036967:25 | cache=present
+  equal: yes
+log replaced by a new file (rotation)
+poll 5 (rotated): 0.33 s | identity=deploy:3933356001:17 scope=declared:deploy:3933356001:17 | cache=present
+  whole-log identity of new file: deploy:3933356001:17
+  equal: yes
+log truncated in place to one line
+poll 6 (truncated): 0.31 s | identity=deploy:1971436884:0 scope=declared:deploy:1971436884:0 | cache=present
+  equal to whole-log identity deploy:1971436884:0: yes
+lab removed: /Users/charlesabrooker/tmp/fm-lab.ADfuff
