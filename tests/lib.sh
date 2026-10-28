@@ -75,11 +75,17 @@ unset FM_DURATION_HOME
 # suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
 export FM_CREW_STATE_NM_CACHE=off
 
+# bin/fm-merge-prune.sh arms and starts a pool-copy prune after every verified
+# merge, which would run the real teardown against a fixture home. The suite
+# arms nothing by default; tests/fm-merge-prune.test.sh turns it on against a
+# fake pool and a fake treehouse.
+export FM_MERGE_PRUNE=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
 # under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
-unset FM_TASK_ID
+unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
 # marker an adviser-enabled worker carries, so they can neither force a
@@ -124,6 +130,7 @@ TOML
 # test files, not by this library, so it reads as "unused" here.
 # shellcheck disable=SC2034
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export FM_GUARD_AUDIT_READER="$ROOT/bin/fm-jev-audit-read.mjs"
 
 # --- reporters --------------------------------------------------------------
 
@@ -1083,6 +1090,30 @@ fm_git_worktree() {
   fm_git_init_commit "$repo"
   fm_git_add_origin "$repo" "$repo.origin.git"
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
+}
+
+# fm_test_graft_output <copy>: the output graft's session hook leaves at the root
+# of a worker copy, taken from a real worker: its .ignore overlay byte for byte,
+# and a graft/ index with a card, the graph and caches. The copy's git ignores
+# both, as graft's own global ignore does on a worker host.
+fm_test_graft_output() {
+  local copy=$1
+  printf '/.ignore\n/graft/\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  cat > "$copy/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+  mkdir -p "$copy/graft/.graph" "$copy/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$copy/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$copy/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$copy/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$copy/graft/work.md"
+  cat > "$copy/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
 }
 
 # --- state/<id>.meta writers ------------------------------------------------

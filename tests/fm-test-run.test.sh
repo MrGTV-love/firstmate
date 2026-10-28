@@ -120,7 +120,7 @@ init_changed_fixture_repo() {
     fm-test-isolation-proof.test.sh \
     fm-test-run.test.sh \
     fm-test-fixtures.test.sh \
-    fm-cd-pretool-check.test.sh \
+    fm-arm-pretool-check.test.sh \
     fm-daemon.test.sh \
     fm-harness-adapter-instructions-live-e2e.test.sh \
     fm-harness-adapter-references.test.sh \
@@ -184,7 +184,7 @@ init_changed_fixture_repo() {
   # the file verbatim so the changed-file scan can find it, not expand here.
   printf '. "$ROOT/bin/shared-probe-lib.sh"\n' >"$repo/bin/fm-watch-probe.sh"
   printf '# .claude/settings.json\n# .pi/extensions/fm-primary-turnend-guard.ts\n' \
-    >>"$repo/tests/fm-cd-pretool-check.test.sh"
+    >>"$repo/tests/fm-arm-pretool-check.test.sh"
   printf '# .pi/extensions/fm-primary-pi-watch.ts\n' >>"$repo/tests/fm-pi-watch-extension.test.sh"
   mkdir -p \
     "$repo/.agents/skills/example" \
@@ -476,7 +476,7 @@ test_captain_hold_groups_share_helper_changed_selection() {
 
 # The three teardown groups partition one former suite. This is the checked
 # inventory the split is judged against: the union of the group lists must be the
-# same 337 cases, each registered by the one file that defines it, with no case
+# same 340 cases, each registered by the one file that defines it, with no case
 # twice. A dropped or duplicated case is exactly what a partition loses while
 # every remaining assertion still passes.
 test_teardown_groups_register_each_case_once() {
@@ -498,9 +498,9 @@ test_teardown_groups_register_each_case_once() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a teardown case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 337 ] \
-    || fail "the teardown groups register $total cases, not the 337-case inventory they partition"
-  pass "the teardown groups are a duplicate-free 337-case cover, each case registered by the file that defines it"
+  [ "$total" = 340 ] \
+    || fail "the teardown groups register $total cases, not the 340-case inventory they partition"
+  pass "the teardown groups are a duplicate-free 340-case cover, each case registered by the file that defines it"
 }
 
 # Each group must stay independently runnable and keep its lane coverage: the
@@ -657,7 +657,7 @@ test_changed_dependency_selection_and_unmapped_failure() {
   printf '\n' >>"$repo/.pi/extensions/fm-primary-turnend-guard.ts"
   listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
   assert_contains "$listed" "tests/fm-ask-user-authority.test.sh" "skill source selects pure contract coverage"
-  assert_contains "$listed" "tests/fm-cd-pretool-check.test.sh" "Claude and Pi source selects hook coverage"
+  assert_contains "$listed" "tests/fm-arm-pretool-check.test.sh" "Claude and Pi source selects hook coverage"
   assert_contains "$listed" "tests/fm-pi-watch-extension.test.sh" "Pi source selects watcher coverage"
   assert_contains "$listed" "tests/fm-pi-windows-shell-invocation.test.sh" \
     "turn-end extension selects native-Windows shell coverage"
@@ -909,6 +909,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     fm-status-event-lib.sh \
     fm-status-wake-lib.sh \
     fm-status-io-lib.sh \
+    fm-file-identity-lib.sh \
     fm-utc-lib.sh; do
     printf '\n' >>"$repo/bin/$owner"
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
@@ -954,7 +955,7 @@ test_changed_status_owners_select_all_consuming_tests() {
     git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm "$owner-change"
   done
   rm -rf "$tmp"
-  pass "all six status and UTC owner-only changes select consuming families and exact additional consumers"
+  pass "all status, identity, and UTC owner-only changes select consuming families and exact additional consumers"
 }
 
 # A direct test reference is per-script evidence. Widening it to the referencing
@@ -1184,7 +1185,7 @@ SH
   set +e
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-cd-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
   rc=$?
   set -e
   expect_code 0 "$rc" "native-Windows POSIX-mode emulation"
@@ -1194,7 +1195,7 @@ SH
   set +e
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" FAKE_UNAME=CYGWIN_NT-10.0 \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-cd-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
   rc=$?
   set -e
   expect_code 1 "$rc" "Cygwin POSIX-mode enforcement"
@@ -1286,9 +1287,9 @@ test_script_list_uses_bounded_automatic_concurrency() {
   repo="$tmp/repo"
   init_changed_fixture_repo "$repo"
   rm -f "$repo/bin/fm-timeout-lib.sh"
-  # fm-cd-pretool-check and fm-pr-merge are individually proven isolated;
+  # fm-arm-pretool-check and fm-pr-merge are individually proven isolated;
   # fm-backend-orca is not, so it must still land in the serial tail.
-  for script in fm-cd-pretool-check.test.sh fm-pr-merge.test.sh fm-backend-orca.test.sh; do
+  for script in fm-arm-pretool-check.test.sh fm-pr-merge.test.sh fm-backend-orca.test.sh; do
     cat >"$repo/tests/$script" <<'SH'
 #!/usr/bin/env bash
 sleep 1
@@ -1297,14 +1298,14 @@ SH
     chmod +x "$repo/tests/$script"
   done
 
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       --json "$tmp/parallel.json") >"$tmp/parallel.out" 2>"$tmp/parallel.err" \
     || fail "default script-list run failed: $(cat "$tmp/parallel.err")"
   parallel_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/parallel.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
   [ "$parallel_shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
     || fail "a plain script list did not use bounded concurrent scheduling: $parallel_shape"
 
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       --jobs 1 --json "$tmp/serial.json") >"$tmp/serial.out" 2>"$tmp/serial.err" \
     || fail "explicit serial script-list run failed: $(cat "$tmp/serial.err")"
   serial_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/serial.out" | head -n 2 | awk '{print $1}' | paste -sd, -)
@@ -1313,7 +1314,7 @@ SH
 
   # An unproven script in the list is scheduled around, never refused and never
   # run beside another script.
-  (cd "$repo" && bin/fm-test-run.sh tests/fm-cd-pretool-check.test.sh tests/fm-pr-merge.test.sh \
+  (cd "$repo" && bin/fm-test-run.sh tests/fm-arm-pretool-check.test.sh tests/fm-pr-merge.test.sh \
       tests/fm-backend-orca.test.sh) >"$tmp/mixed.out" 2>"$tmp/mixed.err" \
     || fail "mixed proven/unproven script list failed: $(cat "$tmp/mixed.err")"
   mixed_shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/mixed.out" | awk '{print $1}' | paste -sd, -)
@@ -1473,7 +1474,8 @@ echo "ok - fixture"
 exit 0
 SH
   chmod +x "$fixture"
-  "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
+  FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$RUNNER" --json "$json" "$fixture" >"$out" 2>"$tmp/err.txt" \
     || { rm -rf "$tmp"; fail "runner should pass on a green fixture"; }
   begin_n=$(grep -c '^FM_TEST_BEGIN ' "$out" || true)
   end_n=$(grep -c '^FM_TEST_END ' "$out" || true)
@@ -1502,6 +1504,9 @@ assert doc["summary"]["total"] == 1
 assert doc["summary"]["failed"] == 0
 assert "duration_ms" in doc["scripts"][0]
 assert "family" in doc["scripts"][0]
+assert "cpu_ms" in doc["scripts"][0], "the artifact must carry the CPU field"
+cpu_ms = doc["scripts"][0]["cpu_ms"]
+assert isinstance(cpu_ms, int) and cpu_ms > 0, cpu_ms
 ' "$json" || { rm -rf "$tmp"; fail "JSON timing artifact missing required fields"; }
   rm -rf "$tmp"
   pass "timing markers and JSON artifact are valid"
@@ -2653,6 +2658,7 @@ test_per_script_timeout_bounds_a_hang() {
   cp "$RUNNER" "$runner"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/fm-timeout-lib.sh"
+  cp "$ROOT/bin/fm-duration.py" "$repo/bin/fm-duration.py"
   grandchild_pid="$tmp/grandchild.pid"
   cat >"$repo/$hang" <<'SH'
 #!/usr/bin/env bash
@@ -2664,8 +2670,8 @@ SH
 
   began=$(date +%s)
   set +e
-  GRANDCHILD_PID="$grandchild_pid" \
-    "$runner" --per-script-timeout-secs 3 "$hang" >"$tmp/out" 2>"$tmp/err"
+  GRANDCHILD_PID="$grandchild_pid" FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
+    "$runner" --per-script-timeout-secs 3 --json "$tmp/timing.json" "$hang" >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
   ended=$(date +%s)
@@ -2680,6 +2686,12 @@ SH
   # The run still completes and accounts for the script, rather than dying.
   grep -Fq 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out" \
     || fail "the bounded run did not report a complete summary: $(cat "$tmp/out")"
+  python3 -c '
+import json, sys
+script = json.load(open(sys.argv[1]))["scripts"][0]
+assert script["exit"] == 124, script
+assert "cpu_ms" in script and script["cpu_ms"] is None, script
+' "$tmp/timing.json" || fail "a bounded script must carry a null cpu_ms: $(cat "$tmp/timing.json")"
   [ -s "$grandchild_pid" ] || fail "the hanging fixture did not record its grandchild"
   grandchild=$(cat "$grandchild_pid")
   waited=0
@@ -3209,10 +3221,11 @@ test_herdr_ci_family_run_has_a_step_timeout
 test_aggregate_json
 
 # The three control-relaunch groups partition one former suite. The union of
-# their registered case lists must be its 157 cases plus the omp adoption case
-# that joined the backends group and test_relocation_refuses_a_non_lease_copy
-# that joined the recovery group, 159 in all, each registered by the one file
-# that also defines it, with no case twice. A dropped or duplicated case
+# their registered case lists must be its 157 cases plus the omp adoption and
+# unconfined omp retirement cases that joined the backends group and
+# test_relocation_refuses_a_non_lease_copy that joined the recovery group, 160
+# in all, each registered by the one file that also defines it, with no case
+# twice. A dropped or duplicated case
 # is exactly what a partition loses while every remaining assertion still passes.
 test_control_relaunch_groups_partition_one_inventory() {
   local group file registered defined union total dup diff name
@@ -3245,9 +3258,9 @@ test_control_relaunch_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a control-relaunch case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 159 ] \
-    || fail "the control-relaunch groups register $total cases, not the 159-case inventory they partition"
-  pass "the control-relaunch groups are a duplicate-free 159-case cover, each case registered by the file that defines it"
+  [ "$total" = 160 ] \
+    || fail "the control-relaunch groups register $total cases, not the 160-case inventory they partition"
+  pass "the control-relaunch groups are a duplicate-free 160-case cover, each case registered by the file that defines it"
 }
 
 # The fm-watch-triage-waits selector called 67 shared-helper cases as one list.
@@ -3306,7 +3319,7 @@ test_watch_triage_waits_groups_partition_one_inventory
 test_split_suites_stay_selectable_in_their_families
 
 # The three fm-pr-merge groups partition one former suite. The union of their
-# registered lists must be the same 149 cases, each registered by the file that
+# registered lists must be the same 151 cases, each registered by the file that
 # also defines it, with no case twice.
 test_pr_merge_groups_partition_one_inventory() {
   local group file registered defined union total dup name
@@ -3338,15 +3351,15 @@ test_pr_merge_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "an fm-pr-merge case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 149 ] \
-    || fail "the fm-pr-merge groups register $total cases, not the 149-case inventory they partition"
-  pass "the fm-pr-merge groups are a duplicate-free 149-case cover, each case registered by the file that defines it"
+  [ "$total" = 151 ] \
+    || fail "the fm-pr-merge groups register $total cases, not the 151-case inventory they partition"
+  pass "the fm-pr-merge groups are a duplicate-free 151-case cover, each case registered by the file that defines it"
 }
 
 test_pr_merge_groups_partition_one_inventory
 
 # The four fm-lint groups partition one former suite. The union of their
-# registered lists must be the same 73 cases, each registered by the file that
+# registered lists must be the same 84 cases, each registered by the file that
 # also defines it, with no case twice.
 test_fm_lint_groups_partition_one_inventory() {
   local group file registered defined union total dup name
@@ -3378,9 +3391,9 @@ test_fm_lint_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "an fm-lint case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 73 ] \
-    || fail "the fm-lint groups register $total cases, not the 73-case inventory they partition"
-  pass "the fm-lint groups are a duplicate-free 73-case cover, each case registered by the file that defines it"
+  [ "$total" = 84 ] \
+    || fail "the fm-lint groups register $total cases, not the 84-case inventory they partition"
+  pass "the fm-lint groups are a duplicate-free 84-case cover, each case registered by the file that defines it"
 }
 
 test_fm_lint_groups_partition_one_inventory

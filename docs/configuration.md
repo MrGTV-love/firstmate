@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
+| Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -105,7 +106,9 @@ Each effective `FM_HOME` contains private operational directories.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
+- The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
@@ -483,7 +486,10 @@ If the target is a symlink, the write replaces it with a regular file.
 Linking the code-root copy into the home therefore forks the queue on the first write instead of keeping the copies in sync.
 
 Run every routine Firstmate backlog command through [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh).
-Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
+Like lifecycle transitions, it addresses this home's backlog, archive, and opt-in fleet ledger from any working directory, including a caller-relative `FM_HOME`.
+Changing directories is not the correctness boundary: a bare relative write still addresses the caller's directory, while home-owned entry points resolve their destinations themselves.
+[`tests/fm-home-writes.test.sh`](../tests/fm-home-writes.test.sh) exercises those write paths from a project-like foreign directory, including a negative control reproducing the bare relative-append incident.
+[`tests/fm-tasks-axi.test.sh`](../tests/fm-tasks-axi.test.sh) also covers nested relative homes and caller-relative state/config overrides with the fleet ledger enabled.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
 ## Runtime backend (config/backend / FM_BACKEND)
@@ -689,6 +695,101 @@ Secondmate homes inherit the primary's resolved role, never its raw file: a prim
 In a secondmate home the file is honored only while the inheritance receipt `config/.fm-inherit-firstmate-role.generation` proves the exact bytes the primary last published (`bin/fm-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
 The receipt prevents accidental publication through supported paths; it proves consistency, not provenance, and is not a security boundary against a process that deliberately forges local records.
 
+## Pool-copy prune after a merge (FM_MERGE_PRUNE)
+
+A merged task's pool copy is pruned right after its pull request merges, with no human step.
+`bin/fm-pr-merge.sh` arms the prune once it has verified the merge, and the watcher arms it for a merge that the merge poll sees, such as one made by someone else.
+Arming writes `state/<id>.merge-prune`, and a detached attempt then runs `bin/fm-teardown.sh <id>` without `--force`, under the automatic-reap admission check, so a worker that is still busy, steered, or held for the captain is left alone.
+Because the merge is already verified, that check waives the finished-session sweep's grace wait and ignores its refusal memo, and every other gate stands (`bin/fm-idle-reap-lib.sh` owns this mode).
+The watcher starts `bin/fm-merge-prune.sh sweep` detached while a record exists (`FM_MERGE_PRUNE_INTERVAL`), so no model or person has to carry the retry.
+A teardown that succeeds and returns the slot to the pool leaves it reset in place, so the copy is still on disk.
+The prune removes that copy only when it really was returned: it is a pool slot of the task's project, and Treehouse state records it as not leased, read again under the project lock and again when a retry resumes.
+A copy that the read proves teardown kept on purpose is never removed: a slot whose lease is still held, for another task's record or for foreign copies, and a copy with no `treehouse-state.json` beside it, which is not a pool slot.
+Its outcome is the log line `reaped: teardown completed; teardown kept the copy`, with no wake and no record.
+A read that cannot tell is never taken as "kept": a copy path that cannot be resolved, a lease state that cannot be read or is ambiguous, a pool-slot test that does not prove the copy a slot of the project, no project recorded, or a project lock path that cannot be resolved keeps the record and the copy and retries quietly with the usual backoff, and raises the one wake when the retries run out.
+The prune removes a returned copy itself, under the project lock, with `treehouse destroy <copy> --include-leased --yes` (never forced), after it proves the slot's owner claim is still this task's or absent, that no process is inside it (a search indexer excepted), that each nested copy holds no work of its own, and that the copy and each nested copy hold only scratch or preserve-list ignored files.
+The preserve-list files are copied with checksums first, the same as for the fallback (below), so a returned copy with unique ignored files stays with one wake.
+It clears the prune record only once the copy path is gone, except for a returned slot that another task's launch has claimed since: that slot is the other task's and is left alone, with one log line and no wake.
+A removal that is refused keeps the record and the copy and raises the one wake; the retry needs only the record, because the task's own record is already gone.
+`FM_MERGE_PRUNE=0` stops new arming.
+
+Before teardown runs, each copy nested in the task's copy must pass the fallback's commit, stash and status proofs (below).
+A teardown that succeeds returns the slot with its nested copies still in it, or closes the task and holds the slot.
+So a nested copy with an unpushed commit, a stash or a changed file keeps the whole slot with one wake, and teardown does not run.
+Teardown also ends a job working at the copy root.
+So a job in the task's terminal pane (tmux or herdr) whose working directory is inside the copy keeps it with one wake before teardown runs, too; a shell, the worker's agent, what the agent started, and the processes it runs under do not count here.
+
+A refusal that only means "not now" is retried on later ticks and says nothing.
+That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
+The retry waits 60 seconds, then doubles up to 3600 seconds.
+One wake is raised if the task is still not pruned after 24 attempts.
+
+The fallback handles only the two refusal classes that really reach it.
+Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged) and a closeout driver that reports the exact tree of a nested copy as not covered.
+Every refusal line of the teardown output must be one of them.
+Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, an orphan nested copy refused for a HEAD that is not proved landed (teardown always prints a second refusal with it, that the pool slot contains a registered copy that is not the task's), and any refusal text that is not on that list.
+Teardown preserves ignored files that exist nowhere else itself, so a refusal about them is not one of the two classes.
+Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
+The copy and every nested copy inside it, each checked one by one, must pass all of these:
+
+- The task's own copy is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
+- Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says.
+  The one status line that does not count is the untracked directory of a nested copy that the project's `.gitignore` does not cover (`?? .claude/worktrees/<name>/`), because each nested copy is proved on its own.
+- The copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
+- A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
+- The search for nested copies enters dependency and environment trees too (`.venv`, `venv`, `node_modules`, `__pycache__`), because a clone there holds work like any other.
+- No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
+- For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
+- The task's own copy holds nothing the merged pull request leaves out: its HEAD is in the merged pull request's head (fetched before the locks), or the default branch already carries its content, which is what a squash merge leaves; a commit that is only pushed, such as a follow-up commit after the merge, is not landed and keeps the copy.
+- Every ignored file is scratch, a symlink, or on the preserve list.
+- No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
+
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
+When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+Any other child of that `.tac/` still keeps the copy.
+A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
+Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
+The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
+Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 checksums, and the copy is verified, before anything is removed.
+An ignored file that is neither scratch nor preserved is unique work, so the copy stays.
+The finished worker's own session is stopped first with `bin/fm-control.sh <id> exit`.
+That verb keeps the task's terminal pane open, and the pane keeps the idle shell it entered the copy with, so that shell is inside the copy.
+That one shell does not keep the copy, but `treehouse destroy` refuses a copy that has a process working inside it, so the fallback ends it with SIGHUP just before the destroy.
+It must be a recognized shell whose working directory is inside the copy, with no child process, that is a strict descendant of the pane's own shell, found by the pane's process id on the tmux and herdr backends, and the exit verb must have confirmed that the agent stopped.
+The pane's own shell is never ended, so a bare pane shell inside the copy keeps the copy.
+On any other backend nothing is ignored.
+The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
+Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
+A process check that fails, by an error exit or a message, proves nothing: the copy stays and the attempt is retried.
+The silent exit 1 that `lsof` gives for a copy nothing holds open is not a failure.
+The task's Treehouse project lock is held from the worker stop to the destroy.
+The finished-session check is asked again once that lock is held, right before the worker is stopped.
+A worker that was steered or became busy since the first answer backs off, and nothing is stopped, signalled, or destroyed.
+The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
+The slot's owner claim is read again right before the signal: a slot that another task has claimed, whose claim cannot be read, or whose claim for this task id names another home or no home, stays untouched.
+Then each nested copy that the project's `.gitignore` does not cover, already proved on its own, is removed: `treehouse destroy` counts its untracked directory as dirt and refuses the slot, and the pane's `treehouse get` would stop at its "uncommitted changes" prompt when its idle shell ends.
+An independent clone goes with its directory and a linked worktree with a plain `git worktree remove`, never forced; a linked worktree that git refuses to remove, such as a locked one, or any nested copy that does not go, keeps the copy with one wake.
+When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
+That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, its terminal pane positively shows no live agent, and its last status event is `done`.
+The pane check reads the pane's process tree on tmux and herdr and passes only when every process in it is a shell, except at most one `treehouse get`, the launcher that opened the slot's subshell; an agent, any other process, a second launcher, or a pane that cannot be read keeps the worker unknown, so the prune backs off and retries; on any other backend the check proves nothing.
+The first teardown asks the same check, so a worker stopped with the exit verb before the merge is pruned too, while a relaunched worker whose old marker is still present is not.
+After the fallback ends the pane's idle shell, a `treehouse get` that has not exited yet, or that waits at a prompt, still passes the second teardown's check; if anything else is left in the pane, that teardown refuses, and the prune backs off and retries until its retries run out, then raises its one wake.
+The ordinary finished-session sweep keeps its classification unchanged.
+No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
+
+A proof read that fails never counts as finding nothing.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
+A process table (`ps`) or open-file listing (`lsof`) that fails also counts as a failed read when it printed rows or process ids first, because the process it did not list may be the one that is alive: the copy stays and the prune retries.
+
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails, including the removal of a copy that teardown returned.
+It is never forced or discarded.
+Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
+The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
+Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
+The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
+`bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
+
 ## Waiting worker spends no turns (config/wait-no-turns)
 
 The optional local, gitignored `config/wait-no-turns` presence flag opts this home into keeping a waiting worker from spending turns until it is answered.
@@ -804,20 +905,27 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
-`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt or already answered in the current handling turn follow in a `STANDING` block, and a drain whose only overdue rows stand or are answered prints neither block and opens no handling episode.
+`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no valid action recorded after its action requirement opened; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Reads (`drain`, `--present-overdue`, and `--check-actions`) preserve recorded actions while the row's category, subject, owner, next action, and evidence remain unchanged and the receipt's time bound and any bound proof remain valid.
+Every elapsed-time token in a stalled worker's evidence (`45s`, `3m 12s`, `1h 2m`, whether a collector counter such as `Ns without progress` or a timer the worker's pane paints) grows with every heartbeat and never counts as a change; any other evidence change does.
+An ordinary action recorded since the row's current presentation answers it for at most four hours, even if that handling turn never closes; a deferral or dependency wait keeps its own recheck bound, and a bound captain hold is reverified before acknowledgement.
+A refused acknowledgement is a read-only check, never a new presentation; only successful acknowledgement through every row the actor presented closes its handling turn.
+A partial acknowledgement preserves the turn's receipts for its remaining rows.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
-The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
-The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt before acknowledging; on an unchanged firstmate-owned row without a verified hold this suppresses repeated presentation for four hours, not until somebody acts on the escalation.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), per-actor `completed` sequence watermarks written after successful acknowledgement, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, `requires_followup` mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The single-row and JSONL batch action forms share the same evidence checks; one invocation caches its fleet snapshot, including a failed read, rather than rescanning for each row, and the `help:` line that presents overdue rows names the batch form.
+Each batch line has an independent result and refusal, so a bad line does not undo successful siblings; [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) owns the input fields, output format, and stdin syntax.
 The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: first its `source.task` provenance (including PR rows whose subject is a URL), then its `worker:` owner or the task id leading its subject, with each candidate checked against the task-name pattern.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
 Escalation evidence is free text: no receipt is checked against the forge or against a delivered captain notification.
 A deferral's recheck time must be in the future and at most 24 hours ahead.
-Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
+Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, or escalation before acknowledgement, even if that prior receipt otherwise stood.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
-A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
+A first deferral stands until its recheck time, except on a `review_pass_not_merged` row or after the row's category, subject, owner, next action, or evidence changes.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
 An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
 A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
@@ -826,13 +934,15 @@ The first of these that is currently held binds: the explicit `--hold TASK_ID`, 
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An escalation that finds no held task answers only the turn it followed, which the command reports.
+An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time, whichever comes first, except for `review_pass_not_merged`.
+This bounded standing also applies when an optional hold could not be verified; an explicit unverifiable `--hold` still refuses.
+A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded, rather than falling back to the time-based receipt.
 When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
 Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
 When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-A receipt recorded before this binding existed needs one new escalation to stand.
+A receipt recorded before this binding existed needs one new escalation to stand on a hold.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
@@ -1136,6 +1246,9 @@ That branch shares no history with code branches, so evidence never enters a pus
 The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
 
 `commands.test` executes code, so no-mistakes honors it only from the default-branch copy of `.no-mistakes.yaml`; a pushed branch cannot change what the gate runs.
+
+It also sets `rebase: strategy: merge`, so the rebase step merges newer main instead of rewriting the submitted commits; no-mistakes honors that setting only from the default-branch copy, and [`tests/fm-nm-test-contract.test.sh`](../tests/fm-nm-test-contract.test.sh) pins it.
+[Event-driven supervision](architecture.md#event-driven-supervision) owns its effect on run binding and the CI conflict-repair path it does not cover.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test policy and entry points.
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
@@ -1777,7 +1890,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard.
+A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard; on macOS, outside secondmate launches, so is one in which any later command runs `claude`, such as `true && claude ...`.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.
@@ -1914,7 +2027,7 @@ my-project 2
 ```
 
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns declaration syntax, clone-name matching, same-origin occupancy, and the concurrency invariant.
-A PR-ready handoff frees a place; local-only ships and scouts retain theirs until cleanup.
+A PR-ready handoff, or a no-mistakes run that `bin/fm-crew-state.sh` reads as checks green naming its PR (a ten-second read that searches the run's full ci log for its newest checks marker, skipped for that pass when slower), is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason and is retried after ten minutes, and `bin/fm-pr-check.sh <id> <PR url>` by hand remains for a fixed refusal or a lane with neither reading; local-only ships and scouts retain theirs until cleanup.
 The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
@@ -2481,6 +2594,106 @@ Claude's guard runs at the pre-tool boundary for every tool except the shell-com
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
 
+### Worker OS write confinement
+
+On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
+The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
+It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+Writes are allowed by default; the profile denies writes to these named protected assets:
+
+- the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;
+- every other linked worktree those repositories list, nested `.claude/worktrees/fm-*` copies and pool copies alike;
+- this home's checkout, `config/` and `.env`;
+- every other task's `state/<other>.*` records, every task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, this task's other Main-owned records and the shared legacy `state/jev-guard.jsonl`; the rest of `state/`, such as `state/procevent/`, `state/friction.jsonl` and the fleet ledger, stays writable;
+- the home `data/` root, including every `data/<other>/` directory and the Main-loaded `data/secondmates.md`, `data/captain.md` and `data/backlog.md`, apart from this task's own `data/<task>/` directory and the duration ledger `data/command-durations.jsonl` with its `.lock` and `.compact` siblings;
+- every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id, unless the name also carries this task's longer id;
+- other tasks' branches, and the primary checkout's own `HEAD` and index, in the shared Git directory;
+- the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
+- every other local Firstmate home: the root home and each registered local secondmate home;
+- the no-mistakes gate repository of every other project under `$NM_HOME/repos` (default `~/.no-mistakes/repos`).
+
+Task ids come from the `state/<id>.meta` records of this home and of every other local home.
+Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`.
+The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
+The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
+The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
+Native temp selectors point at the task temporary root.
+A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
+The measured harness contracts are omp and Claude.
+`codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy`, `devin` and `dsh` launch unchanged and unconfined, with no guessed state-root grants, unless a raw launch command that starts with one of them runs `claude`, which makes it a confined Claude launch as described below.
+Each launch audit prints the actual harness identifier and confinement mode; macOS metadata records `write_confinement=unconfined-macos-<harness>` for these unmeasured harnesses.
+Their root contracts are follow-up work, not coverage supplied by this boundary.
+Secondmates are persistent homes and are not subject to this task-worker boundary.
+A raw omp or Claude launch command's own root assignment runs after the profile's and wins, so [`bin/fm-raw-launch.py`](../bin/fm-raw-launch.py) reads the command as shell words, without evaluating or expanding anything.
+For a confined raw Claude launch, session arguments are inserted only at executable program-word spans; quoted data, comments and here-document bodies retain their original bytes, including literal, single/double-quoted and tab-stripped delimiters and several here-documents on one line.
+Command or process substitution, backticks, here-strings, shell control structures, continued here-document delimiters and unterminated quotes or here-documents refuse rewriting with a construct-specific message and a request to simplify the command or use a named harness; there is no unmarked fallback.
+Linux and secondmate raw Claude launches are not confined, get no session id and keep the earlier memory-exclusion prefix placement, so these shell constructs still launch there under the pane's own shell, and only a confined launch wraps its compound command in this host's `/bin/sh`.
+One leading `PI_CODING_AGENT_DIR=` assignment for omp, or `CLAUDE_CONFIG_DIR=` for Claude, with a literal value, quoted or not, is resolved to an absolute path against the task worktree, and the profile grants that path as the harness root.
+A value that needs expansion (`$`, a backquote or a leading `~`), an empty value, or a second assignment by a later command refuses the launch with text that names the variable and asks for the resolved absolute path.
+A raw omp command that names `OMP_PROFILE`, `PI_PROFILE` or `--profile` anywhere in its literal text refuses, so launch the profile through `--harness omp` with `OMP_PROFILE` set in the environment instead; a raw `PI_CONFIG_DIR` also refuses, so set it in the environment and launch with `--harness omp`.
+Admission sees only the command's literal text, so a selector that appears only after the pane's shell expansion (for example `"$PROFILE_FLAG"`) is admitted, and that profile's harness state writes fail closed.
+A home list that cannot be read, or a project whose worktrees Git cannot list, also refuses the launch instead of leaving those assets out.
+
+Inside its protected config home the running harness keeps only its measured runtime state writable: omp's `agent.db` and `models.db` with their WAL, SHM and journal files, its `sessions/` transcripts and exactly its project-scoped daemon directory; or Claude's `history.jsonl` with its `history.jsonl.lock` lock directory, its `backups/`, `statsig/` and `debug/` directories, and only this worker's own session state: `session-env/<session-id>/`, `file-history/<session-id>/`, `tasks/<session-id>/` (not exercised by a real session; model-free write proven), its transcript `projects/<slug>/<session-id>.jsonl` with the `projects/<slug>/<session-id>/` sidecar directory, and creation as a folder, but never as a symlink or plain file and never rename or deletion, of the `projects/<slug>` container that also holds other sessions' transcripts.
+The profile grants no creation of the `session-env/`, `file-history/`, `tasks/` and `projects/` folders that hold other sessions' entries; before every confined Claude launch, relaunches through `bin/fm-control.sh <task> relaunch` included, `fm-spawn.sh` creates them and `projects/<slug>/` itself, outside the profile, each with owner-only mode `700`, as is a missing config root it creates, together with any missing parent folders of a `CLAUDE_CONFIG_DIR` set in the environment (a raw command's own `CLAUDE_CONFIG_DIR=` root whose parent folder is missing refuses instead), and it never changes the mode of a folder that already exists, so a worker on a new config root still writes its own session state.
+Claude's `.claude.json`, both `~/.claude.json` in the default layout and `.claude.json` with its atomic siblings under an overridden config root, stays protected, because it carries user-scoped MCP server commands that later unconfined sessions run.
+The slug is Claude's name for the task worktree path, every non-alphanumeric character replaced by `-`.
+`fm-spawn.sh` mints a fresh session id with `uuidgen` at every confined Claude launch, relaunches included, records it as `claude_session_id=` in the Main-owned task metadata and passes it both to the profile and to `claude --session-id`.
+Claude Code 2.1.310 refuses to start under an id that is already in use, and a Claude relaunch starts a fresh conversation rather than resuming one, so an earlier session's directories lose their grant at the next launch; the task's measurement record `data/fm-jev-guard-t5-os-write-confinement/n2-measurement.md` in the owning home holds the evidence.
+A raw launch command in which a command's program is `claude`, such as `[ -d src ] && claude ...` or `true && claude ...`, is a confined Claude launch; it gets `--session-id <session-id>` spliced after each `claude` program word.
+Claude names its transcript and temp folders after the directory it starts in, and the profile grants only the worktree's, so a confined raw command that runs `cd` or `pushd` before `claude`, such as `[ -d src ] && cd src; claude ...` or `bash -c 'cd sub && claude ...'`, refuses with a message to start Claude from the worktree root.
+A command's program is its first word after leading `NAME=value` assignments, where commands are separated by an unquoted newline, `;`, `&`, `|`, `&&` or `||`.
+Behind one of these named wrappers it is the word after that wrapper's own options and operands: `env` (`NAME=value`, `-i`, `-u NAME`, `--`), `command` (`-p`), `exec` (`-a NAME`, `-c`, `-l`), `nohup`, `time` (`-p`), `timeout` (`-f`, `-p`, `-v`, `-k <duration>`, `-s <signal>`, then its duration), `nice` (`-n <n>`), `caffeinate` (`-d`, `-i`, `-m`, `-s`, `-u`, `-t <seconds>`, `-w <pid>`), `arch` (`-arm64`, `-x86_64` and similar, `-arch <name>`, `-e NAME=value`, `-d NAME`) and `stdbuf` (`-i`, `-o` or `-e` with its mode).
+The `-c` text of `sh`, `bash` or `zsh` is read by the same rules, past the shell's short options, `-o` or `-O` with its name, and long options such as `--login`, `--norc` or `--noprofile` (`--rcfile`, `--init-file` and `--emulate` with their value), and a `claude` found there gets its id inside that text, which is quoted again as one word.
+A quoted expansion such as `"$T"` is always one word, so it fills a named wrapper's option value, operand or `env` `NAME=value` assignment the way a literal word would: `timeout "$T" claude ...`, `env -u "$V" claude ...` and `nice -n "$N" claude ...` are Claude launches, and so is `bash -c "claude -p $X"`, whose quoted text is read with `$X` as an expansion.
+Any other program in front of `claude`, such as `sudo`, `xargs` or `flock`, another option of a named wrapper, such as `env -S`, a shell that runs a script or standard input instead of `-c` text, a `claude` behind an unquoted expansion in a program or option position, such as `timeout $T claude ...` or `env $OPTS claude ...`, which can split into any number of words, a `claude` behind a quoted expansion before a shell's `-c`, such as `bash "$O" -c 'claude ...'`, a `claude` behind a quoted expansion where `timeout` reads its options, such as `timeout "$O" 60 claude ...`, which is taken as the duration, and a `claude` behind a quoted expansion where another named wrapper reads its options, such as `env "$X" claude ...`, `nice "$N" claude ...` or `caffeinate "$O" claude ...`, which is taken as the program, are not detected: when nothing else in the command selects confinement, that Claude runs unconfined and the task metadata records `write_confinement=unconfined-macos-<first program>`; inside a confined Claude launch it gets no id, so its session writes fail closed.
+On macOS, outside secondmate launches, a raw launch whose first program is neither `claude` nor `omp` is read word by word; when a command runs `claude`, the launch takes the Claude route even if later text cannot be read, and text that this route cannot rewrite refuses at spawn with an `error:` line, a `repair:` line and a `spawn-write-confinement` deny event.
+Text the scanner cannot read before it finds a `claude`, such as `true && (claude ...)`, a `$(...)` substitution or a backquote, launches unchanged and unconfined, as before.
+A raw omp command is not read for `claude`: the omp profile denies Claude's config, so a `claude` it starts fails closed.
+A plain parameter expansion such as `${HOME}/worker.yml` is read as ordinary argument text where it only fills an argument, so an existing `codex --config "${HOME}/worker.yml"` launch keeps its harness; in a confined Claude launch a program word that expands, including a quoted expansion where a named wrapper other than `timeout` reads its options, such as `env "$X" claude ...`, a skipped wrapper word that can split, such as `nice -n $N claude ...`, or expanded shell `-c` text refuses, because it can name a program the scanner cannot see. A leading `NAME=value` assignment does not split, so `X=$Y claude ...` is an ordinary Claude launch.
+When that command resumes or continues with `--resume`, `-r`, `--continue` or `-c`, including `--resume=<id>`, `-r<id>` and clustered short flags such as `-pc`, it also receives `--fork-session`, so the conversation forks into the fresh id its write profile grants rather than trying to reuse the old session id.
+Options are read as Claude Code 2.1.310 parses them: an option that requires a value takes the next word as that value even when it starts with `-`, so `--append-system-prompt --continue` does not fork and `--model -- --resume <id>` does.
+A confined raw `claude` command that sets its own `--session-id`, in any spelling such as `--session-id=<id>`, refuses, because the confinement profile grants only the session id `fm-spawn.sh` injects.
+A confined raw `claude` argument that needs shell expansion, such as `$FLAGS`, `"$PROMPT"`, `${X}`, `$(...)`, a backquote, or unquoted glob or brace characters (`*`, `?`, a `[...]` bracket pattern closed by `]` in the same word, `{`), also refuses, because an expansion can produce options such as `--resume` that this check cannot see; quote the literal text instead.
+Quoted data is never changed, so a prompt that mentions `claude` keeps its bytes, while shell control constructs such as `eval` refuse rewriting.
+A non-session call such as `claude --version` ignores the flag, and a second real session in the same command fails on the id already being in use.
+`/clear` inside a confined Claude pane starts a session under a new id that the profile does not grant, so its session writes, including `SessionStart` hooks, fail closed; Firstmate never sends `/clear`, and the remedy is to relaunch with `bin/fm-control.sh <task> relaunch`.
+Everything else there stays protected, including every path that loads code or instructions: Claude's `CLAUDE.md`, `rules/`, `agents/`, `commands/`, `skills/`, `plugins/`, `hooks/`, `shell-snapshots/`, `todos/`, `sessions/`, settings and credentials files and status-line scripts, every other session's `session-env/`, `file-history/`, `tasks/` and transcripts, and omp's `config.yml`, `models.yml`, `auth.json`, `.env`, `settings.json`, `extensions/`, `managed-skills/` and `memories/`.
+The omp daemon suffix uses omp's `Bun.hash.wyhash(path.resolve(projectDir))` derivation, not a hard-coded hash or a grant of the shared daemon parent.
+SQLite database creation requires the omp agent directory; an observed `EPERM mkdir` requires the separate daemon scope.
+An earlier measurement saw Claude SessionStart create `.claude.json` and its backups; with both config locations write-denied, a model-free Claude Code process still completed protocol initialization and a local `/status` command with no provider access (decision 022), but SessionStart hooks under that denial and a real conversational session are not measured.
+No authentication or runtime state is copied.
+
+Linux workers remain unconfined, exactly as before; `write_confinement=unconfined-linux` in task metadata is the explicit audit field, while macOS records `seatbelt-v1`.
+Landlock is not enabled; the Linux layout is a separate prerequisite, not a reason to broaden this boundary.
+
+This is inherited process-tree filesystem enforcement, not confinement of external authorities.
+Two residuals remain, and the residual review on 2026-11-07 revisits both.
+First, a precious location that is not on the protected list is unprotected.
+That includes any temp entry with no owner marker: a `/private/tmp/claude-<uid>/` file outside a session directory, a `~/tmp` entry whose name carries no task id, and a `/tmp/fm-*` root whose task has no `state/<id>.meta` record.
+It also includes the home's shared `state/` files, the shared Git directory's config and hooks, credentials outside the listed harness homes, and Claude's shared `history.jsonl` prompt history, which loads no code.
+Protected lists are read at launch, so a task, home, gate or session directory created later is not covered until the worker is relaunched; only a later task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, a later `data/<other>/` directory and the contents of a later Claude session directory are still covered, by their name patterns or the protected data root.
+Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
+The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
+In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
+macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
+`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
+The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects only the task audit ledger, still reaches the helper.
+`bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`, and its macOS resident-memory watch reads each root's process-group tree through a long-lived helper `mem-tree` reader started at the root's first tick, falling back to `ps` for a tick the reader does not answer in time, and for the rest of the root once the reader is given up.
+The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
+Another user's argv cannot be read without setuid, so for that process the helper prints its short kernel name where `ps` prints the full command, and the two identities differ.
+The 53 test files identified in decision 023 that run `ps` themselves, rather than through these tools, still fail inside a confined worker; that count is historical, and converting them is follow-up work outside this boundary.
+[`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) builds the omp and Claude profiles over a synthetic home and runs a plain Python process under each, after an unconfined control.
+It checks B3's glob deletion in the shared Claude temp root, B15's aged sweep under `~/tmp`, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record, `ps` refused and, through `bin/fm-proc-info.py`, `bin/fm-duration.py`'s process table, an inactivity stop, a stale slot holder and a zombie process group's completion check, a process identity read inside the sandbox that equals the one `ps` gives outside it for arguments with non-ASCII bytes, a newline, a tab and an empty word, an orphaned test stub stopped by the reaper, a lint CPU sample reported as `unavailable`, a procevent board registered, polled once by its runner and retired, a process budget, a session-lock ancestry walk, a fleet-ledger append, writes to its own `data/<task>/` directory and Claude's `history.jsonl.lock`, a refused rename of this session's transcript container to a writable place, refused creation of the `projects/`, `session-env/`, `file-history/` and `tasks/` folders under a fresh config root, refused planting of the missing transcript container as a symlink or plain file, its creation as a folder with this session's transcript appended inside it while its rename and deletion stay refused, one refused write per protected asset class including Claude's `.claude.json` in both layouts, `data/secondmates.md`, `data/captain.md`, `data/backlog.md` and the `.meta` and `.control-relaunch` records of a task created after the profile was built, refused renames of protected folders and their parents including the shared Git `refs/` and `worktrees/` folders, `~/tmp` ownership for task ids that extend this task's id and that are part of it, and writes to this Claude session's own `session-env/`, `file-history/`, `tasks/` and transcript while another session's are refused.
+[`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) also runs a confined raw `CLAUDE_CONFIG_DIR='<root>' claude` launch through the TeamClaude wrapper's `--exec` and checks that the stand-in receives the recorded `--session-id` and the proxy, and, on a root that holds no session folder before the spawn, can write only its own `session-env/`, `file-history/`, `tasks/` and transcript entries under that root.
+It also spawns, in a worktree that holds `src/` and `sub/`, `[ -d src ] && claude --print hi`, `true && claude --print hi`, `[[ -f README.md ]] && claude --print hi`, `env -u FM_UNSET_PROBE claude --print hi` and `bash -c 'claude --print hi'` and checks that each is recorded as a confined `claude` launch whose stand-in runs inside the profile under the recorded `--session-id` and, from its real working directory, writes only its own session entries.
+It checks that `true && claude --print "$(date)"`, its backquoted form, `true && env "$PROGRAM" --print hi; claude --print hi`, `[ -d src ] && cd src; claude --print hi` and `bash -c 'cd sub && claude -p hi'` each refuse with an `error:` line, a `repair:` line and a `spawn-write-confinement` deny event before any launch or task metadata, and that `true && (claude --print hi)` launches unchanged and unconfined, recorded as `write_confinement=unconfined-macos-true`.
+[`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) runs the launch `fm-spawn.sh` delivers for omp and Claude with a model-free stand-in for each harness.
+No test starts a real harness session or calls a model.
+
+### Model guard integration
+
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
 `fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except the shell-command tools `Bash`, `Monitor` and `PowerShell`, so every other native call passes tool coverage and egress authorization while a Claude `Bash`, `Monitor` or `PowerShell` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
@@ -2668,7 +2881,11 @@ They perform no guard key lookup or provider request and retain deterministic to
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
-The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, named outage/enforcement branch, usage, models, latency, attempts and cost certainty; `thresholds` and `answers` are empty objects because no guard question remains.
+Confined workers append minimized terminal records to their own `state/<task>.jev-guard.jsonl`; their [write profile](#worker-os-write-confinement) denies the shared ledger and the audit file of every other task known at launch.
+Unconfined and primary sessions retain the owning home's private `state/jev-guard.jsonl`.
+[`bin/fm-jev-audit-read.mjs`](../bin/fm-jev-audit-read.mjs) reads the shared legacy file plus every per-task audit file, so historical and new rows remain visible without copying or rewriting either layout.
+The reader orders rows by numeric `at`, preserving source filename and line order for ties, and fails on unreadable or malformed audit files rather than silently omitting history.
+Both destinations retain task, policy version, named outage/enforcement branch, usage, models, latency, attempts and cost certainty; `thresholds` and `answers` are empty objects because no guard question remains.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
@@ -4016,6 +4233,12 @@ FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-se
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
+FM_MERGE_PRUNE=1   # 0 stops bin/fm-merge-prune.sh from arming a pool-copy prune after a verified merge (see "Pool-copy prune after a merge"); anything else leaves it on
+FM_MERGE_PRUNE_INTERVAL=60   # seconds between the watcher's detached pool-copy prune sweeps while a prune record exists; 0 turns the sweep off; invalid values use 60
+FM_MERGE_PRUNE_EXIT_WAIT=10   # seconds the fallback waits for the stopped worker's session to leave the copy, and for the pane's idle shell to exit on SIGHUP, before it keeps the copy; invalid values use 10
+FM_MERGE_PRUNE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-merge-prune.sh
+FM_MERGE_PRUNE_TEARDOWN_BIN=   # test seam: the teardown the prune runs instead of bin/fm-teardown.sh
+FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses to stop the finished worker instead of bin/fm-control.sh
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
@@ -4090,7 +4313,7 @@ FMX_X_THREAD_MAX=25     # maximum messages in one auto-split reply thread
 FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion follow-ups (7 days)
 FMX_FOLLOWUP_MAX_COUNT=3   # local cap on Relay completion follow-ups per linked mention
 FM_PF_RETRY_BACKOFF_SECS=900   # seconds before the next attempt after a retryable promised-public-reply delivery error
-FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs have no age grace
+FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs, including zombies, have no age grace
 FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
@@ -4103,7 +4326,7 @@ FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds a Pi wake waits for its succes
 FM_OMP_ARM_READY_TIMEOUT_MS=12000   # milliseconds an omp wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
 FM_PI_SUCCESSOR_GRACE_MS=15000   # milliseconds after a Pi replacement shutdown before recording missing-successor diagnostics and expiry; never activates the outgoing runtime, and never applies to terminal quit
 FM_OMP_SUCCESSOR_GRACE_MS=15000   # milliseconds after omp shutdown retirement before missing-successor recovery checks home-lock ownership; an explicit arm call can repair sooner (.omp/extensions/fm-primary-omp-watch.ts header)
-FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
+FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits, and omp bounds the output drain after an arm exits
 FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/omp/OpenCode adapter base delay for continuity restoration retries
 FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/omp/OpenCode adapter cap for exponential continuity retry delay
 FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/omp/OpenCode adapter launch-failure retries before surfacing restoration failure
@@ -4111,7 +4334,7 @@ FM_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifec
 FM_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior
 FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds after which a live holder's beacon is stale; a stale holder that does not prove the lock's recorded identity is refused, while an identity-matched one is attached to or reported running until fm_progress_check proves no CPU or beacon progress for FM_WATCHER_STALL_BOUND; the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
-FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
+FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"; also the no-progress bound for the watcher's status reclassification read (docs/watcher-continuity.md "Grace, beacon, and stop signals")
 FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals into one wake
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
@@ -4125,6 +4348,7 @@ FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each regist
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.secondmate-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
 FM_SECONDMATE_LIVENESS_WINDOW_SECS=3600   # window the relaunch bound counts state/.secondmate-relaunch-<id> attempt lines over; the file is also the durable per-mate relaunch record; zero or invalid values use 3600
+FM_PR_READY_RECONCILE_TIMEOUT=120   # hard limit in whole seconds on one detached ready-PR registration pass (bin/fm-pr-ready-reconcile.sh); a pass that exceeds it is killed with any hung forge call and the next watcher tick starts a fresh one; zero or invalid values use 120
 FM_WEDGE_DEMAND_INSPECT_COUNT=3    # consecutive provably-working stale escalations on the same unchanged pane before demand-deep-inspection is added
 FM_WORKTREE_WRITE_PRUNE='.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'   # directory names the wedge detector's task-worktree write probe skips; the default keeps .git out so a supervisor's own read-only git command can never look like crew progress; set it to the empty string to prune nothing, which widens the probe to the whole depth-bounded tree rather than disabling it
 FM_WORKTREE_WRITE_MAXDEPTH=6       # depth that same probe walks below the recorded worktree; it runs only at the moment a wedge escalation would otherwise fire, never on every poll; no probe knob applies to a secondmate, whose recorded worktree is a provisioned home the probe skips entirely

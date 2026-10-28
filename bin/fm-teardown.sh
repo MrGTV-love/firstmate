@@ -654,6 +654,7 @@ for _teardown_source in \
   fm-status-event-lib.sh \
   fm-status-wake-lib.sh \
   fm-status-io-lib.sh \
+  fm-file-identity-lib.sh \
   fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \
@@ -2026,7 +2027,8 @@ remove_pr_poll_artifacts() {
   fm_pr_poll_merge_notified_remove "$state_dir" "$id" || return 1
   rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
-    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" || return 1
+    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
+    "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
 }
 
 # Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
@@ -5584,6 +5586,7 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.pi-ext.ts" "$sub_state/$child_id.omp-ext.ts" "$sub_state/$child_id.omp-fallback.yml" \
       "$sub_state/$child_id.live-model" \
       "$sub_state/$child_id.omp-session.json" "$sub_state/$child_id.reboot-notice" \
+      "$sub_state/$child_id.write-confinement.sb" \
       "$sub_state/$child_id.grok-turnend-token" "$sub_state/$child_id.kimi-turnend-token" \
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
       "$sub_state/$child_id.cursor-session" "$sub_state/$child_id.reconcile-nudged" \
@@ -6135,7 +6138,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.omp-fallback.yml" "$STATE/$ID.live-model" \
   "$STATE/$ID.grok-turnend-token" \
-  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" \
+  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" "$STATE/$ID.write-confinement.sb" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
   "$STATE/$ID.muse-session-current" "$STATE/$ID.cursor-session" \
   "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior" \

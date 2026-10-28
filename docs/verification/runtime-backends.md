@@ -6,6 +6,49 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## macOS worker write confinement
+
+Verified on 2026-10-24 on macOS 27 arm64.
+The configuration owner is [Worker OS write confinement](../configuration.md#worker-os-write-confinement).
+Refresh with these model-free executable entry points:
+
+```sh
+bash tests/fm-write-confinement.test.sh
+bash tests/fm-spawn-worktree-settle.test.sh
+```
+
+The direct fixture builds both the omp and the Claude profile over a synthetic HOME, home, project, gate store and foreign assets, then runs a plain Python process once unconfined as a control and once under each profile.
+Every confined check was true for both profiles:
+
+- cases a-e, with B3's glob deletion against another task's directory in the shared `/private/tmp/claude-<uid>` root and B15's aged sweep against another task's `~/tmp` entry;
+- own Git commit, inbox handling, the real busy writer, native session proof and task audit;
+- a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
+- a duration record appended through `bin/fm-duration.py`, and its process table, inactivity stop, stale slot holder and zombie process-group completion check read through `bin/fm-proc-info.py` while `ps` is refused, a procevent board registered, polled once by its runner and retired through `bin/fm-procevent.sh`, a process budget through `bin/fm-proc-budget.sh`, a session-lock ancestry walk, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
+- one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state, data and temp roots, the shared legacy audit, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another Firstmate home and another project's gate, including a push to that gate;
+- refused writes to every Claude and omp file that loads code or instructions, `~/.codex` and `~/.dsh`, while the running harness's measured runtime state stayed writable;
+- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/`, the shared Git `refs/` and `worktrees/` folders and another session's Claude temp directory;
+- a `~/tmp` entry of a task whose id extends this task's id stays protected, while this task's own entry stays writable when another task's id is part of its id.
+
+The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused check, while the positive operations remained successful.
+The gate hooks are the installed no-mistakes hooks with `NM_BIN` pointed at a model-free stand-in for the daemon client, so no real daemon run starts.
+The probes invoke the real `createGuardService.record` and `createTaskSessionProof` writers, including native proof publication and shutdown invalidation; no audit or session writer is mocked.
+The task audit succeeds without changing seeded shared legacy history, while another task's audit append fails with `AuditUnavailableError`.
+`bash tests/fm-jev-guard-audit.test.sh` passed 24 offline cases, including shared-plus-task history merging, homes with no shared log and explicit failure on corrupt history.
+The settle case runs the launch `fm-spawn.sh` delivers for omp and Claude with a stand-in harness: the primary-checkout write is refused, the own status append succeeds, `TMPDIR` is the task temp root and `FM_WRITE_CONFINEMENT` is `seatbelt-v1`.
+No checked-in test starts a real harness session.
+One-time measurements on 2026-10-24 ran real sessions of Claude Code 2.1.310 (`haiku` through the TeamClaude launcher) and omp (`openai-codex/gpt-6-luna`) under the generated profiles; the task's private record is `data/fm-jev-guard-t5-os-write-confinement/n2-measurement.md` in the owning home, beside the exact profiles and raw session outputs.
+omp's shell, read and edit tools completed with `agent/settings.json` and `agent/memories/` protected.
+A first Claude session without a fixed session id completed Bash, Read and Edit, but every `SessionStart` hook failed with `EPERM` creating `session-env/<session-id>`.
+A second Claude session launched with `--session-id` under the session-scoped profile ran all four `SessionStart` hooks successfully and completed Bash, Read and Edit, with `shell-snapshots/` and every other session's entries protected.
+Its transcript and temp directories used the builder's derived slug.
+Neither Claude session had a to-do tool in print mode or wrote `todos/`, so `todos/` carries no grant.
+A third Claude session ran interactively, as `fm-spawn.sh` launches workers, under a profile that also granted its own `tasks/<session-id>/` and kept `sessions/` protected: all four `SessionStart` hooks finished with status 0 and Bash, Read and Edit completed, with Edit writing its own `file-history/<session-id>/`.
+TaskCreate was not available in that session, so `tasks/<session-id>/` was not exercised by a real session; its model-free write is proven by `tests/fm-write-confinement.test.sh`.
+Claude's debug log showed the `sessions/` registry write refused without failing any tool, prompt history unsaved because that profile did not grant `history.jsonl.lock` (the profile now grants the lock directory; no real session has exercised it, and its model-free write is proven by `tests/fm-write-confinement.test.sh`), and `ps` refused because macOS runs no setuid program inside a sandbox; the Firstmate tools the [configuration owner](../configuration.md#worker-os-write-confinement) names read process facts through `bin/fm-proc-info.py` instead, and the direct fixture proves a process budget, a procevent poll and a session-lock ancestry walk under each profile.
+All three sessions ran under profiles that still let the worker write `.claude.json`; the shipped profile now denies `.claude.json` in both layouts, and under that denial only a model-free Claude Code protocol initialization and local `/status` command ran (decision 022), so `SessionStart` hooks, Bash, Read and Edit are not measured under the shipped profile.
+The unified log recorded no Seatbelt denial even for a deliberate refused write, so denials were read from tool results, hook output and error strings; a denial a harness swallows silently would not be seen.
+Linux enforcement is deliberately not enabled and was not graded as a passing confinement case.
+
 ## Pool-only cleanup critical sections
 
 Verified on 2026-10-14 on macOS arm64 with stock Bash 3.2.57 through isolated, model-free executions of the actual `fm-teardown.sh` and `fm-spawn.sh` paths.

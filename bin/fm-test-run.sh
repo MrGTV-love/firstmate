@@ -37,9 +37,11 @@
 # Options:
 #   --json <path>   write a deterministic timing artifact after the run. Each
 #                   script record carries its family, expected gate-skip class,
-#                   exit, duration, whether it gate-skipped, and the reason it
-#                   gave (empty when it ran), so a lane can say which harness or
-#                   tool this host could not exercise.
+#                   exit, duration, CPU (cpu_ms, null when unmeasured), whether
+#                   it gate-skipped, and the reason it gave (empty when it ran),
+#                   so a lane can say which harness or tool this host could not
+#                   exercise. docs/fm-test-portable-shards.md "Timing artifacts"
+#                   owns what cpu_ms does and does not show.
 #   --list          print selected script paths (one per line) and exit 0
 #   --list-scheduled
 #                   print selected paths longest-hint-first and exit 0.
@@ -307,15 +309,15 @@ PORTABLE_PARALLEL_EFFECTIVE_JOBS=3
 # measured that spread and docs/fm-test-portable-shards.md records it. So
 # 1200000 ms bounds a real lane near 20 minutes, and a new member or a slow
 # path fails the coverage guard instead of quietly stretching the workflow.
-# Since the 2026-10-26 refresh every parallel hint is measured, including the
-# five the fm-lint split had apportioned. Lane 1 is fm-test-run, fm-lint,
-# fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
+# The 2026-10-26 refresh measured every parallel hint, including the five the
+# fm-lint split had apportioned. Lane 1 is
+# fm-test-run, fm-lint, fm-captain-hold-lifecycle, fm-pr-merge, fm-captain-hold-archive,
 # fm-backend-herdr, fm-arm-pretool-check, fm-brief, fm-grok-harness,
 # fm-send-strict, fm-pi-primary-types, and fm-supervision-instructions;
 # fm-pi-primary-types stays in lane 1 because that is the job that installs the
 # Pi package and the TypeScript compiler it typechecks with. Lane 2 holds the
-# other twenty. Their three-bin packings model at 1030514 ms and 1030749 ms, so
-# the reported parallel_makespan_ms is 1030749 ms, and replaying each run's own
+# other nineteen. Their three-bin packings model at 1030514 ms and 1023089 ms, so
+# the reported parallel_makespan_ms is 1030514 ms, and replaying each run's own
 # durations through that membership puts a real lane between 958965 ms and
 # 1027567 ms. Like the serial target this is packing arithmetic, not an
 # execution timeout.
@@ -419,7 +421,7 @@ family_for_basename() {
     fm-arm-pretool-check.test.sh|fm-ask-user-authority.test.sh|\
     fm-bearings-board.test.sh|\
     fm-brief.test.sh|fm-dod-lib.test.sh|fm-vendor-auth-probe.test.sh|\
-    fm-calm-pi-extension.test.sh|fm-cd-pretool-check.test.sh|\
+    fm-calm-pi-extension.test.sh|\
     fm-classify-decision-key.test.sh|\
     fm-composer-ghost.test.sh|fm-composer-lib.test.sh|\
     fm-crew-state.test.sh|fm-captain-hold-archive.test.sh|fm-captain-hold-cleanup.test.sh|\
@@ -542,7 +544,7 @@ family_for_basename() {
     fm-spawn-dispatch-profile.test.sh|fm-claude-trust.test.sh|\
     fm-worker-account.test.sh|fm-teamclaude-launch.test.sh|\
     fm-git-strip-ai-trailers.test.sh|\
-    fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
+    fm-home-writes.test.sh|fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
     fm-spawn-acquisition-cleanup.test.sh|\
     fm-spawn-retained-copy.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
@@ -552,7 +554,7 @@ family_for_basename() {
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
       ;;
-    fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|\
+    fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|fm-pr-ready-reconcile.test.sh|\
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
@@ -656,7 +658,6 @@ tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-captain-hold-sweep.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-composer-ghost.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-crew-state.test.sh
@@ -696,7 +697,6 @@ tests/fm-captain-hold-keyed-answers.test.sh 350046
 tests/fm-captain-hold-lifecycle.test.sh 509030
 tests/fm-captain-hold-reconcile.test.sh 446667
 tests/fm-captain-hold-sweep.test.sh 494535
-tests/fm-cd-pretool-check.test.sh 26886
 tests/fm-composer-ghost.test.sh 5046
 tests/fm-composer-lib.test.sh 373103
 tests/fm-crew-state.test.sh 251251
@@ -769,7 +769,6 @@ tests/fm-crew-state.test.sh
 tests/fm-lint-slots.test.sh
 tests/fm-x-mode.test.sh
 tests/fm-herdr-lab.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-lint-policy.test.sh
 tests/fm-send-popup-settle.test.sh
 tests/fm-review-diff.test.sh
@@ -990,7 +989,6 @@ tests/fm-inbox.test.sh 8769
 tests/fm-jev-guard-audit.test.sh 8143
 tests/fm-jev-guard-claude-live-e2e.test.sh 1075
 tests/fm-jev-guard-omp-live-e2e.test.sh 876
-tests/fm-jev-guard-producer.test.sh 866
 tests/fm-jev-guard.test.sh 401320
 tests/fm-keep-ai-trailers-home-local.test.sh 46294
 tests/fm-kimi-harness.test.sh 65265
@@ -1906,7 +1904,7 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       ;;
     bin/fm-status-record-lib.sh|bin/fm-status-decision-lib.sh|\
-    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-utc-lib.sh)
+    bin/fm-status-event-lib.sh|bin/fm-status-wake-lib.sh|bin/fm-status-io-lib.sh|bin/fm-file-identity-lib.sh|bin/fm-utc-lib.sh)
       printf '%s\n' pure-contract-unit
       printf '%s\n' standalone
       printf '%s\n' secondmate
@@ -2152,6 +2150,10 @@ families_for_changed_path() {
       printf '%s\n' secondmate
       printf '%s\n' watcher-wake-lock
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
+      ;;
+    bin/fm-merge-prune.sh|bin/fm-merge-prune-lib.sh)
+      # The pool-copy prune after a merge, proven against a fake pool.
+      printf '%s\n' "__script__:fm-merge-prune.test.sh"
       ;;
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-teardown-nested-lib.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
@@ -2484,12 +2486,13 @@ with open(records_file, encoding="utf-8") as fh:
         line = line.rstrip("\n")
         if not line:
             continue
-        path, family, expected, exit_s, dur_s, gate, reason = line.split("\t")
+        path, family, expected, exit_s, dur_s, gate, reason, cpu_s = line.split("\t")
         scripts.append({
             "path": path,
             "family": family,
             "expected_gate_skip": expected,
             "duration_ms": int(dur_s),
+            "cpu_ms": int(cpu_s) if cpu_s else None,
             "exit": int(exit_s),
             "gate_skip": gate == "true",
             "gate_skip_reason": reason,
@@ -3059,7 +3062,19 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
-  local base family expected gate_skip gate_reason fail_delta token timed_out=0
+  local base family expected gate_skip gate_reason fail_delta token timed_out=0 cpu_ms=
+  # CPU comes from the slot gate's single process-tree sample, so it is present
+  # when that wrapper ran and empty otherwise. See docs "Timing artifacts":
+  # this is measurement evidence, not a verdict on why a suite took as long as
+  # it did. When the per-script bound fired, its killed process group was
+  # reparented before anything waited for it, so that CPU never reached the
+  # wrapper and any value would understate exactly the suites profiling targets.
+  if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
+    :
+  elif [ -f "$out.cpu" ]; then
+    cpu_ms=$(head -n 1 "$out.cpu" 2>/dev/null || true)
+    case "$cpu_ms" in ''|*[!0-9]*) cpu_ms= ;; esac
+  fi
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
@@ -3092,8 +3107,8 @@ record_script_result() {
     AGG_RC=1
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" "$cpu_ms" >>"$RECORDS"
   if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1 && [ ! -e "$out.guarded" ]; then
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
@@ -3208,7 +3223,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
     # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
     cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
-      --wait-file "$out.slotwait" "test.$script" -- "${cmd[@]}")
+      --wait-file "$out.slotwait" --cpu-file "$out.cpu" "test.$script" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then

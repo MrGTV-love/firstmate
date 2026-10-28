@@ -889,7 +889,7 @@ holder_code = (
     'import importlib.util as u\n'
     's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
     'gone = subprocess.Popen(["true"]); gone.wait()\n'
-    'listed = subprocess.run(["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, env=dict(os.environ, LC_ALL="C")).stdout\n'
+    'listed = d.proc_read(["ps", "-o", "lstart=", "-p", str(os.getpid())], ["lstart", str(os.getpid())], env=dict(os.environ, LC_ALL="C"))[0].stdout\n'
     'started = int(time.mktime(time.strptime(" ".join(listed.split()), "%a %b %d %H:%M:%S %Y")))\n'
     'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time())), "later1": (os.getpid(), started - 1), "later3": (os.getpid(), started - 3)}[sys.argv[3]]\n'
     'directory = d.slot_directory(sys.argv[2])\n'
@@ -990,6 +990,21 @@ assert passed.returncode == 0 and log_file.read_text() == 'from-command\n', (pas
 # A --log-fd that is not open falls back to stderr instead of stopping the command.
 closed = subprocess.run([sys.executable, str(helper), 'gate', '--log-fd', '57', 'test.slot.logfd', '--', 'echo', 'ran'], env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
 assert closed.returncode == 0 and closed.stdout == 'ran\n', closed
+
+# --cpu-file reports the command tree's CPU, including a descendant reaped
+# before the sample, so a suite's CPU can be compared with its wall time.
+burn = tmp / 'cpu-burn.py'
+burn.write_text('import time\nend = time.process_time() + 1.5\nwhile time.process_time() < end:\n    pass\n', encoding='utf-8')
+cpu_file = tmp / 'cpu.ms'
+cpu_run = subprocess.run([sys.executable, str(helper), 'gate', '--cpu-file', str(cpu_file), 'test.slot.cpu', '--', sys.executable, str(burn)],
+                         env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=180)
+assert cpu_run.returncode == 0, cpu_run
+reported_cpu = int(cpu_file.read_text().strip())
+assert 1400 <= reported_cpu <= 20000, reported_cpu
+# A cpu file that cannot be written never changes the command's exit status.
+unwritable_cpu = subprocess.run([sys.executable, str(helper), 'gate', '--cpu-file', str(tmp / 'no-such-dir/cpu.ms'), 'test.slot.cpu', '--', 'echo', 'ran'],
+                                env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert unwritable_cpu.returncode == 0 and unwritable_cpu.stdout == 'ran\n', unwritable_cpu
 
 # An unusable slot file, or a Python with no POSIX file locks, runs the command without a slot and says so.
 fault_env = dict(slot_env, FM_TEST_SLOT_DIR=str(tmp / 'fault-slots'))

@@ -7,9 +7,10 @@ TMP_ROOT=$(fm_test_tmproot fm-jev-guard-audit)
 export AUDIT_ROOT="$ROOT" AUDIT_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'guard settlement/audit regression'
 import assert from 'node:assert/strict';
+const { readGuardAudit } = await import(process.env.FM_GUARD_AUDIT_READER);
 import { mock, test } from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const reportUrl = pathToFileURL(`${process.env.AUDIT_ROOT}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
@@ -17,8 +18,25 @@ const state = process.env.AUDIT_TMP;
 mkdirSync(`${state}/config`);
 const context = { home: state, config: `${state}/config`, state, task: 'audit', project: 'firstmate', worktree: state, data: state, policy: report.GUARD_POLICY_VERSION };
 const service = report.createGuardService(context);
+await test('audit history merges legacy and task rows without reading unrelated state', () => {
+  const dir = `${state}/reader`;
+  mkdirSync(dir);
+  const legacy = { at: 20, task: 'legacy', decision: 'clear' };
+  const earlier = { at: 10, task: 'a', decision: 'block' };
+  const later = { at: 30, task: 'b', decision: 'review' };
+  writeFileSync(`${dir}/jev-guard.jsonl`, JSON.stringify(legacy) + '\n');
+  writeFileSync(`${dir}/a.jev-guard.jsonl`, JSON.stringify(earlier) + '\n');
+  writeFileSync(`${dir}/b.jev-guard.jsonl`, JSON.stringify(later) + '\n');
+  writeFileSync(`${dir}/b.omp-session.json`, 'not an audit row');
+  const rows = () => readGuardAudit(dir).trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows(), [earlier, legacy, later]);
+  rmSync(`${dir}/jev-guard.jsonl`);
+  assert.deepEqual(rows(), [earlier, later], 'a home with only task logs retains all history');
+  writeFileSync(`${dir}/a.jev-guard.jsonl`, 'invalid audit row\n');
+  assert.throws(() => readGuardAudit(dir), SyntaxError, 'corrupt history must not be silently omitted');
+});
 // A failure before any piece exists has no chunk to report: no piece failed, none was planned, none was sent.
-const rowCount = () => existsSync(`${state}/jev-guard.jsonl`) ? readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').length : 0;
+const rowCount = () => readGuardAudit(state).split('\n').filter(Boolean).length;
 async function fresh(act) {
   const before = rowCount();
   await act();
@@ -37,7 +55,7 @@ function assertNoPiece(r, errorType) {
 const { installJevGuard } = await import(pathToFileURL(`${process.env.AUDIT_ROOT}/bin/fm-jev-guard.ts`));
 const handlers = {};
 installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
-const row = () => JSON.parse(readFileSync(`${state}/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const row = () => JSON.parse(readGuardAudit(state).trim().split('\n').at(-1));
 const answer = (noul = 0.05) => ({ model: 'fixture', answers: {
   fixture: { type: 'noul', noul },
 }, usage: { input_tokens: 3, output_tokens: 1 }, meta: { provider: 'typesafe', attempts: 1, elapsedMs: 7, cost: { amount: 0.001, source: 'reported' } } });

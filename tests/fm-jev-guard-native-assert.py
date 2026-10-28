@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import pathlib
+import subprocess
 import sys
 
 lab = pathlib.Path(sys.argv[1])
@@ -43,8 +44,9 @@ if backend == 'omp':
     assert text == source, 'complete original read bytes changed in the receiving model context'
 assert '[jev-guard]' not in text, 'retired result screen appended or replaced native output'
 assert (lab / 'jev.jsonl').read_text() == '', 'a native read result reached TypeSafe'
-ledger = lab / 'home/state/jev-guard.jsonl'
-if phase != 'audit' and ledger.exists():
-    terminal = [json.loads(line) for line in ledger.read_text().splitlines()]
+audit_state = lab / 'home/state'
+if phase != 'audit' and audit_state.is_dir():
+    audit = subprocess.check_output(['node', str(pathlib.Path(__file__).resolve().parents[1] / 'bin/fm-jev-audit-read.mjs'), str(audit_state)], text=True)
+    terminal = [json.loads(line) for line in audit.splitlines()]
     assert not any(row['hook'] == 'tool_result' for row in terminal), 'retired result audit row was written'
 print(f'{backend}: {phase}/{kind}: unchanged native read in next model context; no result request or audit row')

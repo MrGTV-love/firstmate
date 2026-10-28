@@ -239,17 +239,14 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
   assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
-  assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
+  assert_launch_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u FM_DSH_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$WT_DIR' --config '$ROOT/.omp/fm-worker-overlay.yml'" \
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$WT_DIR' --config '$ROOT/.omp/fm-worker-overlay.yml'" \
     "omp scout launch did not carry shared posture and worker-only memory overlays"
-  assert_contains "$launch" "--model 'openai-codex/gpt-6-astra' --thinking 'medium' -e '$state/$id.omp-ext.ts'" \
+  assert_launch_contains "$launch" "--model 'openai-codex/gpt-6-astra' --thinking 'medium' -e '$state/$id.omp-ext.ts'" \
     "omp launch did not pass the model, thinking level, and the state-resident worker extension"
-  assert_contains "$launch" "encode launch-brief < '$HOME_DIR/data/$id/launch-brief.md'" "omp launch lost the canonical typed launch-brief envelope"
-  case "$launch" in
-    *"-e '$state/$id.omp-ext.ts' \"\$("*) ;;
-    *) fail "omp launch must keep exactly one positional brief after the extension flag: $launch" ;;
-  esac
+  assert_launch_contains "$launch" "encode launch-brief < '$HOME_DIR/data/$id/launch-brief.md'" "omp launch lost the canonical typed launch-brief envelope"
+  assert_launch_contains "$launch" "-e '$state/$id.omp-ext.ts' \"\$(" "omp launch must keep exactly one positional brief after the extension flag"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "busy fm-spawn" ] \
     || fail "omp spawn must seed the busy-state contract"
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
@@ -284,12 +281,12 @@ test_no_helpers_rejects_nonworker_launches() {
 assert_no_helper_launch() {  # <label> <launch-log> <fallback-yml> <meta>
   local label=$1 launch fallback=$3 meta=$4 flag
   launch=$(cat "$2")
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
   for flag in --no-title --no-extensions --no-skills --no-rules; do
-    assert_contains "$launch" " $flag" "$label launch lost $flag"
+    assert_launch_contains "$launch" " $flag" "$label launch lost $flag"
   done
-  assert_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
-  assert_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
+  assert_launch_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
+  assert_launch_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
   assert_equals '[]' "$(jq -c .retry.fallbackChains.default "$fallback")" "$label launch must keep no default fallback chain"
   assert_equals '[]' "$(jq -c '[.retry.fallbackChains | to_entries[] | select(.key != "default") | .value[]]' "$fallback")" \
     "$label launch must keep no stand-in fallback entry"
@@ -406,7 +403,7 @@ test_omp_workers_disable_openrouter_prompt_helpers() {
       expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
       overlay="$HOME_DIR/state/$id.omp-fallback.yml"
       launch=$(cat "$LAUNCH_LOG")
-      assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
+      assert_launch_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
       assert_worker_helper_policy "an ordinary omp $scope $kind launch" "$overlay" "$role"
       assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
       assert_not_contains "$launch" "--no-skills" "an ordinary omp $scope $kind launch must keep skill discovery"
@@ -847,7 +844,7 @@ test_spawn_raw_api_billing_admission() {
         expect_code "$expected" "$status" "raw $form $spelling billing admission for $provider: $out"
         if [ "$expected" = 0 ]; then
           assert_present "$HOME_DIR/state/$id.meta" "subscription raw launch must publish metadata"
-          assert_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
+          assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
         else
           assert_contains "$out" 'routes use API billing' "raw rejection must come from the billing guard"
           assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
@@ -868,7 +865,7 @@ test_spawn_raw_api_billing_admission() {
     expect_code "$expected" "$status" "literal raw admission in '$command': $out"
     if [ "$expected" = 0 ]; then
       assert_present "$HOME_DIR/state/$id.meta" "non-model arguments must remain accepted"
-      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "non-model arguments must reach the launch unchanged"
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "non-model arguments must reach the launch unchanged"
     else
       assert_contains "$out" 'routes use API billing' "profile, expansion, or prior pin must not bypass literal admission"
       assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
@@ -951,7 +948,7 @@ test_spawn_api_billed_fallback_admission() {
         assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "usable primary must stay selected"
       else
         assert_grep 'model=openai-codex/gpt-6.1-sol' "$HOME_DIR/state/$id.meta" "subscription fallback must remain selectable"
-        assert_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6.1-sol'" "subscription fallback must reach launch"
+        assert_launch_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6.1-sol'" "subscription fallback must reach launch"
       fi
     done
   done
@@ -976,7 +973,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   status=$?
   expect_code 0 "$status" "an extension-registered provider must pass through: $out"
   assert_contains "$out" "notice: omp provider 'claude-bridge' is not in 'omp models --json'" "pass-through did not state its reason"
-  assert_contains "$(cat "$LAUNCH_LOG")" "--model 'claude-bridge/claude-opus-4-8'" "pass-through model did not reach the launch line"
+  assert_launch_contains "$(cat "$LAUNCH_LOG")" "--model 'claude-bridge/claude-opus-4-8'" "pass-through model did not reach the launch line"
 
   rec=$(make_spawn_case model-fuzzy omp omp-model-fuzzy-q4)
   read_case_record "$rec"
@@ -1080,7 +1077,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
     assert_absent "$out" "the global config must not be quarantined"
   done
   assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
-  assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
+  assert_launch_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
 
   id='omp-role-agent-dir-q13'
   rec=$(make_spawn_case role-agent-dir omp "$id")
@@ -1155,6 +1152,16 @@ test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
     out=$(PI_CODING_AGENT_DIR="$caller_dir" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
       run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
     status=$?
+    # Decision R7-4 (2026-10-25): a confined macOS launch follows only a literal
+    # raw root, and the spawn sees "$PANE_AGENT_DIR" unexpanded, so it refuses
+    # and names the variable instead of granting a root it cannot know.
+    if [ "$mode" = uncertain ] && [ "$(uname -s)" = Darwin ]; then
+      expect_code 1 "$status" "a confined raw omp launch must refuse a root that needs shell expansion: $out"
+      assert_contains "$out" "sets PI_CODING_AGENT_DIR to a value that needs shell expansion" "the refusal must name the variable"
+      assert_contains "$out" "pass the resolved absolute path" "the refusal must say how to proceed"
+      assert_absent "$HOME_DIR/state/$id.meta" "a refused raw-directory launch must publish no record"
+      continue
+    fi
     case "$mode" in
       missing | unlisted | stderr | stdin | append | descriptor)
         expect_code 1 "$status" "raw omp must refuse the launch directory's invalid role ($mode): $out"
@@ -1223,12 +1230,25 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
         FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "${spawn_args[@]}")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector and points to the supported --harness omp route.
+      case "$mode" in
+        flag | flag-equals | assignment-omp | assignment-pi)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse its own profile selector ($mode): $out"
+            assert_contains "$out" "selects its own omp profile" "the refusal must name the profile selector ($mode)"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused profile-selecting launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
-        *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
+        *) assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
       esac
       HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$launch_dir" \
         OMP_PROFILE="$omp_profile" PI_PROFILE="$pi_profile" \
@@ -1243,7 +1263,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
 }
 
 test_spawn_raw_omp_expansions_pass_through_unchanged() {
-  local rec id out status mode role command launch_dir first_arg
+  local rec id out status mode role command launch_dir first_arg pane_home
   for mode in profile after-delimiter substitution backticks redirect glob long-glob tilde tilde-redirection tilde-user tilde-assignment process ansi locale braces heredoc punctuation; do
     for role in missing unlisted; do
       id="omp-expansion-$mode-$role"
@@ -1304,14 +1324,36 @@ EOF" ;;
       out=$(FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
+      # Decision R8-1 (2026-10-25): a confined macOS launch refuses every raw
+      # omp profile selector, including one inside a substitution, and never
+      # evaluates it.
+      case "$mode" in
+        substitution | backticks)
+          if [ "$(uname -s)" = Darwin ]; then
+            expect_code 1 "$status" "a confined raw omp launch must refuse a profile selector in an expansion ($mode): $out"
+            assert_contains "$out" "launch the profile through --harness omp" "the refusal must name the supported route ($mode)"
+            assert_absent "$CASE_DIR/expanded" "the refusal must not evaluate the command substitution ($mode)"
+            assert_absent "$HOME_DIR/state/$id.meta" "a refused expanded launch must publish no record"
+            continue
+          fi
+          ;;
+      esac
       assert_absent "$CASE_DIR/node-timeout" "a long literal prefix ending in a glob must classify within three seconds"
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
-      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
-      HOME="$HOME_DIR/user-home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
+      # This fixture nests user-home inside the firstmate home, which macOS
+      # write confinement protects; the tilde redirection writes to a home
+      # outside it, as a real user home is.
+      pane_home="$HOME_DIR/user-home"
+      if [ "$mode" = tilde-redirection ]; then
+        pane_home="$CASE_DIR/pane-home"
+        mkdir -p "$pane_home"
+      fi
+      HOME="$pane_home" PROFILE_FLAG=--profile=work ERROR_LOG="$CASE_DIR/errors.log" \
         PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
         bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
       status=$?
@@ -1322,7 +1364,7 @@ EOF" ;;
           [ "$(cat "$CASE_DIR/expanded")" = evaluated ] || fail "the pane must evaluate the command substitution"
           ;;
         redirect) assert_present "$CASE_DIR/errors.log" "the pane must evaluate the redirection" ;;
-        tilde-redirection) assert_present "$HOME_DIR/user-home/omp-errors.log" "the pane must expand the tilde redirection" ;;
+        tilde-redirection) assert_present "$pane_home/omp-errors.log" "the pane must expand the tilde redirection" ;;
       esac
     done
   done
@@ -1385,7 +1427,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model() {
     expect_code "$expected" "$status" "raw omp guard must follow the effective model in '$command': $out"
     if [ "$expected" = 0 ]; then
       assert_present "$HOME_DIR/state/$id.meta" "a pinned raw launch must publish the task"
-      assert_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/$model_flag}" "raw model selection did not reach the launch"
+      assert_launch_contains "$(cat "$LAUNCH_LOG")" "${command//__MODELFLAG__/$model_flag}" "raw model selection did not reach the launch"
     else
       assert_contains "$out" "omp modelRoles.default is not set" "an unpinned raw launch must refuse the missing role"
       assert_absent "$HOME_DIR/state/$id.meta" "a refused raw launch must publish no record"
@@ -1440,12 +1482,12 @@ test_secondmate_launch_relies_on_discovery() {
   launch=$(cat "$launchlog")
   [ "$(printf '%s\n' "$launch" | grep -o ' -e ' | wc -l | tr -d ' ')" = 1 ] \
     || fail "an omp secondmate launch must name exactly one -e: omp auto-discovers .omp/extensions and a file named both ways loads twice: $launch"
-  assert_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
-  assert_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
+  assert_launch_contains "$launch" "-e '$world/home/state/sm.omp-ext.ts'" "an omp secondmate launch must load the parent-home busy extension: $launch"
+  assert_launch_contains "$launch" "--config '$ROOT/.omp/fm-session-overlay.yml' --auto-approve --cwd '$home'" "secondmate launch lost the posture overlay or the pinned home directory: $launch"
   assert_not_contains "$launch" "fm-worker-overlay.yml" "secondmate launch must preserve the lane's memory settings"
   assert_not_contains "$launch" "PI_EDIT_VARIANT" "an omp secondmate launch must not force the worker-only replace edit mode"
-  assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
-  assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
+  assert_launch_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
+  assert_launch_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_present "$world/home/state/sm.omp-ext.ts" "a secondmate must receive the per-task busy extension"
   assert_absent "$home/state/.omp-live-model" "a secondmate launch must not keep its home's previous live-model record"
   pass "fm-spawn: a real omp secondmate launch loads only the busy -e and auto-discovers its primary extensions"
@@ -1640,8 +1682,6 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = $'/st/id1.omp-ext.ts\n/st/id1.omp-session.json\n/st/id1.omp-fallback.yml' ] \
-    || fail "omp wiring paths must be the state-resident extension, its current-session record, and the fallback overlay"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"
@@ -1762,7 +1802,6 @@ SH
 #!/usr/bin/env bash
 case "$*" in *fm-watch-arm.sh*'&'*) printf 'fm watcher-arm seatbelt: blocked\n' >&2; exit 2 ;; esac; exit 0
 SH
-  printf '#!/usr/bin/env bash\nexit 0\n' > "$repo/bin/fm-cd-pretool-check.sh"
   # shellcheck disable=SC2016 # $2 expands in the generated script
   printf '#!/usr/bin/env bash\nprintf "OMP DIGEST source=%%s\\n" "$2"\n' > "$repo/bin/fm-sessionstart-run.sh"
   chmod +x "$repo/bin/"*.sh
@@ -4138,6 +4177,540 @@ EOF
   pass ".omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool"
 }
 
+# The repair call judges ownership by a live arm child, never by a recorded one:
+# an arm child whose process ended while a descendant still holds its output
+# pipe is replaced, and the call reports started, even inside the output drain
+# window (held long here so the repair lands inside it). A live child of the
+# current owner is left alone.
+test_watch_extension_repairs_a_stale_arm_owner() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-stale/repo"; home="$TMP_ROOT/watch-stale/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+if [ ! -e "$FM_HOME/state/.first-arm-ended" ]; then
+  : > "$FM_HOME/state/.first-arm-ended"
+  # The arm process ends, but a descendant keeps its output pipe open.
+  sleep 60 &
+  printf '%s\n' "$!" > "$FM_HOME/state/.pipe-holder"
+  exit 0
+fi
+exec sleep 60
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_ARM_RETIRE_TIMEOUT_MS=5000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage() { return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, { isIdle: () => true });
+for (let i = 0; i < 100 && arms() < 1; i += 1) await sleep(50);
+await sleep(500);
+if (arms() !== 1) throw new Error(`expected one arm, saw ${arms()}`);
+const holder = Number(readFileSync(`${home}/state/.pipe-holder`, "utf8"));
+try {
+  // The first arm process ended; its pipe holder keeps "close" from firing.
+  process.kill(holder, 0);
+  const repaired = await tool.execute();
+  console.log(`repair: ${repaired.content[0].text}`);
+  if (/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`a dead arm owner was reported unchanged: ${repaired.content[0].text}`);
+  if (!/^watcher: started omp extension arm child 2;/.test(repaired.content[0].text)) throw new Error(`the repair did not start a new arm: ${repaired.content[0].text}`);
+  for (let i = 0; i < 100 && arms() < 2; i += 1) await sleep(50);
+  if (arms() !== 2) throw new Error(`the repair did not start a live arm: ${arms()} arms`);
+  const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+  if (!record.includes("event=arm-owner-stale")) throw new Error(`the lifecycle record lacks arm-owner-stale:\n${record}`);
+  // The replacement is live and belongs to the current owner: a second call leaves it alone.
+  await sleep(300);
+  const again = await tool.execute();
+  if (!/^watcher: unchanged/.test(again.content[0].text)) throw new Error(`a live arm child was replaced: ${again.content[0].text}`);
+  if (arms() !== 2) throw new Error(`a live arm child was replaced: ${arms()} arms`);
+} finally {
+  try { process.kill(holder); } catch {}
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension stale arm owner: $out"
+  case "$out" in *"repair: watcher: started omp extension arm child 2;"*) ;; *) fail "the stale-owner repair did not report started: $out" ;; esac
+  pass ".omp watch extension: a dead arm owner is replaced and reported started, a live one is left alone"
+}
+
+# A recorded arm child whose pid is gone before Node reaps it (exit state still
+# unset) is logged as ended-unreaped, gets no SIGTERM, and is replaced.
+test_watch_extension_labels_an_ended_unreaped_arm_owner() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-unreaped/repo"; home="$TMP_ROOT/watch-unreaped/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 60
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { ChildProcess } from "node:child_process";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage() { return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const armPids = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).map((l) => Number(l.slice(4))) : [];
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, { isIdle: () => true });
+for (let i = 0; i < 100 && armPids().length < 1; i += 1) await sleep(50);
+await sleep(500);
+const [stalePid] = armPids();
+if (!stalePid) throw new Error("the first arm did not start");
+const realKill = process.kill;
+const realChildKill = ChildProcess.prototype.kill;
+const childKills = [];
+try {
+  // The pid is gone to a liveness probe while the handle still has no exit state.
+  process.kill = function (pid, signal) {
+    if (Number(pid) === stalePid && signal === 0) {
+      const error = new Error("kill ESRCH"); error.code = "ESRCH"; throw error;
+    }
+    return realKill.call(process, pid, signal);
+  };
+  ChildProcess.prototype.kill = function (signal) {
+    if (this.pid === stalePid) childKills.push(signal ?? "SIGTERM");
+    return realChildKill.call(this, signal);
+  };
+  const repaired = await tool.execute();
+  process.kill = realKill;
+  ChildProcess.prototype.kill = realChildKill;
+  if (!/^watcher: started omp extension arm child 2;/.test(repaired.content[0].text)) throw new Error(`the repair did not start a new arm: ${repaired.content[0].text}`);
+  if (childKills.length) throw new Error(`an ended arm child was sent ${childKills.join(",")}`);
+  const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+  if (!record.includes(`event=arm-owner-stale pid=${stalePid} exit=ended-unreaped`)) throw new Error(`the lifecycle record lacks the ended-unreaped label:\n${record}`);
+  if (record.includes("exit=alive-unverified")) throw new Error(`an ended arm child was labelled alive:\n${record}`);
+} finally {
+  process.kill = realKill;
+  ChildProcess.prototype.kill = realChildKill;
+  try { process.kill(stalePid); } catch {}
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension ended-unreaped arm owner: $out"
+  [ -z "$out" ] || fail "omp watch extension ended-unreaped test printed output: $out"
+  pass ".omp watch extension: an ended-unreaped arm owner is labelled so, not killed, and replaced"
+}
+
+# The arm ends at its process exit, not at "close": an arm whose process exits
+# while a descendant still holds its output pipe is observed without a repair
+# call. An exit after "watcher: started" earns the bounded retry, and an exit
+# after a wake line delivers that captured wake and arms its successor.
+test_watch_extension_observes_an_arm_exit_held_open_by_a_descendant() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-exit/repo"; home="$TMP_ROOT/watch-exit/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+n=$(($(wc -l < "${FM_ARM_LOG:-/dev/null}" 2>/dev/null || echo 0) + 1))
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$n"
+case "$n" in
+  1) ;;
+  2)
+    while [ ! -e "$FM_HOME/state/.fire-wake" ]; do sleep 0.1; done
+    . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+    fm_wake_append signal omp-exit 'signal: omp-exit done' || exit 1
+    printf 'signal: omp-exit done\n' ;;
+  *) exec sleep 60 ;;
+esac
+# The arm process ends, but a descendant keeps its output pipe open.
+sleep 60 &
+printf '%s\n' "$!" >> "$FM_HOME/state/pipe-holders"
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=60000 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=2 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); const sent = []; let tool = null;
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage(m) { sent.push(m); return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 160 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(sent)}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const holders = () => existsSync(`${home}/state/pipe-holders`) ? readFileSync(`${home}/state/pipe-holders`, "utf8").trim().split("\n").filter(Boolean).map(Number) : [];
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+try {
+  await handlers.get("session_start")({ type: "session_start" }, idle);
+  // The first arm exits after "watcher: started" with its pipe held open: the retry runs on its own.
+  await until(() => arms() === 2, "the retry after an exit held open by a descendant");
+  for (const holder of holders()) process.kill(holder, 0);
+  // The retried arm exits after a wake line with its pipe held open: the captured wake is delivered.
+  writeFileSync(`${home}/state/.fire-wake`, "");
+  await until(() => sent.some((m) => m.includes("signal: omp-exit done")), "the captured wake");
+  await until(() => arms() === 3, "the successor after the captured wake");
+  if (holders().length !== 2) throw new Error(`expected two pipe holders, saw ${holders().length}`);
+  if (sent.some((m) => m.includes("FAILED"))) throw new Error(`the observed exits were reported failed: ${JSON.stringify(sent)}`);
+  const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+  if (!record.includes("waited-on=arm-output-drain")) throw new Error(`the lifecycle record lacks the output drain:\n${record}`);
+  if (tool === null) throw new Error("the arm tool was not registered");
+} finally {
+  for (const holder of holders()) { try { process.kill(holder); } catch {} }
+  await handlers.get("session_shutdown")({}, idle);
+}
+console.log("exit-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension arm exit: $out"
+  case "$out" in *exit-ok*) ;; *) fail "the arm exit test did not finish: $out" ;; esac
+  pass ".omp watch extension: an arm exit held open by a descendant is observed, retried, and its wake delivered with no repair call"
+}
+
+# omp's agent registry tells the primary session ("main") from a task or
+# subagent helper session. A helper that loads the extension in the same
+# process never takes the home, never re-arms, and never receives a forwarded
+# arm or a wake, while it lives or after it ends: the wake reaches the primary.
+test_watch_extension_keeps_the_home_from_a_helper_session() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-helper/repo"; home="$TMP_ROOT/watch-helper/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+while [ ! -e "$FM_HOME/state/.fire-wake" ]; do sleep 0.1; done
+rm -f "$FM_HOME/state/.fire-wake"
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-helper 'signal: omp-helper done' || exit 1
+printf 'signal: omp-helper done\n'
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const refs = [];
+const registry = { AgentRegistry: { global: () => ({ list: () => refs }) } };
+const makePi = () => {
+  const handlers = new Map(); const box = { tool: null, sent: [] };
+  return { handlers, box, pi: {
+    pi: registry,
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(m) { box.sent.push(m); return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const arm = (target, ctx) => target.box.tool.execute("call", {}, undefined, undefined, ctx);
+const primarySession = {}; const helperSession = {};
+const primaryCtx = { isIdle: () => true, sessionManager: primarySession };
+const helperCtx = { isIdle: () => true, sessionManager: helperSession };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+// The primary binds before its session is registered, as omp loads extensions first.
+const primary = makePi(); mod.default(primary.pi);
+refs.push({ kind: "main", session: { sessionManager: primarySession } });
+await primary.handlers.get("session_start")({ type: "session_start" }, primaryCtx);
+await until(() => arms() === 1, "the primary arm");
+// A helper session loads the extension in the same process and runs.
+const helper = makePi(); mod.default(helper.pi);
+refs.push({ kind: "sub", session: { sessionManager: helperSession } });
+await helper.handlers.get("session_start")({ type: "session_start" }, helperCtx);
+await helper.handlers.get("before_agent_start")({}, helperCtx);
+const viaHelper = await arm(helper, helperCtx);
+if (!/^watcher: unchanged/.test(viaHelper.content[0].text)) throw new Error(`a helper arm call changed the primary arm: ${viaHelper.content[0].text}`);
+await sleep(600);
+if (arms() !== 1) throw new Error(`a live helper took the home: ${arms()} arms`);
+const viaPrimary = await arm(primary, primaryCtx);
+if (!/^watcher: unchanged/.test(viaPrimary.content[0].text)) throw new Error(`the primary lost its arm to a live helper: ${viaPrimary.content[0].text}`);
+// With the helper live, a wake reaches the primary.
+writeFileSync(`${home}/state/.fire-wake`, "");
+await until(() => primary.box.sent.some((m) => m.includes("signal: omp-helper done")), "the wake on the primary");
+await until(() => arms() === 2, "the primary successor");
+// The helper ends; nothing moves to it or away from the primary.
+refs.splice(1, 1);
+await helper.handlers.get("session_shutdown")({}, helperCtx);
+await sleep(600);
+if (arms() !== 2) throw new Error(`an ended helper changed the primary arm: ${arms()} arms`);
+const afterHelper = await arm(primary, primaryCtx);
+if (!/^watcher: unchanged/.test(afterHelper.content[0].text)) throw new Error(`the primary arm call went elsewhere: ${afterHelper.content[0].text}`);
+if (helper.box.sent.length !== 0) throw new Error(`a helper received a wake: ${JSON.stringify(helper.box.sent)}`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["waiting=primary-session", "event=session_start-ignored reason=not-primary-session", "event=session_shutdown-ignored reason=not-primary-session"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+if (record.includes("event=home-claimed") || record.includes("event=instance-retired")) throw new Error(`a helper took the home:\n${record}`);
+await primary.handlers.get("session_shutdown")({}, primaryCtx);
+console.log("helper-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension helper session: $out"
+  case "$out" in *helper-ok*) ;; *) fail "the helper session test did not finish: $out" ;; esac
+  pass ".omp watch extension: a helper session never takes the home or the wakes, and a wake reaches the primary"
+}
+
+# A rebind for the primary session (a second factory bind while the primary
+# runs) takes the home at the primary's next event. The instance it replaced
+# no longer receives events and gets nothing afterwards: not the home after a
+# session replacement, not an arm, and not a wake.
+test_watch_extension_rebound_primary_keeps_the_home() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-rebind/repo"; home="$TMP_ROOT/watch-rebind/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+while [ ! -e "$FM_HOME/state/.fire-wake" ]; do sleep 0.1; done
+rm -f "$FM_HOME/state/.fire-wake"
+. "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-rebind 'signal: omp-rebind done' || exit 1
+printf 'signal: omp-rebind done\n'
+exit 0
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const refs = [];
+const registry = { AgentRegistry: { global: () => ({ list: () => refs }) } };
+const makePi = () => {
+  const handlers = new Map(); const box = { tool: null, sent: [] };
+  return { handlers, box, pi: {
+    pi: registry,
+    on(e, h) { handlers.set(e, h); },
+    registerCommand() {},
+    registerTool(t) { box.tool = t; },
+    sendUserMessage(m) { box.sent.push(m); return undefined; },
+  } };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const primarySession = {};
+const ctx = { isIdle: () => true, sessionManager: primarySession };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+const before = makePi(); mod.default(before.pi);
+refs.push({ kind: "main", session: { sessionManager: primarySession } });
+await before.handlers.get("session_start")({ type: "session_start" }, ctx);
+await until(() => arms() === 1, "the first arm");
+// The rebind: from here on only the new instance receives the session events.
+const after = makePi(); mod.default(after.pi);
+await sleep(300);
+if (arms() !== 1) throw new Error(`a bind that has not proven the primary session changed the arm: ${arms()} arms`);
+await after.handlers.get("before_agent_start")({}, ctx);
+await until(() => arms() === 2, "the arm of the rebound instance");
+// The primary session is replaced (/new): the new instance keeps the home.
+await after.handlers.get("session_shutdown")({}, ctx);
+await after.handlers.get("session_start")({ type: "session_start" }, ctx);
+await until(() => arms() === 3, "the arm after the session replacement");
+await sleep(900);
+if (arms() !== 3) throw new Error(`the home moved after the session replacement: ${arms()} arms`);
+const current = await after.box.tool.execute("call", {}, undefined, undefined, ctx);
+if (!/^watcher: unchanged/.test(current.content[0].text)) throw new Error(`the rebound instance lost the home: ${current.content[0].text}`);
+writeFileSync(`${home}/state/.fire-wake`, "");
+await until(() => after.box.sent.some((m) => m.includes("signal: omp-rebind done")), "the wake on the rebound instance");
+if (before.box.sent.length !== 0) throw new Error(`the replaced instance received a wake: ${JSON.stringify(before.box.sent)}`);
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["waiting=primary-session", "event=home-claimed", "cause=turn-start"]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+await after.handlers.get("session_shutdown")({}, ctx);
+console.log("rebind-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension rebound primary: $out"
+  case "$out" in *rebind-ok*) ;; *) fail "the rebound primary test did not finish: $out" ;; esac
+  pass ".omp watch extension: a rebound primary keeps the home and the instance it replaced gets nothing"
+}
+
+# A session event that fails to bind its generation is not a dead end: the
+# failure is recorded and surfaced as a watcher FAILED wake, and the bounded
+# self-heal arms once the cause is gone, with no fm_watch_arm_omp call.
+test_watch_extension_heals_a_failed_session_bind() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-bind-fail/repo"; home="$TMP_ROOT/watch-bind-fail/home"
+  install_omp_extension_fixture "$repo"
+  install_counting_arm "$repo"
+  mkdir -p "$home/state"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_SUCCESSOR_GRACE_MS=400 FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); const sent = [];
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {}, sendUserMessage(m) { sent.push(m); return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what) => { for (let i = 0; i < 100 && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(sent)}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+// The loaded-build marker cannot be written while the session binds.
+const marker = `${home}/state/.omp-watch-extension-loaded`;
+rmSync(marker, { force: true });
+mkdirSync(marker);
+await handlers.get("session_start")({ type: "session_start" }, idle).catch(() => {});
+await until(() => sent.some((m) => m.includes("could not bind the session generation")), "the surfaced bind failure");
+if (arms() !== 0) throw new Error(`the failed bind armed ${arms()} cycles`);
+rmSync(marker, { recursive: true });
+await until(() => arms() === 1, "the self-heal arm");
+const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+for (const needle of ["event=session-bind-failed", "cause=session_start", "event=self-heal "]) {
+  if (!record.includes(needle)) throw new Error(`the lifecycle record lacks ${needle}:\n${record}`);
+}
+await handlers.get("session_shutdown")({}, idle);
+console.log("bind-heal-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension failed session bind: $out"
+  case "$out" in *bind-heal-ok*) ;; *) fail "the failed session bind test did not finish: $out" ;; esac
+  pass ".omp watch extension: a failed session bind is surfaced and the bounded self-heal arms without a repair call"
+}
+
+# Readiness is judged by liveness and progress, not by a fixed total time: a
+# successor that is slow to report keeps running and is reported as still
+# starting, a cycle whose process dies is reported as failed and replaced by the
+# next repair call, and a live child that is still starting is not replaced.
+test_watch_extension_judges_readiness_by_liveness() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-ready/repo"; home="$TMP_ROOT/watch-ready/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+n=$(($(wc -l < "${FM_ARM_LOG:-/dev/null}" 2>/dev/null || echo 0) + 1))
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+case "$n" in
+  1)  # The first cycle reports, then ends with a wake.
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-1\n' "$$"
+    sleep 0.3
+    . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+fm_wake_append signal omp-ready 'signal: omp-ready done' || exit 1
+printf 'signal: omp-ready done\n'
+    exit 0 ;;
+  2)  # A slow successor: it burns CPU for longer than the notice window, then reports.
+    end=$((SECONDS + 2))
+    while [ "$SECONDS" -lt "$end" ]; do :; done
+    : > "$FM_HOME/state/.slow-ready-reported"
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-2\n' "$$"
+    exec sleep 60 ;;
+  3)  # A dead successor: its process ends without ever reporting.
+    sleep 0.3
+    kill -9 "$$" ;;
+  *)
+    printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$n"
+    exec sleep 60 ;;
+esac
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=300 \
+    FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null; const sent = [];
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage(m) { sent.push(m); return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (check, what, rounds = 200) => { for (let i = 0; i < rounds && !check(); i += 1) await sleep(50); if (!check()) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(sent)}`); };
+const arms = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).length : 0;
+const idle = { isIdle: () => true };
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, idle);
+// The slow successor passes the 300ms notice window; the wake goes out saying so.
+await until(() => sent.some((m) => m.includes("signal: omp-ready done")) && sent.some((m) => m.includes("still starting")), "the still-starting wake");
+if (existsSync(`${home}/state/.slow-ready-reported`)) throw new Error("the wake waited for the slow successor to report");
+if (sent.some((m) => m.includes("FAILED"))) throw new Error(`a slow but progressing successor was reported failed: ${JSON.stringify(sent)}`);
+// It is still alive and starting: a repair call leaves it alone.
+const during = await tool.execute(idle);
+if (!/^watcher: unchanged/.test(during.content[0].text)) throw new Error(`a live starting successor was replaced: ${during.content[0].text}`);
+if (arms() !== 2) throw new Error(`a live starting successor was replaced: ${arms()} arms`);
+// It finishes startup well past the notice window and was never dropped.
+await until(() => existsSync(`${home}/state/.slow-ready-reported`), "the slow successor own report");
+await sleep(300);
+const after = await tool.execute(idle);
+if (!/^watcher: unchanged/.test(after.content[0].text)) throw new Error(`the slow successor lost ownership after reporting: ${after.content[0].text}`);
+if (sent.some((m) => m.includes("FAILED"))) throw new Error(`the slow successor was reported failed: ${JSON.stringify(sent)}`);
+// The running cycle dies. Its replacement dies too without ever reporting: that is reported, not hidden.
+const running = Number(readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n")[1].replace("arm=", ""));
+process.kill(running, "SIGKILL");
+await until(() => sent.some((m) => m.includes("FAILED")), "the report of the dead cycle");
+await sleep(300);
+const repaired = await tool.execute(idle);
+console.log(`dead: ${repaired.content[0].text}`);
+if (/^watcher: unchanged/.test(repaired.content[0].text)) throw new Error(`a dead cycle was reported owned: ${repaired.content[0].text}`);
+if (!repaired.details.ok) throw new Error(`the repair after a dead cycle failed: ${repaired.content[0].text}`);
+await until(() => arms() >= 4, "a live replacement");
+await handlers.get("session_shutdown")({}, idle);
+console.log("slow-ok");
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension readiness by liveness: $out"
+  case "$out" in *slow-ok*) ;; *) fail "the readiness test did not finish: $out" ;; esac
+  pass ".omp watch extension: a slow but progressing successor is not dropped and a live starting child is not replaced"
+}
+
 test_watch_extension_repairs_after_handoff_publication_failure() {
   local repair repo home out status
   for repair in tool command factory; do
@@ -4300,4 +4873,11 @@ test_secondmate_watch_proof_publishes_for_the_secondmate_itself
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home
+test_watch_extension_repairs_a_stale_arm_owner
+test_watch_extension_labels_an_ended_unreaped_arm_owner
+test_watch_extension_observes_an_arm_exit_held_open_by_a_descendant
+test_watch_extension_keeps_the_home_from_a_helper_session
+test_watch_extension_rebound_primary_keeps_the_home
+test_watch_extension_heals_a_failed_session_bind
+test_watch_extension_judges_readiness_by_liveness
 test_watch_extension_repairs_after_handoff_publication_failure

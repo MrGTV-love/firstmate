@@ -121,14 +121,23 @@ identity_ready() {
 }
 
 SELF=$$
+# A confined worker's sandbox refuses to run setuid ps (exit 126); there
+# bin/fm-proc-info.py reads the same process facts from sysctl.
+PROC_INFO="$SCRIPT_DIR/fm-proc-info.py"
 
 # owner_is_ancestor: 0 when OWNER_PID is this process or one of its ancestors.
 # Only then is a marker the caller made also proof that the caller is reaping.
 owner_is_ancestor() {
-  local p=$SELF hops=0
+  local p=$SELF hops=0 parent
   while [ "$hops" -lt 64 ] && [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do
     [ "$p" != "$OWNER_PID" ] || return 0
-    if [ "$p" = "$SELF" ]; then p=$PPID; else p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' '); fi
+    if [ "$p" = "$SELF" ]; then
+      p=$PPID
+    else
+      parent=$(ps -o ppid= -p "$p" 2>/dev/null)
+      [ "$?" -ne 126 ] || parent=$(python3 "$PROC_INFO" ppid "$p" 2>/dev/null)
+      p=${parent// /}
+    fi
     hops=$((hops + 1))
   done
   return 1
@@ -193,7 +202,12 @@ lab_inactive() {
           [ -n "$start" ] || return 1
           case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
           if kill -0 "$pid" 2>/dev/null; then
-            current=$(LC_ALL=C ps -o lstart= -p "$pid" 2>/dev/null) || return 1
+            current=$(LC_ALL=C ps -o lstart= -p "$pid" 2>/dev/null)
+            case $? in
+              0) ;;
+              126) current=$(python3 "$PROC_INFO" lstart "$pid" 2>/dev/null) || return 1 ;;
+              *) return 1 ;;
+            esac
             current=$(printf '%s\n' "$current" | awk '{$1=$1; print}')
             [ -n "$current" ] && [ "$current" != "$start" ] || return 1
           fi
@@ -286,8 +300,10 @@ else
 fi
 [ -s "$WORK/roots" ] || exit 0
 
-COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o lstart= -o command= > "$WORK/ps" 2>/dev/null \
-  || { echo "fm-test-reap-orphans: cannot read the process list" >&2; exit 1; }
+COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o lstart= -o command= > "$WORK/ps" 2>/dev/null
+status=$?
+[ "$status" -ne 126 ] || { python3 "$PROC_INFO" table pid,ppid,lstart,command > "$WORK/ps" 2>/dev/null; status=$?; }
+[ "$status" -eq 0 ] || { echo "fm-test-reap-orphans: cannot read the process list" >&2; exit 1; }
 
 : > "$WORK/cwds"
 if [ -d /proc/self ]; then
@@ -405,8 +421,17 @@ END {
 ' "$WORK/ps" > "$WORK/targets"
 
 target_identity() {
-  local out
-  out=$(COLUMNS=10000 LC_ALL=C ps -p "$1" -ww -o lstart= -o command= 2>/dev/null) || return 1
+  local out start args
+  out=$(COLUMNS=10000 LC_ALL=C ps -p "$1" -ww -o lstart= -o command= 2>/dev/null)
+  case $? in
+    0) ;;
+    126)
+      start=$(python3 "$PROC_INFO" lstart "$1" 2>/dev/null) || return 1
+      args=$(python3 "$PROC_INFO" args "$1" 2>/dev/null) || return 1
+      out="$start $args"
+      ;;
+    *) return 1 ;;
+  esac
   [ -n "$out" ] || return 1
   printf '%s\n' "$out" | sed 's/^[[:space:]]*//'
 }

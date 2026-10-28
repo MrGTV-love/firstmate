@@ -2,7 +2,44 @@
 # fm-proc-budget.sh - run a command tree under a per-tree process budget.
 #
 # Usage:
-#   fm-proc-budget.sh [<extra>] -- <command...>   run <command...> with a budget
+#   fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>
+#   fm-proc-budget.sh --memory-kib 2097152 -- <command...>  2 GiB memory stop
+#
+# --memory-kib adds an opt-in sampled hard stop: once per second, sum the
+# command tree's resident memory and physical footprint, in KiB (1024 bytes),
+# and compare the larger sum with the positive decimal limit. The command runs
+# in a new process group that it leads, so the tree is that whole group, even
+# a background job orphaned before the first sample, plus each descendant a
+# sample has seen in another group or session, including nested wrappers. The
+# only gap: a process that leaves the group (setsid or setpgid, as a daemon's
+# double fork does) and that no sample has seen before its parent exits is not
+# tracked; it escapes the stop and every cleanup below. Being outside the
+# caller's group, the command is a background job for a terminal: Ctrl-C
+# reaches the supervisor, which ends the tree, and a command that reads the
+# terminal is stopped.
+# The memory reader joins the command's group and reads a pipe that only the
+# supervisor writes; if the supervisor dies (for example SIGKILL from a kill of
+# the caller's group), the reader sends the group and every member a sample has
+# seen TERM, then KILL after at most one second. The command itself starts only
+# after the reader has answered a first sample; a supervisor that dies sooner
+# leaves no command running. Crossing the limit STOPs and re-scans the tree
+# before KILLing every member, then exits 99 with one stderr line naming the
+# limit and sample. This is not a kernel allocation ceiling: memory can
+# overshoot between samples. A failed, malformed, or late memory sample ends the
+# tree and exits 125, as does a member of this user whose memory cannot be read, or a sample in
+# which no member's memory can be read. A member running as another user (a
+# setuid program such as ps) whose memory cannot be read is left out of the sum;
+# a 99 or 125 stderr line counts and names such members.
+# When the command itself exits, its remaining tree gets TERM, then KILL after
+# at most one second, and successful cleanup preserves the command's status.
+# A command meant to leave a daemon running must not use this option. HUP, INT
+# and TERM that the caller ignores (nohup) stay ignored by the supervisor and
+# the command; the command gets default PIPE and XFSZ handling, because Python
+# discards an inherited ignore of those two before the supervisor can see it.
+# The libproc reader is checked before launch; an unsupported host (currently
+# any non-Darwin host) or unavailable reader refuses to start with status 125.
+# No ps memory sampler or external watcher is used. Without this option the
+# original exec path and process-only budget are unchanged.
 #
 # The kernel compares RLIMIT_NPROC with the user's WHOLE count, not with one
 # process tree: processes on Darwin, tasks (threads included) on Linux.
@@ -29,17 +66,26 @@
 # Exit status: the command's own, 2 for a malformed call, and 125 when no budget
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
+# With --memory-kib, 99 is a crossed memory limit, 125 also covers a failed
+# memory sample or a failed cleanup after the command exits. A command that
+# cannot start gets bash's own exec status and message (127 or 126), as without
+# the option. On a failed supervisor cleanup sweep, the independent reader
+# receives EOF and finishes its bounded TERM/KILL cleanup before it is ended.
+# The command's own status comes after successful cleanup of its remaining
+# tree; only an untracked process (above) survives it. Cleanup failures are
+# reported on one stderr line, never as a successful command exit.
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it.
 set -u
+FM_PROC_BUDGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 fm_proc_budget_error() {
   echo "fm-proc-budget: $*" >&2
 }
 
 fm_proc_budget_usage() {
-  fm_proc_budget_error "usage: fm-proc-budget.sh [<extra>] -- <command...>"
+  fm_proc_budget_error "usage: fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>"
 }
 
 fm_proc_budget_count() {
@@ -48,7 +94,16 @@ fm_proc_budget_count() {
   set -o pipefail
   case "$(uname -s)" in
     Linux) count=$(ps -L -U "$uid" -o lwp= | wc -l) || return 1 ;;
-    *) count=$(ps -U "$uid" -o pid= | wc -l) || return 1 ;;
+    # A confined worker's sandbox refuses to run setuid ps (exit 126), so the
+    # count then comes from bin/fm-proc-info.py instead.
+    *)
+      count=$(ps -U "$uid" -o pid= 2>/dev/null)
+      case $? in
+        0) [ -n "$count" ] || return 1; count=$(printf '%s\n' "$count" | wc -l) || return 1 ;;
+        126) count=$(python3 "$FM_PROC_BUDGET_DIR/fm-proc-info.py" count-uid "$uid") || return 1 ;;
+        *) return 1 ;;
+      esac
+      ;;
   esac
   count=$(printf '%s' "$count" | tr -d '[:space:]')
   case "$count" in
@@ -89,10 +144,27 @@ fm_proc_budget_apply() {
 }
 
 extra=1500
-if [ "${1:-}" != -- ] && [ "$#" -gt 0 ]; then
-  extra=$1
-  shift
-fi
+memory_kib=
+extra_given=0
+while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+  if [ "$1" = --memory-kib ]; then
+    [ "$#" -ge 2 ] && [ -z "$memory_kib" ] || { fm_proc_budget_usage; exit 2; }
+    memory_kib=$2
+    case "$memory_kib" in
+      ''|*[!0-9]*|0|0[0-9]*) fm_proc_budget_error "memory limit must be a positive decimal integer in KiB"; exit 2 ;;
+    esac
+    # Bound conversion before Python or shell arithmetic can overflow.
+    [ "${#memory_kib}" -le 15 ] || { fm_proc_budget_error "memory limit is too large"; exit 2; }
+    shift 2
+  elif [ "$extra_given" -eq 0 ]; then
+    extra=$1
+    extra_given=1
+    shift
+  else
+    fm_proc_budget_usage
+    exit 2
+  fi
+done
 if [ "${1:-}" != -- ]; then
   fm_proc_budget_usage
   exit 2
@@ -107,4 +179,11 @@ case "$extra" in
 esac
 
 fm_proc_budget_apply "$extra" || exit 125
+if [ -n "$memory_kib" ]; then
+  command -v python3 >/dev/null 2>&1 && [ -r "$FM_PROC_BUDGET_DIR/fm-proc-budget-memory.py" ] || {
+    fm_proc_budget_error "cannot start memory reader; command not started"
+    exit 125
+  }
+  exec python3 "$FM_PROC_BUDGET_DIR/fm-proc-budget-memory.py" "$memory_kib" -- "$@"
+fi
 exec "$@"

@@ -269,7 +269,7 @@ bash bin/fm-test-run.sh tests/fm-backlog-read-bound.test.sh tests/fm-work-progre
 # FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=214255
 ```
 
-These recorded runs predate the later unavailable-ctypes blind path, the Darwin per-member CPU fallback, the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
+These recorded runs predate the later unavailable-ctypes blind path, the Darwin non-root per-member CPU fallback, the blind sample in every runner mode whenever no complete process-tree CPU sample exists (a failed native root read, ps and fm-proc-info.py both unavailable, or native imports that cannot load), which leaves the default run mode only its 6 hour absolute stop outside a cleanup (a cleanup that a forwarded signal or that stop began still follows the cleanup SIGKILL rule), the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
 
 The backlog fixture includes a short completion phase after its CPU worker is reaped, with the existing one-second inactivity interval unchanged.
 The progress suite observes a real shell before and after a complete CPU-producing child lifetime, verifies that the second observation does not prove inactivity, then verifies that subsequent real inactivity does.
@@ -327,6 +327,43 @@ The blocking and bounded-follow-up mechanisms were validated across seven harnes
 | omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `FM_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `fm_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
+
+### Claude presentation-hold release, 2026-10-25 and 2026-10-26
+
+`bin/fm-claude-hold-release.sh` is registered for `UserPromptSubmit` and `StopFailure`.
+On 2026-10-25 the scratch probe ran through `bin/fm-teamclaude-launch.sh`, under `fm-proc-budget.sh`, with a fresh task-scoped `CLAUDE_CONFIG_DIR` on Claude Code 2.1.310.
+The launcher's own proxy check passed, so it did not refuse, but Claude did: through the launcher, `claude auth status` exited 1 reporting `"loggedIn": false`, and a one-line `claude -p --model haiku` exited 1 with `Not logged in · Please run /login` before sending any request.
+The TeamClaude proxy does not stand in for Claude's own sign-in, so a scratch config needs a credential, which the [worker account contract](../configuration.md) forbids copying, and the default store would have Claude itself write the real `~/.claude.json`.
+
+On 2026-10-26 the gate's test phase ran real Claude Code 2.1.310 (Haiku) primaries in throwaway lab homes started from the target tree (aeb99bd), with base 3b3fb14 as the counterfactual.
+Its lab driver scripts were not retained, so this record carries the observed output and states no replay command for the lab cases.
+
+| Case | Observed result |
+| --- | --- |
+| Stale hold, then a typed prompt | A hand-written hold was still present after 6 s idle and was gone 0.3 s after the prompt, before any `Stop`. |
+| Message typed while a turn streams | Claude queued the message (`Press up to edit queued messages`), and the hand-written hold was gone at the first poll about 1 s later; the turn finished with the hold still absent. |
+| Escape, then a new prompt | The hold was still present 4 s after Escape, so Escape fired no hook; it was gone within 0.2 s of the next prompt. |
+| Host close while main's open turn holds the rows, live watcher | The parked `Stop` firing recorded `outcome=refused` with the episode's `recovery_generation`, wrote no failure notice, and left the hold in place. |
+| Next `Stop` after that refusal | The firing recorded `outcome=rewake` for the same `recovery_generation`, and Claude received exactly one "presented to a turn that ended without acknowledging them" wake. |
+| Host close after main's drain, successor watcher killed (`kill -9`) | Base recorded `outcome=failed`, wrote `.claude-autoarm-failure-notified`, and Claude received the `auto-arm FAILED` notice; target recorded `outcome=rewake` with no failure notice. |
+
+After the one redelivery, the lab model never acknowledged its rows, and a `check: rearm-resurface` wake repeated about every 5 s.
+Base 3b3fb14 repeats the same wake for unacknowledged rows, so that loop predates this change.
+The first lab died when the test runner's orphan reaper took its exited owner process and was rebuilt with a long-lived owner.
+The first mid-turn attempt did not count, because the turn ended before the message was typed.
+An API-error turn end (`StopFailure`) was not produced, so that release stays untested live.
+A mid-turn `UserPromptSubmit` release costs at most a duplicate wake.
+
+The model-free proof runs the real hook scripts against a fake harness:
+
+```sh
+bash tests/fm-claude-stop-autoarm.test.sh
+bash tests/fm-supervision-host-hook.test.sh
+bash tests/fm-supervision-host.test.sh
+```
+
+On 2026-10-26 the five new `tests/fm-claude-stop-autoarm.test.sh` cases failed against base `bin/` and passed against target `bin/`.
+The first `tests/fm-supervision-host.test.sh` run failed once with `not ok - a handled away wake printed more than the first cycle's status to main`; the rerun passed with `exit=0`.
 
 ### DSH native message identity, 2026-10-22
 

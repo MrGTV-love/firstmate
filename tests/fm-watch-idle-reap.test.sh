@@ -396,6 +396,97 @@ test_lavish_sweep_failing_or_hung_never_stops_the_poll() {
   pass "a failing Lavish sweep is retried quietly and a hung one is never doubled, and the poll keeps running"
 }
 
+# --- the merged-task prune sweep ---------------------------------------------------
+# The same detached single-flight shape. The sweep runs only while a
+# state/<id>.merge-prune record exists, and it is the only thing that makes the
+# attempt (and every retry) for a merge the poll armed, so a tick that stopped
+# firing would leave merged pool copies behind with no error. The sweep itself is
+# covered by tests/fm-merge-prune.test.sh.
+arm_merge_prune_record() {  # <state> <id>
+  printf 'version=fm-merge-prune-v1\npr=https://github.com/acme/widget/pull/7\nattempts=0\nnext_at=0\nstate=armed\n' > "$1/$2.merge-prune"
+}
+
+test_merge_prune_sweep_starts_for_an_armed_record_and_waits_for_one() {
+  local dir state fakebin out pid
+  dir=$(make_case merge-prune-runs); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exit 0'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=1 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  sleep 4
+  is_live_non_zombie "$pid" || fail "the watcher stopped early"
+  if sweep_called "$state"; then
+    stop_owned_watcher "$pid"
+    fail "the prune sweep must not start while no merge-prune record exists"
+  fi
+  arm_merge_prune_record "$state" t1
+  fm_test_wait_until 30 sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the prune sweep for an armed record"; }
+  case "$(head -n 1 "$state/.sweep-calls")" in
+    "sweep|$dir|$state|"*) ;;
+    *) stop_owned_watcher "$pid"; fail "the prune sweep is started as 'sweep' with this home: $(head -n 1 "$state/.sweep-calls")" ;;
+  esac
+  is_live_non_zombie "$pid" || fail "a finished prune sweep must not stop the watcher"
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a routine prune sweep must not wake firstmate: $(cat "$state/.wake-queue")"; }
+  stop_owned_watcher "$pid"
+  pass "the poll loop starts the prune sweep detached, for this home, once a merge-prune record exists and not before"
+}
+
+test_merge_prune_zero_interval_disables_the_sweep() {
+  local dir state fakebin out pid
+  dir=$(make_case merge-prune-off); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exit 0'
+  arm_merge_prune_record "$state" t1
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=0 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  sleep 4
+  is_live_non_zombie "$pid" || fail "the watcher stopped early"
+  if sweep_called "$state"; then
+    stop_owned_watcher "$pid"
+    fail "FM_MERGE_PRUNE_INTERVAL=0 must turn the prune sweep off"
+  fi
+  stop_owned_watcher "$pid"
+  pass "FM_MERGE_PRUNE_INTERVAL=0 turns the prune sweep off even with a record armed"
+}
+
+# A transient refusal leaves the record in place, so the next tick must try
+# again; once the record is gone the sweep must stop.
+test_merge_prune_sweep_retries_until_the_record_is_gone() {
+  local dir state fakebin out pid
+  dir=$(make_case merge-prune-retry); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  # shellcheck disable=SC2016 # The stub's body is literal shell source, expanded when the stub runs.
+  install_sweep "$fakebin" 'n=$(wc -l < "$FM_STATE_OVERRIDE/.sweep-calls" | tr -d " ")
+if [ "$n" -ge 3 ]; then rm -f "$FM_STATE_OVERRIDE/t1.merge-prune"; fi
+exit 0'
+  arm_merge_prune_record "$state" t1
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=1 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  fm_test_wait_until 60 test ! -e "$state/t1.merge-prune" || { stop_owned_watcher "$pid"; fail "the prune sweep was not retried while the record stayed: $(sweep_calls "$state") call(s)"; }
+  sleep 4
+  sweep_count_is "$state" 3 || { stop_owned_watcher "$pid"; fail "want 3 attempts (two that leave the record, one that retires it), got $(sweep_calls "$state")"; }
+  is_live_non_zombie "$pid" || fail "a retried prune sweep must not stop the watcher"
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a retried prune sweep must not wake firstmate by itself: $(cat "$state/.wake-queue")"; }
+  stop_owned_watcher "$pid"
+  pass "a prune sweep that leaves the record is retried on a later tick, and stops once the record is gone"
+}
+
+test_merge_prune_sweep_still_running_is_never_doubled() {
+  local dir state fakebin out pid hung
+  dir=$(make_case merge-prune-hung); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exec sleep 30'
+  arm_merge_prune_record "$state" t1
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=1 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  fm_test_wait_until 30 sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung prune sweep case never started a sweep"; }
+  sleep 4
+  hung=$(head -n 1 "$state/.sweep-calls" | cut -d'|' -f4)
+  if [ "$(sweep_calls "$state")" != 1 ]; then
+    stop_owned_watcher "$pid" "$hung"
+    fail "a prune sweep still running must not be started a second time"
+  fi
+  is_live_non_zombie "$pid" || fail "a hung prune sweep must not stop the watcher"
+  stop_owned_watcher "$pid" "$hung"
+  pass "a prune sweep still running is never started twice, and the poll keeps running"
+}
+
 # --- the poll interval by home role -----------------------------------------------
 # A secondmate home polls every 30 seconds, every other home every 15, config/watch-poll
 # overrides a home, and FM_POLL still wins. The cadences are observed through a recording
@@ -563,6 +654,10 @@ test_successive_watchers_preserve_the_cleanup_deadline
 test_lavish_sweep_runs_detached_on_its_interval_in_auto_mode
 test_lavish_sweep_first_run_waits_and_zero_turns_it_off
 test_lavish_sweep_failing_or_hung_never_stops_the_poll
+test_merge_prune_sweep_starts_for_an_armed_record_and_waits_for_one
+test_merge_prune_zero_interval_disables_the_sweep
+test_merge_prune_sweep_retries_until_the_record_is_gone
+test_merge_prune_sweep_still_running_is_never_doubled
 test_poll_resolution_by_home_role
 test_wake_lib_sources_without_the_primary_scope_lib
 test_poll_config_override

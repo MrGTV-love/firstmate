@@ -14,11 +14,11 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-helpers.sh"
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
-  local dir out rc gen_before gen_after
+  local dir out rc gen_before gen_after session old_session=00000000-0000-4000-8000-000000000000
   dir=$(new_case same rl1)
   add_ship_task "$dir" rl1 claude
   gen_before=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" rl1)
-  printf 'busy_gen=%s\n' "$gen_before" >> "$dir/home/state/rl1.meta"
+  printf 'busy_gen=%s\nclaude_session_id=%s\n' "$gen_before" "$old_session" >> "$dir/home/state/rl1.meta"
   out=$(run_control "$dir" rl1 relaunch --note "stopped mid-refactor"); rc=$?
   expect_code 0 "$rc" "a same-harness relaunch should succeed"$'\n'"$out"
   assert_contains "$out" "relaunched rl1 harness=claude from=claude" "the outcome should name the transition"
@@ -36,6 +36,14 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   assert_grep "/exit" "$dir/fake/literal" "the previous agent should have been exited"
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
   assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
+  if [ "$(meta_field "$dir" rl1 write_confinement)" = seatbelt-v1 ]; then
+    session=$(meta_field "$dir" rl1 claude_session_id)
+    [ "$(grep -c '^claude_session_id=' "$dir/home/state/rl1.meta")" = 1 ] && [ -n "$session" ] && [ "$session" != "$old_session" ] \
+      || fail "a confined relaunch must replace the recorded Claude session id with one fresh id"
+    assert_grep "--session-id $session" "$dir/fake/literal" "the replacement must launch under the recorded session id"
+  else
+    assert_no_grep claude_session_id= "$dir/home/state/rl1.meta" "an unconfined relaunch must drop the Claude session id"
+  fi
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
 }
 
@@ -359,7 +367,7 @@ SH
       else
         assert_equals complete "$(journal_field "$dir" "$id" phase)" "subscription relaunch must complete"
         assert_equals "$model" "$(meta_field "$dir" "$id" model)" "subscription selection must reach the replacement"
-        assert_contains "$(cat "$dir/fake/launch")" "--model '$model'" "subscription model must reach executable launch"
+        assert_launch_word "$dir/fake/launch" "--model " "$model" "subscription model must reach executable launch"
       fi
     done
   done
@@ -754,6 +762,9 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   # Wiring the previous claude incarnation left in the worktree.
   mkdir -p "$dir/wt/.claude"
   printf '{"hooks":{}}\n' > "$dir/wt/.claude/settings.local.json"
+  printf '(version 1)\n(allow default)\n' > "$dir/home/state/rl4.write-confinement.sb"
+  printf '{"at":1,"task":"rl4","decision":"clear"}\n' > "$dir/home/state/rl4.jev-guard.jsonl"
+  cp "$dir/home/state/rl4.jev-guard.jsonl" "$dir/prior-audit"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" rl4 relaunch --harness codex --note "switching runtime"); rc=$?
   expect_code 0 "$rc" "a harness switch should succeed"$'\n'"$out"
@@ -761,6 +772,8 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   [ "$(meta_field "$dir" rl4 harness)" = codex ] || fail "the record should follow the switch"
   [ ! -e "$dir/wt/.claude/settings.local.json" ] \
     || fail "the previous harness's per-task wiring must be cleared on a switch"
+  assert_absent "$dir/home/state/rl4.write-confinement.sb" "the old confinement profile must not survive an unconfined replacement"
+  cmp -s "$dir/prior-audit" "$dir/home/state/rl4.jev-guard.jsonl" || fail "harness replacement removed historical task audit rows"
   assert_grep "codex" "$dir/fake/literal" "the replacement launch should be the new harness"
   [ "$(journal_field "$dir" rl4 from_harness)" = claude ] || fail "the journal should record the origin harness"
   [ "$(journal_field "$dir" rl4 to_harness)" = codex ] || fail "the journal should record the target harness"
@@ -1052,8 +1065,7 @@ test_worker_account_pin_follows_the_relaunch() {
   out=$(run_control "$dir" "$id" relaunch --note "pinned account"); rc=$?
   expect_code 0 "$rc" "a relaunch under a signed-in account pin should succeed"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" account)" = "$dir/work" ] || fail "the relaunched record should carry the pinned account"
-  assert_contains "$(cat "$dir/fake/literal")" "CLAUDE_CONFIG_DIR='$dir/work'" \
-    "the replacement should launch under the pinned root"
+  assert_launch_word "$dir/fake/literal" "CLAUDE_CONFIG_DIR=" "$dir/work" "the replacement should launch under the pinned root"
   rm "$dir/home/config/claude-account"
   : > "$dir/fake/literal"
   out=$(run_control "$dir" "$id" relaunch --note "pin removed"); rc=$?

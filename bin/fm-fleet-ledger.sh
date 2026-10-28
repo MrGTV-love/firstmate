@@ -36,7 +36,7 @@
 #   fm-fleet-ledger.sh closed <task> <evidence> <pr>
 #   fm-fleet-ledger.sh answered <task> send <key>
 #   fm-fleet-ledger.sh answered <task> hold <key> <source>
-#   fm-fleet-ledger.sh capture
+#   fm-fleet-ledger.sh capture [--try-lock]
 #   fm-fleet-ledger.sh appended <config> <state>/<task>.status
 #
 # capture appends one task.status record for every complete (newline-ended)
@@ -65,12 +65,17 @@
 # already holds a task.closed with the same evidence and pr, so a close that more
 # than one path reaches is recorded once and a reopened task records its next close.
 # Every write holds state/.fleet-ledger.lock.
+# capture --try-lock is the watcher's periodic, nonblocking attempt: it returns
+# 75 on contention without changing any status offset or ledger record, so the
+# next poll retries the pending growth while lock alarms remain runnable.
+# Explicit lifecycle writers and plain capture retain their blocking contract.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
 # home exactly as the other bin/ scripts do.
 #
-# Exit status: 0 on success or when off, 2 on a usage error, 1 when a record
-# could not be written. Producers ignore a failure so it never changes theirs.
+# Exit status: 0 on success or when off, 2 on a usage error, 75 when --try-lock
+# sees contention, 1 when a record could not be written. Producers ignore a
+# failure so it never changes theirs.
 set -u
 # Byte semantics for offsets and lengths; jq still reads the text as UTF-8.
 export LC_ALL=C
@@ -85,7 +90,7 @@ LOCK="$STATE/.fleet-ledger.lock"
 TEXT_MAX_CHARS=2000
 
 usage() {
-  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture | appended <config> <state>/<task>.status" >&2
+  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture [--try-lock] | appended <config> <state>/<task>.status" >&2
   exit 2
 }
 
@@ -94,6 +99,7 @@ task_ok() {
 }
 
 cmd=${1:-}
+TRY_CAPTURE=0
 case "$cmd" in
   dispatched) { [ "$#" -eq 6 ] && task_ok "$2"; } || usage ;;
   pr_ready) { [ "$#" -eq 3 ] && task_ok "$2" && [ -n "$3" ]; } || usage ;;
@@ -109,7 +115,13 @@ case "$cmd" in
     case "$#:${3:-}" in 4:send) ;; 5:hold) ;; *) usage ;; esac
     [ -n "$4" ] || usage
     ;;
-  capture) [ "$#" -eq 1 ] || usage ;;
+  capture)
+    case "$#" in
+      1) ;;
+      2) [ "$2" = --try-lock ] || usage; TRY_CAPTURE=1 ;;
+      *) usage ;;
+    esac
+    ;;
   appended)
     [ "$#" -eq 3 ] && [ -n "$2" ] || usage
     case "$3" in /*/*.status) ;; *) usage ;; esac
@@ -243,7 +255,14 @@ if [ "$cmd" = capture ]; then
 fi
 
 load_libs || exit 1
-fm_lock_acquire_wait "$LOCK" || exit 1
+if [ "$TRY_CAPTURE" -eq 1 ]; then
+  if ! fm_lock_try_acquire "$LOCK"; then
+    [ "${FM_LOCK_BUSY:-0}" -ne 1 ] || exit 75
+    exit 1
+  fi
+else
+  fm_lock_acquire_wait "$LOCK" || exit 1
+fi
 trap 'fm_lock_release "$LOCK"' EXIT
 rc=0
 # shellcheck disable=SC2016 # $names below are jq variables, not shell ones.

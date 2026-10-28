@@ -79,16 +79,17 @@ The prompt flow never touches the composer, so an operator draft stays unsent, a
 ### Stopped generations and duplicate loads
 
 omp can repair a missing successor automatically or through an explicit arm call; Pi requires a live replacement runtime rather than repair through its invalidated outgoing API.
-The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
+The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, stale callback behavior, and omp's rule that only the primary session and a live arm child count as owners.
 The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns predecessor-reference release after factory handoff.
 
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
+omp's `home-claimed`, `arm-owner-stale`, and `bound-expired` with `waited-on=arm-output-drain` record ownership transitions.
 The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns the record format, expiry fields, rotation, and best-effort evidence policy. Expiry waits recheck a monotonic deadline before settling; early timer callbacks wait only the remaining duration. The `actual` field records measured monotonic elapsed milliseconds, not a value clamped to the bound, so wall-clock changes do not distort deadline evidence.
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
-`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, and wake delivery after recovery.
+`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, an arm whose exit is observed while a descendant holds its output pipe, a helper session that never takes the primary's home or wakes, a rebound primary that keeps the home, and a slow but progressing successor that is never dropped.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
 Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp or Claude successor does not hold the wake and stays alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 
@@ -355,7 +356,31 @@ An acknowledged episode does not freeze the generation, because the next downtim
 ### Who presents queued wakes between turns
 
 While an auto-arm claim is open ([claim predicate](turnend-guard.md#auto-arm-generation-claim)), the Claude Stop hook is the only deliverer of queued wakes between turns.
-Its rewake commit accepts only a downtime marker, so a drain that moves the marker to handling makes the hook drop its wake in silence.
+A supervision-host close commits against a valid unacknowledged downtime episode.
+It also commits against a handling episode whenever no healthy watcher runs, independently of queued rows or a presentation hold.
+With a healthy watcher, it commits only while main owns a queued row that no presentation hold covers (`fm_wake_main_unpresented` in `bin/fm-wake-lib.sh`): a queued row that no live branch grant reserves, unless `state/.main-eligible-rows`, main's presented-row claim, names it while `state/.main-eligible-rows.held` exists.
+Two invariants keep that refusal from dropping a wake.
+Delivery: the hold lasts only for the main turn that presented the rows, and a row counts as delivered only once main acknowledges it with `--ack-through`.
+Liveness: a supervision-host close that leaves no live successor is never refused in silence, because a handling-episode close is refused only while a healthy watcher runs (`fm_watcher_healthy`); the host does not change the marker for such a close ([supervision host](supervision-host.md#failure-direction)).
+A main presentation drain sets that held flag with a token unique to that presentation, and the first proof that the presenting turn ended releases it.
+Every Claude Stop firing of the session-lock owner that passes the AFK and need gates clears it before it defers to an open claim, because that Stop ends the turn that presented the rows.
+The firing reads the token before any gate or library load and clears the flag under the queue lock only while it still carries that token, so a late asynchronous firing never clears a hold that a newer turn's drain wrote.
+A turn that ends with no Stop releases it at the next proof: `bin/fm-claude-hold-release.sh` runs on `StopFailure` (an API error) and on the next `UserPromptSubmit`, which Claude fires for a typed prompt, a steer, and an asyncRewake turn, so it also follows a mid-stream Escape, which fires no hook ([Claude reference](../.agents/skills/harness-adapters/references/harness/claude.md)).
+A message typed while a turn is still running also releases it: on Claude Code 2.1.310 the hold cleared about 1 s after the message was queued ([verification](verification/supervision.md#claude-presentation-hold-release-2026-10-25-and-2026-10-26)), so a later host close for that turn's rows is delivered as a duplicate, which main handles idempotently.
+The next main drain replaces the hold with its own.
+The shared phase is not proof that this host's close reached main, since a branch drain can enter handling while a newer main-only row is still queued.
+When main's own drain entered handling, the turn that presented every row still holds them, and a healthy watcher runs, that turn holds the close, so the rewake is refused rather than delivered twice; the row stays queued until main acknowledges it, and that watcher stays live beside it.
+With no healthy watcher, the close commits even while a hold covers its rows or the queue is empty, because a refusal could leave nothing to rewake main if that turn then ends with no Stop; main handles the possible duplicate idempotently.
+An empty-queue main drain can enter handling for an unacknowledged recovery episode, so a host cycle-boundary close must not depend on a queued row or held flag to take this liveness path.
+The boundary regression in `tests/fm-claude-stop-autoarm.test.sh` covers the downtime control and both pending and announced handling after a real empty-queue drain.
+Once that turn's hold is released without an acknowledgement, the claim no longer counts as held, so a host close that arrives after the release is delivered once.
+A close refused before the release is owed too: the refused terminal ledger entry records that held close's recovery generation, and the next Claude Stop firing consumes that entry when it takes a new auto-arm generation.
+Only when that receipt names the current handling episode and main still owns a queued row no hold covers does the firing rewake main before it arms, because `fm_recovery_marker_arm_check` waits on a handling episode.
+This allows one early redelivery per recorded held-close refusal, not a new rewake on every Stop that ends without an acknowledgement or whose acknowledgement the overdue-action gate refuses.
+That covers a turn that ended through Stop and the turn after the next prompt, including the prompt after a mid-stream Escape.
+A turn that ended on an API error releases its hold through `StopFailure`, but that hook cannot rewake main, so rows owed by a close refused beside a healthy watcher wait for the next turn's Stop while that watcher keeps supervising.
+Session-lock ownership and the generation-owned terminal write remain mandatory, and acknowledged, missing or invalid episodes refuse delivery.
+The direct-arm path still requires downtime.
 The context re-emit (`bin/fm-session-start.sh --reemit`, sources `clear` and `compact`) delegates this decision to `bin/fm-wake-drain.sh --reemit` at its presentation/mutation boundary.
 When the claim is open, the re-emit reports how many records are queued and leaves both the queue and the marker alone.
 The drain takes the queue lock before checking the claim under the ownership micro-mutex; ownership-mutex contention also defers presentation without mutation.
@@ -364,8 +389,8 @@ Claim publication waits up to ten seconds for the queue lock before attempting t
 The ownership micro-mutex is never held across a lock wait or output.
 The handling turn the hook starts then runs the ordinary presentation drain, which enters handling, and uses the emitted `--ack-through` command only after handling completes.
 Once the claim is finished or absent and the ownership micro-mutex is available, the re-emit drains as before; homes without a Claude epoch ledger retain their ordinary drain behavior.
-A refused rewake commit (including a non-downtime marker or lost session-lock ownership) exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
-`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, and refusal cleanup.
+A refused rewake commit exits 0, removes its output file, and best-effort records `outcome=refused` in the epoch ledger; the ownership-checked write cannot overwrite a newer generation.
+`tests/fm-session-start.test.sh`, `tests/fm-wake-queue.test.sh`, and `tests/fm-claude-stop-autoarm.test.sh` cover deferral, serialized claim publication, ordinary presentation after a finished claim, refusal cleanup, a branch presentation overlapping a main-only host handback with and without a healthy successor, and a main presentation of that handback refused without a second wake while its turn is open beside a healthy watcher or after an in-turn acknowledgement, delivered once while held with no healthy watcher, and otherwise delivered once after that turn ended unacknowledged through Stop, `StopFailure`, or the next prompt, without repeated early rewakes when subsequent turns omit acknowledgement or the overdue-action gate refuses it; `tests/fm-supervision-host-hook.test.sh` covers a held close whose successor cannot start or is still starting, which leaves the marker in handling and still rewakes main, and a close main acknowledged before the hand-back, which keeps that acknowledged episode and is not rewoken.
 
 ## Per-actor acknowledgement
 
@@ -378,6 +403,7 @@ The Pi branch extension injects its branch actor into its own bash tool calls.
 Every presented row is claimed to exactly one actor under the durable queue lock.
 
 - Main records its presented set in `state/.main-eligible-rows`.
+  The claim outlives the presenting turn until acknowledgement; `state/.main-eligible-rows.held` says only whether the presenting turn still holds it ([who presents queued wakes](#who-presents-queued-wakes-between-turns)).
 - A branch grant is published through `bin/fm-wake-grant.sh` under that same lock in `state/.branch-eligible-rows`.
   The grant is bound to the live branch process and extension generation recorded in `state/.branch-eligible-owner`.
   Publication is refused if main already claimed any requested row.
@@ -523,8 +549,9 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection, or for a status reclassification.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
+A status reclassification has no total-time deadline: a span read that keeps making CPU progress runs to completion and commits its classified endpoint, and only a read whose process tree makes no CPU progress for `FM_WATCHER_STALL_BOUND` is stopped as stalled and left unclassified.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
 It observes check completion through a private pipe using Bash's timed read, waking immediately on pipe closure and rechecking the leader once per second if a descendant retains the writer, instead of starting a sleep process on each poll tick.
 Group cleanup retains its existing grace and stop bounds, with one process per bounded wait rather than one per stop poll.
@@ -618,6 +645,7 @@ Its measured limit and calibration evidence are recorded beside the assertions r
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
 It also checks that a slow pending-reply pass keeps refreshing the beacon between records, so the pass is not mistaken for a stalled watcher.
 `tests/fm-watch-triage.test.sh` checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
+It also verifies that status reclassification keeps the main shell's beacon fresh during an injected slow read of a large log, without increasing the stale bound, that a read still making progress past `FM_WATCHER_STALL_BOUND` commits its endpoint, and that a read with no progress for that bound is stopped as stalled.
 Completed-cycle waits observe the test-owned terminal poll-wait boundary in the fixture's explicit state directory, not intermediate progress-beacon writes.
 Process-event fixtures pass both the home and its matching explicit state directory to every watcher launch, including output-failure launches, so the same completed-cycle boundary covers replay, handling acknowledgement, and the absence of duplicate wakes.
 `tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.

@@ -532,6 +532,9 @@ fm_control_endpoint_absence_verdict() {  # <backend> <target> [worktree]
 fm_control_harness_wiring_paths() {  # <harness> <worktree> <state-dir> <id> [kind]
   local harness=${1-} wt=${2-} state=${3-} id=${4-} kind=${5-}
   [ -n "$wt" ] && [ -n "$state" ] && [ -n "$id" ] || return 1
+  if [ "$kind" != secondmate ]; then
+    case "$harness" in omp|claude) printf '%s\n' "$state/$id.write-confinement.sb" ;; esac
+  fi
   case "$harness" in
     # A secondmate's .claude/settings.local.json belongs to the captain.
     # Retire only the firstmate-owned settings file the launch passes to

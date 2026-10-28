@@ -325,7 +325,7 @@ test_production_nested_sources_and_pending_reply_cache() {
   fakebin=$(fm_fakebin "$tmp/fake")
   fm_lint_stub_shellcheck "$fakebin" "$tmp/checks"
   for root in bin/fm-backlog-transition-lib.sh bin/fm-config-inherit-lib.sh \
-    bin/fm-ff-lib.sh bin/fm-arm-pretool-check.sh bin/fm-cd-pretool-check.sh \
+    bin/fm-ff-lib.sh bin/fm-arm-pretool-check.sh \
     bin/fm-vendor-auth-probe.sh bin/fm-worker-account-lib.sh; do
     for attempt in 1 2; do
       out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/nested-cache" \

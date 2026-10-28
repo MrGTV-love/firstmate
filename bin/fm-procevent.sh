@@ -1017,7 +1017,7 @@ require_isolated_group() {  # <role>
   local role=$1 pgid
   [ "${FM_PROCEVENT_RUNNER_GROUP:-}" = "$$" ] \
     || die "$role process group was not isolated"
-  pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d '[:space:]') \
+  pgid=$(fm_procevent_proc pgid "$$" | tr -d '[:space:]') \
     || die "cannot inspect $role process group"
   [ -n "$pgid" ] || die "cannot inspect $role process group"
   [ "$pgid" = "$$" ] || die "$role does not lead its process group"
@@ -2253,17 +2253,19 @@ cmd_ensure_listening() {
 # as settled design and eventually relax it.
 # Exit cleanup holds its own leader alive, so group quiescence here means no
 # member other than that leader. The inspector moves to a separate group before
-# invoking ps: neither it nor its ps child can look like a surviving source.
+# reading the process table: neither it nor its reader child can look like a
+# surviving source. The table comes from fm_procevent_proc, so a confined runner
+# reads it without setuid ps.
 # Return 0 when drained, 1 while children remain, 2 when inspection is uncertain.
 runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
   perl -MTime::HiRes=clock_gettime,sleep,CLOCK_MONOTONIC -e '
     use strict;
     use warnings;
-    my ($pid, $wait) = @ARGV;
+    my ($pid, $wait, @table) = @ARGV;
     setpgrp(0, 0) or exit 2;
     my $deadline = clock_gettime(CLOCK_MONOTONIC) + $wait;
     while (1) {
-      open my $ps, "-|", "ps", "-axo", "pid=,pgid=" or exit 2;
+      open my $ps, "-|", @table or exit 2;
       my ($leader, $children) = (0, 0);
       while (my $line = <$ps>) {
         $line =~ /\A\s*(\d+)\s+(\d+)\s*\z/ or exit 2;
@@ -2276,7 +2278,7 @@ runner_group_children_gone() {  # <live-runner-pid> <wait-seconds>
       exit 1 if clock_gettime(CLOCK_MONOTONIC) >= $deadline;
       sleep 0.1;
     }
-  ' "$1" "$2"
+  ' "$1" "$2" bash -c "SCRIPT_DIR=$(printf '%q' "$SCRIPT_DIR"); $(declare -f fm_procevent_proc); fm_procevent_proc table pid,pgid"
 }
 
 runner_group_signal() {  # <signal> <pid> <identity> [proved]
@@ -2298,7 +2300,7 @@ runner_group_signal() {  # <signal> <pid> <identity> [proved]
       1) fm_procevent_group_alive "$pid" && return 2; return 1 ;;
       *) return 2 ;;
     esac
-    pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || return 2
+    pgid=$(fm_procevent_proc pgid "$pid" | tr -d '[:space:]') || return 2
     [ "$pgid" = "$pid" ] || return 2
   fi
   # KNOWN LIMIT: portable shell cannot make this verification and signal atomic,

@@ -14,7 +14,6 @@ Firstmate's worker guard uses those policies and the canonical client through `b
 These files remain byte-for-byte copies at their upstream paths:
 
 - `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
-- `src/levels/level06/bash-gate.ts` (unused)
 - `src/levels/level05/intent-router.ts` and `index.ts`
 - `tests/level05.test.ts`
 - `LICENSE`
@@ -37,10 +36,6 @@ The [operator contract](../../docs/configuration.md#typed-dispatch-resolution-en
 ## Changed copies: Level 6 policies and service
 
 - `src/levels/level06/index.ts` exports only the lexical write-root helper.
-  `src/levels/level06/result-screen.ts` is unchanged by this ship and unused: no import or call loads it.
-  Its Firstmate changes from upstream remain: a frozen, calibrated injection Noul, the canonical contract error on invalid answers, no invented probability for empty output, complete-text instead of prefix-only screening, and the shared `Decide` type imported from `write-gate.ts`.
-  The unchanged vendored `bash-gate.ts` is unused: no imports or calls load it.
-  Follow-up task `fm-jev-guard-delete-unused-result-screen` deletes both `result-screen.ts` and `bash-gate.ts`; ship T2 already removed the bash model gate.
 - `src/levels/level06/write-gate.ts` retains only the lexical root helper and the shared `Decide` type; file-kind and credential questions, thresholds, `GateDecision` and model-call entry points are removed in favor of the per-task Git credential hooks.
 - `tests/level06.test.ts` exercises lexical root admission and the refusal of escapes and the root itself.
 - `extensions/report.ts` is Firstmate's per-installation pre-tool service and minimized audit owner rather than the upstream lab side channel.

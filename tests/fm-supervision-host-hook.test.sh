@@ -112,7 +112,7 @@ test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
   pass "host+hook: a successor closed before exit_to_main does not suppress the branch-outcome rewake"
 }
 
-assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() {
+assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails() {
   local status=$1 home real_mktemp successor
   home=$(make_primary_home "hook-successor-restore-fails-$status")
   ln -s "$ROOT/.agents" "$home/.agents"
@@ -149,20 +149,20 @@ SH
   : > "$home/fail-downtime-write"
   printf 'continue\n' > "$home/stub-release"
   wait_until 250 hook_exited "$home" || fail "restore failure: the Stop hook did not finish"
-  expect_code 2 "$(cat "$home/hook.rc")" "the Stop hook must notify main when neither hand-back nor downtime restoration commits"
-  assert_grep 'firstmate watcher auto-arm FAILED' "$home/hook.err" "the refused rewake must turn into a delivered failure notice"
-  assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=failed ' "$home/state/.claude-autoarm-epoch" \
-    "the failed hand-back must be committed"
+  assert_rewoke_main "$home" "failed downtime restoration"
+  assert_grep 'supervision-host: watcher downtime could not be restored' "$home/hook.err" "the host restoration diagnostic must reach main"
+  assert_no_grep 'firstmate watcher auto-arm FAILED' "$home/hook.err" "a valid actionable handback must not become an auto-arm failure"
+  assert_absent "$home/state/.claude-autoarm-failure-notified" "an actionable handback opened a failure episode"
 }
 
-test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails() {
-  assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails pending
-  pass "host+hook: a refused hand-back becomes a delivered failure notice"
+test_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails() {
+  assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails pending
+  pass "host+hook: an actionable hand-back commits normally despite failed downtime restoration"
 }
 
-test_claude_stop_hook_notifies_when_closed_announced_successor_downtime_restore_fails() {
-  assert_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails announced
-  pass "host+hook: a refused hand-back on an announced handling marker becomes a delivered failure notice"
+test_claude_stop_hook_rewakes_when_closed_announced_successor_downtime_restore_fails() {
+  assert_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails announced
+  pass "host+hook: an announced handling hand-back commits normally despite failed downtime restoration"
 }
 
 test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn() {
@@ -542,10 +542,205 @@ test_unrecorded_successor_is_stopped_rather_than_left_for_main() {
   pass "host+hook: a successor that cannot be recorded is stopped, and main's next turn end arms a fresh cycle"
 }
 
+# Main's open turn, modeled inside the parked host: $FM_HOME/open-turn runs
+# main's drain once, at the host's offer or at its successor start (whichever
+# $FM_HOME/drain-at names), then, when $FM_HOME/ack-in-turn exists, main's
+# acknowledgement of that drain, recording the acknowledged marker in
+# $FM_HOME/acked-token. The successor watcher fails to start (or is still
+# starting) after $FM_HOME/fail-successor seconds.
+install_open_turn_fixture() {  # <home>
+  local home=$1 real_node entry
+  rm "${home:?}/bin"
+  mkdir "$home/bin"
+  for entry in "$ROOT"/bin/*; do ln -s "$entry" "$home/bin/${entry##*/}"; done
+  rm "$home/bin/fm-watch-arm.sh"
+  ln -s "$ROOT/bin/fm-watch-arm.sh" "$home/bin/fm-watch-arm.real.sh"
+  cat > "$home/open-turn" <<SH
+#!/usr/bin/env bash
+rm -f "\$FM_HOME/drain-at"
+FM_SUPERVISION_ACTOR=main "$ROOT/bin/fm-wake-drain.sh" > "\$FM_HOME/interrupted-turn-drain" 2>&1 || true
+[ -e "\$FM_HOME/ack-in-turn" ] || exit 0
+ack=\$(sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p' "\$FM_HOME/interrupted-turn-drain" | tail -1)
+[ -n "\$ack" ] && FM_SUPERVISION_ACTOR=main "$ROOT/bin/fm-wake-drain.sh" \$ack > "\$FM_HOME/open-turn-ack" 2>&1 \\
+  && cp "\$FM_HOME/state/.watcher-down" "\$FM_HOME/acked-token"
+SH
+  chmod +x "$home/open-turn"
+  cat > "$home/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ] && [ -e "$FM_HOME/fail-successor" ]; then
+  printf '%s\n' "$$" >> "$FM_HOME/successor-attempts"
+  [ "$(cat "$FM_HOME/drain-at" 2>/dev/null)" != successor ] || "$FM_HOME/open-turn"
+  sleep "$(cat "$FM_HOME/fail-successor")"
+  printf 'watcher: FAILED - the fixture successor could not start\n'
+  exit 1
+fi
+exec "$(dirname "$0")/fm-watch-arm.real.sh" "$@"
+SH
+  chmod +x "$home/bin/fm-watch-arm.sh"
+  real_node=$(command -v node)
+  cat > "$home/fakebin/node" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *fm-branch-dispatch.mjs\ offer*)
+    [ "\$(cat "\$FM_HOME/drain-at" 2>/dev/null)" != offer ] || "\$FM_HOME/open-turn" ;;
+esac
+exec "$real_node" "\$@"
+SH
+  chmod +x "$home/fakebin/node"
+}
+
+# The held-refusal-without-watcher sequence: main's open turn drains the
+# watcher's wake while the parked host classifies it (its presentation hold is
+# set and the marker reads handling), that turn ends with no Stop (an Escape or
+# an API error), and the main-only successor is not proven live: it cannot
+# start (failed), or it is still starting at the readiness
+# bound and fails later (starting). The marker stays in handling, and with no
+# healthy watcher the Stop hook still rewakes main, so the row stays queued for
+# main to present again and acknowledge.
+assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
+  local mode=$1 home delay=0 timeout=''
+  [ "$mode" = failed ] || { delay=4; timeout=1; }
+  home=$(make_primary_home "hook-held-no-successor-$mode")
+  install_open_turn_fixture "$home"
+  if [ -n "$timeout" ]; then
+    FM_SUPERVISION_HOST_READY_TIMEOUT=$timeout start_hook_session "$home"
+  else
+    start_hook_session "$home"
+  fi
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "held close: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  printf '%s\n' "$delay" > "$home/fail-successor"
+  printf 'offer\n' > "$home/drain-at"
+  append_status "$home" 'which export format?' needs-decision
+  wait_until 250 hook_exited "$home" || fail "held close: the Stop hook never closed: $(cat "$home/state/.supervision-host.log")"
+  assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "fixture: the close was not a main-only pass-through"
+  assert_re '	signal	demo\.status	' "$home/interrupted-turn-drain" "fixture: main's turn did not present the watcher's wake"
+  assert_present "$home/state/.main-eligible-rows.held" "fixture: main's presentation hold is missing"
+  if [ "$mode" = failed ]; then
+    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "held close: a failed successor must be started exactly once"
+    assert_re '	pass-through	successor-unverified	signal:' "$home/state/.supervision-host.log" "held close: the failed start was not logged"
+  else
+    [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "held close: a still-starting successor must not be started twice"
+    assert_grep 'the successor watcher cycle is still starting' "$home/hook.err" "held close: the close must say the successor is still starting"
+  fi
+  assert_re '^(pending|announced):handling:' "$home/state/.watcher-down" "held close: the host must leave main's handling episode as its drain left it"
+  assert_rewoke_main "$home" "held close without a successor"
+  assert_re '^signal: .*demo.status' "$home/hook.err" "held close: the rewake must carry the close"
+  assert_no_grep 'firstmate watcher auto-arm FAILED' "$home/hook.err" "held close: a deliverable close must not become an auto-arm failure"
+  main_drain "$home" > "$home/rewoken-drain"
+  assert_re '	signal	demo\.status	' "$home/rewoken-drain" "held close: the rewoken turn must present the row again"
+  [ -n "$MAIN_ACK" ] || fail "held close: the rewoken drain printed no acknowledgement"
+  # shellcheck disable=SC2086 # the printed acknowledgement arguments
+  FM_HOME="$home" "$FAKE_CLAUDE" -c '"$0" "$@" >/dev/null 2>&1' "$ROOT/bin/fm-wake-drain.sh" $MAIN_ACK \
+    || fail "held close: main's acknowledgement failed: $MAIN_ACK"
+  [ ! -s "$home/state/.wake-queue" ] || fail "held close: main's acknowledgement left the row queued"
+}
+
+test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor() {
+  assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor failed
+  pass "host+hook: a held close whose successor cannot start stays in handling, rewakes main, and stays acknowledgeable"
+}
+
+test_claude_stop_hook_rewakes_main_when_a_held_close_successor_is_still_starting() {
+  assert_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor starting
+  pass "host+hook: a held close whose successor is still starting stays in handling, rewakes main, and stays acknowledgeable"
+}
+
+# Main's open turn drains and acknowledges the watcher's wake while the parked
+# host handles it, and the host then hands that close to main with no live
+# successor: through the main-only pass-through after its offer (main-only), or
+# through exit_to_main after an accepted close's successor cannot start
+# (accepted).
+# The acknowledgement retired the episode, so the hand-back keeps that
+# acknowledged generation instead of minting a new episode, and the Stop hook
+# refuses the close rather than rewaking main for work it already finished.
+assert_acknowledged_close_without_successor_is_not_rewoken() {
+  local class=$1 home
+  home=$(make_primary_home "hook-acked-no-successor-$class")
+  install_open_turn_fixture "$home"
+  start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "acknowledged close: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  printf '0\n' > "$home/fail-successor"
+  : > "$home/ack-in-turn"
+  if [ "$class" = accepted ]; then
+    printf 'successor\n' > "$home/drain-at"
+    append_status "$home" 'first actionable wake'
+  else
+    printf 'offer\n' > "$home/drain-at"
+    append_status "$home" 'which export format?' needs-decision
+  fi
+  wait_until 250 hook_exited "$home" || fail "acknowledged close: the Stop hook never closed: $(cat "$home/state/.supervision-host.log")"
+  assert_re '	signal	demo\.status	' "$home/interrupted-turn-drain" "fixture: main's turn did not present the watcher's wake"
+  assert_present "$home/acked-token" "fixture: main's acknowledgement did not run: $(cat "$home/open-turn-ack" 2>/dev/null)"
+  assert_re '^acked:handling:' "$home/acked-token" "fixture: main's acknowledgement did not retire its handling episode"
+  [ "$(wc -l < "$home/successor-attempts" | tr -d ' ')" -eq 1 ] || fail "acknowledged close: the successor was not attempted exactly once"
+  if [ "$class" = accepted ]; then
+    assert_re '	to-main	the successor watcher cycle could not be verified' "$home/state/.supervision-host.log" "fixture: the close did not reach main through exit_to_main"
+  else
+    assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" "fixture: the close was not a main-only pass-through"
+  fi
+  [ "$(cat "$home/state/.watcher-down")" = "$(cat "$home/acked-token")" ] \
+    || fail "acknowledged close: the hand-back minted a new episode: $(cat "$home/acked-token") became $(cat "$home/state/.watcher-down")"
+  expect_code 0 "$(cat "$home/hook.rc")" "acknowledged close: the Stop hook must not rewake main: $(cat "$home/hook.err")"
+  assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=refused' "$home/state/.claude-autoarm-epoch" "acknowledged close: the refusal must be recorded"
+  [ ! -s "$home/state/.wake-queue" ] || fail "acknowledged close: main's acknowledgement left the row queued"
+}
+
+test_main_only_close_acknowledged_without_successor_is_not_rewoken() {
+  assert_acknowledged_close_without_successor_is_not_rewoken main-only
+  pass "host+hook: a main-only close main acknowledged before a failed successor keeps its episode and is not rewoken"
+}
+
+test_accepted_close_acknowledged_without_successor_is_not_rewoken() {
+  assert_acknowledged_close_without_successor_is_not_rewoken accepted
+  pass "host+hook: an exit_to_main close main acknowledged before a failed successor keeps its episode and is not rewoken"
+}
+
+# The host serves only the auto-arm generation and owner that started it. Once
+# the ledger names another generation (epoch) or the same generation under
+# another owner (owner), the close belongs to that owner: the host stands down
+# before any engine turn, and the Stop hook that ran it exits 0 without a
+# rewake. The ordinary rewakes above prove the valid owner delivers.
+assert_superseded_host_stands_down() {  # <epoch|owner>
+  local field=$1 home ledger other
+  home=$(make_primary_home "hook-superseded-$field")
+  start_hook_session "$home"
+  turn_end "$home"
+  wait_until 150 watcher_live "$home" || fail "superseded: the Stop hook never started a watcher cycle: $(cat "$home/hook.err" 2>/dev/null)"
+  ledger="$home/state/.claude-autoarm-epoch"
+  assert_re '^epoch=[0-9]+ owner_pid=[0-9]+ outcome=arming' "$ledger" "fixture: the hook's generation is not arming"
+  other=$(cat "$home/state/.lock")
+  if ! awk -v field="$field" -v other="$other" 'NR == 1 {
+      for (i = 1; i <= NF; i++) {
+        if (field == "epoch" && $i ~ /^epoch=/) $i = "epoch=" (substr($i, 7) + 1)
+        if (field == "owner" && $i ~ /^owner_pid=/) $i = "owner_pid=" other
+      }
+    } { print }' "$ledger" > "$ledger.new" || ! mv "$ledger.new" "$ledger"; then
+    fail "fixture: could not supersede the hook's generation"
+  fi
+  append_status "$home" 'first actionable wake'
+  wait_until 250 hook_exited "$home" || fail "superseded: the Stop hook never closed: $(cat "$home/state/.supervision-host.log")"
+  assert_re '	stand-down	this session no longer owns supervision' "$home/state/.supervision-host.log" "superseded: the host did not stand down"
+  [ "$(engine_calls "$home")" -eq 0 ] || fail "superseded: a superseded host ran an engine turn"
+  expect_code 0 "$(cat "$home/hook.rc")" "superseded: the Stop hook must not rewake main: $(cat "$home/hook.err")"
+  assert_no_grep 'firstmate watcher wake' "$home/hook.err" "superseded: a superseded host's close produced a rewake"
+}
+
+test_host_stands_down_when_its_generation_is_superseded() {
+  assert_superseded_host_stands_down epoch
+  pass "host+hook: a host whose auto-arm generation is superseded stands down without an engine turn or rewake"
+}
+
+test_host_stands_down_when_its_owner_is_replaced() {
+  assert_superseded_host_stands_down owner
+  pass "host+hook: a host whose generation names another owner stands down without an engine turn or rewake"
+}
+
 run_host_case test_claude_stop_hook_restores_handoff_when_successor_closed_before_exit_to_main
 run_host_case test_claude_stop_hook_restores_handoff_when_successor_closed_mid_engine_turn
-run_host_case test_claude_stop_hook_notifies_when_closed_successor_downtime_restore_fails
-run_host_case test_claude_stop_hook_notifies_when_closed_announced_successor_downtime_restore_fails
+run_host_case test_claude_stop_hook_rewakes_when_closed_successor_downtime_restore_fails
+run_host_case test_claude_stop_hook_rewakes_when_closed_announced_successor_downtime_restore_fails
 run_host_case test_claude_stop_hook_delivers_a_main_only_pass_through
 run_host_case test_claude_stop_hook_rewakes_a_present_captain_beside_a_quiet_record
 run_host_case test_claude_stop_hook_runs_the_host_without_the_file_and_off_opts_out
@@ -557,3 +752,9 @@ run_host_case test_pass_through_successor_survives_the_hook_process_group_teardo
 run_host_case test_next_park_takes_over_the_cycle_a_pass_through_left_for_main
 run_host_case test_a_park_stopped_mid_take_over_leaves_the_take_over_to_the_next_park
 run_host_case test_unrecorded_successor_is_stopped_rather_than_left_for_main
+run_host_case test_claude_stop_hook_rewakes_main_when_a_held_close_leaves_no_successor
+run_host_case test_claude_stop_hook_rewakes_main_when_a_held_close_successor_is_still_starting
+run_host_case test_main_only_close_acknowledged_without_successor_is_not_rewoken
+run_host_case test_accepted_close_acknowledged_without_successor_is_not_rewoken
+run_host_case test_host_stands_down_when_its_generation_is_superseded
+run_host_case test_host_stands_down_when_its_owner_is_replaced

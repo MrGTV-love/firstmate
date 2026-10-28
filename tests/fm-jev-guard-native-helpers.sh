@@ -181,7 +181,7 @@ fm_jev_native_omp_pretool() {  # <subject> <lab> <provider-base>
   [ "$status" -eq 0 ] || fail "$subject: pre-tool native run exited $status: $(cat "$lab/native.out")"
   [ "$(cat "$marker" 2>/dev/null)" = ran ] || fail "$subject: the write call did not write its file: $(cat "$lab/native.out")"
   jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].tool == "write" and .[0].decision == "allow" and .[0].enforcement == "pretool_allow" and .[0].branch == "deterministic" and .[0].error_type == null and .[0].request_started == false' \
-    "$lab/home/state/jev-guard.jsonl" > /dev/null || fail "$subject: the write call was not admitted deterministically: $(cat "$lab/home/state/jev-guard.jsonl")"
+    <(node "$FM_GUARD_AUDIT_READER" "$lab/home/state") > /dev/null || fail "$subject: the write call was not admitted deterministically: $(node "$FM_GUARD_AUDIT_READER" "$lab/home/state")"
   [ ! -s "$lab/jev.jsonl" ] || fail "$subject: write admission sent a Jev request: $(cat "$lab/jev.jsonl")"
   ! grep -q 'timed out after' "$lab/native.out" || fail "$subject: the host timed out the pre-tool handler: $(cat "$lab/native.out")"
   pass "$subject: write call admitted deterministically under the worker overlay with no Jev request"
