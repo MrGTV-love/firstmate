@@ -1330,7 +1330,7 @@ EOF
       fi
     fi
     [ "$source_unreadable" = false ] || return 4
-    if [ -z "$other_refusals" ] && [ -n "$unreported" ] \
+    if [ -z "$other_refusals" ] && [ -z "$lacks_tip" ] && [ -n "$unreported" ] \
       && { [ "$mergeable" = MERGEABLE ] || [ "$mergeable" = UNKNOWN ]; }; then
       return 4
     fi
@@ -1894,12 +1894,11 @@ case "$PROVIDER" in
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
-    # One event per green-check decision, after the retries settle it. The
+    # One event per green-check decision, after the retries settle it; an
+    # allow waits for the base tip re-read immediately before the merge. The
     # writer always exits 0 and never sits in a condition, so telemetry cannot
     # change what this merge does.
-    if [ "$mergeable_status" -eq 0 ]; then
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
-    elif [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
+    if [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
     fi
     cat "$MERGE_VERIFY_LOG" >&2
@@ -1925,15 +1924,18 @@ case "$PROVIDER" in
     # lands in the seconds between this read and GitHub applying the merge is
     # not closed.
     if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
       printf 'error: refusing to merge %s: the tip of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
         "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
       exit 1
     fi
     if [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
       printf 'error: refusing to merge %s: base branch %s moved from %s to %s after head %s was verified, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
         "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_MERGE_BASE_TIP" "$FM_PR_BASE_TIP" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
       exit 1
     fi
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?

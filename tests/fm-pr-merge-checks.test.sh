@@ -1763,8 +1763,9 @@ test_a_base_tip_that_moves_before_the_merge_refuses() {
   write_github_compare "$case_dir" "$moved" "$verified" 1
 
   set +e
-  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
 
@@ -1772,9 +1773,74 @@ test_a_base_tip_that_moves_before_the_merge_refuses() {
   assert_grep "base branch main moved from $verified to $moved after head $head was verified" \
     "$case_dir/stderr" \
     "tip-moves: the refusal did not name the verified and the moved tip"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
+    "tip-moves: the moved tip did not record one merge-green-head deny"
+  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+    "tip-moves: an allow was recorded for a merge the moved tip refused"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "tip-moves: gh pr merge ran after the base tip moved"
   pass "fm-pr-merge refuses when the base tip moves between the verify read and the merge"
+}
+
+test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses() {
+  local case_dir rc head verified
+  head=1414141414141414141414141414141414141414
+  case_dir=$(make_case github-tip-reread-unreadable)
+  add_gh_mocks "$case_dir" "$head"
+  verified=$(cat "$case_dir/github-base")
+  write_github_compare "$case_dir" "$verified" "$verified" 0 1
+  printf '%s\n' '{"message":"Not Found"}' > "$case_dir/compare-responses/final"
+
+  set +e
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "tip-reread-unreadable: a tip that cannot be re-read before the merge must refuse"
+  assert_grep 'the tip of base branch main could not be re-read immediately before the merge' \
+    "$case_dir/stderr" \
+    "tip-reread-unreadable: the failed re-read was not reported"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
+    "tip-reread-unreadable: the failed re-read did not record one merge-green-head deny"
+  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+    "$case_dir/guard-events.jsonl")" \
+    "tip-reread-unreadable: the deny did not record an unreadable source"
+  assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+    "tip-reread-unreadable: an allow was recorded for a merge the failed re-read refused"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "tip-reread-unreadable: gh pr merge ran without a re-read base tip"
+  pass "fm-pr-merge refuses and records a deny when the base tip cannot be re-read before the merge"
+}
+
+# Waiting cannot change a tree, so a head that lacks the tip is refused at once
+# even beside a required check that has not reported yet, which alone retries.
+test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried() {
+  local case_dir rc head built_on tip=b34192a213f406add8809a34224315cdc9073798
+  head=1515151515151515151515151515151515151515
+  case_dir=$(make_case github-lacks-tip-unreported)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:coverage
+  built_on=$(cat "$case_dir/github-base")
+  write_github_compare "$case_dir" "$tip" "$built_on" 2
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "lacks-tip-unreported: a head without the tip must refuse"
+  assert_grep "head $head lacks the current tip $tip of base branch main" "$case_dir/stderr" \
+    "lacks-tip-unreported: the refusal did not name the missing tip"
+  assert_grep "required check 'coverage' has not reported" "$case_dir/stderr" \
+    "lacks-tip-unreported: the unreported required check was not reported"
+  assert_equals 1 "$(grep -c '/compare/' "$case_dir/gh.log")" \
+    "lacks-tip-unreported: a head that lacks the tip was retried as transient"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "lacks-tip-unreported: gh pr merge ran on a tree no check ran on"
+  pass "fm-pr-merge refuses a head that lacks the tip at once, even beside an unreported check"
 }
 
 test_an_unreadable_base_comparison_refuses() {
@@ -1855,6 +1921,8 @@ test_a_head_that_lacks_the_live_base_tip_refuses_naming_both_bases
 test_a_head_that_contains_the_live_base_tip_merges_with_no_extra_step
 test_fresh_green_runs_and_waivers_do_not_pass_a_head_that_lacks_the_tip
 test_a_base_tip_that_moves_before_the_merge_refuses
+test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses
+test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried
 test_an_unreadable_base_comparison_refuses
 )
 pr_merge_run "$@"
