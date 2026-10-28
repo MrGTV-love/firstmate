@@ -512,33 +512,44 @@ fm_test_reap_processes() {
 
 # --- owned writer waiting ---------------------------------------------------
 #
-# A detached product process that can still write fixture state after its
-# foreground caller returned (bin/fm-home-summary-refresh.sh --detach and its
-# progress worker) publishes its own pidfile here as a `wait` entry before any
-# fixture write; its launcher returns only once that entry exists, and one that
-# cannot publish starts no work. Removing a root under such a writer lets it
-# recreate the root afterwards, so cleanup waits instead of signalling: it
-# rereads the registry until every entry's exact identity is gone and the
-# process group that pid leads is empty, which covers entries published by a
-# writer that was still running at the previous pass. A finished entry's
-# pidfile is removed so it is not probed again. At the bound the still-running
-# identities are named, the registry and its remaining pidfiles are kept as
-# evidence, and the wait fails. Group membership is probed with signal 0 only.
+# A detached product process can still write fixture state after its
+# foreground caller returned (bin/fm-home-summary-refresh.sh --detach and the
+# groups below it). Inside such a registered tree every launcher reserves a
+# fresh record file listed here as a `wait` entry BEFORE the launch, and fills
+# it with the leader pid of the group it created; bin/fm-timeout-lib.sh owns
+# that contract. Removing a root under such a writer lets it recreate the root
+# afterwards, so cleanup waits instead of signalling: it rereads the registry,
+# which covers records reserved by a writer still running at the previous pass,
+# until every filled record's pid is gone and the group it leads is empty. An
+# empty or partial record is a pending or failed handoff: it is never read as a
+# finished writer, so it is waited on to the bound. A finished record is
+# removed so it is not probed again. At the bound the pending records and live
+# pids are named, the registry and its remaining records are kept as evidence,
+# and the wait fails. Liveness is probed with signal 0 only; a reused pid or
+# group id can only lengthen the wait.
 FM_TEST_PROCESS_WAIT_SECONDS=${FM_TEST_PROCESS_WAIT_SECONDS:-150}
 
 fm_test_wait_processes() {  # [registry]
-  local registry=${1:-$FM_TEST_PROCESS_REGISTRY} pidfile needle mode pid start live ticks=0
+  local registry=${1:-$FM_TEST_PROCESS_REGISTRY} record label mode pid live ticks=0
   [ -f "$registry" ] || return 0
   while :; do
     live=
-    while IFS=$'\t' read -r pidfile needle mode; do
-      [ "$mode" = wait ] || continue
-      IFS=$'\t' read -r pid start 2>/dev/null < "$pidfile" || continue
-      if fm_test_process_alive "$pidfile" "$needle" || kill -0 -- "-$pid" 2>/dev/null; then
-        live="$live $pid ($start)"
-      else
-        rm -f "$pidfile"
+    while IFS=$'\t' read -r record label mode; do
+      [ "$mode" = wait ] && [ -e "$record" ] || continue
+      if ! IFS= read -r pid < "$record" 2>/dev/null; then
+        live="$live pending:$record ($label)"
+        continue
       fi
+      case "$pid" in
+        '' | 0* | *[!0-9]*) live="$live unreadable:$record ($label)" ;;
+        *)
+          if kill -0 "$pid" 2>/dev/null || kill -0 -- "-$pid" 2>/dev/null; then
+            live="$live $pid ($label)"
+          else
+            rm -f "$record"
+          fi
+          ;;
+      esac
     done < "$registry"
     [ -n "$live" ] || break
     if [ "$ticks" -ge $((FM_TEST_PROCESS_WAIT_SECONDS * 10)) ]; then

@@ -126,46 +126,19 @@ case "$HOME_SUMMARY_IF_IDLE" in
 esac
 
 # Test fixtures export FM_TEST_PROCESS_REGISTRY (tests/lib.sh), whose cleanup
-# waits for every `wait` entry before it removes a fixture home. The refresh
-# parent and its progress worker each publish their own pid and start time there
-# before any state write (the worker's first is fm-wake-lib.sh's source-time
-# mkdir), and one that cannot publish starts no work. --detach returns only
-# after its parent has published. Unset, nothing is published.
-home_summary_register() {
-  local registry=${FM_TEST_PROCESS_REGISTRY:-} record ps_bin=/bin/ps start
-  [ -n "$registry" ] || return 0
-  [ -f "$registry" ] || return 1
-  record="$registry.$$"
-  [ -x "$ps_bin" ] || ps_bin=/usr/bin/ps
-  start=$(LC_ALL=C "$ps_bin" -o lstart= -p "$$" 2>/dev/null) && [ -n "$start" ] \
-    && printf '%s\t%s\n' "$$" "$start" > "$record.tmp" 2>/dev/null \
-    && mv -f -- "$record.tmp" "$record" 2>/dev/null \
-    && printf '%s\t%s\twait\n' "$record" fm-home-summary-refresh.sh >> "$registry" 2>/dev/null \
-    && return 0
-  rm -f -- "$record.tmp" "$record" 2>/dev/null || true
-  return 1
-}
-
-# The registration entry, or the registering process's exit without one.
-home_summary_await_registration() {  # <pid>
-  local entry ticks=0
-  entry="$FM_TEST_PROCESS_REGISTRY.$1"$'\t'fm-home-summary-refresh.sh$'\t'wait
-  while ! grep -Fqx -- "$entry" "$FM_TEST_PROCESS_REGISTRY" 2>/dev/null; do
-    if ! kill -0 "$1" 2>/dev/null || [ "$ticks" -ge 600 ]; then
-      grep -Fqx -- "$entry" "$FM_TEST_PROCESS_REGISTRY" 2>/dev/null
-      return
-    fi
-    ticks=$((ticks + 1))
-    sleep 0.05
-  done
-}
-
-if [ "$HOME_SUMMARY_MODE" = worker ] || { [ "$HOME_SUMMARY_MODE" = parent ] && [ "$DETACH" -eq 0 ]; }; then
-  if ! home_summary_register; then
-    printf 'fm-home-summary-refresh: could not register with the fixture process registry %s\n' \
-      "$FM_TEST_PROCESS_REGISTRY" >&2
-    exit 1
-  fi
+# waits for every `wait` record before it removes a fixture home. A refresh
+# started outside a registered tree is that tree's root (see
+# bin/fm-timeout-lib.sh): --detach reserves a record before it starts its
+# refresh and fills it with that refresh's group before returning; any other
+# mode records its own pid before its first state write (fm-wake-lib.sh's
+# source-time mkdir). Either root exports FM_TEST_PROCESS_RECORD, so every
+# worker, failure-logging, accounting and release child below it is recorded by
+# its launcher before it starts. One that cannot record starts no work. Unset,
+# nothing is recorded.
+if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && [ -z "${FM_TEST_PROCESS_RECORD:-}" ] && [ "$DETACH" -eq 0 ]; then
+  fm_process_reserve FM_TEST_PROCESS_RECORD fm-home-summary-refresh.sh || exit 1
+  fm_process_fill "$FM_TEST_PROCESS_RECORD" "$$"
+  export FM_TEST_PROCESS_RECORD
 fi
 
 if [ "$HOME_SUMMARY_MODE" != parent ]; then
@@ -437,17 +410,17 @@ if [ "$HOME_SUMMARY_MODE" = parent ]; then
     # stdio to /dev/null so no caller's pipe is held open, nohup so the refresh
     # outlives the shell that launched it, and its own process group so the
     # bounded child that runs session start cannot take it down with it.
+    detach_record=
+    if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ]; then
+      fm_process_reserve detach_record 'fm-home-summary-refresh.sh --detach' || exit 1
+      [ -n "${FM_TEST_PROCESS_RECORD:-}" ] || export FM_TEST_PROCESS_RECORD="$detach_record"
+    fi
     case $- in *m*) monitor_was_on=1 ;; *) monitor_was_on=0 ;; esac
     set -m 2>/dev/null || true
     FM_HOME_SUMMARY_IF_IDLE=1 nohup "$SCRIPT_DIR/fm-home-summary-refresh.sh" --best-effort \
       >/dev/null 2>&1 </dev/null &
-    detached_pid=$!
+    fm_process_fill "$detach_record" "$!"
     [ "$monitor_was_on" -eq 1 ] || set +m 2>/dev/null || true
-    if [ -n "${FM_TEST_PROCESS_REGISTRY:-}" ] && ! home_summary_await_registration "$detached_pid"; then
-      printf 'fm-home-summary-refresh: detached refresh %s did not register with the fixture process registry %s\n' \
-        "$detached_pid" "$FM_TEST_PROCESS_REGISTRY" >&2
-      exit 1
-    fi
     exit 0
   fi
   while :; do
