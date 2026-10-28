@@ -1,0 +1,10 @@
+helper_with_nonempty_ppid: [('instrumentation_error', 'malformed_phase_mark', '-', '-')]
+product_with_empty_ppid: [('instrumentation_error', 'malformed_phase_mark', '-', '-')]
+helper_empty_pid_bash32: [('instrumentation_error', 'malformed_phase_mark', '-', '-')]
+product_without_entry: [('instrumentation_error', 'product_phase_without_entry', '-', '-')]
+unknown_edge: [('instrumentation_error', 'unknown_phase_edge_or_status', '-', '-')]
+status_on_wrong_edge: [('instrumentation_error', 'unknown_phase_edge_or_status', '-', '-')]
+unselected_case: [('phase_unavailable', 'outside_source_proven_serial_scope', '-', False)]
+full_sequence: [('phase_invocation', None, None, '-'), ('phase_invocation', None, 10, '-'), ('phase_interval', 'startup', 10, True), ('phase_interval', 'preflight', 10, True), ('phase_interval', 'backend', 10, True), ('phase_interval', 'cli', None, True), ('helper_return', None, None, '-'), ('phase_invocation_closed', 'helper_returned_no_product_phase_end', 10, '-'), ('phase_invocation_closed', 'helper_end', None, '-')]
+refusal_before_backend: [('phase_invocation', None, None, '-'), ('phase_invocation', None, 10, '-'), ('phase_interval', 'startup', 10, True), ('phase_interval', 'cli', None, True), ('helper_return', None, None, '-'), ('phase_interval', 'preflight', 10, False), ('phase_invocation_closed', 'helper_returned_no_product_phase_end', 10, '-'), ('phase_invocation_closed', 'helper_end', None, '-')]
+helper_empty_pid_bash32 (corrected 6-field line, previous line above was mis-built by the tester): FM_TEARDOWN_CPU {"case": "test_local_only_force_overrides_unpushed", "cpu_seconds": null, "event": "phase_unavailable", "mark": "phase|helper|||cli.start|", "reason": "shell_sender_pid_unavailable", "valid": false}

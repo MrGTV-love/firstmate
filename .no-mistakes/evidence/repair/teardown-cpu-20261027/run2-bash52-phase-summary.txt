@@ -1,0 +1,34 @@
+invalid phase_intervals: [('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end'), ('docker', 'missing_end:helper_returned_no_product_phase_end')]
+helper sender_ppid values: {None}
+product sender_ppid all ints: True
+product ppid == parent helper sender_pid: True
+product helper_relation: Counter({'direct_parent_matches_open_helper': 15})
+phase cases: Counter({'test_docker_all_failure_channels_retain_forced_tasks_until_retry': 35, 'test_local_only_force_overrides_unpushed': 3})
+phase rows naming unselected dsh case: 0
+region edges: [('backend', 'backend.start', 'backend.end'), ('cli', 'cli.start', 'cli.end'), ('docker', 'docker.start', 'docker.end'), ('docker', 'docker.start', None), ('preflight', 'startup.end', 'backend.start'), ('runtime', 'runtime.start', 'runtime.end'), ('safety', 'safety.start', 'safety.end'), ('setup', 'setup.start', 'setup.end'), ('startup', 'entry', 'startup.end')]
+helper_return: [('test_local_only_forc', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1), ('test_docker_all_fail', 1, 1), ('test_docker_all_fail', 0, 1)]
+cpu ('test_docker_all_failure_channe', 'helper', 'cli') 24.51
+cpu ('test_docker_all_failure_channe', 'helper', 'setup') 1.34
+cpu ('test_docker_all_failure_channe', 'product', 'backend') 0.71
+cpu ('test_docker_all_failure_channe', 'product', 'docker') 1.71
+cpu ('test_docker_all_failure_channe', 'product', 'preflight') 1.47
+cpu ('test_docker_all_failure_channe', 'product', 'runtime') 4.3
+cpu ('test_docker_all_failure_channe', 'product', 'safety') 0.0
+cpu ('test_docker_all_failure_channe', 'product', 'startup') 4.05
+cpu ('test_local_only_force_override', 'helper', 'cli') 1.47
+cpu ('test_local_only_force_override', 'helper', 'setup') 0.17
+cpu ('test_local_only_force_override', 'product', 'backend') 0.05
+cpu ('test_local_only_force_override', 'product', 'docker') 0.14
+cpu ('test_local_only_force_override', 'product', 'preflight') 0.08
+cpu ('test_local_only_force_override', 'product', 'runtime') 0.28
+cpu ('test_local_only_force_override', 'product', 'safety') 0.0
+cpu ('test_local_only_force_override', 'product', 'startup') 0.26
+case/gap unattributed_launch None False missing_endpoint
+case/gap unattributed_startup 0.2 True None
+case/gap test_local_only_force_overrides_unpushed 1.6700000000000002 True None
+case/gap unattributed_gap 0.0 True None
+case/gap test_docker_all_failure_channels_retain_forced_tasks_until_retry 26.89 True None
+case/gap unattributed_gap 0.0 True None
+case/gap test_teardown_retires_the_dsh_launch_state 2.1499999999999986 True None
+case/gap unattributed_tail None False root_reaped_no_cpu_endpoint
+[{'boundaries_missing': False, 'event': 'target_exit', 'monotonic_ns': 28249086553708, 'partial_mark_bytes': 0, 'pipe_eof_observed': True, 'returncode': 0}]

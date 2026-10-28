@@ -1,0 +1,17 @@
+== a_no_probe_env: exit=1 stderr_lines=2 marks_written=       0
+== b_probe_env_no_helper_pid: exit=1 stderr_lines=2 marks_written=       0
+== c_probe_env_wrong_helper_pid: exit=1 stderr_lines=2 marks_written=       0
+== d_matching_helper_pid_ack_eof: exit=1 stderr_lines=2 marks_written=       2
+== e_matching_pid_child_flag_off: exit=1 stderr_lines=2 marks_written=       0
+--- product stdout/stderr per variant (diff vs a):
+b identical to a
+c identical to a
+d identical to a
+e identical to a
+--- a output:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.44ykXM
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.44ykXM/state/task-nonexistent-zz.meta
+exit=1
+--- d marks file:
+phase|product|70792|70774|entry|
+phase|product|70792|70774|startup.end|
