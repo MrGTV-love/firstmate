@@ -12,8 +12,10 @@
 # reader walks, and on 2026-10-18 a loop appending to three of them filled the
 # disk. This command makes that impossible through the sanctioned path: a line that
 # would pass the cap is refused, loudly, with exit 75, and nothing is written. Only
-# a decision or terminal line (anything but working: and note:) may use the reserve
-# above the cap, so a worker at the cap can still report done: or blocked:. A line
+# a decision or terminal line (needs-decision, blocked, done, failed, resolved,
+# paused or captain-held, or the configured verb for the last three) may use the
+# reserve above the cap, so a worker at the cap can still report done: or blocked:;
+# any other line, one with no verb included, stops at the cap. A line
 # repeated by a loop is written like any other until the cap refuses it. A log
 # already past cap plus reserve refuses every line, terminal ones included, and each
 # refusal names the file on stderr. It never deletes, truncates or rewrites an

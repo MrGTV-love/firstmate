@@ -106,6 +106,41 @@ test_sanctioned_loop_stops_growing_at_the_cap() {
   pass "the sanctioned writer holds the cap, refuses a repeat loop and filler loudly, keeps the reserve for done:, and refuses everything past cap plus reserve"
 }
 
+test_a_verbless_loop_stops_at_the_cap_and_leaves_the_reserve_for_done() {
+  local dir status err size rc line
+  dir=$(make_case verbless-loop); status="$dir/state/text.status"; err="$dir/text.err"
+  # The 2026-10-18 line had no verb at all. A loop that pushes it through the helper must stop at
+  # the cap, not run on into the reserve, so a later done: still has the whole reserve to land in.
+  FM_STATUS_CAP_BYTES=4096 FM_STATUS_CAP_RESERVE_BYTES=512 bash -c '
+    ulimit -f '"$HARD_LIMIT_BLOCKS"'
+    i=0
+    refused=0
+    while [ "$i" -lt 1500 ]; do
+      i=$((i + 1))
+      "$1" "$2" "text" 2>>"$3" && continue
+      [ "$?" -eq 75 ] || exit 1
+      refused=$((refused + 1))
+    done
+    [ "$refused" -gt 0 ]
+  ' _ "$APPEND" "$status" "$err" || fail "the verbless loop was never refused, or failed another way"
+  size=$(file_size "$status")
+  [ "$size" -le 4096 ] || fail "the verbless loop used the reserve: the log is $size bytes, past the 4096 byte cap"
+  # Prose with a colon, and a line whose head is not a verb, stop at the cap too.
+  for line in "1793124970: text" "Reason: retrying" "working: still going" "note: aside"; do
+    rc=0
+    FM_STATUS_CAP_BYTES=4096 FM_STATUS_CAP_RESERVE_BYTES=512 "$APPEND" "$status" "$line" 2>/dev/null || rc=$?
+    [ "$rc" -eq 75 ] || fail "the line '$line' was not refused at the cap (rc=$rc)"
+  done
+  [ "$(file_size "$status")" -eq "$size" ] || fail "a refused line changed the log"
+  for line in "done [at=9]: finished" "blocked [key=k1] corr=0123456789abcdef: stuck" "resolved [key=k1]: cleared"; do
+    FM_STATUS_CAP_BYTES=4096 FM_STATUS_CAP_RESERVE_BYTES=512 "$APPEND" "$status" "$line" 2>/dev/null \
+      || fail "the line '$line' was refused although the reserve was free"
+    [ "$(tail -1 "$status")" = "$line" ] || fail "the line '$line' did not land"
+  done
+  [ "$(file_size "$status")" -le $((4096 + 512)) ] || fail "the log passed cap plus reserve: $(file_size "$status")"
+  pass "a verbless text loop through the helper stops at the cap, and done:, blocked: and resolved: still land in the reserve"
+}
+
 test_without_the_helper_the_same_loop_passes_the_cap() {
   local dir status size
   dir=$(make_case raw-loop); status="$dir/state/raw.status"
@@ -542,13 +577,13 @@ stop_a_writer_during_a_long_walk() {  # <case> <walk: signal|heartbeat|stale>
 }
 
 test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_wake() {
-  local dir state side out shell wpid watch_pid waited=0
+  local dir state side out shell wpid watch_pid resumer waited=0
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
   dir=$(make_case one-wake); state="$dir/state"; side="$state/.one-wake.home-appends.runaway"; out="$dir/watch.out"
   shell=$(make_named_shell "$dir" notomp)
   : > "$side"
-  # A writer that is not omp is named and left alone, so it is still growing the file through the
-  # whole over-cap wake: 5000 bytes every 20 ms or so against a 2048 byte cap, far more than one cap
+  # A writer that is stopped and at once resumed by another process, so it is still growing the file
+  # through the whole over-cap wake: 5000 bytes every 20 ms or so against a 2048 byte cap, far more than one cap
   # between the size the guard keeps in its marker and the next look at the file. It starts once the
   # watcher is looping. The check that raised the wake must not run again inside that wake: if it did,
   # each pass would find the file grown by another cap and raise another wake, and the watcher would
@@ -558,15 +593,18 @@ test_a_runaway_that_keeps_growing_through_the_over_cap_wake_raises_exactly_one_w
   start_gated_tiny_writer "$shell" "$side" "$dir/gate" "$dir/writer.pid" 5 10 0.02 200
   wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
   wpid=$(cat "$dir/writer.pid")
+  ( while kill -CONT "$wpid" 2>/dev/null; do sleep 0.01; done ) &
+  resumer=$!
   watch_cap "$state" "$out" FM_STATUS_CAP_BYTES=2048
   watch_pid=$!
   while [ ! -e "$state/.last-watcher-beat" ] && [ "$waited" -lt 600 ]; do sleep 0.1; waited=$((waited + 1)); done
-  [ -e "$state/.last-watcher-beat" ] || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher never started its loop"; }
+  [ -e "$state/.last-watcher-beat" ] || { kill -9 "$wpid" "$resumer" 2>/dev/null; reap "$watch_pid"; fail "the watcher never started its loop"; }
   : > "$dir/gate"
-  wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" 2>/dev/null; reap "$watch_pid"; fail "the watcher did not exit for a file that kept growing through its over-cap wake: $(cat "$out" "$out.err" 2>/dev/null)"; }
-  kill -9 "$wpid" 2>/dev/null
+  wait_for_exit "$watch_pid" 600 || { kill -9 "$wpid" "$resumer" 2>/dev/null; reap "$watch_pid"; fail "the watcher did not exit for a file that kept growing through its over-cap wake: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  kill -9 "$resumer" "$wpid" 2>/dev/null
+  wait "$resumer" 2>/dev/null
   grep -q 'check: status-log-over-cap: file=.one-wake.home-appends.runaway' "$out" || fail "the watcher's wake is not the over-cap check: $(cat "$out")"
-  grep -q 'is not an omp process' "$out" || fail "the wake does not say the writer is not omp: $(cat "$out")"
+  grep -q "stopped pid $wpid (notomp) with SIGSTOP" "$out" || fail "the wake does not say the writer was stopped: $(cat "$out")"
   [ "$(queue_rows_for "$state")" -eq 1 ] || fail "expected exactly one queued over-cap wake for one runaway file, found $(queue_rows_for "$state"): $(cat "$state/.wake-queue")"
   pass "a runaway that keeps growing through the over-cap wake raises exactly one wake and the watcher exits on it"
 }
@@ -916,6 +954,28 @@ test_the_span_classifier_calls_its_tick_for_every_line_it_walks() {
   pass "the span classifier calls its tick once per line in its own walk and in the decision fold, and the tick changes nothing it reports"
 }
 
+test_the_guard_never_stops_the_firstmate_session_or_a_reader() {
+  local dir state status out wpid rpid
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case guard-spares); state="$dir/state"; status="$state/spared.status"
+  head -c 300000 /dev/zero | tr '\0' 'x' > "$status"
+  printf '\n' >> "$status"
+  bash -c 'exec 9>>"$1"; i=0; while [ "$i" -lt 60 ]; do i=$((i + 1)); sleep 1 9>&-; done' _ "$status" &
+  wpid=$!
+  bash -c 'exec 8<"$1"; i=0; while [ "$i" -lt 60 ]; do i=$((i + 1)); sleep 1 8<&-; done' _ "$status" &
+  rpid=$!
+  printf '%s\n' "$wpid" > "$state/.lock"
+  sleep 0.3
+  out=$(FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 "$GUARD" scan) || { kill -9 "$wpid" "$rpid" 2>/dev/null; fail "the guard scan failed"; }
+  [ "$(state_letter "$wpid")" != T ] || { kill -9 "$wpid" "$rpid" 2>/dev/null; fail "the firstmate session pid $wpid was stopped"; }
+  [ "$(state_letter "$rpid")" != T ] || { kill -9 "$wpid" "$rpid" 2>/dev/null; fail "a process that only reads the log was stopped"; }
+  kill -9 "$wpid" "$rpid" 2>/dev/null
+  wait "$wpid" "$rpid" 2>/dev/null
+  case "$out" in *"writer=pid $wpid bash; stopped nothing: pid $wpid is the firstmate session"*) ;; *) fail "the wake does not name the spared firstmate session: $out" ;; esac
+  case "$out" in *"pid $rpid "*) fail "a process that only reads the log was named as a writer: $out" ;; esac
+  pass "the guard names but never stops the firstmate session, and never names or stops a process that only reads the log"
+}
+
 test_guard_says_unknown_when_lsof_is_missing_or_timed_out() {
   local dir state status scan_env out fakebin
   dir=$(make_case lsof-state); state="$dir/state"; status="$state/lonely.status"; fakebin="$dir/fakebin"
@@ -942,20 +1002,19 @@ test_guard_says_unknown_when_lsof_is_missing_or_timed_out() {
   pass "the guard reports a missing or timed-out lsof as an unknown writer, and an lsof that ran and listed nothing as none found"
 }
 
-test_non_omp_and_missing_writers_wake_but_stop_nothing() {
-  local dir state status out shell wpid watch_pid
+test_a_bash_writer_is_stopped_and_a_missing_writer_stops_nothing() {
+  local dir state status out wpid watch_pid
   command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
-  dir=$(make_case foreign-other); state="$dir/state"; status="$state/other.status"; out="$dir/watch.out"
-  shell=$(make_named_shell "$dir" notomp)
+  dir=$(make_case foreign-bash); state="$dir/state"; status="$state/other.status"; out="$dir/watch.out"
   : > "$status"
-  start_paced_writer "$shell" "$status" "$dir/writer.pid"
+  # A raw >> loop held open by a plain bash child: the writer is judged by what it does, not by its name.
+  start_paced_writer "$(command -v bash)" "$status" "$dir/writer.pid"
   wait_for_file_nonempty "$dir/writer.pid" || fail "the fake writer did not start"
   wpid=$(cat "$dir/writer.pid")
-  run_until_cap_wake "$state" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "no wake for a non-omp writer: $(cat "$out" "$out.err" 2>/dev/null)"; }
-  grep -q 'check: status-log-over-cap' "$out" || fail "no over-cap wake for a non-omp writer: $(cat "$out")"
-  grep -q 'is not an omp process' "$out" || fail "the wake does not say the writer is not omp: $(cat "$out")"
-  grep -q 'stopped nothing' "$out" || fail "the wake does not say nothing was stopped: $(cat "$out")"
-  [ "$(state_letter "$wpid")" != T ] || fail "a non-omp writer was stopped"
+  run_until_cap_wake "$state" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "no wake for a bash writer: $(cat "$out" "$out.err" 2>/dev/null)"; }
+  grep -q "writer=pid $wpid bash" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not name the bash writer pid $wpid: $(cat "$out")"; }
+  grep -q "stopped pid $wpid (bash) with SIGSTOP; resume it with kill -CONT $wpid" "$out" || { kill -9 "$wpid" 2>/dev/null; fail "the wake does not say the bash writer was stopped: $(cat "$out")"; }
+  [ "$(state_letter "$wpid")" = T ] || { kill -9 "$wpid" 2>/dev/null; fail "the bash writer pid $wpid was not stopped (state $(state_letter "$wpid"))"; }
   kill -9 "$wpid" 2>/dev/null
 
   # No writer at all: a finished log that is simply over the cap.
@@ -966,7 +1025,7 @@ test_non_omp_and_missing_writers_wake_but_stop_nothing() {
   grep -q 'writer=none found' "$out" || fail "the wake does not say no writer was found: $(cat "$out")"
   grep -q 'stopped nothing' "$out" || fail "the wake does not say nothing was stopped: $(cat "$out")"
   [ "$(file_size "$status")" -eq 300001 ] || fail "the log was changed"
-  pass "a non-omp writer, and no writer at all, still raise the wake and stop nothing"
+  pass "a raw >> loop held by a bash child is named and stopped, and a log with no writer still wakes and stops nothing"
 }
 
 test_a_resumed_writer_is_woken_for_and_stopped_again() {
@@ -1659,6 +1718,7 @@ wait_for_file_nonempty() {  # <path>
 
 tests=(
   test_sanctioned_loop_stops_growing_at_the_cap
+  test_a_verbless_loop_stops_at_the_cap_and_leaves_the_reserve_for_done
   test_without_the_helper_the_same_loop_passes_the_cap
   test_incident_shape_is_refused_at_the_cap_and_loses_no_distinct_line
   test_foreign_omp_writer_is_named_stopped_and_never_deleted
@@ -1680,8 +1740,9 @@ tests=(
   test_a_held_rate_does_not_outlive_its_due_alert
   test_the_open_decisions_fold_calls_its_tick_for_every_line
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
+  test_the_guard_never_stops_the_firstmate_session_or_a_reader
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
-  test_non_omp_and_missing_writers_wake_but_stop_nothing
+  test_a_bash_writer_is_stopped_and_a_missing_writer_stops_nothing
   test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth
   test_readers_stay_bounded_on_a_two_gib_log
   test_history_readers_refuse_a_log_past_the_limit_and_name_it

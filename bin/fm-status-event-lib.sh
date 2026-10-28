@@ -38,11 +38,12 @@ FM_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|
 # the stale path bounds repeats instead of escalating a possible wedge; a live
 # idle worker can still surface a first-sight stale alert. It is
 # deliberately NOT in the captain-relevant set above: a pause is a "stop
-# wedge-nagging this idle pane" signal, not work to keep surfacing. This constant
-# is the ONE definition of the verb; both the watcher and the daemon read it here
-# (status_is_paused) rather than hardcoding the literal, so the vocabulary cannot
-# drift between the two consumers. FM_CLASSIFY_PAUSED_VERB overrides it.
-FM_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
+# wedge-nagging this idle pane" signal, not work to keep surfacing. Its constant,
+# FM_CLASSIFY_PAUSED_VERB_DEFAULT, is the ONE definition of the verb and lives in
+# bin/fm-status-cap-lib.sh, which every status library sources; both the watcher and
+# the daemon read it here (status_is_paused) rather than hardcoding the literal, so
+# the vocabulary cannot drift between the two consumers. FM_CLASSIFY_PAUSED_VERB
+# overrides it.
 _FM_CLASSIFY_KEYLESS_PHASE=$'\036default'
 # The body of the note the generated OMP extension appends when a native model
 # fallback serves a request. It is a machine notice, not a status event, so it

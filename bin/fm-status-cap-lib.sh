@@ -13,8 +13,10 @@
 #            guard (bin/fm-status-cap-guard.sh) also raises its wake when any
 #            status log or sidecar passes it.
 #   reserve  headroom above the cap that only a decision or terminal event
-#            (anything but working: and note:) may use, so a worker can still
-#            report done: or blocked: from a log that is at the cap.
+#            (needs-decision, blocked, done, failed, and the resolve, paused and
+#            captain-held verbs below) may use, so a worker can still report
+#            done: or blocked: from a log that is at the cap. Any other line,
+#            one with no verb included, stops at the cap.
 #   limit    cap plus reserve: the most a status log can be through the sanctioned
 #            writer, and so the most a reader that needs the log's history takes
 #            from it. A log up to the limit is read whole and exactly; a log past it
@@ -57,6 +59,15 @@ FM_STATUS_CAP_BYTES_DEFAULT=33554432
 FM_STATUS_CAP_RESERVE_BYTES_DEFAULT=1048576
 _FM_STATUS_READ_WINDOW_BYTES=4194304
 _FM_STATUS_READ_LIMIT_LINES=32768
+
+# The configurable status verbs. Every status library sources this one, so these are
+# their one definition: the resolution and captain-held transfer verbs that close a
+# keyed decision (bin/fm-status-decision-lib.sh), and the declared-wait verb
+# (bin/fm-status-event-lib.sh). FM_CLASSIFY_RESOLVE_VERB, FM_CLASSIFY_PAUSED_VERB and
+# FM_CLASSIFY_CAPTAIN_HELD_VERB override them.
+FM_CLASSIFY_RESOLVE_VERB_DEFAULT='resolved'
+FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
+FM_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
 
 # Printed, or assigned to <out-var> when one is given, so a reader takes the bound
 # without forking a command substitution. Locals carry the __fm_cb_ prefix because
@@ -158,10 +169,13 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
 #
 # Per line it does one of two things:
 #   append    the line is written, unless it would pass the cap. Past the cap only
-#             a line whose verb is not working or note may use the reserve; any
-#             other line is refused and the program exits 75 after saying so on
-#             stderr, naming the file. Nothing is written for a refused line, and
-#             a later line in the same call is judged on its own.
+#             a line whose verb is one of the reserve verbs may use the reserve; any
+#             other line, one with no verb included, is refused and the program
+#             exits 75 after saying so on stderr, naming the file. Nothing is
+#             written for a refused line, and a later line in the same call is
+#             judged on its own. The verb is read as status_line_verb reads it
+#             (bin/fm-status-decision-lib.sh): the text before the first colon or
+#             bracket, trimmed, with a correlation token after the first word dropped.
 #   frame     a log whose last byte is not a newline gets one first, so a torn
 #             foreign write cannot glue itself onto a new event.
 # stdout stays empty: the exit status and stderr are the whole contract. A repeated
@@ -172,8 +186,19 @@ use strict;
 use warnings;
 use Fcntl qw(:DEFAULT :flock);
 
-my ($path, $cap, $reserve, @lines) = @ARGV;
+my ($path, $cap, $reserve, $reserve_verbs, @lines) = @ARGV;
 if (!@lines) { @lines = map { chomp; $_ } <STDIN>; }
+my %reserve_verb = map { $_ => 1 } split / /, $reserve_verbs;
+
+sub line_verb {
+    my ($line) = @_;
+    my ($head) = $line =~ /^([^:\[]*)/;
+    $head =~ s/^\s+//;
+    $head =~ s/\s+$//;
+    return $head if index($head, 'corr=') < 0;
+    my ($first, @rest) = split /\s+/, $head;
+    return join ' ', $first, grep { !/^corr=[0-9A-Fa-f]{16}$/ } @rest;
+}
 
 sub ends_with_newline {
     my ($handle, $size) = @_;
@@ -192,8 +217,7 @@ for my $line (@lines) {
     my $size = (stat($fh))[7];
     my $frame = ($size > 0 && !ends_with_newline($fh, $size)) ? "\n" : '';
     my $out = $frame . $line . "\n";
-    my $terminal = $line !~ /^\s*(?:working|note)\b/;
-    my $limit = $terminal ? $cap + $reserve : $cap;
+    my $limit = $reserve_verb{line_verb($line)} ? $cap + $reserve : $cap;
     if ($size + length($out) > $limit) {
         print STDERR "fm-status-append: refused: $path is $size bytes and this line would pass the limit of $limit bytes (cap $cap, reserve $reserve for decision and terminal lines)\n";
         $rc = 75;
@@ -207,16 +231,22 @@ close($fh);
 exit $rc;
 PERL
 
+# The verbs whose line may use the reserve, space-separated, into <out-var>.
+_fm_status_reserve_verbs() {  # <out-var>
+  printf -v "$1" '%s' "needs-decision blocked done failed ${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT} ${FM_CLASSIFY_PAUSED_VERB:-$FM_CLASSIFY_PAUSED_VERB_DEFAULT} ${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
+}
+
 # Append <line>... to <status-file> through the cap above. Each line is one status
 # event without its newline. Returns 0 when every line was appended, 75 when a line
 # was refused at the cap (stderr names the file), 1 on any other failure.
 fm_status_append_lines() {  # <status-file> <line>...
-  local file=$1 cap reserve
+  local file=$1 cap reserve verbs
   shift
   [ "$#" -gt 0 ] || return 0
   fm_status_cap_bytes cap
   fm_status_cap_reserve_bytes reserve
-  perl -e "$_FM_STATUS_APPEND_PERL" -- "$file" "$cap" "$reserve" "$@"
+  _fm_status_reserve_verbs verbs
+  perl -e "$_FM_STATUS_APPEND_PERL" -- "$file" "$cap" "$reserve" "$verbs" "$@"
 }
 
 fm_status_append_line() {  # <status-file> <line>
@@ -227,10 +257,11 @@ fm_status_append_line() {  # <status-file> <line>
 # writer itself rather than passed on its command line, for a batch too large for one
 # command line. Returns as fm_status_append_lines does; an empty file appends nothing.
 fm_status_append_file() {  # <status-file> <lines-file>
-  local file=$1 cap reserve
+  local file=$1 cap reserve verbs
   fm_status_cap_bytes cap
   fm_status_cap_reserve_bytes reserve
-  perl -e "$_FM_STATUS_APPEND_PERL" -- "$file" "$cap" "$reserve" < "$2"
+  _fm_status_reserve_verbs verbs
+  perl -e "$_FM_STATUS_APPEND_PERL" -- "$file" "$cap" "$reserve" "$verbs" < "$2"
 }
 
 # --- over-cap detection ------------------------------------------------------

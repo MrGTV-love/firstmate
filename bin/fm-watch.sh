@@ -119,8 +119,8 @@
 #                          (docs/configuration.md "Status log size bounds"); one
 #                          wake per growth step of one cap, raised within one poll
 #                          of the growth being seen, naming the writer lsof found.
-#                          An omp writer is stopped with SIGSTOP; nothing is
-#                          deleted or rewritten.
+#                          Each writer holding it open for writing is stopped
+#                          with SIGSTOP; nothing is deleted or rewritten.
 #                          bin/fm-status-cap-guard.sh owns the investigation
 #   heartbeat              fleet-scan backstop found an unsurfaced captain-relevant
 #                          status, unless afk is active
@@ -2848,7 +2848,7 @@ status_cap_tick() {
   [ -n "$records" ] || return 0
   # In a subshell (a status read the watcher captures with $(...)) a wake would print
   # into the capture and end only that subshell. There the tick only contains: the
-  # scan stops an omp writer over the cap, nothing is queued or marked, and the growth
+  # scan stops a writer over the cap, nothing is queued or marked, and the growth
   # rate it measured before the stop goes to the handoff file. The watcher's own next
   # tick scans the file again, keeps its own writer and action, puts the held rate in
   # place of the near-zero one a stopped writer now shows, queues it and wakes.

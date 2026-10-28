@@ -1235,7 +1235,8 @@ The reserve is a judgement: enough for the `done:` or `blocked:` a worker must a
 Every worker's instructions tell it to append with [`bin/fm-status-append.sh`](../bin/fm-status-append.sh) instead of a bare `>>`.
 A line that would pass the cap is refused loudly with exit status 75, and nothing is written.
 A line the loop repeats is written like any other until the cap refuses it, so a runaway loop through the helper stops at the cap with every earlier line intact.
-Only a line whose verb is not `working` or `note` may use the reserve, so a worker at the cap can still report `done:` or `blocked:`.
+Only a decision or terminal line may use the reserve: one whose verb is `needs-decision`, `blocked`, `done` or `failed`, or the resolve, paused or captain-held verb (`resolved`, `paused` and `captain-held` unless configured), read as the status readers read a verb.
+Every other line stops at the cap, `working:`, `note:` and a line with no verb such as the incident's `text` included, so a loop through the helper cannot use up the reserve and a worker at the cap can still report `done:` or `blocked:`.
 A log already past the cap plus the reserve, such as the three incident logs left in place, refuses every line with exit status 75, terminal lines included, and each refusal names the file on stderr.
 A burst of distinct events is never dropped below the cap.
 A remote or secondmate clone must run the current Firstmate release before its workers use the guarded append: on an older clone the charter's status command fails with `No such file or directory` (exit 127) because `bin/fm-status-append.sh` is not there, and the worker's replies never reach the parent's status log.
@@ -1251,8 +1252,9 @@ A refused spawn failure report is not dropped silently: `bin/fm-spawn.sh` prints
 A process that opens the log itself is not bound by the helper, so the watcher checks for it.
 Each poll costs one stat over every `state/*.status` and the per-task cursor, ledger and presentation sidecars, and it runs before the fleet-ledger capture so a slow reader cannot delay it.
 When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it and the watcher raises a `check: status-log-over-cap` wake naming the file, its size, its growth rate and the writer process found by `lsof`.
-An omp writer is stopped with `SIGSTOP`, which `kill -CONT <pid>` undoes; the guard first checks that the process is still the one `lsof` named, is not itself or one of its ancestors, and signals exactly the listed writers that are omp.
-Any other writer, and a log with no writer found, is named and left alone.
+Every process `lsof` lists as holding the log open for writing is stopped with `SIGSTOP`, whatever its name: the incident's omp process, or a raw `>>` loop in a `bash`, `sh` or `zsh` child. `kill -CONT <pid>` undoes it.
+The guard first checks that the process is still the one `lsof` named, and never signals itself, one of its ancestors (the watcher that ran it) or the firstmate session named on line 1 of `state/.lock`.
+A process that only reads the log is not listed, so it is never stopped, and a log with no writer found is named and nothing is stopped.
 When `lsof` is not installed, or does not finish inside its 10 s bound, the wake says `writer=unknown (lsof not available)` or `writer=unknown (lsof timed out)` instead of `none found`, and nothing is stopped: `none found` means `lsof` ran and listed no process.
 The writer of 2026-10-18 was one `printf` whose format has no conversion and that has an extra argument, which the harness shell re-applied without end: it opened the log once and held it for its whole run.
 A shell loop that opens and closes the log on every append wrote 0.3 to 1 KB/s on 2026-10-19, so it cannot have written the 0.7 GB/s measured on 2026-10-18, and `lsof` lists a held descriptor.
@@ -1275,7 +1277,7 @@ It is not a bound on size: the cap bounds the sanctioned writer only.
 How far a log passes the cap before the stop is the writer's growth rate times the poll interval.
 The poll interval is 15 s in a primary home, 30 s in a secondmate home, and `FM_POLL` can raise it to 240 s.
 At the 0.7 GB/s measured on 2026-10-18 that is about 10 GB at 15 s and about 21 GB at 30 s, before `lsof` and the stop.
-The watcher must be alive for any of it, and only a process named omp is stopped.
+The watcher must be alive for any of it.
 
 An existing log is never deleted, so a log that went over the cap stays over it.
 Detection therefore keys on growth.
@@ -1298,7 +1300,7 @@ Every line the event scan counts as an event is event-shaped, so the pass drops 
 So the 2026-10-18 `text` lines, a counter such as `1793124970: text`, a label such as `Reason: retrying`, and a URL cost those loops nothing however many there are.
 A line those passes keep without being an event, such as one whose head is a word with a digit (`a1: x`) or a misused `corr` token, is still walked line by line.
 In the watcher the latest-event, declared-wait and identity walks call the cap tick on every line, and the stale loop ticks in the watcher's own shell at the top of each window, so a walk's tick acts only when that one read has run longer than a poll since the watcher's last tick.
-Then, because those reads run in a captured subshell that cannot wake, the tick stops an omp writer over the cap and writes the growth rate it measured before the stop, with the time it measured it, to `state/.status-cap-handoff.<watcher pid>`.
+Then, because those reads run in a captured subshell that cannot wake, the tick stops a writer over the cap and writes the growth rate it measured before the stop, with the time it measured it, to `state/.status-cap-handoff.<watcher pid>`.
 That file holds at most one rate per file over the cap, the highest measured, since a later scan of a writer already stopped measures about zero, and it is replaced, never appended to.
 The watcher's own next tick reads and deletes it before anything else, drops the rate of any file no longer due an alert, and in the over-cap wake keeps its own scan's writer and action (so the wake names the pid it stopped and `kill -CONT <pid>`) and puts the held rate, marked `measured at <time>`, in place of its own lower one; the watcher's exit cleanup also deletes the file.
 The watcher makes the latest-event and declared-wait reads, and takes the declared-wait identity, for every window on every poll, so when it widens them past the last 200 lines it reads no further than the last tail window (4 MiB), never the whole log; a healthy log fits in that window whole.

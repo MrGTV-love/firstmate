@@ -35,11 +35,11 @@ fi
 FM_OPEN_DECISIONS_FOLD_VERSION=11
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
-# status decision opened by needs-decision or blocked. See status_open_decisions
-# below for the status-fold contract. The transfer verb is written only after
-# fm-captain-hold.sh has verified the corresponding captain-held backlog item.
-FM_CLASSIFY_RESOLVE_VERB_DEFAULT='resolved'
-FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT='captain-held'
+# status decision opened by needs-decision or blocked are
+# FM_CLASSIFY_RESOLVE_VERB_DEFAULT and FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT, defined
+# in bin/fm-status-cap-lib.sh. See status_open_decisions below for the status-fold
+# contract. The transfer verb is written only after fm-captain-hold.sh has verified
+# the corresponding captain-held backlog item.
 
 # --- durable keyed decisions ------------------------------------------------
 #

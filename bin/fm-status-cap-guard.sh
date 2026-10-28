@@ -19,20 +19,22 @@
 # scan investigates each such file once and prints one record per file:
 #   <identity><TAB><path><TAB><size after containment><TAB><wake reason>
 # The reason names the file, its size, its growth rate over a short sample, and the
-# writer process found by lsof. It then contains the damage: when the writer is an
-# omp process (the harness that produced the incident) it is stopped with SIGSTOP,
-# which a later `kill -CONT <pid>` undoes. Exactly the pids lsof reported as holding
-# the file open for writing and recognized as omp are signalled; any other writer,
-# none found, or no answer from lsof (not installed, or past its bound) is named and
-# left alone, and an absent answer is reported as unknown, never as none found. It
-# never deletes, truncates or rewrites a file.
+# writer process found by lsof. It then contains the damage: every pid lsof reported
+# as holding the file open for writing is stopped with SIGSTOP, whatever its process
+# name (the incident's was omp; a raw `>>` loop in a bash, sh or zsh child is stopped
+# the same way), which a later `kill -CONT <pid>` undoes. A process that only reads the
+# file is never listed, and this guard, its parent chain (the watcher that ran it) and
+# the firstmate session (line 1 of state/.lock) are never signalled. None found, or no
+# answer from lsof (not installed, or past its bound), stops nothing, and an absent
+# answer is reported as unknown, never as none found. It never deletes, truncates or
+# rewrites a file.
 #
 # bin/fm-control.sh is the control plane for a task's agent, addressed by task id
 # and driving its endpoint; it has no verb for one process id, and the writer is a
 # lane's harness process that need not belong to the task whose log it filled. The
 # one-process stop therefore lives here, guarded the same way: the pid must still
-# be the omp process lsof named, must not be this process or one of its ancestors,
-# and is checked again just before the signal.
+# be the process lsof named, must not be this process, one of its ancestors or the
+# firstmate session, and is checked again just before the signal.
 #
 # mark records that the watcher durably queued the wake for <path> at <identity>
 # when the file was <size> bytes, so the file wakes again only after it grows by more
@@ -134,13 +136,19 @@ file_size() {  # <file>
   fi
 }
 
-# Stop pid with SIGSTOP when it is still the omp process found earlier. Prints
-# the action text. Never signals this process, an ancestor, or pid 1 and below.
+# Stop pid with SIGSTOP when it is still the process found earlier. Prints the
+# action text. Never signals this process, an ancestor, the firstmate session, or
+# pid 1 and below.
 stop_writer() {  # <pid> <name> <start>
-  local pid=$1 name=$2 start=$3
+  local pid=$1 name=$2 start=$3 firstmate
   case "$pid" in ''|*[!0-9]*) printf 'stopped nothing: unusable pid'; return 1 ;; esac
   if [ "$pid" -le 1 ] || is_ancestor_or_self "$pid"; then
     printf 'stopped nothing: pid %s is this guard or its own parent chain' "$pid"
+    return 1
+  fi
+  firstmate=$(sed -n '1p' "$STATE/.lock" 2>/dev/null)
+  if [ "$pid" = "${firstmate//[[:space:]]/}" ]; then
+    printf 'stopped nothing: pid %s is the firstmate session' "$pid"
     return 1
   fi
   if [ "$(process_name "$pid")" != "$name" ] || [ "$(process_start "$pid")" != "$start" ]; then
@@ -173,12 +181,12 @@ rate_between() {  # <size-a> <time-a> <size-b> <time-b>
 }
 
 # Containment first, measurement second: the growth rate is taken from the sample
-# lsof's own run already spans, and every omp writer is stopped before anything
+# lsof's own run already spans, and every writer is stopped before anything
 # sleeps, because at the incident's 0.2 to 0.7 GB/s each second costs hundreds of
 # megabytes. Only a log with no writer found yet waits one sample for a second look.
 investigate() {  # <size> <ident> <path>
   local size=$1 ident=$2 path=$3 cap size_a size_b size_end time_a time_b rate writers pid cmd name start line reason
-  local writer_text='' action_text='' omp_found=0 seen_other='' lsof_rc=0
+  local writer_text='' action_text='' lsof_rc=0
   fm_status_cap_bytes cap
   size_a=$(file_size "$path") || size_a=$size
   time_a=$(now_hires)
@@ -212,22 +220,12 @@ investigate() {  # <size> <ident> <path>
       [ -n "$pid" ] || continue
       name=$(process_name "$pid") || name=$cmd
       writer_text="${writer_text:+$writer_text, }pid $pid $name"
-      if [ "$name" != omp ]; then
-        seen_other="${seen_other:+$seen_other, }pid $pid ($name) is not an omp process"
-        continue
-      fi
-      omp_found=1
       start=$(process_start "$pid")
       line=$(stop_writer "$pid" "$name" "$start") || :
       action_text="${action_text:+$action_text; }$line"
     done <<EOF
 $writers
 EOF
-    if [ "$omp_found" -eq 0 ]; then
-      action_text="stopped nothing: $seen_other"
-    elif [ -n "$seen_other" ]; then
-      action_text="$action_text; left alone: $seen_other"
-    fi
   fi
   # The size after containment is the one the marker keeps, so growth is measured from it.
   size_b=$(file_size "$path") && size_end=$size_b

@@ -107,7 +107,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-secondmate-report.sh` | Optional helper that resolves the parent channel itself and appends a correlated status or document-pointer report |
 | `fm-status-append.sh`    | Sanctioned worker append to a task status log: size-capped, refusing loudly with exit 75 at the cap |
 | `fm-status-cap-lib.sh`   | Single owner of the status-log size cap, the read limits and tail window, the capped append, and over-cap detection |
-| `fm-status-cap-guard.sh` | Investigate a status log or sidecar over the cap once: name its writer and growth, and stop an omp writer with SIGSTOP |
+| `fm-status-cap-guard.sh` | Investigate a status log or sidecar over the cap once: name its writer and growth, and stop each process holding it open for writing with SIGSTOP |
 | `fm-extension.mjs`       | Bind, inspect, verify, and strictly invoke trusted external process-event adapter packages |
 | `fm-extension-launch-barrier.mjs` | Publish one exact static core-owned invocation group before package code runs |
 | `fm-extension.sh`        | Expose extension binding commands through the tracked shell and remote-home command boundary |
