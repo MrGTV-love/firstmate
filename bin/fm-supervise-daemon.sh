@@ -91,7 +91,8 @@
 #                                   way bin/fm-backend.sh's fm_backend_detect
 #                                   resolves the runtime firstmate itself is
 #                                   executing inside - $TMUX_PANE selects tmux,
-#                                   $HERDR_ENV=1 selects herdr - falling back to
+#                                   $HERDR_ENV=1 or $FM_HERDR_RUNTIME=1 selects
+#                                   herdr - falling back to
 #                                   tmux). zellij, orca, and cmux are not yet
 #                                   supported as supervisor backends; the daemon
 #                                   refuses loudly at startup rather than trying
@@ -1822,8 +1823,8 @@ fm_super_main() {
   fi
 
   # --- auto-discover the supervisor BACKEND (tmux vs herdr) first -----------
-  # Priority: FM_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > $HERDR_ENV=1
-  # (herdr) > tmux fallback. Resolved before the target below, since target
+  # Priority: FM_SUPERVISOR_BACKEND override > $TMUX_PANE (tmux) > Herdr
+  # runtime marker (bin/fm-backend.sh) > tmux fallback. Resolved before the target below, since target
   # discovery composes a herdr "<session>:<pane-id>" string using the same
   # $HERDR_PANE_ID/$HERDR_SESSION markers this checks. Exporting the result
   # into FM_SUPERVISOR_BACKEND makes inject_msg/pane_is_busy/pane_input_pending
@@ -1834,8 +1835,9 @@ fm_super_main() {
   if [ -z "${FM_SUPERVISOR_BACKEND:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       backend_source="TMUX_PANE"
-    elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
-      backend_source="HERDR_ENV"
+    elif { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
+      backend_source="FM_HERDR_RUNTIME"
+      [ "${HERDR_ENV:-}" != 1 ] || backend_source="HERDR_ENV"
     else
       backend_source="FALLBACK($FM_SUPERVISOR_BACKEND_DEFAULT)"
     fi
@@ -1868,8 +1870,9 @@ fm_super_main() {
   if [ -z "${FM_SUPERVISOR_TARGET:-}" ]; then
     if [ -n "${TMUX_PANE:-}" ]; then
       target_source="TMUX_PANE"
-    elif [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
-      target_source="HERDR_ENV(HERDR_PANE_ID)"
+    elif { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
+      target_source="FM_HERDR_RUNTIME(HERDR_PANE_ID)"
+      [ "${HERDR_ENV:-}" != 1 ] || target_source="HERDR_ENV(HERDR_PANE_ID)"
     else
       target_source="FALLBACK(firstmate:0)"
     fi
@@ -1877,7 +1880,7 @@ fm_super_main() {
   if discovered=$(discover_supervisor_target); then
     : # resolved cleanly
   else
-    echo "warn: could not auto-discover supervisor pane (no FM_SUPERVISOR_TARGET, TMUX_PANE, or HERDR_ENV/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
+    echo "warn: could not auto-discover supervisor pane (no FM_SUPERVISOR_TARGET, TMUX_PANE, or Herdr runtime marker/HERDR_PANE_ID); falling back to '$discovered' — verify this is firstmate's pane" >&2
   fi
   FM_SUPERVISOR_TARGET="$discovered"
   local TARGET="$FM_SUPERVISOR_TARGET"
