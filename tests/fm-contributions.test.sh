@@ -662,6 +662,12 @@ case "$fault:$plain" in
     export GH_SHIM_REMAINING=500
     if [ "$fault:$plain" = 'quota-deadline:api repos/o/r' ]; then clock_bump 100; fi
     ;;
+  # Semantic sustained-workload cost: one core/wave/closing observation costs
+  # nine seconds, charged once after successful closing, never once per peer.
+  model-latency:'pr view '*)
+    "$(dirname "$0")/gh-fixture" "$@" || exit "$?"
+    clock_bump 9
+    exit 0 ;;
   reserve:'api repos/o/r/issues/9') clock_bump 6 ;;
   quota-issue:'api repos/o/r/issues/9') clock_bump 6 ;;
   slow-wave:'api repos/o/r/pulls/8') sleep 3 ;;
@@ -931,8 +937,39 @@ test_slow_read_deadline_kill_is_budget_refusal() {
   pass 'a read killed at the five-second bound is budget refusal and stays silent'
 }
 
+semantic_rest_home() {
+  local home=$1
+  # Only the sustained scheduling fixture uses this copy. Real slow-head and
+  # real3s/6s integration cases keep ROOT, REST publication, locks and watchdogs.
+  cp -R "$ROOT/bin" "$home/semantic-bin"
+  cp "$ROOT/bin/fm-gh-rest.sh" "$home/semantic-bin/fm-gh-rest-real.sh"
+  cat > "$home/semantic-bin/fm-gh-rest.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+here=$(cd "$(dirname "$0")" && pwd)
+case "${1:-}" in
+  guard) shift; exec "$here/fm-gh-rest-real.sh" guard "$@" ;;
+  get) shift ;;
+  *) exit 2 ;;
+esac
+# Retain the real recorded-quota refusal contract, but not HTTP caching or
+# quota publication. These fixture endpoints each have exactly one JSON page.
+"$here/fm-gh-rest-real.sh" guard >&2 || exit "$?"
+endpoint=${1:?}; shift
+case "$*" in
+  '') slurp=false ;;
+  '--paginate --slurp') slurp=true ;;
+  *) printf 'unsupported semantic REST flags: %s\n' "$*" >&2; exit 2 ;;
+esac
+body=$(gh api "$endpoint") || exit "$?"
+printf '%s\n' "$body" | jq -cs --argjson slurp "$slurp" '
+  if length != 1 then error("expected one fixture page")
+  elif $slurp then . else .[0] end'
+SH
+}
+
 test_unmeasured_url_does_not_starve_the_tail() {
-  local home out cycle at started elapsed task
+  local home out cycle at started elapsed task selected number calls_before
   home=$(new_home unmeasured-tail)
   forge_home "$home"
   wrap_forge "$home"
@@ -941,7 +978,9 @@ test_unmeasured_url_does_not_starve_the_tail() {
   mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   printf 'slow-wave\n' > "$home/forge/fault"
+  : > "$home/forge/calls"
   for cycle in 0 1 2; do
+    calls_before=$(wc -l < "$home/forge/calls")
     at=$(jq -nr --arg now "$NOW" --argjson cycle "$cycle" '(($now | fromdateiso8601) + ($cycle + 1) * 300) | todateiso8601')
     started=$(/bin/date +%s)
     out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" FM_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/fm-contributions.sh" poll) \
@@ -951,9 +990,19 @@ test_unmeasured_url_does_not_starve_the_tail() {
     [ "$elapsed" -le 23 ] || fail "poll exceeded its elapsed budget: $elapsed seconds"
     if [ "$cycle" -eq 0 ]; then
       [ "$elapsed" -ge 8 ] || fail 'the slow head did not consume its core and parallel-wave budget'
-      if grep -Eq '^api repos/o/r/pulls/(9|10)$' "$home/forge/calls"; then
-        fail 'a tail PR began without its observation reserve'
-      fi
+      printf '%s\n' 'api repos/o/r/pulls/8' \
+        'api repos/o/r/issues/8/comments?per_page=100' \
+        'api repos/o/r/pulls/8/reviews?per_page=100' \
+        'api repos/o/r/pulls/8/comments?per_page=100' \
+        "api repos/o/r/commits/$HEAD_A/check-runs?filter=all&per_page=100" \
+        "api repos/o/r/commits/$HEAD_A/statuses?per_page=100" \
+        'api repos/o/r' | LC_ALL=C sort > "$home/expected-expiry-calls"
+      LC_ALL=C sort "$home/forge/calls" > "$home/actual-expiry-calls"
+      cmp -s "$home/expected-expiry-calls" "$home/actual-expiry-calls" \
+        || fail 'expired wave must launch exactly core and six peers, without closing or a tail'
+    elif [ "$cycle" -eq 1 ]; then
+      [ "$(awk -v prior="$calls_before" 'NR > prior && /^api repos\/o\/r\/pulls\/[0-9]+$/ { print; exit }' "$home/forge/calls")" = 'api repos/o/r/pulls/9' ] \
+        || fail 'next poll did not rotate from expired PR8 to PR9'
     fi
     cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
       || fail 'a timed-out observation changed its prior freshness or record'
@@ -979,15 +1028,46 @@ test_unmeasured_url_does_not_starve_the_tail() {
   for task in delivery second third; do
     mutate_record "$home" "$task" '.records[0].checked_at="2026-09-16T07:55:00Z"'
   done
-  printf 'latency\n' > "$home/forge/fault"
+  semantic_rest_home "$home"
+  printf 'model-latency\n' > "$home/forge/fault"
   for cycle in 0 1 2 3 4 5; do
     at=$(jq -nr --arg now "$NOW" --argjson cycle "$cycle" '(($now | fromdateiso8601) + $cycle * 300) | todateiso8601')
-    started=$(/bin/date +%s)
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" FM_CONTRIBUTIONS_BUDGET=20 FORGE_LATENCY=3 "$ROOT/bin/fm-contributions.sh" poll) \
-      || fail 'sustained slow-read poll failed'
-    elapsed=$(( $(/bin/date +%s) - started ))
-    [ "$elapsed" -ge 9 ] && [ "$elapsed" -le 23 ] \
-      || fail "slow successful poll did not respect its elapsed budget: $elapsed seconds"
+    printf '0\n' > "$home/forge/clock"
+    : > "$home/forge/calls"
+    for task in delivery second third; do
+      cp "$home/data/$task/contributions.json" "$home/$task.before.json"
+    done
+    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$at" FM_CONTRIBUTIONS_BUDGET=20 "$home/semantic-bin/fm-contributions.sh" poll) \
+      || fail 'sustained modeled-workload poll failed'
+    # Completion costs9, leaving11 below reserve15. A fast second observation
+    # must not trivialize rotation/freshness, even though no physical sleep ran.
+    [ "$(cat "$home/forge/clock")" = 9 ] || fail 'expected exactly one modeled completion'
+    case "$((cycle % 3))" in
+      0) selected=third; number=10 ;;
+      1) selected=delivery; number=8 ;;
+      2) selected=second; number=9 ;;
+    esac
+    printf '%s\n' "api repos/o/r/pulls/$number" \
+      "api repos/o/r/issues/$number/comments?per_page=100" \
+      "api repos/o/r/pulls/$number/reviews?per_page=100" \
+      "api repos/o/r/pulls/$number/comments?per_page=100" \
+      "api repos/o/r/commits/$HEAD_A/check-runs?filter=all&per_page=100" \
+      "api repos/o/r/commits/$HEAD_A/statuses?per_page=100" \
+      'api repos/o/r' \
+      "pr view https://github.com/o/r/pull/$number --json headRefOid,reviewDecision" \
+      | LC_ALL=C sort > "$home/expected-calls"
+    LC_ALL=C sort "$home/forge/calls" > "$home/actual-calls"
+    cmp -s "$home/expected-calls" "$home/actual-calls" \
+      || fail 'modeled poll did not execute exactly core, six peers and closing for selected URL'
+    for task in delivery second third; do
+      if [ "$task" = "$selected" ]; then
+        jq -e --arg at "$at" '.records[0] | .checked_at == $at and .error == null' \
+          "$home/data/$task/contributions.json" >/dev/null || fail 'selected observation incomplete'
+      else
+        cmp -s "$home/$task.before.json" "$home/data/$task/contributions.json" \
+          || fail 'nonselected live row changed'
+      fi
+    done
     [ -z "$out" ] || fail "slow successful reads printed a wake: $out"
     for task in closed-two late-owner; do
       jq -e --slurpfile prior "$home/terminal.json" '.records[0] | .error == null
