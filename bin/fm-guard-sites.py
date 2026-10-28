@@ -24,15 +24,16 @@ import re
 import subprocess
 import sys
 
-DEFAULT_DIRS = ('bin', '.claude', '.codex', '.cursor', '.grok', '.omp', '.opencode', '.pi')
+DEFAULT_DIRS = ('bin', '.claude', '.codex', '.cursor', '.dsh', '.grok', '.omp', '.opencode', '.pi')
 SKIP_DIRS = {'tests', 'test', 'node_modules', '__pycache__', '.git', 'fixtures'}
 CODE_EXT = {'.sh', '.bash', '.py', '.ts', '.js', '.mjs', '.pl', '.jq'}
 HOOK_JSON_GLOBS = ('.codex/hooks.json', '.cursor/hooks.json', '.claude/settings.json')
 
 # The character classes keep this file from matching its own signatures.
 MARKER = re.compile(r'REFUS[E]D:')
-WORD = re.compile(r'(?<![A-Za-z0-9_-])refus(?:e|es|ed|ing)(?![A-Za-z0-9_-]|\.sh)', re.I)
+WORD = re.compile(r'(?<![A-Za-z0-9_$.{/-])refus(?:e|es|ed|ing)(?![A-Za-z0-9_-]|\.sh)', re.I)
 STRING = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|`[^`]*`')
+COMPARED = re.compile(r'[=!]==?\s*$')
 HELPER_WORD = 'refus' + 'e'
 HELPER_EXACT = ('deny', 'block_stop')
 DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\']')
@@ -165,6 +166,15 @@ def case_arm_text(line):
     return line
 
 
+def emits_refusal(text):
+    """True when a string literal carries the refusal vocabulary; an operand of == or != tests a value and does not emit it."""
+    for match in STRING.finditer(text):
+        if WORD.search(match.group()) and not COMPARED.search(text[:match.start()]) \
+                and not re.match(r'\s*[=!]==?', text[match.end():]):
+            return True
+    return False
+
+
 def is_comment(stripped, kind):
     if kind in ('sh', 'py', 'other'):
         return stripped.startswith('#')
@@ -207,7 +217,7 @@ def scan_file(root, rel, helpers, hook_names):
                 # A text heredoc is data: only a marker, or a message it prints to stderr, is a site.
                 if MARKER.search(line):
                     sig.append('A')
-                elif heredoc_stderr and any(WORD.search(s) for s in STRING.findall(line)):
+                elif heredoc_stderr and WORD.search(line):
                     sig.append('B')
                 if sig:
                     sites.append((number, ','.join(sig), stripped))
@@ -241,14 +251,15 @@ def scan_file(root, rel, helpers, hook_names):
         if MARKER.search(line):
             sig.append('A')
         message = case_arm_text(line) if eff == 'sh' else line
-        if WORD.search(message) and any(WORD.search(s) for s in STRING.findall(message)):
+        if emits_refusal(message):
             sig.append('B')
         if calls and calls.search(line) and not (eff == 'sh' and SH_DEF.match(line)) \
                 and not (eff == 'py' and PY_DEF.match(line)) and not (eff == 'js' and JS_DEF.match(line)):
             sig.append('C')
         if DENY_PERMISSION.search(line) or DENY_DECISION.search(line) or DENY_BLOCK.search(line) \
                 or (hook and eff == 'sh' and EXIT_TWO.search(stripped)
-                    and not any('usage' in row for row in lines[max(0, number - 3):number - 1])) \
+                    and not any('usage' in row for row in lines[max(0, number - 3):number - 1])
+                    and '$#' not in (lines[number - 2] if stripped == 'exit 2' and number > 1 else stripped)) \
                 or (opencode and re.search(r'\bthrow new Error\(', line)):
             sig.append('D')
         if GUARD_EVENT.search(line) and not re.search(r'\b(?:grep|sed|awk|allow)\b', line) \

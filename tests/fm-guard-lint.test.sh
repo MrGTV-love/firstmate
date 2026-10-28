@@ -22,6 +22,8 @@
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
 #     in the default discovery paths, and comments, heredocs, docstrings and tests are not
 #   - an unmapped `|| exit 2` in a hook script fails S1, and the same site mapped passes
+#   - an unquoted refusal in a stderr heredoc and a refusal under .dsh/ are sites, while a variable,
+#     a path, a compared value and an argument-count exit 2 are not
 #   - an unmapped site fails S1, the same site mapped by a sites marker passes, and a site added
 #     inside an already-mapped owner file still needs its own mapping
 #   - a marker that matches nothing, the wrong number of sites, or a site another entry owns fails
@@ -330,11 +332,22 @@ pass "a usage exit 2 in a hook script is not a deny"
 
 SIG=$(fixture sig_hook_or_exit)
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
-printf '#!/usr/bin/env bash\nreset_episode "$STATE" || exit 2\n' >"$SIG/bin/fm-x-turnend-check.sh"
+printf '#!/usr/bin/env bash\n[ "$#" -eq 0 ] || exit 2\nif [ "$#" -gt 1 ]; then\n  exit 2\nfi\nreset_episode "$STATE" || exit 2\n' >"$SIG/bin/fm-x-turnend-check.sh"
 assert_site "S1 fails an unmapped || exit 2 of a hook script" "$SIG" 'D'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] || fail "the argument-count exit 2 must not count as a deny: $(site_ids "$SIG")"
+pass "an argument-count exit 2 in a hook script is not a deny"
 # shellcheck disable=SC2016 # the jq filter matches literal shell source
 mutate "$SIG" '.guards[0].sites = [{"file":"bin/fm-x-turnend-check.sh","match":"reset_episode \"$STATE\" || exit 2"}]'
 assert_mapped "a || exit 2 hook site passes once a registered entry maps it" "$SIG" 1
+
+SIG=$(fixture sig_heredoc_stderr)
+printf 'cat >&2 <<EOF\nerror: refusing to retire the slot\nEOF\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds an unquoted refusal in a heredoc printed to stderr" "$SIG" 'B'
+
+SIG=$(fixture sig_dsh)
+mkdir -p "$SIG/.dsh"
+printf 'console.error("REFUSED: the adapter cannot relay");\n' >"$SIG/.dsh/p.mjs"
+assert_site "S1 finds a refusal in the .dsh adapter" "$SIG" 'A,B'
 
 SIG=$(fixture sig_plugin)
 mkdir -p "$SIG/.opencode/plugins"
@@ -350,13 +363,16 @@ pass "a guard event allow is not a site"
 
 SIG=$(fixture sig_quiet)
 printf '# refusing here is only a comment: REFUSED: nothing\ncat <<'"'"'DOC'"'"'\nthe script refuses when it is told to\nDOC\necho "ok"\n' >"$SIG/bin/a.sh"
-printf '"""This module refuses nothing."""\nx = 1  # refused\n' >"$SIG/bin/b.py"
+printf '"""This module refuses nothing."""\nx = 1  # refused\nif state == "refused":\n    x = 2\n' >"$SIG/bin/b.py"
+# shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
+printf 'if [ "$refused" = 1 ]; then\n  rm -f -- "$DIR/$id.refused" "${refused}"\nfi\n' >"$SIG/bin/e.sh"
+printf 'if (device.effect === "refused") { done(); }\n' >"$SIG/bin/f.js"
 mkdir -p "$SIG/bin/tests"
 printf 'echo "REFUSED: a fixture"\n' >"$SIG/bin/tests/c.sh"
 printf 'echo "REFUSED: the one genuine site" >&2\n' >"$SIG/bin/d.sh"
 [ "$(site_ids "$SIG")" = "$(site_ids "$SIG" | grep 'bin/d.sh')" ] && [ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 1 ] \
   || fail "only the genuine site may be found among comments, heredoc bodies, docstrings and tests: $(site_ids "$SIG")"
-pass "comments, heredoc bodies, docstrings and test directories are not sites"
+pass "comments, heredoc bodies, docstrings, test directories, variables, paths and compared values are not sites"
 
 # --- refusal sites: mapping --------------------------------------------------
 MAPPED=$(fixture site_mapped)
