@@ -1765,6 +1765,17 @@ if [ "${FM_LINT_REQUIRE_BOUNDS:-0}" = 1 ]; then
   fi
 fi
 
+# The resident-memory watch starts each libproc reader with the real python3
+# interpreter, resolved once per lint, so no shim (pyenv's, say) starts between
+# it and each reader; plain python3 is used only when resolution fails.
+WATCH_PYTHON=python3
+if [ "$BOUND_MECH" = none ] && [ "$(uname)" = Darwin ]; then
+  resolved_python=$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null) || resolved_python=
+  if [ "${resolved_python#/}" != "$resolved_python" ] && [ -x "$resolved_python" ]; then
+    WATCH_PYTHON=$resolved_python
+  fi
+fi
+
 # Host-wide pool configuration; the header owns its public controls.
 SLOT_DIR=${FM_LINT_SLOT_DIR:-${XDG_CACHE_HOME:-${HOME:-${TMPDIR:-/tmp}}/.cache}/firstmate/lint-slots}
 case "${FM_LINT_HOST_SLOTS:-1}" in
@@ -1957,6 +1968,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_INTERNAL_BOUNDED="$BOUND_MECH"
     FM_LINT_INTERNAL_MEMORY_KIB="$ROOT_MEMORY_KIB"
     FM_LINT_INTERNAL_RSS_KIB="$ROOT_RSS_KIB"
+    FM_LINT_INTERNAL_PYTHON="$WATCH_PYTHON"
     FM_LINT_INTERNAL_ROOT_SECS="$ROOT_SECONDS"
     FM_LINT_INTERNAL_GRACE="$ROOT_GRACE"
     FM_LINT_INTERNAL_ROOTS_LOG="$ROOTS_LOG"

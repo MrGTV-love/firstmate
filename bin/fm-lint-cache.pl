@@ -212,11 +212,14 @@ if (($ARGV[0] // '') eq 'gate') {
 # Each sample is the larger of the tree's resident size and its physical
 # footprint, which also counts the compressed pages jetsam counts, both read by
 # a long-lived libproc reader (fm-proc-info.py mem-tree) started at the first
-# tick, so a command that ends sooner starts none. A tick whose reply is late
-# (over 0.5 s) or malformed is sampled by ps, which gives resident size alone;
-# that reply is discarded and a new reader starts for the next tick. A
-# replacement that cannot start, or that fails before it replies, is one failed
-# restart, and the next tick tries again. The reader is given up for the rest
+# tick, so a command that ends sooner starts none. Each reader runs under the
+# interpreter fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON), or python3
+# when that is unset. A reader's first reply may take 2 s, which covers its
+# start-up; each later reply has 0.5 s. A tick whose reply is late or malformed
+# is sampled by ps, which gives resident size alone; that reply is discarded
+# and a new reader starts for the next tick. A replacement that cannot start,
+# or that fails before it replies, is one failed restart, and the next tick
+# tries again. The reader is given up for the rest
 # of the command, with ps sampling every later tick, only when libproc cannot
 # read the command, the command's first reader exits before its first reply,
 # or three restarts in a row fail; a good reply resets that count. The reason
@@ -246,7 +249,8 @@ if (($ARGV[0] // '') eq 'rsswatch') {
     # its command's, so an owner's group sweep cannot kill it before it has
     # ended the command's group (it notices the lost parent within a tick).
     POSIX::setpgid(0, 0);
-    my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down);
+    my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+    my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
     my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
     my $stop_reader = sub {
         return unless $reader_pid;
@@ -264,8 +268,8 @@ if (($ARGV[0] // '') eq 'rsswatch') {
         no warnings 'exec';
         my $first = !defined $reader_fresh;
         $reader_pid = -r $helper
-            ? eval { IPC::Open2::open2($from_reader, $to_reader, 'python3', $helper, 'mem-tree', $root_pid) } : undef;
-        $reader_fresh = $first && $reader_pid ? 1 : 0;
+            ? eval { IPC::Open2::open2($from_reader, $to_reader, $python, $helper, 'mem-tree', $root_pid) } : undef;
+        ($reader_fresh, $reader_answered) = ($first && $reader_pid ? 1 : 0, 0);
         return if $reader_pid;
         $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
     };
@@ -279,11 +283,12 @@ if (($ARGV[0] // '') eq 'rsswatch') {
             my ($answer, $ready) = ('', '');
             vec($ready, fileno($from_reader), 1) = 1;
             my $gone = !syswrite($to_reader, "\n");
-            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, 0.5) > 0) {
+            my $wait = $reader_answered ? 0.5 : 2;
+            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
                 $gone = !sysread($from_reader, $answer, 64, length $answer);
             }
             if ($answer =~ /\A([0-9]+) ([0-9]+)\n\z/) {
-                ($reader_failures, $reader_fresh) = (0, 0);
+                ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
                 $samples{libproc}++;
                 return $1 > $2 ? $1 + 0 : $2 + 0;
             }

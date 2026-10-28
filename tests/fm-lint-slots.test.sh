@@ -1567,8 +1567,10 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # and with FM_TEST_PY_MEMORY set answers each line a mem-tree reader is sent
 # with that value instead of reading memory; with FM_TEST_PY_PLAN=<file> too,
 # the Nth mem-tree reader started follows line N of <file>: stall answers its
-# first line 2 s late, exit exits before any reply, and anything else (or no
-# such line) answers at once.
+# first line 3 s late, slow answers its first line 1 s late, slow-later answers
+# its second line 1 s late, exit exits before any reply, and anything else (or
+# no such line) answers at once. The python3 shim names itself as the
+# interpreter lint resolves for the watch's readers.
 fm_lint_write_rss_shims() {  # <dir>
   local guard
   guard=$(cat <<'SH'
@@ -1592,17 +1594,23 @@ SH
   {
     printf '%s\n' "$guard"
     cat <<'SH'
+if [ "$*" = "-c import sys; print(sys.executable)" ]; then
+  printf '%s\n' "$0"
+  exit 0
+fi
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
 [ "${FM_TEST_PY_REFUSE:-0}" = 0 ] || exit 1
 if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = mem-tree ]; then
   plan=
   [ -z "${FM_TEST_PY_PLAN:-}" ] || plan=$(sed -n "$(grep -c mem-tree "$FM_TEST_PY_LOG")p" "$FM_TEST_PY_PLAN")
   [ "$plan" != exit ] || exit 1
+  line=0
   while read -r _; do
-    if [ "$plan" = stall ]; then
-      plan=answer
-      sleep 2
-    fi
+    line=$((line + 1))
+    case "$plan:$line" in
+      stall:1) sleep 3 ;;
+      slow:1|slow-later:2) sleep 1 ;;
+    esac
     printf '%s\n' "$FM_TEST_PY_MEMORY"
   done
   exit 0
@@ -1764,7 +1772,7 @@ test_resident_watch_replaces_a_stalled_reader() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-stall)
   printf 'stall\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan"; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=6; then
     pass "SKIP (the resident-memory watch runs only on macOS): stalled reader check"
     return
   fi
@@ -1778,6 +1786,52 @@ test_resident_watch_replaces_a_stalled_reader() {
   [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 2 ] \
     || fail "the stalled reader was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
   pass "a reader that misses one deadline is replaced and footprint ends the root on the next tick"
+}
+
+# A reader's first reply has its own longer deadline, so a reader that starts
+# slowly on a busy host still has its footprint used, with no ps fallback.
+test_resident_watch_waits_for_a_slow_first_reply() {
+  local tmp out samples
+  tmp=$(fm_test_tmproot fm-lint-rss-slow-start)
+  printf 'slow\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan"; then
+    pass "SKIP (the resident-memory watch runs only on macOS): slow first reply check"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root over the bound after a slow first reply did not pass its narrower retry (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/flags.log")" = "$(printf 'yes\nno')" ] \
+    || fail "a root over the bound by footprint after a slow first reply was not ended and retried narrower"$'\n'"$(cat "$tmp/flags.log")"
+  samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
+  [ "$samples" = libproc:1,ps:0 ] \
+    || fail "a first reply 1 s late was not used as the footprint sample: $samples"
+  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 1 ] \
+    || fail "a reader whose first reply was 1 s late was replaced"$'\n'"$(cat "$tmp/py.log")"
+  pass "a reader whose first reply is 1 s late keeps footprint in use"
+}
+
+# A later reply keeps the short deadline: one 1 s late costs only that tick,
+# which ps samples, and a new reader answers every tick after it.
+test_resident_watch_samples_a_slow_later_reply_by_ps() {
+  local tmp out samples
+  tmp=$(fm_test_tmproot fm-lint-rss-slow-later)
+  printf 'slow-later\n' > "$tmp/plan"
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_PY_MEMORY="1024 2048" FM_TEST_GROW_HOLD=5; then
+    pass "SKIP (the resident-memory watch runs only on macOS): slow later reply check"
+    return
+  fi
+  out=$(cat "$tmp/out")
+  [ "$(cat "$tmp/rc")" -eq 0 ] || fail "a root under the bound with one slow reply did not pass (exit $(cat "$tmp/rc"))"$'\n'"$out"
+  [ "$(cat "$tmp/flags.log")" = yes ] \
+    || fail "a root under the bound with one slow reply was not left to its one attempt"$'\n'"$(cat "$tmp/flags.log")"
+  samples=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $16 }' "$tmp/pass.roots.tsv")
+  case "$samples" in
+    libproc:[2-9],ps:1) ;;
+    *) fail "a later reply 1 s late was not sampled by ps for that tick alone: $samples" ;;
+  esac
+  [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 2 ] \
+    || fail "the reader with a slow later reply was not replaced exactly once"$'\n'"$(cat "$tmp/py.log")"
+  pass "a later reply 1 s late is sampled by ps for that tick only"
 }
 
 # A replacement reader that exits before its first reply is one failed restart,
@@ -1809,7 +1863,7 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
   local tmp out samples
   tmp=$(fm_test_tmproot fm-lint-rss-restarts-failed)
   printf 'stall\nexit\nexit\nexit\n' > "$tmp/plan"
-  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=7; then
+  if ! fm_lint_footprint_lint "$tmp" FM_TEST_PY_PLAN="$tmp/plan" FM_TEST_GROW_HOLD=9; then
     pass "SKIP (the resident-memory watch runs only on macOS): restarts-failed check"
     return
   fi
@@ -1853,6 +1907,8 @@ test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
 test_resident_watch_bounds_footprint_beyond_resident
 test_resident_watch_replaces_a_stalled_reader
+test_resident_watch_waits_for_a_slow_first_reply
+test_resident_watch_samples_a_slow_later_reply_by_ps
 test_resident_watch_retries_a_replacement_that_exits
 test_resident_watch_gives_up_after_three_failed_restarts
 test_cache_key_wait_preserves_root_retry_budget
