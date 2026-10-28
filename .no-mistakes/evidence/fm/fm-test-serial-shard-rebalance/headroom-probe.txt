@@ -1,0 +1,9 @@
+$ (head tree + 3 unhinted serial suites at the 45000 ms default) bin/fm-proc-budget.sh -- bin/fm-test-run.sh --check-coverage
+probes in serial lane: 3
+FM_TEST_COVERAGE ok total=382 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 serial=333 serial_shards=24 serial_unhinted=3 serial_max_ms=1150246 serial_budget_ms=1200000 serial_indivisible_ms=1005601 herdr=18
+exit=0
+$ (s23 tree + 3 unhinted serial suites at the 45000 ms default) bin/fm-proc-budget.sh -- bin/fm-test-run.sh --check-coverage
+probes in serial lane: 3
+fm-test-run: coverage guard: portable serial shard 2 of 23 packs 1200054ms above the 1200000ms target and beyond its own largest script (840300ms), so the excess is packing
+fm-test-run: refresh CI hints and rebalance or add shards; do not raise the job timeout: docs/fm-test-portable-shards.md
+exit=1

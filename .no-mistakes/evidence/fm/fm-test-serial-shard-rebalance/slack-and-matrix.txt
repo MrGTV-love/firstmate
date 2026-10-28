@@ -1,0 +1,13 @@
+serial members across 24 lanes:      330 (duplicates: 0)
+serial hint sum=27464684 unhinted=0
+per-shard max=1144680 (shard 11)
+shards=23 slack=135316 rule(slack>=1200000)=REFUSE
+shards=24 slack=1335316 rule(slack>=1200000)=PASS
+--- CI matrix (parsed with python yaml) vs runner
+job tests-portable-serial: shard matrix=1..24 count=24 name=Behavior portable serial ${{ matrix.shard }}
+runner lanes: 24 portable-serial-1of24 .. portable-serial-24of24
+--- mismatched lane (CI built for 23) is refused:
+fm-test-run: lane 'portable-serial-1of23' asks for 23 portable serial shards but this runner is configured for 24 (see --list-lanes)
+exit=2
+--- CONTRIBUTING required checks:
+Behavior portable serial 1` through `Behavior portable serial 24

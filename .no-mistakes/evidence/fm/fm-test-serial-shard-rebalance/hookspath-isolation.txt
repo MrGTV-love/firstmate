@@ -1,0 +1,11 @@
+=== base-9ae26125e tests/lib.sh, launcher env GIT_CONFIG_COUNT=2 (core.hooksPath=<hook that exits 1>, fixture.input=preserved)
+HOST HOOK RAN
+fm_git_init_commit exit=1
+commit subject: fatal: your current branch 'main' does not have any commits yet
+fixture.input=preserved
+
+=== head-5adc6a4df tests/lib.sh, launcher env GIT_CONFIG_COUNT=2 (core.hooksPath=<hook that exits 1>, fixture.input=preserved)
+fm_git_init_commit exit=0
+commit subject: initial
+fixture.input=preserved
+
