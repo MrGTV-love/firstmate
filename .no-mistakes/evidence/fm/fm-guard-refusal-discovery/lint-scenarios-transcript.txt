@@ -1,0 +1,72 @@
+### S3a new unregistered REFUSED site in a registered owner file, working tree
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+VIOLATION S1 site:bin/fm-spawn.sh:3f671b25f5: bin/fm-spawn.sh:7778 [A,B] echo "REFUSED: lab slot is busy; nothing was changed" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+exit=1 expected=1 RESULT=PASS
+
+### S3a same, enforce mode (CI step 1)
+$ bin/fm-guard-lint.sh --mode enforce --counts
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+VIOLATION S1 site:bin/fm-spawn.sh:3f671b25f5: bin/fm-spawn.sh:7778 [A,B] echo "REFUSED: lab slot is busy; nothing was changed" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+exit=1 expected=1 RESULT=PASS
+
+### S3b committed new site, CI new-or-touched --base HEAD^1
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+VIOLATION S1 site:bin/fm-spawn.sh:3f671b25f5: bin/fm-spawn.sh:7778 [A,B] echo "REFUSED: lab slot is busy; nothing was changed" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+exit=1 expected=1 RESULT=PASS
+
+### S3c new site absorbed by teardown-unlanded marker (count 4 -> 5)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S2 teardown-unlanded: site marker 'teardown-unlanded deny' in bin/fm-teardown.sh matches 5 sites, the entry declares 4; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1 expected=1 RESULT=PASS
+
+### S4 same site registered with full fields, new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=38 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0 expected=0 RESULT=PASS
+
+### S4 same site registered, enforce
+$ bin/fm-guard-lint.sh --mode enforce --counts
+LINT_SUMMARY mode=enforce guards=38 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0 expected=0 RESULT=PASS
+
+### S5a legacy allocation-guard site removed, allowlist entry left (stale)
+$ bin/fm-guard-lint.sh --mode enforce --counts
+STALE S1 site:bin/fm-task-copy-lib.sh:6df0fed844: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=1 shown=0 sites=894
+exit=1 expected=1 RESULT=PASS
+
+### S5b allowlist grows by one entry for an existing unmapped site
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=846 stale=0 shown=0 sites=896
+VIOLATION S5 site:bin/fm-spawn.sh:3f671b25f5: allowlist entry S1 is not in HEAD^1; the allowlist may only shrink
+exit=1 expected=1 RESULT=PASS
+
+### S5c touched (re-indented) allowlisted shared-slot teardown site, new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1 expected=1 RESULT=PASS
+
+### S5c same, enforce still allowlists it
+$ bin/fm-guard-lint.sh --mode enforce --counts
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0 expected=0 RESULT=PASS
+
+### S6a typed unregistered_ids of length 1 vs computed 845
+$ bin/fm-guard-lint.sh --mode enforce --counts
+VIOLATION S4 inventory: the registry types unregistered_ids (1) but the scan computes 845; remove the typed list
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=895
+exit=1 expected=1 RESULT=PASS
+
+### S6b typed unregistered_ids matching the computed count
+$ bin/fm-guard-lint.sh --mode enforce --counts
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0 expected=0 RESULT=PASS
+
+### RED-FIRST base lint (7c204105483e077e19f2df76fbad072bed1eb7f6) with the same new unregistered site
+INFO inventory: active=37 retired=13 beyond_audit=12 excluded=1 unregistered=0 audited=30 beyond_audit_active=9
+LINT_SUMMARY mode=enforce guards=37 violations=0 allowlisted=0 stale=0 shown=0
+exit=0 (base passes: the site is invisible to the old lint)
