@@ -1603,6 +1603,12 @@ EOF
   out=$(run_crew_state "$d" feat-evidence)
   assert_contains "$out" "state: done" "matching plan evidence must complete the run"
   assert_not_contains "$out" "state: unknown" "matching plan evidence must not be unverified"
+
+  # A relative state directory names the same absolute task plan the snapshot
+  # records, as the status-log completion path resolves it.
+  out=$(cd "$d" && PATH="$d/fakebin:$PATH" FM_HERDR_PS_BIN="$d/fakebin/herdr-ps" \
+    FM_STATE_OVERRIDE=state "$CREW_STATE" feat-evidence)
+  assert_contains "$out" "state: done" "a relative state directory did not bind the task's absolute plan"
   pass "no-mistakes completion consumes revision-bound verification-plan evidence"
 }
 

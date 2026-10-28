@@ -1419,7 +1419,7 @@ if [ "$HAVE_RUN" = 1 ]; then
     # ones accounted for; it never claims the reviewer graded the items
     # correctly.
     if [ "$RUN_STATE" = "done" ] && [ "$RUN_MODE" = no-mistakes ]; then
-      evidence_plan="${FM_DATA_OVERRIDE:-$(dirname "$STATE")/data}/$ID/verification-plan.md"
+      evidence_plan=$(fm_dod_nm_expected_plan "$STATE" "$ID")
       meta_value_to evidence_head pr_head
       if reason=$(fm_nm_evidence_problem "$WT" "$RUN_OUT" "$evidence_plan" "$evidence_head"); then
         RUN_STATE=unknown
