@@ -306,20 +306,28 @@ test_memory_setuid_member_is_not_counted() {
 }
 
 test_memory_root_exit_ends_leftovers() {
-  local start output rc
+  local start output rc pid
+  mkdir -p "$TMP_ROOT/sleep-shim"
+  printf '#!/bin/sh\necho "$$" >>"$FM_SLEEP_PIDS"\nexec /bin/sleep "$@"\n' >"$TMP_ROOT/sleep-shim/sleep"
+  chmod +x "$TMP_ROOT/sleep-shim/sleep"
+  : >"$TMP_ROOT/sleep.pids"
   start=$SECONDS
-  # The root outlives the first sample so the background job is a seen member.
-  output=$("$WRAP" --memory-kib 262144 -- bash -c 'sleep 600 & echo "$!"; sleep 2; exit 7')
+  output=$(PATH="$TMP_ROOT/sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/sleep.pids" \
+    "$WRAP" --memory-kib 262144 -- bash -c 'sleep 600 & echo done')
   rc=$?
-  expect_code 7 "$rc" "root status after a leftover descendant is ended"
+  expect_code 0 "$rc" "root status after a leftover background job is ended"
+  assert_equals 'done' "$output" "the command's output is untouched"
   [ $((SECONDS - start)) -lt 30 ] || fail "memory stop waited for a leftover descendant"
-  assert_memory_pid_ended "$output"
-  pass "the command's exit ends its leftover descendants and returns its status at once"
+  # A job ended before its first line records no PID and leaves no sleep.
+  while read -r pid; do
+    assert_memory_pid_ended "$pid"
+  done <"$TMP_ROOT/sleep.pids"
+  pass "the command's exit ends a background job orphaned before the first sample and returns at once"
 }
 
-test_memory_group_kill_reaches_command() {
-  local pid
-  python3 - "$WRAP" "$TMP_ROOT/group.pid" <<'PY'
+test_memory_supervisor_kill_ends_tree() {
+  local root_pid job_pid
+  python3 - "$WRAP" "$TMP_ROOT/supervised.pids" <<'PY'
 import os
 import signal
 import subprocess
@@ -327,15 +335,51 @@ import sys
 import time
 
 wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
-                            'echo "$$" >"$0"; exec sleep 600', sys.argv[2]], start_new_session=True)
+                            'sleep 600 & echo "$$ $!" >"$0"; wait', sys.argv[2]])
 while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
     time.sleep(0.05)
-os.killpg(wrapper.pid, signal.SIGKILL)
+os.kill(wrapper.pid, signal.SIGKILL)
 wrapper.wait()
 PY
-  read -r pid <"$TMP_ROOT/group.pid" || fail "memory-stopped command did not start"
-  assert_memory_pid_ended "$pid"
-  pass "a caller's group kill ends the memory-stopped command with its supervisor"
+  read -r root_pid job_pid <"$TMP_ROOT/supervised.pids" || fail "memory-stopped command did not start"
+  assert_memory_pid_ended "$root_pid"
+  assert_memory_pid_ended "$job_pid"
+  pass "a SIGKILLed supervisor's command tree is ended by the reader's dead-man link"
+}
+
+test_memory_ignored_hangup_passes_through() {
+  local rc
+  python3 - "$WRAP" "$TMP_ROOT/hup.pid" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+signal.signal(signal.SIGHUP, signal.SIG_IGN)
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'echo "$$" >"$0"; sleep 2; exit 7', sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+os.kill(wrapper.pid, signal.SIGHUP)
+os.kill(int(open(sys.argv[2]).read()), signal.SIGHUP)
+sys.exit(wrapper.wait())
+PY
+  rc=$?
+  expect_code 7 "$rc" "a caller-ignored HUP neither ends the supervisor nor the command"
+  pass "an ignored HUP stays ignored by the supervisor and the command"
+}
+
+test_memory_command_cannot_start() {
+  local rc
+  "$WRAP" --memory-kib 262144 -- "$TMP_ROOT/no-such-command" 2>"$TMP_ROOT/missing.err"
+  rc=$?
+  expect_code 127 "$rc" "missing command"
+  assert_contains "$(cat "$TMP_ROOT/missing.err")" "no-such-command: No such file or directory" "missing command is named"
+  : >"$TMP_ROOT/not-executable"
+  "$WRAP" --memory-kib 262144 -- "$TMP_ROOT/not-executable" 2>/dev/null
+  expect_code 126 $? "non-executable command"
+  pass "a command that cannot start exits 127 or 126 as exec does"
 }
 
 test_memory_reader_failure() {
@@ -415,7 +459,9 @@ if memory_supported; then
   test_memory_normal_command
   test_memory_setuid_member_is_not_counted
   test_memory_root_exit_ends_leftovers
-  test_memory_group_kill_reaches_command
+  test_memory_supervisor_kill_ends_tree
+  test_memory_ignored_hangup_passes_through
+  test_memory_command_cannot_start
   test_memory_reader_failure
 fi
 

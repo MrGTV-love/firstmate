@@ -4,8 +4,10 @@
 Usage: python3 fm-proc-budget-memory.py LIMIT_KIB -- COMMAND...
 The shell wrapper owns the public interface, process limit, and exit statuses.
 Both sampling and cleanup reuse fm-proc-info.py's libproc tree identities.
-The command stays in the caller's process group; a descendant stays owned
-across process-group and session changes once a sample has observed it.
+The command leads its own process group, which the cleanup always covers; a
+descendant outside it stays owned once a sample has observed it. The reader
+joins that group as a dead-man link: if this supervisor dies, the reader sees
+the end of its stdin and ends the group.
 """
 import json
 import os
@@ -30,9 +32,6 @@ REPLY_SECONDS = 0.5
 # The same reply measurements leave headroom within the lint watch's cadence.
 # measured: value=1 date=2026-10-28 host=Mac-Studio.local margin=357
 SAMPLE_SECONDS = 1
-# Sixty real TERM-to-exit waits (sleep, bash, python3): maximum 0.005238 s.
-# measured: value=1 date=2026-10-28 host=Mac-Studio.local margin=190
-TERM_SECONDS = 1
 
 
 class SampleError(Exception):
@@ -40,11 +39,12 @@ class SampleError(Exception):
 
 
 class Reader:
-    def __init__(self, root):
+    def __init__(self, root, group=None):
         helper = Path(__file__).with_name("fm-proc-info.py")
         self.process = subprocess.Popen(
             [sys.executable, str(helper), "rss-tree", str(root)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            preexec_fn=None if group is None else lambda: os.setpgid(0, group),
         )
         self.first = True
         self.root = root
@@ -187,9 +187,12 @@ def run(limit, command):
     cleanup_error = None
 
     def end_child(grace=0):
-        nonlocal ended, cleanup_error
+        nonlocal ended, cleanup_error, reader
         if child is not None and not ended:
             ended = True
+            if reader is not None:
+                reader.close()
+                reader = None
             try:
                 end_tree(proc, child.pid, known, grace)
             except (OSError, LookupError) as error:
@@ -202,12 +205,16 @@ def run(limit, command):
                 except OSError as error:
                     cleanup_error = error
 
+    def outcome():
+        return "ended" if cleanup_error is None else f"tree cleanup failed: {cleanup_error}"
+
     def interrupted(number, _frame):
         nonlocal caught
         caught = number
 
     for number in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM):
-        signal.signal(number, interrupted)
+        if signal.getsignal(number) != signal.SIG_IGN:
+            signal.signal(number, interrupted)
     try:
         # run_path shares the existing kernel readers without importing a
         # hyphenated module or creating bytecode files in the checkout.
@@ -219,8 +226,12 @@ def run(limit, command):
         reader = None
         if caught:
             return 128 + caught
-        child = subprocess.Popen(command)
-        reader = Reader(child.pid)
+        try:
+            child = subprocess.Popen(command, preexec_fn=os.setpgrp)
+        except OSError as error:
+            reason(f"{command[0]}: {error.strerror}; command not started")
+            return 127 if isinstance(error, FileNotFoundError) else 126
+        reader = Reader(child.pid, child.pid)
         while True:
             if caught:
                 return 128 + caught
@@ -229,9 +240,7 @@ def run(limit, command):
                 reason(f"debug: sample at {rss} KiB{uncounted_note(uncounted)}")
             if rss > limit:
                 end_child()
-                if cleanup_error is not None:
-                    raise SampleError(f"tree cleanup failed: {cleanup_error}")
-                reason(f"command tree exceeded {limit} KiB memory limit at {rss} KiB; ended"
+                reason(f"command tree exceeded {limit} KiB memory limit at {rss} KiB; {outcome()}"
                        + uncounted_note(uncounted))
                 return 99
             # The root's exit ends the run; leftover descendants get TERM,
@@ -240,17 +249,16 @@ def run(limit, command):
                 status = child.wait(SAMPLE_SECONDS)
             except subprocess.TimeoutExpired:
                 continue
-            end_child(TERM_SECONDS)
+            end_child(proc.TERM_SECONDS)
             if cleanup_error is not None:
-                raise SampleError(f"tree cleanup failed: {cleanup_error}")
+                reason(f"command exited; remaining command tree: {outcome()}")
             return status if status >= 0 else 128 - status
-    except (SampleError, OSError) as error:
+    except (SampleError, OSError, subprocess.SubprocessError) as error:
         if child is None:
             reason(f"cannot start memory reader ({error}); command not started")
         else:
             end_child()
-            outcome = "ended" if cleanup_error is None else f"tree cleanup failed: {cleanup_error}"
-            reason(f"cannot sample command-tree memory ({error}); {outcome}" + uncounted_note(uncounted))
+            reason(f"cannot sample command-tree memory ({error}); {outcome()}" + uncounted_note(uncounted))
         return 125
     finally:
         if child is not None:
