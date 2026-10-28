@@ -3,8 +3,10 @@
 # Projects carrying scripts/git-stability/provision_existing_slot.py must attest
 # the assigned isolated copy before admission. --owned-path is an explicit,
 # repeatable task scope, never inferred from prose or expanded to the whole repo.
-# The provisioner owns schema, origin/main merge-base validation, create-only
-# refusal, same-owner adoption, and lease/liveness-gated previous-owner replacement.
+# The provisioner owns schema, default origin/main merge-base validation, explicit
+# local-default qualification, same-owner adoption and lease/liveness-gated replacement.
+# A selected local-default ref/SHA is passed explicitly by spawn; no local choice
+# is rederived from origin/main, and legacy callers send no new project flag.
 # Firstmate never deletes/replaces its manifests or creates another worktree.
 # Call from a clean checkout on the task branch, using the project's existing
 # Python environment (no environment installation/sync). Preserve its full report.
@@ -13,6 +15,7 @@
 FM_SLOT_PROVISIONED=0
 FM_SLOT_MANIFEST=
 FM_SLOT_BASE_SHA=
+FM_SLOT_BASE_REF=
 FM_SLOT_PREPARED_HEAD=
 FM_SLOT_PREVIOUS_BRANCH=
 FM_SLOT_PREVIOUS_HEAD=
@@ -108,12 +111,14 @@ fm_slot_run_local() { # <project> <report> <provisioner> <arg>...
   ) >"$report" 2>&1
 }
 
-fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <owned-path>...
-  local runner=$1 project=$2 copy=$3 id=$4 branch=$5 report=$6 base old_branch old_head branch_head rc=0
-  shift 6
+fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <local-default-ref-or-empty> <selected-sha-or-empty> <owned-path>...
+  local runner=$1 project=$2 copy=$3 id=$4 branch=$5 report=$6 local_ref=$7 selected=$8
+  local base old_branch old_head branch_head rc=0
+  shift 8
   FM_SLOT_PROVISIONED=0
   FM_SLOT_MANIFEST=
   FM_SLOT_BASE_SHA=
+  FM_SLOT_BASE_REF=
   FM_SLOT_PREPARED_HEAD=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
@@ -124,10 +129,25 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <o
   git check-ref-format --branch "$branch" >/dev/null || return 1
   old_branch=$(git -C "$copy" branch --show-current) || return 1
   old_head=$(git -C "$copy" rev-parse --verify HEAD) || return 1
-  base=$(git -C "$copy" merge-base origin/main HEAD) || {
-    echo 'error: slot provisioning requires a resolvable merge-base with origin/main; no manifest was changed' >&2
-    return 1
-  }
+  if [ -n "$local_ref" ]; then
+    case "$local_ref" in refs/heads/*) ;; *) echo 'error: invalid qualified local-default ref' >&2; return 1 ;; esac
+    git check-ref-format "$local_ref" || return 1
+    base=$(git -C "$copy" rev-parse --verify --quiet "$selected^{commit}") || return 1
+    if [ -z "$selected" ] || [ "$base" != "$selected" ] ||
+      ! git -C "$copy" merge-base --is-ancestor "$base" "$old_head"; then
+      echo 'error: selected local-default baseline is not an immutable ancestor of the task; no manifest was changed' >&2
+      return 1
+    fi
+    # Pass the selected identity, never an origin merge-base that predates it.
+    # The actual project owner independently qualifies fresh defaults and existing
+    # same-owner declarations, so an admitted baseline can survive default advance.
+  else
+    [ -z "$selected" ] || { echo 'error: a selected slot baseline requires its qualified local-default ref' >&2; return 1; }
+    base=$(git -C "$copy" merge-base origin/main HEAD) || {
+      echo 'error: slot provisioning requires a resolvable merge-base with origin/main; no manifest was changed' >&2
+      return 1
+    }
+  fi
   if [ "$old_branch" != "$branch" ]; then
     if branch_head=$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$branch^{commit}"); then
       [ "$branch_head" = "$old_head" ] || {
@@ -141,6 +161,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <o
   fi
   FM_SLOT_PREPARED_HEAD=$old_head
   local args=() path
+  [ -z "$local_ref" ] || args+=(--base-source local-default)
   for path in "$@"; do args+=(--owned-path "$path"); done
   # Spawn executes in the acquired pane's ancestry, so its own cwd holder is
   # attributable to this invocation. The provisioner still rejects unrelated
@@ -149,14 +170,18 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <o
     --repo-root "$project" --worktree-path "$copy" --owner-id "$id" \
     --branch "$branch" --base-sha "$base" "${args[@]}" || rc=$?
   if [ "$rc" -eq 0 ]; then
-    python3 - "$report" "$copy" "$id" "$branch" "$base" "$@" <<'PY' || rc=$?
+    python3 - "$report" "$copy" "$id" "$branch" "$base" "$local_ref" "$@" <<'PY' || rc=$?
 import json
 import os
 import sys
 try:
     report = json.load(open(sys.argv[1], encoding="utf-8"))
     expected = dict(worktree_path=os.path.realpath(sys.argv[2]), owner_id=sys.argv[3],
-                    branch=sys.argv[4], base_sha=sys.argv[5], owned_paths=sys.argv[6:])
+                    branch=sys.argv[4], base_sha=sys.argv[5], owned_paths=sys.argv[7:])
+    if sys.argv[6]:
+        expected['base_ref'] = sys.argv[6]
+        if report.get('base_source') != 'local-default':
+            raise ValueError('provisioner did not attest local-default source')
     if report.get("state") != "PASS":
         raise ValueError("provisioner did not report PASS")
     manifest = json.load(open(report["manifest_path"], encoding="utf-8"))
@@ -188,6 +213,7 @@ PY
   fi
   FM_SLOT_MANIFEST=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["manifest_path"])' "$report") || return 1
   FM_SLOT_BASE_SHA=$base
+  FM_SLOT_BASE_REF=$local_ref
   FM_SLOT_PROVISIONED=1
 }
 

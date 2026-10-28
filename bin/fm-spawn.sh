@@ -542,8 +542,11 @@
 #   A project carrying scripts/git-stability/provision_existing_slot.py additionally
 #   requires repeatable --owned-path <tracked-path> flags: explicit task scope,
 #   never inferred from the brief. bin/fm-slot-provision-lib.sh calls that actual
-#   provisioner before any harness admission, with origin/main's merge-base and
-#   task id as owner. Spawn executes it through the acquired shell, retaining
+#   provisioner before any harness admission, with origin/main's merge-base by
+#   default or the selected qualified local-default ref/SHA for unpublished local
+#   delivery. The latter requires the project's explicit --base-source local-default
+#   capability; an older project owner refuses rather than widening scope. Task id
+#   remains the owner. Spawn executes it through the acquired shell, retaining
 #   the primary-project Python cwd, so get/bash holders are actual ancestors;
 #   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
 #   It uses the assigned copy, never another worktree. Governed
@@ -1882,6 +1885,8 @@ SPAWN_BASE_SHA=
 SPAWN_SELECTED_BASE_SHA=
 SPAWN_LOCAL_DEFAULT=
 SPAWN_LOCAL_SHA=
+SLOT_SOURCE_REF=
+SLOT_SOURCE_SHA=
 SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
 SPAWN_BASE_ERROR=
@@ -4432,29 +4437,56 @@ spawn_fetch_base_evidence() {
 # or working tree. Validate it under project custody before assigning a copy and
 # again before preparation; neither divergent history nor a changed plan is safe.
 spawn_validate_local_base() {
-  local default current
-  [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ "$RELAUNCH" -eq 0 ] && [ -z "$BASE_BRANCH" ] || return 0
+  local default current ancestry_rc pinned_default=$SPAWN_LOCAL_DEFAULT pinned_sha=$SPAWN_LOCAL_SHA
+  [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ -z "$BASE_BRANCH" ] || return 0
   [ "$BACKEND" != orca ] || return 0
-  spawn_worktree_has_origin_config "$PROJ_ABS" || return 0
+  if [ "$RELAUNCH" -eq 1 ]; then
+    [ -n "$SLOT_SOURCE_REF" ] || return 0
+    case "$SLOT_SOURCE_REF" in refs/heads/*) ;; *) echo 'error: invalid recorded local-default ref' >&2; return 1 ;; esac
+    pinned_default=${SLOT_SOURCE_REF#refs/heads/}
+    pinned_sha=$SLOT_SOURCE_SHA
+  fi
+  if ! spawn_worktree_has_origin_config "$PROJ_ABS"; then
+    [ "$RELAUNCH" -eq 0 ] && return 0
+    echo 'error: recorded local-default source no longer has its origin qualification' >&2
+    return 1
+  fi
   if [ -n "$SPAWN_BASE_ERROR" ]; then
     echo "error: $SPAWN_BASE_ERROR; local-only source selection refused" >&2
     return 1
   fi
   default=$(default_branch "$PROJ_ABS") || default=
-  current=$(git -C "$PROJ_ABS" rev-parse --verify --quiet "refs/heads/$SPAWN_LOCAL_DEFAULT^{commit}") || current=
-  if [ -z "$SPAWN_LOCAL_SHA" ] || [ "$default" != "$SPAWN_LOCAL_DEFAULT" ] ||
-    [ "$current" != "$SPAWN_LOCAL_SHA" ] ||
-    git -C "$PROJ_ABS" symbolic-ref --quiet "refs/heads/$SPAWN_LOCAL_DEFAULT" >/dev/null 2>&1; then
+  current=$(git -C "$PROJ_ABS" rev-parse --verify --quiet "refs/heads/$pinned_default^{commit}") || current=
+  if [ -z "$pinned_sha" ] || [ -z "$current" ] || [ "$default" != "$pinned_default" ] ||
+    git -C "$PROJ_ABS" symbolic-ref --quiet "refs/heads/$pinned_default" >/dev/null 2>&1; then
     echo 'error: qualified local-only default changed or is ambiguous; refusing the stale source plan' >&2
     return 1
   fi
+  if [ "$current" != "$pinned_sha" ]; then
+    # Only an already admitted declaration may retain its baseline as the named
+    # default advances. The actual project owner must verify the matching record;
+    # a refused, never-declared attempt cannot claim this exception.
+    if [ "$RELAUNCH" -ne 1 ] || [ -z "$(fm_meta_get "$RELAUNCH_META" slot_manifest)" ] ||
+      ! git -C "$PROJ_ABS" merge-base --is-ancestor "$pinned_sha" "$current"; then
+      echo 'error: qualified local-only default changed or is ambiguous; refusing the stale source plan' >&2
+      return 1
+    fi
+  fi
+  [ "$RELAUNCH" -eq 0 ] || return 0
   if git -C "$PROJ_ABS" merge-base --is-ancestor "$SPAWN_BASE_SHA" "$SPAWN_LOCAL_SHA"; then
     SPAWN_SELECTED_BASE_SHA=$SPAWN_LOCAL_SHA
-  elif git -C "$PROJ_ABS" merge-base --is-ancestor "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_SHA"; then
-    SPAWN_SELECTED_BASE_SHA=$SPAWN_BASE_SHA
   else
-    echo 'error: local-only local and remote defaults diverge; reconcile them before assigning a task copy' >&2
-    return 1
+    ancestry_rc=$?
+    [ "$ancestry_rc" -eq 1 ] || {
+      echo 'error: cannot compare local-only local and remote defaults; preserving the source plan' >&2
+      return 1
+    }
+    if git -C "$PROJ_ABS" merge-base --is-ancestor "$SPAWN_LOCAL_SHA" "$SPAWN_BASE_SHA"; then
+      SPAWN_SELECTED_BASE_SHA=$SPAWN_BASE_SHA
+    else
+      echo 'error: local-only local and remote defaults diverge or cannot be compared; reconcile them before assigning a task copy' >&2
+      return 1
+    fi
   fi
 }
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
@@ -6180,6 +6212,10 @@ spawn_slot_refused() {
         for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
       fi
       [ -z "$FM_SLOT_PREPARED_HEAD" ] || echo "slot_prepared_head=$FM_SLOT_PREPARED_HEAD"
+      if [ -n "$SLOT_SOURCE_REF" ]; then
+        echo "slot_source_ref=$SLOT_SOURCE_REF"
+        echo "slot_base_sha=$SLOT_SOURCE_SHA"
+      fi
       [ "$BACKEND" != orca ] || printf 'orca_worktree_id=%s\nterminal=%s\n' "$ORCA_WORKTREE_ID" "$ORCA_TERMINAL"
       [ "$BACKEND" != herdr ] || printf 'herdr_session=%s\nherdr_workspace_id=%s\nherdr_tab_id=%s\nherdr_pane_id=%s\n' "$HERDR_SES" "$HERDR_WORKSPACE_ID" "$HERDR_TAB_ID" "$HERDR_PANE_ID"
       [ "$BACKEND" != zellij ] || printf 'zellij_session=%s\nzellij_tab_id=%s\nzellij_pane_id=%s\n' "$ZELLIJ_SES" "$ZELLIJ_TAB_ID" "$ZELLIJ_PANE_ID"
@@ -6210,6 +6246,19 @@ spawn_slot_refused() {
   echo "error: assigned copy $WT and endpoint $T retained; no worker admitted" >&2
   exit 1
 }
+if [ "$RELAUNCH" -eq 1 ]; then
+  SLOT_SOURCE_REF=$(fm_meta_get "$RELAUNCH_META" slot_source_ref)
+  if [ -n "$SLOT_SOURCE_REF" ]; then
+    SLOT_SOURCE_SHA=$(fm_meta_get "$RELAUNCH_META" slot_base_sha)
+    [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ -n "$SLOT_SOURCE_SHA" ] || {
+      echo 'error: invalid recorded local-only source declaration; preserving the assigned copy' >&2
+      exit 1
+    }
+  fi
+elif [ -n "$SPAWN_SELECTED_BASE_SHA" ] && [ "$SPAWN_SELECTED_BASE_SHA" != "$SPAWN_BASE_SHA" ]; then
+  SLOT_SOURCE_REF="refs/heads/$SPAWN_LOCAL_DEFAULT"
+  SLOT_SOURCE_SHA=$SPAWN_SELECTED_BASE_SHA
+fi
 spawn_validate_local_base || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
@@ -6232,6 +6281,12 @@ if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RE
       # Finish the original fresh-base contract without resetting old refs.
       SLOT_FRESH_BASE=1
       fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
+      if [ -n "$SLOT_SOURCE_REF" ]; then
+        # No worker was admitted and no prepared branch existed. Finish that
+        # original immutable local plan, not a newly derived origin baseline.
+        git -C "$WT" reset --hard "$SLOT_SOURCE_SHA" >/dev/null || spawn_slot_refused
+        SLOT_FRESH_BASE=0
+      fi
     fi
   fi
 fi
@@ -6286,7 +6341,7 @@ spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
 }
 if [ "$SLOT_GOVERNED" = 1 ]; then
   fm_slot_provision spawn_slot_run_in_pane "$PROJ_ABS" "$WT" "$ID" "$BRANCH" \
-    "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
+    "$DATA/$ID/slot-provision-spawn.${BASHPID:-$$}.json" "$SLOT_SOURCE_REF" "$SLOT_SOURCE_SHA" "${SLOT_OWNED_PATHS[@]}" || spawn_slot_refused
   render_launch_brief || exit 1
 fi
 
@@ -7230,7 +7285,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp slot_manifest slot_base_sha slot_owned_path slot_prepared_head base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked write_confinement claude_session_id busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp slot_manifest slot_base_sha slot_source_ref slot_owned_path slot_prepared_head base_branch upstream_consent model model_stale effort fixed_family omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked write_confinement claude_session_id busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -7253,6 +7308,7 @@ preserve_relaunch_meta() {
   if [ "$FM_SLOT_PROVISIONED" = 1 ]; then
     echo "slot_manifest=$FM_SLOT_MANIFEST"
     echo "slot_base_sha=$FM_SLOT_BASE_SHA"
+    [ -z "$FM_SLOT_BASE_REF" ] || echo "slot_source_ref=$FM_SLOT_BASE_REF"
     for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
   fi
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
