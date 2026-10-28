@@ -1,0 +1,25 @@
+## fm-spawn output
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.M44RU4
+warning: task lab-ship1: /Users/charlesabrooker/tmp/fm-lab.M44RU4/data/lab-ship1/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.M44RU4/data/lab-ship1/launch-brief.md records no ship branch; defaulting to legacy branch fm/lab-ship1
+warning: /Users/charlesabrooker/tmp/fm-lab.M44RU4/data/lab-ship1/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: lab-ship1 ships mode=local-only while the standing posture for labproj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for lab-ship1: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=omp write_confinement=seatbelt-v1
+spawned lab-ship1 harness=omp kind=ship mode=local-only yolo=off window=primary:fm-lab-ship1 worktree=/Users/charlesabrooker/.treehouse/labproj-3a40aa/1/labproj
+spawn-exit=0
+
+## state/lab-ship1.launch-models (tab-separated spawn_gen, prior, model)
+s1793183348.29715.31432^I^Iopenai-codex/gpt-6.1-sol
+s1793183348.29715.31432^I^Igoogle-antigravity/claude-opus-5-5
+
+## state/lab-ship1.omp-fallback.yml retry chains
+{"modelFallback":true,"fallbackChains":{"default":[],"openai-codex/gpt-6.1-sol":["google-antigravity/claude-opus-5-5:high"],"openai-codex/gpt-6.1-sol:high":["google-antigravity/claude-opus-5-5:high"],"google-antigravity/claude-opus-5-5":[],"google-antigravity/claude-opus-5-5:high":[]}}
+
+## state/lab-ship1.meta (model, spawn_gen, worktree, branch)
+worktree=/Users/charlesabrooker/.treehouse/labproj-3a40aa/1/labproj
+harness=omp
+kind=ship
+branch=fm/lab-ship1
+model=openai-codex/gpt-6.1-sol
+spawn_gen=s1793183348.29715.31432

@@ -1,0 +1,12 @@
+ Firstmate spec
+ No work. Reply done.
+ Skill selection
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.13.2 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ done
+❯
+ π · ◒ GPT-6.1 Sol 🙈 · 🌳 labproj/labproj · ⑂ detached · ◫ 1.9%/500K ⟲ · S0.02 + 👁 0.01                                                                                                    🆔 01a1820e

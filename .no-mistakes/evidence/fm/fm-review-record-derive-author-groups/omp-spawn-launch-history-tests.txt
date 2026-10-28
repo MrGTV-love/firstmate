@@ -1,0 +1,7 @@
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - launch-model history preserves both families across relaunch
+ok - omp ship native fallback stand-ins are ship author evidence
+ok - default fallback overlay matches pre-change bytes
+ok - fixed-family empties native chains, survives relaunch, and is dropped on promotion
+ok - fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op

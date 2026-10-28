@@ -1,0 +1,231 @@
+
+==================== S1 PR-197 shape: OpenAI ship + Claude pipeline commits, Main types all=OpenAI, one Claude PASS ====================
+case s1: ship meta model=openai-codex/gpt-6.1-sol
+  5827b44 no-mistakes(test): update assertion
+  d7da0e2 no-mistakes(review): repair consumer behavior
+  eb0c566 feat: ship implementation
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["openai-codex/gpt-6.1-sol"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s1/report-3196.md
+recorded: review
+[exit 0]
+
+$ OLD gate at base commit 7c204105483e077e19f2df76fbad072bed1eb7f6 (no evidence derivation):
+
+$ python3 /tmp/nmlab-73675/oldbin/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763
+review: PASS
+[exit 0]
+
+$ NEW gate:
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --task task-197 --base 22cbb24e5a2d1a17c5b6d08cf869b42e4014c8a9
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s1/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s1/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-opus-5-5","claude-sonnet-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+==================== S1b fix path: OpenAI reader reads the pipeline group (command shape printed by the refusal) ====================
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-opus-5-5","claude-sonnet-5-5"]} --covered-groups ["no-mistakes:anthropic"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s1/report-8634.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --task task-197 --base 22cbb24e5a2d1a17c5b6d08cf869b42e4014c8a9
+error: uncovered commit group ship, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s1/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s1/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-opus-5-5","claude-sonnet-5-5"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+==================== S1c Claude reader re-records its read declaring the real ship author ====================
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --covered-groups ["ship"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s1/report-18942.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 5827b443412e61d8ac151889277cdd752180f763 --task task-197 --base 22cbb24e5a2d1a17c5b6d08cf869b42e4014c8a9
+review: PASS
+[exit 0]
+
+==================== S2 routine: OpenAI-only ship, one Claude PASS naming ship ====================
+case s2: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 085979371134486cd0143acc32801459bccafe68 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s2/report-29279.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 085979371134486cd0143acc32801459bccafe68 --task task-197 --base 05a5ed6a68a2d9fc81d97554c0502d4b6b125105
+review: PASS
+[exit 0]
+
+==================== S3 typed lie: Claude ship author (meta), Main types all=OpenAI, Claude reader ====================
+case s3: ship meta model=claude-opus-5-5
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --verdict PASS --reader-model claude-opus-5-5 --author-groups {"all":["openai-codex/gpt-6.1-sol"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s3/report-6309.md
+recorded: review
+[exit 0]
+
+$ OLD gate:
+
+$ python3 /tmp/nmlab-73675/oldbin/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc
+review: PASS
+[exit 0]
+
+$ NEW gate:
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --task task-197 --base cffb3bca61a903a60079326db8cbf76375f16e0d
+error: uncovered commit group declared:all, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s3/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s3/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["claude-opus-5-5"],"declared:all":["openai-codex/gpt-6.1-sol"]}' --covered-groups '["declared:all"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+==================== S4 relaunch history: gen g0 OpenAI then g1 Claude; Claude-only PASS, then add OpenAI PASS ====================
+case s4: ship meta model=claude-opus-5-5
+g0		openai-codex/gpt-6.1-sol
+g1	g0	openai-codex/gpt-6.1-sol
+g1	g0	claude-opus-5-5
+gOLD		gemini-3-pro
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol","claude-opus-5-5"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s4/report-2125.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --task task-197 --base cffb3bca61a903a60079326db8cbf76375f16e0d
+error: uncovered commit group ship, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s4/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s4/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["claude-opus-5-5","openai-codex/gpt-6.1-sol"]}' --covered-groups '["ship"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"ship":["openai-codex/gpt-6.1-sol","claude-opus-5-5"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s4/report-28690.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 785e9afe5da5edfb6ceee4393650f3279e7266dc --task task-197 --base cffb3bca61a903a60079326db8cbf76375f16e0d
+review: PASS
+[exit 0]
+
+==================== S6 null-base run (new-branch push, base_sha all zero) with Claude invocations ====================
+case s6: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 413ebcce2403bcf25291bb2d5e6aeafec1a6e1e3 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --covered-groups ["ship"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s6/report-24465.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 413ebcce2403bcf25291bb2d5e6aeafec1a6e1e3 --task task-197 --base 93e82ad632b8074577e4ead3f6e5c6039afe8ae5
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s6/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s6/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 413ebcce2403bcf25291bb2d5e6aeafec1a6e1e3 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-opus-5-5"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 413ebcce2403bcf25291bb2d5e6aeafec1a6e1e3 --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"no-mistakes:anthropic":["claude-opus-5-5"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s6/report-18977.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 413ebcce2403bcf25291bb2d5e6aeafec1a6e1e3 --task task-197 --base 93e82ad632b8074577e4ead3f6e5c6039afe8ae5
+review: PASS
+[exit 0]
+
+==================== S7 rebase: OpenAI run A wrote commit (old SHA), Claude run B rebased it ====================
+case s7: ship meta model=claude-opus-5-5
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d360f9026603c40f5cc6c0a619ad337bac91fa99 --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"ship":["claude-opus-5-5"],"no-mistakes:anthropic":["claude-opus-5-5"],"no-mistakes:openai":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s7/report-19644.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head d360f9026603c40f5cc6c0a619ad337bac91fa99 --task task-197 --base 8ce4e5ff0fd341921b38399f9fbb159a7fbba31f
+error: uncovered commit group no-mistakes:openai, family openai; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s7/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s7/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d360f9026603c40f5cc6c0a619ad337bac91fa99 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["claude-opus-5-5"],"no-mistakes:openai":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-opus-5-5"]}' --covered-groups '["no-mistakes:openai"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d360f9026603c40f5cc6c0a619ad337bac91fa99 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"no-mistakes:openai":["gpt-5.1-codex"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s7/report-17813.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head d360f9026603c40f5cc6c0a619ad337bac91fa99 --task task-197 --base 8ce4e5ff0fd341921b38399f9fbb159a7fbba31f
+review: PASS
+[exit 0]
+
+==================== S8a cancelled claude invocation with empty model counts as anthropic ====================
+case s8a: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d7c0c687325c6fcd7332e5a596e4c08ea17ae2e3 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --covered-groups ["ship"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s8a/report-6723.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head d7c0c687325c6fcd7332e5a596e4c08ea17ae2e3 --task task-197 --base dcad1266d296a06fae577ee63aba7875ccc4fb99
+error: uncovered commit group no-mistakes:anthropic, family anthropic; each author family needs an exact-head PASS reading this group whose reader_family is known and different from it (model family unknown is never covered); obtain the named read, set its actual trigger answers and local report, then record it with: FM_HOME=/tmp/nmlab-73675/cases/s8a/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s8a/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d7c0c687325c6fcd7332e5a596e4c08ea17ae2e3 --verdict PASS --reader-model OUTSIDE_FAMILY_MODEL --author-groups '{"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude"]}' --covered-groups '["no-mistakes:anthropic"]' --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report LOCAL_READER_REPORT; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head d7c0c687325c6fcd7332e5a596e4c08ea17ae2e3 --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"no-mistakes:anthropic":["claude"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s8a/report-333.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head d7c0c687325c6fcd7332e5a596e4c08ea17ae2e3 --task task-197 --base dcad1266d296a06fae577ee63aba7875ccc4fb99
+review: PASS
+[exit 0]
+
+==================== S8b errored acp:omp invocation with empty model stays unknown -> captain words only ====================
+case s8b: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --covered-groups ["ship"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s8b/report-19646.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"no-mistakes:anthropic":["claude-opus-5-5"],"no-mistakes:unknown":["unknown"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s8b/report-12325.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --task task-197 --base 329d4f946e890bbebf785aede60e6bf5fdd686f5
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/tmp/nmlab-73675/cases/s8b/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s8b/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --words Lab: merge PR 197 at this head
+recorded: captain-word
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 7000ec1cb39409f8f26a9afdc799f6b393d0f96e --task task-197 --base 329d4f946e890bbebf785aede60e6bf5fdd686f5
+review: captain-word
+[exit 0]
+
+==================== S9 exact-head FAIL blocks even after later covering PASSes ====================
+case s9: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head ffe5dd0c65dc427b5ad500acaa97b682ae09742a --verdict FAIL --reader-model gemini-3-pro --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s9/report-26692.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head ffe5dd0c65dc427b5ad500acaa97b682ae09742a --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s9/report-24405.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head ffe5dd0c65dc427b5ad500acaa97b682ae09742a --task task-197 --base c0ad2975db0a80b27bdff42c9be5a32494089552
+error: verdict is FAIL at live head ffe5dd0c65dc427b5ad500acaa97b682ae09742a (reader gemini-3-pro, report /tmp/nmlab-73675/cases/s9/report-26692.md); a PASS never clears an exact-head FAIL; record fresh captain words with fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head ffe5dd0c65dc427b5ad500acaa97b682ae09742a --words WORDS, then retry the merge; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+
+==================== S10 state.sqlite opened read-only: bytes+mtime unchanged; missing DB is never created ====================
+case s10: ship meta model=openai-codex/gpt-6.1-sol
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 897f57d62d25cd08ad4148cb214bfa9697f87fc4 --verdict PASS --reader-model openai-codex/gpt-6.1-sol --author-groups {"ship":["openai-codex/gpt-6.1-sol"],"no-mistakes:anthropic":["claude-opus-5-5"]} --covered-groups ["no-mistakes:anthropic"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s10/report-26587.md
+recorded: review
+[exit 0]
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py review --pr https://github.com/example/repo/pull/197 --head 897f57d62d25cd08ad4148cb214bfa9697f87fc4 --verdict PASS --reader-model claude-opus-5-5 --author-groups {"ship":["openai-codex/gpt-6.1-sol"]} --covered-groups ["ship"] --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report /tmp/nmlab-73675/cases/s10/report-22757.md
+recorded: review
+[exit 0]
+
+$ before:
+1793182888 139264
+394649d754c9e4a1915c9686ff70bacffd9ab39b2629a14f325441823af607c1  /tmp/nmlab-73675/cases/s10/nm/state.sqlite
+.
+..
+state.sqlite
+state.sqlite-shm
+state.sqlite-wal
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 897f57d62d25cd08ad4148cb214bfa9697f87fc4 --task task-197 --base a6338225c7377911c08da2a1ce3adc475b338a25
+review: PASS
+[exit 0]
+
+$ after:
+1793182888 139264
+394649d754c9e4a1915c9686ff70bacffd9ab39b2629a14f325441823af607c1  /tmp/nmlab-73675/cases/s10/nm/state.sqlite
+.
+..
+state.sqlite
+state.sqlite-shm
+state.sqlite-wal
+
+$ missing database:
+
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py verify --pr https://github.com/example/repo/pull/197 --head 897f57d62d25cd08ad4148cb214bfa9697f87fc4 --task task-197 --base a6338225c7377911c08da2a1ce3adc475b338a25
+error: uncovered commit group no-mistakes:unknown, family unknown; model family unknown is never covered by a PASS; repair the author evidence so every author model has a known family, or obtain a fresh explicit captain merge instruction for this PR at this exact head and record the captain's actual words (never fabricated ones) in place of FRESH_CAPTAIN_WORDS with: FM_HOME=/tmp/nmlab-73675/cases/s10/fmhome FM_STATE_OVERRIDE=/tmp/nmlab-73675/cases/s10/fmhome/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Z05FQ5ECT7BK4D4PXCK0G/bin/fm-review-record.py captain-word --pr https://github.com/example/repo/pull/197 --head 897f57d62d25cd08ad4148cb214bfa9697f87fc4 --words FRESH_CAPTAIN_WORDS; inspect review-records.jsonl in the PR task home before retrying
+[exit 1]
+.
+..
