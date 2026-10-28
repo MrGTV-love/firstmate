@@ -73,11 +73,12 @@
 #      neither is the overview table's narrower status column)
 #      is authoritative REGARDLESS of head (fm_nm_run_is_executing in
 #      bin/fm-nm-run-lib.sh) as long as an explicit probe has not ANSWERED that
-#      the daemon is down (nm_daemon_answered_down): the pipeline rebases the
-#      branch and
-#      commits its fix rounds in its own checkout, so a live run's head
-#      routinely differs from the local head, and reading an older run that
-#      still matches the local head would report a working crew as failed - but
+#      the daemon is down (nm_daemon_answered_down): the rebase step merges
+#      newer main into the branch, CI merge-conflict repair can still rewrite
+#      its history, and fix rounds commit in the pipeline's own checkout, so a
+#      live run's head routinely differs from the local head, and reading an
+#      older run that still matches the local head would report a working crew
+#      as failed - but
 #      a record still saying `running` because the daemon died under it is
 #      evidence from a dead instrument, exactly as for a terminal record, and
 #      must not answer once the worktree has moved off the run head. Every

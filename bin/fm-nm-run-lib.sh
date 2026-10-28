@@ -490,10 +490,11 @@ fm_nm_run_is_parked() {  # <toon-output>
 # 0 if the run in captured `axi status` TOON $1 is EXECUTING: in flight and
 # actively working (pending, running, fixing, or ci), not parked at a gate.
 # Read-only current-state reporting (fm-crew-state.sh) treats an executing run
-# on the task's own branch as authoritative REGARDLESS of head: the pipeline
-# rebases the branch and commits fix rounds in its own checkout, so a live run's
-# head routinely differs from the task worktree's local head, and falling back
-# to an older run that matches the local head reads a working crew as failed.
+# on the task's own branch as authoritative REGARDLESS of head: the rebase step
+# merges newer main into the branch, CI merge-conflict repair can still rewrite
+# its history, and fix rounds commit in the pipeline's own checkout, so a live
+# run's head routinely differs from the task worktree's local head, and falling
+# back to an older run that matches the local head reads a working crew as failed.
 # A run parked at a gate keeps the strict head rule, and no destructive caller
 # uses this predicate: teardown stays on fm_nm_head_matches_worktree and the
 # ledger rule below.
