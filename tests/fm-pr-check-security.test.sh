@@ -17,6 +17,9 @@ WATCH="$ROOT/bin/fm-watch.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 REGISTER="$ROOT/bin/fm-check-register.sh"
 TMP_ROOT=$(fm_test_tmproot fm-pr-check-security)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 fm_git_identity fmtest fmtest@example.invalid
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)

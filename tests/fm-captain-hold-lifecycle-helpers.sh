@@ -19,6 +19,9 @@ set -u
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh"
 TMP_ROOT=$(fm_test_tmproot fm-captain-hold)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }

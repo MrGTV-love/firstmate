@@ -115,6 +115,16 @@ unset FM_ARM_CONFIRM_TIMEOUT
 # pipeline database instead of their own. A case that needs one sets it itself.
 unset NM_HOME
 
+# fm_test_empty_pipeline_db <nm-home>: an existing, readable no-mistakes home
+# whose pipeline database records no run. Author evidence treats a missing
+# database as unknown for a no-mistakes task, so merge fixtures point NM_HOME
+# (or HOME/.no-mistakes) here rather than at whatever the host happens to hold.
+fm_test_empty_pipeline_db() {  # <nm-home>
+  mkdir -p "$1"
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$1/state.sqlite"
+}
+
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
 # there (for example a beads backend at its live backlog), so a copy points the
