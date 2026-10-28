@@ -283,12 +283,14 @@ def event_denies(body):
     return decision != 'allow'
 
 
-def embedded_kind(opener_line):
+def embedded_kind(opener_line, tag):
     """The language of a heredoc body when the opener feeds an interpreter, else None (text)."""
     if re.search(r'\b(?:python3?|py)\b', opener_line):
         return 'py'
     if re.search(r'\b(?:node|bun|deno)\b', opener_line):
         return 'js'
+    if tag == 'PERL' or re.search(r'\bperl\b', opener_line):
+        return 'sh'  # perl is scanned like a .pl file
     return None
 
 
@@ -364,7 +366,7 @@ def scan_file(root, rel, helpers, hook_names):
             if opener and any(row.strip() == opener.group(2) for row in lines[number:]):
                 heredoc = opener.group(2)
                 heredoc_stderr = '>&2' in line
-                body_kind = embedded_kind(line)
+                body_kind = embedded_kind(line, heredoc)
         calls = call_pattern(helpers.get(eff, set()), eff) if eff in helpers else None
         if MARKER.search(line) and 'A' not in sig:
             sig.append('A')

@@ -22,7 +22,8 @@
 #   - every refusal-site signature (marker, message, helper call, hook deny, guard event) is found
 #     in the default discovery paths, and comments, heredocs, docstrings and tests are not
 #   - an unmapped `|| exit 2` in a hook script fails S1, and the same site mapped passes
-#   - an unquoted refusal in a stderr heredoc and a refusal under .dsh/ are sites, while a variable,
+#   - an unquoted refusal in a stderr heredoc, a refusal in a perl heredoc and a refusal under .dsh/
+#     are sites, while a variable,
 #     a path, a compared value and an argument-count exit 2 are not
 #   - an unmapped site fails S1, the same site mapped by a sites marker passes, and a site added
 #     inside an already-mapped owner file still needs its own mapping
@@ -432,6 +433,12 @@ assert_mapped "a || exit 2 hook site passes once a registered entry maps it" "$S
 SIG=$(fixture sig_heredoc_stderr)
 printf 'cat >&2 <<EOF\nerror: refusing to retire the slot\nEOF\n' >"$SIG/bin/a.sh"
 assert_site "S1 finds an unquoted refusal in a heredoc printed to stderr" "$SIG" 'B'
+
+SIG=$(fixture sig_heredoc_perl)
+printf 'IFS= read -r -d '"''"' PROG <<'"'"'PERL'"'"' || :\nprint STDERR "x: refused: the log stayed locked\\n";\nPERL\nperl <<'"'"'EOF'"'"'\nprint STDERR "x: refused: the log is full\\n";\nEOF\n' >"$SIG/bin/a.sh"
+assert_site "S1 finds a refusal in a perl heredoc" "$SIG" 'B'
+[ "$(site_ids "$SIG" | wc -l | tr -d ' ')" = 2 ] || fail "both perl heredoc refusals must be sites: $(site_ids "$SIG")"
+pass "a heredoc delimited by PERL or fed to perl is scanned as code"
 
 SIG=$(fixture sig_dsh)
 mkdir -p "$SIG/.dsh"
