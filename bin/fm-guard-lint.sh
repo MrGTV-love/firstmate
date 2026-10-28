@@ -45,12 +45,12 @@
 # Output:
 #   VIOLATION <rule> <id>: <message>          one line per violation
 #   INFO <id>: <message>                      non-failing observations
-#   LINT_SUMMARY mode=<m> guards=<n> violations=<v> allowlisted=<a> stale=<s> shown=<k>
+#   LINT_SUMMARY mode=<m> guards=<n> violations=<v> allowlisted=<a> stale=<s> shown=<k> sites=<r>
 # With --json, one JSON object is written to stdout instead, carrying the same
-# fields plus the complete violation and stale-entry lists.
+# fields except sites, plus the complete violation and stale-entry lists.
 #
 # Exit: 0 clean or report mode; 1 violations, stale entries, or a malformed
-# registry; 2 usage error. A missing registry is a violation, not a skip,
+# registry; 2 usage or environment error. A missing registry is a violation, not a skip,
 # because a guard population with no registry is exactly the state this lint
 # exists to make visible.
 set -u
