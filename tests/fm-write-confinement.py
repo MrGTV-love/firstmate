@@ -236,7 +236,9 @@ def child(manifest):
     # The custody-return route creates this task's own archive branches. They
     # must work with the route's own git commands, while no other ref name
     # does: another task's archive, ids that contain or extend this task's id,
-    # and names outside the two documented shapes.
+    # and names outside the two documented shapes. No case-only variant of an
+    # own name is tried: the default macOS volume is case-insensitive, so that
+    # path is the very same file and the kernel treats it as one.
     def ref_exists(name):
         return git("-C", str(worktree), "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
 
@@ -264,7 +266,7 @@ def child(manifest):
                         ("own-id-other-shape", "archive/task-other-0123abcd"),
                         ("own-id-short-hex", "archive/task-submitted-0123abc"),
                         ("own-id-long-hex", "archive/task-submitted-0123abcde"),
-                        ("own-id-upper-hex", "archive/task-submitted-0123ABCD"),
+                        ("own-id-non-hex", "archive/task-submitted-0123abcg"),
                         ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
                         ("outside-archive", "task-submitted-0123abcd")):
         results[f"refused-archive-{label}"] = ref_refused(name)
