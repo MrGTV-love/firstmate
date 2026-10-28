@@ -141,6 +141,42 @@ test_a_verbless_loop_stops_at_the_cap_and_leaves_the_reserve_for_done() {
   pass "a verbless text loop through the helper stops at the cap, and done:, blocked: and resolved: still land in the reserve"
 }
 
+# A holder of the log's lock, opened read-only so the guard never lists it as a writer.
+start_lock_holder() {  # <status-file> <ready-file>
+  perl -MFcntl=:flock -e '
+    open(my $f, "<", $ARGV[0]) or exit 1;
+    flock($f, LOCK_EX) or exit 1;
+    open(my $r, ">", $ARGV[1]) or exit 1;
+    print $r "locked\n";
+    close($r);
+    sleep 120;
+  ' "$1" "$2" &
+}
+
+test_a_stopped_lock_holder_never_hangs_a_sanctioned_append() {
+  local dir status err holder rc=0 began elapsed size
+  dir=$(make_case stopped-holder); status="$dir/state/held.status"; err="$dir/held.err"
+  printf 'working: before\n' > "$status"
+  size=$(file_size "$status")
+  start_lock_holder "$status" "$dir/ready"
+  holder=$!
+  wait_for_file_nonempty "$dir/ready" || { kill -9 "$holder" 2>/dev/null; fail "the lock holder did not start"; }
+  kill -STOP "$holder"
+  began=$SECONDS
+  fm_run_timed 40 "$APPEND" "$status" "done: finished" 2>"$err" || rc=$?
+  elapsed=$((SECONDS - began))
+  kill -9 "$holder" 2>/dev/null
+  wait "$holder" 2>/dev/null
+  ! fm_timed_out "$rc" || fail "a sanctioned append hung on a lock held by a stopped writer (still waiting after 40 s)"
+  [ "$rc" -eq 75 ] || fail "a sanctioned append behind a stopped lock holder did not return 75 (rc=$rc): $(cat "$err")"
+  [ "$elapsed" -le 15 ] || fail "the refusal took $elapsed s, past the 10 s lock bound"
+  grep -q 'fm-status-append: refused: .*held.status stayed locked' "$err" || fail "the refusal is not loud or does not name the file: $(cat "$err")"
+  [ "$(file_size "$status")" -eq "$size" ] || fail "a refused append changed the log"
+  "$APPEND" "$status" "done: finished" || fail "an append after the holder went away did not land"
+  [ "$(tail -1 "$status")" = "done: finished" ] || fail "the later append did not land"
+  pass "a sanctioned append behind a stopped lock holder is refused loudly with exit 75 within the lock bound, and lands once the lock is free"
+}
+
 test_without_the_helper_the_same_loop_passes_the_cap() {
   local dir status size
   dir=$(make_case raw-loop); status="$dir/state/raw.status"
@@ -976,6 +1012,39 @@ test_the_guard_never_stops_the_firstmate_session_or_a_reader() {
   pass "the guard names but never stops the firstmate session, and never names or stops a process that only reads the log"
 }
 
+test_the_guard_never_stops_a_sanctioned_append() {
+  local dir state status holder apid ppid='' out i rc=0
+  command -v lsof >/dev/null 2>&1 || { echo "skip: lsof not found"; return 0; }
+  dir=$(make_case guard-spares-append); state="$dir/state"; status="$state/busy.status"
+  head -c 300000 /dev/zero | tr '\0' 'x' > "$status"
+  printf '\n' >> "$status"
+  # The capped append holds the over-cap log open for writing while it takes the lock, so a guard
+  # scan in that window lists it as a writer. It must leave it running.
+  start_lock_holder "$status" "$dir/ready"
+  holder=$!
+  wait_for_file_nonempty "$dir/ready" || { kill -9 "$holder" 2>/dev/null; fail "the lock holder did not start"; }
+  FM_STATUS_CAP_BYTES=262144 "$APPEND" "$status" "done: landed after the scan" 2>"$dir/append.err" &
+  apid=$!
+  for i in $(seq 1 100); do
+    if [ "$(ps -p "$apid" -o comm= 2>/dev/null | tr -d ' ')" = perl ]; then ppid=$apid; else ppid=$(pgrep -P "$apid" perl 2>/dev/null | head -1); fi
+    [ -z "$ppid" ] || break
+    sleep 0.05
+  done
+  [ -n "$ppid" ] || { kill -9 "$holder" "$apid" 2>/dev/null; fail "the capped append did not start"; }
+  sleep 0.3
+  out=$(FM_STATE_OVERRIDE="$state" FM_STATUS_CAP_BYTES=262144 "$GUARD" scan) || { kill -9 "$holder" "$apid" 2>/dev/null; fail "the guard scan failed"; }
+  [ "$(state_letter "$ppid")" != T ] || { kill -9 "$holder" "$ppid" "$apid" 2>/dev/null; fail "the guard stopped the capped append pid $ppid: $out"; }
+  kill -9 "$holder" 2>/dev/null
+  wait "$holder" 2>/dev/null
+  wait "$apid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "the capped append did not land after the scan (rc=$rc): $(cat "$dir/append.err")"
+  case "$out" in *"stopped nothing: pid $ppid is the capped append"*) ;; *) fail "the wake does not name the spared capped append pid $ppid: $out" ;; esac
+  [ "$(tail -1 "$status")" = "done: landed after the scan" ] || fail "the held append did not land"
+  FM_STATUS_CAP_BYTES=262144 "$APPEND" "$status" "done: a later line" || fail "a later append did not land"
+  [ "$(tail -1 "$status")" = "done: a later line" ] || fail "the later append did not land"
+  pass "the guard names a capped append that holds an over-cap log open but never stops it, and later appends still land"
+}
+
 test_guard_says_unknown_when_lsof_is_missing_or_timed_out() {
   local dir state status scan_env out fakebin
   dir=$(make_case lsof-state); state="$dir/state"; status="$state/lonely.status"; fakebin="$dir/fakebin"
@@ -1719,6 +1788,7 @@ wait_for_file_nonempty() {  # <path>
 tests=(
   test_sanctioned_loop_stops_growing_at_the_cap
   test_a_verbless_loop_stops_at_the_cap_and_leaves_the_reserve_for_done
+  test_a_stopped_lock_holder_never_hangs_a_sanctioned_append
   test_without_the_helper_the_same_loop_passes_the_cap
   test_incident_shape_is_refused_at_the_cap_and_loses_no_distinct_line
   test_foreign_omp_writer_is_named_stopped_and_never_deleted
@@ -1741,6 +1811,7 @@ tests=(
   test_the_open_decisions_fold_calls_its_tick_for_every_line
   test_the_span_classifier_calls_its_tick_for_every_line_it_walks
   test_the_guard_never_stops_the_firstmate_session_or_a_reader
+  test_the_guard_never_stops_a_sanctioned_append
   test_guard_says_unknown_when_lsof_is_missing_or_timed_out
   test_a_bash_writer_is_stopped_and_a_missing_writer_stops_nothing
   test_guard_scan_names_a_sidecar_and_wakes_again_only_on_growth

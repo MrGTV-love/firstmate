@@ -23,8 +23,9 @@
 # as holding the file open for writing is stopped with SIGSTOP, whatever its process
 # name (the incident's was omp; a raw `>>` loop in a bash, sh or zsh child is stopped
 # the same way), which a later `kill -CONT <pid>` undoes. A process that only reads the
-# file is never listed, and this guard, its parent chain (the watcher that ran it) and
-# the firstmate session (line 1 of state/.lock) are never signalled. None found, or no
+# file is never listed, and this guard, its parent chain (the watcher that ran it),
+# the firstmate session (line 1 of state/.lock) and a running capped append
+# (fm_status_is_capped_append, which the cap already bounds) are never signalled. None found, or no
 # answer from lsof (not installed, or past its bound), stops nothing, and an absent
 # answer is reported as unknown, never as none found. It never deletes, truncates or
 # rewrites a file.
@@ -33,8 +34,8 @@
 # and driving its endpoint; it has no verb for one process id, and the writer is a
 # lane's harness process that need not belong to the task whose log it filled. The
 # one-process stop therefore lives here, guarded the same way: the pid must still
-# be the process lsof named, must not be this process, one of its ancestors or the
-# firstmate session, and is checked again just before the signal.
+# be the process lsof named, must not be this process, one of its ancestors, the
+# firstmate session or a capped append, and is checked again just before the signal.
 #
 # mark records that the watcher durably queued the wake for <path> at <identity>
 # when the file was <size> bytes, so the file wakes again only after it grows by more
@@ -137,8 +138,8 @@ file_size() {  # <file>
 }
 
 # Stop pid with SIGSTOP when it is still the process found earlier. Prints the
-# action text. Never signals this process, an ancestor, the firstmate session, or
-# pid 1 and below.
+# action text. Never signals this process, an ancestor, the firstmate session, a
+# capped append, or pid 1 and below.
 stop_writer() {  # <pid> <name> <start>
   local pid=$1 name=$2 start=$3 firstmate
   case "$pid" in ''|*[!0-9]*) printf 'stopped nothing: unusable pid'; return 1 ;; esac
@@ -153,6 +154,10 @@ stop_writer() {  # <pid> <name> <start>
   fi
   if [ "$(process_name "$pid")" != "$name" ] || [ "$(process_start "$pid")" != "$start" ]; then
     printf 'stopped nothing: pid %s changed or exited before it could be stopped' "$pid"
+    return 1
+  fi
+  if fm_status_is_capped_append "$pid"; then
+    printf 'stopped nothing: pid %s is the capped append, which the cap bounds' "$pid"
     return 1
   fi
   if kill -STOP "$pid" 2>/dev/null; then

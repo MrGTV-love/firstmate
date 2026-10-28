@@ -19,8 +19,10 @@
 # repeated by a loop is written like any other until the cap refuses it. A log
 # already past cap plus reserve refuses every line, terminal ones included, and each
 # refusal names the file on stderr. It never deletes, truncates or rewrites an
-# existing event line. Exit status: 0 when every line was appended, 75 when one was
-# refused at the cap, 2 for a malformed call, 1 for any other failure.
+# existing event line. It waits at most 10 s for the log's lock, so a writer stopped
+# while it held the lock cannot hang it. Exit status: 0 when every line was appended,
+# 75 when one was refused at the cap or the lock stayed held past that wait, 2 for a
+# malformed call, 1 for any other failure.
 #
 # tests/fm-status-runaway-guard.test.sh is the regression entry point.
 set -u

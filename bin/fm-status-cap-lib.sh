@@ -178,13 +178,21 @@ fm_status_read_exact() {  # <status-file> <start-offset> <byte-length> [<max-lin
 #             bracket, trimmed, with a correlation token after the first word dropped.
 #   frame     a log whose last byte is not a newline gets one first, so a torn
 #             foreign write cannot glue itself onto a new event.
+# The lock is taken without blocking and retried every 10 ms for at most 10 s. A
+# holder that keeps it longer (a writer stopped while it held it) refuses the call
+# with exit 75, said on stderr naming the file, and nothing is written; no writer
+# waits on the lock without end.
+# measured: value=10 date=2026-10-27 host=Mac-Studio.local margin=4.6 (one call appending a full cap and reserve of 100-byte lines held the lock 2.15 s)
 # stdout stays empty: the exit status and stderr are the whole contract. A repeated
 # line is written like any other; the cap is what stops a loop, and it stops it
-# loudly.
+# loudly. The program's first line is a marker comment, so the watcher guard can tell
+# a running capped append from any other writer (fm_status_is_capped_append).
+_FM_STATUS_APPEND_MARKER='fm-status-capped-append'
 IFS= read -r -d '' _FM_STATUS_APPEND_PERL <<'PERL' || :
 use strict;
 use warnings;
 use Fcntl qw(:DEFAULT :flock);
+use Time::HiRes qw(time sleep);
 
 my ($path, $cap, $reserve, $reserve_verbs, @lines) = @ARGV;
 if (!@lines) { @lines = map { chomp; $_ } <STDIN>; }
@@ -210,7 +218,16 @@ sub ends_with_newline {
 
 sysopen(my $fh, $path, O_RDWR | O_APPEND | O_CREAT | O_NOFOLLOW, 0644)
     or do { print STDERR "fm-status-append: cannot open $path: $!\n"; exit 1 };
-flock($fh, LOCK_EX) or do { print STDERR "fm-status-append: cannot lock $path: $!\n"; exit 1 };
+my $lock_secs = 10;
+my $lock_deadline = time + $lock_secs;
+until (flock($fh, LOCK_EX | LOCK_NB)) {
+    ($!{EWOULDBLOCK} || $!{EAGAIN}) or do { print STDERR "fm-status-append: cannot lock $path: $!\n"; exit 1 };
+    if (time >= $lock_deadline) {
+        print STDERR "fm-status-append: refused: $path stayed locked by another writer for $lock_secs s; nothing was written\n";
+        exit 75;
+    }
+    sleep 0.01;
+}
 
 my $rc = 0;
 for my $line (@lines) {
@@ -230,6 +247,20 @@ for my $line (@lines) {
 close($fh);
 exit $rc;
 PERL
+_FM_STATUS_APPEND_PERL="# $_FM_STATUS_APPEND_MARKER"$'\n'"$_FM_STATUS_APPEND_PERL"
+
+# 0 when <pid> is running the capped append above: a perl process whose arguments
+# start with `-e` and the program's marker line. It is read from the process's own
+# arguments, never from its name alone. The capped append is bounded by the cap, so
+# the watcher guard never stops it.
+fm_status_is_capped_append() {  # <pid>
+  local __fm_ca_comm __fm_ca_args __fm_ca_re="^[[:space:]]*([^[:space:]]*/)?perl[^[:space:]/]* -e # $_FM_STATUS_APPEND_MARKER"
+  __fm_ca_comm=$(ps -p "$1" -o comm= 2>/dev/null) || return 1
+  __fm_ca_comm=${__fm_ca_comm%"${__fm_ca_comm##*[![:space:]]}"}
+  case "${__fm_ca_comm##*/}" in perl|perl[0-9]*) ;; *) return 1 ;; esac
+  __fm_ca_args=$(ps -ww -p "$1" -o args= 2>/dev/null) || return 1
+  [[ "$__fm_ca_args" =~ $__fm_ca_re ]]
+}
 
 # The verbs whose line may use the reserve, space-separated, into <out-var>.
 _fm_status_reserve_verbs() {  # <out-var>
@@ -238,7 +269,8 @@ _fm_status_reserve_verbs() {  # <out-var>
 
 # Append <line>... to <status-file> through the cap above. Each line is one status
 # event without its newline. Returns 0 when every line was appended, 75 when a line
-# was refused at the cap (stderr names the file), 1 on any other failure.
+# was refused at the cap or the log stayed locked past the lock bound (stderr names
+# the file), 1 on any other failure.
 fm_status_append_lines() {  # <status-file> <line>...
   local file=$1 cap reserve verbs
   shift

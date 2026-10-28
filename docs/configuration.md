@@ -1238,6 +1238,8 @@ A line the loop repeats is written like any other until the cap refuses it, so a
 Only a decision or terminal line may use the reserve: one whose verb is `needs-decision`, `blocked`, `done` or `failed`, or the resolve, paused or captain-held verb (`resolved`, `paused` and `captain-held` unless configured), read as the status readers read a verb.
 Every other line stops at the cap, `working:`, `note:` and a line with no verb such as the incident's `text` included, so a loop through the helper cannot use up the reserve and a worker at the cap can still report `done:` or `blocked:`.
 A log already past the cap plus the reserve, such as the three incident logs left in place, refuses every line with exit status 75, terminal lines included, and each refusal names the file on stderr.
+The helper takes the log's lock without blocking and retries it for at most 10 s, about 4.6 times the 2.15 s one call appending a full cap and reserve held it on 2026-10-27.
+When the lock stays held longer, for example by a writer stopped while it held it, the call is refused with exit status 75, the refusal names the file on stderr, and nothing is written, so no sanctioned writer waits on the lock without end.
 A burst of distinct events is never dropped below the cap.
 A remote or secondmate clone must run the current Firstmate release before its workers use the guarded append: on an older clone the charter's status command fails with `No such file or directory` (exit 127) because `bin/fm-status-append.sh` is not there, and the worker's replies never reach the parent's status log.
 The writer never deletes, truncates or rewrites an event line.
@@ -1254,6 +1256,7 @@ Each poll costs one stat over every `state/*.status` and the per-task cursor, le
 When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it and the watcher raises a `check: status-log-over-cap` wake naming the file, its size, its growth rate and the writer process found by `lsof`.
 Every process `lsof` lists as holding the log open for writing is stopped with `SIGSTOP`, whatever its name: the incident's omp process, or a raw `>>` loop in a `bash`, `sh` or `zsh` child. `kill -CONT <pid>` undoes it.
 The guard first checks that the process is still the one `lsof` named, and never signals itself, one of its ancestors (the watcher that ran it) or the firstmate session named on line 1 of `state/.lock`.
+It never stops a running capped append either: the guard proves one from the process's own arguments (a `perl -e` program whose first line is the helper's marker), never from its name alone, and the cap already bounds it.
 A process that only reads the log is not listed, so it is never stopped, and a log with no writer found is named and nothing is stopped.
 When `lsof` is not installed, or does not finish inside its 10 s bound, the wake says `writer=unknown (lsof not available)` or `writer=unknown (lsof timed out)` instead of `none found`, and nothing is stopped: `none found` means `lsof` ran and listed no process.
 The writer of 2026-10-18 was one `printf` whose format has no conversion and that has an extra argument, which the harness shell re-applied without end: it opened the log once and held it for its whole run.
