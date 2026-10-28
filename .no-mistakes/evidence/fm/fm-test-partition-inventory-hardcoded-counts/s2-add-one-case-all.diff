@@ -1,0 +1,79 @@
+diff --git a/tests/fm-control-relaunch-backends.test.sh b/tests/fm-control-relaunch-backends.test.sh
+index 746d4f19d..133156247 100644
+--- a/tests/fm-control-relaunch-backends.test.sh
++++ b/tests/fm-control-relaunch-backends.test.sh
+@@ -2115,7 +2115,10 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
+   pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
+ }
+ 
++test_new_relaunch_case() { pass "test_new_relaunch_case"; }
++
+ control_relaunch_test_cases=(
++  test_new_relaunch_case
+ test_omp_adoption
+ test_bounded_reboot_recovery_rotates_unmanaged_inspections_without_mutation
+ test_bounded_reboot_recovery_notifies_each_unmanaged_identity_once
+diff --git a/tests/fm-lint-slots.test.sh b/tests/fm-lint-slots.test.sh
+index 9388d95a4..90e6cfd05 100644
+--- a/tests/fm-lint-slots.test.sh
++++ b/tests/fm-lint-slots.test.sh
+@@ -1881,7 +1881,10 @@ test_resident_watch_gives_up_after_three_failed_restarts() {
+   pass "three failed replacement readers in a row give the reader up as restarts-failed"
+ }
+ 
++test_new_lint_case() { pass "test_new_lint_case"; }
++
+ fm_lint_test_cases=(
++  test_new_lint_case
+ test_jobs_are_deterministic_and_complete
+ test_host_slots_bound_concurrent_runs
+ test_oversubscribed_runs_share_the_cap_and_all_finish
+diff --git a/tests/fm-pr-merge-checks.test.sh b/tests/fm-pr-merge-checks.test.sh
+index 22f356fdb..5b671ac63 100644
+--- a/tests/fm-pr-merge-checks.test.sh
++++ b/tests/fm-pr-merge-checks.test.sh
+@@ -1748,7 +1748,10 @@ test_github_review_required_refuses() {
+   pass "fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED"
+ }
+ 
++test_new_pr_merge_case() { pass "test_new_pr_merge_case"; }
++
+ pr_merge_test_cases=(
++  test_new_pr_merge_case
+ test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
+ test_single_pr_task_with_a_local_only_head_is_still_refused
+ test_multi_pr_task_without_a_reported_forge_head_is_still_refused
+diff --git a/tests/fm-teardown-cleanup.test.sh b/tests/fm-teardown-cleanup.test.sh
+index ff42a79a3..5a216cf10 100755
+--- a/tests/fm-teardown-cleanup.test.sh
++++ b/tests/fm-teardown-cleanup.test.sh
+@@ -6036,7 +6036,10 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
+   pass "a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place"
+ }
+ 
++test_new_teardown_case() { pass "test_new_teardown_case"; }
++
+ teardown_test_cases=(
++test_new_teardown_case
+ test_teardown_never_holds_up_a_steer_to_another_task
+ test_lane_registry_scan_reads_each_distinct_registry_once
+ test_task_teardown_preserves_another_homes_abandoned_worker
+diff --git a/tests/fm-watch-triage-helpers.sh b/tests/fm-watch-triage-helpers.sh
+index fc3e579d5..c8ca3d0be 100755
+--- a/tests/fm-watch-triage-helpers.sh
++++ b/tests/fm-watch-triage-helpers.sh
+@@ -8342,3 +8342,5 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
+   exit 0
+ fi
+ 
++
++test_new_triage_case() { pass test_new_triage_case; }
+diff --git a/tests/fm-watch-triage-waits-away.test.sh b/tests/fm-watch-triage-waits-away.test.sh
+index 8885d551d..d8ba60989 100644
+--- a/tests/fm-watch-triage-waits-away.test.sh
++++ b/tests/fm-watch-triage-waits-away.test.sh
+@@ -17,3 +17,4 @@ test_live_captain_held_first_sight_silenced_by_away_record
+ test_backlog_hold_never_rechecked_while_away_record_exists
+ test_afk_one_shot_never_hands_off_captain_held_under_away_record
+ test_captain_held_rechecked_under_a_quiet_record
++test_new_triage_case

@@ -1,0 +1,26 @@
+== head checker: H1 fm-pr-merge-checks: test_cases defined but its registration line deleted
+exit=0
+== head checker: H2 fm-lint-slots: test_ghost_case registered but never defined
+not ok - the fm-lint groups do not partition their suite: tests/fm-lint-slots.test.sh registers test_ghost_case but does not define it;tests/fm-lint-slots.test.sh registers test_ghost_case but does not define it;registered in more than one group: test_ghost_case 
+exit=1
+== head checker: H3 teardown: test_local_only_fork_remote_allows (from fm-teardown) also registered in fm-teardown-pool
+not ok - the teardown groups do not partition their suite: tests/fm-teardown-pool.test.sh registers test_local_only_fork_remote_allows but does not define it;registered in more than one group: test_local_only_fork_remote_allows 
+exit=1
+== head checker: H4 fm-teardown-cleanup: test_local_only_force_overrides_unpushed defined a second time in the same file
+not ok - the teardown groups do not partition their suite: tests/fm-teardown-cleanup.test.sh defines test_local_only_force_overrides_unpushed twice
+exit=1
+== head checker: H5 fm-control-relaunch-backends (nested mode): test_orphan_relaunch_case defined, nothing runs it
+not ok - the control-relaunch groups do not partition their suite: tests/fm-control-relaunch-backends.test.sh defines test_orphan_relaunch_case but does not register it
+exit=1
+== head checker: H6 watch-triage: call to helper case test_afk_paused_changed_pane_hands_off_plain_stale deleted from fm-watch-triage-waits-away
+not ok - the watch-triage groups do not partition their suite: tests/fm-watch-triage-helpers.sh defines test_afk_paused_changed_pane_hands_off_plain_stale but no listed script calls it
+exit=1
+== head checker: H7 watch-triage: helper case test_afk_paused_changed_pane_hands_off_plain_stale also called from fm-watch-triage-waits-pauses
+not ok - the watch-triage groups do not partition their suite: registered in more than one group: test_afk_paused_changed_pane_hands_off_plain_stale 
+exit=1
+== head checker: H8 an unlisted tests/fm-pr-merge-stray.test.sh declares the pr_merge_test_cases registry
+not ok - the fm-pr-merge groups do not partition their suite: tests/fm-pr-merge-stray.test.sh uses the same suite but is not a listed group
+exit=1
+== head checker: H9 fm-pr-merge-forges: a '<<EOF' in a comment, then an unregistered case after it
+not ok - the fm-pr-merge groups do not partition their suite: tests/fm-pr-merge-forges.test.sh:1315: heredoc <<EOF never closes, so the rest of the file is unjudged
+exit=1

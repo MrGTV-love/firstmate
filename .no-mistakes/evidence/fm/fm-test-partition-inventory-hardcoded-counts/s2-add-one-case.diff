@@ -1,0 +1,24 @@
+diff --git a/tests/fm-pr-merge-checks.test.sh b/tests/fm-pr-merge-checks.test.sh
+index 22f356fdb..5b671ac63 100644
+--- a/tests/fm-pr-merge-checks.test.sh
++++ b/tests/fm-pr-merge-checks.test.sh
+@@ -1748,7 +1748,10 @@ test_github_review_required_refuses() {
+   pass "fm-pr-merge refuses a PR whose reviewDecision is REVIEW_REQUIRED"
+ }
+ 
++test_new_pr_merge_case() { pass "test_new_pr_merge_case"; }
++
+ pr_merge_test_cases=(
++  test_new_pr_merge_case
+ test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
+ test_single_pr_task_with_a_local_only_head_is_still_refused
+ test_multi_pr_task_without_a_reported_forge_head_is_still_refused
+diff --git a/tests/fm-watch-triage-waits-away.test.sh b/tests/fm-watch-triage-waits-away.test.sh
+index 8885d551d..d8ba60989 100644
+--- a/tests/fm-watch-triage-waits-away.test.sh
++++ b/tests/fm-watch-triage-waits-away.test.sh
+@@ -17,3 +17,4 @@ test_live_captain_held_first_sight_silenced_by_away_record
+ test_backlog_hold_never_rechecked_while_away_record_exists
+ test_afk_one_shot_never_hands_off_captain_held_under_away_record
+ test_captain_held_rechecked_under_a_quiet_record
++test_new_triage_case

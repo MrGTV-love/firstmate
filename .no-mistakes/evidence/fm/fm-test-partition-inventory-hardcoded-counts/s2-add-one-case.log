@@ -1,0 +1,14 @@
+== base checker: one new registered case added to each split suite, no other edit
+not ok - the teardown groups register 341 cases, not the 340-case inventory they partition
+not ok - the control-relaunch groups register 161 cases, not the 160-case inventory they partition
+not ok - the watch-triage-waits groups call 68 cases, not the 67-case inventory they partition
+not ok - the fm-pr-merge groups register 159 cases, not the 158-case inventory they partition
+not ok - the fm-lint groups register 85 cases, not the 84-case inventory they partition
+exit=1
+== head checker: one new registered case added to each split suite, no other edit
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the watch-triage scripts call each helper-defined case exactly once
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
