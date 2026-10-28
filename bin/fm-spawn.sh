@@ -100,6 +100,19 @@
 #   kind and project or home come from the task's validated state/<id>.meta,
 #   so --backend, --scout, --secondmate, a project positional, and batch pairs
 #   are refused. Harness, model, and effort may change explicitly.
+#   Every launch appends its exact model (or default) as a tab-separated
+#   <spawn_gen> <prior spawn_gen> <model> line to state/<id>.launch-models under
+#   the task metadata lock, before publishing replacement metadata. A fresh
+#   spawn leaves the prior field empty; relaunch names the replaced spawn_gen and
+#   also appends the prior meta model under the new spawn_gen. An omp launch
+#   also appends each native fallback model of its state/<id>.omp-fallback.yml
+#   chain under the same spawn_gen, because the session can switch to it without
+#   a relaunch; the worker-owned live-model record is never author evidence.
+#   History is never truncated or unwound on launch failure.
+#   fm-review-record.py counts only the lines reached from the current meta's
+#   spawn_gen through prior links, so a reused task id never inherits an
+#   earlier incarnation's authors. A confined
+#   worker cannot write this history; fm-write-confinement.py denies it.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
 #   or herdr), and clears the previous harness's per-task wiring before arming
@@ -6399,6 +6412,7 @@ BUSY_GEN=
     fi
     ;;
   esac
+  native_fallback='[]'
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
@@ -6654,7 +6668,6 @@ EOF
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
-    native_fallback='[]'
     while IFS= read -r candidate; do
       fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
       candidate_harness=$(jq -r .harness <<<"$candidate")
@@ -7046,6 +7059,29 @@ preserve_relaunch_meta() {
   fi
 } >"$SPAWN_META_PATH" || {
   echo "error: task record for $ID could not be prepared at $SPAWN_META_PATH" >&2
+  exit 1
+}
+# Append-only author evidence shares the per-task metadata lock. Preserve the
+# prior launch before replacing legacy metadata, including failed relaunches:
+# over-attribution fails closed, while losing a prior author would widen merges.
+SPAWN_MODEL_HISTORY="$STATE/$ID.launch-models"
+if [ -L "$SPAWN_MODEL_HISTORY" ] || { [ -e "$SPAWN_MODEL_HISTORY" ] && [ ! -f "$SPAWN_MODEL_HISTORY" ]; }; then
+  echo "error: launch-model history is not an ordinary file: $SPAWN_MODEL_HISTORY" >&2
+  exit 1
+fi
+SPAWN_PRIOR_GEN=
+if [ "$RELAUNCH" -eq 1 ]; then
+  SPAWN_PRIOR_GEN=$(fm_meta_get "$RELAUNCH_META" spawn_gen)
+  SPAWN_PRIOR_MODEL=$(fm_meta_get "$RELAUNCH_META" model)
+fi
+{
+  if [ "$RELAUNCH" -eq 1 ]; then
+    printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${SPAWN_PRIOR_MODEL:-unknown}"
+  fi
+  printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${MODEL:-default}"
+  jq -r --arg gen "$SPAWN_GEN" --arg prior "$SPAWN_PRIOR_GEN" '.[] | [$gen, $prior, .model] | join("\t")' <<<"$native_fallback"
+} >> "$SPAWN_MODEL_HISTORY" || {
+  echo "error: could not append launch-model history: $SPAWN_MODEL_HISTORY" >&2
   exit 1
 }
 if [ "$RELAUNCH" -eq 0 ]; then
