@@ -1,0 +1,11 @@
+$ FM_LINT_ROOT_RSS_KIB=2097152 FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots FM_DURATION_HOME=$L/dur bin/fm-proc-budget.sh -- bin/fm-lint.sh --telemetry $E/s3-runaway.tsv $L/runaway.test.sh
+# runaway.test.sh = base-commit tests/fm-spawn-acquisition-cleanup.test.sh (no source=/dev/null directives), the file that reached 34 GB / 65 GB
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: /Users/charlesabrooker/tmp/fm-rss-lab.utvN/runaway.test.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)
+env FM_LINT_ROOT_RSS_KIB=2097152 FM_LINT_CACHE_DIR=off   bin/fm-proc-budget.s  2.00s user 0.60s system 14% cpu 18.304 total
+rc=0
+--- roots log
+begin	1	/Users/charlesabrooker/tmp/fm-rss-lab.utvN/runaway.test.sh	0	full	1793166218126
+end	1	/Users/charlesabrooker/tmp/fm-rss-lab.utvN/runaway.test.sh	0	full	1793166218126	1793166233984	15857	0	memory-fallback	2604672	0	0	21.68	20.86	libproc:15,ps:0
+00:43:56 peak_seen_by_safety_net_kib=2603136

@@ -1,0 +1,21 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+       27.89 real         1.86 user         0.49 sys
+           213008384  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              102470  page reclaims
+                 215  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                  64  signals received
+                1383  voluntary context switches
+               14196  involuntary context switches
+           233630122  instructions retired
+           175829418  cycles elapsed
+             2769304  peak memory footprint

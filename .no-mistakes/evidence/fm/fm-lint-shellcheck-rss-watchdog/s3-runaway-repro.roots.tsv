@@ -1,0 +1,19 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/zz-runaway-repro.test.sh	0	full	1793167568449
+end	1	tests/zz-runaway-repro.test.sh	0	full	1793167568449	1793167594146	25697	0	memory-fallback	3320576	0	0	18.17	17.12	libproc:25,ps:0
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	0

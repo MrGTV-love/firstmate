@@ -1,0 +1,11 @@
+$ FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots FM_DURATION_HOME=$L/dur bin/fm-proc-budget.sh -- bin/fm-lint.sh --telemetry $E/s2-long-normal.tsv bin/backends/herdr.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+/opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which: line 93: echo: write error: Broken pipe
+/opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which: line 93: echo: write error: Broken pipe
+/opt/homebrew/Cellar/pyenv/2.6.6/libexec/pyenv-which: line 93: echo: write error: Broken pipe
+env FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots FM_DURATION_HOME=$L/dur    13.71s user 1.35s system 39% cpu 37.747 total
+rc=0
+--- roots log end records
+begin	1	bin/backends/herdr.sh	0	full	1793166071945
+end	1	bin/backends/herdr.sh	0	full	1793166071945	1793166102320	30374	0	ok	2023712	1	1	17.08	30.22	libproc:0,ps:30,reader-unavailable:restarts-failed

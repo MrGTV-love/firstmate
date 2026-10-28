@@ -1,0 +1,20 @@
+$ FM_LINT_ROOT_RSS_KIB=abc bin/fm-lint.sh $L/small.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got abc.
+rc=2
+$ FM_LINT_ROOT_RSS_KIB=0 bin/fm-lint.sh $L/small.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 0.
+rc=2
+$ FM_LINT_ROOT_RSS_KIB=012 bin/fm-lint.sh $L/small.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 012.
+rc=2
+$ FM_LINT_ROOT_RSS_KIB=-5 bin/fm-lint.sh $L/small.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got -5.
+rc=2

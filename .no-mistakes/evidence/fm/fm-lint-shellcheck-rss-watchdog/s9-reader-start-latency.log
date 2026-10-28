@@ -1,0 +1,15 @@
+ 0:49  up  7:06, 4 users, load averages: 29.45 24.61 18.37
+# first-reply latency of `python3 bin/fm-proc-info.py mem-tree <pid>` started the way the watch starts it (open2), at nice 10 like lint workers; deadline in the watch is 0.5 s
+first reply 0.493s
+first reply 0.333s
+first reply 0.230s
+first reply 0.195s
+first reply 0.150s
+first reply 0.182s
+first reply 0.214s
+first reply 0.220s
+first reply 0.262s
+first reply 0.226s
+first reply 0.230s
+first reply 0.187s
+ 0:49  up  7:06, 4 users, load averages: 28.85 24.57 18.39

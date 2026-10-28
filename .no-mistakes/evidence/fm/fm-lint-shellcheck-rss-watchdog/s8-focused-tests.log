@@ -1,0 +1,13 @@
+$ bin/fm-proc-budget.sh 400 -- bash tests/fm-lint-slots.test.sh <the 9 resident-watch cases> test_memory_failure_retries_without_external_sources
+ok - memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding
+ok - a root over the resident-memory bound is ended and retried narrower with the roots log marking it
+ok - a root under the resident-memory bound, a malformed bound, and the enforced envelope behave as before
+ok - the resident-memory watch ends its command when the owner dies
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+ok - a root whose footprint crosses the bound while its resident size does not is ended and retried narrower
+ok - a reader that misses one deadline is replaced and footprint ends the root on the next tick
+ok - a replacement reader that exits before replying is retried and footprint still ends the root
+ok - three failed replacement readers in a row give the reader up as restarts-failed
+bin/fm-proc-budget.sh 400 -- bash tests/fm-lint-slots.test.sh            13.33s user 9.99s system 35% cpu 1:06.28 total
+rc=0

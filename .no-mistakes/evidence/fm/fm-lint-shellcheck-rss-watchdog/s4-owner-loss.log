@@ -1,0 +1,18 @@
+# Start the runaway lint (bound 4 GiB so it is still growing), then send TERM to fm-lint (an interrupted lint) at ~6 s.
+--- before (00:45:49): lint pid 8179, shellcheck pid 9422
+ 9416  9416   1536 /usr/bin/time -lp -o /Users/charlesabrooker/tmp/fm-lint.ezWs7b/output/root.0.1.rss /Users/c
+ 9422  9416 1291184 /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesab
+ 8179  4913   3344 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/
+ 9076  8932   9232 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+ 9158  8932  10096 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+13603  9286  15600 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistak
+ 8932  8932   3136 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT
+ 9286  9286  10448 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+fm-lint exit=143 at 00:45:49
+fm-lint ended 0.30 s after TERM; shellcheck 9422 gone 0.00 s after fm-lint ended
+--- leftovers of the lint tree:
+(none listed = clean)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+--- independent safety net
+00:45:51 peak_seen_by_safety_net_kib=1235888

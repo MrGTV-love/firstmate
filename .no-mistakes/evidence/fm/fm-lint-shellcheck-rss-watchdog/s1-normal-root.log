@@ -1,0 +1,26 @@
+$ FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots bin/fm-proc-budget.sh -- bin/fm-lint.sh --telemetry $E/s1-normal.tsv $L/small.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+env FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots bin/fm-proc-budget.sh --   1.41s user 0.43s system 80% cpu 2.301 total
+rc=0
+--- roots log
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/Users/charlesabrooker/tmp/fm-rss-lab.utvN/small.sh	0	full	1793166061912
+end	1	/Users/charlesabrooker/tmp/fm-rss-lab.utvN/small.sh	0	full	1793166061912	1793166062088	175	0	ok	20096	1	1	16.30	16.30	libproc:0,ps:0
+meta	roots_begun	1
+meta	roots_completed	1
+meta	roots_unfinished	0
+meta	result_exit	0

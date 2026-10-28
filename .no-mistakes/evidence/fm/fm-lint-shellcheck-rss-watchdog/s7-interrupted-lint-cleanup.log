@@ -1,0 +1,7 @@
+watch, reader and ShellCheck before TERM (pid pgid ppid rss command):
+88189 88189 88078  10336 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/bin/fm-lint-cache.pl rsswatch 8388608 /Users/charlesabrooker/tmp/fm-lint.iGg3Pv/output/root.0.1
+88305 88293 88293 137936 /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- bin/backends/herdr.sh
+91928 88189 88189  15664 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/bin/fm-proc-info.py mem-tree 88293
+lint rc=143 (TERM)
+still alive after TERM: [] checked at +.61 s
+any watch/reader/herdr ShellCheck left on host: []

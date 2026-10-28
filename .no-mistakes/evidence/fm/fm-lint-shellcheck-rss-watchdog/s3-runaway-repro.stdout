@@ -1,0 +1,1 @@
+fm-lint: tests/zz-runaway-repro.test.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback passed with cross-file codes excluded (SC1091,SC2034,SC2153,SC2329)

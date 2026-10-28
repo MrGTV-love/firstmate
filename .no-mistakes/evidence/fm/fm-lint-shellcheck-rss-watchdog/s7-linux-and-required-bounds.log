@@ -1,0 +1,38 @@
+# A: uname reports Linux (PATH shim; only bare `uname` is faked). The watch must not wrap the root: roots-log last column = none.
+$ PATH=$L/linuxbin:$PATH FM_LINT_ROOT_RSS_KIB=1024 bin/fm-lint.sh --telemetry $L/lx.tsv $L/sleepy.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+/usr/bin/time: illegal option -- f
+usage: time [-al] [-h | -p] [-o file] utility [argument ...]
+/usr/bin/time: illegal option -- f
+usage: time [-al] [-h | -p] [-o file] utility [argument ...]
+fm-lint.sh: worker produced no result for shard 0.
+fm-lint.sh: worker produced no result for shard 1.
+awk: can't open file /Users/charlesabrooker/tmp/fm-lint.oZggIc/timing.*
+ source line number 7
+rc=2
+
+# Control: same 1 MiB bound on real Darwin uname -> the watch ends the root and it takes the narrower retry.
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: end bin/backends/herdr.sh reason=memory rc=98 duration_ms=2814 rss_kib=249392
+fm-lint: bin/backends/herdr.sh hit the memory ceiling with --external-sources (reason=memory rc=98); retried without it; fallback reason=memory rc=98
+fm-lint: root exceeded the 1024 KiB resident-memory bound (FM_LINT_ROOT_RSS_KIB) at 249392 KiB; ended
+rc=98
+end	1	bin/backends/herdr.sh	0	full	1793166413542	1793166416362	2814	98	memory	249392	0	1	20.47	20.83	libproc:2,ps:0
+
+# B: FM_LINT_REQUIRE_BOUNDS=1 on macOS, base commit vs this change (must be identical)
+## base
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+rc=2
+## head
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: bounds required but per-root memory limit FM_LINT_ROOT_MEMORY_KIB=12582912 KiB is not enforceable on this host (ulimit -v).
+fm-lint.sh: refusing to lint uncapped under FM_LINT_REQUIRE_BOUNDS=1.
+rc=2
+## diff base vs head:
+(identical)

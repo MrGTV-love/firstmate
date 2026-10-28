@@ -1,0 +1,22 @@
+# Start the runaway lint (bound 4 GiB so it is still growing), then KILL the worker group that owns the watch, then fm-lint itself (the KILL sweep) at ~6 s.
+--- before (00:46:13): lint pid 97325, shellcheck pid 99401
+97325 93141   3344 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT0052/
+99134 98696  10160 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+98696 98696   3136 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4MJFTT
+99303 99303  10592 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+98951 98696   8944 /usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60AEWRSA6M1SD4M
+99401 99382  83680 /Users/charlesabrooker/.local/bin/shellcheck --norc --external-sources -- /Users/charlesabr
+99382 99382   1536 /usr/bin/time -lp -o /Users/charlesabrooker/tmp/fm-lint.gESVmI/output/root.0.1.rss /Users/c
+KILL worker group 98696
+98696 (holds gate owner 99134
+98951), then KILL fm-lint 97325
+/Users/charlesabrooker/tmp/fm-rss-lab.utvN/s5.sh: line 13: kill: (98696) - No such process
+/Users/charlesabrooker/tmp/fm-rss-lab.utvN/s5.sh: line 14: 97325 Killed: 9               env FM_LINT_ROOT_RSS_KIB=4194304 FM_LINT_CACHE_DIR=off FM_LINT_SLOT_DIR=$L/slots FM_DURATION_HOME=$L/dur bin/fm-proc-budget.sh -- bin/fm-lint.sh "$L/runaway.test.sh" > "$L/s4.out" 2>&1
+fm-lint exit=137 at 00:46:14
+fm-lint ended 0.34 s after TERM; shellcheck 99401 gone 0.34 s after fm-lint ended
+--- leftovers of the lint tree:
+(none listed = clean)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+--- independent safety net
+00:46:16 peak_seen_by_safety_net_kib=83680

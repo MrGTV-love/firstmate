@@ -1,0 +1,21 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	bin/backends/herdr.sh	0	full	1793167515609
+begin	2	tests/fm-spawn-acquisition-cleanup.test.sh	1	full	1793167515609
+end	2	tests/fm-spawn-acquisition-cleanup.test.sh	1	full	1793167515609	1793167530586	14977	0	ok	1434896	1	1	16.23	18.26	libproc:14,ps:0
+end	1	bin/backends/herdr.sh	0	full	1793167515609	1793167535486	19877	0	ok	2023712	1	1	16.23	17.84	libproc:19,ps:0
+meta	roots_begun	2
+meta	roots_completed	2
+meta	roots_unfinished	0
+meta	result_exit	0

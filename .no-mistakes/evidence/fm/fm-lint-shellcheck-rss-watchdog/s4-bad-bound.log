@@ -1,0 +1,5 @@
+FM_LINT_ROOT_RSS_KIB=0 -> fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 0.  rc=2
+FM_LINT_ROOT_RSS_KIB=08 -> fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got 08.  rc=2
+FM_LINT_ROOT_RSS_KIB=abc -> fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got abc.  rc=2
+FM_LINT_ROOT_RSS_KIB=-5 -> fm-lint.sh: FM_LINT_ROOT_RSS_KIB must be a positive integer, got -5.  rc=2
+FM_LINT_ROOT_RSS_KIB='' ->  rc=0
