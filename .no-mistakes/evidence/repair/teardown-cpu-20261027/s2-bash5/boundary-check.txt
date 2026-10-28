@@ -1,0 +1,9 @@
+instrumentation_errors 0 []
+product_invocations 15
+last_mark ('test_docker_all_failure_channels_retain_forced_tasks_until_retry', 'docker.end') 7
+last_mark ('test_docker_all_failure_channels_retain_forced_tasks_until_retry', 'docker.start') 7
+last_mark ('test_local_only_force_overrides_unpushed', 'docker.end') 1
+envelope backend.end->guard.end n=15 cpu_s_sum=4.490 wall_s_sum=8.179 min_cpu=0.2900
+envelope guard.end->routing.end n=15 cpu_s_sum=0.970 wall_s_sum=2.210 min_cpu=0.0600
+envelope routing.end->safety.start n=15 cpu_s_sum=1.360 wall_s_sum=3.063 min_cpu=0.0800
+violations none

@@ -1,0 +1,6 @@
+tmp=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/nm-s4-ss.nVoKrl5oEm
+a820bfbce4ecfe886201403335f202f74e654cbb
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+Wed Oct 28 17:34:39 UTC 2026
+suite_exit=0 wall_s=516
+tmp_left:

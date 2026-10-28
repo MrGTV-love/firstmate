@@ -1,0 +1,31 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.XuOJa6
+== A-no-instrumentation
+wrapper_pid=64140 helper_pid=unset child=unset
+exit=1
+marks:
+stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuOJa6
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.XuOJa6/state/task-nosuch.meta
+== B-mismatched-helper-pid
+wrapper_pid=66521 helper_pid=999999 child=1
+exit=1
+marks:
+stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuOJa6
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.XuOJa6/state/task-nosuch.meta
+== C-matched-helper-pid
+wrapper_pid=68208 helper_pid=68208 child=1
+exit=1
+marks:
+phase|product|68228|68208|entry|
+phase|product|68228|68208|startup.end|
+stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuOJa6
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.XuOJa6/state/task-nosuch.meta
+== D-matched-but-child-flag-0
+wrapper_pid=69982 helper_pid=69982 child=0
+exit=1
+marks:
+stderr:
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuOJa6
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.XuOJa6/state/task-nosuch.meta

@@ -1,0 +1,10 @@
+tmp=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/nm-s2-bash5.3ELsVarTFU
+a820bfbce4ecfe886201403335f202f74e654cbb
+/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61RFQFAZF1914JA37Q4DBBK/.nm-test-scratch/bash-build/inst/bin/bash
+GNU bash, version 5.2.37(1)-release (aarch64-apple-darwin27.0.0)
+431715839d492017e39f86a6901ee9e899115bb4c5e74ea0c9f3eabfb5a4e4e2  /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M61RFQFAZF1914JA37Q4DBBK/.nm-test-scratch/bash-build/inst/bin/bash
+b1457e94c0a8964eb808f3826806a3f4135df463f97e839d3fdd04f2ed820398  bin/fm-teardown.sh
+7826b952889ee247fb5a8a3927c12c7cd2908e4cce42552e599735da6a41b51c  tests/fm-teardown-cpu-probe.py
+07fbc3127e2080d9d6c1618513d44546c89dc21b1f0ee96fb8518db1465b3c80  tests/fm-teardown-helpers.sh
+62d1340b256c3970103c19b205864ad85dbc53ca1607e70be62d5396f571c262  tests/fm-teardown-cleanup.test.sh
+suite_exit=0

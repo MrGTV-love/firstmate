@@ -1,0 +1,2 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.XuOJa6
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-lab.XuOJa6/state/task-nosuch.meta

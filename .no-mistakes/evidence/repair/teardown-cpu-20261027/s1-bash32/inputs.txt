@@ -1,0 +1,4 @@
+tmp=/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/nm-s1-bash32.1TaNe8EIdf
+a820bfbce4ecfe886201403335f202f74e654cbb
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+suite_exit=0

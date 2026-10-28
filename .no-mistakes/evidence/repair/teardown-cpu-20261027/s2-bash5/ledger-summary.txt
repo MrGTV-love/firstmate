@@ -1,0 +1,14 @@
+target_exit {'boundaries_missing': False, 'event': 'target_exit', 'monotonic_ns': 9185487022875, 'partial_mark_bytes': 0, 'pipe_eof_observed': True, 'returncode': 0}
+phase_interval ('helper', 'cli', True, None) 15
+phase_interval ('helper', 'setup', True, None) 8
+phase_interval ('product', 'backend', True, None) 15
+phase_interval ('product', 'docker', False, 'missing_end:helper_returned_no_product_phase_end') 7
+phase_interval ('product', 'docker', True, None) 8
+phase_interval ('product', 'preflight', True, None) 15
+phase_interval ('product', 'runtime', True, None) 15
+phase_interval ('product', 'safety', True, None) 15
+phase_interval ('product', 'startup', True, None) 15
+invocation ('helper', 'not_applicable') 23
+invocation ('product', 'direct_parent_matches_open_helper') 15
+closed helper_end 23
+closed helper_returned_no_product_phase_end 15
