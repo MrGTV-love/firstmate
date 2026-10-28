@@ -2397,6 +2397,7 @@ run_owned_capture() {
   # read, without spawning a timer on each tick.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
+    [ -z "${FM_CAPTURE_TICK:-}" ] || "$FM_CAPTURE_TICK"
     if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
       progress_rc=0
       [ -z "$progress_sampled" ] \
@@ -2475,11 +2476,13 @@ watcher_capture() {  # <backend> <target> <lines> [expected-label]
 # to completion however long it takes, and only one with no progress for
 # WATCHER_STALL_BOUND is stalled. Meanwhile the main poll shell refreshes its
 # beacon through run_owned_capture, including a slow span reader or decision
-# fold. A failed/stalled read remains unclassified and surfaces conservatively
-# instead of committing a partial endpoint.
-watcher_status_span_output() {  # <file> <offset> [tick-command]
+# fold, and runs the optional <tick-command> (status_cap_span_tick) in its own
+# shell, so a writer that passes the cap during a long read is stopped and woken
+# for within a poll. A failed/stalled read remains unclassified and surfaces
+# conservatively instead of committing a partial endpoint.
+watcher_status_span_output() {
   local span_record='' span_needs=0 span_rc
-  status_span_first_actionable_record "$1" "$2" span_record span_needs "${3-}"
+  status_span_first_actionable_record "$1" "$2" span_record span_needs
   span_rc=$?
   printf '%s\n%s\n.' "$span_needs" "$span_record"
   return "$span_rc"
@@ -2506,11 +2509,11 @@ watcher_status_span() {  # <file> <offset> <record-out> [needs-decision-out] [ti
   printf -v "$3" '%s' ''
   [ -z "${4-}" ] || printf -v "$4" '%s' 0
   if watcher_status_span_idle "$1" "$2"; then
-    status_span_first_actionable_record "$1" "$2" "$3" "${4-}" "${5-}"
+    status_span_first_actionable_record "$1" "$2" "$3" "${4-}"
     return
   fi
   FM_STATUS_CAPTURE_SCRATCH="$(_fm_status_span_scratch "$1").span"
-  FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" "${5-}" \
+  FM_CAPTURE_TICK=${5-} FM_CAPTURE_PROGRESS=1 run_owned_capture "$WATCHER_STALL_BOUND" 0 discard watcher_status_span_output "$1" "$2" \
     || { watcher_status_span_cleanup; return 2; }
   span_rc=$FM_CHECK_STATUS
   watcher_status_span_cleanup
@@ -2907,6 +2910,8 @@ EOF
 # (the status-event library's scans) it only stops the writer and hands its growth rate on, and
 # the wake follows at the watcher's next tick (status_cap_tick). The stale loop ticks in
 # its own shell at each window, so a captured read ticks only when it alone outlasts a poll.
+# The signal and heartbeat walks run in an owned capture, and the watcher's shell ticks
+# while it waits on them (watcher_status_span).
 # It does nothing while this watcher holds the wake-queue lock (procevent_surface_queued),
 # because the stop appends a row under that same lock.
 status_cap_span_tick() {
@@ -3540,6 +3545,11 @@ signal_phase_note_queued() {
 }
 
 watch_before_wake() {
+  # A wake from a tick inside an owned capture's wait ends that capture first, so the
+  # flush below and the exit never nest a capture in it or leave its group running.
+  fm_active_check_stop || exit 1
+  fm_check_output_cleanup
+  watcher_status_span_cleanup
   [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ] || status_cap_tick
   case "$1" in
     signal:*) ;;
