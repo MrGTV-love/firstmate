@@ -491,10 +491,12 @@ fm_nm_run_is_parked() {  # <toon-output>
 # actively working (pending, running, fixing, or ci), not parked at a gate.
 # Read-only current-state reporting (fm-crew-state.sh) treats an executing run
 # on the task's own branch as authoritative REGARDLESS of head: the rebase step
-# merges newer main into the branch, CI merge-conflict repair can still rewrite
-# its history, and fix rounds commit in the pipeline's own checkout, so a live
-# run's head routinely differs from the task worktree's local head, and falling
-# back to an older run that matches the local head reads a working crew as failed.
+# integrates newer main into the branch, by merge where `rebase: strategy: merge`
+# is set and otherwise by rewriting the submitted commits, CI merge-conflict
+# repair can still rewrite its history, and fix rounds commit in the pipeline's
+# own checkout, so a live run's head routinely differs from the task worktree's
+# local head, and falling back to an older run that matches the local head reads
+# a working crew as failed.
 # A run parked at a gate keeps the strict head rule, and no destructive caller
 # uses this predicate: teardown stays on fm_nm_head_matches_worktree and the
 # ledger rule below.

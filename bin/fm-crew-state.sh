@@ -73,9 +73,11 @@
 #      neither is the overview table's narrower status column)
 #      is authoritative REGARDLESS of head (fm_nm_run_is_executing in
 #      bin/fm-nm-run-lib.sh) as long as an explicit probe has not ANSWERED that
-#      the daemon is down (nm_daemon_answered_down): the rebase step merges
-#      newer main into the branch, CI merge-conflict repair can still rewrite
-#      its history, and fix rounds commit in the pipeline's own checkout, so a
+#      the daemon is down (nm_daemon_answered_down): the rebase step
+#      integrates newer main into the branch, by merge where
+#      `rebase: strategy: merge` is set and otherwise by rewriting the submitted
+#      commits, CI merge-conflict repair can still rewrite its history, and fix
+#      rounds commit in the pipeline's own checkout, so a
 #      live run's head routinely differs from the local head, and reading an
 #      older run that still matches the local head would report a working crew
 #      as failed - but

@@ -52,7 +52,7 @@ Run every git command directly, never inside a script, alias, subshell, or other
 4. Run `git reset --keep refs/heads/archive/<task>-pipeline-<P8>` to adopt P.
    Then `git range-diff` the submitted commits against the new head and report any submitted commit that is missing.
    For a Gerrit run whose outcome is passed, passed-with-skips, or passed-with-override, confirm `HEAD`'s tree equals P's tree and resume the worker brief's fix-commit check and publish steps. Do not perform steps 5–6 or start another run: P is the head the passing run validated, even if `axi sync --check` offers `run_pipeline`.
-5. If `git merge-base --is-ancestor <S> HEAD` exits 0, the pipeline kept S as an ancestor: skip the replay below and step 6's range-diff, confirm `no-mistakes axi sync --check` offers `run_pipeline`, and start exactly one fresh run with the original intent.
+5. If `git merge-base --is-ancestor <S> HEAD` exits 0, the pipeline kept S as an ancestor: skip the replay below and all of step 6, confirm `no-mistakes axi sync --check` offers `run_pipeline`, and start exactly one fresh run with the original intent.
    Otherwise a fresh run refuses at the private-mirror guard until S is an ancestor of the head, because the gate's mirror branch still holds S.
    Do not record this with `git merge -s ours`: a project can forbid that merge with no allowed form.
    Replay instead, before adding any commit or merging main, so the range holds no merge commit.
