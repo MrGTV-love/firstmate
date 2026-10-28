@@ -82,12 +82,14 @@ omp can repair a missing successor automatically or through an explicit arm call
 The extension headers own the detailed [Pi generation contract](../.pi/extensions/fm-primary-pi-watch.ts) and [omp recovery and instance contract](../.omp/extensions/fm-primary-omp-watch.ts), including retirement ordering, terminal-quit handling, and stale callback behavior.
 The [instance registry contract](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns predecessor-reference release after factory handoff.
 
-omp judges arm ownership by a live owner, never by a record that an owner once existed.
+omp judges arm ownership by positive evidence, never by a record that an owner once existed.
+The primary session owns the home and its supervision wakes.
+omp's agent registry names each session in the process with its kind, and only the `main` session is the primary.
+A factory bind made while the primary session already runs, from a task or subagent helper session or from a rebind for the primary, waits: it claims the home only when a `session_start`, turn start, or arm call from the primary session reaches it.
+So a helper session never takes the home and never receives a forwarded arm or a wake, whether or not it is still live, and a rebound primary keeps the home while the instance it replaced gets nothing.
 An arm child owns the watch only while its process runs and its readiness has not failed, so a repair call that finds a dead recorded child replaces it and reports `started`, not `unchanged`.
-An instance is live from its factory bind until its session shuts down with no later `session_start`.
-A helper session that loads the extension in the same process takes the home while it lives; when its session ends the home returns to the newest other live instance (the primary) at once, and an arm call, `session_start`, or turn start on a displaced primary takes it back when its holder is not live.
-A call is forwarded only to a live holder, so a wake never goes to an ended instance.
-`home-handed-back`, `home-reclaimed`, `home-resumed`, and `arm-owner-stale` in the lifecycle log record each of these transitions.
+An arm ends at its process exit: the remaining output drains for at most `FM_WATCH_ARM_RETIRE_TIMEOUT_MS`, because `close` also waits for every descendant that holds an output pipe, and then the bounded retry and the wake delivery run without a repair call.
+`home-claimed`, `arm-owner-stale`, and a `bound-expired` record with `waited-on=arm-output-drain` in the lifecycle log record these transitions.
 
 For a lifecycle gap, inspect `state/extensions/pi-primary-watch/lifecycle.log` or `state/extensions/omp-primary-watch/lifecycle.log`.
 Pi's `successor-missing` diagnostic calls for reloading the extension in a live session; omp's `self-heal-failed` identifies a recovery failure for later repair.
@@ -95,7 +97,7 @@ The shared [lifecycle helper](../.pi/extensions/lib/fm-watch-lifecycle.ts) owns 
 These logs are evidence, not proof of a healthy arm or permission to use a retired runtime.
 
 `tests/fm-pi-watch-extension.test.sh` covers missing-successor expiry without reviving the outgoing API, live successor activation, duplicate-instance handoff, repeated binding predecessor release, and owner-marker publication failures.
-`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, return of the home from an ended helper, and a slow but progressing successor that is never dropped.
+`tests/fm-omp-harness.test.sh` covers missing-successor self-heal, shutdown followed by start without a duplicate arm, instance replacement, wake delivery after recovery, replacement of a dead arm owner, an arm whose exit is observed while a descendant holds its output pipe, a helper session that never takes the primary's home or wakes, a rebound primary that keeps the home, and a slow but progressing successor that is never dropped.
 Both suites use `tests/watch-lifecycle-expiry.mjs` for explicit shutdown child-close expiry evidence and deterministic early-callback, wall-clock-change, cancellation, and unref coverage for the shared deadline timer.
 Pi also exercises its unready-arm retirement expiry for a successor that reported failure but does not exit; `tests/fm-work-progress.test.sh` proves that a slow omp or Claude successor does not hold the wake and stays alive until readiness, and `tests/fm-pi-watch-extension.test.sh` and `tests/fm-supervision-host.test.sh` prove the same for Pi, OpenCode and the supervision host.
 

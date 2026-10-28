@@ -15,9 +15,10 @@
 // with -e, when a helper session loads it, or when a reload rebinds it). Each
 // factory bind claims the home's slot in a process-global registry, so the
 // latest bind is the current instance and every earlier one learns it was
-// superseded. The registry answers who is current, can hand the slot back
-// (claim), and can name the newest other instance that is still live (earlier);
-// each extension decides what a superseded instance does and what live means.
+// superseded. A bind may instead wait (claim: false) and take the slot later
+// through claim, once the extension has proof it should own the home. The
+// registry only answers who is current; each extension decides what a
+// superseded or waiting instance does.
 // A binding's previous slot is only for transferring predecessor state. Callers
 // release it after handoff; publish also clears it before storing an API that
 // may capture the binding, so the current slot cannot retain retired factories
@@ -79,14 +80,7 @@ export function createLifecycleLog(path: string, instance: () => number): Lifecy
 }
 
 export type WatchInstanceSlot<T> = { id: number; api: T | null };
-type WatchInstanceRegistry = {
-  nextId: number;
-  slots: Map<string, WatchInstanceSlot<unknown>>;
-  // Every bind per home, held weakly: an instance whose session is gone is
-  // collected and drops out, while a session that still lives keeps its own
-  // slot reachable through its tools. Used only to find a live earlier owner.
-  history: Map<string, WeakRef<WatchInstanceSlot<unknown>>[]>;
-};
+type WatchInstanceRegistry = { nextId: number; slots: Map<string, WatchInstanceSlot<unknown>> };
 
 export type WatchInstanceBinding<T> = {
   id: number;
@@ -94,25 +88,21 @@ export type WatchInstanceBinding<T> = {
   isCurrent: () => boolean;
   current: () => WatchInstanceSlot<T> | null;
   publish: (api: T) => void;
-  // Take the home's slot back from whichever instance holds it and return that
+  // Take the home's slot from whichever instance holds it and return that
   // displaced slot (null when this instance already held it).
   claim: () => WatchInstanceSlot<T> | null;
-  // The newest other instance whose session is still live, by the owner's own
-  // liveness answer. A dead or ended instance is never returned.
-  earlier: (isLive: (api: T) => boolean) => WatchInstanceSlot<T> | null;
 };
 
-// Claim <home>'s slot in the process-global registry named <registryKey>.
-export function bindWatchInstance<T>(registryKey: string, home: string): WatchInstanceBinding<T> {
+// Claim <home>'s slot in the process-global registry named <registryKey>, or
+// with claim false only register this instance, leaving the slot to claim().
+export function bindWatchInstance<T>(registryKey: string, home: string, options: { claim?: boolean } = {}): WatchInstanceBinding<T> {
   const holder = globalThis as typeof globalThis & Record<string, WatchInstanceRegistry | undefined>;
-  const registry = holder[registryKey] ??= { nextId: 0, slots: new Map(), history: new Map() };
+  const registry = holder[registryKey] ??= { nextId: 0, slots: new Map() };
   const slot: WatchInstanceSlot<T> = { id: ++registry.nextId, api: null };
-  const history = (registry.history.get(home) ?? []).filter((ref) => ref.deref() !== undefined);
-  history.push(new WeakRef(slot as WatchInstanceSlot<unknown>));
-  registry.history.set(home, history);
+  const claimNow = options.claim !== false;
   const binding: WatchInstanceBinding<T> = {
     id: slot.id,
-    previous: (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
+    previous: claimNow ? (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null : null,
     isCurrent: () => registry.slots.get(home) === slot,
     current: () => (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
     publish: (api: T) => {
@@ -124,15 +114,7 @@ export function bindWatchInstance<T>(registryKey: string, home: string): WatchIn
       registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
       return displaced === slot ? null : displaced;
     },
-    earlier: (isLive) => {
-      const refs = registry.history.get(home) ?? [];
-      for (let index = refs.length - 1; index >= 0; index -= 1) {
-        const other = refs[index].deref() as WatchInstanceSlot<T> | undefined;
-        if (other && other !== slot && other.api && isLive(other.api)) return other;
-      }
-      return null;
-    },
   };
-  registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
+  if (claimNow) registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
   return binding;
 }

@@ -64,21 +64,25 @@
 // instance retires its generation and its event handlers become no-ops, and
 // its arm tool and command forward to the current instance, so a session that
 // loaded this file twice still has exactly one live generation and one arm.
-// Ownership is judged by liveness, never by a record that an owner once existed:
-//   - An instance is live from its factory bind until its session shuts down
-//     with no session_start after it (a helper session that ended is not live).
-//     A superseded instance still sees its own session's events, so it keeps
-//     that answer current.
-//   - When the current instance's session ends, the home goes back to the
-//     newest other live instance (the primary a helper displaced) at once, and
-//     only with none does the ordinary self-heal run. An arm call, a
-//     session_start, or a turn start on a superseded instance takes the home back
-//     the same way when its current holder is not live; it never forwards to an
-//     ended instance. A live current holder keeps the home and the delivery.
+// Ownership is judged by positive evidence, never by a record that an owner once existed:
+//   - The primary session owns the home and its wakes. omp's agent registry
+//     names every session in this process with its kind: "main" is the
+//     primary, and a task or subagent helper session has another kind. A
+//     factory bind made while the primary session already runs (a helper
+//     session loading this file, or a rebind for the primary) does not take
+//     the home: it waits, and claims the home only when a session_start, turn
+//     start, or arm call whose context is the primary session reaches it. So a
+//     helper never retires the primary's generation, never holds the home, and
+//     never receives a forwarded arm or a wake, whether or not it is still
+//     live; its own arm call reaches the primary's instance without the
+//     helper's context. With no registry the latest bind owns the home.
 //   - An arm child counts as owned only while its process is alive and its
-//     readiness has not failed; a child whose process ended (its close held
-//     open by a descendant's pipe, for example) is replaced, and the repair
-//     call reports started, not unchanged.
+//     readiness has not failed; a child whose process ended is replaced, and
+//     the repair call reports started, not unchanged.
+//   - An arm ends at its process exit. "close" also waits for every descendant
+//     that still holds an output pipe, so after the exit the remaining output
+//     is drained for at most FM_WATCH_ARM_RETIRE_TIMEOUT_MS, and then the
+//     retry, wake delivery, and ownership paths see the end as a close.
 // .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
 // at state/extensions/omp-primary-watch/lifecycle.log.
 //
@@ -279,10 +283,39 @@ function pidAlive(pid: string): boolean {
 // not failed. The handle's exit state is authoritative: it is set when the
 // process ends, before "close" fires, and "close" waits for every descendant
 // that still holds an output pipe.
+function armChildExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
 function armChildOwnsWatch(child: ChildProcess): boolean {
-  if (child.exitCode !== null || child.signalCode !== null) return false;
+  if (armChildExited(child)) return false;
   if (child.pid === undefined || !pidAlive(String(child.pid))) return false;
   return !armUnverified.has(child);
+}
+
+type AgentSessionRef = { kind?: unknown; session?: { sessionManager?: unknown } | null };
+
+// omp's process-global agent registry (see the header); null when this omp
+// exposes none.
+function agentSessions(pi: ExtensionAPI): AgentSessionRef[] | null {
+  try {
+    const refs = (pi.pi as { AgentRegistry?: { global?: () => { list?: () => unknown } } } | undefined)
+      ?.AgentRegistry?.global?.()?.list?.();
+    return Array.isArray(refs) ? refs : null;
+  } catch {
+    return null;
+  }
+}
+
+function primarySessionRunning(pi: ExtensionAPI): boolean {
+  return agentSessions(pi)?.some((ref) => ref.kind === "main" && ref.session) ?? false;
+}
+
+// Positive proof that ctx comes from the primary session, by its identity.
+function fromPrimarySession(pi: ExtensionAPI, ctx: unknown): boolean {
+  const manager = (ctx as { sessionManager?: unknown } | null | undefined)?.sessionManager;
+  if (!manager) return false;
+  return agentSessions(pi)?.some((ref) => ref.kind === "main" && ref.session?.sessionManager === manager) ?? false;
 }
 
 // The lock records the omp process that runs the extensions, and omp loads them
@@ -760,28 +793,30 @@ process.once("exit", cleanupOnProcessExit);
 type OmpWatchInstanceApi = {
   activate: (ctx?: unknown) => Promise<ArmResult>;
   retire: () => { recovery: boolean; stopped: Promise<void>; context: unknown };
-  // Whether this instance's session has not ended (see the header).
-  live: () => boolean;
-  // Take the home back and arm for this instance's live session.
-  resume: (cause: string) => Promise<void>;
 };
 
 export default function (pi: ExtensionAPI) {
-  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state);
+  // A bind while the primary session already runs waits for proof; see the header.
+  let awaitingPrimaryProof = primarySessionRunning(pi);
+  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state, { claim: !awaitingPrimaryProof });
   const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
   lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
-  activateGeneration(generation);
-  lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  if (!awaitingPrimaryProof) {
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  }
   // The stop of the latest generation, so a self-heal never races the child
   // retirement that stop is still waiting on.
   let generationStopped: Promise<void> = Promise.resolve();
   let healTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
   let recoveryPending = false;
-  // Set at session_shutdown, cleared at session_start; see the header.
-  let sessionEnded = false;
   let latestContext: any = null;
-  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  lifecycle("factory-bind", {
+    generation: generation.id,
+    superseded: instance.previous?.id,
+    waiting: awaitingPrimaryProof ? "primary-session" : undefined,
+  });
   if (instance.previous?.api) {
     const predecessor = instance.previous.api.retire();
     generationStopped = predecessor.stopped;
@@ -844,43 +879,34 @@ export default function (pi: ExtensionAPI) {
     healTimer = timer;
   }
 
-  // Take the home back from a holder that is not live. The holder's generation
-  // and arm child are retired first; this instance's own generation was retired
-  // when it was superseded, so the next bind creates a fresh one.
-  async function reclaimHome(cause: string, ctx?: unknown): Promise<void> {
+  // A waiting instance takes the home only with proof that ctx is the primary
+  // session (see the header). The holder is retired as a factory bind retires
+  // its predecessor, and the caller binds and activates this instance.
+  function claimHomeForPrimary(cause: string, ctx: unknown): boolean {
+    if (!awaitingPrimaryProof || !fromPrimarySession(pi, ctx)) return false;
+    awaitingPrimaryProof = false;
     const displaced = instance.claim();
-    lifecycle("home-reclaimed", { cause, from: displaced?.id });
+    lifecycle("home-claimed", { cause, from: displaced?.id });
     rememberContext(ctx);
     if (displaced?.api) {
       const retired = displaced.api.retire();
-      generationStopped = Promise.all([generationStopped, retired.stopped]).then(() => {});
+      generationStopped = retired.stopped;
       void generationStopped.catch(() => {});
     }
     recoveryPending = true;
-    await generationStopped;
-    bindLiveGeneration(cause);
-    markLoaded();
+    return true;
   }
 
-  // The newest other live instance, when this instance's session has ended.
-  function liveEarlier(): ReturnType<typeof instance.earlier> {
-    return instance.earlier((api) => api.live());
-  }
-
-  // The arm tool and command. A superseded instance forwards to the current
-  // one while that one is live; a stopped generation is healed first, because
-  // the call itself proves the session is live.
+  // The arm tool and command. A superseded or waiting instance forwards to the
+  // current one; a stopped generation is healed first, because the call itself
+  // proves the session is live.
   async function armFromSession(ctx?: unknown): Promise<ArmResult> {
-    if (!instance.isCurrent()) {
+    if (!instance.isCurrent() && !claimHomeForPrimary("arm-call", ctx)) {
       const current = instance.current();
-      if (current?.api?.live()) {
-        lifecycle("arm-forwarded", { to: current.id });
-        return await current.api.activate(ctx);
-      }
-      if (!current?.api && current) return { ok: false, message: shuttingDownMessage };
-      // The call comes from a live session, so the holder that is not live must
-      // not receive it: this instance takes the home back.
-      await reclaimHome("arm-call", ctx);
+      lifecycle("arm-forwarded", { to: current?.id });
+      // A waiting instance's context is not the primary session's.
+      if (current?.api) return await current.api.activate(awaitingPrimaryProof ? undefined : ctx);
+      return { ok: false, message: shuttingDownMessage };
     }
     rememberContext(ctx);
     const stopped = generation;
@@ -1603,7 +1629,7 @@ export default function (pi: ExtensionAPI) {
           bound: `${armRetireTimeoutMs}ms`,
           actual: `${timer.elapsedMs()}ms`,
         });
-        resolveRetired(false);
+        resolveRetired(armChildExited(armChild));
       }, armRetireTimeoutMs);
       timer.unref();
       void closed.then(() => {
@@ -1782,7 +1808,7 @@ export default function (pi: ExtensionAPI) {
       stderr += chunk;
       observeEstablishedArm();
     });
-    armChild.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+    const endArm = (code: number | null, signal: NodeJS.Signals | null): void => {
       if (settled) return;
       settled = true;
       resolveClosed();
@@ -1816,7 +1842,25 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       scheduleRetry(owner, classification.message, predecessor);
+    };
+    // The arm ends at its process exit; see the header.
+    armChild.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      const drain = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "omp-watch-extension",
+          "waited-on": "arm-output-drain",
+          bound: `${armRetireTimeoutMs}ms`,
+          actual: `${drain.elapsedMs()}ms`,
+        });
+        armChild.stdout.destroy();
+        armChild.stderr.destroy();
+        endArm(code, signal);
+      }, armRetireTimeoutMs);
+      drain.unref();
+      armChild.once("close", () => drain.cancel());
     });
+    armChild.on("close", endArm);
     armChild.on("error", (error: Error) => {
       if (settled) return;
       settled = true;
@@ -1866,37 +1910,22 @@ export default function (pi: ExtensionAPI) {
     return result;
   }
 
-  // Bring the home back to this instance when it is not current and its holder
-  // is not live; a live holder keeps the home. The caller has proof this
-  // session runs (an event or an arm call from it).
-  async function resumeHome(cause: string, ctx?: unknown): Promise<void> {
-    if (sessionEnded) return;
-    if (!instance.isCurrent()) {
-      const current = instance.current();
-      if (!current?.api || current.api.live()) return;
-      await reclaimHome(cause, ctx);
-    } else {
-      rememberContext(ctx);
-      await generationStopped;
-      if (!instance.isCurrent() || sessionEnded) return;
-      bindLiveGeneration(cause);
-      markLoaded();
-    }
+  // Bind and activate this instance's generation for a session event.
+  async function bindForSession(cause: string, ctx: unknown): Promise<void> {
+    rememberContext(ctx);
+    await generationStopped;
+    if (!instance.isCurrent()) return;
+    bindLiveGeneration(cause);
+    markLoaded();
     if (lockOwnership() !== "owned") return;
-    const result = activateOwnedWatch(generation);
-    lifecycle("home-resumed", { cause, generation: generation.id, ok: result.ok });
-    if (!result.ok) surfaceFailure(generation, `watcher: FAILED - omp extension could not resume the home\n${result.message}`);
+    activateOwnedWatch(generation);
   }
 
   pi.on?.("before_agent_start", (_event, ctx) => {
     if (!instance.isCurrent()) {
-      // A turn start proves this session runs, even when session_start never
-      // reached a superseded instance.
-      sessionEnded = false;
-      void resumeHome("turn-start", ctx).catch(() => {});
-      return;
+      if (!claimHomeForPrimary("turn-start", ctx)) return;
+      void bindForSession("turn-start", ctx).catch(() => {});
     }
-    sessionEnded = false;
     sessionActivity += 1;
     rememberContext(ctx);
     markLoaded();
@@ -1926,29 +1955,16 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on?.("session_start", async (_event, ctx) => {
-    sessionEnded = false;
-    if (!instance.isCurrent()) {
-      const current = instance.current();
-      if (current?.api && !current.api.live()) {
-        await resumeHome("session_start", ctx);
-        return;
-      }
-      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+    if (!instance.isCurrent() && !claimHomeForPrimary("session_start", ctx)) {
+      lifecycle("session_start-ignored", { reason: awaitingPrimaryProof ? "not-primary-session" : "superseded-instance" });
       return;
     }
-    rememberContext(ctx);
     lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
-    await generationStopped;
-    if (!instance.isCurrent()) return;
-    bindLiveGeneration("session_start");
-    markLoaded();
-    if (lockOwnership() !== "owned") return;
-    activateOwnedWatch(generation);
+    await bindForSession("session_start", ctx);
   });
   pi.on?.("session_shutdown", async (_event, ctx) => {
     // omp carries no shutdown reason, so pending work is always persisted;
     // watcher delivery re-reads the queue on the next owning activation.
-    sessionEnded = true;
     if (!instance.isCurrent()) {
       lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
       return;
@@ -1965,15 +1981,7 @@ export default function (pi: ExtensionAPI) {
       await generationStopped;
     } finally {
       lifecycle("generation-stop", { generation: stopped.id });
-      // A session that ended hands the home to the newest other live instance
-      // (the primary a helper displaced) instead of re-arming for itself.
-      const successor = liveEarlier();
-      if (successor?.api) {
-        lifecycle("home-handed-back", { to: successor.id });
-        void successor.api.resume("handback").catch(() => {});
-      } else {
-        scheduleSelfHeal(stopped);
-      }
+      scheduleSelfHeal(stopped);
     }
   });
 
@@ -2004,8 +2012,6 @@ export default function (pi: ExtensionAPI) {
   });
 
   instance.publish({
-    live: () => !sessionEnded,
-    resume: (cause) => resumeHome(cause),
     activate: armFromSession,
     retire: () => {
       clearHealTimer();
