@@ -1503,6 +1503,8 @@ require_released_captain_hold() {
         "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       printf 'If a recorded captain ruling made the question moot, release it honestly instead: %s withdraw %s --evidence-file <file> --ruling <captain-ruling-task>\n' \
         "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      printf "If a secondmate home filed it before owners were recorded and the question was the parent firstmate's, classify it and record that decision: %s classify %s --owner parent --evidence-file <file> --reason <reason>, then %s decide %s --decision-file <parent-decision-file>\n" \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task deny --source-ok true --elapsed-ms 0 2>/dev/null
       return 1
       ;;

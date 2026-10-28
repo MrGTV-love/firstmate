@@ -622,6 +622,42 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
   pass "a classified hold reads as Main's classification in every list, and the captain can take it back"
 }
 
+# The lifecycle readers and the completion gate know the parent's decision and
+# the withdrawal: cleanup keeps a row whose parent decision is open, a scout's
+# inventory accepts both records as durable, and a withdrawal retires the
+# board's reconcile request for the call it released.
+test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records() {
+  local mate evidence decision list
+  mate=$(make_mate_home lifecycle-readers)
+  evidence="$mate/evidence.txt"
+  decision="$mate/decision.txt"
+  printf 'Moot under the ruling.\n' > "$evidence"
+  printf 'Retry once.\n' > "$decision"
+  tasks_in "$mate" add scout-a "Scout A" --kind scout --repo sample --start >/dev/null
+  write_origin_meta "$mate" scout-a
+  make_legacy_mate_hold "$mate" legacy-p "retry or fix one red check"
+  classify_as_parent "$mate" legacy-p
+  [ "$(open_status "$mate" legacy-p --any-owner)" = 0 ] || fail "the any-owner predicate missed an open parent decision"
+  [ "$(open_status "$mate" legacy-p)" = 1 ] || fail "the captain predicate counted the parent's decision"
+  make_legacy_mate_hold "$mate" legacy-w "pick the mechanism"
+  [ "$(open_status "$mate" legacy-w --any-owner)" = 0 ] || fail "the any-owner predicate missed an open captain call"
+  request_reconciles "$mate" lifecycle-board legacy-w || fail "could not record the board reconcile request"
+  assert_contains "$(run_captain "$mate" reconcile list)" "legacy-w" "the board reconcile request was not recorded"
+
+  run_captain "$mate" complete scout-a legacy-p legacy-w >/dev/null \
+    || fail "the completion gate refused an open parent decision"
+  run_captain "$mate" decide legacy-p --decision-file "$decision" >/dev/null || fail "decide failed"
+  [ "$(open_status "$mate" legacy-p --any-owner)" = 1 ] || fail "a decided call still reads as an open held decision"
+  run_captain "$mate" hold ruling-w --title "The mechanism for legacy-w" --reason "choose" --repo sample >/dev/null
+  run_captain "$mate" answer ruling-w --decision-file "$decision" >/dev/null || fail "could not record the ruling"
+  run_captain "$mate" withdraw legacy-w --evidence-file "$evidence" --ruling ruling-w >/dev/null || fail "withdraw failed"
+  list=$(run_captain "$mate" reconcile list) || fail "could not list the reconcile requests"
+  assert_not_contains "$list" "legacy-w" "the withdrawal left the board reconcile request for a released call"
+  run_captain "$mate" verify scout-a >/dev/null \
+    || fail "the completion gate refused a parent decision or a withdrawal as durable"
+  pass "the lifecycle readers and the completion gate know parent decisions and withdrawals, and a withdrawal retires its reconcile request"
+}
+
 tests=(
 test_a_mate_home_must_declare_who_owns_each_hold
 test_a_parent_owned_call_closes_on_the_parents_decision
@@ -635,5 +671,6 @@ test_the_decision_hold_shim_refuses_a_secondmate_hold_with_no_owner
 test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it
 test_a_recorded_captain_owner_is_never_reclassified
 test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse_it
+test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records
 )
 captain_hold_run_tests "$@"

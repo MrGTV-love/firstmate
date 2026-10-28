@@ -1166,14 +1166,15 @@ if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   fi
   [ "$TEARDOWN_LEGACY_PENDING" = 1 ] || TEARDOWN_META_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 fi
-# Cleanup never closes a captain call (see the header). Asked here, before any
+# Cleanup never closes a captain call or an open parent decision (see the
+# header). Asked here, before any
 # destructive step, so "cannot tell" can refuse while everything is intact.
 TEARDOWN_BACKLOG_TRANSITION=close
 if [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ]; then
   TEARDOWN_CAPTAIN_OPEN_STATUS=0
   TEARDOWN_CAPTAIN_OPEN_OUT=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
-    "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
+    "$SCRIPT_DIR/fm-captain-hold.sh" open "$ID" --any-owner 2>&1) || TEARDOWN_CAPTAIN_OPEN_STATUS=$?
   case "$TEARDOWN_CAPTAIN_OPEN_STATUS" in
     0) TEARDOWN_BACKLOG_TRANSITION=retain ;;
     1) ;;

@@ -19,8 +19,9 @@
 #   - fm_backend_agent_state is dead (pane at a shell, no agent); a missing
 #     endpoint is left to the supervisor, because fm-control relaunch cannot
 #     prove it gone on every backend
-#   - fm-captain-hold.sh open reports no open captain call (exit 1); an open
-#     call or an answer it cannot establish skips the lane
+#   - fm-captain-hold.sh open --any-owner reports no open held decision of
+#     either owner (exit 1); an open call or an answer it cannot establish
+#     skips the lane
 #   - state/<id>.control-exit does not name this busy generation
 #   - no control lock is held, and no in-progress control-relaunch journal
 #
@@ -261,7 +262,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   fi
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
-    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
+    FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" --any-owner >/dev/null 2>&1 || hold_rc=$?
     [ "$hold_rc" -eq 1 ] || return 0
   fi
   lock="$state/.control-$id.lock"

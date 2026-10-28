@@ -32,14 +32,14 @@ Only `answer` with the captain's words, an evidence-backed `reconcile close`, or
 A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
 A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
 The only parent-owned hold is a legacy hold already on record that `classify --owner parent` filed as the parent's: it is never a captain call, only `bin/fm-captain-hold.sh decide` with the parent's decision resolves it, and the captain's `answer` refuses it.
-A captain-owned hold is never released by `decide`, and no actor other than the captain's own words can release one.
+A captain-owned hold is never released by `decide`; only the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it can release one.
 
 Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
 When verified evidence establishes that all answers were already recorded elsewhere or the premise is moot, use the evidence-only reconciliation path rather than inventing new captain words.
 A merge approval uses that existing release path because approval permits the merge to proceed; cleanup closes the work only after it lands and records what shipped.
 Closing a held row at merge approval instead records completion before landing, so the backlog claims completion before the work actually ships.
 When the answer changes what a task must build, follow `worker-steering`'s mid-task ask rule to preserve the captain's words in the brief and steer the worker.
-When the captain says "later", that is an answer too: re-hold with `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --until <date>` so the item leaves the live Captain's Call and resurfaces on its date, instead of leaving a live-looking card or fabricating a closure.
+When the captain says "later", that is an answer too: re-hold with `bin/fm-captain-hold.sh hold <id> --reason "<reason>" --until <date>` (adding `--owner captain` in a secondmate home) so the item leaves the live Captain's Call and resurfaces on its date, instead of leaving a live-looking card or fabricating a closure.
 "A keyed answer resolves its matching captain-held task" is one capability with one owner, `bin/fm-captain-hold.sh answers`, and every channel that carries a captain answer feeds it the same task id and answer; a channel never maps keys to tasks, records a decision, or resolves anything itself.
 Chat already feeds it through `bin/fm-send.sh --resolve-key`, and a captured-answer source feeds it once bound with `bin/fm-captain-hold.sh bind <source-id>`; bind before arming the source, and key each structured question by the held task's id.
 An unbound source and a key that names no captain-held task both simply feed nothing: the answer is still captured and firstmate is still woken, and closing falls back to the direct command above.

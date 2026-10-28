@@ -298,6 +298,10 @@ It refuses every hold whose recorded owner is not the parent, so it cannot relea
 The merge entry points (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh`) refuse while a captain call or a parent decision is open.
 They read the second through `open --parent-owned` and name whose decision is outstanding.
 Splitting the owner therefore never lets through a merge that the single captain kind would have stopped.
+Teardown, the idle reaper, and the session-end relauncher read `open --any-owner`, so cleanup never closes a row while either decision is open.
+The investigation completion gate (`complete` and `verify`) accepts an open classified parent hold, and a newest `decided` or `withdrawn` record, live or archived, as durable states, because each is attributed and marked `Not a captain answer.`.
+An archived parent decision or withdrawal is never a ruling for `withdraw`.
+A retried `decide` or `withdraw` whose record is already written for the current hold finishes the release without writing a second record.
 
 ### Withdrawing a call that a captain ruling made moot
 
@@ -628,7 +632,8 @@ A markdown home keeps its legacy rows verbatim, so its resolution is unchanged.
 ### The `fm-decision-hold.sh` shim
 
 `bin/fm-decision-hold.sh` itself remains for one release as a thin command-mapping shim over `bin/fm-captain-hold.sh`.
-In-flight work briefed before the collapse therefore keeps working, and the shim's header owns the exact mapping.
+In-flight work briefed before the collapse therefore keeps working in a main home, and the shim's header owns the exact mapping.
+In a secondmate home a shim `hold` is refused unless it passes `--owner captain`, because the shim declares no owner for its caller.
 The shim recognizes an exact replay of a pre-collapse routed resolution by its historical answer digest and routed ids.
 It then finishes any still-recorded dependency-edge cleanup without rewriting the old decision text.
 
@@ -749,14 +754,14 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
 - The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases a gated work item with the work left open, closes a question-shaped row, closes the channel key, and replays once.
 - A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
 - `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
-  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that names the task only by its origin, a ruling reused after the task was re-held, and a missing evidence file.
+  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that does not name the hold, a ruling that names the task only by its origin, a ruling reused after the task was re-held, and a missing evidence file.
 - `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
 - `classify` moves a legacy hold to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.
   It refuses a missing record piece, any owner other than the parent, a recorded captain or parent owner, a task that is not a captain hold, a second classification, and a main home.
   A legacy hold that is the captain's is marked so by `hold --owner captain`, which keeps it an open captain call and leaves nothing for `classify` to change.
   The classified hold reads as Main's classification in the held listing, leaves Bearings and the divergence check, and the captain's re-hold with `--owner captain` takes it back and makes `decide` refuse it.
-- The retired `fm-decision-hold.sh` shim files its holds with `--owner captain` in a secondmate home unless the caller names an owner, and leaves a main home alone.
+- The retired `fm-decision-hold.sh` shim refuses a secondmate hold that names no owner or `--owner parent`, keeps `--owner captain`, and leaves a main home alone.
 - The merge gate refuses an open parent decision with a message naming the parent, proceeds after `decide`, and refuses a captain-owned hold after a `decide` attempt.
 
 ### Reconcile coverage
