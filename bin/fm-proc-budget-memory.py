@@ -104,13 +104,20 @@ class Reader:
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise SampleError("reader returned an unreadable sample") from error
 
-    def close(self):
-        self.process.kill()
-        self.process.wait()
+    def close(self, cleanup_seconds=0):
         try:
             self.process.stdin.close()
         except BrokenPipeError:
             pass
+        if cleanup_seconds:
+            # A failed supervisor sweep must not disarm the independent
+            # guardian. EOF invokes its existing TERM/KILL cleanup first.
+            try:
+                self.process.wait(cleanup_seconds)
+            except subprocess.TimeoutExpired:
+                pass
+        self.process.kill()
+        self.process.wait()
         self.process.stdout.close()
 
 
@@ -212,7 +219,7 @@ def run(limit, command):
                 except OSError as error:
                     cleanup_error = error
                 if reader is not None:
-                    reader.close()
+                    reader.close(proc.TERM_SECONDS + STARTUP_SECONDS if cleanup_error is not None else 0)
                     reader = None
 
     def outcome():
@@ -271,6 +278,7 @@ def run(limit, command):
             end_child(proc.TERM_SECONDS)
             if cleanup_error is not None:
                 reason(f"command exited; remaining command tree: {outcome()}")
+                return 125
             return status if status >= 0 else 128 - status
     except (SampleError, OSError, subprocess.SubprocessError) as error:
         if child is None:

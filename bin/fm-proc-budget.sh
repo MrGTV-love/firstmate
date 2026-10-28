@@ -31,8 +31,8 @@
 # setuid program such as ps) whose memory cannot be read is left out of the sum;
 # a 99 or 125 stderr line counts and names such members.
 # When the command itself exits, its remaining tree gets TERM, then KILL after
-# at most one second, and the wrapper exits with the command's status. A
-# command meant to leave a daemon running must not use this option. HUP, INT
+# at most one second, and successful cleanup preserves the command's status.
+# A command meant to leave a daemon running must not use this option. HUP, INT
 # and TERM that the caller ignores (nohup) stay ignored by the supervisor and
 # the command; the command gets default PIPE and XFSZ handling, because Python
 # discards an inherited ignore of those two before the supervisor can see it.
@@ -67,11 +67,13 @@
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
 # With --memory-kib, 99 is a crossed memory limit, 125 also covers a failed
-# memory sample, and a command that cannot start gets bash's own exec status
-# and message (127 or 126), as without the option. The command's own status
-# comes after its remaining tree is ended; only an untracked process (above)
-# survives it. A tree that cannot be
-# fully ended keeps that status and says so on its one stderr line.
+# memory sample or a failed cleanup after the command exits. A command that
+# cannot start gets bash's own exec status and message (127 or 126), as without
+# the option. On a failed supervisor cleanup sweep, the independent reader
+# receives EOF and finishes its bounded TERM/KILL cleanup before it is ended.
+# The command's own status comes after successful cleanup of its remaining
+# tree; only an untracked process (above) survives it. Cleanup failures are
+# reported on one stderr line, never as a successful command exit.
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it.

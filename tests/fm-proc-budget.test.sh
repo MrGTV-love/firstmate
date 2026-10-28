@@ -466,6 +466,77 @@ PY
   pass "a supervisor killed before its reader is ready leaves no command run or running"
 }
 
+test_memory_supervisor_cleanup_refusal() {
+  local fixture="$TMP_ROOT/cleanup-refusal"
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import errno
+import os
+from pathlib import Path
+import runpy
+
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ == "__main__":
+    # The independent guardian keeps using the real kernel reader.
+    runpy.run_path(real, run_name="__main__")
+else:
+    globals().update(runpy.run_path(real))
+    real_kinfo = kinfo
+
+    def kinfo(pid):
+        if Path(os.environ["FM_CLEANUP_FAULT"]).exists():
+            raise OSError(errno.EPERM, "injected supervisor kinfo refusal")
+        return real_kinfo(pid)
+PY
+  run_memory_case python3 - "$fixture" <<'PY'
+import os
+from pathlib import Path
+import runpy
+import signal
+import subprocess
+import sys
+
+fixture = Path(sys.argv[1])
+info = runpy.run_path(str(fixture / "fm-proc-info-real.py"))
+marker = fixture / "fault"
+os.environ["FM_CLEANUP_FAULT"] = str(marker)
+payload = '''import os, pathlib, subprocess, sys
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+pathlib.Path(sys.argv[1]).write_text(f"{os.getpid()} {child.pid}")
+if sys.argv[2] == "fault": pathlib.Path(sys.argv[3]).touch()
+'''
+for mode in ("control", "fault"):
+    marker.unlink(missing_ok=True)
+    pids = fixture / (mode + ".pids")
+    result = subprocess.run([str(fixture / "fm-proc-budget.sh"), "--memory-kib", "524288", "--",
+                             sys.executable, "-c", payload, str(pids), mode, str(marker)],
+                            capture_output=True, text=True)
+    root, child = map(int, pids.read_text().split())
+    try:
+        record = info["kinfo"](child)
+        alive = record[info["P_STAT"]] != info["SZOMB"]
+    except LookupError:
+        alive = False
+    if alive:
+        # Always clean up the finite fixture, even when the regression fails.
+        assert os.getpgid(child) == root, "fixture ownership changed"
+        os.kill(child, signal.SIGKILL)
+    print(f"{mode}: status={result.returncode} child_alive={alive} reason={result.stderr.strip()}", flush=True)
+    assert not alive, f"{mode}: cleanup left a descendant alive"
+    if mode == "control":
+        assert result.returncode == 0 and not result.stderr, result
+    else:
+        assert result.returncode == 125, result
+        assert "tree cleanup failed" in result.stderr, result
+        assert len(result.stderr.splitlines()) == 1, result
+PY
+  expect_code 0 $? "supervisor cleanup refusal must leave no descendant and report failure"
+  pass "supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125"
+}
+
 test_memory_group_kill_idiom_keeps_status() {
   "$WRAP" --memory-kib 262144 -- bash -c "trap 'kill 0' EXIT; sleep 0.003"
   expect_code 0 $? "a command that signals its own group keeps its own status"
@@ -575,6 +646,7 @@ if memory_supported; then
   test_memory_out_of_group_member_ends_with_supervisor
   test_memory_supervisor_kill_during_cleanup
   test_memory_supervisor_death_before_reader_ready
+  test_memory_supervisor_cleanup_refusal
   test_memory_group_kill_idiom_keeps_status
   test_memory_inherited_fd_reaches_command
   test_memory_command_start_matches_exec
