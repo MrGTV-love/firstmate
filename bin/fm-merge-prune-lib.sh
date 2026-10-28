@@ -53,8 +53,10 @@
 # Ignored scratch: virtual environments, node_modules, tool and build caches
 # (.venv, venv, node_modules, __pycache__, .pytest_cache, .ruff_cache,
 # .mypy_cache, .next, graphify-out, .import_linter_cache, *.tsbuildinfo,
-# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, and
-# scripts/hooks/_conformance_manifest.json: the disposable entries of
+# .tac/tmp, .tac/uv-cache), .DS_Store, Firstmate's own hook files, graft's exact
+# generated .ignore overlay and version-1 extracted graph/cards (unknown files,
+# unknown cache formats, summaries and edited cards under graft/ keep the copy), and
+# scripts/hooks/_conformance_manifest.json: apart from graft, the disposable entries of
 # teardown_preservable_ignored in bin/fm-teardown-nested-lib.sh, which
 # tests/fm-merge-prune.test.sh holds to the same verdict, except one named
 # shape: when a project ignores the whole .tac/ directory, teardown preserves
@@ -108,6 +110,219 @@ fm_mp_scratch_name() {  # <basename>
     .next|graphify-out|.import_linter_cache|*.tsbuildinfo) return 0 ;;
   esac
   return 1
+}
+
+# Graft is not a scratch basename: its directory can also hold user material.
+# Accept only the observed version-1 extracted graph and byte-exact cards that
+# can be regenerated from it, plus known generated cache formats. Unknown
+# formats and edited cards stay.
+fm_mp_graft_scratch() {  # <real-copy>
+  python3 - "$1/graft" <<'PY'
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import sys
+
+
+def number(value):
+    return type(value) in (int, float) and value >= 0 and value < float('inf')
+
+
+def source_path(value):
+    return (isinstance(value, str) and bool(value)
+            and not PurePosixPath(value).is_absolute() and '..' not in PurePosixPath(value).parts)
+
+
+def digest(value):
+    return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) is not None
+
+
+def node_generated(node, extracted=False):
+    required = {'id', 'name', 'kind', 'path', 'span', 'signature', 'exported',
+                'origin', 'body_hash', 'summary_state', 'summary', 'crux'}
+    optional = {'chars', 'owner'} | ({'body_text'} if extracted else set())
+    return (isinstance(node, dict) and required <= set(node) <= required | optional
+            and all(isinstance(node[key], str) for key in ('id', 'name', 'kind', 'span', 'origin'))
+            and source_path(node['path']) and digest(node['body_hash'])
+            and node['kind'] in {'file', 'class', 'function', 'interface', 'method', 'type', 'constant', 'struct'}
+            and node['origin'] in {'ast', 'generic'} and type(node['exported']) is bool
+            and (node['signature'] is None or isinstance(node['signature'], str))
+            and node['summary_state'] == 'pending' and node['summary'] is None and node['crux'] is None
+            and re.fullmatch(r'L[0-9]+-L[0-9]+', node['span']) is not None
+            and ('chars' not in node or number(node['chars']))
+            and ('owner' not in node or isinstance(node['owner'], str))
+            and ('body_text' not in node or isinstance(node['body_text'], str)))
+
+
+def raw_edge_generated(edge, source):
+    required = {'source', 'relation', 'file'}
+    optional = {'name', 'specifier', 'targetId', 'viaMember', 'recvType'}
+    if (not isinstance(edge, dict) or not required <= set(edge) <= required | optional
+            or edge['file'] != source or not isinstance(edge['source'], str)
+            or any(not isinstance(value, str) for key, value in edge.items() if key != 'viaMember')
+            or ('viaMember' in edge and type(edge['viaMember']) is not bool)):
+        return False
+    target_key = {'contains': 'targetId', 'imports': 'specifier', 'calls': 'name',
+                  'extends': 'name', 'references': 'name'}.get(edge['relation'])
+    return target_key is not None and target_key in edge
+
+
+def terms_generated(terms):
+    return (isinstance(terms, list) and all(isinstance(pair, list) and len(pair) == 2
+            and isinstance(pair[0], str) and type(pair[1]) is int and pair[1] > 0 for pair in terms))
+
+
+def cache_generated(relative, data):
+    # Only observed cache formats, including nested records and value types.
+    # Recognizing the outer JSON keys alone could discard unrelated user data.
+    if relative == '.cache/session/.prompts-dropped':
+        return data == b''
+    value = json.loads(data)
+    if not isinstance(value, dict):
+        return False
+    if relative == '.cache/stats.json':
+        counts = {'nodeCount', 'edgeCount', 'totalCount', 'readyCount', 'staleCount'}
+        return (set(value) == counts | {'languages', 'dirty', 'syncing', 'syncedAt', 'lastFile'}
+                and all(type(value[key]) is int and value[key] >= 0 for key in counts)
+                and isinstance(value['languages'], list) and all(isinstance(v, str) for v in value['languages'])
+                and type(value['dirty']) is bool and type(value['syncing']) is bool
+                and isinstance(value['syncedAt'], str) and source_path(value['lastFile']))
+    if relative == '.cache/telemetry-repo-id.json':
+        return (set(value) == {'repoId'} and isinstance(value['repoId'], str)
+                and re.fullmatch(r'[0-9a-f-]{36}', value['repoId']) is not None)
+    match = re.fullmatch(r'\.cache/(extract|fingerprint)\.([0-9a-f]+)\.json', relative)
+    if match:
+        if (set(value) != {'version', 'extractor', 'files'} or value['version'] != 1
+                or value['extractor'] != match[2] or not isinstance(value['files'], dict)):
+            return False
+        for source, entry in value['files'].items():
+            if not source_path(source):
+                return False
+            if match[1] == 'fingerprint':
+                if (not isinstance(entry, list) or len(entry) != 3
+                        or not number(entry[0]) or not number(entry[1]) or not digest(entry[2])):
+                    return False
+            elif (not isinstance(entry, dict) or set(entry) != {'size', 'mtimeMs', 'hash', 'nodes', 'rawEdges'}
+                    or not number(entry['size']) or not number(entry['mtimeMs']) or not digest(entry['hash'])
+                    or not isinstance(entry['nodes'], list) or not isinstance(entry['rawEdges'], list)
+                    or not all(node_generated(node, extracted=True) and node['path'] == source for node in entry['nodes'])
+                    or not all(raw_edge_generated(edge, source) for edge in entry['rawEdges'])):
+                return False
+        return True
+    if relative == '.cache/ask-index.json':
+        return (set(value) == {'version', 'avgBodyLen', 'df', 'docCount', 'docs'}
+                and value['version'] == 1 and number(value['avgBodyLen']) and terms_generated(value['df'])
+                and isinstance(value['docs'], list) and value['docCount'] == len(value['docs'])
+                and all(isinstance(doc, dict) and set(doc) == {'id', 'name', 'path', 'body'}
+                        and isinstance(doc['id'], str) and all(terms_generated(doc[key]) for key in
+                        ('name', 'path', 'body')) for doc in value['docs']))
+    if re.fullmatch(r'\.cache/session/[0-9a-f-]{36}\.json', relative):
+        counts = {'graftReads', 'sourceReads', 'savedTokens', 'nudges'}
+        optional_counts = {'inputCostMicros', 'inputTokensBilled', 'promptAsks', 'graftTurns'}
+        strings = {'lastBillingUuid', 'lastTallyUuid'}
+        flags = {'turnUsedGraft', 'summarized'}
+        required = counts | {'injectedPointers', 'host'}
+        return (required <= set(value) <= required | optional_counts | strings | flags
+                and value['host'] == 'claude-code' and value['injectedPointers'] == []
+                and all(number(value[key]) for key in counts | (set(value) & optional_counts))
+                and all(isinstance(value[key], str) for key in set(value) & strings)
+                and all(type(value[key]) is bool for key in set(value) & flags))
+    return False
+
+
+def prove(root):
+    graph_path = root / '.graph/wiring.json'
+    if not root.is_dir() or not graph_path.is_file():
+        return False
+    graph = json.loads(graph_path.read_bytes())
+    if set(graph) != {'meta', 'nodes', 'edges'}:
+        return False
+    meta, nodes, edges = graph['meta'], graph['nodes'], graph['edges']
+    if (not isinstance(meta, dict) or set(meta) != {'version', 'nodeCount', 'edgeCount', 'languages', 'scopes'}
+            or meta['version'] != 1 or not isinstance(nodes, list) or not isinstance(edges, list)
+            or meta['nodeCount'] != len(nodes) or meta['edgeCount'] != len(edges)
+            or not isinstance(meta['languages'], list) or not all(isinstance(v, str) for v in meta['languages'])
+            or not isinstance(meta['scopes'], list)
+            or not all(isinstance(scope, dict) and set(scope) == {'prefix', 'label', 'markers'}
+                       and isinstance(scope['prefix'], str) and isinstance(scope['label'], str)
+                       and isinstance(scope['markers'], list) and all(isinstance(v, str) for v in scope['markers'])
+                       for scope in meta['scopes'])):
+        return False
+    files = {}
+    for node in nodes:
+        if not node_generated(node):
+            return False
+        if node['kind'] == 'file':
+            source = PurePosixPath(node['path'])
+            if source.is_absolute() or '..' in source.parts or node['path'] in files:
+                return False
+            files[node['path']] = []
+    for edge in edges:
+        if (not isinstance(edge, dict) or set(edge) != {'source', 'target', 'relation', 'confidence'}
+                or not all(isinstance(v, str) for v in edge.values())):
+            return False
+    for node in nodes:
+        if node['kind'] != 'file':
+            files[node['path']].append(node)
+    expected = {}
+    for source, symbols in files.items():
+        card = str(PurePosixPath(source).with_suffix('.md'))
+        if card in expected or card in {'INDEX.md', '.graph/wiring.json'}:
+            return False
+        text = '# ' + source + '\n\n'
+        if symbols:
+            for node in sorted(symbols, key=lambda n: int(n['span'][1:].split('-')[0])):
+                text += '- {name} \u00b7 {kind} \u00b7 {span} \u2014 {signature}\n'.format(
+                    **{**node, 'signature': node['signature'] or node['name']})
+        else:
+            text += '_No extracted symbols in this file._\n'
+        expected[card] = text.encode()
+    expected['INDEX.md'] = ('''# graft \u2014 repo map
+
+Small markdown nodes summarising this repo. `grep` any term, symbol, or
+filename here, or run `graft ask "<task>"`. Each node carries prose plus exact
+`file:line`; open a source file only to edit the named span.
+
+The same graph is queryable as MCP tools (`graft_find_code`, `graft_find_all`,
+`graft_trace_calls`, `graft_file_api`, `graft_repo_map`) where a host exposes them, and
+as the `graft` CLI everywhere else. Edges \u2014 who calls what \u2014 live only in the
+graph, not in these files: `graft callers <symbol>` is the only way to read them.
+
+## Files
+
+''' + str(len(files)) + ' per-file wiring cards mirror the source tree under `graft/` ('
+        + str(sum(bool(symbols) for symbols in files.values()))
+        + ' carry extracted symbols). They are deliberately not enumerated here \u2014\n'
+        + '`grep` a symbol or `find`/`ls` a filename under `graft/` to land on the card for that file.\n').encode()
+
+    def unreadable(error):
+        raise error
+
+    for directory, _, names in os.walk(root, onerror=unreadable):
+        for name in names:
+            path = Path(directory) / name
+            if path.is_symlink():
+                continue  # The existing classifier allows ignored symlinks.
+            relative = path.relative_to(root).as_posix()
+            if relative == '.graph/wiring.json':
+                continue
+            if not path.is_file():
+                return False
+            data = path.read_bytes()
+            if relative.startswith('.cache/'):
+                if not cache_generated(relative, data):
+                    return False
+            elif relative not in expected or data != expected[relative]:
+                return False
+    return True
+
+
+try:
+    sys.exit(0 if prove(Path(sys.argv[1])) else 1)
+except (OSError, ValueError, TypeError, KeyError, AttributeError):
+    sys.exit(1)
+PY
 }
 
 fm_mp_real() {  # <path> -> physical path on stdout
@@ -334,6 +549,23 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
     return 0
   fi
   case "$rel" in
+    .ignore)
+      if [ -f "$copy/$rel" ] && cmp -s "$copy/$rel" - <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+      then
+        return 0
+      fi
+      ;;
+    graft|graft/*)
+      if fm_mp_graft_scratch "$copy"; then
+        return 0
+      fi
+      ;;
     .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)
       case "$rel" in
         .claude/bug-evidence|.claude/channel-outbox) FM_MP_PRESERVE+=("$rel") ;;

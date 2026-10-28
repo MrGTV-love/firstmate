@@ -877,6 +877,105 @@ scn_wholly_ignored_tac_caches_are_the_named_exception() {
   return 0
 }
 
+# Graft's generated search overlay, copied byte-for-byte from a real worker.
+write_graft_ignore() {
+  cat > "$COPY/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+}
+
+make_graft_output() {
+  make_world
+  printf '/.ignore\n/graft/\n' >> "$W/project/.git/info/exclude"
+  write_graft_ignore
+  mkdir -p "$COPY/graft/.graph" "$COPY/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$COPY/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$COPY/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$COPY/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$COPY/graft/work.md"
+  cat > "$COPY/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
+}
+
+scn_graft_output_is_removed() {
+  make_graft_output
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a merged copy holding only generated graft output was kept: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "generated graft output raised a keep wake" || return 1
+}
+
+scn_non_graft_ignore_is_kept() {
+  local variant
+  for variant in custom appended extra-newline; do
+    make_graft_output
+    case "$variant" in
+      custom) printf 'project-private/\n' > "$COPY/.ignore" ;;
+      appended) printf 'project-private/\n' >> "$COPY/.ignore" ;;
+      extra-newline) printf '\n' >> "$COPY/.ignore" ;;
+    esac
+    go
+    [ -e "$COPY/.ignore" ] && [ "$(destroy_calls)" = 0 ] || why "$variant .ignore was discarded" || return 1
+    case "$(rec_field t1 reason)" in
+      *'holds an ignored file that is neither scratch nor on the preserve list: .ignore') ;;
+      *) why "$variant .ignore lost its existing keep reason: $(rec_field t1 reason)" || return 1 ;;
+    esac
+  done
+}
+
+scn_unique_graft_content_is_kept() {
+  local variant
+  for variant in notes.md work.md .graph/wiring.json .cache/notes; do
+    make_graft_output
+    mkdir -p "$COPY/graft/$(dirname "$variant")"
+    printf 'unique user content\n' >> "$COPY/graft/$variant"
+    go
+    [ -e "$COPY/graft/$variant" ] && [ "$(destroy_calls)" = 0 ] || why "unique graft/$variant was discarded" || return 1
+    [ "$(wake_count)" = 1 ] || why "unique graft/$variant did not raise a keep wake" || return 1
+  done
+}
+
+scn_non_index_json_graft_content_is_kept() {
+  local variant relative
+  for variant in extract fingerprint search graph session stats; do
+    make_graft_output
+    case "$variant" in
+      extract)
+        relative=.cache/extract.780d32dc5ad1bdc9.json
+        printf '{"version":1,"extractor":"780d32dc5ad1bdc9","files":{"notes":"only copy"}}\n' > "$COPY/graft/$relative" ;;
+      fingerprint)
+        relative=.cache/fingerprint.780d32dc5ad1bdc9.json
+        printf '{"version":1,"extractor":"780d32dc5ad1bdc9","files":{"notes":"only copy"}}\n' > "$COPY/graft/$relative" ;;
+      search)
+        relative=.cache/ask-index.json
+        printf '{"version":1,"avgBodyLen":0,"df":[],"docCount":1,"docs":[{"id":"work.txt","name":[],"path":[],"body":[],"notes":"only copy"}]}\n' > "$COPY/graft/$relative" ;;
+      graph)
+        relative=.graph/wiring.json
+        printf '{"meta":{"version":1,"nodeCount":0,"edgeCount":0,"languages":[],"scopes":[{"prefix":"","label":"","markers":[],"notes":"only copy"}]},"nodes":[],"edges":[]}\n' > "$COPY/graft/$relative"
+        rm -f "$COPY/graft/work.md" ;;
+      session)
+        relative=.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json
+        printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[{"notes":"only copy"}],"nudges":0,"host":"claude-code"}\n' > "$COPY/graft/$relative" ;;
+      stats)
+        relative=.cache/stats.json
+        printf '{"nodeCount":1,"edgeCount":0,"languages":{"notes":"only copy"},"totalCount":1,"readyCount":0,"staleCount":0,"dirty":false,"syncing":false,"syncedAt":"2026-10-28T05:51:39.057Z","lastFile":"work.txt"}\n' > "$COPY/graft/$relative" ;;
+    esac
+    go
+    [ -e "$COPY/graft/$relative" ] && [ "$(destroy_calls)" = 0 ] || why "valid JSON with non-index content in $relative was discarded" || return 1
+    [ "$(wake_count)" = 1 ] || why "non-index JSON in $relative did not raise a keep wake" || return 1
+  done
+}
+
+test_fallback_keeps_non_index_json_in_graft() { assert_scenario scn_non_index_json_graft_content_is_kept "valid JSON with non-index nested content keeps the copy"; }
+
+test_fallback_removes_only_generated_graft_output() { assert_scenario scn_graft_output_is_removed "a merged copy holding only graft output is removed without a keep wake"; }
+test_fallback_keeps_non_graft_ignore() { assert_scenario scn_non_graft_ignore_is_kept "custom .ignore content, including appended lines and newlines, keeps its existing reason"; }
+test_fallback_keeps_unique_graft_content() { assert_scenario scn_unique_graft_content_is_kept "unknown graft files and edits to generated cards or graph keep the copy"; }
+
 scn_unique_ignored_file_is_kept() {
   make_world
   printf 'only here\n' > "$COPY/precious.local"
@@ -2756,6 +2855,10 @@ ALL_TESTS=(
   test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work
   test_fallback_judges_ignored_entries_like_teardown
   test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch
+  test_fallback_removes_only_generated_graft_output
+  test_fallback_keeps_non_graft_ignore
+  test_fallback_keeps_unique_graft_content
+  test_fallback_keeps_non_index_json_in_graft
   test_fallback_keeps_unique_ignored_files
   test_fallback_keeps_a_non_pool_copy
   test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot
