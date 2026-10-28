@@ -799,9 +799,9 @@ test_nested_replacement_blocks_slot_allocation() {
 # case home, with a treehouse that records each call and quiet endpoint and
 # forge tools.
 # assert_treehouse_unchanged <case-dir> <message>: Treehouse was at most read
-# through its status listing.
+# through its pool-dir answer and status listing.
 assert_treehouse_unchanged() {
-  [ ! -e "$1/treehouse.log" ] || ! grep -qv '^status --json$' "$1/treehouse.log" \
+  [ ! -e "$1/treehouse.log" ] || ! grep -Eqv '^(pool-dir|status --json)$' "$1/treehouse.log" \
     || fail "$2: $(cat "$1/treehouse.log")"
 }
 

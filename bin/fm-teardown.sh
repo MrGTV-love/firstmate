@@ -303,15 +303,15 @@
 # the reservation point through the return with treehouse return --force, as
 # before the narrowing.
 # So does an unleased slot in a superseded pool folder: treehouse lease takes a
-# slot NAME and resolves it in the project's current pool, and a pool folder is
-# named from the origin URL, so a copy left in an older folder after origin was
-# repointed shares its name with a different copy. Such a slot is returned by
+# slot NAME and resolves it in the project's current pool, and a pool folder
+# follows the origin URL and the Treehouse root, so a copy left in an older
+# folder after either moved shares its name with a different copy. Such a slot is returned by
 # path, and once every refusal check has passed, a lease an earlier teardown
 # took by name on a same-named current-pool slot is released with treehouse
 # return <path> --if-lease-holder <this task> when no other task claims it and
 # no process runs inside it (docs/configuration.md "Superseded pool folders").
-# A project with no origin remote has no derivable pool folder, so its unleased
-# slot costs one treehouse status listing per teardown, reused across descendants.
+# Placing an unleased slot is fast where Treehouse has pool-dir; otherwise it
+# costs one 11-23 s treehouse status listing per teardown under the project lock.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
