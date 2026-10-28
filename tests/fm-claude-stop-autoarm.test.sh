@@ -33,6 +33,7 @@ install_autoarm_scripts() {
   local dir=$1
   mkdir -p "$dir/bin"
   cp "$ROOT/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-stop-autoarm.sh"
+  cp "$ROOT/bin/fm-claude-hold-release.sh" "$dir/bin/fm-claude-hold-release.sh"
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
@@ -47,7 +48,7 @@ install_autoarm_scripts() {
   cp "$ROOT/bin/fm-classify-lib.sh" "$dir/bin/fm-classify-lib.sh"
   cp "$ROOT/bin/fm-timeout-lib.sh" "$dir/bin/fm-timeout-lib.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
-  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-lock.sh" "$dir/bin/fm-afk-contract.sh"
+  chmod +x "$dir/bin/fm-claude-stop-autoarm.sh" "$dir/bin/fm-claude-hold-release.sh" "$dir/bin/fm-lock.sh" "$dir/bin/fm-afk-contract.sh"
 }
 
 # A Claude home runs the supervision host unless config/supervision-host-off
@@ -1530,9 +1531,16 @@ write_host_fixture() {
     printf 'echo "$$" >> "$FM_HOME/state/host-ran"\n'
     printf 'printf "gen=%%s owner=%%s primary=%%s mode=%%s\\n" "${FM_SUPERVISION_HOST_AUTOARM_GEN:-}" "${FM_SUPERVISION_HOST_OWNER_PID:-}" "${FM_SUPERVISION_HOST_PRIMARY:-}" "${1:-}" > "$FM_HOME/state/host-env"\n'
     case "$kind" in
-      boundary)
+      boundary|boundary-pending-handling|boundary-announced-handling)
         printf "printf 'pending:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
         printf 'touch "$FM_HOME/state/.last-watcher-beat"\n'
+        if [ "$kind" = boundary-announced-handling ]; then
+          printf "printf 'announced:downtime:fixture-generation\\n' > \"\$FM_HOME/state/.watcher-down\"\n"
+        fi
+        if [ "$kind" != boundary ]; then
+          printf 'FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$FM_HOME/state/boundary-drain" 2>&1\n'
+          printf 'cp "$FM_HOME/state/.watcher-down" "$FM_HOME/state/before-boundary-handback"\n'
+        fi
         printf "printf 'supervision-host: cycle boundary - fixture\\n'\n"
         ;;
       handed-back)
@@ -1549,10 +1557,18 @@ write_host_fixture() {
         [ "$kind" = lost-handback ] || marker=announced
         printf "printf '%s:handling:fixture-generation\\\\n' > \"\$FM_HOME/state/.watcher-down\"\\n" "$marker"
         cat <<'SH'
+printf '1\t1\tsignal\tfixture.status\tsignal: fixture.status\n' >> "$FM_HOME/state/.wake-queue"
 printf 'signal: fixture.status\n'
 printf 'supervision-host: branch-outcome: fixture\n'
 printf 'supervision-host: watcher downtime could not be restored for the main hand-back\n'
 exit 1
+SH
+        ;;
+      handling-lock-lost)
+        cat <<'SH'
+printf 'pending:handling:fixture-generation\n' > "$FM_HOME/state/.watcher-down"
+printf '%s\n' "$FM_TEST_OTHER_SESSION_PID" > "$FM_HOME/state/.lock"
+printf 'check: handback after session ownership changed\n'
 SH
         ;;
       benign-refusal)
@@ -1619,27 +1635,30 @@ test_host_absent_flag_runs_the_host() {
 }
 
 test_host_boundary_rewakes_with_the_host_line() {
-  local dir out status
-  dir=$(make_primary_dir "$TMP_ROOT/host-boundary")
-  mkdir -p "$dir/config"
-  rm -f "$dir/config/supervision-host-off"
-  : > "$dir/state/task.meta"
-  write_arm_fixture "$dir" actionable
-  write_host_fixture "$dir" boundary
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a host cycle boundary must rewake main"
-  assert_contains "$out" "firstmate watcher wake" "the host close must carry the wake banner"
-  assert_contains "$out" "supervision-host: cycle boundary - fixture" "the rewake must carry the host's line"
-  [ ! -e "$dir/state/arm-ran" ] || fail "an opted-in home ran the plain arm instead of the host"
-  [ "$(epoch_outcome "$dir")" = rewake ] || fail "a host boundary must record outcome=rewake, got: $(epoch_outcome "$dir")"
-  [ "$(sed -n 's/^.* mode=//p' "$dir/state/host-env")" = park ] || fail "the host was not run in park mode: $(cat "$dir/state/host-env")"
-  [ "$(sed -n 's/^.* primary=\([a-z]*\) .*$/\1/p' "$dir/state/host-env")" = claude ] \
-    || fail "the host was not told its primary harness: $(cat "$dir/state/host-env")"
-  [ "$(sed -n 's/^gen=\([0-9]*\) .*$/\1/p' "$dir/state/host-env")" = "$(epoch_field "$dir" epoch)" ] \
-    || fail "the host was not bound to the hook's generation: $(cat "$dir/state/host-env") vs $(head -n 1 "$dir/state/.claude-autoarm-epoch")"
-  [ "$(sed -n 's/^.* owner=\([0-9]*\) .*$/\1/p' "$dir/state/host-env")" = "$(epoch_field "$dir" owner_pid)" ] \
-    || fail "the host was not bound to the hook's owner pid: $(cat "$dir/state/host-env")"
-  pass "auto-arm: an opted-in home runs the host bound to its generation, and a host line rewakes like a wake"
+  local kind phase dir out status
+  for kind in boundary boundary-pending-handling boundary-announced-handling; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    write_arm_fixture "$dir" actionable
+    write_host_fixture "$dir" "$kind"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" run_autoarm "$dir" 2>/dev/null); status=$?
+    if [ "$kind" != boundary ]; then
+      phase=${kind#boundary-}
+      assert_contains "$(cat "$dir/state/before-boundary-handback")" "${phase%-handling}:handling:fixture-generation" "the empty main drain must enter handling before the close"
+      assert_contains "$(cat "$dir/state/boundary-drain")" '--ack-through 0 --recovery-generation fixture-generation' "the empty handling episode must remain acknowledgeable"
+      [ ! -s "$dir/state/.wake-queue" ] || fail "$kind: the boundary fixture unexpectedly queued a row"
+      assert_absent "$dir/state/.main-eligible-rows.held" "$kind: an empty drain must not manufacture held rows"
+      assert_absent "$dir/state/.watch.lock" "$kind: the fixture must expose delivery without a watcher"
+    fi
+    expect_code 2 "$status" "$kind: a host cycle boundary must rewake main, including after an empty drain"
+    assert_contains "$out" "firstmate watcher wake - one supervision event needs a handling turn now." "$kind: the host close must carry the wake banner"
+    assert_contains "$out" "supervision-host: cycle boundary - fixture" "$kind: the rewake must carry the host's line"
+    assert_not_contains "$out" 'auto-arm FAILED' "$kind: a boundary close must use the normal rewake"
+    [ ! -e "$dir/state/arm-ran" ] || fail "$kind: an opted-in home ran the plain arm instead of the host"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "$kind: a host boundary must record outcome=rewake, got: $(epoch_outcome "$dir")"
+    pass "auto-arm: $kind commits the host boundary normally without needing a queued row or watcher"
+  done
 }
 
 test_host_handback_under_away_record_is_not_a_return() {
@@ -1711,6 +1730,311 @@ test_host_handback_carries_every_host_line() {
   pass "auto-arm: a host handback delivers every host line, while its wake lines keep their cap"
 }
 
+# The recovery phase is shared by both actors, not a delivery receipt for the
+# host's current close. A branch presentation can enter handling while a newer
+# main-only row is still queued. Drive that interleaving with the real queue,
+# grant and drain, rather than manufacturing a handling token in the stub.
+test_host_handback_during_open_handling_commits_normally() {
+  local phase watcher dir out status pid identity drain generation cutoff
+  for phase in pending announced downtime; do
+    for watcher in absent live; do
+      dir=$(make_primary_dir "$TMP_ROOT/host-overlap-$phase-$watcher")
+      rm -f "$dir/config/supervision-host-off"
+      : > "$dir/state/task.meta"
+      cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ ! -e "$FM_HOME/state/host-prepared" ]; then
+  . "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+  fm_wake_append signal branch-task.status 'signal: branch-task.status old handling work'
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" activate "$$" overlap
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" publish overlap 1
+  fm_wake_append check main-new 'check: newer main-only host handback'
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/after-append"
+  if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+    fm_recovery_marker_arm_check "$STATE/.watcher-down"
+  fi
+  if [ "$FM_TEST_OVERLAP_PHASE" != downtime ]; then
+    FM_SUPERVISION_ACTOR=branch bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/branch-drain" 2>&1
+  fi
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/before-handback"
+  bash "$FM_TEST_REAL_BIN/fm-wake-grant.sh" deactivate "$$" overlap
+  : > "$STATE/host-prepared"
+fi
+printf 'check: newer main-only host handback\n'
+SH
+      chmod +x "$dir/bin/fm-supervision-host.sh"
+      pid=
+      if [ "$watcher" = live ]; then
+        live_fixture &
+        pid=$!
+        identity=$(watcher_identity "$dir" "$pid") || fail "could not identify overlap successor"
+        record_watcher_lock "$dir" "$pid" "$identity"
+        touch "$dir/state/.last-watcher-beat"
+      fi
+      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+      fi
+      expect_code 2 "$status" "$phase/$watcher: an outstanding main handback must reach main"
+      assert_contains "$(cat "$dir/state/after-append")" 'pending:downtime:' "a new queue append itself republishes downtime"
+      if [ "$phase" != downtime ]; then
+        assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real branch drain must expose the handling interleaving"
+        assert_contains "$(cat "$dir/state/branch-drain")" 'signal: branch-task.status old handling work' "the branch must present its own row"
+        assert_not_contains "$(cat "$dir/state/branch-drain")" 'check: newer main-only host handback' "the branch must not have presented main's newer wake"
+      fi
+      assert_not_contains "$out" 'auto-arm FAILED' "$phase/$watcher: a valid actionable handback is not an auto-arm failure"
+      [ "$(epoch_outcome "$dir")" = rewake ] || fail "$phase/$watcher: handback did not commit normally: $(epoch_outcome "$dir")"
+      [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "handback was not delivered exactly once: $out"
+      assert_absent "$dir/state/.claude-autoarm-failure-notified" "normal handling overlap opened a failure episode"
+      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 2 ] || fail "translation consumed a durable row"
+      drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "main could not drain overlap rows: $drain"
+      assert_contains "$drain" 'check: newer main-only host handback' "handed-back work must remain drainable"
+      generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+      cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+      FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "overlap acknowledgement failed"
+      [ ! -s "$dir/state/.wake-queue" ] || fail "overlap acknowledgement left rows behind"
+      FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" >/dev/null 2>&1; status=$?
+      expect_code 0 "$status" "an acknowledged host close must not be delivered again"
+      [ "$(epoch_outcome "$dir")" = refused ] || fail "acknowledged handback was not refused"
+      # Exit 0 is the harness's discard boundary, including buffered stderr.
+      pass "auto-arm: $phase/$watcher host overlap commits once, stays durable, and is silent after acknowledgement"
+    done
+  done
+}
+
+# The same overlap when main's own drain presents the newer row inside the host
+# successor window. While the presenting main turn is open, or after it acked
+# in-turn, that turn holds the close, so the host's copy is refused in silence.
+# Once that turn's Stop fires (deferring to the parked host's open claim)
+# without an ack, nothing holds the still-queued row and the close is delivered
+# exactly once. A late Stop firing whose start precedes the next turn's drain
+# (late-stop: the drain runs while the firing loads its libraries) must leave
+# that newer turn's hold in place, so the close is still refused. A turn that
+# ends with no Stop - the next prompt after an Escape (interrupted) or an API
+# error (api-error) - releases its hold through bin/fm-claude-hold-release.sh,
+# so the close is delivered exactly once. Every close leaves a live watcher or
+# wakes main: a held close with no healthy watcher beside it (the drain landed
+# after the host's downtime publish, and no successor runs) is delivered once,
+# because a refusal there could end in a blind stop.
+test_host_handback_after_main_presentation() {
+  local phase watcher watchers mode dir out status pid identity drain generation cutoff queued lib
+  for mode in open acked ended late-stop interrupted api-error; do
+    watchers="absent live"
+    [ "$mode" != acked ] || watchers=live
+    for phase in pending announced; do
+      for watcher in $watchers; do
+        dir=$(make_primary_dir "$TMP_ROOT/host-main-drain-$mode-$phase-$watcher")
+        rm -f "$dir/config/supervision-host-off"
+        : > "$dir/state/task.meta"
+        if [ "$mode" = late-stop ]; then
+          lib=$(cat "$dir/bin/fm-supervision-lib.sh")
+          {
+            cat <<'SH'
+if [ -e "$FM_HOME/state/late-stop-drain" ]; then
+  rm -f "$FM_HOME/state/late-stop-drain"
+  cp "$FM_HOME/state/.main-eligible-rows.held" "$FM_HOME/state/hold-before-next-turn"
+  FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$FM_HOME/state/next-turn-drain" 2>&1 || true
+fi
+SH
+            printf '%s\n' "$lib"
+          } > "$dir/bin/fm-supervision-lib.sh"
+        fi
+        cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ ! -e "$FM_HOME/state/host-prepared" ]; then
+  . "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+  fm_wake_append check main-new 'check: newer main-only host handback'
+  if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+    fm_recovery_marker_arm_check "$STATE/.watcher-down"
+  fi
+  FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/main-drain" 2>&1
+  fm_recovery_marker_snapshot "$STATE/.watcher-down"
+  printf '%s\n' "$FM_RECOVERY_MARKER_TOKEN" > "$STATE/before-handback"
+  case "$FM_TEST_MAIN_TURN" in
+    acked)
+      # shellcheck disable=SC2046
+      set -- $(sed -n 's|^WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh ||p' "$STATE/main-drain")
+      FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" "$@" > "$STATE/main-ack" 2>&1
+      ;;
+    interrupted|api-error)
+      event=UserPromptSubmit
+      [ "$FM_TEST_MAIN_TURN" = interrupted ] || event=StopFailure
+      rc=0
+      printf '{"hook_event_name":"%s","session_id":"sess-autoarm"}\n' "$event" \
+        | "$FM_HOME/bin/fm-claude-hold-release.sh" > "$STATE/turn-release" 2>&1 || rc=$?
+      printf '%s\n' "$rc" > "$STATE/turn-release-rc"
+      ;;
+    ended|late-stop)
+      [ "$FM_TEST_MAIN_TURN" = ended ] || : > "$STATE/late-stop-drain"
+      rc=0
+      printf '%s\n' '{"session_id":"sess-autoarm","stop_hook_active":false}' \
+        | "$FM_HOME/bin/fm-claude-stop-autoarm.sh" > "$STATE/turn-stop" 2>&1 || rc=$?
+      printf '%s\n' "$rc" > "$STATE/turn-stop-rc"
+      ;;
+  esac
+  : > "$STATE/host-prepared"
+fi
+printf 'check: newer main-only host handback\n'
+SH
+        chmod +x "$dir/bin/fm-supervision-host.sh"
+        pid=
+        if [ "$watcher" = live ]; then
+          live_fixture &
+          pid=$!
+          identity=$(watcher_identity "$dir" "$pid") || fail "could not identify main-drain successor"
+          record_watcher_lock "$dir" "$pid" "$identity"
+          touch "$dir/state/.last-watcher-beat"
+        fi
+        out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" FM_TEST_MAIN_TURN="$mode" run_autoarm "$dir" 2>/dev/null); status=$?
+        if [ -n "$pid" ]; then
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
+        fi
+        assert_contains "$(cat "$dir/state/before-handback")" "$phase:handling:" "the real main drain must expose the handling interleaving"
+        assert_contains "$(cat "$dir/state/main-drain")" 'check: newer main-only host handback' "main's drain must present the newer row"
+        assert_not_contains "$out" 'auto-arm FAILED' "$mode/$phase/$watcher: a main-presented handback is not an auto-arm failure"
+        assert_absent "$dir/state/.claude-autoarm-failure-notified" "$mode/$phase/$watcher: a main-presented handback opened a failure episode"
+        queued=$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')
+        case "$mode/$watcher" in
+          open/absent|late-stop/absent)
+            expect_code 2 "$status" "$phase: a held close with no healthy watcher must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "$mode/$phase: unwatched held handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "$mode/$phase: unwatched held handback was not delivered exactly once: $out"
+            assert_present "$dir/state/.main-eligible-rows.held" "$mode/$phase: the presenting turn's hold is missing"
+            [ "$queued" -eq 1 ] || fail "$mode/$phase: translation consumed a durable row"
+            ;;
+          open/*)
+            expect_code 0 "$status" "$phase/$watcher: a close the open main turn holds must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "open/$phase/$watcher: held handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 1 ] || fail "open/$phase/$watcher: refusal consumed a durable row"
+            ;;
+          acked/*)
+            expect_code 0 "$status" "$phase/$watcher: a close main acknowledged in-turn must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "acked/$phase/$watcher: acknowledged handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 0 ] || fail "acked/$phase/$watcher: the in-turn acknowledgement left rows behind"
+            ;;
+          ended/*)
+            [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "ended/$phase/$watcher: the turn's Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
+            expect_code 2 "$status" "$phase/$watcher: a close left unacknowledged by an ended main turn must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "ended/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "ended/$phase/$watcher: handback was not delivered exactly once: $out"
+            [ "$queued" -eq 1 ] || fail "ended/$phase/$watcher: translation consumed a durable row"
+            ;;
+          interrupted/*|api-error/*)
+            [ "$(cat "$dir/state/turn-release-rc")" = 0 ] && [ ! -s "$dir/state/turn-release" ] \
+              || fail "$mode/$phase/$watcher: the hold release hook was not silent: $(cat "$dir/state/turn-release")"
+            assert_absent "$dir/state/.main-eligible-rows.held" "$mode/$phase/$watcher: the ended turn's hold survived"
+            expect_code 2 "$status" "$phase/$watcher: a close left unacknowledged by a turn that ended without Stop must reach main"
+            [ "$(epoch_outcome "$dir")" = rewake ] || fail "$mode/$phase/$watcher: unheld handback did not commit: $(epoch_outcome "$dir")"
+            [ "$(printf '%s\n' "$out" | grep -c '^check: newer main-only host handback$')" -eq 1 ] || fail "$mode/$phase/$watcher: handback was not delivered exactly once: $out"
+            [ "$queued" -eq 1 ] || fail "$mode/$phase/$watcher: translation consumed a durable row"
+            ;;
+          late-stop/*)
+            [ "$(cat "$dir/state/turn-stop-rc")" = 0 ] || fail "late-stop/$phase/$watcher: the late Stop firing did not defer to the open claim: $(cat "$dir/state/turn-stop")"
+            assert_contains "$(cat "$dir/state/next-turn-drain")" 'check: newer main-only host handback' "the next turn's drain must present the row again"
+            assert_present "$dir/state/.main-eligible-rows.held" "late-stop/$phase/$watcher: an older Stop firing cleared the newer turn's hold"
+            [ "$(cat "$dir/state/.main-eligible-rows.held")" != "$(cat "$dir/state/hold-before-next-turn")" ] \
+              || fail "late-stop/$phase/$watcher: the next turn's drain did not write its own hold"
+            expect_code 0 "$status" "$phase/$watcher: a close the newer open main turn holds must not wake main again"
+            [ "$(epoch_outcome "$dir")" = refused ] || fail "late-stop/$phase/$watcher: held handback was not refused: $(epoch_outcome "$dir")"
+            [ "$queued" -eq 1 ] || fail "late-stop/$phase/$watcher: refusal consumed a durable row"
+            ;;
+        esac
+        if [ "$mode" != acked ]; then
+          drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "main could not drain its presented row again: $drain"
+          assert_contains "$drain" 'check: newer main-only host handback' "the unacknowledged row must remain drainable"
+          generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+          cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+          FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 || fail "main's acknowledgement of its presented row failed"
+          [ ! -s "$dir/state/.wake-queue" ] || fail "main's acknowledgement left rows behind"
+        fi
+        pass "auto-arm: $mode/$phase/$watcher host handback after a main presentation is delivered at most once, and once when unheld"
+      done
+    done
+  done
+}
+
+# The refused-first order: the parked host's close for row R is refused while
+# the open main turn that presented R still holds it, and that turn then ends
+# through Stop without acknowledging R. No arm re-presents a handling episode,
+# so that Stop firing must rewake main for R before it parks another host.
+test_host_refusal_before_hold_release_rewakes_at_the_next_stop() {
+  local phase dir out status pid identity drain generation cutoff turn ack
+  for phase in pending announced; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-refused-first-$phase")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    cat > "$dir/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ -e "$FM_HOME/state/host-prepared" ]; then
+  : > "$FM_HOME/state/host-parked-again"
+  exit 0
+fi
+. "$FM_TEST_REAL_BIN/fm-wake-lib.sh"
+fm_wake_append check main-new 'check: newer main-only host handback'
+if [ "$FM_TEST_OVERLAP_PHASE" = announced ]; then
+  fm_recovery_marker_arm_check "$STATE/.watcher-down"
+fi
+FM_SUPERVISION_ACTOR=main bash "$FM_TEST_REAL_BIN/fm-wake-drain.sh" > "$STATE/main-drain" 2>&1
+: > "$STATE/host-prepared"
+printf 'check: newer main-only host handback\n'
+SH
+    chmod +x "$dir/bin/fm-supervision-host.sh"
+    live_fixture &
+    pid=$!
+    identity=$(watcher_identity "$dir" "$pid") || fail "could not identify refused-first successor"
+    record_watcher_lock "$dir" "$pid" "$identity"
+    touch "$dir/state/.last-watcher-beat"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 0 "$status" "$phase: a close the open turn still holds is refused"
+    [ "$(epoch_outcome "$dir")" = refused ] || fail "$phase: the held close was not refused: $(epoch_outcome "$dir")"
+    assert_present "$dir/state/.main-eligible-rows.held" "fixture: the presenting turn's hold is missing"
+    out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 2 "$status" "$phase: the turn end after a refused held close must rewake main for its row"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "$phase: the owed row did not commit a rewake: $(epoch_outcome "$dir")"
+    assert_contains "$out" 'presented to a turn that ended without acknowledging them' "$phase: the rewake must say why the row is owed"
+    assert_contains "$out" 'Run bin/fm-wake-drain.sh first' "$phase: the rewake must tell main to drain"
+    assert_not_contains "$out" 'auto-arm FAILED' "$phase: an owed row is not an auto-arm failure"
+    assert_absent "$dir/state/host-parked-again" "$phase: the Stop firing parked a host beside rows nothing re-presents"
+    assert_absent "$dir/state/.main-eligible-rows.held" "$phase: the ended turn's hold survived its Stop"
+    drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "$phase: main could not drain the owed row: $drain"
+    assert_contains "$drain" 'check: newer main-only host handback' "$phase: the rewoken turn must present the row again"
+    generation=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --recovery-generation //p')
+    cutoff=$(printf '%s\n' "$drain" | sed -n 's/^WAKE_ACK_REQUIRED:.* --ack-through \([0-9]*\) .*/\1/p')
+    for turn in unacknowledged ack-refused unacknowledged-again; do
+      if [ "$turn" = ack-refused ]; then
+        printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"home":"%s","complete":true,"rows":[{"id":"fixture-overdue","category":"coverage","subject":"fixture overdue obligation","owner":"firstmate","next_action":"record action","age_seconds":60,"limit_seconds":0,"overdue":true}]}\n' \
+          "$(date +%s)" "$dir" > "$dir/state/open-loops.json"
+        drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "could not present the overdue obligation: $drain"
+        ack=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" 2>&1); status=$?
+        expect_code 1 "$status" "$phase: the real overdue-action gate must refuse acknowledgement"
+        assert_contains "$ack" 'fixture-overdue' "the acknowledgement must name the unresolved obligation"
+      fi
+      out=$(FM_TEST_REAL_BIN="$ROOT/bin" FM_TEST_OVERLAP_PHASE="$phase" run_autoarm "$dir" 2>/dev/null); status=$?
+      expect_code 0 "$status" "$phase/$turn: a consumed held-close refusal must not cause repeated rewakes"
+      [ -z "$out" ] || fail "$phase/$turn: repeated Stop produced a wake: $out"
+      assert_present "$dir/state/host-parked-again" "$phase/$turn: the next cycle did not arm normally"
+      [ "$(wc -l < "$dir/state/.wake-queue" | tr -d ' ')" -eq 1 ] || fail "$phase/$turn: silence consumed the durable row"
+      drain=$(FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" 2>&1) || fail "$phase/$turn: main could not drain the durable row: $drain"
+      assert_contains "$drain" 'check: newer main-only host handback' "$phase/$turn: the row must remain available"
+    done
+    FM_HOME="$dir" bash "$ROOT/bin/fm-open-loops.sh" action fixture-overdue escalated --evidence 'fixture escalation' >/dev/null \
+      || fail "$phase: the overdue action could not be recorded"
+    FM_HOME="$dir" bash "$ROOT/bin/fm-wake-drain.sh" --ack-through "$cutoff" --recovery-generation "$generation" >/dev/null 2>&1 \
+      || fail "$phase: the owed row could not be acknowledged"
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    [ ! -s "$dir/state/.wake-queue" ] || fail "$phase: the acknowledgement left the owed row queued"
+    pass "auto-arm: $phase held close is redelivered once, never loops after missing or refused ack, and remains acknowledgeable"
+  done
+}
+
 test_host_stand_down_is_silent() {
   local dir out status
   dir=$(make_primary_dir "$TMP_ROOT/host-stand-down")
@@ -1744,36 +2068,41 @@ test_host_benign_rewake_refusal_opens_no_failure_episode() {
   pass "auto-arm: a host rewake refused on an acknowledged marker opens no failure episode"
 }
 
-# The host handed a wake back but left the marker in handling (pending or
-# announced) with no live successor, so no rewake can commit: the hook delivers
-# the failure notice once per episode and keeps exiting 2 without repeating it.
-assert_host_lost_handback_notifies_once_per_episode() {
-  local kind=$1 dir out status
-  dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
-  mkdir -p "$dir/config"
+test_host_handling_handback_lost_session_never_delivers() {
+  local dir other out status
+  dir=$(make_primary_dir "$TMP_ROOT/host-handling-session-lost")
   rm -f "$dir/config/supervision-host-off"
   : > "$dir/state/task.meta"
-  write_host_fixture "$dir" "$kind"
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a lost hand-back must reach main"
-  assert_contains "$out" "auto-arm FAILED - the supervision host returned an actionable wake" "a lost hand-back must deliver the failure notice"
-  assert_present "$dir/state/.claude-autoarm-failure-notified" "a lost hand-back did not record its failure episode"
-  [ "$(epoch_outcome "$dir")" = failed ] || fail "a lost hand-back must record outcome=failed, got: $(epoch_outcome "$dir")"
-  out=$(run_autoarm "$dir" 2>/dev/null); status=$?
-  expect_code 2 "$status" "a repeated lost hand-back must still reach main"
-  assert_not_contains "$out" "auto-arm FAILED" "a repeated lost hand-back must not repeat the failure notice"
-  [ "$(epoch_outcome "$dir")" = failed-suppressed ] \
-    || fail "a repeated lost hand-back must record outcome=failed-suppressed, got: $(epoch_outcome "$dir")"
+  write_host_fixture "$dir" handling-lock-lost
+  live_fixture &
+  other=$!
+  out=$(FM_TEST_OTHER_SESSION_PID="$other" run_autoarm "$dir" 2>/dev/null); status=$?
+  kill "$other" 2>/dev/null || true
+  wait "$other" 2>/dev/null || true
+  expect_code 0 "$status" "a handling handback must not bypass session ownership via the failure path"
+  assert_not_contains "$out" 'auto-arm FAILED' "session loss is a refusal, not an auto-arm failure"
+  assert_absent "$dir/state/.claude-autoarm-failure-notified" "a different session's handback opened a failure episode"
+  [ "$(epoch_outcome "$dir")" = refused ] || fail "session loss did not record refusal"
+  pass "auto-arm: a handling-phase host handback never delivers after session ownership changes"
 }
 
-test_host_lost_handback_notifies_once_per_episode() {
-  assert_host_lost_handback_notifies_once_per_episode lost-handback
-  pass "auto-arm: a lost host hand-back notifies once per failure episode"
-}
-
-test_host_lost_announced_handback_notifies_once_per_episode() {
-  assert_host_lost_handback_notifies_once_per_episode lost-announced-handback
-  pass "auto-arm: a lost host hand-back on an announced marker notifies once per failure episode"
+# An actionable handback remains deliverable even if the host could not restore
+# downtime. Preserve its diagnostic, not an invented auto-arm failure episode.
+test_host_actionable_failed_restoration_still_commits_normally() {
+  local kind dir out status
+  for kind in lost-handback lost-announced-handback; do
+    dir=$(make_primary_dir "$TMP_ROOT/host-$kind")
+    rm -f "$dir/config/supervision-host-off"
+    : > "$dir/state/task.meta"
+    write_host_fixture "$dir" "$kind"
+    out=$(run_autoarm "$dir" 2>/dev/null); status=$?
+    expect_code 2 "$status" "an actionable hand-back must reach main"
+    assert_contains "$out" 'supervision-host: watcher downtime could not be restored' "the host diagnostic must not be hidden"
+    assert_not_contains "$out" 'auto-arm FAILED' "handling phase is not an auto-arm failure"
+    assert_absent "$dir/state/.claude-autoarm-failure-notified" "a deliverable hand-back opened a failure episode"
+    [ "$(epoch_outcome "$dir")" = rewake ] || fail "an actionable hand-back did not commit normally"
+    pass "auto-arm: $kind delivers its host diagnostic through the normal rewake"
+  done
 }
 
 # An explicit failed hand-back must notify, not park on another host, even if
@@ -1935,8 +2264,11 @@ test_plain_arm_banner_keeps_its_wake_line_cap
 test_host_handback_carries_every_host_line
 test_host_stand_down_is_silent
 test_host_benign_rewake_refusal_opens_no_failure_episode
-test_host_lost_handback_notifies_once_per_episode
-test_host_lost_announced_handback_notifies_once_per_episode
+test_host_handback_during_open_handling_commits_normally
+test_host_handback_after_main_presentation
+test_host_refusal_before_hold_release_rewakes_at_the_next_stop
+test_host_handling_handback_lost_session_never_delivers
+test_host_actionable_failed_restoration_still_commits_normally
 test_host_failed_handback_is_not_retried
 test_host_crash_is_retried_then_reported
 test_arguments_never_arm

@@ -75,11 +75,17 @@ unset FM_DURATION_HOME
 # suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
 export FM_CREW_STATE_NM_CACHE=off
 
+# bin/fm-merge-prune.sh arms and starts a pool-copy prune after every verified
+# merge, which would run the real teardown against a fixture home. The suite
+# arms nothing by default; tests/fm-merge-prune.test.sh turns it on against a
+# fake pool and a fake treehouse.
+export FM_MERGE_PRUNE=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
 # under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
-unset FM_TASK_ID
+unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
 # marker an adviser-enabled worker carries, so they can neither force a
@@ -124,6 +130,7 @@ TOML
 # test files, not by this library, so it reads as "unused" here.
 # shellcheck disable=SC2034
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export FM_GUARD_AUDIT_READER="$ROOT/bin/fm-jev-audit-read.mjs"
 
 # --- reporters --------------------------------------------------------------
 

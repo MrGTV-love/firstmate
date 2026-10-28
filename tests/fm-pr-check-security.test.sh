@@ -332,7 +332,7 @@ seed_merge_review() {
   FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
     --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
     --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
-    --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
     --report "$dir/review.md"
 }
 
@@ -1182,6 +1182,31 @@ test_static_poll_contract() {
   [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll"
   [ "$(grep -c '^check: .*: merged$' "$dir/watch.out")" -eq 1 ] || fail "watcher did not convert merged output into exactly one wake"
   pass "static poll is silent except for one merged line and remains watcher-bounded"
+}
+
+# A merge that happens elsewhere reaches the watcher through the merge poll. The
+# poll's outcome arms the pool-copy prune (bin/fm-merge-prune.sh); the watcher
+# does not run it inside the lock it holds. The tick is off here so nothing
+# attempts a teardown against the fixture.
+test_watcher_merged_poll_arms_the_pool_copy_prune() {
+  local dir rc
+  dir=$(make_case merge-prune-poll-arms)
+  write_task_meta "$dir"
+  write_poll_meta "$dir/home/state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$dir/home/state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare authenticated watcher poll"
+  fm_pr_poll_publish_prepared || fail "could not publish authenticated watcher poll"
+  rm -f "$dir/home/state/.last-check"
+  set +e
+  FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=0 FM_TEST_GH_STATE=MERGED \
+    run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll: $(cat "$dir/watch.err")"
+  [ -f "$dir/home/state/task-a.merge-prune" ] || fail "the merged poll did not arm the pool-copy prune"
+  grep -qx 'pr=https://github.com/o/r/pull/1' "$dir/home/state/task-a.merge-prune" \
+    || fail "the armed record does not name the merged PR: $(cat "$dir/home/state/task-a.merge-prune")"
+  pass "a merge seen by the poll arms the pool-copy prune without running it under the poll's lock"
 }
 
 test_atomic_interruption_leaves_no_partial_artifact() {
@@ -3797,6 +3822,7 @@ test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
+test_watcher_merged_poll_arms_the_pool_copy_prune
 test_atomic_interruption_leaves_no_partial_artifact
 test_concurrent_watcher_sees_only_complete_publication
 test_poll_publication_refuses_unsafe_destinations

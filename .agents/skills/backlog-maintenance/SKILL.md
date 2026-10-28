@@ -1,6 +1,6 @@
 ---
 name: backlog-maintenance
-description: Load before filing, holding, updating, archiving, or handing off backlog items or task notes.
+description: "Load before filing, holding, updating, archiving, or handing off backlog items or task notes, and on escalated open-work receipts marked `standing: no` because no held task was named."
 user-invocable: false
 metadata:
   internal: true
@@ -11,6 +11,9 @@ metadata:
 A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it.
 When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
+
+An escalated open-work receipt marked `standing: no` because no captain-held task was named answers only the turn it followed.
+Name the actual captain-held task with `--hold TASK_ID` rather than treating that receipt as a standing wait.
 
 `.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax.
 Use compatible `tasks-axi` when the configured backend selects it, always through `bin/fm-tasks-axi.sh` so the call reaches this home's backlog from any directory, and the documented manual path otherwise; keep only the configured recent Done entries.

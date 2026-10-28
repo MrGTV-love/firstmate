@@ -1053,6 +1053,13 @@ fi
 TAB=$(printf '\t')
 # Slowest successful per-root duration_ms from three Ubuntu main runs.
 # docs/fm-test-portable-shards.md owns measurement provenance and refresh.
+# Exception: the four tests/fm-pr-merge*.sh hints are apportioned estimates
+# sized from the former single-file 3825 ms hint, pending measurement.
+# Exception: the tests/fm-lint.test.sh, tests/fm-lint-policy.test.sh,
+# tests/fm-lint-slots.test.sh, tests/fm-lint-report.test.sh, and
+# tests/fm-lint-helpers.sh hints are approximate sizing estimates from each
+# file's line count at the split (tests/fm-lint-report.test.sh is rounded from
+# 617 lines), pending measurement; they are not Ubuntu durations.
 # Hints affect assignment only, never source analysis or canonical coverage.
 fm_lint_partition_weight_hints() {
   cat <<'EOF'
@@ -1381,8 +1388,8 @@ tests/fm-contributions-read-saved.test.sh	768
 tests/fm-contributions.test.sh	2221
 tests/fm-control-herdr-smoke.test.sh	1069
 tests/fm-control-reassociate.test.sh	3073
-tests/fm-control-relaunch-backends.test.sh	2274
-tests/fm-control-relaunch-helpers.sh	1825
+tests/fm-control-relaunch-backends.test.sh	2997
+tests/fm-control-relaunch-helpers.sh	1839
 tests/fm-control-relaunch-recovery.test.sh	2724
 tests/fm-control-relaunch.test.sh	2922
 tests/fm-control.test.sh	9788
@@ -1443,7 +1450,11 @@ tests/fm-kimi-harness.test.sh	1819
 tests/fm-launch-prompt-signals-live-e2e.test.sh	56051
 tests/fm-launch-proof.test.sh	15948
 tests/fm-lint-workflows.test.sh	1069
-tests/fm-lint.test.sh	3523
+tests/fm-lint-report.test.sh	600
+tests/fm-lint-policy.test.sh	452
+tests/fm-lint-slots.test.sh	1437
+tests/fm-lint.test.sh	1083
+tests/fm-lint-helpers.sh	552
 tests/fm-live-gate.test.sh	1119
 tests/fm-live-lab-up-mate.test.sh	967
 tests/fm-live-lab.test.sh	2070
@@ -1488,7 +1499,10 @@ tests/fm-pi-watch-loader-live.test.sh	717
 tests/fm-pi-windows-shell-invocation.test.sh	716
 tests/fm-pipeline-spend.test.sh	968
 tests/fm-pr-check-security.test.sh	13798
-tests/fm-pr-merge.test.sh	3825
+tests/fm-pr-merge-checks.test.sh	1280
+tests/fm-pr-merge-forges.test.sh	1250
+tests/fm-pr-merge-helpers.sh	240
+tests/fm-pr-merge.test.sh	1250
 tests/fm-pr-reviewers.test.sh	767
 tests/fm-pr-state-live-e2e.test.sh	716
 tests/fm-pr-state.test.sh	869
@@ -1968,7 +1982,9 @@ fm_lint_load_average() {
 }
 
 fm_lint_aggregate_cpu() {
-  ps -A -o %cpu= 2>/dev/null | awk '{sum += $1} END {printf "%.2f", sum + 0}'
+  local sample
+  sample=$(ps -A -o %cpu= 2>/dev/null) || { printf 'unavailable'; return 0; }
+  printf '%s\n' "$sample" | awk '{sum += $1} END {printf "%.2f", sum + 0}'
 }
 
 TELEMETRY_START_EPOCH=0

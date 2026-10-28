@@ -23,7 +23,8 @@
 #   7. A ship reassociated into a copy nested in its own pool slot is retired by
 #      the real teardown once its work lands, and the slot is free for the next
 #      spawn. A later hop out of the pool proves and anchors that slot before
-#      releasing it, a vanished pool copy is released history, and a failed
+#      releasing it, a scout's vanished pool copy is released history while a ship's
+#      refuses and names relocation, and a failed
 #      staging write publishes nothing.
 #   8. Two or three records sharing a slot root retire finished ship/scout
 #      records without touching any copy, then reassociate parked unlanded
@@ -1159,26 +1160,43 @@ test_released_enclosing_slot_is_proved_and_anchored() {
   pass "a hop out of the pool refuses an enclosing slot with uncommitted work and anchors its committed work before releasing it"
 }
 
-# A recorded copy that vanished from Treehouse's pool layout is a slot path,
-# not custody: it is recorded as history and its claim released, so it never
-# blocks the task Treehouse later hands that slot to.
+# A ship whose recorded copy vanished is recovered only by relocation, whose
+# lease proof a re-point does not run, so it refuses and changes nothing. A
+# scout's recorded copy that vanished from Treehouse's pool layout is a slot
+# path, not custody: it is recorded as history and its claim released, so it
+# never blocks the task Treehouse later hands that slot to.
 test_absent_pool_copy_is_released_not_preserved() {
-  local id=reassoc-absent-slot dir slot new out
-  dir=$(new_case absent-slot "$id")
-  slot=$(move_case_into_slot "$dir" "$id")
-  new="$dir/new"
-  add_copy "$dir" "$new" "fm/$id-v2"
-  git -C "$dir/proj" worktree remove --force "$slot"
-  [ ! -e "$slot" ] && [ -f "$dir/pool/1/.fm-slot-owner" ] || fail "absent-slot setup failed"
-  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "slot vanished") \
-    || fail "reassociating out of a vanished slot failed: $out"
-  assert_contains "$out" "prior_state=absent" "the vanished copy was not reported absent"
-  assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path is not history"
-  assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path became custody"
-  [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the vanished slot's claim was kept"
-  assert_contains "$(cat "$dir/home/data/$id/brief.md")" "It replaces $slot, whose pool slot was released for reuse." \
-    "the instructions did not record the released slot"
-  pass "a vanished pool copy is recorded as released history and its claim is dropped"
+  local id dir slot new out kind claim
+  for kind in ship scout; do
+    id="reassoc-absent-slot-$kind"
+    dir=$(new_case "absent-slot-$kind" "$id")
+    slot=$(move_case_into_slot "$dir" "$id")
+    if [ "$kind" = scout ]; then
+      sed -i.bak -e 's/^kind=ship$/kind=scout/' -e '/^branch=/d' "$dir/home/state/$id.meta"
+      rm -f "$dir/home/state/$id.meta.bak"
+    fi
+    new="$dir/new"
+    add_copy "$dir" "$new" "fm/$id-v2"
+    git -C "$dir/proj" worktree remove --force "$slot"
+    [ ! -e "$slot" ] && [ -f "$dir/pool/1/.fm-slot-owner" ] || fail "absent-slot-$kind setup failed"
+    if [ "$kind" = ship ]; then
+      claim=$(cat "$dir/pool/1/.fm-slot-owner")
+      expect_refusal "$dir" "a ship whose recorded copy vanished must not be re-pointed" \
+        "fm-control $id relaunch --worktree <copy> --note <why>" 1 \
+        "$id" reassociate --worktree "$new" --note "slot vanished"
+      [ "$(cat "$dir/pool/1/.fm-slot-owner")" = "$claim" ] || fail "the refused ship reassociation changed the slot claim"
+      continue
+    fi
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "slot vanished") \
+      || fail "reassociating a scout out of a vanished slot failed: $out"
+    assert_contains "$out" "prior_state=absent" "the vanished copy was not reported absent"
+    assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path is not history"
+    assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path became custody"
+    [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the vanished slot's claim was kept"
+    assert_contains "$(cat "$dir/home/data/$id/brief.md")" "It replaces $slot, whose pool slot was released for reuse." \
+      "the instructions did not record the released slot"
+  done
+  pass "a ship whose copy vanished refuses reassociation and names relocation, and a scout's vanished pool copy is released history"
 }
 
 # A staging write that fails partway must refuse before anything is

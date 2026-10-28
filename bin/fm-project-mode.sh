@@ -83,7 +83,7 @@
 #
 # --names prints every registered project name, one per line, and nothing when
 # the registry is absent. It takes no project name. Project identity consumers
-# (bin/fm-dispatch-eligibility-lib.sh) ask here instead of parsing
+# (the dispatch resolver's match.projects rule) ask here instead of parsing
 # data/projects.md themselves, so the registry format keeps one owner.
 #
 # An unknown/missing project or unknown mode falls back to "no-mistakes off" (or

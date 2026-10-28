@@ -138,6 +138,10 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 OWNER_LOCK="$STATE/.claude-autoarm.lock"
 FAILURE_NOTICE="$STATE/.claude-autoarm-failure-notified"
 FAILURE_ALARM="$STATE/.claude-autoarm-failure-alarmed"
+# The main presentation hold this Stop's turn left, read before any library load
+# or gate: this async firing can start late, and its release below clears only
+# this hold, never one a newer turn's drain wrote meanwhile (bin/fm-wake-lib.sh).
+MAIN_HOLD_AT_STOP=$(cat "$STATE/.main-eligible-rows.held" 2>/dev/null || true)
 AUTOARM_ATTEMPTS=${FM_CLAUDE_AUTOARM_ATTEMPTS:-2}
 case "$AUTOARM_ATTEMPTS" in
   1|2|3) : ;;
@@ -226,6 +230,10 @@ if [ "$RECOVER_SESSION_LOCK" -eq 1 ]; then
   fm_session_lock_owned_by_self "$STATE" || exit 0
 fi
 
+# This Stop ends the owning session's main turn, so rows that turn presented
+# are no longer held by it, even when this firing defers to an open claim below.
+fm_wake_main_presentation_release "$MAIN_HOLD_AT_STOP" 2>/dev/null || true
+
 # --- single-flight generation claim --------------------------------------------
 # Claude runs one background process per firing with no dedupe. Exactly one
 # generation owner arms and translates per event epoch: every firing defers to
@@ -258,14 +266,36 @@ MY_GEN=$FM_AUTOARM_MY_GEN
 # the same hold. Failure means refused or unverifiable: the caller goes silent
 # (cleanup, exit 0) - the harness discards the collected stderr on exit 0, so
 # even an already-printed banner is never delivered by a losing generation.
+HELD_CLOSE_RECOVERY=
 autoarm_commit() {  # <outcome> [marker-file]
-  local outcome=$1 marker=${2:-} session_pid recovery
+  local outcome=$1 marker=${2:-} session_pid recovery main_rows
+  HELD_CLOSE_RECOVERY=
   if [ "$outcome" = rewake ]; then
     fm_session_lock_owned_by_self "$STATE" || return 2
     session_pid=$(sed -n '1p' "$STATE/.lock" 2>/dev/null || true)
     fm_recovery_marker_snapshot "$STATE/.watcher-down" || return 2
     case "$FM_RECOVERY_MARKER_TOKEN" in
       pending:downtime:*|announced:downtime:*) recovery=${FM_RECOVERY_MARKER_TOKEN##*:} ;;
+      pending:handling:*|announced:handling:*)
+        # A shared recovery phase is not a delivery receipt for this host's
+        # close: a branch drain can enter handling with main's wake still
+        # queued. The close stays owed while main has a queued row no
+        # presentation hold covers (fm_wake_main_unpresented). While the turn
+        # that presented every row still holds them and a healthy watcher
+        # stays live, a rewake would duplicate the close; with no healthy
+        # watcher, refusing could end in a blind stop, so the close commits
+        # even for a cycle boundary after an empty-queue drain.
+        [ "$HOST_MODE" -eq 1 ] || return 2
+        if ! fm_wake_main_unpresented \
+          && fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
+          if [ -e "$STATE/.main-eligible-rows.held" ] \
+            && main_rows=$(fm_wake_main_rows) && [ -n "$main_rows" ]; then
+            HELD_CLOSE_RECOVERY=${FM_RECOVERY_MARKER_TOKEN##*:}
+          fi
+          return 2
+        fi
+        recovery=${FM_RECOVERY_MARKER_TOKEN##*:}
+        ;;
       *) return 2 ;;
     esac
     fm_autoarm_write_owned "$STATE" "$MY_GEN" "$outcome" "$marker" "$session_pid" "$recovery"
@@ -279,7 +309,9 @@ autoarm_commit() {  # <outcome> [marker-file]
 # Best-effort ownership-checked record for exit-0 paths, where supersession
 # changes nothing about the action taken.
 autoarm_record() {  # <outcome>
-  fm_autoarm_write_owned "$STATE" "$MY_GEN" "$1" >/dev/null 2>&1 || true
+  local recovery=
+  [ "$1" != refused ] || recovery=$HELD_CLOSE_RECOVERY
+  fm_autoarm_write_owned "$STATE" "$MY_GEN" "$1" "" "" "$recovery" >/dev/null 2>&1 || true
 }
 
 # Claude terminates the complete async-hook process tree when the configured
@@ -426,6 +458,24 @@ if fm_supervision_host_enabled "$CONFIG" claude; then
   HOST_MODE=1
   ACTIONABLE_RE='^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)'
 fi
+
+# A host close refused while main held its queued rows is owed once the hold
+# ends. Claim publication consumes that refusal's episode-bound receipt under
+# the ownership mutex. Only that receipt permits early redelivery: a missing
+# or refused acknowledgement alone must not create an unbounded rewake loop.
+if [ "$HOST_MODE" -eq 1 ] && [ ! -e "$FAILURE_ALARM" ] \
+  && [ -n "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  && fm_autoarm_still_owner "$STATE" "$MY_GEN" \
+  && fm_recovery_marker_read "$STATE/.watcher-down" \
+  && [[ "$FM_RECOVERY_MARKER_TOKEN" == pending:handling:* || "$FM_RECOVERY_MARKER_TOKEN" == announced:handling:* ]] \
+  && [ "${FM_RECOVERY_MARKER_TOKEN##*:}" = "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  && fm_wake_main_unpresented && autoarm_commit rewake; then
+  {
+    printf 'firstmate watcher wake - queued wake rows were presented to a turn that ended without acknowledging them, so they need a handling turn now.\n'
+    printf 'Run bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n'
+  } >&2
+  exit 2
+fi
 attempt=0
 while [ "$attempt" -lt "$AUTOARM_ATTEMPTS" ]; do
   # A superseded owner must not start or attach another watcher or mutate any
@@ -558,23 +608,7 @@ if [ "$ACTIONABLE" -eq 1 ]; then
     [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
     exit 2
   fi
-  if [ "$HOST_MODE" -eq 1 ] && fm_autoarm_still_owner "$STATE" "$MY_GEN" \
-    && fm_recovery_marker_snapshot "$STATE/.watcher-down" \
-    && [[ "$FM_RECOVERY_MARKER_TOKEN" == pending:handling:* || "$FM_RECOVERY_MARKER_TOKEN" == announced:handling:* ]] \
-    && ! fm_watcher_healthy "$STATE" "$SCRIPT_DIR/fm-watch.sh" "$GRACE" "$FM_HOME"; then
-    LOST_HANDBACK_COMMITTED=0
-    if [ ! -e "$FAILURE_NOTICE" ]; then
-      printf 'firstmate watcher auto-arm FAILED - the supervision host returned an actionable wake, but its rewake could not be committed.\n' >&2
-      autoarm_commit failed "$FAILURE_NOTICE" && LOST_HANDBACK_COMMITTED=1
-    else
-      autoarm_commit failed-suppressed && LOST_HANDBACK_COMMITTED=1
-    fi
-    if [ "$LOST_HANDBACK_COMMITTED" -eq 1 ]; then
-      [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true
-      exit 2
-    fi
-  fi
-  # Refused (marker not downtime, lock lost) or superseded: the wake is dropped
+  # Refused (episode not eligible, lock lost) or superseded: the wake is dropped
   # in silence, so leave a forensic trace. A superseded generation cannot write.
   autoarm_record refused
   [ -z "$OUT" ] || rm -f "$OUT" 2>/dev/null || true

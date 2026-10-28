@@ -18,6 +18,7 @@
 #   - report mode exits 0 while still printing the violation
 #   - new-or-touched mode ignores an untouched offending guard
 #   - a retired guard that is still registered fails
+#   - --counts excludes active guards named in beyond_audit_active and beyond_audit_retired points
 set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -165,6 +166,47 @@ JSON
 assert_clean "a retired guard with a live retirement test is clean" "$RETIRED"
 mutate "$RETIRED" '.guards += [(.guards[0] | .id = "gone-guard" | .invariant = "a retired invariant")]'
 assert_fails_with "a retired guard that is still registered fails" "$RETIRED" R1
+
+# --- post-audit inventory ---------------------------------------------------
+LATER=$(fixture later)
+mutate "$LATER" '.guards += [(.guards[0] | .id = "later-guard" | .invariant = "a later invariant")]'
+out=$(run_lint "$LATER" --counts) && fail "an unaccounted post-audit guard balanced the inventory: $out"
+mutate "$LATER" '.beyond_audit_active = ["missing-guard"]'
+out=$(run_lint "$LATER" --counts) && fail "an unregistered post-audit id balanced the inventory: $out"
+mutate "$LATER" '.beyond_audit_active = ["later-guard"]'
+out=$(run_lint "$LATER" --counts) || fail "a registered post-audit guard did not balance the inventory: $out"
+pass "a guard registered after the audit balances the inventory only when it is named"
+
+# --- audited inventory ------------------------------------------------------
+COUNTS=$(fixture counts)
+mutate "$COUNTS" '.guards += [(.guards[0] | .id = "late-guard" | .invariant = "a post-audit invariant")]'
+cat >"$COUNTS/docs/guards/retired.json" <<'JSON'
+[{"id":"late-gone","system":"firstmate","invariant":"a post-audit retired invariant","retired":"2026-10-24",
+  "why":"it was never in the audit","replaced_by":"nothing","retirement_test":"tests/gguard.test.sh"}]
+JSON
+out=$(run_lint "$COUNTS" --counts) && fail "unmarked post-audit guards must break the audited inventory"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 inventory' || fail "expected the inventory violation, got: $out"
+mutate "$COUNTS" '.beyond_audit_active = [.guards[1].id] | .beyond_audit_retired = [{"point":"late-gone","evidence":"fixture","reason":"never in the audit"}]'
+out=$(run_lint "$COUNTS" --counts) || fail "marked post-audit guards must keep the audited inventory: $out"
+printf '%s\n' "$out" | grep -q 'active=2 retired=1 beyond_audit=1 excluded=0 unregistered=0 audited=1 beyond_audit_active=1' \
+  || fail "inventory did not exclude post-audit guards: $out"
+pass "post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory"
+
+# --- post-audit active guards ------------------------------------------------
+POSTAUDIT=$(fixture postaudit)
+mutate "$POSTAUDIT" '.guards += [(.guards[0] | .id = "new-guard" | .invariant = "a post-audit invariant")]'
+out=$(run_lint "$POSTAUDIT" --counts) && fail "an unaccounted post-audit guard must fail the count"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 inventory' || fail "expected the inventory violation, got: $out"
+pass "a guard added after the audit fails the count until it is accounted for"
+mutate "$POSTAUDIT" '.beyond_audit_active = ["new-guard"]'
+out=$(run_lint "$POSTAUDIT" --counts) || fail "an accounted post-audit guard must keep the count clean: $out"
+printf '%s\n' "$out" | grep -q 'active=2 retired=0 beyond_audit=0 excluded=0 unregistered=0 audited=1 beyond_audit_active=1' \
+  || fail "the post-audit guard must be counted outside the audit: $out"
+pass "a post-audit guard in beyond_audit_active keeps the audited size unchanged"
+mutate "$POSTAUDIT" '.beyond_audit_active += ["unknown-guard"] | .audited = 0'
+out=$(run_lint "$POSTAUDIT" --counts) && fail "a post-audit entry with no registered guard must fail"
+printf '%s\n' "$out" | grep -q '^VIOLATION R1 unknown-guard' || fail "expected the unknown-guard violation, got: $out"
+pass "a post-audit entry must name a registered guard"
 
 # --- ratchet ----------------------------------------------------------------
 ALLOW=$(fixture allowlist)

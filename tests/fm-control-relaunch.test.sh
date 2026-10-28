@@ -14,11 +14,11 @@
 . "$(dirname "${BASH_SOURCE[0]}")/fm-control-relaunch-helpers.sh"
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
-  local dir out rc gen_before gen_after
+  local dir out rc gen_before gen_after session old_session=00000000-0000-4000-8000-000000000000
   dir=$(new_case same rl1)
   add_ship_task "$dir" rl1 claude
   gen_before=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" rl1)
-  printf 'busy_gen=%s\n' "$gen_before" >> "$dir/home/state/rl1.meta"
+  printf 'busy_gen=%s\nclaude_session_id=%s\n' "$gen_before" "$old_session" >> "$dir/home/state/rl1.meta"
   out=$(run_control "$dir" rl1 relaunch --note "stopped mid-refactor"); rc=$?
   expect_code 0 "$rc" "a same-harness relaunch should succeed"$'\n'"$out"
   assert_contains "$out" "relaunched rl1 harness=claude from=claude" "the outcome should name the transition"
@@ -36,6 +36,14 @@ test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint() {
   assert_grep "/exit" "$dir/fake/literal" "the previous agent should have been exited"
   assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
   assert_grep "Firstmate operational input waiting: read" "$dir/fake/literal" "the replacement should have been launched"
+  if [ "$(meta_field "$dir" rl1 write_confinement)" = seatbelt-v1 ]; then
+    session=$(meta_field "$dir" rl1 claude_session_id)
+    [ "$(grep -c '^claude_session_id=' "$dir/home/state/rl1.meta")" = 1 ] && [ -n "$session" ] && [ "$session" != "$old_session" ] \
+      || fail "a confined relaunch must replace the recorded Claude session id with one fresh id"
+    assert_grep "--session-id $session" "$dir/fake/literal" "the replacement must launch under the recorded session id"
+  else
+    assert_no_grep claude_session_id= "$dir/home/state/rl1.meta" "an unconfined relaunch must drop the Claude session id"
+  fi
   pass "fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree"
 }
 
@@ -359,7 +367,7 @@ SH
       else
         assert_equals complete "$(journal_field "$dir" "$id" phase)" "subscription relaunch must complete"
         assert_equals "$model" "$(meta_field "$dir" "$id" model)" "subscription selection must reach the replacement"
-        assert_contains "$(cat "$dir/fake/launch")" "--model '$model'" "subscription model must reach executable launch"
+        assert_launch_word "$dir/fake/launch" "--model " "$model" "subscription model must reach executable launch"
       fi
     done
   done
@@ -478,6 +486,7 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
       printf '%s\n' 'pr=https://github.com/example/repo/pull/90'
       printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
       printf '%s\n' 'x_request=request-90'
+      printf '%s\n' 'egress=["web"]'
     } >> "$dir/home/state/rl90.meta"
 
     out=$(run_control "$dir" rl90 relaunch --note "keep PR monitoring alive"); rc=$?
@@ -490,6 +499,14 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
     ' _ "$ROOT" "$dir/home/state/rl90.meta")
     [ "$parsed" = "https://github.com/example/repo/pull/90" ] \
       || fail "PR monitoring must still parse the relaunched task record with tracing $tracing (got: ${parsed:-rejected})"
+    [ "$(meta_field "$dir" rl90 egress)" = '["web"]' ] \
+      || fail "relaunch must preserve the task egress grant recorded after its PR"
+    printf '%s\n' 'unrelated_field=1' >> "$dir/home/state/rl90.meta"
+    parsed=$(bash -c '
+      . "$1/bin/fm-pr-lib.sh"
+      fm_pr_metadata_identity_parse "$2" && printf "%s\n" "$FM_PR_META_URL"
+    ' _ "$ROOT" "$dir/home/state/rl90.meta")
+    [ -z "$parsed" ] || fail "an unrelated field after pr= must still invalidate PR identity"
     if [ "$tracing" = on ]; then
       [ "$(awk -F= '$1 == "traceparent" { count++ } END { print count+0 }' "$dir/home/state/rl90.meta")" = 1 ] \
         || fail "traced relaunch must publish exactly one trace carrier"
@@ -499,7 +516,7 @@ test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
       [ -z "$(meta_field "$dir" rl90 traceparent)" ] \
         || fail "untraced relaunch must remove the task's recorded carrier"
     fi
-    pass "fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing $tracing"
+    pass "fm-control relaunch: a recorded PR with a later egress grant stays parseable for PR monitoring with tracing $tracing"
   done
 }
 
@@ -624,7 +641,7 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
 }
 
 test_relaunch_announces_surviving_inbox_records() {
-  local harness dir id first second out meta
+  local harness dir id first second first_bell second_bell out meta
   for harness in claude omp; do
     id="survivors-$harness"
     dir=$(new_case "$id" "$id")
@@ -644,27 +661,21 @@ test_relaunch_announces_surviving_inbox_records() {
     cp "$dir/fakebin/claude" "$dir/fakebin/omp"
     fm_eval_launch "$(cat "$dir/fake/launch")" "$dir/wt" "$dir/fakebin" \
       HOME="$dir/user-home" FM_FAKE_CLAUDE_ENV_LOG="$dir/argv" || fail "$harness launch execution failed"
-    out=$(GUARD="$ROOT/bin/fm-jev-guard.ts" CASE_DIR="$dir" TASK="$id" HOST="$harness" FIRST="$first" SECOND="$second" \
-      node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+    first_bell=$(bash -c '. "$1"; fm_task_inbox_doorbell_line "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$first") ||
+      fail "$harness first survivor doorbell unavailable"
+    second_bell=$(bash -c '. "$1"; fm_task_inbox_doorbell_line "$2"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$second") ||
+      fail "$harness second survivor doorbell unavailable"
+    out=$(CASE_DIR="$dir" FIRST_BELL="$first_bell" SECOND_BELL="$second_bell" \
+      node --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
-const dir = process.env.CASE_DIR;
-const args = readFileSync(`${dir}/argv.args`, 'utf8').split('\0').filter(Boolean);
-const handlers = {};
-installJevGuard({ on(name, fn) { handlers[name] = fn; } }, {
-  home: `${dir}/home`, state: `${dir}/home/state`, config: `${dir}/home/config`,
-  data: `${dir}/home/data/${process.env.TASK}`, worktree: `${dir}/wt`,
-  task: process.env.TASK, project: 'firstmate', host: process.env.HOST, policy: 'FIRSTMATE_JEV_GUARD_V1',
-});
-handlers.before_agent_start({ prompt: args.at(-1) });
-for (const path of [process.env.FIRST, process.env.SECOND]) {
-  const result = await handlers.tool_result({ toolName: 'read', input: { path: `${path}:raw` },
-    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
-    details: { meta: { source: { type: 'path', value: path } } } }, { cwd: `${dir}/wt` });
-  assert.equal(result, undefined, 'each survivor must be natively announced, even without a provider key');
-}
+const args = readFileSync(`${process.env.CASE_DIR}/argv.args`, 'utf8').split('\0').filter(Boolean);
+const prompt = args.at(-1);
+const first = prompt.indexOf(process.env.FIRST_BELL);
+const second = prompt.indexOf(process.env.SECOND_BELL);
+assert.ok(first >= 0, 'the launch prompt must announce the first surviving record');
+assert.ok(second >= 0, 'the launch prompt must announce the second surviving record');
+assert.ok(first < second, 'surviving records must be announced in numeric order');
 JS
     ) || fail "$harness survivor delivery failed: $out"
   done
@@ -751,6 +762,9 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   # Wiring the previous claude incarnation left in the worktree.
   mkdir -p "$dir/wt/.claude"
   printf '{"hooks":{}}\n' > "$dir/wt/.claude/settings.local.json"
+  printf '(version 1)\n(allow default)\n' > "$dir/home/state/rl4.write-confinement.sb"
+  printf '{"at":1,"task":"rl4","decision":"clear"}\n' > "$dir/home/state/rl4.jev-guard.jsonl"
+  cp "$dir/home/state/rl4.jev-guard.jsonl" "$dir/prior-audit"
   printf 'codex' > "$dir/fake/becomes"
   out=$(run_control "$dir" rl4 relaunch --harness codex --note "switching runtime"); rc=$?
   expect_code 0 "$rc" "a harness switch should succeed"$'\n'"$out"
@@ -758,6 +772,8 @@ test_harness_switch_moves_the_record_and_clears_prior_wiring() {
   [ "$(meta_field "$dir" rl4 harness)" = codex ] || fail "the record should follow the switch"
   [ ! -e "$dir/wt/.claude/settings.local.json" ] \
     || fail "the previous harness's per-task wiring must be cleared on a switch"
+  assert_absent "$dir/home/state/rl4.write-confinement.sb" "the old confinement profile must not survive an unconfined replacement"
+  cmp -s "$dir/prior-audit" "$dir/home/state/rl4.jev-guard.jsonl" || fail "harness replacement removed historical task audit rows"
   assert_grep "codex" "$dir/fake/literal" "the replacement launch should be the new harness"
   [ "$(journal_field "$dir" rl4 from_harness)" = claude ] || fail "the journal should record the origin harness"
   [ "$(journal_field "$dir" rl4 to_harness)" = codex ] || fail "the journal should record the target harness"
@@ -1049,8 +1065,7 @@ test_worker_account_pin_follows_the_relaunch() {
   out=$(run_control "$dir" "$id" relaunch --note "pinned account"); rc=$?
   expect_code 0 "$rc" "a relaunch under a signed-in account pin should succeed"$'\n'"$out"
   [ "$(meta_field "$dir" "$id" account)" = "$dir/work" ] || fail "the relaunched record should carry the pinned account"
-  assert_contains "$(cat "$dir/fake/literal")" "CLAUDE_CONFIG_DIR='$dir/work'" \
-    "the replacement should launch under the pinned root"
+  assert_launch_word "$dir/fake/literal" "CLAUDE_CONFIG_DIR=" "$dir/work" "the replacement should launch under the pinned root"
   rm "$dir/home/config/claude-account"
   : > "$dir/fake/literal"
   out=$(run_control "$dir" "$id" relaunch --note "pin removed"); rc=$?

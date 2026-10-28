@@ -905,13 +905,79 @@ exit 0
 SH
   chmod +x "$fakebin/treehouse"
   printf 'FMX_PAIRING_TOKEN=tok-missing\n' > "$home/.env"
-  out=$(PATH="$fakebin" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+  mkdir -p "$home/operator-home"
+  out=$(PATH="$fakebin" HOME="$home/operator-home" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
     "$BASH" "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null)
-  assert_contains "$out" "MISSING: jq" "bootstrap must report missing jq when X mode is opted in"
+  assert_contains "$out" "MISSING: jq (install:" "bootstrap must report missing jq when X mode is opted in"
+  assert_not_contains "$out" "PATH_MISSING:" "an absent jq must keep install guidance"
   assert_not_contains "$out" "FMX: X mode on" "bootstrap must not announce X mode when a dependency is missing"
   assert_absent "$home/state/x-watch.check.sh" "missing jq must not arm the check shim"
   assert_absent "$home/config/x-mode.env" "missing jq must not write the cadence config"
   pass "bootstrap reports missing X-mode dependencies before arming"
+}
+
+test_bootstrap_reports_off_path_x_dependency() {
+  local home fakebin user user_bin bash_env real_jq out
+  home="$TMP_ROOT/boot-off-path-x"
+  user="$home/operator with spaces"
+  user_bin="$user/.local/bin"
+  mkdir -p "$home" "$user_bin"
+  fakebin=$(fm_fakebin "$home")
+  fm_fake_exit0 "$fakebin" curl
+  real_jq=$(command -v jq) || fail "test host must provide jq"
+  cat > "$user_bin/jq" <<SH
+#!/usr/bin/env bash
+printf 'executed\\n' >> "\$FM_TEST_OFF_PATH_EXEC_LOG"
+exec '$real_jq' "\$@"
+SH
+  chmod +x "$user_bin/jq"
+  # Host jq lives in a system BASE_PATH dir on many hosts; mask it unless the
+  # user-local directory is on PATH, so only that copy can satisfy lookup.
+  bash_env="$home/no-system-jq.bash"
+  cat > "$bash_env" <<'SH'
+case ":$PATH:" in
+  *":$FM_TEST_USER_BIN:"*) ;;
+  *)
+    command() {
+      if [ "${1:-}" = -v ] && [ "${2:-}" = jq ]; then
+        return 1
+      fi
+      builtin command "$@"
+    }
+    jq() {
+      return 127
+    }
+    ;;
+esac
+SH
+  printf 'FMX_PAIRING_TOKEN=tok-off-path\n' > "$home/.env"
+  run_off_path_bootstrap() {
+    PATH="$1" BASH_ENV="$bash_env" HOME="$user" FM_TEST_USER_BIN="$user_bin" \
+      FM_TEST_OFF_PATH_EXEC_LOG="$home/executed" FM_HOME="$home" FM_ROOT_OVERRIDE="$home" \
+      "$ROOT/bin/fm-bootstrap.sh" 2>/dev/null
+  }
+  out=$(run_off_path_bootstrap "$fakebin:$BASE_PATH")
+  assert_contains "$out" "PATH_MISSING: jq (found: $user_bin/jq); add $user_bin to PATH" \
+    "an off-PATH jq needs PATH guidance"
+  assert_not_contains "$out" "MISSING: jq (install:" "an off-PATH jq must not receive reinstall advice"
+  assert_not_contains "$out" "FMX: X mode on" "an off-PATH jq must not enable Relay"
+  assert_absent "$home/state/x-watch.check.sh" "an off-PATH jq must not arm the check shim"
+  assert_absent "$home/config/x-mode.env" "an off-PATH jq must not write the cadence config"
+  assert_absent "$home/executed" "bootstrap executed an off-PATH jq"
+  out=$(run_off_path_bootstrap "$user_bin:$fakebin:$BASE_PATH")
+  assert_contains "$out" "FMX: X mode on" "corrected PATH must enable Relay through normal lookup"
+  assert_not_contains "$out" "PATH_MISSING:" "corrected PATH is not a PATH problem"
+  assert_present "$home/state/x-watch.check.sh" "corrected PATH must arm the check shim"
+  rm -f "$home/executed"
+  out=$(run_off_path_bootstrap "$fakebin:$BASE_PATH")
+  assert_contains "$out" "PATH_MISSING: jq (found: $user_bin/jq)" "a lost PATH entry needs PATH guidance"
+  assert_contains "$out" "FMX: X mode off - missing relay poll dependencies; resolve the dependency lines above" \
+    "Relay must defer to the dependency diagnostics"
+  assert_not_contains "$out" "install them" "Relay must not recommend reinstalling an off-PATH jq"
+  assert_absent "$home/state/x-watch.check.sh" "an off-PATH jq must disarm the check shim"
+  assert_absent "$home/config/x-mode.env" "an off-PATH jq must remove the cadence config"
+  assert_absent "$home/executed" "bootstrap executed an off-PATH jq"
+  pass "bootstrap reports an off-PATH X-mode dependency without executing it or enabling Relay"
 }
 
 test_bootstrap_does_not_announce_when_arm_fails() {
@@ -3303,6 +3369,7 @@ test_followup_rejects_flag_like_arguments
 test_bootstrap_activates_on_env_token
 test_bootstrap_relative_home_writes_absolute_poll_shim
 test_bootstrap_reports_missing_x_dependency
+test_bootstrap_reports_off_path_x_dependency
 test_bootstrap_does_not_announce_when_arm_fails
 test_bootstrap_does_not_follow_x_artifact_symlinks
 test_bootstrap_inert_without_token

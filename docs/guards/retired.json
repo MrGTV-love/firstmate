@@ -8,5 +8,134 @@
     "why": "it cannot withhold on Claude, so it reported itself as protection it did not provide; the note it appended was advisory only",
     "replaced_by": "nothing; the same invariant is carried by the human review of tool output and by jev-pretool-deny for actions, not reads",
     "retirement_test": "tests/fm-retired-jev-posttool-advisory.test.sh"
+  },
+  {
+    "id": "jev-shell-model-gate",
+    "system": "firstmate",
+    "invariant": "a shell command that Jev judges irreversible or destructive never runs",
+    "retired": "2026-10-24",
+    "why": "its effect and destructive-intent questions ask for the decision itself, so a worker's own cleanup reads as destructive: 63 of its 69 refusals were false positives, and eval or python -c bypassed it",
+    "replaced_by": "nothing yet; OS-level write confinement of each worker process tree, with the delegated-write residual named, is the planned replacement",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-model-gate.test.sh"
+  },
+  {
+    "id": "jev-shell-outage-deny",
+    "system": "firstmate",
+    "invariant": "a shell command whose required Jev judgment could not run never runs",
+    "retired": "2026-10-24",
+    "why": "it only failed the retired shell model gate closed; it turned provider failures into refusals of harmless commands, including a worker's own inbox acknowledgement (O13)",
+    "replaced_by": "nothing; a shell call now needs no judgment, so there is no judgment to wait for",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-outage-deny.test.sh"
+  },
+  {
+    "id": "jev-shell-outage-admissions",
+    "system": "firstmate",
+    "invariant": "during a failed shell judgment only a proven read-only command or a lab-home command runs",
+    "retired": "2026-10-24",
+    "why": "the read-only classifier and the lab-home marker existed only to stop the retired shell outage denial from refusing legitimate work, and no ledger row ever used either branch",
+    "replaced_by": "nothing; with no shell judgment and no shell outage denial there is nothing left to admit",
+    "evidence": "data/fm-jev-guard-e2e/report.md",
+    "retirement_test": "tests/fm-retired-jev-shell-outage-admissions.test.sh"
+  },
+  {
+    "id": "jev-omp-result-screen",
+    "system": "firstmate",
+    "assessment_point": "D4",
+    "invariant": "untrusted tool output never becomes an omp worker's authority",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.5 and 7.4: 0 true positives in a random sample of 70 of its withholds, no third-party source among 3,431 traced withholds, 29% of omp bash outputs hidden, and Claude workers never had it",
+    "replaced_by": "nothing; tool results reach the worker unchanged, and third-party input, if one is ever added, is labelled by source at the tool boundary",
+    "retirement_test": "tests/fm-retired-jev-omp-result-screen.test.sh"
+  },
+  {
+    "id": "jev-trusted-read",
+    "system": "firstmate",
+    "assessment_point": "D5",
+    "invariant": "a read of bytes the task owns skips the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: an exemption that existed only to keep the result screen off task-owned reads; it never refused anything",
+    "replaced_by": "nothing; with no result screen there is nothing to exempt",
+    "retirement_test": "tests/fm-retired-jev-trusted-read.test.sh"
+  },
+  {
+    "id": "jev-channel-consistency",
+    "system": "firstmate",
+    "assessment_point": "D6",
+    "invariant": "a launch or steering record whose receipt matches skips the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 7.4 and 8: it only exempted a consistent record from screening and never refused a forged one, so its publisher receipts had no other consumer",
+    "replaced_by": "nothing; launch and steering records reach the worker unchanged and their publishers write no receipt",
+    "retirement_test": "tests/fm-retired-jev-channel-consistency.test.sh"
+  },
+  {
+    "id": "jev-producer-field-exclusion",
+    "system": "firstmate",
+    "assessment_point": "D7",
+    "invariant": "a local AXI tool's own help lines are excluded from the result screen",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2 and 7.4: a command list, omp trailer match and wall-time allowance that existed only to keep the result screen from withholding local tool help",
+    "replaced_by": "nothing; local tool output, help lines included, reaches the worker unchanged",
+    "retirement_test": "tests/fm-retired-jev-producer-field-exclusion.test.sh"
+  },
+  {
+    "id": "jev-result-size-refusal",
+    "system": "firstmate",
+    "assessment_point": "D9",
+    "invariant": "an omp tool result too large to screen completely is withheld",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "data/fm-jev-guard-e2e/report.md sections 3.2, 3.6 and 7.4: the result half of the size refusal withheld large outputs only because the result screen could not cover them; the write-time size refusal retired separately with the write content judgment",
+    "replaced_by": "nothing; large results reach the worker unchanged",
+    "retirement_test": "tests/fm-retired-jev-result-size-refusal.test.sh"
+  },
+  {
+    "id": "jev-write-secrets-kind",
+    "system": "firstmate",
+    "invariant": "a write or edit Jev classifies as a secrets file never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the write kind Choice (assessment Q3) gated on a category label and its confidence; it never chose secrets in 4,363 judged writes, and the harm it named, a credential committed or shipped, happens at commit and push rather than at write",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2, 6.1 (Q3), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-secrets-kind.test.sh"
+  },
+  {
+    "id": "jev-write-credential-noul",
+    "system": "firstmate",
+    "invariant": "a write or edit whose content Jev scores as a real credential never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the contains_secret Noul (assessment Q4) never reached its 0.70 threshold in 4,363 judged writes (maximum 0.52), and writing a key into an ignored .env is correct behaviour; the harm is a key reaching a commit or a push",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2, 6.1 (Q4), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-credential-noul.test.sh"
+  },
+  {
+    "id": "jev-write-remainder-shapes",
+    "system": "firstmate",
+    "invariant": "a write or edit too long for model screening never runs while its replacement text holds a known credential shape",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "the local shape check existed only to cover the unscreened remainder of the write-time size path; with no write-content model screening there is no remainder, and the same anchored shapes now run over added lines at commit and push",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.2 (D3 remainder), 7.3 and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py",
+    "retirement_test": "tests/fm-retired-jev-write-remainder-shapes.test.sh"
+  },
+  {
+    "id": "jev-write-judgment-unavailable",
+    "system": "firstmate",
+    "invariant": "a write or edit whose required content judgment cannot run never runs",
+    "retired": "2026-10-24",
+    "tier": "A",
+    "why": "write-content review-on-unavailable denials (request too large, provider outage, never-send withholding) refused harmless writes such as a worker report, and a write no longer has a content judgment to require",
+    "evidence": "data/fm-jev-guard-e2e/report.md sections 3.6 (O3, O7-O10, O14-O17), 7.6 (D9) and 9 (T3)",
+    "replaced_by": "git-commit-credential-shapes and git-push-credential-shapes in bin/fm-git-secrets.py; write/edit input and audit failures keep jev-pretool-deny",
+    "retirement_test": "tests/fm-retired-jev-write-judgment-unavailable.test.sh"
   }
 ]

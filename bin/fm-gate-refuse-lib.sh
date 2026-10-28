@@ -182,7 +182,7 @@ fm_refuse_if_gate_agent() {
     echo "error: refusing fleet lifecycle from inside a no-mistakes gate worktree ($FM_GATE_REFUSE_COMMON)" >&2
   fi
   # shellcheck disable=SC2016 # Print the command for the caller to expand, not this process.
-  echo 'error: the one permitted escape is a disposable lab home: LAB=$(mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"); bin/fm-lab-home.sh create "$LAB"; FM_HOME=$LAB <command>' >&2
+  echo 'error: the one permitted escape is a disposable lab home: run `eval "$(bin/fm-lab-home.sh env)"`, then re-run this call with that FM_HOME' >&2
   echo 'error: a real home is intentionally unavailable to a gate agent, because a gate call against it would mutate the fleet it is reviewing.' >&2
   fm_gate_refuse_event
   exit "$FM_GATE_REFUSE_EXIT"

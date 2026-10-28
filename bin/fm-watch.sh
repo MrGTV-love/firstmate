@@ -78,6 +78,18 @@
 #   stale: <window> (steering-inbox busy bookkeeping unwritable: ...)
 #                          steering-inbox recovery; bin/fm-task-inbox-lib.sh owns
 #                          delivery-attempt, busy-deferral, and unavailable-endpoint policy
+#   check: long-held lock: lock=<path> owner=<pid> state=<stat> parent=<pid>
+#                          parent_command=<command> age=<seconds>s waiters=<n>
+#                          [trigger=dead-owner]
+#                          a fleet-ledger, watcher-down or wake-queue hold
+#                          exceeded 300s; or, with
+#                          trigger=dead-owner, any other lock's owner is a
+#                          zombie (state Z) or gone (state=dead) while a live
+#                          waiter stays blocked on it across two consecutive
+#                          checks, at any age
+#                          (fm_lock_monitor_check);
+#                          once per ownership episode, observation only
+#                          (bin/fm-wake-lib.sh owns the diagnostic receipts)
 #   check: <script>: <out> authenticated check output, always actionable
 #   check: process-event result captured: <keys>
 #                          a durably captured process-to-event result is queued
@@ -380,6 +392,14 @@ case "$IDLE_REAP_INTERVAL" in
 esac
 IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
 IDLE_REAP_NEXT=
+# Pruning a merged task's pool copy (bin/fm-merge-prune.sh); 0 stops the sweep.
+MERGE_PRUNE_BIN=${FM_MERGE_PRUNE_BIN:-$SCRIPT_DIR/fm-merge-prune.sh}
+MERGE_PRUNE_INTERVAL=${FM_MERGE_PRUNE_INTERVAL:-60}
+case "$MERGE_PRUNE_INTERVAL" in
+  ''|*[!0-9]*) MERGE_PRUNE_INTERVAL=60 ;;
+  *) MERGE_PRUNE_INTERVAL=$((10#$MERGE_PRUNE_INTERVAL)) ;;
+esac
+MERGE_PRUNE_LAUNCHED=0
 # The TypeSafe account-health probe is one tiny request at this cadence;
 # docs/configuration.md "TypeSafe account health" owns the contract.
 TYPESAFE_HEALTH_INTERVAL=${FM_TYPESAFE_HEALTH_INTERVAL:-600}
@@ -2603,6 +2623,65 @@ event_wait_or_sleep() {
   esac
 }
 
+lock_alarm_tick() {  # [settle-command]: given inside a queue wait, failures keep waiting
+  if ! fm_lock_monitor_check "$@"; then
+    echo "watcher: long-held lock observation failed" >&2
+    [ "$#" -eq 0 ] || return 0
+    exit 1
+  fi
+  [ -n "$FM_LOCK_MONITOR_REASON" ] || return 0
+  if [ "$FM_LOCK_MONITOR_UNQUEUED" = 1 ]; then
+    # A jammed queue must not prevent reporting the jam. Preserve the
+    # independent receipt until output succeeds, without signal-phase work
+    # that itself needs the queue lock.
+    FM_WAKE_BEFORE_OUTPUT_ACTION='' FM_WAKE_AFTER_OUTPUT_ACTION='' \
+      FM_WAKE_POST_OUTPUT_ACTION=fm_lock_monitor_delivered wake "$FM_LOCK_MONITOR_REASON"
+  else
+    wake "$FM_LOCK_MONITOR_REASON"
+  fi
+}
+
+# FM_LOCK_WAIT_TICK hook: while this watcher process waits on any lock (the
+# wake queue, the recovery marker, or any other), run the long-held lock alarm
+# once per poll interval and keep waiting; it never re-enters itself. Before any
+# alarm row is published, a pending append is made durable (appended now, or
+# spilled for the next locked append to replay first, never reclaiming a queue
+# lock this watcher already holds); if neither succeeds, or observation fails,
+# the wait goes on. Both EXIT cleanups clear the hook first, so their bounded
+# waits never deliver a second wake.
+WATCH_LOCK_WAIT_TICKED=0
+WATCH_LOCK_WAIT_TICKING=0
+watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
+  [ "$3" = "$$" ] && [ "$WATCH_LOCK_WAIT_TICKING" = 0 ] || return 0
+  [ $((SECONDS - $2)) -ge "$POLL" ] && [ $((SECONDS - WATCH_LOCK_WAIT_TICKED)) -ge "$POLL" ] || return 0
+  WATCH_LOCK_WAIT_TICKED=$SECONDS
+  WATCH_LOCK_WAIT_TICKING=1
+  lock_alarm_tick fm_wake_pending_settle
+  WATCH_LOCK_WAIT_TICKING=0
+  return 0
+}
+
+# Ready-PR registration belongs with housekeeping repairs, not the backed-off
+# heartbeat: a missed supervisor command must not keep capacity occupied. The
+# helper owns the scan and refusal memory; detach forge reads like the existing
+# repair sweeps so a slow forge cannot stall supervision. The pass runs under a
+# hard limit (fm-timeout-lib.sh) and, like the other detached sweeps, outlives a
+# watcher that exits on a wake; a hung forge call dies with its pass and the
+# persisted admission cursor lets the next tick start after that record.
+PR_READY_RECONCILE_PID=
+PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
+# measured: value=120 date=2026-10-27 host=Mac-Studio.local margin=1.02 (basis: conservative 16-ship workload across at least two eight-record passes, so 120 s / (7.32 s per ship x 16, the firstmate capacity in the cited config/project-capacity) = 120 / 117.12; one ship costs 7.32 s: 3.81 s for the slowest of ten real fm-crew-state.sh fallback reads on 2026-10-27, plus 3.51 s to register measured on 2026-10-20 as the slowest live registration pass over a 200,000-line log 2s with a stand-in forge, plus slowest of three real gh isDraft reads 0.87s and of three real gh headRefOid reads 0.64s)
+case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
+pr_ready_reconcile_tick() {
+  if [ -n "$PR_READY_RECONCILE_PID" ]; then
+    kill -0 "$PR_READY_RECONCILE_PID" 2>/dev/null && return 0
+    wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
+  fi
+  ( fm_run_timed "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
+  PR_READY_RECONCILE_PID=$!
+}
+
 # --- Main entry: the runtime below runs only when this file is executed as a
 # script. When sourced (unit tests loading the functions above), return here
 # before acquiring the singleton lock or entering the blocking loop.
@@ -2692,6 +2771,13 @@ while ! fm_lock_try_acquire "$WATCH_LOCK"; do
   fi
   exit 0
 done
+# Startup alarms precede recovery's own queue locks, so an already aged queue
+# owner can be reported without first waiting behind that same owner. Until
+# watcher_cleanup is installed, only a delivered wake closes like an ordinary
+# watcher; startup failures retain the lock as stale evidence for the next arm.
+trap 'FM_LOCK_WAIT_TICK=; [ -z "$FM_WATCH_DELIVERED_REASON" ] || fm_recovery_transition "$WATCHER_DOWNTIME_MARKER" release-lock "$WATCH_LOCK" downtime "$CLEANUP_LOCK_BOUND"' EXIT
+lock_alarm_tick
+FM_LOCK_WAIT_TICK=watch_lock_wait_tick
 if [ -n "$EVICTED_PID" ]; then
   echo "watcher: replaced stalled pid $EVICTED_PID (no CPU or beacon progress for ${WATCHER_STALL_BOUND}s; beacon ${EVICTED_BEAT_AGE}s)"
 fi
@@ -2714,6 +2800,10 @@ if [ "${FM_WATCH_HANDLING_SUCCESSOR:-0}" = 1 ]; then
   WATCHER_RECOVERY_PENDING=0
 elif [ "$FM_RECOVERY_MARKER_ACTION" = recover ]; then
   WATCHER_RECOVERY_PENDING=1
+fi
+if ! fm_wake_spill_replay; then
+  echo "watcher: spilled wakes could not be replayed; retaining them and stale lock evidence" >&2
+  exit 1
 fi
 # Side-band ledger publication, detached from the poll loop.
 #
@@ -2819,6 +2909,31 @@ idle_reap_tick() {
   fi
   FM_HOME="$FM_HOME" "$IDLE_REAP_BIN" reap </dev/null >/dev/null 2>&1 &
   IDLE_REAP_PID=$!
+}
+
+# Merged-task copy pruning, detached and single-flight like the sweep above. A
+# record in state/*.merge-prune is armed by the merge paths; while one exists the
+# sweep is started at most once per FM_MERGE_PRUNE_INTERVAL and decides for
+# itself which records are due. The sweep only ever asks bin/fm-teardown.sh (and
+# its proofs in bin/fm-merge-prune-lib.sh), so a skipped or missed tick loses
+# nothing.
+MERGE_PRUNE_PID=
+merge_prune_tick() {
+  local now
+  [ "$MERGE_PRUNE_INTERVAL" -gt 0 ] || return 0
+  compgen -G "$STATE/*.merge-prune" >/dev/null || return 0
+  fm_epoch_seconds_to now
+  [ $((now - MERGE_PRUNE_LAUNCHED)) -ge "$MERGE_PRUNE_INTERVAL" ] || return 0
+  if [ -n "$MERGE_PRUNE_PID" ]; then
+    if kill -0 "$MERGE_PRUNE_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$MERGE_PRUNE_PID" 2>/dev/null || true
+    MERGE_PRUNE_PID=
+  fi
+  MERGE_PRUNE_LAUNCHED=$now
+  FM_HOME="$FM_HOME" "$MERGE_PRUNE_BIN" sweep </dev/null >/dev/null 2>&1 &
+  MERGE_PRUNE_PID=$!
 }
 
 # The account-health probe is detached and single-flight like the sweeps above: it
@@ -3003,6 +3118,7 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
+  FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
   pr_poll_control_release || cleanup_status=1
   if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" = "${WATCHER_PID:-}" ]; then
@@ -3219,6 +3335,7 @@ prelude_phase() {
   fi
   watcher_beat
   idle_reap_tick
+  merge_prune_tick
   typesafe_health_tick
   lavish_auto_retire_tick
 
@@ -3415,6 +3532,10 @@ EOF
           fi
           retire_merged_pr_poll "$id"
           pr_poll_control_release || exit 1
+          # Arm only: this loop just held the task control lock that teardown
+          # takes, so the detached sweep makes the attempt on a later tick.
+          FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+            "$MERGE_PRUNE_BIN" arm "$id" </dev/null >/dev/null 2>&1 || true
           if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
@@ -3643,8 +3764,12 @@ while :; do
   fi
 
   watcher_beat force
+  # Start the bounded repair before a ready-status notification can exit this
+  # cycle; it must not require the supervisor to re-arm us before registering.
+  pr_ready_reconcile_tick
+  lock_alarm_tick
 
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture --try-lock || true
   watcher_beat
   if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
     home_summary_refresh_detached

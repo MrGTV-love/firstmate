@@ -481,118 +481,6 @@ test_active_dispatch_profile_allows_raw_launch_command() {
   pass "active crew-dispatch profile allows the raw launch-command escape hatch"
 }
 
-# A selected rule that declares hard project eligibility is rebound to the
-# project actually being launched. The resolver checked the caller's project
-# name; this is the boundary that catches a mismatch, a mistyped identity, or a
-# config edit between resolution and launch.
-test_selected_rule_project_eligibility_binds_to_the_launch_project() {
-  local rec id out status meta
-  id=profile-eligibility-z16
-  rec=$(make_spawn_case profile-eligibility claude "$id")
-  read_case_record "$rec"
-  mkdir -p "$HOME_DIR/data"
-  printf '%s\n' '# Projects' '- project - this case' '- other - another project' > "$HOME_DIR/data/projects.md"
-  mkdir -p "$HOME_DIR/config"
-  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_1)
-  status=$?
-  expect_code 1 "$status" "a rule restricted to another project must refuse this launch"
-  assert_contains "$out" "rule rule_1 is not eligible for project project" "the refusal names the rule and the launch project"
-  assert_absent "$HOME_DIR/state/$id.meta" "the eligibility refusal happens before meta is written"
-  assert_no_grep 'codex' "$LAUNCH_LOG" "the eligibility refusal sends no launch"
-
-  # Control: an eligible rule for the same project launches and is recorded so
-  # recovery can re-check it, even though it declares no fallback policy.
-  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}},{"when":"this project","projects":{"allow":["project"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_2)
-  status=$?
-  expect_code 0 "$status" "an eligible project rule must launch: $out"
-  meta="$HOME_DIR/state/$id.meta"
-  assert_grep 'dispatch_rule=rule_2' "$meta" "the restricted rule must be recorded for recovery"
-  rm -f "$meta"
-
-  # An unregistered launch identity fails closed while the rule is restricted.
-  rm -f "$HOME_DIR/data/projects.md"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_2)
-  status=$?
-  expect_code 1 "$status" "a restricted rule with an unregistered project must refuse"
-  assert_contains "$out" 'is not registered in' "the refusal names the unresolved project identity"
-  assert_absent "$HOME_DIR/state/$id.meta" "the identity refusal happens before meta is written"
-
-  # Compatibility control: without a `projects` declaration a launch keeps its
-  # previous behavior, records no rule identifier, and needs no registry.
-  printf '%s\n' '{"rules":[{"when":"any work","use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_1)
-  status=$?
-  expect_code 0 "$status" "an unrestricted rule must launch without a registry: $out"
-  assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "an unrestricted rule records no fallback identifier"
-  pass "spawn binds a selected restricted rule to the actual launch project"
-}
-
-# Omitting --dispatch-rule must not bypass a restriction on the rule the
-# fallback resolver infers from the launched profile, and a rule identity that
-# no longer resolves must refuse rather than act unrestricted.
-test_inferred_or_unverifiable_dispatch_rules_cannot_bypass_eligibility() {
-  local rec id out status
-  id=profile-eligibility-inferred-z17
-  rec=$(make_spawn_case profile-eligibility-inferred claude "$id")
-  read_case_record "$rec"
-  mkdir -p "$HOME_DIR/data" "$HOME_DIR/config"
-  printf '%s\n' '# Projects' '- project - this case' '- other - another project' > "$HOME_DIR/data/projects.md"
-  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high)
-  status=$?
-  expect_code 1 "$status" "a rule inferred from the profile must still enforce its project restriction"
-  assert_contains "$out" "rule rule_1 is not eligible for project project" "the inferred-rule refusal names the rule and project"
-  assert_absent "$HOME_DIR/state/$id.meta" "the inferred-rule refusal happens before meta is written"
-  assert_no_grep 'codex' "$LAUNCH_LOG" "the inferred-rule refusal sends no launch"
-
-  printf '%s\n' '{"rules":[{"when":"any work","use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"codex","model":"gpt-5","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high --dispatch-rule rule_9)
-  status=$?
-  expect_code 1 "$status" "a rule identity that no longer resolves must refuse the launch"
-  assert_contains "$out" 'dispatch rule rule_9 is not present in' "the refusal names the unverifiable rule identity"
-  assert_absent "$HOME_DIR/state/$id.meta" "the unverifiable-rule refusal happens before meta is written"
-
-  # A restricted rule without any fallback produces no fallback identity to
-  # infer, so the profile-authorization check itself must refuse it.
-  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5 --effort high)
-  status=$?
-  expect_code 1 "$status" "a restricted rule without fallback must still refuse the matching profile"
-  assert_contains "$out" 'is not authorized by any dispatch rule eligible for project project' \
-    "the no-fallback refusal names the missing project authorization"
-  assert_absent "$HOME_DIR/state/$id.meta" "the no-fallback refusal happens before meta is written"
-
-  # A supplied rule that does not hold the requested profile refuses instead of
-  # letting another rule's authorization stand in for it.
-  printf '%s\n' '{"rules":[{"when":"other only","projects":{"allow":["other"]},"use":{"harness":"codex","model":"gpt-5","effort":"high"}},{"when":"second","use":{"harness":"codex","model":"gpt-5-mini","effort":"high"}}],"default":{"harness":"claude","model":"sonnet","effort":"high"}}' \
-    > "$HOME_DIR/config/crew-dispatch.json"
-  out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
-    "$id" "$PROJ_DIR" --harness codex --model gpt-5-mini --effort high --dispatch-rule rule_1)
-  status=$?
-  expect_code 1 "$status" "an explicit rule that does not authorize the profile must refuse"
-  assert_contains "$out" 'does not authorize the requested profile' \
-    "the mismatch refusal names the requested rule"
-  assert_absent "$HOME_DIR/state/$id.meta" "the mismatch refusal happens before meta is written"
-  pass "spawn refuses an inferred ineligible rule, an unverifiable identity, a no-fallback restriction, and a rule/profile mismatch"
-}
-
 test_chained_raw_launch_strips_ai_trailer_in_every_step() {
   local rec id out status launch body
   id=chained-raw-z15
@@ -1450,7 +1338,10 @@ test_pi_exclude_tools_malformed_entry_refuses_before_endpoint() {
 }
 
 test_pi_exclude_tools_read_failure_refuses_before_launch() {
-  local harness kind rec id out status bash_env
+  local harness kind rec id out status bash_env real_python
+  # Resolve once before injecting BASH_ENV, so this regression needs neither
+  # pyenv nor any particular Python version installed on the test host.
+  real_python=$(python3 -c 'import sys; print(sys.executable)') || fail "cannot resolve Python"
   for harness in pi pi-signed; do
     for kind in ship scout; do
       id="excl-read-failure-${harness}-${kind}"
@@ -1463,7 +1354,9 @@ test_pi_exclude_tools_read_failure_refuses_before_launch() {
       cat > "$bash_env" <<'SH'
 function [ {
   local status=0
-  builtin test "${@:1:$#-1}" || status=$?
+  # Bash 3.2 collapses a quoted argument slice when IFS=: (as in pyenv-prefix).
+  # Forward the complete argv to the matching builtin, including its closing ].
+  builtin [ "$@" || status=$?
   if builtin [ "$#" -eq 4 ] && builtin [ "$1" = '!' ] &&
     builtin [ "$2" = -r ] &&
     builtin [ "$3" = "${FM_CONFIG_OVERRIDE:-}/crew-exclude-tools" ]; then
@@ -1472,10 +1365,29 @@ function [ {
   return "$status"
 }
 SH
+      # pyenv-prefix changes IFS before asking whether a version is "system".
+      # Exercise that decision in a shell interpreter launcher, but reject a
+      # false match instead of actually starting the incident's recursive tree.
+      cat > "$FAKEBIN_DIR/python3" <<'SH'
+#!/usr/bin/env bash
+(
+  IFS=:
+  if [ selected-version = system ]; then
+    echo 'recursive interpreter route: non-system version treated as system' >&2
+    exit 97
+  fi
+) || exit "$?"
+exec "$FM_TEST_REAL_PYTHON" "$@"
+SH
+      chmod +x "$FAKEBIN_DIR/python3"
+      out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" PATH="$FAKEBIN_DIR:$PATH" \
+        python3 "$ROOT/bin/fm-dsh.py" route deepseek/test-model 2>&1)
+      expect_code 0 "$?" "the exclusion hook must preserve interpreter selection: $out"
+      assert_equals dsh "$out" "the interpreter route must finish without entering the pyenv prefix cycle"
       if [ "$kind" = scout ]; then
-        out=$(BASH_ENV="$bash_env" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
+        out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --scout)
       else
-        out=$(BASH_ENV="$bash_env" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
+        out=$(FM_TEST_REAL_PYTHON="$real_python" BASH_ENV="$bash_env" run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR")
       fi
       status=$?
       [ ! -e "$HOME_DIR/config/crew-exclude-tools" ] || fail "the read-failure injection did not remove the list"
@@ -1827,9 +1739,9 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
         IFS= read -r model_flag
         IFS= read -r model
         IFS= read -r brief
-      } < "$env_out.args"
+      } < <(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")
       [ "$flag" = --settings ] && [ "$model_flag" = --model ] && [ "$model" = opus ] \
-        || fail "raw launch lost its model arguments: $(cat "$env_out.args")"
+        || fail "raw launch lost its model arguments or its recorded session id: $(cat "$env_out.args")"
       [ "$(printf '%s' "$brief" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
         || fail "raw launch lost its brief doorbell"
       if [ "$source" != none ]; then
@@ -1845,6 +1757,26 @@ test_raw_claude_nested_launches_exclude_supervisor_memory() {
   pass "direct and TeamClaude raw nested launches exclude supervisor memory and preserve caller settings"
 }
 
+# keep-ai-trailers turns off only the commit-msg strip: the task hooks still
+# refuse a staged credential, and a kept trailer survives commit-msg.
+assert_kept_trailers_with_credential_hooks() {
+  local hooks=$1 wt=$2 label=$3 msg status
+  [ -x "$hooks/commit-msg" ] && [ -x "$hooks/pre-commit" ] \
+    || fail "$label: keep-ai-trailers launch did not install the task credential hooks"
+  msg="$CASE_DIR/$label-commit-msg"
+  printf 'subject\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n' > "$msg"
+  (cd "$wt" && "$hooks/commit-msg" "$msg") >/dev/null 2>&1 || fail "$label: commit-msg hook failed"
+  grep -Fqx 'Co-Authored-By: Claude <noreply@anthropic.com>' "$msg" \
+    || fail "$label: keep-ai-trailers launch still stripped AI trailers"
+  printf 'ghp_%036d\n' 0 > "$wt/keep-trailers-credential.txt"
+  git -C "$wt" add keep-trailers-credential.txt
+  (cd "$wt" && FM_GUARD_EVENT_LOG="$CASE_DIR/$label-guard-events.jsonl" "$hooks/pre-commit") >/dev/null 2>&1
+  status=$?
+  git -C "$wt" rm -q --cached keep-trailers-credential.txt
+  rm -f "$wt/keep-trailers-credential.txt"
+  expect_code 1 "$status" "$label: keep-ai-trailers launch admitted a staged credential"
+}
+
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   local rec id out status launch
   id=profile-claude-keep-attribution-z25
@@ -1857,9 +1789,8 @@ test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   expect_code 0 "$status" "claude spawn with keep-ai-trailers should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "opted-in claude"
-  [ ! -e "$HOME_DIR/state/$id.git-hooks" ] \
-    || fail "opted-in launch installed AI trailer strip hooks"
-  pass "keep-ai-trailers omits Claude attribution settings and the pane strip hooks"
+  assert_kept_trailers_with_credential_hooks "$HOME_DIR/state/$id.git-hooks" "$WT_DIR" opted-in-claude
+  pass "keep-ai-trailers omits Claude attribution settings and the trailer strip, and keeps credential hooks"
 }
 
 test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches() {
@@ -1887,8 +1818,7 @@ test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches() {
   expect_code 0 "$status" "secondmate crew spawn should succeed"$'\n'"$out"
   launch=$(cat "$LAUNCH_LOG")
   assert_attribution_policy_absent "$launch" "secondmate crew claude"
-  [ ! -e "$HOME_DIR/state/$crew_id.git-hooks" ] \
-    || fail "secondmate crew launch installed AI trailer strip hooks"
+  assert_kept_trailers_with_credential_hooks "$HOME_DIR/state/$crew_id.git-hooks" "$WT_DIR" secondmate-crew
   pass "a secondmate's home-local keep-ai-trailers choice survives spawn and applies to its crew"
 }
 
@@ -2177,6 +2107,7 @@ test_worker_launch_delivers_role_scope() {
         content=${content//"$token"/Filled for the test.}
       done
       content=${content//'{DOD_MANDATORY_ITEMS}'/- M1 Source: the intent. Expected: the spawn behavior works. Verify: this test. Edge/negative: a refused spawn is reported. Evidence place: this test output. Authority: grader.}
+      content=${content//$'\n### Out of scope'/$'\n### Out of scope\nNone.'}
       printf '%s\n' "$content" > "$brief"
     fi
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"
@@ -2463,8 +2394,6 @@ test_active_dispatch_profile_requires_explicit_harness_for_scout
 test_active_dispatch_profile_allows_explicit_harness
 test_active_dispatch_profile_allows_positional_harness
 test_active_dispatch_profile_allows_raw_launch_command
-test_selected_rule_project_eligibility_binds_to_the_launch_project
-test_inferred_or_unverifiable_dispatch_rules_cannot_bypass_eligibility
 test_chained_raw_launch_strips_ai_trailer_in_every_step
 test_claude_threads_model_and_effort
 test_codex_threads_model_and_effort
@@ -2628,8 +2557,8 @@ test_teamclaude_launcher_proxies_a_raw_claude_launch() {
   env_out="$CASE_DIR/claude-env"
   fm_test_teamclaude_launch_env "$FAKEBIN_DIR" "$(cat "$LAUNCH_LOG")" "$env_out" \
     || fail "the raw TeamClaude launch command failed: $(cat "$LAUNCH_LOG")"
-  [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
-    || fail "the raw claude command must keep its own arguments: $(cat "$env_out.args" 2>/dev/null)"
+  [ "$(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")" = "$(printf '%s\n' --model opus)" ] \
+    || fail "the raw claude command must keep its own arguments after its recorded session id: $(cat "$env_out.args" 2>/dev/null)"
   pass "config/claude-launcher=teamclaude: a raw claude launch reaches claude with the proxy and its own arguments"
 }
 
@@ -2778,8 +2707,8 @@ test_teamclaude_snapshot_overrides_stale_pane_configuration() {
     ! grep -q '^FM_TC_' "$env_out" \
       || fail "$scenario: private snapshot variables must not reach Claude"
     if [ "$launch_kind" = raw ]; then
-      [ "$(cat "$env_out.args")" = "$(printf '%s\n' --model opus)" ] \
-        || fail "$scenario: the raw command must retain its Claude arguments"
+      [ "$(fm_test_claude_session_args "$env_out.args" "$HOME_DIR/state/$id.meta")" = "$(printf '%s\n' --model opus)" ] \
+        || fail "$scenario: the raw command must retain its Claude arguments after its recorded session id"
     fi
   done
   pass "TeamClaude template and raw launches snapshot caller selectors independently of stale pane configuration"

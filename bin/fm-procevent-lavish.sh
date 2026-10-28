@@ -899,7 +899,7 @@ held_page_strays() {  # <artifact>
   local artifact=$1 id state own pid pgid lstart ppid plstart command strays=0 kept=0
   id=$(cmd_source_id "$artifact" 2>/dev/null) || return 1
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
-  own=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  own=$(fm_procevent_proc pgid "$$" | tr -d ' ')
   [ -n "$own" ] || return 1
   poller_prune "$(fm_procevent_registry_dir "$state")" "$id"
   while IFS=$'\t' read -r pid pgid lstart ppid plstart command; do
@@ -1558,8 +1558,8 @@ poller_record() {  # <artifact>
   id=$(cmd_source_id "$1" 2>/dev/null) || return 1
   reg=$(fm_procevent_registry_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")
   [ -d "$reg" ] || return 1
-  lstart=$(LC_ALL=C ps -o lstart= -p "$$" 2>/dev/null | awk '{ $1 = $1; print }')
-  pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  lstart=$(fm_procevent_proc lstart "$$")
+  pgid=$(fm_procevent_proc pgid "$$" | tr -d ' ')
   [ -n "$lstart" ] && [ -n "$pgid" ] || return 1
   rec="$reg/$id.$$.poller"
   tmp=$(umask 077; mktemp "$reg/.poller.XXXXXX") || return 1
@@ -1575,22 +1575,22 @@ poller_record() {  # <artifact>
 # at another time. The records are listed before the process snapshot is taken,
 # so a record's live writer is always in that snapshot.
 poller_prune() {  # <registry-dir> [<source-id>]
-  local records=()
+  local records=() table
   if [ -n "${2-}" ]; then
     records=("$1/$2".*.poller)
   else
     records=("$1"/*.poller)
   fi
-  LC_ALL=C perl -e '
+  # An unreadable table proves nothing about any record, so none is dropped.
+  table=$(fm_procevent_proc table pid,lstart) || return 0
+  printf '%s\n' "$table" | LC_ALL=C perl -e '
     use strict; use warnings;
     my %start;
-    open my $ps, "-|", "ps", "-axo", "pid=,lstart=" or exit 1;
-    while (my $line = <$ps>) {
+    while (my $line = <STDIN>) {
       my ($pid, $lstart) = $line =~ /\A\s*(\d+)\s+(.*?)\s*\z/ or next;
       $lstart =~ s/\s+/ /g;
       $start{$pid} = $lstart;
     }
-    close $ps or exit 1;
     for my $rec (@ARGV) {
       next if -l $rec || !-f _;
       open my $in, "<", $rec or next;
@@ -1616,7 +1616,7 @@ poller_recorded() {  # <registry-dir> <source-id> <pid> <lstart>
 # every process whose command is a Lavish poll; parent-lstart is "-" when the
 # parent is not visible.
 orphan_poll_processes() {
-  LC_ALL=C ps -axo pid=,ppid=,pgid=,lstart=,command= 2>/dev/null | perl -e '
+  fm_procevent_proc table pid,ppid,pgid,lstart,command | LC_ALL=C perl -e '
     use strict; use warnings;
     my (%start, @polls);
     while (my $line = <STDIN>) {

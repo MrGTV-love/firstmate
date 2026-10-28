@@ -29,12 +29,13 @@ lets a stale stored family decide independence.
 verify accepts the newest captain-word when it names the exact live head; it then
 stands in for the review and every trigger, unless a FAIL at that live head was
 appended after it and no later PASS at that head would verify on its own (a known
-reader family outside every known author family and no yes trigger): that FAIL is
-refused until the captain gives a new captain-word, while a captain-word appended
-after the FAIL stands. Reviews of other heads and PASS reviews that are not
-independent or carry a yes trigger never clear that FAIL. Otherwise
-the newest review must be PASS at the exact live head with a known reader family
-outside every known author family, and any yes trigger is refused. Captain words
+reader family outside every known author family): that FAIL is refused until the
+captain gives a new captain-word, while a captain-word appended after the FAIL
+stands. Reviews of other heads and PASS reviews that are not independent never
+clear that FAIL. Otherwise the newest review must be PASS at the exact live head
+with a known reader family outside every known author family. Trigger answers
+remain required, recorded and printed by latest, but yes answers do not require
+captain words or prevent an independent PASS from clearing a FAIL. Captain words
 waive no existing forge/hold guard. The caller records as captain-word only a
 current explicit captain merge instruction naming the concrete PR, given in the
 captain's own turn. captain-word itself refuses (exit 2) while the state directory
@@ -288,7 +289,7 @@ def verify(records, rows, head, review_only=False):
             elif row["head"] == head:
                 if row["verdict"] == "FAIL":
                     failed = row
-                elif failed is not None and dependence(row, head) is None and all(row[t] == "no" for t in TRIGGERS):
+                elif failed is not None and dependence(row, head) is None:
                     failed = None
         if failed is not None:
             raise VerificationError(f"verdict is FAIL at live head {head} in the review appended after the captain-word (reader {failed['reader_model']}, at {failed['at']}, report {failed['report']}); the captain must give a new merge word, recorded with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
@@ -307,10 +308,8 @@ def verify(records, rows, head, review_only=False):
     if problem is not None:
         raise VerificationError(problem)
     yes = [trigger for trigger in TRIGGERS if review[trigger] == "yes"]
-    if yes:
-        if review_only:
-            raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
-        raise VerificationError(f"{', '.join(yes)} is yes but captain-word is missing at live head {head}; obtain explicit merge approval and record the exact words with fm-review-record.py captain-word --pr URL --head {head} --words WORDS, then retry the merge")
+    if yes and review_only:
+        raise VerificationError(f"{', '.join(yes)} is yes at live head {head}; --review-only requires an independent PASS with no escalation trigger, and a captain-word is not a substitute")
     return "independent-review", review
 
 

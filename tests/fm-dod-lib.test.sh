@@ -104,6 +104,13 @@ EOF
   assert_not_contains "$plan" 'Keep the existing renderer.' 'plan included unrelated build instructions'
   assert_not_contains "$plan" 'Firstmate-only build constraints' 'plan included mixed Firstmate specification'
   assert_not_contains "$plan" 'This grading prose' 'plan included the grading section'
+  assert_contains "$plan" 'Every factual claim in a PR body must be backed by a record' 'plan lost the shared claim check'
+  assert_contains "$plan" 'Grade every DoD mandatory item pass or fail by its id, with the evidence' 'plan lost per-item grading'
+  assert_contains "$plan" 'A failed DoD mandatory item: block.' 'plan lost the failed-item outcome'
+  assert_contains "$plan" 'A real defect that breaks the stated intent, even when no DoD item names it: block.' 'plan lost the intent-defect outcome'
+  assert_contains "$plan" 'An improvement outside the DoD: a follow-up note, never a block.' 'plan lost the follow-up outcome'
+  assert_contains "$plan" 'A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL' 'plan lost the guard-widening FAIL outcome'
+  assert_contains "$plan" 'A fix that would add scope beyond the intent: escalate to Main for the owner' 'plan lost the scope-escalation outcome'
   assert_not_contains "$plan" 'scout-time context' 'an unpromoted plan was labeled as scout context'
 
   printf '# Task\nLegacy task.\n' > "$brief"
@@ -988,6 +995,137 @@ EOF
   pass "a fully filled brief passes the dispatch verdict with no output"
 }
 
+write_exclusion_brief() {  # <path> <exclusion-lines>
+  local brief=$1 exclusions=$2
+  cat > "$brief" <<EOF
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+### Out of scope
+$exclusions
+EOF
+}
+
+# A scaffolded exclusion list that is still blank is refused: independent review
+# reads that section as the task's stated boundary, so an empty one is a blank
+# the reviewer has to fill with scope the task never had.
+test_dispatch_verdict_refuses_a_blank_exclusion_list() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-blank-out-of-scope.md"
+  write_exclusion_brief "$brief" ''
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 0 ] || fail "a blank exclusion list was reported dispatchable"
+  assert_contains "$out" "### Out of scope is empty" "the dispatch verdict did not name the blank exclusion list"
+  pass "the dispatch verdict refuses a blank exclusion list"
+}
+
+# `None` is an answer, not a blank: the task states that it excludes nothing.
+test_dispatch_verdict_accepts_none_as_the_exclusion_answer() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-none-out-of-scope.md"
+  write_exclusion_brief "$brief" 'None.'
+  out=$(fm_brief_dispatch_problems "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "an explicit None exclusion list did not pass: $out"
+  pass "the dispatch verdict accepts None as the exclusion answer"
+}
+
+# A relaunch re-checks only the Task bodies, so the exclusion list accepted at
+# the fresh spawn never blocks one.
+test_dispatch_verdict_task_only_scope_skips_the_exclusion_list() {
+  local brief out rc
+  brief="$TMP_ROOT/dispatch-task-only-out-of-scope.md"
+  write_exclusion_brief "$brief" ''
+  out=$(fm_brief_dispatch_problems "$brief" task-only); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "the task-only scope reported the exclusion list: $out"
+  pass "the task-only scope skips the exclusion list"
+}
+
+# The stated exclusions are what independent review receives, through the
+# verification plan built from the same brief.
+test_verification_plan_carries_the_stated_exclusions() {
+  local brief plan
+  brief="$TMP_ROOT/plan-exclusions.md"
+  write_exclusion_brief "$brief" '- Do not change the public flag spelling.'
+  fm_brief_verification_plan "$brief" > "$TMP_ROOT/plan-exclusions.out" \
+    || fail "verification plan construction failed for a brief with exclusions"
+  plan=$(cat "$TMP_ROOT/plan-exclusions.out")
+  assert_contains "$plan" "## Out-of-scope list" "the plan has no out-of-scope section"
+  assert_contains "$plan" "Do not change the public flag spelling." "the plan dropped the stated exclusion"
+  pass "the verification plan carries the stated exclusions"
+}
+
+# The exclusion list is specification, not build instructions: an answer under
+# it must never stand in for a Firstmate spec that says nothing.
+test_exclusion_list_does_not_satisfy_an_empty_firstmate_spec() {
+  local brief
+  brief="$TMP_ROOT/spec-content.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+
+### Out of scope
+None.
+EOF
+  if fm_brief_task_content_valid "$brief"; then
+    fail "an empty Firstmate spec passed because the exclusion list held None."
+  fi
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+Print one complete list and the repair.
+
+### Out of scope
+None.
+EOF
+  fm_brief_task_content_valid "$brief" || fail "a filled Firstmate spec with a stated exclusion list was refused"
+  pass "the exclusion list does not satisfy an empty Firstmate spec"
+}
+
+# The exclusion list ends where the reader of that list ends it, so a later spec
+# subsection, or a fenced example of the heading, still counts as the spec.
+test_spec_content_survives_the_exclusion_list() {
+  local brief
+  brief="$TMP_ROOT/spec-after-exclusions.md"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+### Out of scope
+None.
+
+### Approach
+Edit bin/x.sh.
+EOF
+  fm_brief_task_content_valid "$brief" \
+    || fail "a spec subsection after the exclusion list was dropped from the Firstmate spec"
+  cat > "$brief" <<'EOF'
+# Task
+## Captain's intent
+Fix the dispatch refusal.
+
+## Firstmate spec
+```
+### Out of scope
+```
+Print one complete list and the repair.
+EOF
+  fm_brief_task_content_valid "$brief" \
+    || fail "a fenced exclusion heading hid the Firstmate spec after it"
+  pass "spec content survives the exclusion list"
+}
+
 # An empty DoD file is a named problem, with the path the operator must fill.
 test_dispatch_verdict_reports_an_empty_dod_file() {
   local brief criteria out rc
@@ -1259,6 +1397,12 @@ test_task_owns_several_prs_only_on_positive_evidence
 test_promotion_keeps_the_recorded_base_branch
 test_dispatch_verdict_lists_all_problems_in_one_pass
 test_dispatch_verdict_passes_a_filled_brief
+test_dispatch_verdict_refuses_a_blank_exclusion_list
+test_dispatch_verdict_accepts_none_as_the_exclusion_answer
+test_dispatch_verdict_task_only_scope_skips_the_exclusion_list
+test_verification_plan_carries_the_stated_exclusions
+test_exclusion_list_does_not_satisfy_an_empty_firstmate_spec
+test_spec_content_survives_the_exclusion_list
 test_dispatch_verdict_reports_an_empty_dod_file
 test_dispatch_verdict_lists_every_token_in_the_dod_file
 test_dispatch_verdict_task_only_skips_the_definition_of_done
@@ -1328,6 +1472,12 @@ test_worker_role_renders_shared_rubric() {
   done <"$ROOT/docs/review-rubric.md"
   assert_grep "apply the shared review rubric below, rendered from \`$ROOT/docs/review-rubric.md\`" "$role_file" \
     "worker role did not introduce the rendered rubric"
+  assert_grep '- A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD' "$role_file" \
+    "worker role did not carry the guard-widening FAIL outcome"
+  assert_grep 'unless the PR cites a recorded reassessment of that guard'"'"'s harm model' "$role_file" \
+    "worker role did not carry the guard-widening reassessment exception"
+  assert_grep '- Removing a guard rule that such a recorded reassessment recommends: not a block.' "$role_file" \
+    "worker role did not carry the reassessed guard-removal outcome"
   mkdir -p "$missing"
   if fm_brief_worker_role "$TMP_ROOT/state" upstream-4751 "$missing" >/dev/null 2>&1; then
     fail "worker role rendered without the shared rubric"

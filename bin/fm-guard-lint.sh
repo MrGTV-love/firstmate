@@ -280,16 +280,25 @@ if [ "$COUNTS" -eq 1 ]; then
   retired_n=$(jq -r 'length' "$RETIRED" 2>/dev/null || echo 0)
   excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
   unregistered_n=$(jq -r '(.unregistered_ids // []) | length' "$REGISTRY")
+  # An active guard added after the audit is named in beyond_audit_active, and
+  # a retirement beyond the audit is listed in beyond_audit_retired; both stay
+  # outside the audited population.
   beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
-  total=$((active + retired_n - beyond_n + excluded_n + unregistered_n))
+  beyond_active_n=$(jq -r '(.beyond_audit_active // []) | length' "$REGISTRY")
+  jq -r '(.guards | map(.id)) as $ids | (.beyond_audit_active // [])[] | select(. as $b | $ids | index($b) | not)' "$REGISTRY" \
+    | while IFS= read -r bid; do
+        [ -n "$bid" ] && violation R1 "$bid" "beyond_audit_active names no registered guard"
+      done
+  total=$((active - beyond_active_n + retired_n - beyond_n + excluded_n + unregistered_n))
   [ "$total" -eq "$audited" ] \
-    || violation R1 "inventory" "active($active) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
-  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited"
+    || violation R1 "inventory" "active($active, $beyond_active_n beyond the audit) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) + unregistered($unregistered_n) = $total, audited=$audited"
+  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$unregistered_n audited=$audited beyond_audit_active=$beyond_active_n"
 fi
 
 # --------------------------------------------------------------- ratchet gate
 ALLOWED_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-guard-allow.XXXXXX") || exit 2
-trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE"' EXIT
+SC=$(mktemp "${TMPDIR:-/tmp}/fm-guard-shown.XXXXXX") || exit 2
+trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$SC"' EXIT
 if [ -f "$ALLOWLIST" ]; then
   jq -r '(.allowed // [])[] | [.id, .rule] | @tsv' "$ALLOWLIST" >"$ALLOWED_FILE" 2>/dev/null || : >"$ALLOWED_FILE"
 else
@@ -300,8 +309,7 @@ is_allowed() {  # <id> <rule>
   awk -F'\t' -v id="$1" -v rule="$2" '$1 == id && $2 == rule {found = 1} END {exit !found}' "$ALLOWED_FILE"
 }
 
-SC=new; en=0; st=0; shown=0
-: >"$SC"
+en=0; st=0; shown=0
 while IFS=$'\t' read -r rule id msg; do
   [ -n "$rule" ] || continue
   if is_allowed "$id" "$rule"; then
@@ -342,7 +350,7 @@ case "$MODE" in
     # Only guards added or edited since the base are in scope. A changed guard is
     # one whose canonical JSON differs between the base registry and this one.
     base_json=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base.XXXXXX") || exit 2
-    trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$base_json"' EXIT
+    trap 'rm -f "$VIOLATIONS" "$ALLOWED_FILE" "$SC" "$base_json"' EXIT
     if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
       && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
       touched=$(jq -r --slurpfile base "$base_json" '

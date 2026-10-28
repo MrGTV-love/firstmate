@@ -441,6 +441,7 @@ import os, sys
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
 text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
+text = text.replace("\n### Out of scope\n", "\n### Out of scope\nNone.\n", 1)
 dod = {
     "{DOD_CAPABILITY}": "notes/__init__.py gains count_notes(), which returns how many notes are stored.",
     "{DOD_MANDATORY_ITEMS}": "M1. Source: the task text. Expected: count_notes() returns the stored note count. Verify: python3 -m unittest discover -s tests passes. Edge/negative: an empty store returns 0. Evidence place: tests/test_notes.py and the unittest output. Authority: gate.",

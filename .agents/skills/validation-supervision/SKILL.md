@@ -1,6 +1,6 @@
 ---
 name: validation-supervision
-description: Load when a ship starts or already has an active no-mistakes validation run, including a mid-run requirement change or finding, before retrying or reattaching after a wait timeout or output-review refusal, when a failed or aborted run or a passing Gerrit run needs branch custody returned (status offers `recover_custody` or `inspect_and_reconcile_manually`), and before deciding or answering any ask-user finding.
+description: Load before every no-mistakes retry or reattachment after a wait timeout (including repeated timeouts) or output-review refusal; for starting or active ship validation runs, mid-run requirement changes or findings, failed/aborted or passing-Gerrit custody return (`recover_custody` or `inspect_and_reconcile_manually`), and before any ask-user decision.
 user-invocable: false
 metadata:
   internal: true

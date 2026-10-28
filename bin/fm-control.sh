@@ -5,6 +5,7 @@
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
 #        fm-control.sh <task-id> stay
+#        fm-control.sh <task-id> adopt
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            [--also <other-task>=<its-replacement-copy>]...
@@ -51,7 +52,9 @@
 # Ship branch line), anchoring the copy it leaves, recording that copy as
 # prior_worktree= (or, when it is in a pool slot the task leaves entirely,
 # releasing the task's claim and recording it as released_worktree=), and
-# writing the note in the brief. It stops, starts,
+# writing the note in the brief. A ship whose recorded copy is gone refuses,
+# because relocation through relaunch --worktree is that copy's only recovery
+# route. It stops, starts,
 # deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
 # any pipeline run are untouched. A recorded GitHub PR is retained only when
 # the replacement's HEAD equals or descends from its recorded head and the
@@ -67,6 +70,41 @@
 # record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
+# adopt repairs only a local Herdr omp task's state/<id>.omp-session.json,
+# under the task's control and metadata locks. The lock-owning main Firstmate
+# alone may run it: a worker, the supervision branch, or a session that does
+# not own the home lock is refused, as for authorize-continuation and
+# reassociate. It refuses, naming the missing proof, unless all of these hold:
+#   (1) window and herdr_pane_id agree, and the worktree and pane exist;
+#   (2) the launch-proof owner resolves one foreground PID whose process name
+#       or argv[0] is omp;
+#   (3) that PID's kernel cwd is inside this task's recorded worktree and is
+#       not inside another task's worktree that is as deep or deeper;
+#   (4) no other local task claims the pane;
+#   (5) the existing record has the same nonempty spawn_gen as the metadata,
+#       and the live PID does not carry a launch pin for another generation.
+# The preserved task_session_file (or the pane's omp session-file reference
+# when the field is absent) must identify the same persisted file as that
+# reference. Publication also needs a positively readable live environment
+# without a usable launch pin; a matching or different pin and unreadable
+# probing refuse before staging. A record that already names the live PID is
+# refused unchanged, including the extension's empty unproven mark and an
+# activation naming another file, even when Herdr still registers the task
+# file. A record naming another live omp process is that process's extension's
+# to maintain and is refused unchanged too. A recorded PID
+# that is gone, or that a process other than omp has since reused, does not
+# block repair. The repair writes version=1, the unchanged spawn_gen, the
+# live pid, task_session_file, and current_session_file, publishing by rename
+# only while the record still holds the bytes the proofs were gathered from.
+# It never unlocks a session, touches project files, starts or stops an agent,
+# or sends lifecycle input.
+# This widens lifecycle authorization: a repaired record can authorize a
+# restored omp without the launch environment pin, only while the launch-proof
+# owner can recheck all adoption proofs and the same live PID and session
+# file. Ordinary empty or invalid session records still refuse, and other
+# harnesses and backends keep their existing proof rules.
+# docs/agent-control.md "Repairing a restored omp session record" owns the
+# operator contract and the residual risk of an unpinned adopted process.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
 # prepared absolute destination for a ship relaunch, and reassociate names the
 # replacement copy the record moves to.
@@ -302,8 +340,6 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
-# shellcheck source=bin/fm-dispatch-eligibility-lib.sh
-. "$SCRIPT_DIR/fm-dispatch-eligibility-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 
@@ -864,13 +900,17 @@ reassociate_check() {  # <record-index>
   fm_task_copy_same_repository "$new_wt" "$project" \
     || die "replacement copy $new_wt is not a checkout of task $ID's project repository ($project): it uses a different repository/ref store, even if it has the same origin; nothing was changed"
 
-  # The current copy. A path that no longer exists has no bytes or owner left
-  # to protect and is recorded as it was; anything else that exists but is not
-  # a directory cannot be proved preserved, so it refuses.
+  # The current copy. A scout's path that no longer exists has no bytes or
+  # owner left to protect and is recorded as it was; a ship's vanished copy is
+  # recovered only by relocation, whose lease proof this re-point does not run.
+  # Anything else that exists but is not a directory cannot be proved
+  # preserved, so it refuses.
   if [ -e "$old_wt" ] || [ -L "$old_wt" ]; then
     old_real=$(fm_task_copy_canonical_dir "$old_wt") \
       || die "task $ID's recorded copy $old_wt exists but is not a directory, so it cannot be proved preserved; nothing was changed"
   else
+    [ "$kind" != ship ] \
+      || die "task $ID's recorded copy $old_wt is gone; reassociation re-points a ship whose copy still exists, so recover a vanished copy by relocation instead: fm-control $ID relaunch --worktree <copy> --note <why>, which accepts only a pool slot the project's Treehouse lease allocated (docs/agent-control.md \"Relocating a task whose worktree is gone\"); nothing was changed"
     old_state=absent
   fi
   [ "$old_real" != "$new_wt" ] \
@@ -1365,6 +1405,57 @@ if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
   . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
   fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
+if [ "$VERB" = adopt ]; then
+  [ -z "${FM_TASK_ID:-}" ] \
+    || die "workers cannot adopt a session record"
+  fm_lease_forbid_branch "session record adoption (fm-control)"
+  # shellcheck source=bin/fm-session-lock-lib.sh
+  . "$SCRIPT_DIR/fm-session-lock-lib.sh"
+  fm_session_lock_owned_by_self "$STATE" \
+    || die "session record adoption requires the actual lock-owning main Firstmate"
+  [ "$BACKEND" = herdr ] && [ "$RECORDED_HARNESS" = omp ] \
+    || die "adopt needs a local Herdr omp task; no session record was changed"
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || die "adopt needs the task metadata lock"
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  fm_backend_validate_task_endpoint "$META" "$ID" || exit 1
+  adoption_prior=$(cat "$STATE/$ID.omp-session.json" 2>/dev/null) \
+    || die "adopt needs an existing readable session record with the metadata spawn_gen"
+  adoption_record=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  # The omp extension rewrites the record of the process it runs in, by rename
+  # and without these locks, so a record naming a live omp process is the
+  # extension's evidence to keep. A PID reused by any other process after a
+  # restart, another harness included, names no extension and does not block repair.
+  adoption_pid=$(printf '%s' "$adoption_record" | jq -r '.pid')
+  adoption_recorded_pid=$(printf '%s' "$adoption_prior" \
+    | jq -r '.pid | select(type == "number" and . > 1 and . == floor) | tostring' 2>/dev/null)
+  [ "$adoption_recorded_pid" != "$adoption_pid" ] \
+    || die "adopt refused: record proof needs a recorded PID other than the live foreground PID; the record already names $adoption_pid, so it was not changed"
+  if [ -n "$adoption_recorded_pid" ] && fm_launch_proof_pid_is_omp "$adoption_recorded_pid"; then
+    echo "adopt refused: record proof needs the recorded PID to be gone or no longer an omp process; $adoption_recorded_pid is a live omp process, so the omp extension owns this record and it was not changed" >&2
+    exit 1
+  fi
+  # Only a positively readable unpinned process cannot run the extension's
+  # pinned publication path, so its extension never rewrites the record meanwhile.
+  fm_launch_proof_pid_unpinned "$adoption_pid" \
+    || die "adopt refused: launch-pin proof needs a positively readable environment without a usable launch pin; pinned or unreadable processes are not repair candidates"
+  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.omp-session.adopt.XXXXXX") \
+    || die "adopt needs a writable session-record directory"
+  printf '%s\n' "$adoption_record" > "$CONTROL_META_TMP" \
+    || die "adopt could not stage the session record; original record preserved"
+  # Refuse a changing foreground, session registration, generation, or task
+  # record rather than publishing a proof gathered for a different activation.
+  adoption_recheck=$(fm_launch_proof_omp_adoption "$META") || exit 1
+  [ "$adoption_record" = "$adoption_recheck" ] \
+    && [ "$adoption_prior" = "$(cat "$STATE/$ID.omp-session.json" 2>/dev/null)" ] \
+    || die "adopt needs stable foreground, session, and generation proof; retry after they settle"
+  mv -f -- "$CONTROL_META_TMP" "$STATE/$ID.omp-session.json" \
+    || die "adopt could not publish the session record; original record preserved"
+  CONTROL_META_TMP=
+  printf 'adopted: %s\n' "$ID"
+  exit 0
 fi
 
 # --- shared helpers ---------------------------------------------------------
@@ -2299,10 +2390,7 @@ resolve_relaunch_profile() {
     fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
   fi
   if [ "$KIND" != secondmate ]; then
-    local dispatch_set dispatch_profile dispatch_result config_dir dispatch_verdict
-    local dispatch_recorded dispatch_rules_to_check dispatch_check_rule
-    local dispatch_requested_match dispatch_authorizing dispatch_hard_projects dispatch_authorized
-    local dispatch_rules_file
+    local dispatch_set dispatch_profile dispatch_result config_dir
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
     TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
     TARGET_DISPATCH_ROUTE=$(fm_meta_get "$META" dispatch_route)
@@ -2310,62 +2398,9 @@ resolve_relaunch_profile() {
       TARGET_DISPATCH_RULE=
       TARGET_DISPATCH_ROUTE=
     fi
-    dispatch_recorded=$TARGET_DISPATCH_RULE
     dispatch_set=$(fm_dispatch_fallbacks "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_RULE" \
       "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
     TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
-    dispatch_rules_file="${RELAUNCH_PAIR_DIR:-${FM_CONFIG_OVERRIDE:-$FM_HOME/config}}/crew-dispatch.json"
-    dispatch_requested_match=$(jq -r '.requested_rule_match | if . == null then "none" else tostring end' <<<"$dispatch_set")
-    dispatch_authorizing=$(jq -c '.authorizing_rules // []' <<<"$dispatch_set")
-    dispatch_hard_projects=0
-    fm_dispatch_projects_configured "$dispatch_rules_file" && dispatch_hard_projects=1
-    # A recorded rule that does not authorize the recorded profile must refuse
-    # under hard projects rather than letting another rule's fallback list
-    # stand in for it.
-    if [ "$dispatch_hard_projects" -eq 1 ] && [ -n "$dispatch_recorded" ] &&
-       [ "$dispatch_requested_match" = false ]; then
-      die "$ID cannot relaunch: recorded dispatch rule $dispatch_recorded does not authorize the recorded profile $TARGET_HARNESS:${TARGET_MODEL:-default}:${TARGET_EFFORT:-default} under hard project eligibility; refusing to infer another rule (docs/configuration.md \"Crew dispatch profiles\")"
-    fi
-    # The recorded rule and any rule inferred from the recorded profile must
-    # both still be eligible for THIS project before the old agent is stopped
-    # or a stand-in is chosen, so a config edit after the launch cannot silently
-    # widen the captain's restriction on recovery. An identity that no longer
-    # resolves refuses: its restriction cannot be verified.
-    dispatch_rules_to_check=$dispatch_recorded
-    if [ -n "$TARGET_DISPATCH_RULE" ] && [ "$TARGET_DISPATCH_RULE" != "$dispatch_recorded" ]; then
-      dispatch_rules_to_check="${dispatch_rules_to_check}${dispatch_rules_to_check:+$'\n'}$TARGET_DISPATCH_RULE"
-    fi
-    while IFS= read -r dispatch_check_rule; do
-      [ -n "$dispatch_check_rule" ] || continue
-      dispatch_verdict=0
-      fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
-        "$dispatch_check_rule" "$(basename "$(fm_meta_get "$META" project)")" || dispatch_verdict=$?
-      case "$dispatch_verdict" in
-        0) ;;
-        *) die "$ID cannot relaunch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to replace the running agent for an incompatible or unverifiable dispatch rule (docs/configuration.md \"Crew dispatch profiles\")" ;;
-      esac
-    done <<<"$dispatch_rules_to_check"
-    # Without a recorded identity, the recorded profile must be authorized by
-    # at least one rule this project allows; an empty authorizing set is a
-    # manual profile outside the rule matrix.
-    if [ "$dispatch_hard_projects" -eq 1 ] && [ -z "$dispatch_recorded" ] &&
-       [ "$(jq 'length' <<<"$dispatch_authorizing")" -gt 0 ]; then
-      dispatch_authorized=0
-      while IFS= read -r dispatch_check_rule; do
-        [ -n "$dispatch_check_rule" ] || continue
-        dispatch_verdict=0
-        fm_dispatch_rule_project_verdict "$DATA" "$dispatch_rules_file" \
-          "$dispatch_check_rule" "$(basename "$(fm_meta_get "$META" project)")" || dispatch_verdict=$?
-        case "$dispatch_verdict" in
-          0) dispatch_authorized=1 ;;
-          1) ;;
-          *) die "$ID cannot relaunch: $FM_DISPATCH_ELIGIBILITY_ERROR; refusing to replace the running agent for an unauthorized profile (docs/configuration.md \"Crew dispatch profiles\")" ;;
-        esac
-      done < <(jq -r '.[]' <<<"$dispatch_authorizing")
-      if [ "$dispatch_authorized" -ne 1 ]; then
-        die "$ID cannot relaunch: the recorded profile $TARGET_HARNESS:${TARGET_MODEL:-default}:${TARGET_EFFORT:-default} is not authorized by any dispatch rule eligible for project $(basename "$(fm_meta_get "$META" project)"); refusing to infer around the hard project restriction (docs/configuration.md \"Crew dispatch profiles\")"
-      fi
-    fi
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
        || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
@@ -2478,7 +2513,7 @@ safe_checkpoint() {
   else
     check_wt=$WT
   fi
-  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)"
+  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (for a ship of a Treehouse project, pass --worktree with a pool slot that 'treehouse get' allocates and that is checked out on the task's branch; if 'treehouse get' enters the recorded path itself, check the branch out there and relaunch without --worktree; a ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch, and a detailed procedure for that is follow-up work)"
   wt_real=$(cd "$check_wt" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $check_wt cannot be resolved"
   wt_top=$(git -C "$check_wt" rev-parse --show-toplevel 2>/dev/null) \
     || die "task $ID's recorded worktree $check_wt is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"

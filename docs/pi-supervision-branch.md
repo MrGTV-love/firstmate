@@ -253,6 +253,7 @@ The guards are wired into these scripts:
 | `fm-send.sh`, the runtime lifecycle verbs of `fm-control.sh`, and `fm-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
 | `fm-control.sh authorize-continuation` | Follows the main-only [instruction-owner recovery policy](agent-control.md#recovering-an-exited-instruction-owner) in every posture. |
 | `fm-control.sh reassociate` | Main-only in every posture, like continuation authorization ([Reassociating a task with a replacement copy](agent-control.md#reassociating-a-task-with-a-replacement-copy)). |
+| `fm-control.sh adopt` | Main-only in every posture, like continuation authorization ([Repairing a restored omp session record](agent-control.md#repairing-a-restored-omp-session-record)). |
 | `fm-pr-merge.sh`, `fm-merge-local.sh`, `fm-spawn.sh`, `fm-send.sh --resolve-key` for a decision key, `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`, and `fm-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
 
 A relaunch through `fm-control` stays branch-legal recovery in both postures.
@@ -620,7 +621,7 @@ The return brief renders the words verbatim beside that account.
 ### The authority invariant
 
 Being away changes how the captain is informed and what happens at a captain-owned decision point, never firstmate's authority set.
-`tests/fm-branch-supervision.test.sh`, `tests/fm-pr-merge.test.sh`, and `tests/fm-send-resolve-key.test.sh` pin this invariant.
+`tests/fm-branch-supervision.test.sh`, `tests/fm-pr-merge-checks.test.sh`, `tests/fm-pr-merge.test.sh`, and `tests/fm-send-resolve-key.test.sh` pin this invariant.
 It sets these limits:
 
 - The never-set (credential entry, legal or financial acceptance, an attended prompt, an unnamed discard, a security-sensitive action) has no guarded entrypoint that accepts away authority for either actor.
@@ -663,7 +664,7 @@ At that moment the branch reports any refusal instead of concluding there is "no
 
 `tests/fm-afk-return.test.sh` covers the ordered cleanup-due section, its durable merge-marker requirement, and exclusion of both a done task without durable merge evidence and a persistent secondmate carrying that evidence.
 
-`tests/fm-pr-merge.test.sh` covers the branch actor merging a green task under the record, being refused on a red check, an unreported required check, or `--allow-red`/`--allow-missing` under it, and being refused at the partition while attended.
+`tests/fm-pr-merge-checks.test.sh` covers the branch actor merging a green task under the record, being refused on a red check, an unreported required check, or `--allow-red`/`--allow-missing` under it, and being refused at the partition while attended.
 
 `tests/fm-secondmate-safety.test.sh` covers the branch actor being refused second-mate retirement with the mate's record, home, route, and endpoint left intact.
 

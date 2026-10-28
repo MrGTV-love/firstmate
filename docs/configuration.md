@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
+| Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
@@ -105,7 +106,9 @@ Each effective `FM_HOME` contains private operational directories.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The [pool-copy prune](#pool-copy-prune-after-a-merge-fm_merge_prune) record `state/<id>.merge-prune` with its locks, and the task's outcome log `data/<id>/merge-prune.log` with any preserved records under `data/<id>/merge-prune-preserved/`.
 - The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
+- The ready-PR registration pass's single-flight lock, rotating `state/.pr-ready-reconcile/cursor`, and per-task refusal markers `state/.pr-ready-reconcile/<id>.refused` are owned by `bin/fm-pr-ready-reconcile.sh`; `bin/fm-teardown.sh` removes each task's refusal marker, and deleting a marker only makes the next pass retry that task.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 - The nested-copy sweep's size cache `state/copy-sweep.sizes` and record `state/copy-sweep.record` (the budgets over and the live nested copies named), owned by `bin/fm-copy-sweep.sh`.
@@ -118,7 +121,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 ### Friction ledger
 
-The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
+The pilot refusal instrument records teardown nested-copy/preservation predicates in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
@@ -133,8 +136,6 @@ The teardown completing command re-enters its existing proof and automatic ignor
 It is printed with `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` set, and one teardown process keeps one operation across all its refusals, so a refusal, a refusal on retry and the later success are one operation; a human-only exit prints no command and carries none.
 A forced or legacy-record teardown prints a human-only exit for that refusal instead, because the printed command carries no force or legacy flags and so could not complete that run; the owner re-runs it with the owner's own flags.
 Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
-Jev's size message, for shell calls and untrusted results, names the existing request/overlap budget and a human-only question without changing their screening or admission.
-A refusal line and a blocked event are produced only where the guard denies a call or withholds a result; Claude runs no post-tool screening, so an oversized result there is neither printed as `REFUSED` nor counted.
 
 The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
 Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
@@ -155,7 +156,7 @@ The pilot leaves adjudication, theater and fact delta unknown rather than invent
 A retry is a new attempt/event under the same operation/episode, so a retry that is refused again is another `blocked` event; a terminal event appends its measured elapsed time without rewriting the blocked event.
 The writer's `outcome` interface appends a follow-up only for the `FM_FRICTION_OPERATION_ID` it is given, only when that operation already holds a blocked event for the same guard, task and subject, and a terminal outcome (`retry-succeeded`, `completed`, `abandoned`) at most once; elapsed time runs from the first block.
 Teardown records `retried` when a run starts with such an operation, `retry-succeeded` when it removes a copy that was refused, and `completed` when the teardown finishes without a lost slot.
-No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded; Jev's size bridge sees only the refusal, so it records no outcome.
+No site observes `abandoned`, `worked-around`, `bypassed` or `escalated`, so none is recorded.
 `FM_FRICTION_EVENT_ID`, `FM_FRICTION_ATTEMPT_ID`, `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` supply existing correlation identities when available; otherwise the constructor generates a fresh event/attempt identity, without guessing continuity across invocations.
 `FM_FRICTION_EXECUTION_KIND=test` separates fixtures, and `FM_FRICTION_ACTOR` supplies a known typed role; absent actor information remains unknown.
 Commands, completing questions, tool output, credentials, raw paths and customer content are never ledger fields.
@@ -167,7 +168,7 @@ A short/crashed append leaves its existing bytes intact; subsequent writes diagn
 A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
-The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
+The Jev guard writes no friction events; its mandatory audit's `AuditUnavailableError` behavior is unchanged.
 [`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
@@ -688,6 +689,101 @@ A task's project counts as the firstmate repository when it shares the code root
 Secondmate homes inherit the primary's resolved role, never its raw file: a primary file that resolves to user for any reason propagates as revocation.
 In a secondmate home the file is honored only while the inheritance receipt `config/.fm-inherit-firstmate-role.generation` proves the exact bytes the primary last published (`bin/fm-config-inherit-lib.sh`); a role file with no matching receipt or a stale grant authorizes nothing.
 The receipt prevents accidental publication through supported paths; it proves consistency, not provenance, and is not a security boundary against a process that deliberately forges local records.
+
+## Pool-copy prune after a merge (FM_MERGE_PRUNE)
+
+A merged task's pool copy is pruned right after its pull request merges, with no human step.
+`bin/fm-pr-merge.sh` arms the prune once it has verified the merge, and the watcher arms it for a merge that the merge poll sees, such as one made by someone else.
+Arming writes `state/<id>.merge-prune`, and a detached attempt then runs `bin/fm-teardown.sh <id>` without `--force`, under the automatic-reap admission check, so a worker that is still busy, steered, or held for the captain is left alone.
+Because the merge is already verified, that check waives the finished-session sweep's grace wait and ignores its refusal memo, and every other gate stands (`bin/fm-idle-reap-lib.sh` owns this mode).
+The watcher starts `bin/fm-merge-prune.sh sweep` detached while a record exists (`FM_MERGE_PRUNE_INTERVAL`), so no model or person has to carry the retry.
+A teardown that succeeds and returns the slot to the pool leaves it reset in place, so the copy is still on disk.
+The prune removes that copy only when it really was returned: it is a pool slot of the task's project, and Treehouse state records it as not leased, read again under the project lock and again when a retry resumes.
+A copy that the read proves teardown kept on purpose is never removed: a slot whose lease is still held, for another task's record or for foreign copies, and a copy with no `treehouse-state.json` beside it, which is not a pool slot.
+Its outcome is the log line `reaped: teardown completed; teardown kept the copy`, with no wake and no record.
+A read that cannot tell is never taken as "kept": a copy path that cannot be resolved, a lease state that cannot be read or is ambiguous, a pool-slot test that does not prove the copy a slot of the project, no project recorded, or a project lock path that cannot be resolved keeps the record and the copy and retries quietly with the usual backoff, and raises the one wake when the retries run out.
+The prune removes a returned copy itself, under the project lock, with `treehouse destroy <copy> --include-leased --yes` (never forced), after it proves the slot's owner claim is still this task's or absent, that no process is inside it (a search indexer excepted), that each nested copy holds no work of its own, and that the copy and each nested copy hold only scratch or preserve-list ignored files.
+The preserve-list files are copied with checksums first, the same as for the fallback (below), so a returned copy with unique ignored files stays with one wake.
+It clears the prune record only once the copy path is gone, except for a returned slot that another task's launch has claimed since: that slot is the other task's and is left alone, with one log line and no wake.
+A removal that is refused keeps the record and the copy and raises the one wake; the retry needs only the record, because the task's own record is already gone.
+`FM_MERGE_PRUNE=0` stops new arming.
+
+Before teardown runs, each copy nested in the task's copy must pass the fallback's commit, stash and status proofs (below).
+A teardown that succeeds returns the slot with its nested copies still in it, or closes the task and holds the slot.
+So a nested copy with an unpushed commit, a stash or a changed file keeps the whole slot with one wake, and teardown does not run.
+Teardown also ends a job working at the copy root.
+So a job in the task's terminal pane (tmux or herdr) whose working directory is inside the copy keeps it with one wake before teardown runs, too; a shell, the worker's agent, what the agent started, and the processes it runs under do not count here.
+
+A refusal that only means "not now" is retried on later ticks and says nothing.
+That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
+The retry waits 60 seconds, then doubles up to 3600 seconds.
+One wake is raised if the task is still not pruned after 24 attempts.
+
+The fallback handles only the two refusal classes that really reach it.
+Those are the ship deliverable reported as not landed (the case that matters is a squash merge, which `treehouse destroy` counts as merged) and a closeout driver that reports the exact tree of a nested copy as not covered.
+Every refusal line of the teardown output must be one of them.
+Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, an orphan nested copy refused for a HEAD that is not proved landed (teardown always prints a second refusal with it, that the pool slot contains a registered copy that is not the task's), and any refusal text that is not on that list.
+Teardown preserves ignored files that exist nowhere else itself, so a refusal about them is not one of the two classes.
+Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
+The copy and every nested copy inside it, each checked one by one, must pass all of these:
+
+- The task's own copy is a Treehouse pool slot of the task's project, by the test the rest of Firstmate uses (`fm_treehouse_pool_slot`): the pool's `treehouse-state.json` sits beside it and it shares the project's git directory.
+- Git reports no changed or untracked file, and every untracked file and every changed submodule counts, whatever `status.showUntrackedFiles` or `diff.ignoreSubmodules` says.
+  The one status line that does not count is the untracked directory of a nested copy that the project's `.gitignore` does not cover (`?? .claude/worktrees/<name>/`), because each nested copy is proved on its own.
+- The copy holds no stash entry of its own work: for a linked worktree of the project, a stash made on another branch of the project is another task's, because a linked worktree shares the project's stash list, while a stash made on the copy's branch, or any stash of a detached copy, keeps the copy.
+- A nested copy that is an independent clone, with its own git directory, shares nothing with the project, so every stash it holds keeps it.
+- The search for nested copies enters dependency and environment trees too (`.venv`, `venv`, `node_modules`, `__pycache__`), because a clone there holds work like any other.
+- No commit reachable from the copy's HEAD, which is its own checked-out branch, is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head; for a linked worktree, other branches of the project are other work and are not read.
+- For a nested copy that is an independent clone, every local branch that is not on a remote also keeps it, because removing the clone destroys that branch.
+- The task's own copy holds nothing the merged pull request leaves out: its HEAD is in the merged pull request's head (fetched before the locks), or the default branch already carries its content, which is what a squash merge leaves; a commit that is only pushed, such as a follow-up commit after the merge, is not landed and keeps the copy.
+- Every ignored file is scratch, a symlink, or on the preserve list.
+- No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
+
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
+When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
+Any other child of that `.tac/` still keeps the copy.
+A clone under `.claude/worktrees` is not data of the outer copy, because the search for nested copies proves it on its own.
+Any other ignored entry under `.claude` or `.opencode` is unique work, unless its name is one of the scratch names above, such as `node_modules` or `.DS_Store`.
+The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
+Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 checksums, and the copy is verified, before anything is removed.
+An ignored file that is neither scratch nor preserved is unique work, so the copy stays.
+The finished worker's own session is stopped first with `bin/fm-control.sh <id> exit`.
+That verb keeps the task's terminal pane open, and the pane keeps the idle shell it entered the copy with, so that shell is inside the copy.
+That one shell does not keep the copy, but `treehouse destroy` refuses a copy that has a process working inside it, so the fallback ends it with SIGHUP just before the destroy.
+It must be a recognized shell whose working directory is inside the copy, with no child process, that is a strict descendant of the pane's own shell, found by the pane's process id on the tmux and herdr backends, and the exit verb must have confirmed that the agent stopped.
+The pane's own shell is never ended, so a bare pane shell inside the copy keeps the copy.
+On any other backend nothing is ignored.
+The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
+Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
+A process check that fails, by an error exit or a message, proves nothing: the copy stays and the attempt is retried.
+The silent exit 1 that `lsof` gives for a copy nothing holds open is not a failure.
+The task's Treehouse project lock is held from the worker stop to the destroy.
+The finished-session check is asked again once that lock is held, right before the worker is stopped.
+A worker that was steered or became busy since the first answer backs off, and nothing is stopped, signalled, or destroyed.
+The proof that is repeated while that lock and the task control lock are held makes no fetch and reuses the remote refs fetched before them, so a hung remote never holds either lock.
+The slot's owner claim is read again right before the signal: a slot that another task has claimed, whose claim cannot be read, or whose claim for this task id names another home or no home, stays untouched.
+Then each nested copy that the project's `.gitignore` does not cover, already proved on its own, is removed: `treehouse destroy` counts its untracked directory as dirt and refuses the slot, and the pane's `treehouse get` would stop at its "uncommitted changes" prompt when its idle shell ends.
+An independent clone goes with its directory and a linked worktree with a plain `git worktree remove`, never forced; a linked worktree that git refuses to remove, such as a locked one, or any nested copy that does not go, keeps the copy with one wake.
+When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
+That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, its terminal pane positively shows no live agent, and its last status event is `done`.
+The pane check reads the pane's process tree on tmux and herdr and passes only when every process in it is a shell, except at most one `treehouse get`, the launcher that opened the slot's subshell; an agent, any other process, a second launcher, or a pane that cannot be read keeps the worker unknown, so the prune backs off and retries; on any other backend the check proves nothing.
+The first teardown asks the same check, so a worker stopped with the exit verb before the merge is pruned too, while a relaunched worker whose old marker is still present is not.
+After the fallback ends the pane's idle shell, a `treehouse get` that has not exited yet, or that waits at a prompt, still passes the second teardown's check; if anything else is left in the pane, that teardown refuses, and the prune backs off and retries until its retries run out, then raises its one wake.
+The ordinary finished-session sweep keeps its classification unchanged.
+No step of the fallback uses `--force`, `--include-unlanded`, or `--include-in-use`.
+
+A proof read that fails never counts as finding nothing.
+That covers the ignored-file listing, the stash listing, the listing of a `.claude` or `.tac` directory, and the search for nested copies: the copy stays, except that a failed stash listing is retried later.
+A process table (`ps`) or open-file listing (`lsof`) that fails also counts as a failed read when it printed rows or process ids first, because the process it did not list may be the one that is alive: the copy stays and the prune retries.
+
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy that is not a pool slot of the task's project, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, a task whose PR is not a `https://github.com/<owner>/<repo>/pull/<n>` URL, work that is pushed but not merged, which the fallback proves itself before it stops anything (ending the pane's idle shell returns the slot to the pool, reset to the default branch, so `treehouse destroy` would no longer see it as unmerged), or a destroy that fails, including the removal of a copy that teardown returned.
+It is never forced or discarded.
+Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
+The wake is recorded as sent only after the wake queue took it, so a failed append is raised again by the next attempt.
+Each outcome is one line in `data/<id>/merge-prune.log`; a pruned copy raises no wake, and only a copy that stays raises its one wake, `check: merge-prune kept <copy> for <id>: <reason>`; the prune never writes to the task's status file.
+The hourly `treehouse prune --all --yes` safety net is unchanged, and the prune does not alter what teardown itself preserves or refuses: the fallback acts only after teardown has refused, and the removal of a returned copy only after teardown has returned it.
+`bin/fm-merge-prune.sh`'s header owns the exact mechanics; `tests/fm-merge-prune.test.sh` covers them against a fake pool and a stand-in `treehouse`.
 
 ## Waiting worker spends no turns (config/wait-no-turns)
 
@@ -1609,16 +1705,9 @@ The address selects the existing shared server; it does not authorize starting o
 ## Task Definition of Done (ship and scout briefs)
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
-Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items, supporting items, hard gates, and the honesty rule.
-Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with a unique id and every field nonempty; Authority is exactly agent, gate, or grader.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
 The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
-It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
-This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
-A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
-A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head tree equals the copy's `HEAD` tree, and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
-A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
-The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check. This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
 A filled section may quote a placeholder inside a sentence.
@@ -1630,7 +1719,17 @@ A fresh spawn of a brief with no such section at all is not refused: it prints o
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
 The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items, supporting items, hard gates, and the honesty rule.
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with a unique id and every field nonempty; Authority is exactly agent, gate, or grader.
+It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
+A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
+A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head tree equals the copy's `HEAD` tree, and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
+A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
+The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
+This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
+A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
 
 ## Home brief include (config/brief-include.md)
@@ -1768,13 +1867,13 @@ Report raw counts and outcomes, not estimated savings from a single synthetic sm
 
 The optional local, gitignored `config/keep-ai-trailers` presence flag opts this home into keeping AI co-author trailers on its launched workers.
 With the flag absent, every Claude launch's inline `--settings` JSON carries `"attribution":{"commit":"","pr":"","sessionUrl":false}`, every Devin worker config sets `"attribution": false`, and every fleet launch receives a pane-scoped `GIT_CONFIG` `core.hooksPath` pointing at `state/<id>.git-hooks`, where git's `commit-msg` hook strips known AI trailers even when a runtime injects them after the typed message.
-When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and fleet launches do not install or select the strip hooks.
+When the flag is present, Claude launches omit those attribution-off settings, Devin worker configs keep the user config's `attribution` setting (Devin's default is on), and the task Git hooks omit only the commit-message strip.
 Fresh launches and supported same-task relaunches apply the current attribution choice without retaining that task's obsolete hook selection, including when `config/launch-env-allowlist` is enabled.
 Unrelated Git environment entries and explicit operator settings remain in the persistent pane; their inheritance by the worker is subject to the [launch environment filter](#worker-launch-environment-configlaunch-env-allowlist).
-When keeping trailers, Git uses the repository's configured hooks unless the worker receives an explicit operator override.
-`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs when stripping is enabled.
+Every fleet launch selects the task Git hooks for the [commit and push credential check](#jev-guard), independently of the attribution choice.
+`bin/fm-git-strip-ai-trailers.sh` owns the identities, the install, and chaining the hooks of whichever repository git is running in, including when `git -c core.hooksPath` supplies the pane's hook override, so a project hook such as husky still runs in either attribution posture.
 A repository whose config sets `core.hooksPath` to the empty string runs no project hook, as in plain git; if the wrapper otherwise cannot resolve that repository's hooks directory, the git operation fails rather than silently skipping a project hook such as a pre-push guard.
-When stripping is enabled, the hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the strip; install a project's hooks from outside the pane, where the wrappers chain them.
+The task hooks directory is read-only, so a hook manager run inside a fleet pane (lefthook's npm postinstall, `pre-commit install`) fails instead of displacing the task hooks, which hold the credential checks and, unless trailers are kept, the strip; install a project's hooks from outside the pane, where the wrappers chain them.
 The flag is a home-wide attribution choice, independently owned by each home and not inherited into secondmate homes; the [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md) inherited-local-material contract leaves each home's presence or absence unchanged.
 Per-machine Cursor `cli-config.json` attribution-off is not this contract: it does not travel with Firstmate, defaults back to on when unset, and only feeds the CLI's request to the server, so it suppresses the trailer rather than preventing it.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns launch-boundary reconciliation, with model-free real-tmux transition and preservation coverage in [`tests/fm-git-strip-ai-trailers.test.sh`](../tests/fm-git-strip-ai-trailers.test.sh).
@@ -1786,7 +1885,7 @@ Claude Code prefers an API key over a claude.ai subscription login and silently 
 The refusal names the variable that triggered it; the credential value is never printed or logged.
 
 The guard applies to all claude ship, scout, secondmate, and relaunch launches except when `--allow-api-key` is passed to `fm-spawn.sh`, which affirms that the API key is intentional, or when a `config/claude-account` worker account pin is active: the pin strips both variables from the launch environment, so neither can reach the worker.
-A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard.
+A raw launch command (the unverified-adapter escape hatch) whose first non-assignment word is `claude` is a claude launch and gets the same guard; on macOS, outside secondmate launches, so is one in which any later command runs `claude`, such as `true && claude ...`.
 
 When `--allow-api-key` is used, `api_key=allow` is recorded in the task metadata, and `fm-control.sh relaunch` carries that opt-in to the replacement launch.
 A direct `fm-spawn.sh --relaunch` without the flag drops the line.
@@ -1923,7 +2022,7 @@ my-project 2
 ```
 
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns declaration syntax, clone-name matching, same-origin occupancy, and the concurrency invariant.
-A PR-ready handoff frees a place; local-only ships and scouts retain theirs until cleanup.
+A PR-ready handoff, or a no-mistakes run that `bin/fm-crew-state.sh` reads as checks green naming its PR (a ten-second read that searches the run's full ci log for its newest checks marker, skipped for that pass when slower), is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason and is retried after ten minutes, and `bin/fm-pr-check.sh <id> <PR url>` by hand remains for a fixed refusal or a lane with neither reading; local-only ships and scouts retain theirs until cleanup.
 The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
@@ -1991,11 +2090,10 @@ The header also owns the closeout-script liveness dependency and the proposed Ve
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
 
-`config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules, with an optional explicit project restriction, that firstmate reads before dispatching a crewmate or scout.
+`config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `dispatch-profile-intake`, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` naming the selected rule when it declares a fallback policy or hard project eligibility.
-Typed resolution names every selected rule, so launch and recovery can rebind it to the project actually being launched.
+Firstmate resolves the rule's profile object or array under `dispatch-profile-intake`, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` when the rule has a fallback policy.
 
 **Spawn requirements**
 
@@ -2007,14 +2105,16 @@ Typed resolution names every selected rule, so launch and recovery can rebind it
 
 This section is the single owner of the canonical schema and its per-field semantics.
 `dispatch-profile-intake` owns the dispatch intake boundary, and `quota-array-dispatch` owns the completion-aware profile-array selection procedure.
-`bin/fm-dispatch-eligibility-lib.sh` owns the `projects` verdict and the identity rules every consumer applies.
 
 ```json
 {
+  "judgments": {
+    "<judgment_id>": { "type": "noul", "instructions": "<one observable question about task>", "criteria": { "true": "<when true>", "false": "<when false>" } }
+  },
   "rules": [
     {
       "when": "<natural-language condition describing a kind of task>",
-      "projects": { "allow": ["<registered project name>"], "exclude": ["<registered project name>"] },
+      "match": { "projects": ["<registered project id>"], "kind": "<ship|scout, optional>", "all": ["<judgment_id>"], "any": ["<judgment_id>"], "none": ["<judgment_id>"] },
       "approval": "captain",
       "min_confidence": 0.85,
       "floor": { "scope": "<quota-axi scope>", "min_percent": 20, "provider": "<quota-axi provider>" },
@@ -2037,58 +2137,11 @@ This section is the single owner of the canonical schema and its per-field seman
 | --- | --- |
 | `rules` | May be absent or empty for a default-only configuration. |
 | Rule `when` and `use` | Required for each rule. |
+| Top-level `judgments` and rule `match` | Required only by typed resolution, as "Fields applied only by typed resolution" below defines. |
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
 | Rule `fallback` and top-level `default_fallback` | Optional ordered arrays of explicit stand-ins; an empty or absent list permits none. |
-| Rule `projects` | Optional hard project eligibility: an object with a non-empty `allow` and/or `exclude` array of exact names registered in `data/projects.md`, and no other keys. |
-
-**Hard project eligibility (rule `projects`)**
-
-A rule without `projects` is unrestricted and keeps every existing configuration unchanged.
-A rule with it is eligible only for a project named in `allow` (when present) and absent from `exclude` (when present).
-There is no other shape: `allow` and `exclude` are both optional, at least one must be present, and both are non-empty arrays of registered names when present.
-One line can carry both, for example `"projects": {"allow": ["vernant", "acme"], "exclude": ["vernant-archive"]}`.
-
-Names are exact registered identities from the home's `data/projects.md`, the same identity owner that answers project delivery posture.
-Case, spacing, aliases, and partial matches are never normalized or guessed: a rule name that is not registered, or a `--project` value that is empty, malformed, or unregistered while some rule declares `projects`, is an actionable configuration error rather than a silently widened policy.
-A name with leading or trailing whitespace is a typo, not a different identity.
-The launch identity is the project directory's basename: typed resolution receives that name as `--project`, and launch matches the same basename against the registry.
-Firstmate has no separate origin-to-registry-name mapping, so a clone whose directory name differs from its registered name cannot satisfy a restricted rule; that is reported as an unregistered identity rather than guessed around.
-
-`bin/fm-dispatch-eligibility-lib.sh` owns the verdict and every consumer applies it:
-
-- Typed resolution removes an ineligible rule from the Choice the model sees and rejects a provider answer that still names one.
-- The Level 5 adapter refuses to prepare or apply a rules file that declares `projects` without the resolved eligibility argument, so an internal direct call cannot silently waive the declaration.
-- `fm-spawn.sh` rechecks the selected rule, and any rule the fallback resolver infers from the launched profile, against the project actually being launched before any worktree, endpoint, or task record exists; a profile can also be authorized by a restricted rule that declares no fallback, so the launched profile must be held by at least one rule this project allows.
-- Under hard project eligibility, a supplied rule that does not hold the requested profile refuses instead of letting another rule's authorization stand in for it; the explicit `--harness`/`--model` override remains the deliberate manual route.
-- A profile that no rule holds is such an explicit manual route outside the rule matrix; the required explicit harness authorizes it, while a profile at least one rule holds must be permitted by an eligible one.
-- An identity that no longer resolves refuses rather than acting unrestricted.
-- `fm-control.sh relaunch` rechecks a recorded rule, its inferred fallback rule, and the recorded profile's authorizing rules before the running agent is stopped, so a later config edit cannot silently widen the restriction; a recorded identity that no longer resolves, or that does not authorize the recorded profile, refuses.
-- A rule's declared `fallback` and `default_fallback` are reachable only through a selected eligible rule, so project policy is not lost in stand-in selection.
-
-`when` remains natural-language judgment about task suitability and is never parsed for a project restriction.
-An arbitrary English condition such as "only when the project is Vernant" is not a hard guarantee: declare the restriction here when it must be enforced.
-`projects` is a rule field only; the top-level `default` profile array names no project scope and remains the generic fallback when no rule applies.
-The model cannot waive a declared restriction by choosing that rule.
-
-```json
-{
-  "rules": [
-    {
-      "when": "Vernant design work that changes the customer-facing model",
-      "projects": { "allow": ["vernant"] },
-      "use": [{ "harness": "claude", "model": "<opus-class id>", "effort": "high" }]
-    },
-    {
-      "when": "Routine implementation work outside Vernant",
-      "projects": { "exclude": ["vernant"] },
-      "use": [{ "harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high", "provider": "codex" }]
-    }
-  ],
-  "default": { "harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high", "provider": "codex" }
-}
-```
 
 **Pooled OMP capacity and declared stand-ins**
 
@@ -2116,10 +2169,9 @@ A `powerful` route never selects a Haiku/Luna stand-in from `fallback` or `defau
 A launch without `--dispatch-route`, such as a manual route, keeps each stand-in exactly as declared.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
-When the matched rule has a fallback policy or declares hard project eligibility, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
-Launch rechecks that identifier against the project actually being launched, and recovery rechecks it before stopping the running agent, so an incompatible rule or an unregistered project identity refuses in both paths.
+When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
 A recorded rule still contains the task's profile when typed resolution raised its effort above the configured one for the same harness and model.
-A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent for fallback matching, but it refuses launch and recovery because the project restriction it may have carried can no longer be verified; relaunch with an explicit harness or model override to accept a manual route deliberately.
+A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
 OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task; `fm-spawn.sh --fixed-family` empties those chains for a scout task, including an independent review reader, so a provider error stops the reader instead of switching its model family.
@@ -2142,12 +2194,23 @@ Account pins and saved resets are unchanged; reviewer model selection remains ow
 **Fields applied only by typed resolution**
 
 Top-level `task_horizon_minutes`, rule `approval`, `min_confidence`, and `floor`, and profile `provider` and `floor` are optional declarations that only [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key) applies in code; without that opt-in they are inert, and firstmate's own intake reads them as ordinary hints.
-The resolver supplies the fixed neutral Choice option `No listed rule applies to this task.` for work that matches no listed rule.
+Typed resolution requires a top-level `judgments` object and a `match` object on every rule; `when` remains the human-readable description, not a question sent to the model.
+Each judgment has `type: "noul"`, one observable question in `instructions`, and concrete `criteria.true` and `criteria.false` strings.
+Every rule's `match.projects` is a nonempty positive list of ids registered in `data/projects.md`; config load rejects unregistered ids, missing project lists, and negative selectors.
+It may also constrain `kind` (`ship` or `scout`) and reference judgment ids in nonempty `all`, `any`, and `none` arrays.
+Unknown selector keys, unknown judgment ids, and missing structured matches are configuration errors, not a fallback to prose classification.
+These declarations restrict routing; they do not grant an exception, new profile, or permission.
+The [example configuration](examples/crew-dispatch.json) shows the structured format.
+
+Migration to structured matches (required before typed resolution runs): a rules file written for the retired rule Choice has no `judgments` object and no rule `match`.
+List each rule's applicable registered projects in `match.projects`, retain any `match.kind` fact, and express each remaining semantic condition as a single-judgment Noul in `judgments` referenced from `match.all`, `match.any`, or `match.none`.
+The former `project` and `exclude_project` selectors have no compatibility layer; adding a project to the registry does not make any existing rule apply to it.
+There is no compatibility layer: an old-format file with at least one rule fails closed as a malformed rules file (exit 2), so firstmate dispatches through its manual intake until the file is migrated, and bootstrap reports the same `CREW_DISPATCH: invalid` diagnostic while the key is set.
 
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
 
 `min_confidence` is a number from 0 through 1.
-The rule's own probability in the answer, pooled with any option that selects the identical outcome (see "Confidence and fallback rules" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key)), must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
+The rule's own predicate support must reach it, replacing the resolver's global 0.6 support floor (see "Confidence and fallback rules" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key)).
 Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
 
 `task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
@@ -2196,8 +2259,8 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 - When the file exists, bootstrap validates it with `jq`.
 - Valid files stay silent by default unless [model-index warnings](#fleet-model-index-configmodel-indexjson) apply; with `FM_BOOTSTRAP_VERBOSE_FACTS=1`, bootstrap emits `BOOTSTRAP_INFO: crew dispatch active config/crew-dispatch.json`, one `BOOTSTRAP_INFO:` fact per rule, and one fact for the optional default profile set.
 - Malformed JSON, malformed rules, an empty or malformed profile array, an unverified harness, or an effort value unsupported by that harness is reported as `CREW_DISPATCH: invalid config/crew-dispatch.json - ...`.
-- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations receive the same diagnostic; without the key those inert declarations preserve the pre-existing bootstrap behavior.
-- Missing `jq` is reported through the normal `MISSING: jq` install-consent flow.
+- While typed resolution is active, malformed `task_horizon_minutes`, `approval`, `min_confidence`, `floor`, and present `provider` declarations, and a nonempty `rules` array without valid `judgments` and rule `match` declarations, receive the same diagnostic; a missing, unreadable, or invalid `data/projects.md` registry is reported there with the registry's own error; without the key those inert declarations preserve the pre-existing bootstrap behavior.
+- Missing `jq` is reported through the normal [missing-tool diagnostics](#toolchain).
 - While the file remains present, no crewmate or scout spawn may proceed without an explicit resolved harness; malformed configuration must be reported and corrected rather than selected around.
 
 **Inheritance**
@@ -2219,7 +2282,6 @@ The script header owns flags, the output block, and exit status.
 - Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
 - A `use` profile's `effort`, when present, is one of `low`, `medium`, `high`, `xhigh`, or `max`; any other value is an error.
 - A malformed rule, duplicate profile, invalid fallback, unreadable rules file, failed quota read, or invalid quota snapshot is reported as an error; the selector never selects around it.
-- A review rule that declares `projects` is refused: this dry run has no launch project to bind, so dropping the hard restriction silently would be worse than stopping. Declare `projects` only on worker dispatch rules.
 
 **Procedure**
 
@@ -2246,11 +2308,8 @@ This section is the single owner of the tool's operator contract; the script hea
 Rules come only from the effective home's `config/crew-dispatch.json`; `FM_CONFIG_OVERRIDE` selects the config directory for tests and specialized setup like the other scripts.
 
 ```sh
-bin/fm-dispatch-resolve.sh data/<id>/brief.md --project <name>        # TOON block on stdout
+bin/fm-dispatch-resolve.sh data/<id>/brief.md        # TOON block on stdout
 ```
-
-When any rule declares `projects`, `<name>` must be the project's exact registered identity in the home's `data/projects.md`; an empty, malformed, or unregistered name exits 2 with an actionable diagnostic instead of guessing or normalizing it.
-Without such a declaration the project stays free text, as before.
 
 **When firstmate invokes the resolver**
 
@@ -2258,20 +2317,30 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
-That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every eligible rule's `when` plus the fixed neutral option for no matching rule.
-The rule Choice alone decides which offered rule applies, including task-suitability and Claude-only rules.
-Explicit hard project eligibility is the one pre-choice filter: a rule whose declared `projects` allow/exclude lists exclude the project is withheld before judgment, and an answer that still names it is rejected rather than applied.
-No text pre-check parses `when`, selects among the remaining rules, or removes one for any other reason.
-The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
-The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
-The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
+When on and at least one rule exists, the tool sends the project name and task-specific text in one `JevClient.systemOne` call using the current `jev-latest` model.
+Code eliminates rules whose project or kind facts do not match before assembling any semantic questions; an excluded rule cannot reappear in confidence fallback.
+The resolved brief kind stays in code and is never a request field.
+The remaining rules contribute only their referenced individual Noul judgments, each sent once even when several rules share it.
+The request also includes the upstream ambiguity, model-tier and reasoning-effort questions, plus a desktop-access Noul with concrete true/false criteria.
+The upstream workflow/profile Choice is not asked or applied: human, script and browser workflow labels cannot force dispatch escalation.
+The model never sees quota, catalogs, `why`, `when`, `use`, approvals, or confidence floors.
+The [vendor provenance](../bin/ten-levels/SOURCE.md) distinguishes unchanged upstream questions from Firstmate's adapter policy.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
 
 When the sections are sent from a scout brief, the line `Brief kind: scout (report only)` comes first, taken from the scaffold's scout contract line; ship briefs and briefs sent whole get no kind line.
-A ship brief's delivery mode is deliberately not sent, because in live runs naming it pushed a routine ship brief toward the hardest tier (see [the verification record](verification/dispatch-resolve.md)).
+An unfenced `# Current ship Firstmate spec` heading makes the brief a ship; otherwise the scout scaffold's contract line in the unfenced `# Setup` section makes it a scout, and remaining briefs are ships.
+Kind is resolved before task extraction, so a promoted brief sends its current ship specification rather than the obsolete scout specification.
+Scaffolding and typed clone-path binding require `python3` and use only its standard library.
+The scaffold's first line is one typed header, `FIRSTMATE_DISPATCH: {"project_path":"/absolute/clone/path"}`, from its positional repository argument, not an independently editable id.
+Only that first line can bind the project; a record quoted later in task prose, fenced or otherwise, is not metadata.
+The resolver derives the registered id by requiring that path's strict realpath to equal exactly one registered clone location: `<projects>/<id>`, where `<projects>` is `FM_PROJECTS_OVERRIDE` when set and `<home>/projects` otherwise, or the home itself for `firstmate`.
+Missing or malformed metadata, a missing clone, an unrelated or ambiguous clone location, and a missing, unreadable, or invalid registry return a named `escalate` result without sending anything.
+Unregistered scaffold inputs may still be written for manual intake but cannot resolve automatically.
+No caller `--project` flag, case folding, whitespace trimming, regex matching, or task-prose project inference participates in this binding.
+The clone path is removed from whole-brief fallback text and is never sent to the provider.
+A ship brief's delivery mode is not sent.
 
 The scaffold's standard setup, rules, and definition-of-done text is the same in every brief, so leaving it out keeps its safety language from reading as a signal about the task.
 
@@ -2320,7 +2389,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, every string value and object key in the complete assembled request, including question keys built from judgment ids, project, sanitized task text, referenced judgment criteria, fixed question text and the requested model id (`jev-latest`); for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay and the shadow model picker check every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2332,14 +2401,14 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 
 **Checks performed after the answer**
 
-The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
+Desktop access above 0.5 and ambiguity scores above 1 still escalate to firstmate; dispatch cannot provision an unapproved capability.
 The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
 Among them, a sole usable pool clears and otherwise the composite ranks them.
 When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
 This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
 `powerful` excludes Haiku/Luna candidates and declared stand-ins, from `fallback` and `default_fallback` alike, and a selected stand-in takes the same route effort clamp as `use` candidates, Haiku at `max`.
 When only such stand-ins remain, the result is `escalate`.
-The resolver's profile line names the selected rule as `--dispatch-rule`, so launch and recovery rebind it to the project actually being launched; `--dispatch-route` accompanies it when the rule declares a fallback policy, so launch and recovery apply the same class and effort.
+The resolver's profile line carries `--dispatch-route` beside `--dispatch-rule`, so launch and recovery apply the same class and effort.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
 These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.
@@ -2382,27 +2451,18 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 **Confidence and fallback rules**
 
-- A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick; a pick's probability is also joined by its equivalent options, as below.
-- A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors and no equivalent options behaves as it did.
-- Options that select the identical outcome pool their probability: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
-  The neutral option counts as a rule with the `default` array and no approval or floor.
-  The pick is the group holding the answer's `choice`, which a group of one option makes the option itself.
-  That group clears when its support (the answer confidence for the `choice`, or its probability when it declares `min_confidence`, plus the probability of every other member) reaches the `choice` floor: its `min_confidence`, or 0.6.
-  When it does not clear, the pooled group with the most probability becomes the pick if that group clears its own floor on the sum of its members' probabilities; the group is then stood for by its most probable member, whose `min_confidence` or 0.6 is the floor.
-  So a 0.51/0.49 split between rules that dispatch identically resolves, and so does four options sharing 0.7 against one distinct `choice` at 0.3; the output carries a `pooled:` line naming the pooled options and the combined probability.
-  The same split between different profiles, approval, or floor is a real low-confidence pick and stays `ambiguous`, as does a pooled group still below its floor.
-  A `choice` that clears its own declared floor stays the pick, and a runner-up is still checked on its own probability.
-- Deviation from the approved plan, with its codebase reason: the plan reads "add per-rule floors for equivalent rules", and `min_confidence` already existed per rule.
-  The neutral `default` option cannot carry `min_confidence`, so a default pick at 0.51 stays under the global 0.6 however its equivalent rules are configured; pooling the support of identical outcomes is the only change that lets that split resolve without a floor on `default`.
+Code evaluates eligible rule predicates with minimum for `all`, maximum for `any`, and minimum of the complements for `none`; when a rule uses several groups, their minimum is its support.
+A fact-only matching rule has support 1.
+The default support is the minimum complement of all eligible rule supports, or 1 when no rule is eligible.
+These supports are fuzzy predicate scores, not a mutually exclusive probability distribution, so they are never summed or pooled even when rules select identical profiles.
 
-When the group holding the answer's `choice` does not clear its floor, a pooled group with more probability that clears its own floor replaces it before any runner-up is considered, and the output carries a `replaced:` line naming the answer `choice` with its probability and floor, and the pooled group that stands in.
-
-When the picked rule declares its own floor but its probability falls below it and no pooled group replaced it, the tool checks the other options:
-
-1. Find the most probable other option that clears its own floor: the rule's `min_confidence`, or 0.6 otherwise.
-2. Print a `fallback:` line naming both floors and resolve that rule as though it had been picked.
-
-No qualifying option, or two equally probable qualifying options, produces `ambiguous`.
+Code picks the highest-supported eligible rule or default and applies its declared `min_confidence`, or 0.6 when absent.
+An exact highest-support tie between different dispatch outcomes is `ambiguous` before any floor or runner-up check, so rule order and `min_confidence` cannot resolve it; identical profiles, approval, quota floor, selection mode and fallback may share the same outcome without increasing support.
+If the highest-supported rule misses its explicitly declared floor, code considers the highest-supported other eligible option that clears its own floor.
+A qualifying runner-up prints a `fallback:` line; no qualifying option or a tie between different qualifying outcomes is `ambiguous`.
+Without a declared floor, a below-0.6 pick remains `ambiguous` rather than selecting around uncertainty.
+The existing `confidence` result/log field now records the picked rule's support, and the output's `support:` line lists eligible rule supports rather than Choice probabilities.
+New resolves no longer emit the retired categorical `pooled` field.
 
 When every candidate of the resolved rule is proven exhausted, the rule's declared model-matrix stand-in is selected through the shared fallback list above, with a `fallback:` line naming it.
 
@@ -2428,9 +2488,9 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | Result | Meaning |
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
-| `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
-| `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
+| `ambiguous` | Predicate support below the floor with no runner-up taken, or a conflicting rule-support tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, desktop capability request, missing or invalid typed clone-path bindings, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `error` | API, network, malformed response metadata, rendering, quota-axi failure, a Level 5 adapter that cannot run, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 
@@ -2442,7 +2502,7 @@ Every result above exits 0.
 **Result log**
 
 Every resolve that reaches a status appends one JSON line to `data/dispatch-resolve.jsonl`, so the rate of results that need firstmate's own intake can be measured as every status other than `clear`.
-A record holds a UTC timestamp `ts`, `status`, the option Jev answered `choice`, the picked option `rule` (the `choice`, or the pooled group member that replaced it), the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric `confidence` and `floor` applied, the `pooled` probability when pooling cleared the floor, and a coarse `reason`.
+A record holds a UTC timestamp `ts`, `status`, the highest-supported eligible option `choice` and `rule`, the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric support in `confidence` and the `floor` applied, and a coarse `reason`.
 No brief text, request, API body, rule criterion, or credential is written, and a failed write never changes the result.
 Opt-out and withheld paths and exit-2 configuration errors have no status and write nothing.
 
@@ -2524,86 +2584,234 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
 The Claude post-tool advisory was retired on 2026-10-22: it could only add context, never withhold output, so it reported protection it did not provide.
-Claude's only remaining guard coverage is the pre-tool deny on `Bash|Write|Edit`, so result handling stays **no protection** and the result-screening and read-consistency rules below apply only to omp.
+Both integrations enforce only pre-tool checks; neither screens, annotates or withholds tool results.
+Claude's guard runs at the pre-tool boundary for every tool except the shell-command tools `Bash`, `Monitor` and `PowerShell`; omp's runs for every tool call.
 The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
+Dispatch is separate from this tool-call guard: its [typed resolution contract](#typed-dispatch-resolution-env-typesafe_api_key) owns deterministic project/kind eligibility, independent semantic judgments, the removed workflow Choice, and desktop criteria.
+
+### Worker OS write confinement
+
+On macOS, `fm-spawn.sh` wraps the complete omp and Claude ship/scout process tree in `sandbox-exec`, after composing account, environment and Git-hook settings.
+The profile builder is [`bin/fm-write-confinement.py`](../bin/fm-write-confinement.py).
+It requires Python 3 and Git, plus the `bun` CLI for omp's native scope-hash derivation; missing prerequisites refuse a measured-harness launch rather than silently removing confinement.
+Writes are allowed by default; the profile denies writes to these named protected assets:
+
+- the primary checkout of every project in `projects/`, of the task's own repository and of this home, except the task's own worktree;
+- every other linked worktree those repositories list, nested `.claude/worktrees/fm-*` copies and pool copies alike;
+- this home's checkout, `config/` and `.env`;
+- every other task's `state/<other>.*` records, every task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, this task's other Main-owned records and the shared legacy `state/jev-guard.jsonl`; the rest of `state/`, such as `state/procevent/`, `state/friction.jsonl` and the fleet ledger, stays writable;
+- the home `data/` root, including every `data/<other>/` directory and the Main-loaded `data/secondmates.md`, `data/captain.md` and `data/backlog.md`, apart from this task's own `data/<task>/` directory and the duration ledger `data/command-durations.jsonl` with its `.lock` and `.compact` siblings;
+- every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id, unless the name also carries this task's longer id;
+- other tasks' branches, and the primary checkout's own `HEAD` and index, in the shared Git directory;
+- the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
+- every other local Firstmate home: the root home and each registered local secondmate home;
+- the no-mistakes gate repository of every other project under `$NM_HOME/repos` (default `~/.no-mistakes/repos`).
+
+Task ids come from the `state/<id>.meta` records of this home and of every other local home.
+Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`.
+The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
+The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
+The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
+Native temp selectors point at the task temporary root.
+A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
+The measured harness contracts are omp and Claude.
+`codex`, `opencode`, `pi`, `pi-signed`, `grok`, `kimi`, `cursor`, `gemini`, `muse`, `rovo`, `agy`, `devin` and `dsh` launch unchanged and unconfined, with no guessed state-root grants, unless a raw launch command that starts with one of them runs `claude`, which makes it a confined Claude launch as described below.
+Each launch audit prints the actual harness identifier and confinement mode; macOS metadata records `write_confinement=unconfined-macos-<harness>` for these unmeasured harnesses.
+Their root contracts are follow-up work, not coverage supplied by this boundary.
+Secondmates are persistent homes and are not subject to this task-worker boundary.
+A raw omp or Claude launch command's own root assignment runs after the profile's and wins, so [`bin/fm-raw-launch.py`](../bin/fm-raw-launch.py) reads the command as shell words, without evaluating or expanding anything.
+For a confined raw Claude launch, session arguments are inserted only at executable program-word spans; quoted data, comments and here-document bodies retain their original bytes, including literal, single/double-quoted and tab-stripped delimiters and several here-documents on one line.
+Command or process substitution, backticks, here-strings, shell control structures, continued here-document delimiters and unterminated quotes or here-documents refuse rewriting with a construct-specific message and a request to simplify the command or use a named harness; there is no unmarked fallback.
+Linux and secondmate raw Claude launches are not confined, get no session id and keep the earlier memory-exclusion prefix placement, so these shell constructs still launch there under the pane's own shell, and only a confined launch wraps its compound command in this host's `/bin/sh`.
+One leading `PI_CODING_AGENT_DIR=` assignment for omp, or `CLAUDE_CONFIG_DIR=` for Claude, with a literal value, quoted or not, is resolved to an absolute path against the task worktree, and the profile grants that path as the harness root.
+A value that needs expansion (`$`, a backquote or a leading `~`), an empty value, or a second assignment by a later command refuses the launch with text that names the variable and asks for the resolved absolute path.
+A raw omp command that names `OMP_PROFILE`, `PI_PROFILE` or `--profile` anywhere in its literal text refuses, so launch the profile through `--harness omp` with `OMP_PROFILE` set in the environment instead; a raw `PI_CONFIG_DIR` also refuses, so set it in the environment and launch with `--harness omp`.
+Admission sees only the command's literal text, so a selector that appears only after the pane's shell expansion (for example `"$PROFILE_FLAG"`) is admitted, and that profile's harness state writes fail closed.
+A home list that cannot be read, or a project whose worktrees Git cannot list, also refuses the launch instead of leaving those assets out.
+
+Inside its protected config home the running harness keeps only its measured runtime state writable: omp's `agent.db` and `models.db` with their WAL, SHM and journal files, its `sessions/` transcripts and exactly its project-scoped daemon directory; or Claude's `history.jsonl` with its `history.jsonl.lock` lock directory, its `backups/`, `statsig/` and `debug/` directories, and only this worker's own session state: `session-env/<session-id>/`, `file-history/<session-id>/`, `tasks/<session-id>/` (not exercised by a real session; model-free write proven), its transcript `projects/<slug>/<session-id>.jsonl` with the `projects/<slug>/<session-id>/` sidecar directory, and creation as a folder, but never as a symlink or plain file and never rename or deletion, of the `projects/<slug>` container that also holds other sessions' transcripts.
+The profile grants no creation of the `session-env/`, `file-history/`, `tasks/` and `projects/` folders that hold other sessions' entries; before every confined Claude launch, relaunches through `bin/fm-control.sh <task> relaunch` included, `fm-spawn.sh` creates them and `projects/<slug>/` itself, outside the profile, each with owner-only mode `700`, as is a missing config root it creates, together with any missing parent folders of a `CLAUDE_CONFIG_DIR` set in the environment (a raw command's own `CLAUDE_CONFIG_DIR=` root whose parent folder is missing refuses instead), and it never changes the mode of a folder that already exists, so a worker on a new config root still writes its own session state.
+Claude's `.claude.json`, both `~/.claude.json` in the default layout and `.claude.json` with its atomic siblings under an overridden config root, stays protected, because it carries user-scoped MCP server commands that later unconfined sessions run.
+The slug is Claude's name for the task worktree path, every non-alphanumeric character replaced by `-`.
+`fm-spawn.sh` mints a fresh session id with `uuidgen` at every confined Claude launch, relaunches included, records it as `claude_session_id=` in the Main-owned task metadata and passes it both to the profile and to `claude --session-id`.
+Claude Code 2.1.310 refuses to start under an id that is already in use, and a Claude relaunch starts a fresh conversation rather than resuming one, so an earlier session's directories lose their grant at the next launch; the task's measurement record `data/fm-jev-guard-t5-os-write-confinement/n2-measurement.md` in the owning home holds the evidence.
+A raw launch command in which a command's program is `claude`, such as `[ -d src ] && claude ...` or `true && claude ...`, is a confined Claude launch; it gets `--session-id <session-id>` spliced after each `claude` program word.
+Claude names its transcript and temp folders after the directory it starts in, and the profile grants only the worktree's, so a confined raw command that runs `cd` or `pushd` before `claude`, such as `[ -d src ] && cd src; claude ...` or `bash -c 'cd sub && claude ...'`, refuses with a message to start Claude from the worktree root.
+A command's program is its first word after leading `NAME=value` assignments, where commands are separated by an unquoted newline, `;`, `&`, `|`, `&&` or `||`.
+Behind one of these named wrappers it is the word after that wrapper's own options and operands: `env` (`NAME=value`, `-i`, `-u NAME`, `--`), `command` (`-p`), `exec` (`-a NAME`, `-c`, `-l`), `nohup`, `time` (`-p`), `timeout` (`-f`, `-p`, `-v`, `-k <duration>`, `-s <signal>`, then its duration), `nice` (`-n <n>`), `caffeinate` (`-d`, `-i`, `-m`, `-s`, `-u`, `-t <seconds>`, `-w <pid>`), `arch` (`-arm64`, `-x86_64` and similar, `-arch <name>`, `-e NAME=value`, `-d NAME`) and `stdbuf` (`-i`, `-o` or `-e` with its mode).
+The `-c` text of `sh`, `bash` or `zsh` is read by the same rules, past the shell's short options, `-o` or `-O` with its name, and long options such as `--login`, `--norc` or `--noprofile` (`--rcfile`, `--init-file` and `--emulate` with their value), and a `claude` found there gets its id inside that text, which is quoted again as one word.
+A quoted expansion such as `"$T"` is always one word, so it fills a named wrapper's option value, operand or `env` `NAME=value` assignment the way a literal word would: `timeout "$T" claude ...`, `env -u "$V" claude ...` and `nice -n "$N" claude ...` are Claude launches, and so is `bash -c "claude -p $X"`, whose quoted text is read with `$X` as an expansion.
+Any other program in front of `claude`, such as `sudo`, `xargs` or `flock`, another option of a named wrapper, such as `env -S`, a shell that runs a script or standard input instead of `-c` text, a `claude` behind an unquoted expansion in a program or option position, such as `timeout $T claude ...` or `env $OPTS claude ...`, which can split into any number of words, a `claude` behind a quoted expansion before a shell's `-c`, such as `bash "$O" -c 'claude ...'`, a `claude` behind a quoted expansion where `timeout` reads its options, such as `timeout "$O" 60 claude ...`, which is taken as the duration, and a `claude` behind a quoted expansion where another named wrapper reads its options, such as `env "$X" claude ...`, `nice "$N" claude ...` or `caffeinate "$O" claude ...`, which is taken as the program, are not detected: when nothing else in the command selects confinement, that Claude runs unconfined and the task metadata records `write_confinement=unconfined-macos-<first program>`; inside a confined Claude launch it gets no id, so its session writes fail closed.
+On macOS, outside secondmate launches, a raw launch whose first program is neither `claude` nor `omp` is read word by word; when a command runs `claude`, the launch takes the Claude route even if later text cannot be read, and text that this route cannot rewrite refuses at spawn with an `error:` line, a `repair:` line and a `spawn-write-confinement` deny event.
+Text the scanner cannot read before it finds a `claude`, such as `true && (claude ...)`, a `$(...)` substitution or a backquote, launches unchanged and unconfined, as before.
+A raw omp command is not read for `claude`: the omp profile denies Claude's config, so a `claude` it starts fails closed.
+A plain parameter expansion such as `${HOME}/worker.yml` is read as ordinary argument text where it only fills an argument, so an existing `codex --config "${HOME}/worker.yml"` launch keeps its harness; in a confined Claude launch a program word that expands, including a quoted expansion where a named wrapper other than `timeout` reads its options, such as `env "$X" claude ...`, a skipped wrapper word that can split, such as `nice -n $N claude ...`, or expanded shell `-c` text refuses, because it can name a program the scanner cannot see. A leading `NAME=value` assignment does not split, so `X=$Y claude ...` is an ordinary Claude launch.
+When that command resumes or continues with `--resume`, `-r`, `--continue` or `-c`, including `--resume=<id>`, `-r<id>` and clustered short flags such as `-pc`, it also receives `--fork-session`, so the conversation forks into the fresh id its write profile grants rather than trying to reuse the old session id.
+Options are read as Claude Code 2.1.310 parses them: an option that requires a value takes the next word as that value even when it starts with `-`, so `--append-system-prompt --continue` does not fork and `--model -- --resume <id>` does.
+A confined raw `claude` command that sets its own `--session-id`, in any spelling such as `--session-id=<id>`, refuses, because the confinement profile grants only the session id `fm-spawn.sh` injects.
+A confined raw `claude` argument that needs shell expansion, such as `$FLAGS`, `"$PROMPT"`, `${X}`, `$(...)`, a backquote, or unquoted glob or brace characters (`*`, `?`, a `[...]` bracket pattern closed by `]` in the same word, `{`), also refuses, because an expansion can produce options such as `--resume` that this check cannot see; quote the literal text instead.
+Quoted data is never changed, so a prompt that mentions `claude` keeps its bytes, while shell control constructs such as `eval` refuse rewriting.
+A non-session call such as `claude --version` ignores the flag, and a second real session in the same command fails on the id already being in use.
+`/clear` inside a confined Claude pane starts a session under a new id that the profile does not grant, so its session writes, including `SessionStart` hooks, fail closed; Firstmate never sends `/clear`, and the remedy is to relaunch with `bin/fm-control.sh <task> relaunch`.
+Everything else there stays protected, including every path that loads code or instructions: Claude's `CLAUDE.md`, `rules/`, `agents/`, `commands/`, `skills/`, `plugins/`, `hooks/`, `shell-snapshots/`, `todos/`, `sessions/`, settings and credentials files and status-line scripts, every other session's `session-env/`, `file-history/`, `tasks/` and transcripts, and omp's `config.yml`, `models.yml`, `auth.json`, `.env`, `settings.json`, `extensions/`, `managed-skills/` and `memories/`.
+The omp daemon suffix uses omp's `Bun.hash.wyhash(path.resolve(projectDir))` derivation, not a hard-coded hash or a grant of the shared daemon parent.
+SQLite database creation requires the omp agent directory; an observed `EPERM mkdir` requires the separate daemon scope.
+An earlier measurement saw Claude SessionStart create `.claude.json` and its backups; with both config locations write-denied, a model-free Claude Code process still completed protocol initialization and a local `/status` command with no provider access (decision 022), but SessionStart hooks under that denial and a real conversational session are not measured.
+No authentication or runtime state is copied.
+
+Linux workers remain unconfined, exactly as before; `write_confinement=unconfined-linux` in task metadata is the explicit audit field, while macOS records `seatbelt-v1`.
+Landlock is not enabled; the Linux layout is a separate prerequisite, not a reason to broaden this boundary.
+
+This is inherited process-tree filesystem enforcement, not confinement of external authorities.
+Two residuals remain, and the residual review on 2026-11-07 revisits both.
+First, a precious location that is not on the protected list is unprotected.
+That includes any temp entry with no owner marker: a `/private/tmp/claude-<uid>/` file outside a session directory, a `~/tmp` entry whose name carries no task id, and a `/tmp/fm-*` root whose task has no `state/<id>.meta` record.
+It also includes the home's shared `state/` files, the shared Git directory's config and hooks, credentials outside the listed harness homes, and Claude's shared `history.jsonl` prompt history, which loads no code.
+Protected lists are read at launch, so a task, home, gate or session directory created later is not covered until the worker is relaunched; only a later task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, a later `data/<other>/` directory and the contents of a later Claude session directory are still covered, by their name patterns or the protected data root.
+Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
+The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
+In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
+macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU from libproc.
+`bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
+The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects only the task audit ledger, still reaches the helper.
+`bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`.
+The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
+Another user's argv cannot be read without setuid, so for that process the helper prints its short kernel name where `ps` prints the full command, and the two identities differ.
+The 53 test files identified in decision 023 that run `ps` themselves, rather than through these tools, still fail inside a confined worker; that count is historical, and converting them is follow-up work outside this boundary.
+[`tests/fm-write-confinement.test.sh`](../tests/fm-write-confinement.test.sh) builds the omp and Claude profiles over a synthetic home and runs a plain Python process under each, after an unconfined control.
+It checks B3's glob deletion in the shared Claude temp root, B15's aged sweep under `~/tmp`, Python eval unlink, nested-root writes, status isolation, symlink escapes, real busy-state transitions, a gate push through the no-mistakes hooks, a duration record, `ps` refused and, through `bin/fm-proc-info.py`, `bin/fm-duration.py`'s process table, an inactivity stop, a stale slot holder and a zombie process group's completion check, a process identity read inside the sandbox that equals the one `ps` gives outside it for arguments with non-ASCII bytes, a newline, a tab and an empty word, an orphaned test stub stopped by the reaper, a lint CPU sample reported as `unavailable`, a procevent board registered, polled once by its runner and retired, a process budget, a session-lock ancestry walk, a fleet-ledger append, writes to its own `data/<task>/` directory and Claude's `history.jsonl.lock`, a refused rename of this session's transcript container to a writable place, refused creation of the `projects/`, `session-env/`, `file-history/` and `tasks/` folders under a fresh config root, refused planting of the missing transcript container as a symlink or plain file, its creation as a folder with this session's transcript appended inside it while its rename and deletion stay refused, one refused write per protected asset class including Claude's `.claude.json` in both layouts, `data/secondmates.md`, `data/captain.md`, `data/backlog.md` and the `.meta` and `.control-relaunch` records of a task created after the profile was built, refused renames of protected folders and their parents including the shared Git `refs/` and `worktrees/` folders, `~/tmp` ownership for task ids that extend this task's id and that are part of it, and writes to this Claude session's own `session-env/`, `file-history/`, `tasks/` and transcript while another session's are refused.
+[`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) also runs a confined raw `CLAUDE_CONFIG_DIR='<root>' claude` launch through the TeamClaude wrapper's `--exec` and checks that the stand-in receives the recorded `--session-id` and the proxy, and, on a root that holds no session folder before the spawn, can write only its own `session-env/`, `file-history/`, `tasks/` and transcript entries under that root.
+It also spawns, in a worktree that holds `src/` and `sub/`, `[ -d src ] && claude --print hi`, `true && claude --print hi`, `[[ -f README.md ]] && claude --print hi`, `env -u FM_UNSET_PROBE claude --print hi` and `bash -c 'claude --print hi'` and checks that each is recorded as a confined `claude` launch whose stand-in runs inside the profile under the recorded `--session-id` and, from its real working directory, writes only its own session entries.
+It checks that `true && claude --print "$(date)"`, its backquoted form, `true && env "$PROGRAM" --print hi; claude --print hi`, `[ -d src ] && cd src; claude --print hi` and `bash -c 'cd sub && claude -p hi'` each refuse with an `error:` line, a `repair:` line and a `spawn-write-confinement` deny event before any launch or task metadata, and that `true && (claude --print hi)` launches unchanged and unconfined, recorded as `write_confinement=unconfined-macos-true`.
+[`tests/fm-spawn-worktree-settle.test.sh`](../tests/fm-spawn-worktree-settle.test.sh) runs the launch `fm-spawn.sh` delivers for omp and Claude with a model-free stand-in for each harness.
+No test starts a real harness session or calls a model.
+
+### Model guard integration
 
 [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
-`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `PreToolUse` on `Bash|Write|Edit` only; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for every Claude `PreToolUse` except the shell-command tools `Bash`, `Monitor` and `PowerShell`, so every other native call passes tool coverage and egress authorization while a Claude `Bash`, `Monitor` or `PowerShell` call starts no guard process; the post-tool advisory and the prompt doorbell were retired because neither could withhold anything, so their registrations are gone rather than left as dead wiring.
+A Claude worker launched with an older matcher keeps it until it is respawned: an old `Bash` registration gives shell calls no judgment, but a missing or crashing runtime still stops them, and an old `Write|Edit` matcher leaves other calls without coverage or egress checks.
 Primary and secondmate sessions and other harnesses do not run this guard.
 Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
-There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
-Pre-receipt records and receipts for an older doorbell never gain the consistency exception.
-To enable the guard for an already-running legacy task, Main must manually reissue its pending messages through the existing current publisher and normal delivery, verify acknowledgement, and only then retire the old pending identity before an authorized fresh guarded launch.
-This is an operator-only migration, not an automated retrofit; isolated verification is not production activation.
+
+### Tool coverage and outbound calls
+
+[`bin/fm-jev-egress.ts`](../bin/fm-jev-egress.ts) owns one judged-or-explicitly-unjudged tool table for pre-tool calls.
+An unclassified tool is refused when it is called instead of silently skipping the guard; calls to classified tools do not depend on the rest of the host registry.
+The [audit regression](../tests/fm-jev-guard-audit.test.sh) compares that table with the installed omp registry joined with omp's own built-in and hidden tool name lists, so settings-gated tools such as `github` and `ida` and the subagent-only `yield` are checked even when the default registry omits them, and with the tool list in the installed Claude Code init event, reached through a dead local proxy, without submitting a model turn, and proves that adding an unclassified tool fails coverage.
+The Claude probe reads only `init.tools` from an API-key session, not the complete claude.ai signed-in tool inventory.
+The observed signed-in tools `ArtifactCheck`, `ArtifactComments` and `ArtifactData` have explicit `provider` rows requiring a task grant, but are not enumerated by that probe; any other gated tool absent from the probe remains subject to call-time coverage refusal until classified.
+Optional host tools need not be installed for the offline regression; each installed-host portion explicitly skips when its host is absent.
+Claude normalizes its native names at the adapter boundary and refuses unclassified names, including new MCP tools, until they receive a policy classification.
+Other harnesses remain outside this guard integration.
+
+Native semantic `find`, web search, browser automation and provider-backed tools require a task egress grant before execution.
+Subagent dispatch (omp `task`, Claude `Agent`, `SendMessage` and `Workflow`) is local: it needs no grant, and each tool a subagent then calls meets its own coverage and egress row.
+omp's memory operations `recall`, `reflect`, `memory_edit`, `retain` and `learn` are classified by their effect under the worker's live omp settings, which the generated worker extension reads from omp's own settings registry, so the global configuration, project settings and every `--config` overlay count.
+Only an effect proven local runs without a grant: with `memory.backend: mnemopi` and `mnemopi.noEmbeddings: true`, `recall`, `reflect` and `memory_edit` read or edit the local SQLite store, and `retain` and `learn` are local only when `mnemopi.llmMode` is `none`; a `learn` under `memory.backend: local` appends to a local file.
+A `learn` that carries a `skill` argument has two effects: the guard records the skill write's T5 confinement owner before and independently of memory authorization, then applies the memory backend's provider check to the memory effect.
+Without a grant, a provider-backed memory effect is refused with `destination_class=provider` while retaining `confinement_owner=T5`; a proven-local memory effect is admitted with that same owner.
+A `retain` or `learn` whose `mnemopi.llmMode` is `smol` or `remote` makes an extraction model call, and every `memory.backend: hindsight` operation calls the remote Hindsight API, so each requires a `provider` grant.
+An unreadable setting, another backend, `mnemopi.noEmbeddings` other than `true` or an unrecognized `mnemopi.llmMode` cannot prove a local effect, so the operation also requires a `provider` grant and its refusal names the operation, the effect it could not prove and the grant remedy; a host without live omp settings, such as Claude, proves nothing local.
+These effects were measured in the installed omp 18.12.6 binary; Mnemopi's background auto-recall and auto-retain are session behavior, not tool calls, and this rule does not judge them.
+`xd://report_issue` has no table row and no grant path: like every other unadmitted xd device it is refused by the [native-device rule](#model-policy), whatever the task grants.
+Egress is judged only at the tool boundary from each tool's own row; shell commands, read/search paths and write/edit content are not parsed for outbound destinations.
+Shell work such as `gh-axi`, `no-mistakes axi run`, `git push`, `git fetch`, package installs and `npx` therefore needs no egress grant; confining what a process can reach is not this hook's job.
+omp's `read`, `grep` and `ast-grep` would otherwise fetch URL paths, so the worker launch overlay [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) sets `fetch.enabled: false` and those calls fail with omp's own `URL reads are disabled by settings.` error; web access requires a `web` grant for a web-classed tool.
+The rule is deterministic and needs neither a model verdict nor a working provider credential.
+Tool coverage and egress-grant refusals apply whether or not the project scope is active, including other or absent project scopes and `--omp-no-helpers` workers.
+A refusal names the destination class whose authorization Firstmate must supply; it never prints the outbound query, command or credential.
+
+Firstmate records the per-task grant as exactly one `egress=` line containing a JSON string array in `state/<task>.meta`, for example `egress=["semantic-search","web"]`.
+The recognized destination classes are `semantic-search`, `web`, `browser`, `provider` and `remote-storage`; a grant naming the removed `subagent` class grants nothing.
+An absent grant, malformed JSON, unknown class, duplicate grant line, unreadable record or symlinked record grants nothing; there is no wildcard, project-wide permission or trust exemption.
+Only Firstmate may authorize this task metadata, which normal relaunch preserves; a worker must report the missing grant rather than write its own.
+The grant line may follow a recorded `pr=` line: PR identity parsing accepts `egress=` among its post-PR fields and still rejects unrelated post-PR fields.
+This uses the same-user trust boundary of other supervisor metadata, not cryptographic publisher authentication or an OS sandbox.
+Each tool has at most one destination class, which must be granted, and a memory operation's class is `provider` whenever its local effect is not proven; a grant never bypasses existing path, credential, shell or privacy checks.
+
+Each outbound-call decision adds exactly one terminal audit row with the tool and its single `destination_class`, never raw arguments, query text or destination addresses.
+A native paid `find` records its deterministic decision even though it has no model classification.
+Local file `read` remains pre-tool unjudged, `bash` receives no model screening, and `write` and `edit` keep path and input screening; their content is checked for credentials only at [commit and push time](#jev-guard).
+This table classifies host tools; it does not detect network behavior inside shell commands, scripts, executable replacements, local configuration or tool internals.
+The `eval` row assigns write-boundary enforcement to T5 (OS write confinement), and each call records `branch=confinement` and `confinement_owner=T5` rather than silently skipping the guard or treating an egress grant as write protection.
+That ownership record does not prove confinement is active: the separately delivered launch-time OS boundary, not this hook or a code parser, must enforce it.
+omp's `python`, `debug` and `run_experiment` code runners, and `ida`, which runs Python against IDA databases and saves them, have the same effect as `eval` and use the same confinement-owned classification.
+Claude's notebook edits and worktree changes, and omp's `notebook` edits, `lsp` actions (including rename and other write actions), managed-skill writes, structural `ast_edit` rewrites and experiment commits or reverts, use the same explicit confinement-owned classification; Claude `LSP` shares the `lsp` row.
+`manage_skill` and the skill-write effect of `learn` use that owner; skill-bearing `learn` also meets the independent memory-effect rule above.
+A legacy host tool absent from the current host references, such as Claude `MultiEdit`, has no row and is refused as unclassified.
+`report_issue` and Claude `SendFeedback` upload reports, so they must never receive a `TOOL_POLICY` row and are refused under every grant; every other unclassified tool gets a row classified by its real effect.
+A coverage refusal names the refused host tool, states the remedy of a `TOOL_POLICY` row classified by its real effect, notes that `report_issue` and `SendFeedback` never get one, and states that no call was made.
+Tools that move no data and run no worker code, such as Claude `Skill`, `ListAgents`, `WaitForMcpServers`, `TaskStop`, `SubagentHandback` and `StructuredOutput` (which only returns the final structured answer to its caller), are classified `local`.
+omp `think`, `yield`, `checkpoint`, `rewind`, `context_notes` and `new_context` change only the session's own conversation state, so they are also `local`, and omp `ast_grep` shares the `grep` path-search classification.
+Claude `DesignSync` reads and uploads files in claude.ai design-system projects, so it requires a `remote-storage` grant.
+omp `github` reaches GitHub, so a top-level `github` call requires a `remote-storage` grant, and only its read ops (`repo_view`, `file_read`, `search_issues`, `search_prs`, `search_code`, `search_commits`, `search_repos` and `run_watch`, the ops installed omp 18.12.6 approves as reads) can run under it.
+Every other `github` op, including `pr_checkout`, `pr_create`, `pr_push`, an unknown op or a missing op, writes worktrees, branches, git config, refs or the remote, so it is refused under every grant; the refusal names the op and points to git and the no-mistakes pipeline, or `gh-axi` through the shell for reads, and its terminal audit row records `branch=github-write-op` rather than the `branch=egress` of a missing-grant refusal.
+The `xd://github` device write stays refused by the native-device rule under every grant.
+Claude `Monitor` and `PowerShell` run shell commands and share `Bash`'s `shell` classification: no pre-call rule or egress grant applies to that effect.
+Their classification supplies no process or network confinement guarantee; the hook does not parse their command text.
+The unclassified-tool, missing-grant and `github` write-op refusals are registered under the [guard spec](guard-spec.md) in [`docs/guards/registry.json`](guards/registry.json) as `jev-tool-coverage`, `jev-egress-grant` and `jev-github-write-op`, each with its deny and pass fixture in the audit regression; the `xd://report_issue` device write stays owned by the native-device rule of the existing `jev-write-path-gate`.
+Each of their allow and deny decisions emits one event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh) to the owning home's `state/guard-events.jsonl`, carrying only the guard id, decision, source health, timing and a session of the task id joined to the decided tool name (for `jev-tool-coverage`), destination class (for `jev-egress-grant`) or `github-read` and `github-write` (for `jev-github-write-op`, which allows a `github` read op and denies every other op), so an allow of another tool, class or `github` read never counts as clearing a refusal; each refusal and each granted outbound call also writes one content-free terminal row to `state/jev-guard.jsonl`.
+The egress event's `source_ok` reports whether the regular, non-symlinked task record was readable, independently of whether its contents authorize the destination; a missing or unreadable record reports false, while a readable record with no valid grant reports true.
+The launch-time URL-read setting is registered as `omp-worker-url-reads-off`; omp refuses inside its own tool, so that decision is visible only in the worker transcript and emits no Firstmate event.
+
+### Model policy
 
 Questions and numeric policy are code-owned:
 
-- Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
-- Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
-- Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
-  The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
+- Bash pre-calls receive no model judgment or TypeSafe request, do not depend on provider or audit availability, and create no pre-call guard audit row.
+  The guard does not assess shell effects or destructive intent and offers no shell deletion or write confinement guarantee.
+- Write/edit handling retains deterministic root and input checks only; file-kind and credential model questions are removed, and write contents are never sent for model screening.
 
-Before omp result planning, a literal single invocation of a known local AXI command can exclude its producer-owned structural next-step help from the screened copy only.
-The command/mode registry and structural rule have one owner in [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts); quoted or expanded shell arguments, executable paths, wrappers, pipelines, chains, redirections, unknown producers and raw-output modes receive ordinary complete screening.
-The supported envelopes cover no-mistakes AXI drive/status/respond, gh-axi PR/issue views and lists, tasks-axi detail/list, Lavish home/playbook, browser eval and quota home output; other modes remain screened unchanged rather than being guessed safe.
-The exclusion applies only when the result ends with the completed omp BashTool trailer that its own `wallTimeMs` and `exitCode` details reproduce exactly; missing or mismatched metadata receives complete screening.
-For a command under 1 second, omp records `wallTimeNoticeEmitted: false` and omits the wall-time line, so the expected trailer is only the exit-code line for a nonzero exit, or nothing.
-The structure is parsed on the command output before that trailer, and every trailer byte stays in the screened copy.
-Only root `help[N]` arrays with exactly the declared primitive entries are excluded.
-PR bodies, comments, findings, file content, every scalar field including `error`, and other indented subtrees stay screened, including help-shaped or host-trailer-shaped text inside them; ambiguous or malformed framing is screened unchanged.
-The original result remains unmodified, and flags or unavailable screening of its remaining content still withhold it.
-This is a bounded trust in the local command's formatter, not executable authentication or a guarantee against same-user replacement of a PATH executable.
-[`tests/fm-jev-guard-producer.test.sh`](../tests/fm-jev-guard-producer.test.sh) exercises the recorded bounded-wait output, embedded injections and these fail-closed boundaries without model calls.
-
-`supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
-It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
-The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
-omp captures native `before_agent_start` prompts in memory, and Claude no longer captures `UserPromptSubmit` because the read-screening that consumed those bindings was retired.
-Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
-The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
-Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
-Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.<name>` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
-A task's own state file has a single name segment after `<task>.`; task IDs may contain dots, so a longer name, such as `state/a.b.status` read by task `a`, could belong to task `a.b` and stays judged.
-Other tasks' data and state, untracked worktree files, and symlink targets outside those roots remain judged.
-Native omp source metadata must agree with the actual read argument, including numeric and database selectors; paths claimed inside result text grant nothing.
-Trusted reads bypass the judge entirely, including for oversized content, and record decision `clear`, branch `trusted_read`, result-pass enforcement, no request started and null error type.
-They do not exempt `bash` results or reads of other paths and do not authenticate the producer.
-An audit failure adds a notice beside the original trusted read rather than erasing it.
-Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
-On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
-Claude receives no result notice at all: its post-tool advisory was retired and the adapter ignores `PostToolUse`.
-The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
-Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
-Native launch prompts carry the survivor doorbells separately from the record-backed launch carrier, so omp sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
-This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
-Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
+omp and Claude tool results reach the worker unchanged: the guard installs no result handler, makes no TypeSafe request for results, and writes no `tool_result` audit rows.
+There is no result size budget or result-dependent read exemption.
+Launch and steering records use the existing [launch publisher](../bin/fm-operational-input.sh) and [steering-inbox owner](../bin/fm-task-inbox-lib.sh); they publish only the record bytes, with no guard receipt, and their delivery and acknowledgement contracts are unchanged.
+The steering carrier names the exact record, acknowledgement ordering and omp `:raw` hint in under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
+The removed result screen and the result-only decision points retired with it are recorded in [`docs/guards/retired.json`](guards/retired.json); their retirement tests, one per retired id, cover unchanged background notices, recorded bounded-wait help, launch/steering records, large results and result-free session accounting offline.
 
 The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
 File write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
-The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, except for these exact native-device `write` invocations:
+Filesystem paths failing that spelling check are blocked without a Jev call because omp can rewrite them before execution.
+Native omp `write` devices instead use the explicit effect table in `bin/fm-jev-guard.ts`, established against installed omp 18.12.6:
 
-- `xd://lsp` with JSON `action` equal to `references`, `definition`, `implementation`, `type_definition`, `hover`, or document `symbols`, and a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
-  The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
-  The session's real working directory must equal that worktree.
-  Workspace-wide `file: "*"` or file-less forms, directories, missing files, glob spellings, symlink escapes, `diagnostics`, raw requests, rename, code actions, formatting, reload, and every other action remain blocked.
-  The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
-- `proc://<id>/kill` when the exact `<id>` appears in the running jobs of the current session's owner-filtered job snapshot at call time.
-  Finished or missing jobs, named project services absent from that snapshot, stdin, mode changes, and every other proc write remain blocked.
+| Device | Effect and guard decision |
+| --- | --- |
+| `xd://lsp` | Proved task-local reads, previews and file-scoped server state changes skip Jev under the scope proofs below. |
+| `proc://<id>/kill` | Cancels a job without Jev only when that exact id is in the current session's owner-filtered running-job snapshot. |
+| `xd://report_issue` | Refused: native Auto QA uploads every pending grievance off the machine, not only the current report. `.omp/fm-worker-overlay.yml` sets `dev.autoqa: false`, so omp's worker tool prompt never offers the device; the refusal says Auto QA is off for firstmate workers. No egress grant admits it. |
+| `xd://github` | Refused by the native-device rule: its native results return as `write` tool output; no tool-result screening is active. Only for the read ops `repo_view` and `file_read` does the refusal name an alternative, `gh-axi` through the shell; every write op (such as `pr_create`, `pr_push` or `pr_checkout`) and unknown op names none and keeps the full report-to-Firstmate rule. A top-level `github` call instead follows its [tool row](#tool-coverage-and-outbound-calls): read ops need a `remote-storage` grant and the same write ops are refused under every grant. |
+| `xd://propose`, `xd://resolve`, `xd://reject` | Refused because the active plan/apply/discard callback's downstream effects and targets cannot be established from this guard's context. |
+| `xd://inspect_image` | Refused as unknown because the measured native installation does not mount this device. |
+| Other xd/proc devices | Fail closed, naming the exact device and asking for installed-effect evidence before a rule is registered. |
 
-Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
-This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
-`xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
-Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
+LSP `references`, `definition`, `implementation`, `type_definition`, `hover`, document `symbols`, file `diagnostics`, and file `capabilities` require a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
+The same file proof admits rename preview only with `apply: false`, code-action listing only when `apply` is absent or exactly `false` (omp repairs values such as `"true"`, `"yes"` or `1` to `true` before dispatch), and file-scoped reload of the local server.
+`status` reads local session/server configuration and requires no file.
+Workspace `symbols` search (exactly `file: "*"`) runs `workspace/symbol` on the local language servers in the session workspace, no wider than `references`, and requires no file.
+All admitted LSP calls require the session's real working directory to equal the task worktree and a native session context.
+The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
+For every other action, workspace-wide `file: "*"`, glob expansion, directories, missing files and symlink escapes do not supply the file proof.
+Raw requests, applying rename or code actions, rename_file (including its separate destination/expanded source set), and unrecognized actions remain refused because their complete effects cannot be proved before dispatch.
+The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
+Finished or missing jobs, named project services absent from the owner snapshot, stdin and mode changes do not supply the proc cancellation proof.
+
+Local devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
+No device that sends data off the machine is admitted.
+This is bounded trusted local-tool access, not a confinement claim: an LSP server can itself access external resources or send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
+Device refusals name the failed effect or scope proof and the next action, not a filesystem path workaround.
+The model-free behavioral regressions are in `tests/fm-jev-guard.test.sh`.
+Device `edit` calls and other schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked; ordinary filesystem spelling refusals still request a plain path.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
-The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
-An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
-A policy block (shell and write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+The guard validates the replacement-input schema but does not judge or scan write/edit content.
+An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unsupported edit.
+A policy block (deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+Only the `xd://github` read-op refusal names an alternative, `gh-axi` through the shell, and it exempts only that named alternative from this rule.
 Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
-A pre-tool denial for a payload too large to cover prints the typed size refusal that [Friction ledger](#friction-ledger) describes instead of that retry advice, because an identical retry cannot succeed.
 Claude receives no post-tool review notice, so an unreviewed result is exactly what the tool returned.
 The [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; re-adding post-tool screening would need that installed-host output-replacement proof, never advisory context.
 Advisory context is not evidence that Claude was prevented from seeing or acting on the original output, which is why the retired advisory was not protection.
@@ -2613,97 +2821,86 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
-For authorized screening, shell state contains the command and working directory, write state contains the path and replacement-content pieces, and result state contains the tool name, `source_role: tool_result` and text output after the bounded producer-field exclusion above.
-These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
+No current guard handler builds a screening request: shell calls, tool results and write/edit content are never sent to a model provider.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
-A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling.
-Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
-Shell calls and untrusted results that would need more than 16 pieces still require review before anything is sent, and the never-send policy still checks their whole payload before the first piece leaves; their complete-cover screening is unchanged.
-Write/edit content is not refused because it exceeds that model-screening budget: the guard screens at most 16 pieces and admits the remainder under deterministic local rules only.
-The existing root check applies to the whole operation.
-A budget-limited write/edit is also checked over its whole replacement text, before any model request, for exactly these shapes: a private-key header, a GitHub token (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` prefix), an AWS access key ID (`AKIA` or `ASIA` prefix), a Slack token (`xox` prefix) and a connection URL with an embedded password.
-A prefix shape counts only when no letter, digit, underscore or hyphen comes right before it.
-The user name of a connection URL may be empty, and its password needs at least 8 characters before the `@`.
-Whitespace, `/`, `?`, `#`, quotes, backticks, angle brackets, parentheses, square and curly brackets, backslashes, commas, semicolons and pipes end that match.
-These are intentionally conservative report boundaries, so compact JSON, CSV and markdown that put a `host:port` value before an address are not read as a password.
-Other credential shapes in the remainder, including `sk-` keys, Bearer tokens and key or password assignments, are not checked beyond the model-screened pieces.
-These checks can reject placeholders that resemble the listed shapes and miss unfamiliar or encoded values; the remainder receives no model credential or file-kind assessment.
-Every admitted write records unique UTF-8 content bytes as `write_coverage.model_screened_bytes` and `write_coverage.local_only_bytes`, excluding framing and repeated overlap; a nonzero local-only count adds an explicit unscreened-remainder note to the audit row.
-The never-send policy checks every model-screened piece of a write/edit before the first piece leaves; the remainder is never sent to a model, so that policy does not check it.
-A write/edit piece is checked alone, so a never-send value longer than about 1,000 JSON-escaped bytes as written, including the whitespace between its words, can be cut across a piece boundary, and then only fragments reach the model.
-The pieces run together under the same per-try and handler budgets described below and the same thresholds; calls pass only when every planned model-screened piece passes, while omp result handling retains the advisory-band and trusted-read exceptions above.
-A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
-A policy verdict on one piece outranks an outage on another.
+The service refuses a larger request with `RequestTooLargeError` before anything is sent; it plans no overlapping pieces.
+Write/edit content has no model-screening size limit and no model coverage audit.
+Credential checks run locally in the per-task `pre-commit` and `pre-push` hooks installed by [`bin/fm-git-strip-ai-trailers.sh`](../bin/fm-git-strip-ai-trailers.sh), for every launched harness and project, independently of `config/keep-ai-trailers` and Jev scope.
+[`bin/fm-git-secrets.py`](../bin/fm-git-secrets.py) scans only added content: the lines the staged index adds against `HEAD`, after the repository's pre-commit hook succeeds, including changes that hook stages, not their working-copy counterparts.
+Existing and moved lines are not scanned again; only new lines are: within one diff, each removed copy of a line cancels one added copy of the same text in any file, so renaming, moving or splitting a file adds nothing new.
+A merge commit is scanned only for lines new relative to every parent, so content brought in from either side is not rescanned.
+At push time it scans the lines each outgoing commit adds relative to all of its parents, with the same per-commit move cancellation, including intermediate commits that a later commit cleans up.
+A commit is outgoing unless an advertised old tip or any remote-tracking ref, of any remote, already reaches it, so pushing to a URL or a new remote does not rescan history already on another remote.
+This exclusion follows commits, not content: a cherry-pick, revert or squash (including `git merge --squash`) of a commit already on a remote makes a new commit whose diff adds that commit's lines again, so a credential-shaped line already on a remote can be falsely refused at commit or push.
+Each content refusal names that likely cause and tells the worker, in that case, to escalate to Firstmate naming the file and line, so Firstmate can confirm the line is already on `origin`; the check itself stays refused and has no content baseline.
+Each commit and push decision in the task's own worktree appends one `git-commit-credential-shapes` or `git-push-credential-shapes` event through [`bin/fm-guard-event.sh`](../bin/fm-guard-event.sh), whose `repeat` is the highest consecutive refusal count for the same credential-shaped line, identified by its content hash; different refused content starts at one even if an earlier attempt was abandoned.
+Commits and pushes in any other repository from the task pane, such as temporary test fixture repositories, are checked and refused the same way but record no event, so retirement metrics count only real task opportunities.
+A failed inspection is a separate episode: it counts under a reserved `inspection-failed` key, reaches the same escalation on retry, and keeps the per-line counts.
+Only an allowed decision clears the counts.
+Past the budget of one refusal in a row, the refusal also prints an `escalate:` line telling the worker to stop retrying and report to Firstmate for a human decision; the commit or push stays refused while the new credential-shaped line remains or inspection keeps failing.
+Ref deletions transfer no content and need no scan; project hooks still run and receive the original pre-push ref-update input.
+The scanner retains the existing anchored shapes: private-key headers, GitHub tokens, AWS access key IDs, Slack tokens and connection URLs with embedded passwords.
+It reports affected file names only, never matching values, and refuses when inspection fails.
+Writing a credential to an ignored `.env` is allowed and stages nothing; force-adding that file still subjects it to the commit check.
+Placeholders such as `replace-me` pass, but an added placeholder shaped like one of the listed credentials can fail; unfamiliar or encoded credentials can be missed.
+This is a client-side check, not a security boundary against hook bypass, alternate Git object writers, or pushes made outside the task launch environment.
+[`tests/fm-git-secrets.test.sh`](../tests/fm-git-secrets.test.sh) exercises staged credentials, ignored files, placeholders, edits beside existing fixtures, renamed and split files, conflicted merges, repeated and abandoned refusals, outgoing history, URL and new-remote pushes, squash and cherry-pick replays of a commit already on a remote, and complete 396,924-byte report writes through both write adapters without provider calls.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
 The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing internal retry behavior; service budgets include those retries and response bodies.
-Claude, and omp's pre-tool shell and write judgments, allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
-omp's result screening allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
+The service's `decide` allows up to three 90-second tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget; no current guard handler calls it.
 Retries follow only a plain provider `Error`, `TimeoutError` or network `TypeError`.
-The 300-second budget reserves a complete further try and backoff before retrying; omp's result second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
-The service never retries a flagged, ambiguous or policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
+The 300-second budget reserves a complete further try and backoff before retrying.
+The service never retries a policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
 The 90-second per-try limit protects only against a judge that never answers; it is not derived from answered-call latency, which was far lower (the tracked 99th percentile of 535 ms over 15,640 answered calls under Unreachable threshold in [TypeSafe account health](#typesafe-account-health)), and answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
 Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
-Installed omp 18.12.0 has a separate nonconfigurable 30-second result-handler deadline that forwards original output if an extension times out.
-Its 25-second result budget must therefore remain below that native deadline; extending `extensionHandlers.toolCallTimeoutMs` cannot protect results.
-That setting is the pre-tool deadline, 30 seconds by default, and omp refuses the call when a `tool_call` handler outlasts it (measured on 18.12.0: the host logged `handler timed out after 30000ms` and returned an extension timeout instead of running the tool).
+omp refuses a call when a `tool_call` handler outlasts `extensionHandlers.toolCallTimeoutMs`, which defaults to 30 seconds.
 [`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
-A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
-Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
-This is not sustained-outage permission to execute shell commands or write files beyond the read-only and lab shell admissions below.
+A raw launch that omits the overlay keeps the 30-second default, so a pre-tool handler slower than that is refused by the host; that failure stays closed.
+Each call is decided on its own; no outcome of one call is carried to another.
+Write/edit admission does not depend on provider availability.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
-While active, required pre-tool judgments that fail, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-A healthy judge still screens every shell command and write; two narrow shell-only admissions apply only when the judgment failed, whether unavailable, withheld for privacy or malformed, and never to a size refusal:
-
-- A shell command proven read-only is admitted with branch `read_only`.
-  [`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns the program allowlist, the read-only git subcommands, the requirement that every pipeline segment be read-only, and the disqualifiers: redirection, substitution, expansion, quoting, sequencing, background, git options before the subcommand other than `--no-pager`, any `--output` option, and the writing or executing `find` actions.
-  Outside the lab admission below, anything not proven read-only is refused on an outage as before.
-- A shell command in a home carrying the `.fm-lab-home` token written by [`bin/fm-lab-home.sh`](../bin/fm-lab-home.sh) is admitted with branch `lab` when every `FM_*_OVERRIDE` is empty, the same rule as `fm_gate_lab_permitted` in [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh), so an approved lab teardown is not refused by an unavailable judge.
-  Writes and edits in a lab home are screened and refused exactly as in a real home.
-  The guard reads only the marker's first-line token, so the marker is deliberately spoofable under the confused-agent threat model that [`bin/fm-gate-refuse-lib.sh`](../bin/fm-gate-refuse-lib.sh) already accepts: a forged marker in a real home admits shell commands there only when their judgment failed as above, and grants nothing while the judge is healthy.
-
-Both admissions keep the failed judgment's error type in their audit row.
-Shell calls too large to cover within the request bound also deny execution; write/edit model coverage follows the bounded-write rule above.
-On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude runs no result screening at all because its post-tool advisory is retired.
-Clear scores at or below 0.20 pass without an advisory.
-Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
-Non-text results that cannot be assessed also require review rather than an unexamined pass.
-Claude receives no result notice, because its post-tool advisory is retired.
-Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type, and no post-tool notice could undo a tool's effects.
+While active, write/edit calls whose input cannot be validated or whose terminal record cannot be written deny execution and request review instead of silently allowing the call.
+The former shell effect and destructive-intent questions, shell outage denial, read-only shell classifier and `.fm-lab-home` outage admission are retired, as are the write file-kind and credential questions and the write-time size refusal.
+Shell pre-calls bypass this policy rather than receiving an exception or an allow-list match; writes and edits have no model-screening size budget.
+Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop every pre-tool call the guard receives, not only write/edit, with a stable error type, and no post-tool notice could undo a tool's effects.
 The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
 Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal keeps its existing hook semantics.
 
 Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
-They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.
+They perform no guard key lookup or provider request and retain deterministic tool-coverage, egress-grant, path, root, native-device and edit-schema checks.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
 
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
-The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
-When producer-field exclusion applies, `producer_fields` records only the fixed producer name and `removed_bytes`, the removed UTF-8 byte count, never the excluded text.
+Confined workers append minimized terminal records to their own `state/<task>.jev-guard.jsonl`; their [write profile](#worker-os-write-confinement) denies the shared ledger and the audit file of every other task known at launch.
+Unconfined and primary sessions retain the owning home's private `state/jev-guard.jsonl`.
+[`bin/fm-jev-audit-read.mjs`](../bin/fm-jev-audit-read.mjs) reads the shared legacy file plus every per-task audit file, so historical and new rows remain visible without copying or rewriting either layout.
+The reader orders rows by numeric `at`, preserving source filename and line order for ties, and fails on unreadable or malformed audit files rather than silently omitting history.
+Both destinations retain task, policy version, named outage/enforcement branch, usage, models, latency, attempts and cost certainty; `thresholds` and `answers` are empty objects because no guard question remains.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
-A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank tool-result piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
+A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer, separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
 Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
-A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning, an unsupported result shape) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
+A failure before any piece exists (invalid tool input, an oversize payload, a never-send refusal while planning) records `failures: []`, `planned_chunks: 0` and `chunks: 0`, because no piece was planned or failed.
 When every planned piece answered, one answer carries its own reported or estimated charge, and several answers sum to a reported charge only when every one of them reported its cost, otherwise unknown.
 Once a request has started, a planned piece that did not answer, whether it failed or was never sent, makes the total unknown with `incomplete: true`.
 A payload for which no request was sent records `not_called` and is not incomplete, because nothing was billed.
 `reported_amount` retains the known reported subtotal, so a partial payload neither hides it nor presents it as the charge for the whole payload.
-`tests/fm-jev-guard-audit.test.sh` exercises settlement and these accounting boundaries offline, including multiple failures and unsent pieces.
+No current guard handler plans pieces or sends a request, so write/edit rows record `request_started: false`, `planned_chunks: 0`, `chunks: 0` and a `not_called` cost; the piece accounting above applies only to rows recorded from service results.
+`tests/fm-jev-guard-audit.test.sh` exercises deterministic admission, invalid input and a retried service result offline.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
 Commands, state, questions, raw exchanges, provider extension fields and exception messages are excluded; paths are excluded except for the refused write/edit target in `refused_path`.
 The guard no longer adds raw session report entries.
 An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
-The explicit trusted-read and channel-consistency exceptions retain original read content beside that notice.
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
-[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, calibration limitations and deployed acceptance.
+[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, controlled decision fixtures and deployed acceptance.
 
 ## Jev belay Stop hook
 
@@ -2789,6 +2986,7 @@ Every home requires:
 - Node 24+ with native TypeScript loading enabled, and git.
   Worker skill selection capability-checks imports of its vendored TypeScript client; unsupported TypeScript loading is a runtime prerequisite, while other import failures report a client-loading error.
 - gh, with GitHub authentication through `gh auth login`.
+- python3, because every ship and scout brief scaffold binds its project through `bin/fm-dispatch-project.py`.
 - no-mistakes v1.46.0 or newer.
 - Compatible gh-axi.
 - chrome-devtools-axi.
@@ -2836,6 +3034,8 @@ A herdr, zellij, or cmux home is therefore never told `tmux` is missing, and the
 - An absent or incompatible `gh-axi` reports `MISSING: gh-axi (install: npm install -g gh-axi && gh-axi setup hooks)`.
 - An absent or board-incompatible `lavish-axi` reports `PRESENTATION_UNAVAILABLE` with the 0.1.77 compatibility floor, install command, and explicit text fallback; compatible versions below 0.1.80 retain legacy board replies and report an upgrade recommendation for synchronous acceptance, while [`bootstrap-diagnostics`](../.agents/skills/bootstrap-diagnostics/SKILL.md) owns diagnostic handling.
 - An absent or too-old `quota-axi` reports `MISSING: quota-axi (install: npm install -g quota-axi)`; firstmate cannot resolve a profile array without a compatible binary.
+- When a required tool, including the feature-specific `curl` and `jq` above, fails `PATH` lookup but an executable regular file exists at `~/.local/bin/<tool>`, bootstrap reports `PATH_MISSING` with the directory to add instead of an install line.
+  Bootstrap never runs that copy or changes `PATH`, and the dependency is not ready until a rerun finds it on `PATH` and passes the normal version and capability checks; `bin/fm-bootstrap.sh`'s header owns the line format.
 
 **Checkout diagnostics**
 
@@ -4028,6 +4228,12 @@ FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-se
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
+FM_MERGE_PRUNE=1   # 0 stops bin/fm-merge-prune.sh from arming a pool-copy prune after a verified merge (see "Pool-copy prune after a merge"); anything else leaves it on
+FM_MERGE_PRUNE_INTERVAL=60   # seconds between the watcher's detached pool-copy prune sweeps while a prune record exists; 0 turns the sweep off; invalid values use 60
+FM_MERGE_PRUNE_EXIT_WAIT=10   # seconds the fallback waits for the stopped worker's session to leave the copy, and for the pane's idle shell to exit on SIGHUP, before it keeps the copy; invalid values use 10
+FM_MERGE_PRUNE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-merge-prune.sh
+FM_MERGE_PRUNE_TEARDOWN_BIN=   # test seam: the teardown the prune runs instead of bin/fm-teardown.sh
+FM_MERGE_PRUNE_CONTROL_BIN=   # test seam: the control command the fallback uses to stop the finished worker instead of bin/fm-control.sh
 FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
@@ -4102,12 +4308,13 @@ FMX_X_THREAD_MAX=25     # maximum messages in one auto-split reply thread
 FMX_FOLLOWUP_MAX_AGE_SECS=604800   # local window for posting Relay completion follow-ups (7 days)
 FMX_FOLLOWUP_MAX_COUNT=3   # local cap on Relay completion follow-ups per linked mention
 FM_PF_RETRY_BACKOFF_SECS=900   # seconds before the next attempt after a retryable promised-public-reply delivery error
-FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs have no age grace
+FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs, including zombies, have no age grace
 FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
+FM_CD_GUARD_MODE=warn   # warn (default) or deny for the primary checkout's persistent top-level cd guard; deny restores the block; docs/cd-guard.md owns the contract
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
@@ -4137,6 +4344,7 @@ FM_SECONDMATE_LIVENESS_SECS=60   # seconds between watcher probes of each regist
 FM_SECONDMATE_LIVENESS_TIMEOUT=120   # seconds allowed separately for a watcher-driven relaunch's per-home lock wait and its spawn execution; a lock-wait timeout skips recovery without touching the endpoint or recording an attempt; zero or invalid values use 120
 FM_SECONDMATE_LIVENESS_MAX_ATTEMPTS=3   # automatic relaunch attempts allowed per mate inside the window before the watcher parks auto-relaunch behind state/.secondmate-relaunch-bound-<id> and escalates once; a later live probe clears the marker and restores the full attempt budget (the ledger keeps its history behind a `rearmed` row); zero or invalid values use 3
 FM_SECONDMATE_LIVENESS_WINDOW_SECS=3600   # window the relaunch bound counts state/.secondmate-relaunch-<id> attempt lines over; the file is also the durable per-mate relaunch record; zero or invalid values use 3600
+FM_PR_READY_RECONCILE_TIMEOUT=120   # hard limit in whole seconds on one detached ready-PR registration pass (bin/fm-pr-ready-reconcile.sh); a pass that exceeds it is killed with any hung forge call and the next watcher tick starts a fresh one; zero or invalid values use 120
 FM_WEDGE_DEMAND_INSPECT_COUNT=3    # consecutive provably-working stale escalations on the same unchanged pane before demand-deep-inspection is added
 FM_WORKTREE_WRITE_PRUNE='.git node_modules .venv venv __pycache__ .mypy_cache .pytest_cache .ruff_cache .tox target dist build .next .cache vendor'   # directory names the wedge detector's task-worktree write probe skips; the default keeps .git out so a supervisor's own read-only git command can never look like crew progress; set it to the empty string to prune nothing, which widens the probe to the whole depth-bounded tree rather than disabling it
 FM_WORKTREE_WRITE_MAXDEPTH=6       # depth that same probe walks below the recorded worktree; it runs only at the moment a wedge escalation would otherwise fire, never on every poll; no probe knob applies to a secondmate, whose recorded worktree is a provisioned home the probe skips entirely

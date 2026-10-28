@@ -126,6 +126,11 @@ SH
   cat > "$1/fakebin/lsof" <<'SH'
 #!/usr/bin/env bash
 D=$FM_FAKE_DIR
+if [ -f "$D/adoption-cwd" ] && [ "${*: -1}" = pn0 ]; then
+  [ ! -f "$D/adoption-cwd-unreadable" ] || exit 1
+  printf 'p%s\0\nn%s\0\n' "$(cat "$D/recovery-pid")" "$(cat "$D/adoption-cwd")"
+  exit 0
+fi
 encode_cwd() {
   local path=$1
   path=${path//\\/\\\\}
@@ -801,6 +806,16 @@ set_case_meta_field() {  # <case-dir> <id> <key> <value>
   ' "$meta" > "$meta.tmp" && mv "$meta.tmp" "$meta"
 }
 
+# write_pool_state <pool> <slot-checkout>...: the Treehouse state of <pool>, one
+# unleased entry per slot checkout, as the pane-driven `treehouse get` a spawn
+# runs records it.
+write_pool_state() {
+  local pool=$1
+  shift
+  jq -n '{worktrees: [$ARGS.positional[] | {name: (split("/") | .[-2]), path: ., leased: false}]}' \
+    --args "$@" > "$pool/treehouse-state.json"
+}
+
 # make_relocation_case <case-dir> <id> [keep-registration]: a ship task with one
 # commit made in its copy, then the copy vanishes.
 # <case-dir>/first-head and committed-head hold the branch's two commits.
@@ -813,12 +828,17 @@ make_relocation_case() {
   git -C "$dir/wt" rev-parse HEAD > "$dir/committed-head"
   printf 'pr_head=%s\n' "$(cat "$dir/committed-head")" >> "$dir/home/state/$id.meta"
   rm -rf "$dir/wt"
-  if [ "$keep" = keep-registration ]; then
-    git -C "$dir/proj" worktree add -q -f "$dir/dest" "task-$id"
-  else
-    git -C "$dir/proj" worktree prune
-    git -C "$dir/proj" worktree add -q "$dir/dest" "task-$id"
-  fi
+  # G-20: a relocation destination must be a Treehouse pool slot that the
+  # pool's state records, so the fresh copy gets the managed pool's
+  # <pool>/<slot>/<repo> layout and a state entry beside it, and the branch is
+  # checked out the documented way: in the detached slot `treehouse get` hands
+  # out, past the vanished copy's kept registration. A copy without that proof
+  # refuses, and test_relocation_refuses_a_non_lease_copy proves that.
+  mkdir -p "$dir/th/1"
+  write_pool_state "$dir/th" "$dir/th/1/dest" "$dir/th/2/next"
+  [ "$keep" = keep-registration ] || git -C "$dir/proj" worktree prune
+  git -C "$dir/proj" worktree add -q --detach "$dir/th/1/dest"
+  git -C "$dir/th/1/dest" checkout -q --ignore-other-worktrees "task-$id"
   printf zsh > "$dir/fake/command"
   printf '%s' "$dir/wt" > "$dir/fake/cwd"
   printf 'working: preserved history\n' > "$dir/home/state/$id.status"
@@ -827,7 +847,7 @@ make_relocation_case() {
 # run_relocation_refusal <case-dir> <id> <fragment> <what> [destination]: the
 # relocation must refuse before anything is stopped, journaled or edited.
 run_relocation_refusal() {
-  local dir=$1 id=$2 fragment=$3 what=$4 dest=${5:-$1/dest} out rc meta_before brief_before journal_before=
+  local dir=$1 id=$2 fragment=$3 what=$4 dest=${5:-$1/th/1/dest} out rc meta_before brief_before journal_before=
   meta_before=$(cat "$dir/home/state/$id.meta")
   brief_before=$(cat "$dir/home/data/$id/brief.md")
   if [ -f "$dir/home/state/$id.control-relaunch" ]; then
@@ -937,6 +957,11 @@ case "${1:-} ${2:-}" in
     fi
     exit 0 ;;
   'pane process-info')
+    if [ -f "$D/adoption-ambiguous" ]; then
+      jq -nc --arg pane "$(cat "$D/herdr-pane")" \
+        '{result:{type:"pane_process_info",process_info:{pane_id:$pane,foreground_processes:[{pid:2000000000,name:"omp"},{pid:2000000001,name:"omp"}]}}}'
+      exit 0
+    fi
     if [ -f "$D/recovery-case-id" ]; then
       if [ -f "$D/herdr-agent-live" ]; then
         pid=2000000000
@@ -1156,9 +1181,28 @@ enable_teamclaude() {  # <case-dir>
   fm_test_fake_teamclaude "$1/fakebin"
 }
 
-# teamclaude_launch_line <log>: the newest launch the pane received.
+# assert_launch_word <file> <prefix> <value> <msg>: the launch in <file> passes
+# <value> right after <prefix>. A confined launch nests the command in more
+# single-quoted levels, so only quote characters may separate them.
+assert_launch_word() {
+  local value='' char i
+  for ((i = 0; i < ${#3}; i++)); do
+    char=${3:i:1}
+    case $char in
+      '[' | ']' | \\ | '.' | '*' | '^' | '$' | '+' | '?' | '(' | ')' | '{' | '}' | '|') value+="\\$char" ;;
+      *) value+=$char ;;
+    esac
+  done
+  grep -Eq -e "$2[\\\\']*'$value'" "$1" || fail "$4 (missing: $2'$3' in $(cat "$1"))"
+}
+
+# teamclaude_launch_line <log>: the newest launch the pane received. A confined
+# launch spans several lines inside its sandbox-exec wrapper and is kept whole.
 teamclaude_launch_line() {
-  grep -F 'Firstmate operational input waiting: read' "$1" | tail -1
+  awk '/\/usr\/bin\/sandbox-exec /{buf=""; open=1}
+    open{buf=buf $0 "\n"}
+    /Firstmate operational input waiting: read/{last=open ? buf : $0 "\n"; open=0}
+    END{printf "%s", last}' "$1"
 }
 
 # arm_session_end <case-dir> <id>: record that the task's Claude session ended.

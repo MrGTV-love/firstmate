@@ -65,6 +65,7 @@ Then append exactly `needs-decision [at=<epoch>] [key=probe-decision]: awaiting 
 When you receive a firstmate message containing `ALBATROSS`, append `done [at=<epoch>]: received ALBATROSS` to that status file and stop.
 Do not change project files or make a commit.''')
 text = text.replace("{FIRSTMATE_SPEC}", "Report only through the status file; the probe changes nothing else.")
+text = text.replace("\n### Out of scope\n", "\n### Out of scope\nNone.\n", 1)
 for token, fill in {
     "{DOD_CAPABILITY}": "The worker answers the codeword through its status file.",
     "{DOD_MANDATORY_ITEMS}": "M1. Source: the task text. Expected: after the ALBATROSS message the status file ends with a done line naming ALBATROSS. Verify: read the status file. Edge/negative: no project file changes and no commit. Evidence place: the status file. Authority: agent.",

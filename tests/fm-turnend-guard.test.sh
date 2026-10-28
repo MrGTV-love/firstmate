@@ -1186,6 +1186,7 @@ const contracts = {
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
+  'fm-claude-hold-release.sh': ['UserPromptSubmit', 'StopFailure'],
   'fm-procevent-posttool-check.sh': ['PostToolUse'],
 };
 const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
@@ -1212,9 +1213,10 @@ function reset(home, target, ordinary = false) {
   fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
   fs.mkdirSync(path.join(home, 'state'));
   fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
-  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
+  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-claude-hold-release.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
+  if (target === 'fm-claude-hold-release.sh') fs.writeFileSync(statePath(home, '.main-eligible-rows.held'), '1 1 1\n');
   if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
   if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, 'task1.meta'), '');
@@ -1245,6 +1247,7 @@ function invoke(registration, home, context, payload) {
     XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
     FM_HOME: home, FM_CONFIG_OVERRIDE: path.join(home, 'config'), FM_STATE_OVERRIDE: path.join(home, 'state'),
     CLAUDE_PROJECT_DIR: home, CLAUDECODE: '1', FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+    FM_CD_GUARD_MODE: 'deny', // This consumer matrix exercises blocking authorizations.
     FM_CLAUDE_AUTOARM_SYNC_WAIT_MS: '100', FM_CLAUDE_AUTOARM_ATTEMPTS: '1',
   };
   if (home === task || context === 'task-marker') env.FM_TASK_ID = 'config-consumer-task';
@@ -1327,6 +1330,10 @@ if (mode === 'contexts') {
                 assert.ok(result.stderr.includes('watcher auto-arm FAILED'), `${label}: no bounded arm failure`);
                 assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
                 assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
+                break;
+              case 'fm-claude-hold-release.sh':
+                silent(result, label);
+                assert.ok(!fs.existsSync(statePath(home, '.main-eligible-rows.held')), `${label}: the ended turn's hold survived`);
                 break;
               case 'fm-procevent-posttool-check.sh': {
                 assert.equal(result.status, 0, label);

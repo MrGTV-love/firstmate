@@ -20,12 +20,13 @@ REGISTRY="$ROOT/docs/guards/registry.json"
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
-printf '%s\n' "$out" | grep -q 'active=28 retired=1 beyond_audit=0 excluded=1 unregistered=0 audited=30' \
-  || fail "registry arithmetic drifted from 28+1+0+1+0=30: $out"
+printf '%s\n' "$out" | grep -q 'active=37 retired=13 beyond_audit=12 excluded=1 unregistered=0 audited=30 beyond_audit_active=9' \
+  || fail "registry arithmetic drifted from (37-9)+(13-12)+1+0=30: $out"
 pass "G-10 the registry accounts for all 30 audited Firstmate guards"
 
 [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
-jq -e '.guards | length == 28' "$REGISTRY" >/dev/null || fail "registry does not hold 28 live guards"
+jq -e '.guards | length == 37' "$REGISTRY" >/dev/null || fail "registry does not hold 37 live guards"
+jq -e '.beyond_audit_active | length == 9' "$REGISTRY" >/dev/null || fail "the nine post-audit guards are not recorded"
 jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
 pass "G-10b the spec and the registry are checked in and agree"
 
@@ -95,7 +96,12 @@ assert_contains() {  # <file> <literal> <claim>
   pass "$3"
 }
 assert_contains bin/fm-spawn.sh 'bin/fm-control.sh' 'G-20 worktree isolation names the reassociation repair'
-assert_contains bin/fm-gate-refuse-lib.sh 'bin/fm-lab-home.sh create' 'G-22 gate containment names the permitted lab home'
+# shellcheck source=bin/fm-gate-refuse-lib.sh
+g22_err=$( (unset FM_GATE_REFUSE_BYPASS FM_HOME; export NO_MISTAKES_GATE=1 FM_GUARD_EVENT_LOG=/dev/null; . "$ROOT/bin/fm-gate-refuse-lib.sh"; fm_refuse_if_gate_agent) 2>&1 >/dev/null ) \
+  && fail "G-22 the gate refusal did not refuse"
+printf '%s\n' "$g22_err" | grep -qF -- 'bin/fm-lab-home.sh env' \
+  || fail "G-22 the gate refusal does not name bin/fm-lab-home.sh env: $g22_err"
+pass 'G-22 gate containment names the one-command lab home it permits'
 assert_contains bin/fm-role-lib.sh 'config/firstmate-role' 'G-21 publication role names where authority is granted'
 assert_contains bin/fm-send.sh 'FM_HOME=<home> bin/fm-send.sh' 'G-05 send names the working invocation'
 assert_contains bin/fm-kimi-turnend-hook.sh 'bin/fm-kimi-turnend-hook.sh install' 'G-06 kimi refusal names the install step'

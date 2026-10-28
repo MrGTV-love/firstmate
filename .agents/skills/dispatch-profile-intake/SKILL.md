@@ -17,6 +17,4 @@ Preserve malformed profile configuration as an actionable error rather than sele
 When every candidate is tight, preserve the captain's strongest-reasoning class rather than silently downgrading it solely to conserve quota; stop and report the tight choice if that class cannot proceed.
 Break genuine evidence ties without array-order or harness bias.
 Load `quota-array-dispatch` before choosing among a matched profile array; that skill is the single owner of the TOON-first spendPriority selection procedure.
-Run `bin/fm-dispatch-resolve.sh` directly on the written brief in the same turn, with no preflight, and on `clear` pass its `profile:` line to `fm-spawn` unless you state a reason to override; `ambiguous`, `escalate`, `error`, and off all mean the intake above, unchanged (contract: `docs/configuration.md` "Typed dispatch resolution").
-Pass `--project` with the project's exact registered name from `data/projects.md`.
-A rule's `projects` allow/exclude lists are hard captain restrictions, never a judgment call: typed resolution withholds an ineligible rule and exits 2 on an unresolved identity instead of guessing or normalizing it.
+Run `bin/fm-dispatch-resolve.sh <brief>` directly on the scaffolded brief in the same turn with no preflight (its typed clone-path binding owns project identity), and on `clear` pass its `profile:` line to `fm-spawn` unless you state a reason to override; `ambiguous`, `escalate`, `error`, and off all mean the intake above, unchanged (contract: `docs/configuration.md` "Typed dispatch resolution").

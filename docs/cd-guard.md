@@ -13,7 +13,8 @@ the watcher-arm PreToolUse seatbelt (`bin/fm-arm-pretool-check.sh`, `docs/arm-pr
 The primary firstmate shell persists its working directory across tool calls.
 A stray persistent top-level `cd projects/<clone>` therefore silently relocates the shell, so the next firstmate-owned command - a backlog write, an `fm-*` lifecycle call - runs inside a project clone instead of the home.
 That has actually happened: a persistent top-level `cd` caused a firstmate-owned backlog write to execute inside a project clone rather than the home.
-The seatbelt denies exactly that command shape - a cwd change that persists to the primary shell - before it runs.
+The seatbelt warns about exactly that command shape - a cwd change that persists to the primary shell - and lets it run by default.
+`FM_CD_GUARD_MODE` accepts `warn` (default) and `deny`; setting `FM_CD_GUARD_MODE=deny` restores the original block with one variable, without changing classification or scope.
 
 This guard is not a general sandbox.
 It classifies shell command positions only; it never evaluates, expands, sources, or runs any byte of the submitted command.
@@ -33,11 +34,11 @@ The cd-guard does not inspect `.fm-secondmate-home`.
 It therefore applies in a git-cloned secondmate home where git-dir equals git-common-dir, but remains inert in a treehouse-leased secondmate home that is itself a linked worktree.
 Secondmate child crew and scout worktrees are likewise inert under the linked-worktree test.
 
-## Block vs allow
+## Warn vs silent allow
 
 The discriminator is persistence to the parent shell's cwd, not the mere presence of the token `cd`.
 
-The guard **blocks** a `cd`, `pushd`, or `popd` builtin that runs in an executed top-level position in the parent shell, because such a command persistently changes the primary shell's own working directory.
+The guard **warns** by default (or **blocks** in `deny` mode) for a `cd`, `pushd`, or `popd` builtin that runs in an executed top-level position in the parent shell, because such a command persistently changes the primary shell's own working directory.
 This covers a bare `cd projects/foo`, `cd ..`, `cd`, `cd -`, an absolute `cd /some/path` (still a persistent relocation of the parent shell), `pushd <dir>`, `popd`, a leading-assignment form such as `X=1 cd foo`, quoted or escaped command-word fragments that cook to a bare builtin, and any list form where the builtin runs in the parent shell (`cd x && cmd`, `cmd; cd x`, `cmd || cd x`, `command cd x`, `command -p cd x`, `command -- cd x`, `builtin cd x`, `command builtin cd x`, `cd x >/dev/null`, and newline-separated lists).
 
 The guard **allows** everything else, including these safe scoped forms that must never be blocked:
@@ -49,8 +50,8 @@ The guard **allows** everything else, including these safe scoped forms that mus
 - A `command` query such as `command -v cd`, `command -V cd`, or a clustered form such as `command -pv cd`, because it reports command resolution without executing the named builtin.
 - The token `cd` appearing as data: quoted text (`echo "cd projects/foo"`), a comment, a substring of another word (`cdk`, `abcd`, `record`), a `printf` payload, or any later argument word.
 
-An absolute-path `cd` is blocked on purpose: the ALLOW carve-out for absolute paths is for commands that address a target by absolute path, not for `cd`, which relocates the shell itself regardless of whether its argument is relative or absolute.
-Blocking a top-level `cd` is safe in the strong sense: the guard's steady state is "always at the home", so a return-to-home `cd` is redundant rather than necessary, and the block never causes a wrong-directory write.
+An absolute-path `cd` intentionally receives the same warning (or block in `deny` mode): the silent-allow carve-out for absolute paths is for commands that address a target by absolute path, not for `cd`, which relocates the shell itself regardless of whether its argument is relative or absolute.
+In default `warn` mode the correction is advisory, not protection against a wrong-directory write; `deny` mode prevents the classified command from running.
 
 ### Accepted non-goals
 
@@ -63,14 +64,16 @@ If a genuinely ambiguous command shape is found that risks a false block, the gu
 
 ## Stable reason code
 
-Every deny carries one stable code in square brackets before its prose reason.
+Every warning and deny carries the same stable code in square brackets before its prose reason.
+`deny` mode keeps the original reason, which says the directory change "is blocked", so its response is unchanged byte for byte.
+`warn` mode uses its own reason, because the command has already run: it says the directory change already ran and the shell is now outside the firstmate home, then names `git -C <dir>`, an absolute path on the command itself, `(cd <dir> && ...)`, and `cd` back to the firstmate home.
 
 | Code | Meaning |
 | --- | --- |
 | `persistent-cd` | A top-level `cd`/`pushd`/`popd` would persistently change the primary shell's own working directory. |
 
-The reason directs the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
-It does not permit `cd /home/project`, because an absolute-path `cd` remains a persistent directory change and is denied.
+Both reasons direct the caller to reach the target without moving the shell by using `git -C <dir>`, placing an absolute path on the intended command itself, or scoping the `cd` to a subshell.
+An absolute-path `cd /home/project` remains a persistent directory change, so it receives the correction rather than a silent allow.
 
 ## Transport and fail-open behavior
 
@@ -81,7 +84,7 @@ It does not permit `cd /home/project`, because an absolute-path `cd` remains a p
 - Grok sends stdin JSON at `.toolInput.command`.
 - OpenCode sends the exact command string through `--command <exact string>`.
 - Pi, pi-signed, and omp send the exact command string through `--command <exact string>`.
-- Cursor sends stdin JSON at `.tool_input.command` and adds `--cursor`, which renders the deny as Cursor's own returned decision object.
+- Cursor sends stdin JSON at `.tool_input.command` and adds `--cursor`, which renders warnings and denies as Cursor's own returned decision objects.
 
 Processing order is cheapest-first: a strict-superset prefilter, then the primary-checkout scope, then the Node policy owner.
 The prefilter removes ordinary single quotes, double quotes, backslashes, carriage returns, and newlines before fast-allowing any command that carries no `cd`, `pushd`, or `popd` substring and no quoting-decoder marker (`$'` ANSI-C or `$"` locale), so quoted or escaped command-word fragments delegate to the policy while most commands never pay for the git scoping calls or the Node process.
@@ -92,15 +95,21 @@ A broken hook must never deny every shell tool call.
 
 ## Output contract
 
-Identical in shape to `docs/arm-pretool-check.md`:
-
-- Allow (and inert-outside-primary) returns exit 0 with both streams empty.
-- Deny returns exit 2 and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` to stderr.
-- Default deny mode also writes `{"decision":"deny","reason":"[persistent-cd] reason"}` to stdout for Grok.
-- `--claude` suppresses stdout completely because Claude ignores a PreToolUse deny when stdout is nonempty.
+- Silent allow (and inert-outside-primary) returns exit 0 with both streams empty.
+- Warn returns exit 0, keeps stderr empty, and writes `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[persistent-cd] warn reason"},"systemMessage":"[persistent-cd] warn reason"}` to stdout.
+- The warn object carries no `permissionDecision`.
+- With `--cursor`, warn instead writes `{"permission":"allow","user_message":"[persistent-cd] warn reason"}` to stdout and keeps stderr empty.
+- In `deny` mode, the original output is unchanged: exit 2 and `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny"},"systemMessage":"[persistent-cd] reason"}` on stderr, plus `{"decision":"deny","reason":"[persistent-cd] reason"}` on stdout for Grok unless `--claude` suppresses stdout.
+- With `--cursor`, deny instead returns exit 0 with `{"permission":"deny","user_message":"[persistent-cd] reason"}` on stdout and stderr empty, because Cursor reads the permission object rather than the exit status.
+- Claude's stdout stays empty in `deny` mode because Claude ignores a PreToolUse deny when stdout is nonempty.
 - Codex blocks on exit 2 and displays stderr.
 - OpenCode throws only when the checker exits 2.
 - Pi, pi-signed, and omp return `{block: true}` only when the checker exits 2.
+
+The warn shape departs from the original work order, which specified an `allow` object on stderr with stdout empty.
+A successful exit does not deliver stderr, and a `permissionDecision` of `allow` would auto-approve the `cd`, so warn prints `systemMessage` and `additionalContext` on stdout with no permission decision.
+Warning delivery to the model is proven for Claude by the live-session evidence in [the warning-mode PR](https://github.com/MrGTV-love/firstmate/pull/189); delivery in other harnesses remains unproven.
+The OpenCode, Pi, pi-signed, and omp adapters act only on exit 2 and never read the checker's stdout on exit 0, so they do not forward the warning.
 
 ## Shared classifier ownership
 
@@ -110,6 +119,8 @@ The cd-guard never duplicates shell lexing; it adds only the cd-specific decisio
 `bin/fm-arm-command-policy.mjs` runs its own CLI entry point only when invoked directly, never on import, so the two policies stay independent CLIs over one parser.
 
 ## Harness wiring
+
+The table describes the unchanged blocking behavior in `deny` mode; default warnings exit 0 without a deny decision.
 
 | Harness | Entry | Adapter behavior on checker exit 2 |
 | --- | --- | --- |
@@ -127,8 +138,10 @@ Every shell variable reference in the Grok hook command carries an inline defaul
 ## Automated validation
 
 `tests/fm-cd-pretool-check.test.sh` owns the acceptance matrix.
-Every block and allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, and Pi-shaped CLI entry forms.
-The suite also proves the end-to-end cwd-leak regression (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
+Every classified and silent-allow case runs through Codex-shaped stdin, Claude-shaped stdin, Grok-shaped stdin, OpenCode-shaped CLI, Pi-shaped CLI, and Cursor-shaped stdin entry forms with the mode unset and with `deny`; an explicit `warn` is spot-checked on `cd projects/foo` for each entry form, because it takes the same path as the unset default.
+The original Claude-shaped stderr deny object and Cursor's stdout deny object are compared byte for byte with golden captures, including escaping and the trailing newline.
+The Grok-shaped stdout deny object is checked for decoded JSON equality, not byte equality.
+The suite also proves the end-to-end cwd-leak regression in `deny` mode (a firstmate-owned backlog write leaking into a project clone, then denied at the exact command), the checkout scoping (fires in a git-cloned secondmate fixture, inert in a crewmate/scout linked worktree, inert outside a firstmate checkout, inert outside a git repo), the fail-open transport behavior, the prefilter fast path, the policy CLI output contract, and the per-harness wiring.
 
 Run:
 
@@ -142,6 +155,9 @@ tests/fm-arm-pretool-check.test.sh
 ```
 
 ## Live validation record, 2026-07-11
+
+This record predates default warnings and describes the blocking behavior retained by `FM_CD_GUARD_MODE=deny`.
+It is not live evidence of warning delivery.
 
 Each harness ran against a scratch primary-shaped firstmate checkout: a plain git repo with `AGENTS.md`, `bin/` holding the real `fm-cd-pretool-check.sh`, `fm-cd-command-policy.mjs`, and `fm-arm-command-policy.mjs` plus a no-op dummy `fm-arm-pretool-check.sh`, a `projects/foo/` stand-in clone, and the tracked harness hook config.
 No live watcher, fleet state, or the captain's real primary checkout was involved.

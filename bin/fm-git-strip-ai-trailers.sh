@@ -6,11 +6,15 @@
 #   fm-git-strip-ai-trailers.sh <msgfile>
 #       Commit-msg hook mode. Git passes the proposed message file as $1.
 #       Rewrites that file in place, then exits 0 so the commit proceeds.
-#   fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree>
-#       Recreate <hooks-dir> as a core.hooksPath for this launch: a commit-msg
-#       hook that runs this strip, plus one wrapper per client-side hook name
+#   fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree> [<keep-trailers:0|1>]
+#       Recreate <hooks-dir> as a core.hooksPath for this launch: pre-commit and
+#       pre-push run the local fm-git-secrets.py scanner, which records guard
+#       events only for <worktree> itself, commit-msg runs this
+#       strip unless keep-trailers=1, plus wrappers per client-side hook name
 #       git documents except reference-transaction and post-index-change,
 #       which are deliberately excluded (see FM_GIT_CLIENT_HOOKS below).
+#       Pre-commit first runs the repository's hook in a subshell, preserving
+#       failure; only then does it inspect the final index that Git will commit.
 #       Each wrapper clears GIT_CONFIG_COUNT so Git ignores numbered overrides,
 #       then resolves core.hooksPath (or $GIT_DIR/hooks) in the repository git is actually
 #       running in, so a husky directory that only appears after npm install
@@ -64,7 +68,7 @@ usage() {
   cat >&2 <<'EOF'
 usage:
   fm-git-strip-ai-trailers.sh <msgfile>
-  fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree>
+  fm-git-strip-ai-trailers.sh install <hooks-dir> <worktree> [<keep-trailers:0|1>]
 EOF
   exit 2
 }
@@ -210,7 +214,8 @@ pre-merge-commit prepare-commit-msg post-commit pre-rebase post-checkout
 post-merge pre-push post-rewrite pre-auto-gc sendemail-validate'
 
 install_hooks() {
-  local hooks_dir=$1 wt=$2 name
+  local hooks_dir=$1 wt=$2 keep_trailers=${3:-0} name
+  case "$keep_trailers" in 0|1) ;; *) usage ;; esac
   [ -n "$hooks_dir" ] && [ -n "$wt" ] || usage
   [ -d "$wt" ] || {
     echo "error: worktree is not a directory: $wt" >&2
@@ -220,25 +225,50 @@ install_hooks() {
     echo "error: not a git worktree: $wt" >&2
     return 1
   }
+  wt=$(CDPATH='' cd -- "$wt" && pwd -P) || return 1
   chmod u+w "$hooks_dir" 2>/dev/null
   rm -rf "$hooks_dir"
   mkdir -p "$hooks_dir" || return 1
   chmod 700 "$hooks_dir" 2>/dev/null || true
   hooks_dir=$(CDPATH='' cd -- "$hooks_dir" && pwd -P) || return 1
 
+  # shellcheck disable=SC2016 # The generated hook expands its own arguments and status.
   write_executable "$hooks_dir/commit-msg" <<EOF
 #!/usr/bin/env bash
 set -u
-$(quote_for_hook "$SELF") "\$1" || exit \$?
+$(if [ "$keep_trailers" = 0 ]; then printf '%s "$1" || exit $?\n' "$(quote_for_hook "$SELF")"; fi)
 $(runtime_chain_body "$hooks_dir")
 EOF
 
   for name in $FM_GIT_CLIENT_HOOKS; do
-    write_executable "$hooks_dir/$name" <<EOF
-#!/usr/bin/env bash
-set -u
+    {
+      printf '#!/usr/bin/env bash\nset -u\n'
+      case "$name" in
+      pre-commit)
+        # Project hooks may stage generated or reformatted files. Inspect the
+        # final index, and preserve their refusal before running our scanner.
+        cat <<EOF
+(
 $(runtime_chain_body "$hooks_dir")
+) || exit \$?
+python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-commit || exit \$?
 EOF
+        ;;
+      pre-push)
+        # Both scanners and project hooks need the exact ref-update stream.
+        cat <<EOF
+push_input=\$(mktemp "\${TMPDIR:-/tmp}/fm-git-pre-push.XXXXXX") || exit 1
+trap 'rm -f "\$push_input"' EXIT
+cat >"\$push_input" || exit 1
+python3 $(quote_for_hook "${SELF%/*}/fm-git-secrets.py") --task-worktree $(quote_for_hook "$wt") pre-push "\$@" <"\$push_input" || exit \$?
+exec <"\$push_input"
+rm -f "\$push_input"
+trap - EXIT
+EOF
+        ;;
+      esac
+      [ "$name" = pre-commit ] || runtime_chain_body "$hooks_dir"
+    } | write_executable "$hooks_dir/$name" || return 1
   done
   chmod 500 "$hooks_dir"
 }
@@ -246,8 +276,8 @@ EOF
 CMD=${1:-}
 case "$CMD" in
 install)
-  [ "$#" -eq 3 ] || usage
-  install_hooks "$2" "$3"
+  { [ "$#" -eq 3 ] || [ "$#" -eq 4 ]; } || usage
+  install_hooks "$2" "$3" "${4:-0}"
   ;;
 -h | --help)
   usage

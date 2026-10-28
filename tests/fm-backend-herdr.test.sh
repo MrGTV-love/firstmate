@@ -55,11 +55,10 @@ LOG="${FM_HERDR_LOG:?}"
 RESP="${FM_HERDR_RESPONSES:?}"
 COUNT_FILE="$RESP/.count"
 next=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
-{
-  printf 'HERDR_SESSION=%s' "${HERDR_SESSION:-}"
-  for a in "$@"; do printf '\x1f%s' "$a"; done
-  printf '\n'
-} >> "$LOG"
+# One write per call, so concurrent calls never interleave inside a line.
+line="HERDR_SESSION=${HERDR_SESSION:-}"
+for a in "$@"; do line+=$'\x1f'"$a"; done
+printf '%s\n' "$line" >> "$LOG"
 if [ -n "${FM_HERDR_SERVER_MARKER:-}" ]; then
   case "${1:-}" in
     status)
@@ -214,11 +213,10 @@ make_herdr_statefake() {  # <dir> -> echoes fakebin dir; seeds an empty state fi
 set -u
 LOG="${FM_HERDR_LOG:?}"
 STATE="${FM_FAKE_HERDR_STATE:?}"
-{
-  printf 'HERDR_SESSION=%s' "${HERDR_SESSION:-}"
-  for a in "$@"; do printf '\x1f%s' "$a"; done
-  printf '\n'
-} >> "$LOG"
+# One write per call, so concurrent calls never interleave inside a line.
+line="HERDR_SESSION=${HERDR_SESSION:-}"
+for a in "$@"; do line+=$'\x1f'"$a"; done
+printf '%s\n' "$line" >> "$LOG"
 
 jq_state() { jq "$@" "$STATE"; }
 save() { local tmp="$STATE.tmp.$$"; cat > "$tmp" && mv "$tmp" "$STATE"; }
@@ -6041,7 +6039,10 @@ make_herdr_eventfake() {  # <dir> -> echoes fakebin dir
 #!/usr/bin/env bash
 set -u
 LOG="${FM_HERDR_LOG:-/dev/null}"
-{ printf 'HERDR_SESSION=%s' "${HERDR_SESSION:-}"; for a in "$@"; do printf '\x1f%s' "$a"; done; printf '\n'; } >> "$LOG"
+# One write per call, so concurrent calls never interleave inside a line.
+line="HERDR_SESSION=${HERDR_SESSION:-}"
+for a in "$@"; do line+=$'\x1f'"$a"; done
+printf '%s\n' "$line" >> "$LOG"
 cmd=${1:-}; sub=${2:-}
 case "$cmd $sub" in
   "status --json")

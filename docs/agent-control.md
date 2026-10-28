@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`.
+- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`, `adopt`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -39,6 +39,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
 | `stay` | Close Claude's background-task exit picker for a live task and leave the agent running; see [Exit and the background-task picker](#exit-and-the-background-task-picker). | A readable viewport no longer shows the recognised picker and the endpoint still classifies the agent alive. Any other screen, harness, or stopped agent refuses with nothing sent. |
 | `relaunch` | Replace the running agent with a new one in the same worktree by default (see the [missing-worktree exception](#relocating-a-task-whose-worktree-is-gone)) - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
+| `adopt` | Repair a live local Herdr omp task's session record without sending input or restarting anything. | The recorded pane, unique foreground PID, unique deepest workspace match, exclusive local pane claim, and unchanged generation are proved before publishing; see [Repairing a restored omp session record](#repairing-a-restored-omp-session-record). |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 | `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. With `--also <task>=<copy>` it re-points several records that share one pool slot root in the same call. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. Every record named in one call is re-pointed or none is. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
 
@@ -151,6 +152,7 @@ Switching harness is therefore one ordinary relaunch rather than a separate mech
 
 Herdr can resume a live omp harness after reboot without the Firstmate launch command.
 That native restore is unmanaged: neither its resume path nor the original launch message proves which conversation the live process currently owns.
+Only the explicit [omp session-record repair](#repairing-a-restored-omp-session-record) can later authorize lifecycle control for it.
 `bin/fm-reboot-recover.sh` inspects only the current home's recorded Herdr ships, scouts, and local secondmates and reports unmanaged live launches without lifecycle input or task-record mutation.
 The script's [header and help](../bin/fm-reboot-recover.sh) own invocation, bounded-scan scheduling, and its durable cursor.
 Deferred startup inspection follows the existing bootstrap sweeps, which keep their recovery responsibilities.
@@ -169,10 +171,39 @@ A legacy record (empty `launch_proof`) keeps exit and relaunch, so inspection re
 The bounded sweep reports that legacy notice once per restored-agent identity, like an unmanaged notice.
 Drafts, busy state, task instructions, profile axes, charters, child records, and unlanded work remain unchanged.
 
+### Repairing a restored omp session record
+
+Run `FM_HOME=<home> bash bin/fm-control.sh <task-id> adopt` to repair a local Herdr omp session record after a restart.
+Only the actual lock-owning main Firstmate may run it: a worker, the supervision branch in any posture, or a session that does not own the home's lock is refused without changing the record, under the same rule as `authorize-continuation` and `reassociate`.
+The [control script header](../bin/fm-control.sh) owns the five required proofs, exact fields, locks, publication, and refusal contract; [the launch-proof library](../bin/fm-launch-proof-lib.sh) owns pane and foreground-process attribution.
+The command writes only the session record, never unlocks a session, modifies a project, sends keys, or starts or stops an agent.
+It preserves the recorded task session file and requires the pane's omp session-file reference to identify that same persisted file; a missing task session field can be initialized from that reference.
+A stale registration alone grants no authority.
+The resolved foreground process must also be omp by its readable process name or argv[0], so a registration that outlives its agent cannot make another program or another harness's agent in the worktree a lifecycle target.
+Only a resolved foreground process with a positively readable environment without a usable launch pin is a repair candidate.
+A matching or different usable pin, or an unreadable environment, refuses before staging the record, because a pinned process's extension may rewrite the record during repair and an unreadable environment cannot rule that out.
+A record that already names the resolved foreground PID is refused unchanged, and the refusal says the record already names that PID, so a repeated `adopt` after a successful repair is reported as such.
+That covers a record an earlier `adopt` wrote, a healthy activation for the resolved foreground PID, the extension's own empty unproven mark (written on shutdown, before a switch, or after a failed start), and an activation naming another file (a different conversation).
+A record naming another live omp process is refused unchanged too, because that process's extension rewrites its record by rename and without the control locks.
+Herdr still registering the original task file never overrides that evidence.
+A recorded PID that is gone, or that a process other than omp has since reused (for example after a reboot), does not block repair, even when that process is another harness's agent.
+Publication renames the new record into place only while the record still holds the bytes the proofs were gathered from; a changed record refuses.
+Every refusal names the missing proof, and no refusal lowers the workspace or duplicate-pane requirements.
+
+**This widens what authorizes lifecycle control: a re-stamped record can become managed without the original launch environment pin.**
+Lifecycle readers recheck the adoption proofs and the same live PID and session file before using that alternative authorization, so a workspace claimed by another task, a duplicate pane claim, or a changed generation still refuses even after a successful repair.
+After a permitted repair, a newly unreadable environment still reads `unknown` and authorizes nothing, while a different launch-generation pin refuses the alternative authorization at every recheck.
+This is an explicit repair, not an automatic restart fix: the omp extension's launch-generation recovery and empty-session classification are unchanged.
+
+**Residual risk:** nothing watches which conversation an adopted process runs.
+The omp extension rewrites the record on every conversation switch only for a launch-pinned process, and an adopted process has no pin.
+An adopted record therefore relies on Herdr's session registration until the extension records switches without a launch pin.
+A switch to a personal conversation that Herdr has not yet registered is not seen, and the record can still read as managed.
+
 ### Live Herdr task attribution
 
 `bin/fm-launch-proof-lib.sh` owns launch attribution, and runtime lifecycle paths to a live Herdr agent use one shared positive task-attribution guard before lifecycle input or a relaunch checkpoint, note, or record mutation.
-A recorded endpoint or matching cwd alone never proves live task ownership.
+A recorded endpoint or matching cwd alone never proves live task ownership; the explicit [omp repair route](#repairing-a-restored-omp-session-record) combines them with independent process, unique-claim, generation, and session-file proof.
 The stopped-agent exception requires process-backed absence even when Herdr has not registered an agent; a live process still requires launch attribution, and unreadable process evidence refuses recovery.
 Only managed launches authorize ordinary interrupt, exit, busy-exit, and relaunch of a record with `launch_proof`.
 A record published before launch proofs existed (empty `launch_proof`) keeps the earlier rule: its live agent at the validated endpoint is attributed without a pin, and its relaunch publishes a proven launch.
@@ -182,13 +213,14 @@ An enabled `config/launch-env-allowlist` still selects the existing cleared-envi
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
 A process that Herdr lists but the later process table lacks has already exited and is dropped; a vanished agent, a broken chain, or two agents still read `unknown`.
-The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
+On the ordinary launch-proof route, the kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
 That matching live pin proves the launch incarnation, including interpreter-based harnesses and older records without a launch-proof field.
-For omp, the existing worker extension or local-secondmate watcher must also record the current session file and live PID for that task.
+For omp, the existing worker extension, local-secondmate watcher, or explicit repair must also record the current session file and live PID for that task.
 Argv and text embedded in other environment values never supply incarnation evidence.
-An omp process without that matching pin is unmanaged, including Herdr-native `omp --resume`.
-Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for extension-recorded current-session proof.
-An in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+Without the matching pin, an omp process is unmanaged, including Herdr-native `omp --resume`, unless its repaired session record passes the [full adoption proof](#repairing-a-restored-omp-session-record).
+Resume arguments, native session-file headers, original launch briefs, task inbox paths, actual cwd, and current Herdr session registration never substitute for current-session proof on their own.
+For a launch-pinned omp process, an in-process switch to a personal conversation is unmanaged even when the PID, argv, environment, and original task session file are unchanged.
+An adopted process has no pin, so this switch protection does not cover it; see the [residual risk](#repairing-a-restored-omp-session-record).
 Every other recorded harness remains unknown with missing or mismatched pins.
 Unreadable environments, ambiguous foreground identity, and unsupported launch-proof versions also remain unknown.
 Neither unmanaged nor unknown proof authorizes lifecycle action for a record with `launch_proof`.
@@ -196,8 +228,8 @@ Every Herdr replacement must have matching managed-launch proof, including curre
 The normal failed-launch and published-record reconciliation rules below still apply.
 
 The omp task record binds its initial session pathname once per launch generation and updates the active pathname and PID synchronously on session activation or switch, including before JSONL persistence under an existing canonical session directory; managed authority still requires persisted task and active files identifying the same file.
-The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation; missing, invalid, or personal-session proof refuses lifecycle action.
-Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged.
+The shared attribution guard requires that active file to resolve to the recorded task file for the identified live PID and matching launch generation, proved by the live environment pin or by the guarded [adoption route](#repairing-a-restored-omp-session-record); missing, invalid, or personal-session proof refuses lifecycle action.
+Session shutdown and pre-switch callbacks invalidate the active proof before replacement; returning to the recorded task session restores attribution, while workers without the extension remain unmanaged unless repaired by `adopt`.
 Cancelled or rolled-back switches and branches restore the predecessor proof only after omp's session transition settles and only if no newer transition or shutdown intervened.
 Every proof callback requires a unique registered top-level session sharing its context's session manager, and settled restoration rechecks that owner, so delegated or unregistered sessions cannot mutate the parent proof without relying on a context agent field.
 The proof installer uses the live registry exposed by omp's extension API rather than importing an on-disk SDK package.
@@ -234,6 +266,7 @@ It refuses without changing the record, instructions, or copies when:
 - a recorded GitHub PR has no full recorded `pr_head=` and no readable forge head, either head is missing from Git or not an ancestor of the replacement's HEAD, or a successful forge response is malformed; other forge providers retain the recorded-PR refusal;
   The proof checks both the recorded head and the current forge head when reachable, regardless of whether the PR is open, closed, or merged, and retains the PR identity rather than treating closure as permission to lose its history;
 - a pending backlog close or an unfinished relaunch transaction exists;
+- the task is a ship whose recorded copy no longer exists: reassociation re-points a live copy and is never a vanished-copy recovery, so the refusal names relocation through `relaunch --worktree`, which runs the lease proof in [Relocating a task whose worktree is gone](#relocating-a-task-whose-worktree-is-gone);
 - the task has no regular `brief.md` to carry the note, the record already names the replacement copy, or the record carries more than one `kind=` line, more than one `branch=` line for a ship, or a `project=` that is not a directory;
 - the replacement copy is not an isolated worktree root of the project's own repository, or is the project or primary checkout itself;
 - a ship's replacement copy has a detached HEAD, or any brief `Ship branch:` line disagrees with the recorded branch, even when the replacement keeps that branch;
@@ -351,7 +384,7 @@ It then publishes, in order, so an earlier failure rolls back to the record that
 
 1. pool slot claims: a managed pool slot that overlaps the replacement copy is claimed for the task, keeping an existing claim's home, and one that overlaps only the copy it leaves has the task's claim released, so the pool may hand it out again;
 2. the brief, with a ship's `Ship branch:` line moved to the replacement copy's branch and a `## Copy reassociation (<timestamp>)` block carrying the note, so a later relaunch agrees with the record and its worker knows where to work;
-3. the record, with `worktree=` and a ship's `branch=` naming the replacement copy and one more `prior_worktree=` line naming the copy it left, or a `released_worktree=` line when that copy lies in a released pool slot (an earlier prior copy inside that slot moves to `released_worktree=` too). A recorded copy that no longer exists but sat in Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file is recorded as `released_worktree=` as well, and the task's claim beside it is released, so the vanished path never blocks the task Treehouse later hands that slot to.
+3. the record, with `worktree=` and a ship's `branch=` naming the replacement copy and one more `prior_worktree=` line naming the copy it left, or a `released_worktree=` line when that copy lies in a released pool slot (an earlier prior copy inside that slot moves to `released_worktree=` too). A scout's recorded copy that no longer exists but sat in Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file is recorded as `released_worktree=` as well, and the task's claim beside it is released, so the vanished path never blocks the task Treehouse later hands that slot to.
 
 The brief and record are each read whole and staged with every write checked, so a read or write failure refuses before anything is published.
 The brief is the durable reassociation narrative; no separate reassociation audit log is created.
@@ -519,8 +552,13 @@ The worktree and the task's records are unaffected either way.
 
 A pool slot can vanish while its task's branch and every commit on it survive in the shared repository.
 Plain `relaunch` refuses that task because it cannot checkpoint the missing recorded copy.
-`fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh isolated copy of the same branch that the caller has already prepared.
+`fm-control <id> relaunch --worktree <path> --note ...` is the supported way out for a **ship**: it rebinds the task to a fresh copy of the same branch that the project's Treehouse lease allocated.
 A scout has no branch to match and a secondmate's home is not a task copy, so both refuse.
+`reassociate` is not a route here: it re-points only a ship whose recorded copy still exists, and refuses one whose copy is gone.
+The lease is the only accepted source: a hand-made `git worktree add` copy, an Orca-allocated worktree, and a project with no Treehouse pool refuse by name, because none of them can prove which allocator produced the copy.
+The `<pool>/<slot>/<repo>` layout is not that proof, since a hand-made copy can reproduce it; the copy must also have an entry, in any lease state, in its pool's Treehouse state file, which only Treehouse writes.
+
+A ship of an Orca-backed project, or of a project with no Treehouse pool, has no in-place relocation, because no lease can prove its copy; continue its work on a new task from the surviving branch, and a detailed procedure for that is follow-up work.
 
 [`bin/fm-control-worktree-lib.sh`](../bin/fm-control-worktree-lib.sh) owns the proof, and both `fm-control` and `fm-spawn --relaunch --worktree` run it, so the two cannot disagree.
 The control-plane preflight checks all of the conditions below before stopping the agent or writing the relaunch journal or progress note.
@@ -528,13 +566,20 @@ The launch owner repeats the proof before publication; a later refusal can there
 
 - **The recorded path is proven absent.**
   Absence is shown from a readable, searchable ancestor.
+  `treehouse get` often enters the vanished copy's own path again, because it reuses a free slot; the recorded copy then exists, so `--worktree` refuses and names the route: run `git checkout --ignore-other-worktrees <branch>` in that slot, then run plain `fm-control <id> relaunch --note ...`.
   A path that exists, a dangling symlink, or an unreadable ancestry is "cannot say", never "gone".
   An unmounted volume looks like a deleted copy, so do not relocate while one is offline.
 - **The fresh copy is an isolated worktree root of the same repository** as the recorded project, never the project's own checkout, with no uncommitted changes.
+- **It is a Treehouse pool slot of the recorded project that its pool's state file records**; an entry in any lease state counts.
+  Four causes refuse, and each refusal names its own remedy:
+  a state file with no entry for the slot, or one that cannot be read, names the lease procedure in **Why the caller prepares the copy** below;
+  a host without `jq` to read the state file says to install `jq` and retry;
+  an entry with a TSV-escaped path, or one with a relative path, even another slot's entry, says that the pool's `treehouse-state.json` must be inspected, because that entry cannot be compared, and that a new lease slot does not clear the refusal.
 - **It is checked out on the recorded branch**, which defaults to `fm/<id>` as in a fresh spawn.
 - **Its HEAD contains every surviving recorded head:** the last head in git's reflog for the vanished copy, both applicable heads (`relocation_head` and `worktree_head`) in this task's prior control journal for that path, and the record's `pr_head`.
   Relocation refuses when none survives, when existing registration, reflog, or journal evidence cannot be read, or when history was rewritten between two recorded heads and the copy cannot contain both.
-  A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `git worktree add -f <path> <branch>` and do not run `git worktree prune` first.
+  A task with no PR and no prior control relaunch has only the reflog, so prepare the copy with `treehouse get` (no `-b`) from the recorded project and `git checkout --ignore-other-worktrees <branch>` in the slot it enters, and do not run `git worktree prune` first; only the pool slot the lease enters is an accepted destination.
+  `treehouse get` can prune the vanished copy's registration itself when it builds a slot (Treehouse v3.1.4 does), and the reflog head goes with it.
   If the registration was already pruned, give a known commit of the branch as evidence, scoped by task:
   a task with no recorded `pr=` takes one line, `pr_head=<sha>`, in its task record (`state/<id>.meta`);
   a task with a recorded `pr=` takes the three lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` in its control journal (`state/<id>.control-relaunch`), never a hand-written `pr_head=`, because `bin/fm-dod-lib.sh` and `bin/fm-review-diff.sh` read `pr_head` as the head the forge reported.
@@ -542,7 +587,7 @@ The launch owner repeats the proof before publication; a later refusal can there
   The journal names all checked sources as `relocation_head_source` and records the copy's proven HEAD as `relocation_head`.
   Recreating the copy with a reset (`checkout -B`) that drops any surviving recorded head is refused.
 - **No other task of any local Firstmate home records it** (the root home and every registered local secondmate home, the same walk teardown uses); an unreadable home or registry refuses. Records are checked by path or alias in both `worktree` and `home`, and a Treehouse pool slot is not claimed by another task or by the same task id in another home.
-  Every relocation, pool or not, repeats the ownership proof under the existing shared project lock and keeps that lock through atomic task-record publication. A free pool slot is claimed for this task under that lock, as a fresh spawn does; an unpublished abort removes only the claim that attempt newly acquired, before releasing the lock. Pre-existing claims and claims paired with a published replacement record remain intact.
+  Every relocation repeats the ownership proof under the existing shared project lock and keeps that lock through atomic task-record publication. A free pool slot is claimed for this task under that lock, as a fresh spawn does; an unpublished abort removes only the claim that attempt newly acquired, before releasing the lock. Pre-existing claims and claims paired with a published replacement record remain intact.
 - **It holds none of the harness files the launch overwrites or deletes** (the worktree-resident paths of `fm_control_harness_wiring_paths` in bin/fm-control-lib.sh).
   The control plane checks, and the launch owner checks again at the moment it would write.
   A file somebody else owns is therefore never touched, so there is no original to restore on an abort.
@@ -558,10 +603,14 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
-It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
+It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration, which changes repository administration that every lane's worktrees share, or force the checkout on the caller's behalf.
 It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (pane path or output) that has an absolute extreme, and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
-The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
+The caller prepares the copy from the lease, never after `git worktree prune`: run `treehouse get` with no `-b` from the recorded project, then run `git checkout --ignore-other-worktrees <branch>` inside the slot it enters, and pass that slot.
+`treehouse get -b <branch>` fails because the branch already exists, and a plain `git checkout <branch>` refuses while the vanished copy's registration still names the branch.
+Do not prune that registration yourself, because its reflog may be the task's only recorded head.
+`treehouse get` can prune it when it builds a slot, so it may already be gone after this step.
+If `treehouse get` enters the vanished copy's own path, that path is the recorded copy again: check the branch out there and run plain `relaunch`, not `relaunch --worktree`.
 If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.
 That evidence only gives the proof a head to check; the proof and the launch owner still make every change.
 Rebinding the task by hand-editing its `worktree=` has none of those checks, no journal, and no lock against a concurrent launch.
@@ -620,6 +669,6 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 - `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, the exit-picker answers and `stay`, and marker non-regression, all against a stubbed session provider.
 - `tests/fm-control-relaunch.test.sh` - the relaunch transaction, identity preservation, harness switching, progress notes, checkpoint refusals, and rollback.
 - `tests/fm-control-relaunch-recovery.test.sh` - Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, conservative process-read refusals, and refusals on a live window, a worktree-holding agent, or unreadable evidence; missing-worktree relocation cases cover recorded-head containment, foreign harness-file preservation, failure-journal recovery, concurrent destination ownership, and unpublished pool-claim cleanup.
-- `tests/fm-control-relaunch-backends.test.sh` - positive live Herdr ownership and no-pin refusals across every lifecycle verb, and unmanaged native restore inspection and bounded copied-home diagnostics.
+- `tests/fm-control-relaunch-backends.test.sh` - positive live Herdr ownership and no-pin refusals across every lifecycle verb, and unmanaged native restore inspection and bounded copied-home diagnostics; omp session-record `adopt` cases cover each named proof refusal, the caller gates, refusal of a non-agent or other-harness foreground process under a lingering omp registration, refusal of a record that already names the live PID or names another live omp process, repair over a recorded PID reused by a process that is not an agent or by another harness's agent, and refusal of a pinned or unreadable-environment process before staging while the real extension activates a personal session.
 - `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, native restore and same-PID personal-session switches remaining unmanaged, and conservative foreground and process-environment refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.
