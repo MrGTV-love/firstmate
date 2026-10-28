@@ -793,10 +793,10 @@ IGNORED_ENTRIES_BOTH_PASS=(
   .DS_Store .fm-grok-turnend .fm-kimi-turnend tsconfig.tsbuildinfo sub/.DS_Store
   .tac/tmp/ .tac/uv-cache/
   .claude/settings.local.json .opencode/plugins/fm-busy-state.js
-  scripts/hooks/_conformance_manifest.json
+  scripts/hooks/_conformance_manifest.json graft/
 )
 IGNORED_ENTRIES_BOTH_BLOCK=(
-  build/ data/unique.bin precious.local .tac/state.json
+  build/ data/unique.bin precious.local .tac/state.json .ignore sub/graft/
   scripts/hooks/other.json scripts/hooks/_conformance_manifest.json.bak
   scripts/_conformance_manifest.json sub/scripts/hooks/_conformance_manifest.json
 )
@@ -877,29 +877,9 @@ scn_wholly_ignored_tac_caches_are_the_named_exception() {
   return 0
 }
 
-# Graft's generated search overlay, copied byte-for-byte from a real worker.
-write_graft_ignore() {
-  cat > "$COPY/.ignore" <<'EOF'
-# graft's cards are gitignored but should stay greppable: ripgrep reads
-# .ignore before .gitignore, so this re-admits the tree to search only.
-!graft/
-graft/.cache/
-graft/.graph/
-EOF
-}
-
 make_graft_output() {
   make_world
-  printf '/.ignore\n/graft/\n' >> "$W/project/.git/info/exclude"
-  write_graft_ignore
-  mkdir -p "$COPY/graft/.graph" "$COPY/graft/.cache/session"
-  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$COPY/graft/.cache/telemetry-repo-id.json"
-  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$COPY/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
-  : > "$COPY/graft/.cache/session/.prompts-dropped"
-  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$COPY/graft/work.md"
-  cat > "$COPY/graft/.graph/wiring.json" <<'EOF'
-{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
-EOF
+  fm_test_graft_output "$COPY"
 }
 
 scn_graft_output_is_removed() {
