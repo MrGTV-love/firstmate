@@ -481,12 +481,14 @@ fm_dod_mandatory_body() {  # <text> <inline|file>
 # is true and complete.
 #
 # The shape is fm_dod_item_shape's: an item starts its own line with its id
-# and the lead field (an optional list marker and ATX heading marker are
-# allowed), and the trailing fields follow as labels with nonempty values,
-# either on the item line or on continuation lines up to the next label, item,
-# or heading. Ids are unique. Text outside an item, such as the scaffold's own
-# instruction line, is not itself a criterion and is ignored; a label-led line
-# with no item id is reported instead of silently accepted.
+# and the lead field (an optional `-`, `*`, or `+` list marker is allowed; a
+# heading line is never an item), and the trailing fields follow as labels with
+# nonempty values, either on the item line or on continuation lines up to the
+# next label, item, or heading. The Authority value takes no continuation, so
+# prose after it is not part of the item. Ids are unique. Text outside an item,
+# such as the scaffold's own instruction line, is not itself a criterion and is
+# ignored; a label-led line with no item id is reported instead of silently
+# accepted.
 fm_dod_criteria_problem() {  # <mandatory-items-body>
   local body=$1 out
   out=$(printf '%s\n' "$body" | awk -v idre="^($FM_DOD_ITEM_ID_PATTERN)\$" -v lead="$FM_DOD_ITEM_LEAD" \
@@ -595,7 +597,7 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         next
       }
       if (in_fence) {
-        if (id != "" && field != "") value[field] = value[field] " " s
+        if (id != "" && field != "" && field != authority_field) value[field] = value[field] " " s
         next
       }
 
@@ -605,7 +607,6 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
       if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/) {
         prefix = trim(substr(s, 1, p - 1))
         sub(/^[-*+][ \t]+/, "", prefix)
-        sub(/^#+[ \t]+/, "", prefix)
         candidate = trim(prefix)
         sub(/[.:)]+$/, "", candidate)
         # The scaffold instruction line mentions the lead field too; only a
@@ -638,7 +639,7 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         consume(substr(s, q + 1))
         next
       }
-      if (id != "" && field != "") value[field] = value[field] " " s
+      if (id != "" && field != "" && field != authority_field) value[field] = value[field] " " s
     }
     END {
       finish()

@@ -1439,6 +1439,17 @@ EOF
   out=$(fm_brief_task_dod_problem "$brief"); rc=$?
   [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "a fenced line inside Verify was treated as criteria: $out"
 
+  # Prose after the last item is not part of its Authority value.
+  cat > "$brief" <<EOF
+## Definition Of Done (task)
+### Mandatory items
+$valid
+These items are graded by an independent reader.
+## How You're Graded
+EOF
+  out=$(fm_brief_task_dod_problem "$brief"); rc=$?
+  [ "$rc" -eq 1 ] && [ -z "$out" ] || fail "trailing prose was read into the last item's Authority: $out"
+
   # Present-but-empty inline DoD is not the intentional legacy absence.
   cat > "$brief" <<'EOF'
 # Task

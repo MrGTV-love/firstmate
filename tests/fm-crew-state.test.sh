@@ -1522,7 +1522,8 @@ test_terminal_passed_with_skips() {
 
 # A passing no-mistakes run is completion evidence only with its supported
 # verification-plan snapshot: the run must expose the snapshot, its bytes must
-# still hash to the recorded sha256, and the run head tree must equal HEAD.
+# still hash to the recorded sha256, and the run head must be the recorded
+# pr_head or attribute to HEAD (equal to it or descending from it).
 test_no_mistakes_pass_requires_verification_plan_evidence() {
   reset_fakes
   local d head plan_source plan_snapshot sha out saved_status

@@ -21,7 +21,8 @@ model's family is derived from its id (any provider route prefix ending in / is
 dropped; the leading name, case-insensitive, selects it) into the closed set
 anthropic, openai, google, deepseek, xai, moonshot, meta (aliases claude, gpt,
 chatgpt, codex, oN, gemini, gemma, grok, kimi, llama, and the exact native Claude
-names opus, sonnet, haiku) and stored beside the model.
+names opus, sonnet, haiku, which are deliberately anthropic because Claude records
+bare model names) and stored beside the model.
 A model outside them records family unknown, which is never independent. Reads
 accept any stored known family or unknown; verify derives every family again from
 the stored model ids, so a later family change neither invalidates history nor
