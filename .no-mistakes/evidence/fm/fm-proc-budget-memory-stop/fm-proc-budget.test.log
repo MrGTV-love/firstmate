@@ -10,6 +10,9 @@ ok - an ignored HUP stays ignored by the supervisor and the command
 ok - a seen member in another session is ended by the dead-man link
 ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
 ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
 ok - a command's kill 0 does not kill its memory reader
 ok - descriptors the caller passes reach the memory-stopped command
 ok - a command that cannot start, or a script without a shebang, behaves as without the option
@@ -20,5 +23,5 @@ ok - a budget only ever tightens the limit it inherits
 ok - a retained soft limit seals the inherited hard limit
 ok - exit status and arguments pass through
 ok - bad calls and an unreadable process count never run the command
-ok - a budgeted runaway tree stops at depth 312 while an unbudgeted probe forks freely
-rc=0 secs=44
+ok - a budgeted runaway tree stops at depth 321 while an unbudgeted probe forks freely
+bash tests/fm-proc-budget.test.sh  5.47s user 8.16s system 28% cpu 48.078 total

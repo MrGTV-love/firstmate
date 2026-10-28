@@ -1,0 +1,69 @@
+
+=== S1 over-limit tree with child+grandchild, limit 262144 KiB, outer stop 2 GiB
+rc=99 elapsed=4s
+stderr:
+fm-proc-budget: command tree exceeded 262144 KiB memory limit at 347728 KiB; ended
+child 36767
+grandchild 36812
+gone 36767
+gone 36812
+
+=== S2 sandbox-style ps refusal (ps stub exits 126): memory stop still works via libproc
+rc=99
+fm-proc-budget: command tree exceeded 262144 KiB memory limit at 265440 KiB; ended
+gone 51462
+gone 51543
+
+=== S3 under-limit command: output, args, status pass through
+out=[a b][c] rc=7
+
+=== S4 no option: plain exec path, same PID as wrapper (no supervisor), status 3
+wrapper-pid=61191
+command-pid=61191 rc=3
+
+=== S5 inherited fd 3 reaches command (recorded decision fix)
+rc=0 fd3.log=via-fd3
+
+=== S6 invalid limits refused before launch
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+limit=0 rc=2 ran=no
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+limit=01 rc=2 ran=no
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+limit=-1 rc=2 ran=no
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+limit=abc rc=2 ran=no
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+limit=1.5 rc=2 ran=no
+
+=== S7 reader fails mid-run (FAULT=exit after 3 good real samples), under outer 2 GiB stop: tree ended, 125, reason given
+rc=125 elapsed=2s stderr: fm-proc-budget: cannot sample command-tree memory (reader exited); ended
+gone 52685
+gone 52748
+
+=== S7 reader fails mid-run (FAULT=garbage after 3 good real samples), under outer 2 GiB stop: tree ended, 125, reason given
+rc=125 elapsed=3s stderr: fm-proc-budget: cannot sample command-tree memory (reader returned an unreadable sample); ended
+gone 58095
+gone 58209
+
+=== S8 reader unavailable at preflight (FAULT=exit after 0 samples): command never starts, 125
+rc=125 ran=no stderr: fm-proc-budget: cannot start memory reader (reader exited); command not started
+
+=== S9 supervisor SIGKILLed mid-run: dead-man reader ends the tree
+supervisor 66524 SIGKILLed, rc=137
+gone 67089
+gone 67151
+
+=== S10 Ctrl-C (SIGINT with default disposition, as from a terminal) mid-run: tree ended, 130
+rc=130 elapsed=2s stderr: 
+gone 72729
+gone 72780
+
+=== S11 command form copied from scaffolded brief rule 9, used verbatim by a "worker"
+form: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6144K9J7BP8R76W12ZJP7GD/bin/fm-proc-budget.sh' --memory-kib <limit-in-KiB> -- <command...>
+shellcheck present: version: 0.11.0
+shellcheck under stop rc=0
+fm-proc-budget: command tree exceeded 524288 KiB memory limit at 583920 KiB; ended
+runaway under brief form rc=99
+gone 59139
+gone 59201
