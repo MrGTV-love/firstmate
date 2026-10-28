@@ -632,7 +632,78 @@ test_spawn_fixed_family_scope() {
   pass "fixed-family refuses non-scouts and raw launches before launch and notes non-omp no-op"
 }
 
+test_spawn_launch_model_history() {
+  local rec id out history prefix first second tab
+  tab=$(printf '\t')
+  id='omp-author-history'
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+    "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  expect_code 0 $? "initial author-history launch: $out"
+  history="$HOME_DIR/state/$id.launch-models"
+  first=$(sed -n 's/^spawn_gen=//p' "$HOME_DIR/state/$id.meta")
+  [ -n "$first" ] || fail "initial launch recorded no spawn_gen"
+  assert_equals "$first$tab${tab}openai-codex/gpt-6.1-sol" "$(cat "$history")" "initial launch binds its author to its incarnation"
+  prefix=$(cat "$history")
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" \
+    --model anthropic/claude-opus-5-5 --effort high)
+  expect_code 0 $? "cross-family author-history relaunch: $out"
+  second=$(sed -n 's/^spawn_gen=//p' "$HOME_DIR/state/$id.meta")
+  [ -n "$second" ] && [ "$second" != "$first" ] || fail "relaunch did not record a new spawn_gen"
+  assert_equals "$prefix
+$second$tab$first${tab}openai-codex/gpt-6.1-sol
+$second$tab$first${tab}anthropic/claude-opus-5-5" "$(cat "$history")" "relaunch appends linked to the prior incarnation without erasing the old author"
+  assert_grep 'model=anthropic/claude-opus-5-5' "$HOME_DIR/state/$id.meta" "current model changes while history retains both authors"
+  pass "launch-model history preserves both families across relaunch"
+}
+
+test_spawn_ship_native_fallback_authors() {
+  local rec id out base head url rc reader groups
+  id='omp-ship-fallback-authors'
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"anthropic","id":"claude-opus-5-5","selector":"anthropic/claude-opus-5-5"}]}' \
+    > "$(dirname "$GLOBAL_CONFIG")/catalog.json"
+  printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"anthropic/claude-opus-5-5","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+    metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(PI_CODING_AGENT_DIR="$(dirname "$GLOBAL_CONFIG")" OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+    "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --mode local-only --yolo off 2>&1)
+  expect_code 0 $? "cross-family native fallback ship launch: $out"
+  assert_equals '["anthropic/claude-opus-5-5:high"]' \
+    "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6.1-sol:high"]' "$HOME_DIR/state/$id.omp-fallback.yml")" "the ship session may switch to the Claude stand-in"
+  base=$(git -C "$WT_DIR" rev-parse HEAD)
+  git -C "$WT_DIR" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' commit -q --allow-empty -m 'ship implementation'
+  head=$(git -C "$WT_DIR" rev-parse HEAD)
+  url=https://github.com/example/repo/pull/9
+  printf 'VERDICT: PASS head=%s\n' "$head" > "$CASE_DIR/review.md"
+  for reader in claude-opus-5-5:openai-codex/gpt-6.1-sol claude-opus-5-5:both openai-codex/gpt-6.1-sol:both; do
+    groups='{"ship":["openai-codex/gpt-6.1-sol","anthropic/claude-opus-5-5"]}'
+    [ "${reader#*:}" = both ] || groups="{\"ship\":[\"${reader#*:}\"]}"
+    out=$(FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
+      --verdict PASS --reader-model "${reader%%:*}" --author-groups "$groups" \
+      --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no --report "$CASE_DIR/review.md" 2>&1)
+    expect_code 0 $? "record the $reader read: $out"
+    rc=0
+    out=$(NM_HOME="$CASE_DIR/no-mistakes" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$HOME_DIR/state" "$ROOT/bin/fm-review-record.py" verify --pr "$url" --head "$head" \
+      --task "$id" --base "$base" 2>&1) || rc=$?
+    case "$reader" in
+      claude-opus-5-5:openai-codex/gpt-6.1-sol)
+        expect_code 1 "$rc" "one Claude PASS of the launch model must not verify a ship that may fall back to Claude: $out"
+        assert_contains "$out" 'uncovered commit group ship, family anthropic,openai;' "the derived ship group names the launch and fallback families" ;;
+      claude-opus-5-5:both)
+        expect_code 1 "$rc" "one Claude PASS must not cover the Claude fallback author: $out"
+        assert_contains "$out" 'uncovered commit group ship, family anthropic;' "the Claude fallback family needs a different-family read" ;;
+      *) expect_code 0 "$rc" "reads from both families must verify the launch and fallback authors: $out" ;;
+    esac
+  done
+  pass "omp ship native fallback stand-ins are ship author evidence"
+}
+
 test_spawn_fixed_family() {
+  test_spawn_launch_model_history
+  test_spawn_ship_native_fallback_authors
   test_spawn_fixed_family_contract
   test_spawn_fixed_family_scope
 }
