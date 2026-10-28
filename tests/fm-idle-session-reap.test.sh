@@ -843,6 +843,64 @@ test_secondmate_parent_freeze() {
   pass "a secondmate home honors its parent's freeze, fails closed when the parent cannot be read, and frees the task on release"
 }
 
+# A freeze at the captain's home reaches every local home below it: a
+# grandchild mate walks each local parent binding up to the root and reads
+# every backlog on the way. A middle link that cannot be read, or a binding that
+# loops back, parks the task and names the failed link, and the root's release
+# frees it.
+test_grandchild_mate_root_freeze() {
+  local root mid grand pr=https://github.com/acme/widget/pull/41 out
+  root=$(make_home freeze-root)
+  mid=$(make_home freeze-mid)
+  grand=$(make_home freeze-grand)
+  printf 'mid\n' > "$mid/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$root" > "$mid/.fm-secondmate-parent"
+  printf 'grand\n' > "$grand/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$mid" > "$grand/.fm-secondmate-parent"
+  mk_task "$grand" vernant-grand-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$grand/projects/vernant"
+  merge_marker "$grand" vernant-grand-merged acme/widget 41
+  printf 'Frozen by the captain.\n' > "$root/release.txt"
+
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged reap "with no freeze anywhere, the grandchild's finished task is reap-ready"
+
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null \
+    || fail "root hold failed"
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "root freeze declaration failed"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "the grandchild's reaper honors the root's freeze"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the grandchild's parked row must name the root's hold: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
+  mv "$mid/.fm-secondmate-parent" "$mid/.fm-secondmate-parent.off"
+  printf 'garbage\n' > "$mid/.fm-secondmate-parent"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "an unreadable middle link parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"parent binding of"*"freeze-mid"*) ;;
+    *) fail "the parked row must name the unreadable middle link: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$grand" > "$mid/.fm-secondmate-parent"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "a parent chain that loops parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"loops back"*) ;;
+    *) fail "the parked row must name the looping link: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+  mv "$mid/.fm-secondmate-parent.off" "$mid/.fm-secondmate-parent"
+
+  FM_HOME="$root" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$root/release.txt" --release >/dev/null || fail "root release failed"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged reap "the root's release makes the grandchild's task eligible again"
+  pass "a grandchild mate honors a root freeze, fails closed on a broken or looping link, and frees the task on release"
+}
+
 test_stale_selection_is_revalidated() {
   local home out
   home=$(make_home stale)
@@ -973,6 +1031,7 @@ test_semantic_idle_sources
 test_captain_holds
 test_project_freeze
 test_secondmate_parent_freeze
+test_grandchild_mate_root_freeze
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate

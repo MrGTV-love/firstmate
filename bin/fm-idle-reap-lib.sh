@@ -62,7 +62,7 @@ fm_idle_reap_exited_by_control() {  # <state> <id>
 }
 
 # A captain hold that declares this task's project frozen, in this home or in
-# a local secondmate home's parent, stops every automatic cleanup of it,
+# any local home above a secondmate home, stops every automatic cleanup of it,
 # whether or not the task has a hold of its own. The answer is
 # bin/fm-captain-hold.sh frozen; an answer it cannot establish also stops
 # cleanup and names its reason. Sets the parked class and its reason and

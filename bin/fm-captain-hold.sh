@@ -78,10 +78,13 @@
 # the task's `project=` metadata, 1 means no open hold declares it, and 2 means
 # the answer could not be established, which a mechanical closer must treat as
 # frozen. It reads this home's backlog and, in a local secondmate home, the
-# parent home's backlog through the parent binding its parent channel uses
-# (bin/fm-parent-channel-lib.sh), so the parent declares a freeze once; a
-# binding or parent backlog that cannot be read is exit 2. A remote parent has
-# no home on this machine to read. The idle reaper (bin/fm-idle-reap-lib.sh)
+# backlog of every local home above it, walking the parent bindings its parent
+# channel uses (fm_local_home_chain in bin/fm-secondmate-parent-lib.sh), so the
+# captain's home declares a freeze once for every local home below it; a
+# binding, a link, or a backlog that cannot be read, a cycle, or a chain past
+# the walk's bound is exit 2 naming the failed link. The walk stops at a remote
+# binding: a remote parent has no home on this machine to read, so a freeze
+# above it is not seen. The idle reaper (bin/fm-idle-reap-lib.sh)
 # asks it before any automatic teardown. docs/captain-hold-lifecycle.md owns
 # the lifecycle.
 #
@@ -2991,7 +2994,7 @@ EOF
 # freezing hold's id, 1 means none declares it, 2 means it could not be
 # established (the header owns the contract).
 command_frozen() {
-  local id=${1:-} meta project hold rc=0
+  local id=${1:-} meta project hold chain ancestor rc=0
   [ "$#" -eq 1 ] || { usage >&2; exit 2; }
   case "$id" in
     ''|*[!A-Za-z0-9._-]*)
@@ -3022,16 +3025,23 @@ command_frozen() {
       ;;
   esac
   [ "$FM_PARENT_CHANNEL_ROUTE" = local ] || return 1
-  rc=0
-  hold=$(backlog_freeze_hold "$FM_SECONDMATE_PARENT_HOME/data" "$project") || rc=$?
-  case "$rc" in
-    0) printf '%s\n' "$hold"; return 0 ;;
-    1) return 1 ;;
-    *)
-      printf 'fm-captain-hold: the captain holds of parent home %s cannot be read\n' "$FM_SECONDMATE_PARENT_HOME" >&2
-      exit 2
-      ;;
-  esac
+  chain=$(fm_local_home_chain "$FM_HOME") || exit 2
+  while IFS= read -r ancestor; do
+    [ -n "$ancestor" ] || continue
+    rc=0
+    hold=$(backlog_freeze_hold "$ancestor/data" "$project") || rc=$?
+    case "$rc" in
+      0) printf '%s\n' "$hold"; return 0 ;;
+      1) ;;
+      *)
+        printf 'fm-captain-hold: the captain holds of parent home %s cannot be read\n' "$ancestor" >&2
+        exit 2
+        ;;
+    esac
+  done <<EOF
+$(printf '%s\n' "$chain" | sed 1d)
+EOF
+  return 1
 }
 
 command_open_bound() {

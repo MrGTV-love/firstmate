@@ -39,7 +39,7 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
 | `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
 | `freeze` | Declares the one project an open hold freezes. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
-| `frozen` | Read-only check of whether an open hold in this home or its parent home freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
+| `frozen` | Read-only check of whether an open hold in this home or a local home above it freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
@@ -217,7 +217,7 @@ The lapse of `--until` for ordinary holds is unchanged.
 An answer moves the old header under its resolution record, so re-holding released work starts a new lifecycle with no freeze.
 
 The read-only `frozen <task-id>` subcommand is the one owner of the question "is this task frozen by an open captain hold".
-It compares the project named by the task's `project=` metadata with the declaration on every open captain hold in this home's own backlog and, in a local secondmate home, in its parent home's backlog.
+It compares the project named by the task's `project=` metadata with the declaration on every open captain hold in this home's own backlog and, in a local secondmate home, in the backlog of every local home above it.
 
 | `frozen` exit | Meaning | What the idle reaper does |
 | --- | --- | --- |
@@ -231,10 +231,14 @@ A parked row carries the reason in the scan output and in `state/idle-sessions.r
 No refusal memo is written, because a memo would outlive the release; the first sweep after the answer finds the task eligible again.
 Only the automatic paths honor a freeze; a teardown the captain or firstmate runs by hand is unchanged.
 
-A local secondmate home also reads its parent home's backlog, read-only, through the `.fm-secondmate-parent` binding its [parent channel](secondmate-parent-channel.md) uses.
-So the parent declares a freeze once, for example on Main's `vernant-freeze-20261023`, and the mate needs no mirror step.
-A binding or a parent backlog that cannot be read is exit 2, and the parked row names the reason.
-A remote parent has no home on this machine to read, so a remote mate sees only its own backlog.
+A local secondmate home also reads, read-only, the backlog of every local home above it.
+It walks the `.fm-secondmate-parent` bindings its [parent channel](secondmate-parent-channel.md) uses, with the same walk, bound, and cycle check that `fm_firstmate_root_home` in [`bin/fm-secondmate-parent-lib.sh`](../bin/fm-secondmate-parent-lib.sh) uses.
+So the captain's home declares a freeze once, for example on Main's `vernant-freeze-20261023`, and no mate or grandchild mate needs a mirror step.
+A binding, a parent home, or a backlog that cannot be read, a cycle, or a chain past the bound is exit 2, and the parked row names the link that failed.
+
+Known limit, not covered: the walk stops at a remote binding, because a remote parent's records cannot be read from this host.
+A remote mate, and every local home below it, sees only the freezes of the local homes it reached; a freeze filed above the remote binding does not stop its reaper.
+That case is a follow-up.
 
 ## Answer-time resolution
 
@@ -595,7 +599,7 @@ The suites do not test the accepted merge-to-cleanup re-hold window or asynchron
 - Rewriting the origin keeps the declaration, a second `freeze` replaces it, and an answer ends it even when the same task is held again.
 - A hold whose `--until` date has passed still freezes, accepts `freeze`, and keeps the declaration when it is held again.
 - An unreadable backlog is exit 2, never exit 1.
-- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, and a secondmate home honors its parent's freeze and parks the task when the parent cannot be read.
+- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, a secondmate home honors its parent's freeze and parks the task when the parent cannot be read, and a grandchild mate honors a freeze at the root, parks on an unreadable middle link or a cycle, and is eligible again after the root releases it.
 
 ### Merges, releases, and unreadable holds
 

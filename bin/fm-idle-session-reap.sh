@@ -22,8 +22,8 @@
 #     open;
 #   - the durable captain-hold `open` predicate confirms no open captain call
 #     (an open call or an inconclusive read is parked, not reaped);
-#   - no open captain hold in this home, or in a local secondmate home's
-#     parent, declares the task's project frozen
+#   - no open captain hold in this home, or in any local home above a
+#     secondmate home, declares the task's project frozen
 #     (`fm-captain-hold.sh frozen`; a freeze or an inconclusive read is parked
 #     with its reason, never offered to teardown, and needs no refusal memo
 #     because the next sweep after the hold is answered finds it eligible);
