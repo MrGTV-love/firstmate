@@ -2112,6 +2112,31 @@ del record['handling']['actions'][row['id']]['clock_start']
 ledger.write_text(json.dumps(record))
 assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a legacy action lost its cover'
 clock['now'] = now
+# A ledger published after the action read its clock (while it waited for the receipt lock) keeps the action's cover.
+home, ledger, row, call, ok, drain, ack = case('ledger-after-clock', owner='captain')
+_, boundary = drain()
+record = json.loads(ledger.read_text())
+record['generated_epoch'] = now + 60
+record['rows'][0]['age_seconds'] = 7200 + 60
+ledger.write_text(json.dumps(record))
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the stalled lint')
+recorded = json.loads(ledger.read_text())['handling']['actions'][row['id']]
+assert recorded['clock_start'] == now - 7200, recorded
+clock['now'] = now + 120
+assert ack(boundary).returncode == 0, 'an action recorded before its ledger was generated lost its cover'
+record = json.loads(ledger.read_text())
+record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'changed evidence stayed covered'
+record['rows'][0]['evidence'] = row['evidence']
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'unchanged work lost its cover'
+record['generated_epoch'] = now + 8000
+ledger.write_text(json.dumps(record))
+clock['now'] = now + 8000
+restarted = call(code / 'bin/fm-open-loops.sh', '--check-actions')
+assert restarted.returncode == 1 and row['id'] in restarted.stdout, ('a restarted clock stayed covered', restarted)
+clock['now'] = now
 # One actor's acknowledgement is never gated by a row only the other actor's later drain presented.
 home, ledger, row, call, ok, drain, ack = case('cross-actor-gate', empty=True)
 assert loops_as(home, 'branch', '--present-overdue').stdout == ''

@@ -1798,7 +1798,7 @@ def record_action(args, state, now, report, waits, waits_error):
                          + int(args.kind == "deferred"), captain_visible=visible,
                          digest=row_digest(by_id[ident]), cited=cited)
     if by_id[ident].get("age_seconds") is not None:
-        actions[ident]["clock_start"] = now - by_id[ident]["age_seconds"]
+        actions[ident]["clock_start"] = max(now, report["generated_epoch"]) - by_id[ident]["age_seconds"]
     if wait_history:
         actions[ident]["waits"] = wait_history
     if binding is not None:
