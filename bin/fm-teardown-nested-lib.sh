@@ -287,10 +287,36 @@ teardown_foreign_proc_record() {  # <pid>
   fi
 }
 
+# Graft's generated output at the root of <copy>: the exact .ignore overlay graft
+# writes, and a graft/ directory that git lists whole as one ignored entry (so it
+# tracks nothing in it) and that holds no .git. Graft rebuilds that index from the
+# tracked source and its hook and session files describe only this copy
+# (data/fm-merge-prune-graft-scratch/report.md). bin/fm-merge-prune-lib.sh judges
+# the same entries with this test.
+teardown_graft_generated() {  # <copy> <ignored-entry>
+  local nested
+  case "$2" in
+    .ignore)
+      [ -f "$1/.ignore" ] && cmp -s "$1/.ignore" - <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+      ;;
+    graft)
+      [ -d "$1/graft" ] && nested=$(find "$1/graft" -name .git -print -quit 2>/dev/null) && [ -z "$nested" ]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 # Ignored entries no commit holds that must be preserved before removal.
-# Symlinks, caches, virtual environments, Firstmate's own hook files, and
-# regenerable build output are derived machinery and are skipped; every other
-# entry is printed for teardown_preserve_ignored to copy.
+# Symlinks, caches, virtual environments, Firstmate's own hook files, graft's
+# generated output (teardown_graft_generated) and regenerable build output are
+# derived machinery and are skipped; every other entry is printed for
+# teardown_preserve_ignored to copy.
 teardown_preservable_ignored() {  # <copy>
   local copy=$1 listing entry name child rc=0
   listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
@@ -299,6 +325,7 @@ teardown_preservable_ignored() {  # <copy>
     while IFS= read -r -d '' entry; do
       entry=${entry%/}
       [ ! -L "$copy/$entry" ] || continue
+      ! teardown_graft_generated "$copy" "$entry" || continue
       name=${entry##*/}
       case "$entry" in .claude|.claude/*|.opencode|.opencode/*) continue ;; esac
       case "$entry" in scripts/hooks/_conformance_manifest.json|.tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) continue ;; esac

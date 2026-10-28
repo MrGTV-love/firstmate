@@ -52,16 +52,19 @@ Run every git command directly, never inside a script, alias, subshell, or other
 4. Run `git reset --keep refs/heads/archive/<task>-pipeline-<P8>` to adopt P.
    Then `git range-diff` the submitted commits against the new head and report any submitted commit that is missing.
    For a Gerrit run whose outcome is passed, passed-with-skips, or passed-with-override, confirm `HEAD`'s tree equals P's tree and resume the worker brief's fix-commit check and publish steps. Do not perform steps 5–6 or start another run: P is the head the passing run validated, even if `axi sync --check` offers `run_pipeline`.
-5. A fresh run refuses at the private-mirror guard until S is an ancestor of the head, because the gate's mirror branch still holds S.
+5. If `git merge-base --is-ancestor <S> HEAD` exits 0, the pipeline kept S as an ancestor: skip the replay below and all of step 6, confirm `no-mistakes axi sync --check` offers `run_pipeline`, and start exactly one fresh run with the original intent.
+   Otherwise a fresh run refuses at the private-mirror guard until S is an ancestor of the head, because the gate's mirror branch still holds S.
    Do not record this with `git merge -s ours`: a project can forbid that merge with no allowed form.
    Replay instead, before adding any commit or merging main, so the range holds no merge commit.
-   Let B be the pipeline's rebased copy of the submitted commits, the commit just below the first pipeline fix commit.
-   Prove both of these first: `git cherry -v <B> <S>` prints no `+` line, and `git diff --quiet <S> <B> -- <files>` passes for every file that `<B>..HEAD` changes.
-   If either proof fails, stop and report the output.
+   Let B be the pipeline's rewritten copy of the submitted commits, the commit just below the first pipeline fix commit.
+   Set S-base to the commit `git merge-base <S> <B>` prints, n to the count `git rev-list --count <S-base>..<S>` prints, and B-base to `<B>~<n>` with that literal count.
+   Prove `git range-diff <S-base>..<S> <B-base>..<B>` pairs every commit on both sides; a commit the rebase dropped or added leaves an unpaired commit, which is a stop.
+   Accept `=` or `!` only when the latter changes solely hunk headers or unchanged context lines, with each pair's own added and removed lines identical; stop and report any unpaired commit or other difference.
    Run `git reset --keep refs/heads/archive/<task>-submitted-<S8>` and cherry-pick every commit of `git rev-list --reverse <B>..refs/heads/archive/<task>-pipeline-<P8>` in that order.
    A merge commit in the range cannot be picked without a mainline: stop and report it rather than choose one.
-6. Prove `git merge-base --is-ancestor <S> HEAD` exits 0, `git range-diff <B>..refs/heads/archive/<task>-pipeline-<P8> <S>..HEAD` shows every commit as `=`, and `no-mistakes axi sync --check` offers `run_pipeline`.
-   Then start exactly one fresh run with the original intent; its rebase step restores a newer main base.
+   Stop on the first conflict, refusal, or empty cherry-pick; never skip a commit.
+6. Prove `git merge-base --is-ancestor <S> HEAD` exits 0, `git range-diff <B>..refs/heads/archive/<task>-pipeline-<P8> <S>..HEAD` pairs every commit under step 5's same content proof, and `no-mistakes axi sync --check` offers `run_pipeline`.
+   Then start exactly one fresh run with the original intent; its rebase step integrates newer main.
 
 ### Validate
 

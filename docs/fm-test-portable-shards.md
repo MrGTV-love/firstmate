@@ -197,7 +197,7 @@ Each invocation owns its temporary root, its registered cleanup, and its own pro
 Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
 The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
 A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
-`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 338-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 340-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
 
 On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in a local Ubuntu 26.04 container, which is the behavior-parity evidence for the split.
 The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
@@ -205,6 +205,7 @@ PR #210 then added `test_squash_pushed_missing_subject_match_ignores_hash_bounda
 The 2026-10-23 caller-CWD landed-proof fix added `test_landed_proof_ignores_unresolvable_git_directory_in_cwd` and `test_shared_project_lock_path_ignores_unresolvable_git_directory_in_cwd`, which makes the inventory 336.
 The DeepSeek harness change then added `test_teardown_retires_the_dsh_launch_state` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 337.
 The automatic PR-ready registration change then added `test_teardown_removes_pr_ready_refusal_marker` to `tests/fm-teardown.test.sh`, which makes the inventory 338.
+The graft-output scratch change then added `test_graft_output_alone_does_not_hold_a_foreign_copy` and `test_graft_output_is_not_preserved_from_a_released_own_nested_copy` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 340.
 
 The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
 That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.
@@ -416,7 +417,7 @@ Each script record carries `duration_ms` and, when the host-wide slot gate wrapp
 `cpu_ms` is one process-tree CPU sample taken by `bin/fm-duration.py gate` when the command exits, using the same accounting its progress runner uses for stall detection: `/proc` `utime+stime+cutime+cstime` on Linux, native libproc usage on Darwin, so a descendant reaped during the run is counted through its parent's waited-child time.
 A killed or orphaned subtree is not counted, because nothing waits for it back up to the wrapper, and work a suite leaves running past the sample is not counted either.
 It is evidence, not a classifier: a low ratio of CPU to wall time says the suite was not computing, which is equally consistent with waiting on I/O, on a lock, on a fixed `sleep`, or competing for a loaded runner, and the sample is taken once at the end rather than continuously.
-The runner records no value when that wrapper did not run or when the per-script bound killed the suite, since that CPU never reaches the sample, and the aggregate carries the field through unchanged.
+The runner records no value when that wrapper did not run or when the per-script bound killed the suite, since that CPU never reaches the sample, or when the sample itself is unavailable, as when the native Darwin read of the wrapper fails, and the aggregate carries the field through unchanged.
 
 ## Lint partitions and end-to-end latency
 

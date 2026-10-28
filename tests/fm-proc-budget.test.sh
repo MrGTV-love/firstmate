@@ -205,6 +205,454 @@ test_budget_stops_a_runaway_tree_inside_the_tree() {
   pass "a budgeted runaway tree stops at depth $depth while an unbudgeted probe forks freely"
 }
 
+# Run every memory case inside a real 2 GiB memory stop, including fixtures
+# that deliberately break the inner reader. No ad-hoc watchdog is needed.
+run_memory_case() {
+  "$WRAP" --memory-kib 2097152 -- "$@"
+}
+
+memory_supported() {
+  if [ "$(uname -s)" != Darwin ]; then
+    "$WRAP" --memory-kib 2097152 -- touch "$TMP_ROOT/unsupported-ran" 2>"$TMP_ROOT/unsupported.err"
+    expect_code 125 $? "unsupported memory reader refuses before launch"
+    assert_absent "$TMP_ROOT/unsupported-ran" "unsupported reader must not launch the command"
+    pass "memory stop refuses unsupported hosts before launch"
+    return 1
+  fi
+  return 0
+}
+
+assert_memory_pid_ended() {
+  local pid=$1 state
+  for _ in {1..50}; do
+    state=$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat | while read -r candidate status; do
+      [ "$candidate" != "$pid" ] || printf '%s' "$status"
+    done)
+    case "$state" in
+      ''|Z*|*E) return 0 ;;
+    esac
+    sleep 0.1
+  done
+  fail "memory stop left descendant $pid alive ($state)"
+}
+
+test_memory_tree_over_limit() {
+  local rc pid
+  cat >"$TMP_ROOT/memory-tree.py" <<'PY'
+import os
+import subprocess
+import sys
+import time
+
+if len(sys.argv) == 1:
+    subprocess.Popen([sys.executable, __file__, "child"])
+    time.sleep(60)
+else:
+    if sys.argv[1] == "child":
+        subprocess.Popen([sys.executable, __file__, "grandchild"])
+    with open(os.environ["FM_MEMORY_PIDS"], "a") as handle:
+        handle.write(str(os.getpid()) + "\n")
+    # Both allocations are finite and together exceed 128 MiB, not 2 GiB.
+    allocation = bytearray(80 * 1024 * 1024)
+    time.sleep(60)
+PY
+  FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" run_memory_case \
+    "$WRAP" --memory-kib 131072 -- python3 "$TMP_ROOT/memory-tree.py" 2>"$TMP_ROOT/memory.err"
+  rc=$?
+  expect_code 99 "$rc" "over-limit command tree"
+  assert_contains "$(cat "$TMP_ROOT/memory.err")" "exceeded 131072 KiB" "over-limit reason names the bound"
+  [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
+  [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
+  while read -r pid; do
+    assert_memory_pid_ended "$pid"
+  done <"$TMP_ROOT/memory.pids"
+  pass "over-limit child and grandchild are ended with status 99"
+}
+
+test_memory_nested_wrapper() {
+  local rc pid
+  # The inner wrapper runs its own supervisor with a higher bound. The outer
+  # stop must still count and end the inner 192 MiB payload.
+  FM_MEMORY_NESTED_PID="$TMP_ROOT/nested-memory.pid" run_memory_case "$WRAP" --memory-kib 131072 -- \
+    "$WRAP" --memory-kib 524288 -- python3 -c \
+    'import os, time; open(os.environ["FM_MEMORY_NESTED_PID"], "w").write(str(os.getpid())); allocation = bytearray(192 * 1024 * 1024); time.sleep(4); raise SystemExit(7)' \
+    2>"$TMP_ROOT/nested-memory.err"
+  rc=$?
+  expect_code 99 "$rc" "lower outer memory stop covers nested wrapper sessions"
+  assert_contains "$(cat "$TMP_ROOT/nested-memory.err")" "exceeded 131072 KiB" "the outer bound, not the higher inner bound, must stop the payload"
+  read -r pid <"$TMP_ROOT/nested-memory.pid"
+  assert_memory_pid_ended "$pid"
+  pass "lower outer limit accounts for and ends payloads in nested wrapper sessions"
+}
+
+test_memory_normal_command() {
+  local output rc
+  output=$(run_memory_case "$WRAP" 1500 --memory-kib 262144 -- bash -c 'printf "%s|" "a b"; sleep 2; exit 7')
+  rc=$?
+  expect_code 7 "$rc" "under-limit status passes through"
+  assert_equals 'a b|' "$output" "under-limit arguments and output are untouched"
+  pass "normal memory-bounded command retains output and status"
+}
+
+test_memory_setuid_member_is_not_counted() {
+  local rc
+  # The pipe fills, so the setuid-root ps stays alive across several samples.
+  run_memory_case "$WRAP" --memory-kib 262144 -- \
+    bash -c '/bin/ps -axwwE -o args -o args | sleep 3; exit 7'
+  rc=$?
+  expect_code 7 "$rc" "healthy tree with a running setuid ps"
+  pass "an unreadable other-user member is left out of the sum and does not end a healthy tree"
+}
+
+test_memory_root_exit_ends_leftovers() {
+  local start output rc pid
+  mkdir -p "$TMP_ROOT/sleep-shim"
+  printf '#!/bin/sh\necho "$$" >>"$FM_SLEEP_PIDS"\nexec /bin/sleep "$@"\n' >"$TMP_ROOT/sleep-shim/sleep"
+  chmod +x "$TMP_ROOT/sleep-shim/sleep"
+  : >"$TMP_ROOT/sleep.pids"
+  start=$SECONDS
+  output=$(PATH="$TMP_ROOT/sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/sleep.pids" \
+    "$WRAP" --memory-kib 262144 -- bash -c 'sleep 600 & echo done')
+  rc=$?
+  expect_code 0 "$rc" "root status after a leftover background job is ended"
+  assert_equals 'done' "$output" "the command's output is untouched"
+  [ $((SECONDS - start)) -lt 30 ] || fail "memory stop waited for a leftover descendant"
+  # A job ended before its first line records no PID and leaves no sleep.
+  while read -r pid; do
+    assert_memory_pid_ended "$pid"
+  done <"$TMP_ROOT/sleep.pids"
+  pass "the command's exit ends a background job orphaned before the first sample and returns at once"
+}
+
+test_memory_supervisor_kill_ends_tree() {
+  local root_pid job_pid
+  python3 - "$WRAP" "$TMP_ROOT/supervised.pids" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'sleep 600 & echo "$$ $!" >"$0"; wait', sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r root_pid job_pid <"$TMP_ROOT/supervised.pids" || fail "memory-stopped command did not start"
+  assert_memory_pid_ended "$root_pid"
+  assert_memory_pid_ended "$job_pid"
+  pass "a SIGKILLed supervisor's command tree is ended by the reader's dead-man link"
+}
+
+test_memory_ignored_hangup_passes_through() {
+  local rc
+  python3 - "$WRAP" "$TMP_ROOT/hup.pid" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+signal.signal(signal.SIGHUP, signal.SIG_IGN)
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'echo "$$" >"$0"; sleep 2; exit 7', sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+os.kill(wrapper.pid, signal.SIGHUP)
+os.kill(int(open(sys.argv[2]).read()), signal.SIGHUP)
+sys.exit(wrapper.wait())
+PY
+  rc=$?
+  expect_code 7 "$rc" "a caller-ignored HUP neither ends the supervisor nor the command"
+  pass "an ignored HUP stays ignored by the supervisor and the command"
+}
+
+test_memory_out_of_group_member_ends_with_supervisor() {
+  local pid
+  python3 - "$WRAP" "$TMP_ROOT/setsid.pid" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+child = ('import subprocess, sys, time\n'
+         'p = subprocess.Popen(["sleep", "600"], start_new_session=True)\n'
+         'open(sys.argv[1], "w").write("%d\\n" % p.pid)\n'
+         'time.sleep(600)\n')
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", sys.executable, "-c", child, sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.05)
+# Let at least one one-second sample see the new session's member.
+time.sleep(2)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r pid <"$TMP_ROOT/setsid.pid" || fail "memory-stopped command did not start its setsid child"
+  assert_memory_pid_ended "$pid"
+  pass "a seen member in another session is ended by the dead-man link"
+}
+
+test_memory_supervisor_kill_during_cleanup() {
+  local root_pid job_pid
+  python3 - "$WRAP" "$TMP_ROOT/cleanup.pids" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            '(trap "" TERM; exec sleep 600) & echo "$$ $!" >"$0"; sleep 1.5', sys.argv[2]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.01)
+root = int(open(sys.argv[2]).read().split()[0])
+# The root is reaped when cleanup starts; the leftover ignores TERM, so the
+# supervisor is still inside its one-second TERM grace when it is killed.
+while wrapper.poll() is None:
+    try:
+        os.kill(root, 0)
+    except ProcessLookupError:
+        break
+    time.sleep(0.01)
+time.sleep(0.2)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r root_pid job_pid <"$TMP_ROOT/cleanup.pids" || fail "memory-stopped command did not start"
+  assert_memory_pid_ended "$job_pid"
+  pass "a supervisor killed during its own cleanup leaves no TERM-ignoring member behind"
+}
+
+test_memory_supervisor_death_before_reader_ready() {
+  local fixture="$TMP_ROOT/startup-fixture" root_pid
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import os
+from pathlib import Path
+import runpy
+import sys
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ != "__main__" or int(sys.argv[2]) == os.getppid():
+    globals().update(runpy.run_path(real, run_name=__name__))
+else:
+    # The command's reader never answers its first sample.
+    with open(os.environ["FM_MEMORY_MARKER"], "w") as handle:
+        handle.write(sys.argv[2] + "\n")
+    sys.stdin.read()
+PY
+  python3 - "$fixture/fm-proc-budget.sh" "$TMP_ROOT/startup.root" "$TMP_ROOT/startup-payload" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+import time
+
+os.environ["FM_MEMORY_MARKER"] = sys.argv[2]
+wrapper = subprocess.Popen([sys.argv[1], "--memory-kib", "262144", "--", "bash", "-c",
+                            'touch "$0"; exec sleep 600', sys.argv[3]])
+while wrapper.poll() is None and not (os.path.exists(sys.argv[2]) and open(sys.argv[2]).read().strip()):
+    time.sleep(0.01)
+os.kill(wrapper.pid, signal.SIGKILL)
+wrapper.wait()
+PY
+  read -r root_pid <"$TMP_ROOT/startup.root" || fail "the command's reader never started"
+  assert_memory_pid_ended "$root_pid"
+  assert_absent "$TMP_ROOT/startup-payload" "a supervisor killed before its reader answered must not run the command"
+  pass "a supervisor killed before its reader is ready leaves no command run or running"
+}
+
+test_memory_supervisor_cleanup_refusal() {
+  local fixture="$TMP_ROOT/cleanup-refusal"
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import errno
+import os
+from pathlib import Path
+import runpy
+
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ == "__main__":
+    # The independent guardian keeps using the real kernel reader.
+    runpy.run_path(real, run_name="__main__")
+else:
+    globals().update(runpy.run_path(real))
+    real_kinfo = kinfo
+
+    def kinfo(pid):
+        if Path(os.environ["FM_CLEANUP_FAULT"]).exists():
+            raise OSError(errno.EPERM, "injected supervisor kinfo refusal")
+        return real_kinfo(pid)
+PY
+  run_memory_case python3 - "$fixture" <<'PY'
+import os
+from pathlib import Path
+import runpy
+import signal
+import subprocess
+import sys
+
+fixture = Path(sys.argv[1])
+info = runpy.run_path(str(fixture / "fm-proc-info-real.py"))
+marker = fixture / "fault"
+os.environ["FM_CLEANUP_FAULT"] = str(marker)
+payload = '''import os, pathlib, subprocess, sys
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+pathlib.Path(sys.argv[1]).write_text(f"{os.getpid()} {child.pid}")
+if sys.argv[2] == "fault": pathlib.Path(sys.argv[3]).touch()
+'''
+for mode in ("control", "fault"):
+    marker.unlink(missing_ok=True)
+    pids = fixture / (mode + ".pids")
+    result = subprocess.run([str(fixture / "fm-proc-budget.sh"), "--memory-kib", "524288", "--",
+                             sys.executable, "-c", payload, str(pids), mode, str(marker)],
+                            capture_output=True, text=True)
+    root, child = map(int, pids.read_text().split())
+    try:
+        record = info["kinfo"](child)
+        alive = record[info["P_STAT"]] != info["SZOMB"]
+    except LookupError:
+        alive = False
+    if alive:
+        # Always clean up the finite fixture, even when the regression fails.
+        assert os.getpgid(child) == root, "fixture ownership changed"
+        os.kill(child, signal.SIGKILL)
+    print(f"{mode}: status={result.returncode} child_alive={alive} reason={result.stderr.strip()}", flush=True)
+    assert not alive, f"{mode}: cleanup left a descendant alive"
+    if mode == "control":
+        assert result.returncode == 0 and not result.stderr, result
+    else:
+        assert result.returncode == 125, result
+        assert "tree cleanup failed" in result.stderr, result
+        assert len(result.stderr.splitlines()) == 1, result
+PY
+  expect_code 0 $? "supervisor cleanup refusal must leave no descendant and report failure"
+  pass "supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125"
+}
+
+test_memory_group_kill_idiom_keeps_status() {
+  "$WRAP" --memory-kib 262144 -- bash -c "trap 'kill 0' EXIT; sleep 0.003"
+  expect_code 0 $? "a command that signals its own group keeps its own status"
+  pass "a command's kill 0 does not kill its memory reader"
+}
+
+test_memory_inherited_fd_reaches_command() {
+  "$WRAP" --memory-kib 262144 -- bash -c 'echo inherited >&3' 3>"$TMP_ROOT/fd3.log"
+  expect_code 0 $? "a command writing to a descriptor its caller passed"
+  assert_equals inherited "$(cat "$TMP_ROOT/fd3.log")" "descriptor 3 reaches the command as with exec"
+  pass "descriptors the caller passes reach the memory-stopped command"
+}
+
+test_memory_command_start_matches_exec() {
+  local target plain memory
+  printf 'echo ran-as-script\n' >"$TMP_ROOT/no-shebang"
+  chmod +x "$TMP_ROOT/no-shebang"
+  : >"$TMP_ROOT/not-executable"
+  for target in "$TMP_ROOT/no-such-command" fm-proc-budget-no-such-command "$TMP_ROOT/not-executable" "$TMP_ROOT/no-shebang"; do
+    plain=$("$WRAP" -- "$target" 2>/dev/null; echo "rc=$?")
+    memory=$("$WRAP" --memory-kib 262144 -- "$target" 2>/dev/null; echo "rc=$?")
+    assert_equals "$plain" "$memory" "memory stop starts $target as exec does"
+  done
+  assert_equals $'ran-as-script\nrc=0' "$memory" "a script without a shebang runs under the shell"
+  pass "a command that cannot start, or a script without a shebang, behaves as without the option"
+}
+
+test_memory_reader_failure() {
+  local fixture="$TMP_ROOT/memory-fixture" rc pid mode marker
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-budget-memory.py" "$fixture/"
+  cp "$ROOT/bin/fm-proc-info.py" "$fixture/fm-proc-info-real.py"
+  cat >"$fixture/fm-proc-info.py" <<'PY'
+import os
+from pathlib import Path
+import runpy
+import sys
+import time
+real = str(Path(__file__).with_name("fm-proc-info-real.py"))
+if __name__ != "__main__":
+    # Only the memory transport is faulted; cleanup still reads the real tree.
+    globals().update(runpy.run_path(real))
+else:
+    for line in sys.stdin:
+        if not os.path.exists(os.environ["FM_MEMORY_MARKER"]):
+            print('{"rss_kib":1,"members":[],"uncounted":[]}', flush=True)
+            continue
+        mode = os.environ["FM_MEMORY_FAILURE"]
+        if mode == "exit":
+            sys.exit(0)
+        if mode == "hang":
+            time.sleep(60)
+        print("-" if mode == "unreadable" else "malformed", flush=True)
+PY
+  for mode in unreadable malformed exit hang; do
+    marker="$TMP_ROOT/reader-$mode.pid"
+    PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
+      FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE="$mode" run_memory_case \
+      "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- \
+      "$WRAP" --memory-kib 524288 -- \
+      bash -c 'echo "$$" >"$FM_MEMORY_MARKER"; exec sleep 20' 2>"$TMP_ROOT/reader.err"
+    rc=$?
+    expect_code 125 "$rc" "failed memory sample ($mode)"
+    assert_contains "$(cat "$TMP_ROOT/reader.err")" "cannot sample command-tree memory" "failed sample has a clear reason ($mode)"
+    [ "$(wc -l <"$TMP_ROOT/reader.err" | tr -d ' ')" -eq 1 ] || fail "reader failure must emit exactly one reason ($mode)"
+    read -r pid <"$marker"
+    assert_memory_pid_ended "$pid"
+  done
+
+  PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
+    FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE=unreadable run_memory_case \
+    "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- touch "$TMP_ROOT/reader-started" 2>"$TMP_ROOT/reader-start.err"
+  expect_code 125 $? "unavailable reader at preflight"
+  assert_absent "$TMP_ROOT/reader-started" "unavailable reader must refuse before launch"
+  pass "unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch"
+}
+
+test_no_memory_option_never_starts_reader() {
+  local fixture="$TMP_ROOT/no-memory-fixture" output
+  mkdir -p "$fixture"
+  cp "$WRAP" "$ROOT/bin/fm-proc-info.py" "$fixture/"
+  output=$("$fixture/fm-proc-budget.sh" -- bash -c 'printf unchanged; exit 0') || fail "no-option call unexpectedly requires a memory helper"
+  assert_equals unchanged "$output" "without option the original exec path still works"
+  pass "no memory option needs no reader or watcher"
+}
+
+test_memory_invalid_limits() {
+  local limit
+  for limit in 0 01 -1 nope 1.5 999999999999999999999999; do
+    "$WRAP" --memory-kib "$limit" -- touch "$TMP_ROOT/bad-memory-ran" 2>/dev/null
+    expect_code 2 $? "invalid memory limit $limit"
+    assert_absent "$TMP_ROOT/bad-memory-ran" "invalid memory limit cannot run the command"
+  done
+  pass "invalid memory bounds refuse before launch"
+}
+
+test_memory_invalid_limits
+test_no_memory_option_never_starts_reader
+if memory_supported; then
+  test_memory_tree_over_limit
+  test_memory_nested_wrapper
+  test_memory_normal_command
+  test_memory_setuid_member_is_not_counted
+  test_memory_root_exit_ends_leftovers
+  test_memory_supervisor_kill_ends_tree
+  test_memory_ignored_hangup_passes_through
+  test_memory_out_of_group_member_ends_with_supervisor
+  test_memory_supervisor_kill_during_cleanup
+  test_memory_supervisor_death_before_reader_ready
+  test_memory_supervisor_cleanup_refusal
+  test_memory_group_kill_idiom_keeps_status
+  test_memory_inherited_fd_reaches_command
+  test_memory_command_start_matches_exec
+  test_memory_reader_failure
+fi
+
 test_default_extra_is_added_to_the_count
 test_explicit_extra
 test_budget_never_widens_the_inherited_limit

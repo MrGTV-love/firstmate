@@ -83,6 +83,7 @@ SH
   ln -s "$ROOT/bin/fm-status-event-lib.sh" "$fake/bin/fm-status-event-lib.sh"
   ln -s "$ROOT/bin/fm-status-wake-lib.sh" "$fake/bin/fm-status-wake-lib.sh"
   ln -s "$ROOT/bin/fm-status-io-lib.sh" "$fake/bin/fm-status-io-lib.sh"
+  ln -s "$ROOT/bin/fm-file-identity-lib.sh" "$fake/bin/fm-file-identity-lib.sh"
   ln -s "$ROOT/bin/fm-utc-lib.sh" "$fake/bin/fm-utc-lib.sh"
   # fm-timeout-lib.sh: the shared hard bound fm-classify-lib.sh sources for the
   # wedge detector's bounded worktree write probe.
