@@ -507,6 +507,11 @@ jobs:
             /bin/bash tests/fm-backend.test.sh)
           printf '%s\n' "$backend_output"
 
+          # The --memory-kib stop runs only on Darwin, with the real setuid
+          # /bin/ps and libproc; each memory-growing case has its own 2 GiB stop.
+          budget_output=$(/bin/bash tests/fm-proc-budget.test.sh)
+          printf '%s\n' "$budget_output"
+
   invariants:
     name: Repo invariants
     runs-on: ubuntu-latest

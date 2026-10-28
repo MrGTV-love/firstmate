@@ -1,4 +1,4 @@
-// Firstmate turn-end guard, pre-tool seatbelts, and native session-start
+// Firstmate turn-end guard, watcher-arm pre-tool seatbelt, and native session-start
 // delivery for the omp (Oh My Pi) primary.
 //
 // A port of .pi/extensions/fm-primary-turnend-guard.ts with the turn-end
@@ -484,13 +484,8 @@ function runGuard(stopHookActive: boolean): Promise<{ code: number; stderr: stri
   });
 }
 
-// PreToolUse seatbelts (bin/fm-arm-pretool-check.sh, docs/arm-pretool-check.md;
-// bin/fm-cd-pretool-check.sh, docs/cd-guard.md). Both piggyback on this same
-// extension file so no extra -e flag is needed: omp auto-discovers this file
-// for the turn-end guard, and pi.on("tool_call", ...) can block (verified on
-// omp 18.1.2: returning {block: true, reason} refused the bash command and
-// surfaced the reason verbatim to the model). Each owner script owns its own
-// decision and is inert outside the real primary checkout.
+// Watcher-arm PreToolUse seatbelt (bin/fm-arm-pretool-check.sh,
+// docs/arm-pretool-check.md), sharing the turn-end extension entry point.
 function runChecker(script: string, command: string): Promise<{ code: number; stderr: string }> {
   return new Promise((resolveResult) => {
     const child = spawn(`${root}/bin/${script}`, ["--command", command], {
@@ -507,10 +502,6 @@ function runChecker(script: string, command: string): Promise<{ code: number; st
 
 function runPretoolCheck(command: string): Promise<{ code: number; stderr: string }> {
   return runChecker("fm-arm-pretool-check.sh", command);
-}
-
-function runCdCheck(command: string): Promise<{ code: number; stderr: string }> {
-  return runChecker("fm-cd-pretool-check.sh", command);
 }
 
 export default function (pi: ExtensionAPI) {
@@ -607,10 +598,6 @@ export default function (pi: ExtensionAPI) {
     if (!event || event.type !== "tool_call" || event.toolName !== "bash") return {};
     const command = String((event.input as { command?: unknown })?.command ?? "");
     if (!command) return {};
-    const cdResult = await runCdCheck(command);
-    if (cdResult.code === 2) {
-      return { block: true, reason: cdResult.stderr.trim() || "denied by the cd-guard PreToolUse seatbelt" };
-    }
     const result = await runPretoolCheck(command);
     if (result.code !== 2) return {};
     return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };

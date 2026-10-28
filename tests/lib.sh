@@ -1092,6 +1092,30 @@ fm_git_worktree() {
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
 }
 
+# fm_test_graft_output <copy>: the output graft's session hook leaves at the root
+# of a worker copy, taken from a real worker: its .ignore overlay byte for byte,
+# and a graft/ index with a card, the graph and caches. The copy's git ignores
+# both, as graft's own global ignore does on a worker host.
+fm_test_graft_output() {
+  local copy=$1
+  printf '/.ignore\n/graft/\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  cat > "$copy/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+  mkdir -p "$copy/graft/.graph" "$copy/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$copy/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$copy/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$copy/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$copy/graft/work.md"
+  cat > "$copy/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
+}
+
 # --- state/<id>.meta writers ------------------------------------------------
 
 # fm_write_meta <file> <key=val> ...: write the given key=val lines to a meta

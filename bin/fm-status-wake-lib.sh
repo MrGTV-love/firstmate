@@ -13,6 +13,8 @@
 # failure kind, so a readability change is a new state that triggers another read.
 # A missing, malformed, identity-mismatched, or past-end classified position reads
 # from byte 0, preferring a bounded duplicate over a lost event.
+# Marker readers stay pure. A device-only remount is migrated by the scan calling
+# status_presentation_marker_adopt_device first; bin/fm-status-io-lib.sh owns that rule.
 
 # The event owner supplies decision folding and status I/O transitively.
 # shellcheck source=bin/fm-status-event-lib.sh
@@ -369,7 +371,8 @@ status_line_is_unread_surface() {  # <status-line>
 # ledger once and ignores any range starting past the point it has reached, so
 # a ledger written out of order would refuse to prove coverage and fail toward
 # waking, never toward silence.
-# An identity mismatch (file rotated) discards the ledger. Teardown deletes it.
+# An identity mismatch (file rotated) discards the ledger; a device-only change
+# of a strong identity keeps it. Teardown deletes it.
 # Not a pure status-file read: status_home_appends_record writes this sidecar.
 # That read-merge-write serializes through bin/fm-wake-lib.sh's fm_lock_*
 # helpers, exactly as status_retire_presentation_task in bin/fm-classify-lib.sh does, so a caller
@@ -394,7 +397,7 @@ status_home_appends_ranges() {  # <status-file> -> start<TAB>end lines
   [ "$rest" != "$data" ] || return 0
   line=${rest%%$'\n'*}
   case "$line" in ident=*) ;; *) return 0 ;; esac
-  [ "${line#ident=}" = "$ident" ] || return 0
+  [ "${line#ident=}" = "$ident" ] || _fm_status_ident_device_shifted "${line#ident=}" "$ident" || return 0
   case "$rest" in
     *$'\n'*) rest=${rest#*$'\n'} ;;
     *) return 0 ;;

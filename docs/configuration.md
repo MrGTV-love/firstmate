@@ -484,7 +484,10 @@ If the target is a symlink, the write replaces it with a regular file.
 Linking the code-root copy into the home therefore forks the queue on the first write instead of keeping the copies in sync.
 
 Run every routine Firstmate backlog command through [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh).
-Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
+Like lifecycle transitions, it addresses this home's backlog, archive, and opt-in fleet ledger from any working directory, including a caller-relative `FM_HOME`.
+Changing directories is not the correctness boundary: a bare relative write still addresses the caller's directory, while home-owned entry points resolve their destinations themselves.
+[`tests/fm-home-writes.test.sh`](../tests/fm-home-writes.test.sh) exercises those write paths from a project-like foreign directory, including a negative control reproducing the bare relative-append incident.
+[`tests/fm-tasks-axi.test.sh`](../tests/fm-tasks-axi.test.sh) also covers nested relative homes and caller-relative state/config overrides with the fleet ledger enabled.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
 ## Runtime backend (config/backend / FM_BACKEND)
@@ -739,7 +742,7 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
-Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
 These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
 When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
@@ -900,20 +903,27 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
-`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt or already answered in the current handling turn follow in a `STANDING` block, and a drain whose only overdue rows stand or are answered prints neither block and opens no handling episode.
+`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no valid action recorded after its action requirement opened; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Reads (`drain`, `--present-overdue`, and `--check-actions`) preserve recorded actions while the row's category, subject, owner, next action, and evidence remain unchanged and the receipt's time bound and any bound proof remain valid.
+Every elapsed-time token in a stalled worker's evidence (`45s`, `3m 12s`, `1h 2m`, whether a collector counter such as `Ns without progress` or a timer the worker's pane paints) grows with every heartbeat and never counts as a change; any other evidence change does.
+An ordinary action recorded since the row's current presentation answers it for at most four hours, even if that handling turn never closes; a deferral or dependency wait keeps its own recheck bound, and a bound captain hold is reverified before acknowledgement.
+A refused acknowledgement is a read-only check, never a new presentation; only successful acknowledgement through every row the actor presented closes its handling turn.
+A partial acknowledgement preserves the turn's receipts for its remaining rows.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
-The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
-The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt before acknowledging; on an unchanged firstmate-owned row without a verified hold this suppresses repeated presentation for four hours, not until somebody acts on the escalation.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), per-actor `completed` sequence watermarks written after successful acknowledgement, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, `requires_followup` mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The single-row and JSONL batch action forms share the same evidence checks; one invocation caches its fleet snapshot, including a failed read, rather than rescanning for each row, and the `help:` line that presents overdue rows names the batch form.
+Each batch line has an independent result and refusal, so a bad line does not undo successful siblings; [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) owns the input fields, output format, and stdin syntax.
 The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: first its `source.task` provenance (including PR rows whose subject is a URL), then its `worker:` owner or the task id leading its subject, with each candidate checked against the task-name pattern.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
 Escalation evidence is free text: no receipt is checked against the forge or against a delivered captain notification.
 A deferral's recheck time must be in the future and at most 24 hours ahead.
-Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
+Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, or escalation before acknowledgement, even if that prior receipt otherwise stood.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
-A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
+A first deferral stands until its recheck time, except on a `review_pass_not_merged` row or after the row's category, subject, owner, next action, or evidence changes.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
 An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
 A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
@@ -922,13 +932,15 @@ The first of these that is currently held binds: the explicit `--hold TASK_ID`, 
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An escalation that finds no held task answers only the turn it followed, which the command reports.
+An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time, whichever comes first, except for `review_pass_not_merged`.
+This bounded standing also applies when an optional hold could not be verified; an explicit unverifiable `--hold` still refuses.
+A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded, rather than falling back to the time-based receipt.
 When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
 Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
 When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-A receipt recorded before this binding existed needs one new escalation to stand.
+A receipt recorded before this binding existed needs one new escalation to stand on a hold.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
@@ -1232,6 +1244,9 @@ That branch shares no history with code branches, so evidence never enters a pus
 The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
 
 `commands.test` executes code, so no-mistakes honors it only from the default-branch copy of `.no-mistakes.yaml`; a pushed branch cannot change what the gate runs.
+
+It also sets `rebase: strategy: merge`, so the rebase step merges newer main instead of rewriting the submitted commits; no-mistakes honors that setting only from the default-branch copy, and [`tests/fm-nm-test-contract.test.sh`](../tests/fm-nm-test-contract.test.sh) pins it.
+[Event-driven supervision](architecture.md#event-driven-supervision) owns its effect on run binding and the CI conflict-repair path it does not cover.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test policy and entry points.
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
@@ -4302,7 +4317,6 @@ FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
-FM_CD_GUARD_MODE=warn   # warn (default) or deny for the primary checkout's persistent top-level cd guard; deny restores the block; docs/cd-guard.md owns the contract
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
@@ -4310,7 +4324,7 @@ FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds a Pi wake waits for its succes
 FM_OMP_ARM_READY_TIMEOUT_MS=12000   # milliseconds an omp wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
 FM_PI_SUCCESSOR_GRACE_MS=15000   # milliseconds after a Pi replacement shutdown before recording missing-successor diagnostics and expiry; never activates the outgoing runtime, and never applies to terminal quit
 FM_OMP_SUCCESSOR_GRACE_MS=15000   # milliseconds after omp shutdown retirement before missing-successor recovery checks home-lock ownership; an explicit arm call can repair sooner (.omp/extensions/fm-primary-omp-watch.ts header)
-FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
+FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits, and omp bounds the output drain after an arm exits
 FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/omp/OpenCode adapter base delay for continuity restoration retries
 FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/omp/OpenCode adapter cap for exponential continuity retry delay
 FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/omp/OpenCode adapter launch-failure retries before surfacing restoration failure
@@ -4318,7 +4332,7 @@ FM_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifec
 FM_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior
 FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds after which a live holder's beacon is stale; a stale holder that does not prove the lock's recorded identity is refused, while an identity-matched one is attached to or reported running until fm_progress_check proves no CPU or beacon progress for FM_WATCHER_STALL_BOUND; the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
-FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
+FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"; also the no-progress bound for the watcher's status reclassification read (docs/watcher-continuity.md "Grace, beacon, and stop signals")
 FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals into one wake
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
