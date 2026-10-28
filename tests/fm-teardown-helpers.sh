@@ -2961,16 +2961,17 @@ assert_own_locked_copy_untouched() {  # <label>
 # A pool-slot ship whose only copy is the slot itself, recorded the way spawn
 # publishes it, with a Treehouse stand-in that models the installed CLI: lease
 # resolves the pool from the working directory's repository and records a
-# durable holder; return releases it. With current-folder, the pool folder has
-# the name Treehouse gives the project's current pool, <repo>-<first six hex
-# digits of the SHA-256 of the origin URL>, and pool/ links to it.
+# durable holder; return releases it. With current-folder, the pool folder is
+# where Treehouse puts the project's current pool when TREEHOUSE_ROOT names the
+# case directory, <case>/.treehouse/<repo>-<first six hex digits of the SHA-256
+# of the origin URL>, and pool/ links to it.
 make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind] [current-folder]
   local case_dir slot kind=${3:-ship} hash
   case_dir=$(make_case "$1")
   if [ "${4:-}" = current-folder ]; then
     hash=$(git -C "$case_dir/project" remote get-url origin | tr -d '\n' | shasum -a 256)
-    mkdir -p "$case_dir/project-${hash:0:6}"
-    ln -s "project-${hash:0:6}" "$case_dir/pool"
+    mkdir -p "$case_dir/.treehouse/project-${hash:0:6}"
+    ln -s ".treehouse/project-${hash:0:6}" "$case_dir/pool"
   fi
   slot="$case_dir/pool/1/project"
   mkdir -p "${slot%/*}" "$case_dir/primary-home/state"

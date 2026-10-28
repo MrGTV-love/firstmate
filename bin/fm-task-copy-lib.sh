@@ -613,11 +613,16 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   return 1
 }
 
-# The folder name Treehouse gives <project>'s pool today: the checkout's
-# directory name, a dash, and the first six hex digits of the SHA-256 of the
-# origin URL git reports for it.
-fm_task_copy_current_pool_folder() {  # <project>
-  local project=$1 top origin hash
+# The pool folder Treehouse uses for <project> today, found without running
+# treehouse: <root>/.treehouse/<checkout name>-<first six hex digits of the
+# SHA-256 of the origin URL git reports>. <root> is TREEHOUSE_ROOT, else the
+# top-level root key of the checkout's treehouse.toml, else $HOME. Fails when a
+# source cannot be proved this way: no origin, a relative root (an in-project
+# pool among them), an unreadable treehouse.toml, a root or worktree_path key
+# it cannot read as a plain absolute root, or a worktree_path template.
+fm_task_copy_current_pool_dir() {  # <project>
+  local project=$1 top origin hash config root
+  [ -z "${TREEHOUSE_WORKTREE_PATH:-}" ] || return 1
   top=$(git -C "$project" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
   origin=$(git -C "$project" remote get-url origin 2>/dev/null) && [ -n "$origin" ] || return 1
   if command -v shasum >/dev/null 2>&1; then
@@ -628,7 +633,22 @@ fm_task_copy_current_pool_folder() {  # <project>
     return 1
   fi
   [ "${#hash}" -ge 6 ] || return 1
-  printf '%s-%s\n' "${top##*/}" "${hash:0:6}"
+  config=$top/treehouse.toml
+  root=
+  if [ -e "$config" ] || [ -L "$config" ]; then
+    [ -f "$config" ] && [ -r "$config" ] || return 1
+    root=$(awk '
+      /^[[:space:]]*\[/ { table = 1; next }
+      /^[[:space:]]*"?(root|worktree_path)"?[[:space:]]*=/ {
+        if (table || seen++ || $0 !~ /^[[:space:]]*root[[:space:]]*=[[:space:]]*"\/[^"\\]*"[[:space:]]*(#.*)?$/) { bad = 1; exit }
+        value = $0; sub(/^[^"]*"/, "", value); sub(/".*$/, "", value)
+      }
+      END { if (bad) exit 1; print value }' "$config") || return 1
+  fi
+  [ -z "${TREEHOUSE_ROOT:-}" ] || root=$TREEHOUSE_ROOT
+  [ -n "$root" ] || root=${HOME:-}
+  case "$root" in /*) ;; *) return 1 ;; esac
+  printf '%s/.treehouse/%s-%s\n' "${root%/}" "${top##*/}" "${hash:0:6}"
 }
 
 # treehouse status --json run from <project>, read once per process and kept,
@@ -657,16 +677,16 @@ fm_task_copy_current_pool_listing() {  # <project>
 }
 
 # Where pool slot <slot>, named <state-name> in its own pool folder's state, stands
-# against the pool Treehouse resolves for <project> today. Treehouse names a
-# pool folder as fm_task_copy_current_pool_folder derives it, so repointing
-# origin moves the project to a new, initially empty folder and leaves earlier
-# copies in the old one, whose state file still records them. treehouse get
-# allocates from the current pool only, and treehouse lease and treehouse
-# return <name> resolve a slot NAME there, so a name taken from an older
-# folder's state would act on a different copy that shares it. A slot whose
-# folder has the current folder's name is in the current pool, with no
-# treehouse status call; otherwise only a path that the status listing
-# (fm_task_copy_current_pool_listing) holds is.
+# against the pool Treehouse resolves for <project> today. Treehouse places a
+# pool folder as fm_task_copy_current_pool_dir derives it, so repointing origin
+# or moving the root moves the project to a new, initially empty folder and
+# leaves earlier copies in the old one, whose state file still records them.
+# treehouse get allocates from the current pool only, and treehouse lease and
+# treehouse return <name> resolve a slot NAME there, so a name taken from an
+# older folder's state would act on a different copy that shares it. A slot
+# whose pool folder is, as a resolved path, the derived current pool folder is
+# in the current pool, with no treehouse status call; otherwise only a path
+# that the status listing (fm_task_copy_current_pool_listing) holds is.
 # Sets FM_TASK_COPY_POOL_CURRENCY to current (and FM_TASK_COPY_CURRENT_SLOT_NAME
 # to the name the current pool gives <slot>), superseded (the listing was read
 # and does not hold <slot>), or unknown (the listing could not be read).
@@ -674,12 +694,11 @@ fm_task_copy_current_pool_listing() {  # <project>
 FM_TASK_COPY_POOL_CURRENCY=
 FM_TASK_COPY_CURRENT_SLOT_NAME=
 fm_task_copy_slot_in_current_pool() {  # <project> <slot> <state-name>
-  local project=$1 slot=$2 state_name=$3 pool folder listing name path
+  local project=$1 slot=$2 state_name=$3 current listing name path
   FM_TASK_COPY_POOL_CURRENCY=unknown
   FM_TASK_COPY_CURRENT_SLOT_NAME=
-  pool=${slot%/*/*}
-  if [ -n "$state_name" ] && folder=$(fm_task_copy_current_pool_folder "$project") \
-      && [ "${pool##*/}" = "$folder" ]; then
+  if [ -n "$state_name" ] && current=$(fm_task_copy_current_pool_dir "$project") \
+      && [ -d "$current" ] && [ "${slot%/*/*}" -ef "$current" ]; then
     FM_TASK_COPY_POOL_CURRENCY=current
     FM_TASK_COPY_CURRENT_SLOT_NAME=$state_name
     return 0

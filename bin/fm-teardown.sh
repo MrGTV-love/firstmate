@@ -310,6 +310,8 @@
 # took by name on a same-named current-pool slot is released with treehouse
 # return <path> --if-lease-holder <this task> when no other task claims it and
 # no process runs inside it (docs/configuration.md "Superseded pool folders").
+# A project with no origin remote has no derivable pool folder, so its unleased
+# slot costs one treehouse status listing per teardown, reused across descendants.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
