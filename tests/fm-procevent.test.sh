@@ -1486,15 +1486,12 @@ assert_contains "$out" "ANNOTATIONS: (none)" "an empty board close invented anno
 pass "read distinguishes a feedback capture from an ended-with-nothing close"
 }
 
-# These four cases are selected by a short name; any other FM_TEST_ONLY value
-# must name a test function, and an unknown one is refused by fm_test_only.
-case "${FM_TEST_ONLY:-}" in
-  lavish-reader) FM_TEST_ONLY=test_lavish_result_read ;;
-  launch-pid-confirmation) FM_TEST_ONLY=test_launch_pid_confirmations ;;
-  restart-connection-failure) FM_TEST_ONLY=test_restart_connection_failure ;;
-  launch-episodes) FM_TEST_ONLY=test_launch_episodes ;;
-esac
-fm_test_only
+# These four cases are also selected by a short name.
+fm_test_only \
+  lavish-reader=test_lavish_result_read \
+  launch-pid-confirmation=test_launch_pid_confirmations \
+  restart-connection-failure=test_restart_connection_failure \
+  launch-episodes=test_launch_episodes
 
 test_restart_connection_failure
 

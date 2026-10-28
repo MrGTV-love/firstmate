@@ -3,7 +3,8 @@
 #
 # Cases call shared primitives directly or write stubs into a fakebin and exec
 # them as a test would. Assertions are on observable output, exit status, and
-# filesystem effects - never on helper source text. Migrated spawn suites cover
+# filesystem effects - never on helper source text, except the owner-requested
+# check that only tests/lib.sh reads FM_TEST_ONLY. Migrated spawn suites cover
 # fm_test_run_spawn through the real fm-spawn.sh; this file pins the shared
 # primitives and stubs those suites use.
 #
@@ -516,58 +517,32 @@ test_single_case_selection() (
   pass "a registry limits the cases, keeps registration order, runs the before hook, and stops at the first failing case"
 )
 
-# Every test file that selects cases refuses an unknown name. The list is
-# explicit because a file reaches the helper by calling it, which only running
-# the file can show; a new selecting file is added here.
-test_every_selector_refuses_an_unknown_case() (
-  local dir="$TMP_ROOT/selector-sweep" file kind rc count failures=''
-  local -a env_files=(
-    fm-arm-pretool-check fm-backend fm-fork-free-helpers fm-launch-proof fm-omp-harness
-    fm-procevent fm-public-followup fm-supervision-fork-budget fm-test-run
-    fm-wake-drain-open-decisions-cursor fm-wake-queue fm-watcher-lock fm-watch-triage
-    fm-watch-triage-waits fm-watch-triage-waits-declared fm-watch-triage-waits-pauses
-    fm-watch-triage-waits-away
-  )
-  local -a positional_files=(
-    fm-backend-orca fm-backlog-atomicity fm-tasks-axi fm-teardown-endpoint-safety
-    fm-teardown fm-teardown-cleanup fm-teardown-pool fm-merge-prune fm-status-runaway-guard
-    fm-watch-open-loops fm-captain-hold-archive fm-captain-hold-cleanup
-    fm-captain-hold-keyed-answers fm-captain-hold-lifecycle fm-captain-hold-reconcile
-    fm-captain-hold-sweep fm-control-relaunch fm-control-relaunch-backends
-    fm-control-relaunch-recovery fm-lint fm-lint-policy fm-lint-report fm-lint-slots
-    fm-pr-merge fm-pr-merge-checks fm-pr-merge-forges
-  )
-  mkdir -p "$dir"
-  # Probe the files in batches: each run only sources its setup and refuses, so
-  # it has no orphans for the exit sweep to reap.
-  probe() {  # <kind> <file>
-    local rc
-    if [ "$1" = env ]; then
-      FM_TEST_SKIP_ORPHAN_REAP=1 FM_TEST_ONLY=no_such_case_xyz bash "$ROOT/tests/$2.test.sh" >"$dir/$2.out" 2>"$dir/$2.err" && rc=0 || rc=$?
-    else
-      FM_TEST_SKIP_ORPHAN_REAP=1 bash "$ROOT/tests/$2.test.sh" no_such_case_xyz >"$dir/$2.out" 2>"$dir/$2.err" && rc=0 || rc=$?
-    fi
-    printf '%s\n' "$rc" >"$dir/$2.rc"
-  }
-  count=0
-  for file in "${env_files[@]}"; do
-    probe env "$file" &
-    count=$((count + 1)); [ $((count % 8)) -ne 0 ] || wait
-  done
-  for file in "${positional_files[@]}"; do
-    probe positional "$file" &
-    count=$((count + 1)); [ $((count % 8)) -ne 0 ] || wait
-  done
-  wait
-  for file in "${env_files[@]}" "${positional_files[@]}"; do
-    kind=ok
-    rc=$(cat "$dir/$file.rc" 2>/dev/null || echo missing)
-    [ "$rc" = 2 ] || kind="exit $rc"
-    grep -q 'Unknown test case: no_such_case_xyz' "$dir/$file.err" || kind="$kind, no refusal message"
-    [ "$kind" = ok ] || failures="$failures $file ($kind);"
-  done
-  [ -z "$failures" ] || fail "these test files did not refuse an unknown case name with exit 2:$failures"
-  pass "all ${#env_files[@]} FM_TEST_ONLY files and all ${#positional_files[@]} positional-selector files refuse an unknown case name"
+# fm_test_only in tests/lib.sh is the only reader of FM_TEST_ONLY: a file that
+# reads it itself can run an unknown name as a command or drop the case's exit
+# status. Every file under the tests directory is searched, so a new selector
+# needs no list entry. Prints file:line:text for each read outside lib.sh.
+selector_reads_outside_lib() {  # <tests-dir>
+  grep -rnIE '[$][{]?FM_TEST_ONLY([^A-Za-z0-9_]|$)' "$1" \
+    | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' \
+    | awk -v lib="$1/lib.sh:" 'index($0, lib) != 1'
+}
+
+test_only_lib_reads_the_case_selector() (
+  local dir="$TMP_ROOT/selector-reads" found
+  mkdir -p "$dir/sub"
+  printf 'x=1\n"$%s"\n# "$%s"\n' FM_TEST_ONLY FM_TEST_ONLY >"$dir/sub/reads.sh"
+  # shellcheck disable=SC2016 # The fixture file holds the unexpanded read.
+  printf '[ -n "${%s:-}" ]\necho "$%s_AUTHOR"\n' FM_TEST_ONLY FM_TEST_ONLY >"$dir/other.test.sh"
+  printf 'fm_test_only() { "$%s"; }\n' FM_TEST_ONLY >"$dir/lib.sh"
+  found=$(selector_reads_outside_lib "$dir" | cut -d: -f1,2 | LC_ALL=C sort)
+  [ "$found" = "$dir/other.test.sh:1"$'\n'"$dir/sub/reads.sh:2" ] \
+    || fail "the selector check did not name exactly the two reads outside lib.sh: $found"
+  pass "the selector check names each read outside lib.sh by file and line, and skips comments, lib.sh and other variables"
+
+  found=$(selector_reads_outside_lib "$ROOT/tests")
+  [ -z "$found" ] || fail "these test files read FM_TEST_ONLY themselves; select cases through fm_test_only in tests/lib.sh:
+$found"
+  pass "no test file reads FM_TEST_ONLY outside fm_test_only in tests/lib.sh"
 )
 
 test_duration_fixture_isolation || fail "Fixture duration isolation"
@@ -582,4 +557,4 @@ test_spawn_tmux_and_fakebin
 test_send_stubs_and_ssh
 test_spawn_home_layout
 test_single_case_selection || fail "Single-case selection"
-test_every_selector_refuses_an_unknown_case || fail "Selector sweep"
+test_only_lib_reads_the_case_selector || fail "Single-case selector ownership"

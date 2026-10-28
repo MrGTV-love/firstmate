@@ -175,9 +175,10 @@ pass() {
 #   to return nonzero ends the file with that status. A file that must prepare
 #   state before a particular case defines fm_test_before_case, which receives
 #   the case name.
-# fm_test_only
+# fm_test_only [short-name=test_function...]
 #   For a file that selects one case by FM_TEST_ONLY: does nothing when the
-#   variable is empty, otherwise runs that case and exits with its status.
+#   variable is empty, otherwise runs that case, or the case a given short name
+#   stands for, and exits with its status. No other file reads FM_TEST_ONLY.
 # fm_test_case_known <name> [registered-case...]
 #   The membership test both use.
 
@@ -247,9 +248,14 @@ fm_test_run_cases() {
   return 0
 }
 
+# shellcheck disable=SC2120 # Most callers pass no short names.
 fm_test_only() {
-  [ -n "${FM_TEST_ONLY:-}" ] || return 0
-  fm_test_run_cases -- "$FM_TEST_ONLY"
+  local requested=${FM_TEST_ONLY:-} short_name
+  [ -n "$requested" ] || return 0
+  for short_name in "$@"; do
+    if [ "${short_name%%=*}" = "$requested" ]; then requested=${short_name#*=}; fi
+  done
+  fm_test_run_cases -- "$requested"
   exit 0
 }
 
