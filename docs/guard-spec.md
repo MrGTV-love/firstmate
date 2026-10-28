@@ -101,7 +101,7 @@ A site is one code line that matches a signature outside comments, heredoc bodie
 
 - `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
 - `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word that is not part of a variable name or path.
-  A string compared with `==` or `!=` tests a value and is not a message.
+  A string compared with `==` or `!=`, or passed to `startswith` or `endswith`, tests a value and is not a message.
 - `C` helper call: a call to a function whose definition name has the word `refuse` in it, or is exactly `deny` or `block_stop`.
   The scan derives these names from the definitions in the code and prints them under `helpers`.
 - `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script outside a usage or argument-count check, or a `throw` in an opencode plugin.

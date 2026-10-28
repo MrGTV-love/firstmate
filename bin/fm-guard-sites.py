@@ -33,7 +33,7 @@ HOOK_JSON_GLOBS = ('.codex/hooks.json', '.cursor/hooks.json', '.claude/settings.
 MARKER = re.compile(r'REFUS[E]D:')
 WORD = re.compile(r'(?<![A-Za-z0-9_$.{/-])refus(?:e|es|ed|ing)(?![A-Za-z0-9_-]|\.sh)', re.I)
 STRING = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'|`[^`]*`')
-COMPARED = re.compile(r'[=!]==?\s*$')
+COMPARED = re.compile(r'(?:[=!]==?|\.(?:starts|ends)_?[wW]ith\(\s*\(?(?:\s*(?:' + STRING.pattern + r')\s*,)*)\s*$')
 HELPER_WORD = 'refus' + 'e'
 HELPER_EXACT = ('deny', 'block_stop')
 DENY_DECISION = re.compile(r'decision\\?"?\s*[:=]\s*\\?["\'](?:deny|block)\\?["\']')
@@ -167,7 +167,7 @@ def case_arm_text(line):
 
 
 def emits_refusal(text):
-    """True when a string literal carries the refusal vocabulary; an operand of == or != tests a value and does not emit it."""
+    """True when a string literal carries the refusal vocabulary; an operand of == or !=, or a prefix or suffix a startswith or endswith call tests for, does not emit it."""
     for match in STRING.finditer(text):
         if WORD.search(match.group()) and not COMPARED.search(text[:match.start()]) \
                 and not re.match(r'\s*[=!]==?', text[match.end():]):

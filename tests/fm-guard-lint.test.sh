@@ -366,7 +366,8 @@ printf '# refusing here is only a comment: REFUSED: nothing\ncat <<'"'"'DOC'"'"'
 printf '"""This module refuses nothing."""\nx = 1  # refused\nif state == "refused":\n    x = 2\n' >"$SIG/bin/b.py"
 # shellcheck disable=SC2016 # fixture text is literal shell source and must not expand
 printf 'if [ "$refused" = 1 ]; then\n  rm -f -- "$DIR/$id.refused" "${refused}"\nfi\n' >"$SIG/bin/e.sh"
-printf 'if (device.effect === "refused") { done(); }\n' >"$SIG/bin/f.js"
+printf 'if (device.effect === "refused") { done(); }\nif (line.startsWith("refused: ")) { done(); }\n' >"$SIG/bin/f.js"
+printf 'seen = any(row.startswith(("skipped: ", "refused: ")) for row in rows)\n' >"$SIG/bin/g.py"
 mkdir -p "$SIG/bin/tests"
 printf 'echo "REFUSED: a fixture"\n' >"$SIG/bin/tests/c.sh"
 printf 'echo "REFUSED: the one genuine site" >&2\n' >"$SIG/bin/d.sh"

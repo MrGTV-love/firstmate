@@ -833,7 +833,6 @@
     {"id": "site:bin/fm_slack_watch.py:e37e0dba84", "rule": "S1", "text": "return 'refused', 'allowlist_unparseable'"},
     {"id": "site:bin/fm_slack_watch.py:71e3c6f306", "rule": "S1", "text": "return 'refused', 'missing_or_invalid_FM_SLACK_DM_USER'"},
     {"id": "site:bin/fm_slack_watch.py:66d08c66f6", "rule": "S1", "text": "return 'refused', 'invalid_FM_SLACK_POLL_MAX_ANSWERS_1_to_200'"},
-    {"id": "site:bin/fm_slack_watch.py:5c472b7024", "rule": "S1", "text": "if not pending['accepted'] and not any(line.startswith(('skipped: ', 'refused: ')) for line in lines"},
     {"id": "site:bin/fm_slack_watch.py:63af952b65", "rule": "S1", "text": "print('slack: refused: ' + reason, file=sys.stderr)"},
     {"id": "site:bin/fm_slack_watch.py:0524075519", "rule": "S1", "text": "print('slack: refused: ' + reason)"},
     {"id": "site:bin/fm_slack_watch.py:70a8e31da5", "rule": "S1", "text": "print('slack: refused: ' + name, file=sys.stderr)"},
