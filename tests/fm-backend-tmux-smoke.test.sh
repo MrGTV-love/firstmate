@@ -26,6 +26,9 @@ wait_for_capture_text() {  # <target> <text> [samples]
     esac
     out=$(fm_backend_tmux_capture "$target" 200 2>/dev/null || printf '%s' "$out")
     case "$pane_state" in
+      # tmux marks the pane dead when its output closes, before it reaps the
+      # exit status; poll again until the status or signal is recorded.
+      1::) sleep 0.1; i=$((i + 1)); continue ;;
       1:*)
         status=${pane_state#*:}
         signal=${status#*:}
@@ -42,6 +45,27 @@ wait_for_capture_text() {  # <target> <text> [samples]
   printf 'tmux capture timed out: target=%s expected=%s\nlast captured output:\n%s\n' "$target" "$text" "$out" >&2
   return 1
 }
+
+# --- a dead pane whose exit status is not yet recorded never becomes ready ---
+# Fake tmux, no server: the pane reads `1::` until the first poll sleep, then
+# `1:23:`, while the captured output already holds the requested text. The fake
+# sleep advances the sample count in this shell, where the fakes can read it.
+if diagnostics=$(
+  fake_samples=0
+  tmux() { if [ "$fake_samples" -eq 0 ]; then printf '1::\n'; else printf '1:23:\n'; fi; }
+  fm_backend_tmux_capture() { printf 'shell-ready\n'; }
+  sleep() { fake_samples=$((fake_samples + 1)); }
+  wait_for_capture_text "fake:startup" "shell-ready" 5 2>&1
+); then
+  printf 'not ok - %s\n' "a dead pane with an unrecorded exit status became ready from captured text" >&2
+  exit 1
+fi
+case "$diagnostics" in
+  *'pane_dead_status=23'*'shell-ready'*) : ;;
+  *) printf 'not ok - %s\n%s\n' "a dead pane with an unrecorded exit status did not wait for status 23" "$diagnostics" >&2
+     exit 1 ;;
+esac
+pass "fake tmux: a dead pane polls again until its exit status is recorded and never becomes ready"
 
 command -v tmux >/dev/null 2>&1 || { echo "skip: tmux not found"; exit 0; }
 REAL_TMUX=$(command -v tmux)
