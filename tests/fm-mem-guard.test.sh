@@ -187,12 +187,13 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     child = {"pid":202, "ppid":201, "comm":"python3", "started":"start-202",
              "rss_bytes":5*gib, "fleet":False}
 
-    def facts(pressure=1, rss=None):
-        (fixture / "sysctl").write_text(f"{32*gib}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
+    def facts(pressure=1, rss=None, total=32*gib, available=8*gib):
+        (fixture / "sysctl").write_text(f"{total}\n{pressure}\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n")
         (fixture / "vm_stat").write_text(
             "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
             "Pages free: 1000.\nPages speculative: 100.\n"
-            "Anonymous pages: 1048576.\nPages occupied by compressor: 32768.\n")
+            f"Anonymous pages: 1048576.\nFile-backed pages: {available//16384 - 1100}.\n"
+            "Pages purgeable: 100.\nPages occupied by compressor: 32768.\n")
         rows = [dict(daemon), dict(fleet), dict(child)] if rss is None else rss
         (fixture / "processes.json").write_text(json.dumps(rows))
 
@@ -212,6 +213,8 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     assert report["admission"] == "admit" and report["baseline"] is None
     assert "no baseline" in report["calibration"], report
     assert "alarm is uncalibrated" in queue() and "admission is unaffected" in queue()
+    assert report["headroom"] is None and "no headroom record" in report["headroom_calibration"], report
+    assert "admission headroom test is uncalibrated" in queue() and report["available_bytes"] == 8*gib
     call("admit")
     assert queue().count("\tmemory-health-uncalibrated\t") == 1
     facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
@@ -304,8 +307,44 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     assert report["baseline"]["host"] == replaced["host"] and report["alarms"][0]["pid"] == 101
     assert queue() == root_queue and (state / "memory-readings.jsonl").read_bytes() == root_readings
     sub_rows = [line.split("\t") for line in (sub / "state/.wake-queue").read_text().splitlines()]
-    assert [row[1] for row in sub_rows] == ["1"] and "xprotectd PID 101" in sub_rows[0][4], sub_rows
-    assert (sub / "state/.wake-queue.seq").read_text().strip() == "1"
+    assert [row[1] for row in sub_rows] == [str(n) for n in range(1, len(sub_rows)+1)], sub_rows
+    assert any("xprotectd PID 101" in row[4] for row in sub_rows), sub_rows
+    assert (sub / "state/.wake-queue.seq").read_text().strip() == str(len(sub_rows))
     assert json.loads((sub / "state/memory-readings.jsonl").read_text())["source"] == "admit"
     print("ok - a secondmate home's admission writes only its own readings and queue sequence while reading the root baseline")
+
+    # SYNTHETIC fixtures, not a measured host calibration: they prove the
+    # headroom arithmetic on the 2026-10-27 Studio shape (128 GiB, a 44 GiB
+    # non-fleet outlier, 12 running runs). The run peak, margin and other
+    # resident memory below are illustrative test numbers only.
+    studio = home / "studio"
+    (studio / "state").mkdir(parents=True)
+    studio_env = {**env, "FM_HOME":str(studio)}
+    run_peak, margin, other = 5*gib, 8*gib, 16*gib
+    runs = [{"pid":300+n, "ppid":1, "comm":"no-mistakes", "started":f"start-{300+n}",
+             "rss_bytes":run_peak, "fleet":True} for n in range(12)]
+    def studio_facts(outlier, pressure=1):
+        facts(pressure=pressure, total=128*gib, available=128*gib - outlier - 12*run_peak - other,
+              rss=[{**daemon,"rss_bytes":outlier}] + [dict(row) for row in runs])
+    studio_facts(44*gib)
+    report = call("admit",environ=studio_env)
+    assert report["admission"] == "admit" and "no headroom record" in report["headroom_calibration"]
+    (studio / "state/.memory-headroom.json").write_text(json.dumps({
+        "schema":"fm-memory-headroom.v1", "host":report["host"], "total_bytes":128*gib,
+        "run_peak_bytes":run_peak, "headroom_bytes":margin,
+        "derivation":"synthetic test fixture, not a measured host calibration"}))
+    report = call("admit",code=75,environ=studio_env)
+    assert report["available_bytes"] == 8*gib and report["headroom_calibration"] is None
+    assert any("below this host's measured headroom margin" in r for r in report["reasons"]), report
+    ran = home / "studio-run"
+    launch = ("--",sys.executable,"-c","from pathlib import Path; import sys; Path(sys.argv[1]).touch()",str(ran))
+    call("run",*launch,code=75,environ=studio_env)
+    assert not ran.exists()
+    studio_facts(10*1024**2)
+    assert call("admit",environ=studio_env)["reasons"] == []
+    call("run",*launch,environ=studio_env)
+    assert ran.exists()
+    studio_facts(10*1024**2, pressure=2)
+    call("admit",code=75,environ=studio_env)
+    print("ok - synthetic Studio shape: the 44 GiB outlier refuses the 13th start only through measured headroom; ample headroom admits and pressure 2 still refuses")
 PY

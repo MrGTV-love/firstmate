@@ -4,20 +4,22 @@
 #        fm-mem-guard.sh sample|baseline|admit|probe
 #        fm-mem-guard.sh run -- <new-run command...>
 # Legacy flags retain the fail-open diagnostic contract in the engine header.
-# sample records facts only; admit returns 75 if native pressure is high or
-# required facts are unreadable. No new work runs after that return, and no
-# existing work is stopped. The non-fleet RSS alarm baseline never affects that
-# result. baseline derives the alarm envelope from recorded healthy readings,
-# as the engine header describes.
+# sample records facts only; admit returns 75 if native pressure is high,
+# required facts are unreadable, or this host's measured headroom record shows
+# that available memory minus one run's measured peak is below its margin. No
+# new work runs after that return, and no existing work is stopped. The
+# non-fleet RSS alarm baseline never affects that result. baseline derives the
+# alarm envelope from recorded healthy readings; the engine header owns both
+# records' contents.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
 # cannot prevent supervising existing work. admit, run and probe queue
 # identifying check wakes through fm-wake-lib.sh in the invoking home's own
 # queue. Alarms dedupe by process name until it drops below the baseline; an
 # outlier is not a leak diagnosis or restart authority. Unavailable facts and
-# unavailable alarm calibration each wake once per episode.
+# unavailable alarm or headroom calibration each wake once per episode.
 # The invoking home's state owns memory-readings.jsonl and .memory-alarmed; the
 # root local home's state owns the one host .memory-baseline.json, which only
-# the baseline command writes.
+# the baseline command writes, and the operator-recorded .memory-headroom.json.
 # FM_MEMORY_FIXTURE_DIR supplies sysctl, vm_stat and processes.json native facts
 # for isolated tests; every fixture reading is explicitly marked in the log.
 # Non-macOS admission is unchanged; its legacy diagnostic remains available.
@@ -44,13 +46,14 @@ fi
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 root=$(fm_firstmate_root_home "$FM_HOME") || exit 75
-baseline="$root/state/.memory-baseline.json"
-[ "$root" != "$FM_HOME" ] || baseline="$STATE/.memory-baseline.json"
+host_state="$root/state"
+[ "$root" != "$FM_HOME" ] || host_state="$STATE"
 engine_mode=$mode
 [ "$mode" != run ] || engine_mode=admit
 rc=0
 reading=$(FM_MEMORY_FLEET_ROOT="$root" python3 "$SCRIPT_DIR/fm-mem-guard.py" "$engine_mode" \
-  --state "$STATE" --baseline "$baseline") || rc=$?
+  --state "$STATE" --baseline "$host_state/.memory-baseline.json" \
+  --headroom "$host_state/.memory-headroom.json") || rc=$?
 [ -n "$reading" ] || exit 75
 # Use the existing queue owner, not a second notification transport. Queue before
 # recording suppression; a crash may duplicate a notification but never loses it.
@@ -72,6 +75,13 @@ if [ "$mode" = probe ] || [ "$mode" = admit ] || [ "$mode" = run ]; then
     active+='uncalibrated'$'\n'
     if ! printf '%s\n' "$previous" | grep -Fx uncalibrated >/dev/null; then
       fm_wake_append check memory-health-uncalibrated "check: memory-health: the non-fleet RSS alarm is uncalibrated ($calibration); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in $root." || exit 75
+    fi
+  fi
+  headroom_calibration=$(jq -r '.headroom_calibration // empty' <<<"$reading")
+  if [ -n "$headroom_calibration" ]; then
+    active+='headroom-uncalibrated'$'\n'
+    if ! printf '%s\n' "$previous" | grep -Fx headroom-uncalibrated >/dev/null; then
+      fm_wake_append check memory-health-headroom-uncalibrated "check: memory-health: the admission headroom test is uncalibrated ($headroom_calibration); new work is admitted on native pressure and readable facts alone. Record this host's measured one-run peak and headroom margin in $host_state/.memory-headroom.json as docs/configuration.md \"Host memory admission\" describes." || exit 75
     fi
   fi
   while IFS= read -r alarm; do

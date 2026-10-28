@@ -2176,7 +2176,12 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 
 On macOS, project capacity is also subject to the [memory guard's admission contract](../bin/fm-mem-guard.sh).
 Its engine header owns the measured signals and baseline derivation; do not reuse the legacy diagnostic percentage defaults as admission thresholds.
-Every fresh spawn, secondmates included, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is high or a required reading is unavailable.
+Every fresh spawn, secondmates included, and every new no-mistakes run started through the generated worker entrypoint reads host memory once and defers with exit 75 while native memory pressure is level 2 or higher, a required reading is unavailable, or the host's measured headroom is too small.
+The headroom test admits a start only when available memory (free, file-backed and purgeable pages, never compressed or swapped memory) minus the measured peak of one run stays at or above the host's measured headroom margin.
+A non-fleet outlier such as a leaking system daemon therefore refuses new work only by shrinking available memory, never by itself.
+Both numbers are per host and come from that host's own measurements: record them in the root local home's `state/.memory-headroom.json` as `{"schema": "fm-memory-headroom.v1", "host": ..., "total_bytes": ..., "run_peak_bytes": ..., "headroom_bytes": ..., "derivation": ...}`, where `host` and `total_bytes` match a `sample` reading on that host and `derivation` names the measured records and arithmetic behind both numbers.
+Firstmate ships no value for either number and no universal cap.
+Without a usable record for this host the headroom test is not applied, each home reports that missing calibration once as a check wake, and pressure and unreadable facts still refuse.
 The non-fleet RSS alarm baseline is separate: a missing, invalid or other-host baseline never defers work, and each home reports that missing calibration once as a check wake.
 
 Each invoking home's state keeps its own append-only readings, alarm episodes and wake rows, so a confined worker in a secondmate home writes only state it may already write.

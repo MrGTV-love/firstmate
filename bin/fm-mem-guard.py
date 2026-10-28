@@ -12,11 +12,22 @@ macOS swap occupancy is telemetry only and never classifies pressure, because
 the OS can grow that pool. Linux swap utilization still classifies the verdict.
 
 Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run):
-  - macOS native pressure level 1 is normal; any other measured level defers.
+  - macOS native pressure level 1 is normal; level 2 or higher defers.
     A missing required memory or process reading also defers with 75, while
     the legacy diagnostic remains fail-open. Raw free + speculative pages
-    (PhysMem unused), occupied compressor pages, swap, each reading's largest
-    non-fleet RSS and the largest residents are recorded for later thresholds.
+    (PhysMem unused), available pages, occupied compressor pages, swap, each
+    reading's largest non-fleet RSS and the largest residents are recorded.
+  - Available memory is free plus reclaimable pages: Pages free, File-backed
+    pages (the page cache, speculative pages included) and Pages purgeable,
+    never compressed or swapped memory. With this host's headroom record, a
+    start also defers when available minus the measured peak of one run is
+    below the measured headroom margin. A non-fleet outlier vetoes admission
+    only through that test. The record (--headroom) is per host and states its
+    measured inputs: schema fm-memory-headroom.v1, host, total_bytes,
+    run_peak_bytes, headroom_bytes and a nonempty derivation naming the
+    measurements. This code ships no value for either number. A missing,
+    invalid or other-host record leaves the test unapplied and is reported as
+    headroom calibration; pressure and unreadable facts still defer.
   - The non-fleet RSS alarm is separate from admission: a missing, invalid or
     other-host baseline never defers work and is reported as calibration.
   - baseline derives that alarm boundary from every recorded reading beside the
@@ -342,11 +353,12 @@ def admission_sample():
             return int(match[1]) * page_size
         report["page_size_bytes"] = page_size
         report["unused_bytes"] = pages("Pages free") + pages("Pages speculative")
+        report["available_bytes"] = pages("Pages free") + pages("File-backed pages") + pages("Pages purgeable")
         report["anonymous_bytes"] = pages("Anonymous pages")
         report["compressor_bytes"] = pages("Pages occupied by compressor")
         if (report["total_bytes"] <= 0 or page_size <= 0 or
                 any(report[key] > report["total_bytes"] for key in
-                    ("unused_bytes", "anonymous_bytes", "compressor_bytes")) or
+                    ("unused_bytes", "available_bytes", "anonymous_bytes", "compressor_bytes")) or
                 report["swap_used_bytes"] > report["swap_total_bytes"] or
                 report["swap_free_bytes"] > report["swap_total_bytes"]):
             raise ValueError("inconsistent native memory sizes")
@@ -381,11 +393,36 @@ def admission_sample():
     return report
 
 
-def admission_evaluate(report, baseline):
-    """Native pressure or unreadable facts defer new work; the RSS alarm never does."""
+def host_record(path, report, label, schema, fields):
+    """A per-host measured record, or why it does not apply to this reading."""
+    try:
+        loaded = json.loads(path.read_text())
+        if (loaded["schema"] != schema or not isinstance(loaded["host"], str) or
+                type(loaded["total_bytes"]) is not int or loaded["total_bytes"] <= 0 or
+                not isinstance(loaded["derivation"], str) or not loaded["derivation"].strip() or
+                any(type(loaded[f]) is not int or not 0 < loaded[f] <= loaded["total_bytes"] for f in fields)):
+            raise ValueError(f"invalid {label} fields")
+        if loaded["host"] != report["host"] or loaded["total_bytes"] != report.get("total_bytes"):
+            raise ValueError(f"recorded for host {loaded['host']} with {loaded['total_bytes']} bytes, "
+                             f"not host {report['host']} with {report.get('total_bytes')} bytes")
+        return loaded, None
+    except FileNotFoundError:
+        return None, f"no {label} at {path}"
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return None, f"{label} {path} unusable: {exc}"
+
+
+def admission_evaluate(report, baseline, headroom):
+    """Pressure, unreadable facts or measured headroom defer new work; the RSS alarm never does."""
     reasons = list(report["errors"])
     if report.get("pressure_level") not in (None, 1):
         reasons.append(f"native memory pressure level {report['pressure_level']} (normal is 1)")
+    if headroom is not None and "available_bytes" in report:
+        spare = report["available_bytes"] - headroom["run_peak_bytes"]
+        if spare < headroom["headroom_bytes"]:
+            reasons.append(f"available {report['available_bytes']} bytes minus the measured one-run peak "
+                           f"{headroom['run_peak_bytes']} bytes leaves {spare} bytes, below this host's "
+                           f"measured headroom margin {headroom['headroom_bytes']} bytes")
     alarms = []
     if baseline is not None:
         alarms = [{**p, "boundary_bytes": baseline["non_fleet_max_bytes"], "samples": baseline["samples"]}
@@ -431,6 +468,7 @@ def admission_main(argv):
     parser.add_argument("mode", choices=("sample", "admit", "probe", "baseline"))
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--baseline", type=Path, required=True)
+    parser.add_argument("--headroom", type=Path, required=True)
     args = parser.parse_args(argv)
     report = admission_sample()
     report["source"] = args.mode
@@ -438,24 +476,11 @@ def admission_main(argv):
     report["non_fleet_max_bytes"] = max(candidates) if candidates else None
     state = args.state
     state.mkdir(parents=True, exist_ok=True)
-    baseline, calibration = None, None
-    try:
-        loaded = json.loads(args.baseline.read_text())
-        if (loaded["schema"] != "fm-memory-baseline.v1" or not isinstance(loaded["host"], str) or
-                type(loaded["total_bytes"]) is not int or loaded["total_bytes"] <= 0 or
-                type(loaded["non_fleet_max_bytes"]) is not int or
-                not 0 < loaded["non_fleet_max_bytes"] <= loaded["total_bytes"] or
-                type(loaded["samples"]) is not int or loaded["samples"] < 2):
-            raise ValueError("invalid baseline fields")
-        if loaded["host"] != report["host"] or loaded["total_bytes"] != report.get("total_bytes"):
-            raise ValueError(f"recorded for host {loaded['host']} with {loaded['total_bytes']} bytes, "
-                             f"not host {report['host']} with {report.get('total_bytes')} bytes")
-        baseline = loaded
-    except FileNotFoundError:
-        calibration = f"no baseline at {args.baseline}"
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        calibration = f"baseline {args.baseline} unusable: {exc}"
-    reasons, alarms = admission_evaluate(report, baseline)
+    baseline, calibration = host_record(args.baseline, report, "baseline", "fm-memory-baseline.v1",
+                                        ("non_fleet_max_bytes", "samples"))
+    headroom, headroom_calibration = host_record(args.headroom, report, "headroom record",
+                                                 "fm-memory-headroom.v1", ("run_peak_bytes", "headroom_bytes"))
+    reasons, alarms = admission_evaluate(report, baseline, headroom)
     # Only an explicit baseline operation writes the envelope; a matching one is
     # never silently re-learned, so a growing process cannot hide in it.
     if args.mode == "baseline" and not reasons:
@@ -472,6 +497,8 @@ def admission_main(argv):
                 baseline, calibration = derived, None
     report["baseline"] = baseline
     report["calibration"] = calibration
+    report["headroom"] = headroom
+    report["headroom_calibration"] = headroom_calibration
     report["admission"] = "defer" if reasons else "admit"
     report["reasons"] = reasons
     report["alarms"] = alarms
