@@ -1882,6 +1882,7 @@ SPAWN_TASK_SET_LOCK_HELD=0
 SPAWN_TREEHOUSE_PROJECT_LOCK=
 SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
 SPAWN_BASE_SHA=
+SPAWN_BASE_HAS_ORIGIN=0
 SPAWN_SELECTED_BASE_SHA=
 SPAWN_LOCAL_DEFAULT=
 SPAWN_LOCAL_SHA=
@@ -4399,6 +4400,7 @@ spawn_fetch_base_evidence() {
   local default=$BASE_BRANCH advertised
   SPAWN_BASE_ERROR=
   spawn_worktree_has_origin_config "$PROJ_ABS" || return 0
+  SPAWN_BASE_HAS_ORIGIN=1
   if [ -z "$default" ]; then
     if ! advertised=$(GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" ls-remote --symref origin HEAD 'refs/heads/*' </dev/null 2>/dev/null); then
       SPAWN_BASE_ERROR="could not fetch origin"
@@ -4437,7 +4439,8 @@ spawn_fetch_base_evidence() {
 # or working tree. Validate it under project custody before assigning a copy and
 # again before preparation; neither divergent history nor a changed plan is safe.
 spawn_validate_local_base() {
-  local default current ancestry_rc pinned_default=$SPAWN_LOCAL_DEFAULT pinned_sha=$SPAWN_LOCAL_SHA
+  local default current ancestry_rc copy=${1:-} origin_now=0 copy_origin=0 expected_origin=$SPAWN_BASE_HAS_ORIGIN
+  local pinned_default=$SPAWN_LOCAL_DEFAULT pinned_sha=$SPAWN_LOCAL_SHA
   [ "$KIND" = ship ] && [ "$MODE" = local-only ] && [ -z "$BASE_BRANCH" ] || return 0
   [ "$BACKEND" != orca ] || return 0
   if [ "$RELAUNCH" -eq 1 ]; then
@@ -4445,12 +4448,22 @@ spawn_validate_local_base() {
     case "$SLOT_SOURCE_REF" in refs/heads/*) ;; *) echo 'error: invalid recorded local-default ref' >&2; return 1 ;; esac
     pinned_default=${SLOT_SOURCE_REF#refs/heads/}
     pinned_sha=$SLOT_SOURCE_SHA
+    expected_origin=1
   fi
-  if ! spawn_worktree_has_origin_config "$PROJ_ABS"; then
-    [ "$RELAUNCH" -eq 0 ] && return 0
-    echo 'error: recorded local-default source no longer has its origin qualification' >&2
+  spawn_worktree_has_origin_config "$PROJ_ABS" && origin_now=1
+  if [ "$origin_now" != "$expected_origin" ]; then
+    echo 'error: local-only origin qualification changed since source planning; preserving the assigned copy' >&2
     return 1
   fi
+  if [ -n "$copy" ]; then
+    spawn_worktree_has_origin_config "$copy" && copy_origin=1
+    if [ "$copy_origin" != "$expected_origin" ]; then
+      echo 'error: local-only primary and assigned-copy origin qualification disagree; preserving the assigned copy' >&2
+      return 1
+    fi
+  fi
+  # Only absence in the original plan AND both copies is genuinely originless.
+  [ "$expected_origin" = 1 ] || return 0
   if [ -n "$SPAWN_BASE_ERROR" ]; then
     echo "error: $SPAWN_BASE_ERROR; local-only source selection refused" >&2
     return 1
@@ -4923,7 +4936,12 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     fi
     return 1
   fi
+  spawn_validate_local_base "$worktree" || return 1
   if ! spawn_worktree_has_origin_config "$worktree"; then
+    if [ -n "$SPAWN_SELECTED_BASE_SHA" ]; then
+      echo 'error: planned local-only origin qualification vanished at freshness; preserving the assigned copy' >&2
+      return 1
+    fi
     [ -z "$base" ] || {
       echo "error: pooled worktree '$worktree' has no origin, so it cannot start from base branch '$base'" >&2
       return 1
@@ -6259,7 +6277,7 @@ elif [ -n "$SPAWN_SELECTED_BASE_SHA" ] && [ "$SPAWN_SELECTED_BASE_SHA" != "$SPAW
   SLOT_SOURCE_REF="refs/heads/$SPAWN_LOCAL_DEFAULT"
   SLOT_SOURCE_SHA=$SPAWN_SELECTED_BASE_SHA
 fi
-spawn_validate_local_base || exit 1
+spawn_validate_local_base "$WT" || exit 1
 SLOT_GOVERNED=0
 SLOT_FRESH_BASE=0
 if [ "$KIND" != secondmate ] && { fm_slot_required "$PROJ_ABS" "$WT" || { [ "$RELAUNCH" -eq 1 ] && grep -q '^slot_manifest=' "$RELAUNCH_META"; }; }; then
