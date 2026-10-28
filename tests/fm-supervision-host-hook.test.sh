@@ -282,9 +282,11 @@ assert_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
   assert_rewoke_main "$home" "hook turns-main-only"
   assert_re '	pass-through	attended	main-only	signal:' "$home/state/.supervision-host.log" \
     "hook turns-main-only: the close did not pass through to main"
-  [ -f "$home/state/.supervision-host-left" ] && [ -s "$home/state/.supervision-host-left" ] \
-    || fail "hook turns-main-only: the host did not leave a recorded successor for main"
   if [ "$mode" = decision ]; then
+    # The successor may close on the decision before the host records it.
+    { [ -f "$home/state/.supervision-host-left" ] && [ -s "$home/state/.supervision-host-left" ]; } \
+      || grep -qF '	pass-through	successor-unrecorded	' "$home/state/.supervision-host.log" \
+      || fail "hook turns-main-only: the host neither recorded its successor nor reported it unrecorded"
     # Reach the assertion after the real successor has queued the new decision
     # and closed, deterministically exercising the slow-reader ordering.
     wait_until 250 grep -qF 'needs-decision: ' "$home/state/.wake-queue" \
@@ -293,8 +295,10 @@ assert_claude_stop_hook_delivers_a_close_that_turns_main_only_at_its_turn() {
       || fail "hook turns-main-only: the successor never closed on the decision"
     drained=$(main_drain "$home")
     assert_contains "$drained" 'which export format?' "hook turns-main-only: main lost the successor's queued decision"
-    pass "host+hook: an at-turn main-only close rewakes main even after its recorded successor queued the decision and closed"
+    pass "host+hook: an at-turn main-only close rewakes main even after its successor queued the decision and closed"
   else
+    [ -f "$home/state/.supervision-host-left" ] && [ -s "$home/state/.supervision-host-left" ] \
+      || fail "hook turns-main-only: the host did not leave a recorded successor for main"
     watcher_live "$home" || fail "hook turns-main-only: the pass-through left no successor watcher"
     pass "host+hook: a close that turns main-only at its turn rewakes main and keeps its successor watcher"
   fi
