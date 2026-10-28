@@ -1,0 +1,23 @@
+HEAD 21ead009d 2026-10-28T14:09:51Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.iL2ITa
+== S1 sanctioned loop ==
+loop exit=75  size=65507 cap=65536  lines=1753
+stderr of refusal: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/loop.status is 65507 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 4096 for decision and terminal lines)
+distinct lines kept = 1753 (last accepted step 1753); every step 1..1753 present: yes
+fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/loop.status is 65507 bytes and this line would pass the limit of 65536 bytes (cap 65536, reserve 4096 for decision and terminal lines)
+ordinary line at cap exit=75
+done: at cap exit=0 (reserve)  size=65538
+blocked: lines accepted into reserve=127 then refused; size=69619 limit=69632
+done: past cap+reserve exit=75 stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/loop.status is 69619 bytes and this line would pass the limit of 69632 bytes (cap 65536, reserve 4096 for decision and terminal lines)
+== S1b 2026-10-18 shape (cap 16384) ==
+repeat loop exit=75 size=16384 (cap 16384) repeats written=1100
+distinct lines present: 300/300; refusal: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/d1-intake.status is 16384 bytes and this line would pass the limit of 16384 bytes (cap 16384, reserve 4096 for decision and terminal lines)
+== S3a stopped lock holder ==
+append behind SIGSTOPped holder: exit=75 after 10.06 s; stderr: fm-status-append: refused: /Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/held.status stayed locked by another writer for 10 s; nothing was written; size unchanged: yes
+after holder gone exit=0 last=done: finished
+== S3b guard spares the sanctioned append ==
+guard scan record: 16777233:932955471:1793196660	/Users/charlesabrooker/tmp/fm-lab.iL2ITa/state/busy.status	300001	check: status-log-over-cap: file=busy.status size=300001 bytes (cap 262144) growth=0 bytes/s writer=pid 27477 perl; stopped nothing: pid 27477 is the capped append, which the cap bounds; nothing was deleted, truncated or rewritten
+capped append perl pid 27477 state=S (T would mean stopped)
+held append exit=0 last=done: landed after the scan
+later append exit=0 last=done: a later line
+lab removed: /Users/charlesabrooker/tmp/fm-lab.iL2ITa

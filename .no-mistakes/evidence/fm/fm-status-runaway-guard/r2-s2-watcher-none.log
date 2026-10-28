@@ -1,0 +1,12 @@
+HEAD 21ead009d 2026-10-28T14:13:11Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Zmegxy writer=none cap=262144
+watcher run 1 exited after 12 s, log 404040 bytes: check: status-log-over-cap: file=d1-intake.status size=404040 bytes (cap 262144) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten 
+--- over-cap wake text ---
+check: status-log-over-cap: file=d1-intake.status size=404040 bytes (cap 262144) growth=0 bytes/s writer=none found (lsof listed no process holding it open for writing); stopped nothing; nothing was deleted, truncated or rewritten
+log size at wake: 404040 bytes (cap 262144); exists: yes
+over-cap rows in wake queue: 1
+firstmate/test shell state: S
+log size 3 s later: 404040 (grew: no)
+second watcher stayed quiet 15 s on the unchanged over-cap log (no second wake)
+final size 404040 ; first 2 lines: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+lab removed: /Users/charlesabrooker/tmp/fm-lab.Zmegxy

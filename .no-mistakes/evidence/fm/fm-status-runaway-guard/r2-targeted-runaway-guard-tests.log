@@ -1,0 +1,24 @@
+HEAD 21ead009d 2026-10-28T14:14:24Z
+ok - the watcher checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the classification is stopped long before the classification ends
+ok - the heartbeat scan checks the cap after each poll-sized slice of a long classification, so a writer that passes it during the scan is stopped long before the scan ends
+ok - the stale-pane surface checks the cap after each poll-sized slice of its walk over the lane's log, so a writer that passes it during the walk is stopped long before the walk ends
+ok - the watcher checks the cap during the status-signal linger, so the over-cap stop is the first wake and waits for no ack or re-arm
+ok - a log that passes the cap while the watcher classifies a short signaled span is checked before the signal wake exits, and its writer is stopped
+ok - a runaway that keeps growing through the over-cap wake raises exactly one wake and the watcher exits on it
+ok - a second writer that passes the cap while the over-cap wake flushes is stopped and queued, and raises no second wake
+ok - the incident writer, which holds the log open and writes without a pause, is named and stopped by the guard and the log is left in place
+wait_for_exit: owned pid 44657 exceeded 30 polls; sending TERM
+44657 70304 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M612N00M5Z7X15B7918BFGFX/bin/fm-watch.sh
+ok - a stopped writer that is continued gets a second wake and a second stop, and a log that has not grown gets none
+ok - the guard names but never stops the firstmate session, and never names or stops a process that only reads the log
+ok - the guard names a capped append that holds an over-cap log open but never stops it, and later appends still land
+ok - a sanctioned append behind a stopped lock holder is refused loudly with exit 75 within the lock bound, and lands once the lock is free
+ok - the 2026-10-18 shape (3000 distinct lines, then one line repeated) keeps every distinct line and is refused loudly at the cap with exit 75
+ok - mutation: the same loop through a raw append passes the cap, so the helper is what holds it
+ok - mutation: with the read limit raised past the log the same reader takes all 2 GiB; with the default it takes nothing
+ok - a wait episode that opens before the tail window keeps its first record as its identity as the window slides; a re-declaration and a replacement get new ones
+ok - distinct restatements across more than two tail windows keep the episode's first record as the identity, and the next poll walks only the appended lines
+ok - a truncated, rewritten or replaced log and a corrupt or altered cache fall back to the exact walk's identity
+ok - an episode older than the read limit has no watcher identity, even with a cache, and the scope falls back to the signature
+bash tests/fm-status-runaway-guard.test.sh                     66.81s user 64.53s system 76% cpu 2:51.79 total
+exit=0

@@ -1,0 +1,10 @@
+HEAD 21ead009d 2026-10-28T14:24:38Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.yqH21E cap=16384 writer pid 80527 (re-opens the log per append)
+watcher run 1 exited after 4 s; log 4530 bytes: signal: /Users/charlesabrooker/tmp/fm-lab.yqH21E/state/d1-intake.status 
+watcher run 2 exited after 12 s; log 14515 bytes: signal: /Users/charlesabrooker/tmp/fm-lab.yqH21E/state/d1-intake.status 
+watcher run 3 exited after 21 s; log 20905 bytes: check: status-log-over-cap: file=d1-intake.status size=20905 bytes (cap 16384) growth=1582 bytes/s writer=pid 80527 bash; stopped pid 80527 (bash) with SIGSTOP; resume it with kill -CONT 80527; nothing was deleted, truncated or rewritten 
+--- over-cap wake ---
+check: status-log-over-cap: file=d1-intake.status size=20905 bytes (cap 16384) growth=1582 bytes/s writer=pid 80527 bash; stopped pid 80527 (bash) with SIGSTOP; resume it with kill -CONT 80527; nothing was deleted, truncated or rewritten
+writer state: T ; log exists: yes ; size 20905
+/Users/charlesabrooker/.no-mistakes/evidence/01M612N00M5Z7X15B7918BFGFX/r2-s7-reopen-writer.sh: line 17: 80527 Killed: 9               bash -c 'i=0; while [ $i -lt 20000 ]; do i=$((i+1)); printf "text\n" "$(date +%s)" >> "$1"; done' _ "$F"
+lab removed: /Users/charlesabrooker/tmp/fm-lab.yqH21E
