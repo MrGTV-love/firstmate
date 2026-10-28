@@ -12,7 +12,8 @@
     "git-commit-credential-shapes",
     "git-push-credential-shapes",
     "spawn-confinement-coverage",
-    "spawn-write-confinement"
+    "spawn-write-confinement",
+    "status-log-size-cap"
   ],
   "guards": [
     {
@@ -963,6 +964,35 @@
       "harm": "irreversible",
       "remedy_verified": "fixture",
       "layer_note": "per-task wrappers installed by bin/fm-git-strip-ai-trailers.sh: pre-commit scans after the repository hook; pre-push scans before replaying the ref-update input to it. Every repository is checked, but only decisions in the task worktree record events. A refusal repeats only while the same new credential-shaped line, identified by its content hash, is refused in consecutive decisions. Different refused content starts at 1 even after an abandoned attempt. A failed inspection counts as its own episode under a reserved inspection-failed key and keeps the per-line counts; only an allowed decision clears the counts. Each refusal past the budget of 1 also prints an escalation to a human decision, and the operation stays refused"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "status-log-size-cap",
+      "owner": "bin/fm-status-cap-lib.sh",
+      "sites": [
+        {"file": "bin/fm-status-append.sh", "match": "refusing a symbolic link"},
+        {"file": "bin/fm-status-cap-lib.sh", "match": "past the read limit of"},
+        {"file": "bin/fm-status-cap-lib.sh", "match": "past the line-by-line read limit"}
+      ],
+      "invariant": "a runaway status log never fills the disk or stalls the readers that walk it",
+      "layer": "runtime-block",
+      "source": "the byte size and line count of the status log or span, measured in bin/fm-status-cap-lib.sh against the cap and reserve (FM_STATUS_CAP_BYTES, FM_STATUS_CAP_RESERVE_BYTES), plus whether the path given to bin/fm-status-append.sh is a symbolic link",
+      "trigger": "an append through bin/fm-status-append.sh would pass the 33554432-byte cap (cap plus the 1048576-byte reserve for a decision or terminal line), a reader asks for a span past cap plus reserve or, line by line, past 32768 lines, or the append path is a symbolic link",
+      "remedy": "read the latest events with tail -c 4194304 state/<task>.status, or retire the log by tearing the lane down with bin/fm-teardown.sh <task>",
+      "budget": 1,
+      "test": "tests/fm-status-runaway-guard.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "layer_note": "added by PR #188 after a status-append loop filled the disk; deny without a guard event: an append past the cap exits 75 and a refused read returns status 2, each naming the file on stderr, and nothing is written or read; the symbolic-link refusal keeps the capped append on the status log itself; bin/fm-status-cap-guard.sh raises the over-cap wake for a raw writer; docs/configuration.md \"Status log size bounds\" describes the bounds for operators; the test proves the cap and both read refusals, and the symbolic-link refusal has no fixture"
     }
   ],
   "excluded": [
