@@ -1,0 +1,21 @@
+## R6 stalled span read (SIGSTOP on the capture group), FM_WATCHER_STALE_GRACE=6 => stall bound 18s
+task02 replaced (new inode) + appended: inode=44459 size=1584050; seen classified before=1584022@strong:16777285:26:1793173774.554497093
+task02 span read started; SIGSTOP sent to capture process group 57807 at +2s
+  stopped: 57807 57807 T    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Q9NTSDEB99J8Q1NC7JYGW/bin/fm-watch.sh
+capture group 57807 gone at +24s, 22s after SIGSTOP (no progress the whole time)
+pass 1: exited rc=0 after ~10s ; signal rows=1 ; names: task02.status 
+beacon during pass 1 [1793176904..1793176929]: passes=1 samples=35 max_age=2s (at 1793176908; running: fm-watch.sh,) ; startup samples before first beat=1 (max 1s to first beat)
+task02 seen classified after stalled read=1584022@strong:16777285:26:1793173774.554497093 size=1584050
+-- next change to task02 is read again (no stop this time) and commits
+  head pass 1: exited rc=0 after ~13s ; signal rows queued=1 ; distinct row keys=1 ; all queued rows=1 ; names: task02.status 
+  head pass 2: alive-after-120s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 3: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 4: alive-after-120s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 1
+beacon [1793176938..1793177518]: passes=4 samples=805 max_age=8s (at 1793177325; running: fm-watch.sh,(bash),(bash),(bash),(bash),) ; startup samples before first beat=2 (max 1s to first beat)
+  span-read captures (name alive-seconds):
+    .task02.open-decisions-cursor.span.39360.span alive 27s (1793176940..1793176967)
+task02 seen classified=1584078@strong:16777285:44459:1793173774.565333226 size=1584078
+watcher stderr (this lab, whole run):
+  no_progress: "pid=57807 no CPU or watched-file progress for 18.9s"
+rc=0

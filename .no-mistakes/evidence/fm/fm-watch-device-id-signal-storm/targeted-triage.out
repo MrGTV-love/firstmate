@@ -1,0 +1,15 @@
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Q9NTSDEB99J8Q1NC7JYGW/tests/fm-watch-triage-helpers.sh: line 51: 49605 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - device-only shift migrates seen and heartbeat markers; two passes enqueue no wake
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Q9NTSDEB99J8Q1NC7JYGW/tests/fm-watch-triage-helpers.sh: line 51: 74331 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that grows after device migration signals once
+ok - changed inode, birth, device plus inode, weak identity, growth, and mode still signal once
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Q9NTSDEB99J8Q1NC7JYGW/tests/fm-watch-triage-helpers.sh: line 51: 49816 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that lags its marker across a device shift reads only its new bytes and signals once
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60Q9NTSDEB99J8Q1NC7JYGW/tests/fm-watch-triage-helpers.sh: line 51: 60298 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - owned appends recorded before a device shift stay owned and do not wake
+ok - adoption leaves a same-device lag alone and migrates each field whose device differs
+ok - eight pending files produce eight rows, retaining the newest between-scan state
+ok - slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3
+ok - a classification still making progress past FM_WATCHER_STALL_BOUND commits its endpoint and signals
+ok - a status read with no progress for FM_WATCHER_STALL_BOUND is stopped as stalled
+ok - a status log that vanishes before its span is read is a quiet empty span in both scans

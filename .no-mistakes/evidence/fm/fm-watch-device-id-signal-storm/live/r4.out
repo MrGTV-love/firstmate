@@ -1,0 +1,21 @@
+## R4 eight logs changed in one pass; task11 changes again during the signal grace (FM_SIGNAL_GRACE=8)
+-- head
+  head: grace sleep seen after ~0s; appending the newest state to task11
+  head pass 1: exited rc=0 after ~6s ; signal rows queued=8 ; names: task07.status task08.status task09.status task10.status task11.status task12.status task13.status task14.status 
+  head task11 seen marker reported == current observed signature: yes
+  head task11 classified offset/size: 561/561
+  head drain shows task11 newest state: 2 line(s)
+  head pass 1: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 2: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 3: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 0
+-- base (comparison)
+  base: grace sleep seen after ~0s; appending the newest state to task11
+  base pass 1: exited rc=0 after ~6s ; signal rows queued=16 ; names: task07.status task07.status task08.status task08.status task09.status task09.status task10.status task10.status task11.status task11.status task12.status task12.status task13.status task13.status task14.status task14.status 
+  base task11 seen marker reported == current observed signature: yes
+  base task11 classified offset/size: 561/561
+  base drain shows task11 newest state: 2 line(s)
+  base pass 1: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base pass 2: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base pass 3: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base TOTAL signal wakes this round: 0

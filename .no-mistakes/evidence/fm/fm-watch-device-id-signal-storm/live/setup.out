@@ -1,0 +1,10 @@
+head tree: 4efe85770 (run worktree); base tree: 1f843933b -> /Users/charlesabrooker/tmp/fmdevT.eEHCjw/base
+hdiutil: WARNING: 'hdiutil attach -nobrowse -owners -mountpoint ...' is deprecated. Please use 'diskutil image attach --mountOptions nobrowse --mountOptions owners --mountPoint ...' instead.
+/dev/disk5s1        	41504653-0000-11AA-AA11-0030654	/Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt
+volume device: 16777239
+lab-head: /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-head
+  1056022 /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-head/state/task01.status
+  1584022 /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-head/state/task02.status
+lab-base: /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-base
+  478 /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-base/state/task01.status
+  478 /Users/charlesabrooker/tmp/fmdevT.eEHCjw/mnt/lab-base/state/task02.status

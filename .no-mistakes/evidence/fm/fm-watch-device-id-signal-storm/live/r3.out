@@ -1,0 +1,42 @@
+## R3a task05 replaced by a byte-identical file (new inode and birth), same device
+before: task05 dev=16777281 inode=29 birth=1793173774 size=478
+after:  task05 dev=16777281 inode=30565 birth=1793173774 size=478
+-- head
+  head pass 1: exited rc=0 after ~1s ; signal rows queued=1 ; distinct row keys=1 ; all queued rows=1 ; names: task05.status 
+  head pass 2: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 3: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 4: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 1
+## R3c task06: same inode, birth time moved earlier (touch -t), plus device remount
+before: task06 dev=16777281 inode=30 birth=1793173774 size=478
+## R3b task01 (1.05 MB) replaced by a byte-identical file (new inode and birth), plus the same remount
+remounted: device 16777281 -> 16777285
+after:  task06 dev=16777285 inode=30 birth=1577858400 size=478
+after:  task01 dev=16777285 inode=32957 birth=1793173774 size=1056022
+-- head (FM_WATCHER_STALE_GRACE=6, stall bound 18s; rival arm every 3 s during pass 1)
+  head pass 1: exited rc=0 after ~7s ; signal rows queued=2 ; distinct row keys=2 ; all queued rows=2 ; names: task01.status task06.status 
+  head pass 2: alive-after-60s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 3: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 4: alive-after-60s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 2
+  head beacon [1793176091..1793176395]: passes=4 samples=406 max_age=3s (at 1793176099; running: (bash),fm-watch.sh,) ; startup samples before first beat=2 (max 1s to first beat)
+  rival arms during head pass 1:
+    03:28:12 beacon_age=1s rival: watcher: already running pid 47515 
+    03:28:16 beacon_age=2s rival: watcher: already running pid 47515 
+    03:28:19 beacon_age=0s rival: watcher: already running pid 47515 
+    03:28:22 beacon_age=0s rival: watcher: already running pid 47515 
+    03:28:26 beacon_age=1s rival: watcher: already running pid 47515 
+after: head markers seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+after: task01 seen classified=1056022@strong:16777285:32957:1793173774.553528964 size=1056022
+after: task06 seen classified=478@strong:16777285:30:1577858400.000000000
+-- base (comparison; rival arm every 3 s during pass 1)
+  base pass 1: exited rc=0 after ~7s ; signal rows queued=28 ; distinct row keys=14 ; all queued rows=28 ; names: task01.status task01.status task02.status task02.status task03.status task03.status task04.status task04.status task05.status task05.status task06.status task06.status task07.status task07.status task08.status task08.status task09.status task09.status task10.status task10.status task11.status task11.status task12.status task12.status task13.status task13.status task14.status task14.status 
+  base pass 2: alive-after-60s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base TOTAL signal wakes this round: 28
+  base beacon [1793176396..1793176558]: passes=2 samples=209 max_age=12s (at 1793176412; running: ) ; startup samples before first beat=2 (max 0s to first beat)
+  rival arms during base pass 1:
+    03:33:17 beacon_age=1s rival: watcher: already running pid 21777 
+    03:33:20 beacon_age=0s rival: watcher: already running pid 21777 
+    03:33:25 beacon_age=5s rival: watcher: already running pid 21777 
+    03:33:29 beacon_age=9s rival: watcher: already running pid 21777 
+    03:33:32 beacon_age=12s rival: watcher: lock held by live pid 21777 but heartbeat is stale for 13s (>6s); inspect or stop that watcher before re-arming. 

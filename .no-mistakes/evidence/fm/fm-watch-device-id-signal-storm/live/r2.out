@@ -1,0 +1,20 @@
+## R2 two logs grew (task03, task04 got a done: line), then device remount (FM_WATCHER_STALE_GRACE=6)
+remounted: device 16777277 -> 16777281
+-- head
+  head pass 1: exited rc=0 after ~1s ; signal rows queued=2 ; distinct row keys=2 ; all queued rows=2 ; names: task03.status task04.status 
+  head pass 2: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 3: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 4: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 2
+  head beacon [1793175612..1793175768]: passes=4 samples=197 max_age=2s (at 1793175655; running: (bash),) ; startup samples before first beat=3 (max 2s to first beat)
+after: head markers seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+after: task03 seen classified=529@strong:16777281:27:1793173774.565444019 size=529
+drain text for the grown logs:
+task03 done: task03 new result appended before the reboot
+task04 done: task04 new result appended before the reboot
+wake annotation: latest wake-EVENT observed at drain, not current state: task03.status: done: task03 new result appended before the reboot
+wake annotation: latest wake-EVENT observed at drain, not current state: task04.status: done: task04 new result appended before the reboot
+-- base (comparison)
+  base pass 1: exited rc=0 after ~4s ; signal rows queued=28 ; distinct row keys=14 ; all queued rows=28 ; names: task01.status task01.status task02.status task02.status task03.status task03.status task04.status task04.status task05.status task05.status task06.status task06.status task07.status task07.status task08.status task08.status task09.status task09.status task10.status task10.status task11.status task11.status task12.status task12.status task13.status task13.status task14.status task14.status 
+  base pass 2: alive-after-60s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base TOTAL signal wakes this round: 28

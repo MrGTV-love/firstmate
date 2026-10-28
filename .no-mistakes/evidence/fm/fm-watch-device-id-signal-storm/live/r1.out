@@ -1,0 +1,21 @@
+## R1 device-only remount, no log changed (FM_WATCHER_STALE_GRACE=6)
+before: head markers seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+before: base markers seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+before: task03 seen marker: v2	r1:343738007374726f6e673a31363737373233393a32373a31373933... classified=478@strong:16777239:27:1793173774.565444019
+before: task01 hb marker classified field: 1056022@strong:16777239:25:1793173774.547381019
+remounted: device 16777239 -> 16777277
+log identity now: 16777277:27:1793173774 (dev:inode:birth)
+-- head
+  head pass 1: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 2: alive-after-30s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 0
+  head beacon [1793175306..1793175446]: passes=2 samples=196 max_age=2s (at 1793175390; running: sleep,) ; startup samples before first beat=1 (max 0s to first beat)
+after: head markers seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+after: task03 seen marker classified field: 478@strong:16777277:27:1793173774.565444019
+after: task01 hb marker classified field: 1056022@strong:16777277:25:1793173774.547381019
+after: task02 seen marker classified field (was unclassified): 1584022@strong:16777277:26:1793173774.554497093
+-- base (comparison)
+  base pass 1: exited rc=0 after ~5s ; signal rows queued=28 ; distinct row keys=14 ; all queued rows=28 ; names: task01.status task01.status task02.status task02.status task03.status task03.status task04.status task04.status task05.status task05.status task06.status task06.status task07.status task07.status task08.status task08.status task09.status task09.status task10.status task10.status task11.status task11.status task12.status task12.status task13.status task13.status task14.status task14.status 
+  base pass 2: alive-after-60s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  base TOTAL signal wakes this round: 28
+after: base markers seen=14/14 hb=14/14

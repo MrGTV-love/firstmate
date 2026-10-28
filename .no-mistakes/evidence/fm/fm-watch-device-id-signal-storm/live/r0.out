@@ -1,0 +1,25 @@
+## R0 prime on device 16777239: first sighting of 14 logs (task01 1.05 MB, task02 1.6 MB); FM_WATCHER_STALE_GRACE=6 => stall bound 18s
+-- head
+  head pass 1: exited rc=0 after ~26s ; signal rows queued=14 ; distinct row keys=14 ; all queued rows=14 ; names: task01.status task02.status task03.status task04.status task05.status task06.status task07.status task08.status task09.status task10.status task11.status task12.status task13.status task14.status 
+  head pass 2: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=1
+  head pass 3: alive-after-600s (no wake; stopped by harness) ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head pass 4: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=0
+  head TOTAL signal wakes this round: 14
+  head beacon during prime [1793173781..1793175255]: passes=4 samples=1972 max_age=8s (at 1793174750; running: (bash),) ; startup samples before first beat=2 (max 2s to first beat)
+  head span-read captures seen (name alive-seconds):
+    .task01.open-decisions-cursor.span.70352.span alive 16s (1793173785..1793173801)
+    .task02.open-decisions-cursor.span.70352.span alive 36s (1793173801..1793173837)
+    .task04.open-decisions-cursor.span.70352.span alive 0s (1793173838..1793173838)
+    .task07.open-decisions-cursor.span.70352.span alive 0s (1793173839..1793173839)
+    .task10.open-decisions-cursor.span.70352.span alive 0s (1793173839..1793173839)
+-- base
+  base pass 1: exited rc=0 after ~4s ; signal rows queued=28 ; distinct row keys=14 ; all queued rows=28 ; names: task01.status task01.status task02.status task02.status task03.status task03.status task04.status task04.status task05.status task05.status task06.status task06.status task07.status task07.status task08.status task08.status task09.status task09.status task10.status task10.status task11.status task11.status task12.status task12.status task13.status task13.status task14.status task14.status 
+  base pass 2: exited rc=0 after ~0s ; signal rows queued=0 ; distinct row keys=0 ; all queued rows=1
+  (base pass 3 stopped by operator after ~21s quiet; base queue rows now=0)
+lab-head markers on device 16777239: seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+  lab-head task01 seen classified=1056022@strong:16777239:25:1793173774.547381019 size=1056022
+  lab-head task02 seen classified=1584022@strong:16777239:26:1793173774.554497093 size=1584022
+lab-base markers on device 16777239: seen=14/14 hb=14/14 ; seen-reported-current=14/14 hb-reported-current=14/14
+  lab-base task01 seen classified=478@strong:16777239:46:1793173774.794201526 size=478
+  lab-base task02 seen classified=478@strong:16777239:47:1793173774.799377717 size=478
+head watcher stderr:
