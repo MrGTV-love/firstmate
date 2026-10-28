@@ -95,6 +95,15 @@ jobs:
         run: bin/fm-guard-refcheck.sh
       - name: Enforce the guard registry contract and its ratchet
         run: bin/fm-guard-lint.sh --mode enforce --counts
+      # New work cannot add debt: a refusal site on a changed line must map to a
+      # guard, and the burn-down allowlist may not grow against the PR base.
+      - name: Enforce the guard ratchet against the pull request base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          bin/fm-guard-lint.sh --mode new-or-touched --base FETCH_HEAD
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
