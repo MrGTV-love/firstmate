@@ -433,7 +433,6 @@ Refresh the duration table from successful `end` records' `duration_ms`, retaini
 `tests/fm-lint.test.sh` proves the measured-cost selection with equal-byte roots whose independently seeded durations require a different split.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
 Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, and shared-cache invalidation.
-`bin/fm-lint.sh --check-version` compares the pinned ShellCheck and actionlint versions with the latest upstream releases (exit 0 current, 1 behind, 2 unknown) without needing either local linter; `.github/workflows/lint-currency.yml` runs it weekly so the pins are refreshed deliberately instead of floating.
 `tests/fm-lint-report.test.sh` verifies initial analysis flags, fallback reporting, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
 No fast mode, path skips, or paid runner provisioning is part of this layout.
