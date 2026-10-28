@@ -1,0 +1,8 @@
+base tests/fm-watcher-lock.test.sh              FM_TEST_ONLY=test_renamed_away exit=0 | tests/fm-watcher-lock.test.sh: line 3040: test_renamed_away: command not found
+base tests/fm-fork-free-helpers.test.sh         FM_TEST_ONLY=test_renamed_away exit=127 | tests/fm-fork-free-helpers.test.sh: line 229: test_renamed_away: command not found
+base tests/fm-supervision-fork-budget.test.sh   FM_TEST_ONLY=test_renamed_away exit=127 | tests/fm-supervision-fork-budget.test.sh: line 654: test_renamed_away: command not found
+base tests/fm-procevent.test.sh                 FM_TEST_ONLY=test_renamed_away exit=124 | Terminated: 15
+head tests/fm-watcher-lock.test.sh              FM_TEST_ONLY=test_renamed_away exit=2 | Unknown test case: test_renamed_away (not defined by fm-watcher-lock.test.sh)
+head tests/fm-fork-free-helpers.test.sh         FM_TEST_ONLY=test_renamed_away exit=2 | Unknown test case: test_renamed_away (not defined by fm-fork-free-helpers.test.sh)
+head tests/fm-supervision-fork-budget.test.sh   FM_TEST_ONLY=test_renamed_away exit=2 | Unknown test case: test_renamed_away (not defined by fm-supervision-fork-budget.test.sh)
+head tests/fm-procevent.test.sh                 FM_TEST_ONLY=test_renamed_away exit=2 | Unknown test case: test_renamed_away (not defined by fm-procevent.test.sh)

@@ -1,0 +1,9 @@
+FM_TEST_ONLY=rm                                   exit=2 | Unknown test case: rm (not defined by fm-watcher-lock.test.sh)
+FM_TEST_ONLY=helper_not_here                      exit=2 | Unknown test case: helper_not_here (not defined by fm-watcher-lock.test.sh)
+FM_TEST_ONLY=test_                                exit=2 | Unknown test case: test_ (not defined by fm-watcher-lock.test.sh)
+FM_TEST_ONLY=test_x\;touch\ /tmp/fm-pwned-marker  exit=2 | Unknown test case: test_x;touch /tmp/fm-pwned-marker (not defined by fm-watcher-lock.test.sh)
+FM_TEST_ONLY=touch\ /tmp/fm-pwned-marker          exit=2 | Unknown test case: touch /tmp/fm-pwned-marker (not defined by fm-watcher-lock.test.sh)
+FM_TEST_ONLY=fail                                 exit=2 | Unknown test case: fail (not defined by fm-watcher-lock.test.sh)
+no marker file: no injected command ran
+positional injection exit=2 | Unknown test case: test_x;touch /tmp/fm-pwned-marker (not defined by fm-teardown-pool.test.sh)
+no marker file

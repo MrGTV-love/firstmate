@@ -1,0 +1,10 @@
+tests/fm-watcher-lock.test.sh              FM_TEST_ONLY=test_wait_deadline_reaps_a_stopped_child exit=0 ok-lines=2
+tests/fm-copy-sweep.test.sh                FM_TEST_ONLY=test_report_lists_every_copy_and_changes_nothing exit=0 ok-lines=1
+tests/fm-fork-free-helpers.test.sh         FM_TEST_ONLY=test_interpreters exit=0 ok-lines=0
+tests/fm-supervision-fork-budget.test.sh   FM_TEST_ONLY=test_interpreters exit=0 ok-lines=0
+tests/fm-launch-proof.test.sh              FM_TEST_ONLY=test_launch_proof_omp_executable_identity exit=0 ok-lines=1
+tests/fm-arm-pretool-check.test.sh         FM_TEST_ONLY=test_full_acceptance_matrix exit=0 ok-lines=201
+tests/fm-fork-free-helpers.test.sh         FM_TEST_ONLY=test_epoch_helper_matches_date_and_never_forks_more exit=0 | ok - fm_epoch_seconds_to reads the clock like date +%s and forks date at most as often 
+tests/fm-supervision-fork-budget.test.sh   FM_TEST_ONLY=test_run_ledger_scan_starts_no_subshell_per_row exit=0 | ok - a 201-row run ledger is read in 4 subshells (bound 20) 
+
+Note: test_interpreters (rows 3-4) is a test_-prefixed helper, not a registered case; the FM_TEST_ONLY selector accepts any defined test_ function, as it did on main. The last two rows use real cases.

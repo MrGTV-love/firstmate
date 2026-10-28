@@ -1,0 +1,14 @@
+### A. CI-selected case mutated to 'return 5' (stock /bin/bash, exactly as ci.yml runs it)
+base: exit=0 | MUTANT: returning 5
+head: exit=5 | MUTANT: returning 5
+
+### B. teardown-pool single case registered after the set -e marker: errexit state
+base: exit=0 | ERREXIT=on ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage 
+head: exit=0 | ERREXIT=on ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage 
+
+### C. planted bare "$FM_TEST_ONLY" reader in tests/fm-wake-queue.test.sh; run fm-test-fixtures in the mutant tree
+mutant fm-test-fixtures exit=1
+not ok - standalone fixture did not stop at the tmux launch
+not ok - Git fixture config isolation
+
+Note: the section C run above was in a plain git-archive copy with no .git, so fm-test-fixtures stopped at earlier git-dependent cases before reaching the selector check. The re-run in a git-initialised copy is in mutation-planted-selector.txt.

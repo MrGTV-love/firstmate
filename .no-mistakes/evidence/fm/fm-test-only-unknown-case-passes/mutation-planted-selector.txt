@@ -1,0 +1,21 @@
+### C. planted `if [ -n "${FM_TEST_ONLY:-}" ]; then "$FM_TEST_ONLY"; exit 0; fi` at tests/fm-wake-queue.test.sh:4380 in a disposable head copy
+ok - fixture timing defaults off, preserves production evidence, and explicitly isolated samples survive re-sourcing
+ok - runner and shared helpers isolate host Git config and preserve explicit config and outside commits
+ok - shared helpers and runner keep fixture Git off an inherited repository location
+ok - agent stand-in: a multicall sleep is refused, and the compiled stand-in survives a harness name
+ok - fm_touch_epoch preserves both epochs in the repeated DST hour
+ok - fake no-mistakes --version is the shared constant and overridable
+ok - init/doctor no-mistakes stub touches markers and refuses other verbs
+ok - fake gh authenticates and fake gh-axi reports the shared version
+ok - spawn fakebin answers pane path, logs -l payloads, and installs extra tools
+ok - send stubs log typed text and fake ssh records argv with a controllable exit
+ok - spawn-home layout writes harness pin, beat, and brief
+ok - an unknown case name is refused with a message naming it, exit 2, and no case runs
+ok - a name that is not a defined test_ function is refused rather than executed
+ok - the selected case's own status is the file's status, and an empty selector runs everything
+ok - a registry limits the cases, keeps registration order, runs the before hook for every registered case, and stops at the first failing case
+ok - the selector check names each read outside lib.sh by file and line, and skips comments, lib.sh and other variables
+not ok - these test files read FM_TEST_ONLY themselves; select cases through fm_test_only in tests/lib.sh:
+/tmp/fm-mut.Ob3K03/tests/fm-wake-queue.test.sh:4380:if [ -n "${FM_TEST_ONLY:-}" ]; then "$FM_TEST_ONLY"; exit 0; fi
+not ok - Single-case selector ownership
+mutant fm-test-fixtures exit=1

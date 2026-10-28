@@ -1,0 +1,46 @@
+== public-followup exit=0
+ok - first register succeeds with an empty lock list under /bin/bash
+== watch-triage exit=0
+ok - a churning turn-end inside an already-open deferral window is absorbed without re-marking
+== backend exit=0
+ok - fm_backend_source: missing adapter fails before lifecycle continuation
+ok - fm_backend_source: unreadable adapter fails before lifecycle continuation
+== procevent short name
+== procevent-short exit=0
+ok - read preserves all nine captured list items including messages and nested targets
+ok - list choices preserve keyed answers, close mode, and latest-selection precedence
+ok - list items with image attachments keep their words, choices, and attachment paths
+ok - read never certifies an item whose attachments cannot all be decoded
+ok - read accepts both collection names and decodes quoted list scalars
+ok - unparseable or missing feedback headers are unreadable, never empty
+ok - read retains valid list neighbors without certifying malformed items
+ok - read distinguishes a live captain message from a session-ending message
+ok - read names the message count with the same label as the message section
+ok - read presents every annotation and a distinct session-ending message
+ok - read never certifies rows missing declared fields as complete
+ok - read keeps every annotation when the session-ending message is absent
+ok - read surfaces a typed comment on an annotated element
+ok - read still surfaces a typed comment that matches the element text
+ok - read still presents a pure annotation with no comment
+ok - read does not present choice context as a comment
+ok - read still presents a pure message with no selector
+ok - read distinguishes a feedback capture from an ended-with-nothing close
+== procevent-full-name exit=0
+ok - read preserves all nine captured list items including messages and nested targets
+ok - list choices preserve keyed answers, close mode, and latest-selection precedence
+ok - list items with image attachments keep their words, choices, and attachment paths
+ok - read never certifies an item whose attachments cannot all be decoded
+ok - read accepts both collection names and decodes quoted list scalars
+ok - unparseable or missing feedback headers are unreadable, never empty
+ok - read retains valid list neighbors without certifying malformed items
+ok - read distinguishes a live captain message from a session-ending message
+ok - read names the message count with the same label as the message section
+ok - read presents every annotation and a distinct session-ending message
+ok - read never certifies rows missing declared fields as complete
+ok - read keeps every annotation when the session-ending message is absent
+ok - read surfaces a typed comment on an annotated element
+ok - read still surfaces a typed comment that matches the element text
+ok - read still presents a pure annotation with no comment
+ok - read does not present choice context as a comment
+ok - read still presents a pure message with no selector
+ok - read distinguishes a feedback capture from an ended-with-nothing close
