@@ -509,12 +509,15 @@ test_single_case_selection() (
   run_file X=1 -- "$dir/registered.test.sh"
   [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_beta\nran-beta' ] \
     || fail "no request did not run every registered case: rc=$rc out=$out"
+  run_file X=1 -- "$dir/registered.test.sh" test_beta
+  [ "$rc" -eq 0 ] && [ "$out" = $'before-test_alpha\nbefore-test_beta\nran-beta' ] \
+    || fail "the before hook did not see the unselected earlier case: rc=$rc out=$out"
   run_file X=1 -- "$dir/registered.test.sh" test_unregistered
   [ "$rc" -eq 2 ] && [ -z "$out" ] || fail "a defined but unregistered case was not refused: rc=$rc out=$out"
   run_file FM_FIXTURE_CASES='test_alpha test_returns_seven test_beta' -- "$dir/registered.test.sh"
   [ "$rc" -eq 7 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_returns_seven\nran-returns-seven' ] \
     || fail "a registered case returning 7 did not end the full run: rc=$rc out=$out"
-  pass "a registry limits the cases, keeps registration order, runs the before hook, and stops at the first failing case"
+  pass "a registry limits the cases, keeps registration order, runs the before hook for every registered case, and stops at the first failing case"
 )
 
 # fm_test_only in tests/lib.sh is the only reader of FM_TEST_ONLY: a file that

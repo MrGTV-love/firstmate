@@ -173,8 +173,9 @@ pass() {
 #   registered case runs when none is requested. Without them, a requested name
 #   must be a defined test_ function and runs in the order given. The first case
 #   to return nonzero ends the file with that status. A file that must prepare
-#   state before a particular case defines fm_test_before_case, which receives
-#   the case name.
+#   state at a particular point in its registry defines fm_test_before_case,
+#   which receives each registered case name in order, selected or not, so a
+#   selected case runs in the same shell state as in the full run.
 # fm_test_only [short-name=test_function...]
 #   For a file that selects one case by FM_TEST_ONLY: does nothing when the
 #   variable is empty, otherwise runs that case, or the case a given short name
@@ -202,7 +203,6 @@ fm_test_case_known() {
 
 fm_test_run_one() {
   local rc
-  if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$1"; fi
   "$1"
   rc=$?
   [ "$rc" -eq 0 ] || exit "$rc"
@@ -236,6 +236,7 @@ fm_test_run_cases() {
   fi
 
   for case_name in "${registered[@]}"; do
+    if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$case_name"; fi
     if [ "$#" -gt 0 ]; then
       selected=false
       for name in "$@"; do
