@@ -128,13 +128,13 @@ fm_idle_reap_classify() {
       IDLE_REAP_DETAIL="busy state $busy"
       return 0
     fi
-    if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
-      return 0
-    fi
     fm_epoch_seconds_to now
     if [ "$memo_applies" = 1 ] \
       && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
       IDLE_REAP_CLASS=refused
+      return 0
+    fi
+    if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
       return 0
     fi
     IDLE_REAP_CLASS=reap
@@ -187,9 +187,6 @@ fm_idle_reap_classify() {
     fi
     return 0
   fi
-  if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
-    return 0
-  fi
   if ! open=$(status_open_decisions "$status" "$IDLE_REAP_KIND"); then
     IDLE_REAP_CLASS=parked
     IDLE_REAP_DETAIL="status log unreadable past the read limits; cleanup ineligible"
@@ -233,6 +230,9 @@ fm_idle_reap_classify() {
   if [ "$memo_applies" = 1 ] \
     && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
     IDLE_REAP_CLASS=refused
+    return 0
+  fi
+  if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
     return 0
   fi
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.

@@ -81,8 +81,9 @@
 # backlog of every local home above it, walking the parent bindings its parent
 # channel uses (fm_local_home_chain in bin/fm-secondmate-parent-lib.sh), so the
 # captain's home declares a freeze once for every local home below it; a
-# binding, a link, or a backlog that cannot be read, a cycle, or a chain past
-# the walk's bound is exit 2 naming the failed link. The walk stops at a remote
+# binding, a link, or a backlog that cannot be read, a home on the walk with
+# the secondmate marker but no binding, a cycle, or a chain past the walk's
+# bound is exit 2 naming the failed link. The walk stops at a remote
 # binding: a remote parent has no home on this machine to read, so a freeze
 # above it is not seen. The idle reaper (bin/fm-idle-reap-lib.sh)
 # asks it before any automatic teardown. docs/captain-hold-lifecycle.md owns
@@ -1286,8 +1287,8 @@ body_hold_set_timestamp() {  # <decoded-task-body>
     | head -1
 }
 
-write_hold_set_stamp() {  # <task-id> <shown-body> <timestamp> <preserve-existing-0-or-1>
-  local id=$1 body=$2 hold_set=$3 preserve=$4 existing new_body tmp
+write_hold_set_stamp() {  # <task-id> <shown-body> <timestamp> <preserve-existing-0-or-1> [<kept-freeze-project>]
+  local id=$1 body=$2 hold_set=$3 preserve=$4 freeze=${5:-} existing new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   existing=$(body_hold_set_timestamp "$body")
@@ -1302,6 +1303,15 @@ write_hold_set_stamp() {  # <task-id> <shown-body> <timestamp> <preserve-existin
     esac
   fi
   new_body=$(printf 'Captain hold set: %s' "$hold_set")
+  if [ -n "$freeze" ]; then
+    body=$(printf '%s\n' "$body" | awk '
+      BEGIN { header = 1 }
+      header && NF == 0 { header = 0 }
+      header && /^Captain hold freezes project: / { next }
+      NF || started { started = 1; print }
+    ')
+    new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$freeze")
+  fi
   if [ -n "$body" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$body")
   fi
@@ -1567,12 +1577,8 @@ command_hold() {
       hold_set=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     done
   fi
-  write_hold_set_stamp "$id" "$(show_field "$show" body)" "$hold_set" "$preserve_hold_set"
+  write_hold_set_stamp "$id" "$(show_field "$show" body)" "$hold_set" "$preserve_hold_set" "$existing_freeze"
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
-  if [ -n "$existing_freeze" ]; then
-    write_hold_freeze "$id" "$(show_field "$show" body)" "$existing_freeze"
-    task_show_or_fail "$id" "task $id disappeared while keeping its freeze"
-  fi
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id did not retain its hold-set stamp"
   if [ -n "$origin" ]; then
@@ -2927,7 +2933,7 @@ command_freeze() {
 # open call's own record, so a body that only quotes the declaration line below
 # its header block, or a closed or released row, freezes nothing.
 backlog_freeze_hold() {  # <data-dir> <project>
-  local data root backend file listing rows expected hold state hold_kind show declared
+  local data root backend file listing rows expected hold state hold_kind show body declared
   data=$(fm_backlog_data_absolute "$1") \
     || { printf 'fm-captain-hold: data directory cannot be resolved: %s\n' "$1" >&2; return 2; }
   root=$(fm_backlog_root "$data") \
@@ -2978,8 +2984,16 @@ backlog_freeze_hold() {  # <data-dir> <project>
       return 2
     }
     [ "$(show_field "$show" state)" != "done" ] || continue
-    [ "$(show_field_value "$show" hold_kind)" = captain ] || continue
-    declared=$(body_hold_freeze_project "$(decode_shown_value "$(show_field "$show" body)")") || declared=
+    hold_kind=$(decode_shown_value "$(show_field "$show" hold_kind)") || {
+      printf 'fm-captain-hold: the hold kind of captain call %s could not be decoded\n' "$hold" >&2
+      return 2
+    }
+    [ "$hold_kind" = captain ] || continue
+    body=$(decode_shown_value "$(show_field "$show" body)") || {
+      printf 'fm-captain-hold: the body of captain call %s could not be decoded\n' "$hold" >&2
+      return 2
+    }
+    declared=$(body_hold_freeze_project "$body")
     if [ "$declared" = "$2" ]; then
       printf '%s\n' "$hold"
       return 0
@@ -3028,6 +3042,15 @@ command_frozen() {
   chain=$(fm_local_home_chain "$FM_HOME") || exit 2
   while IFS= read -r ancestor; do
     [ -n "$ancestor" ] || continue
+    rc=0
+    fm_parent_channel_destination "$ancestor" "$ancestor/state" >/dev/null || rc=$?
+    case "$rc" in
+      0|1) ;;
+      *)
+        printf 'fm-captain-hold: the parent binding of secondmate home %s cannot be read\n' "$ancestor" >&2
+        exit 2
+        ;;
+    esac
     rc=0
     hold=$(backlog_freeze_hold "$ancestor/data" "$project") || rc=$?
     case "$rc" in

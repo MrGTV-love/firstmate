@@ -845,9 +845,9 @@ test_secondmate_parent_freeze() {
 
 # A freeze at the captain's home reaches every local home below it: a
 # grandchild mate walks each local parent binding up to the root and reads
-# every backlog on the way. A middle link that cannot be read, or a binding that
-# loops back, parks the task and names the failed link, and the root's release
-# frees it.
+# every backlog on the way. A middle link that is missing or cannot be read, or
+# a binding that loops back, parks the task and names the failed link, and the
+# root's release frees it.
 test_grandchild_mate_root_freeze() {
   local root mid grand pr=https://github.com/acme/widget/pull/41 out
   root=$(make_home freeze-root)
@@ -877,6 +877,13 @@ test_grandchild_mate_root_freeze() {
   esac
 
   mv "$mid/.fm-secondmate-parent" "$mid/.fm-secondmate-parent.off"
+  out=$(run_reap "$grand" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-grand-merged parked "a middle mate whose binding is missing parks the task"
+  case "$(row_detail "$out" vernant-grand-merged)" in
+    *"captain freeze unreadable"*"parent binding of"*"freeze-mid"*) ;;
+    *) fail "the parked row must name the middle mate's missing binding: $(row_detail "$out" vernant-grand-merged)" ;;
+  esac
+
   printf 'garbage\n' > "$mid/.fm-secondmate-parent"
   out=$(run_reap "$grand" scan) || fail "scan failed: $out"
   expect_class "$out" vernant-grand-merged parked "an unreadable middle link parks the task"

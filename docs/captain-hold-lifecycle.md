@@ -225,7 +225,7 @@ It compares the project named by the task's `project=` metadata with the declara
 | 1 | No open hold declares it, or the task records no project. | Applies its other gates unchanged. |
 | 2 | The answer could not be established. | Parks the task, never reaps it. |
 
-[`bin/fm-idle-reap-lib.sh`](../bin/fm-idle-reap-lib.sh) asks `frozen` for a finished task after its own hold check and for a task whose interrupted teardown left a return-pending record.
+[`bin/fm-idle-reap-lib.sh`](../bin/fm-idle-reap-lib.sh) asks `frozen` as the last gate before a reap verdict, for a finished task and for a task whose interrupted teardown left a return-pending record, so a task that another gate already keeps from teardown pays no backlog read.
 The scan, the locked teardown admission, and the merge-prune check share that classifier, so all three refuse a frozen task.
 A parked row carries the reason in the scan output and in `state/idle-sessions.report`.
 No refusal memo is written, because a memo would outlive the release; the first sweep after the answer finds the task eligible again.
@@ -234,7 +234,7 @@ Only the automatic paths honor a freeze; a teardown the captain or firstmate run
 A local secondmate home also reads, read-only, the backlog of every local home above it.
 It walks the `.fm-secondmate-parent` bindings its [parent channel](secondmate-parent-channel.md) uses, with the same walk, bound, and cycle check that `fm_firstmate_root_home` in [`bin/fm-secondmate-parent-lib.sh`](../bin/fm-secondmate-parent-lib.sh) uses.
 So the captain's home declares a freeze once, for example on Main's `vernant-freeze-20261023`, and no mate or grandchild mate needs a mirror step.
-A binding, a parent home, or a backlog that cannot be read, a cycle, or a chain past the bound is exit 2, and the parked row names the link that failed.
+A binding, a parent home, or a backlog that cannot be read, a home on the walk that carries the secondmate marker but no binding, a cycle, or a chain past the bound is exit 2, and the parked row names the link that failed.
 
 Known limit, not covered: the walk stops at a remote binding, because a remote parent's records cannot be read from this host.
 A remote mate, and every local home below it, sees only the freezes of the local homes it reached; a freeze filed above the remote binding does not stop its reaper.
@@ -599,7 +599,7 @@ The suites do not test the accepted merge-to-cleanup re-hold window or asynchron
 - Rewriting the origin keeps the declaration, a second `freeze` replaces it, and an answer ends it even when the same task is held again.
 - A hold whose `--until` date has passed still freezes, accepts `freeze`, and keeps the declaration when it is held again.
 - An unreadable backlog is exit 2, never exit 1.
-- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, a secondmate home honors its parent's freeze and parks the task when the parent cannot be read, and a grandchild mate honors a freeze at the root, parks on an unreadable middle link or a cycle, and is eligible again after the root releases it.
+- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, a secondmate home honors its parent's freeze and parks the task when the parent cannot be read, and a grandchild mate honors a freeze at the root, parks on an unreadable or missing middle link or a cycle, and is eligible again after the root releases it.
 
 ### Merges, releases, and unreadable holds
 

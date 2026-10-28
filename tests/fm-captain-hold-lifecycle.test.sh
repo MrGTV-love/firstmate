@@ -1758,6 +1758,8 @@ test_freeze_declaration_scopes_one_project() {
   run_captain "$home" hold revisit-hold --reason "asked again" >/dev/null || fail "re-holding the revisit call failed"
   show=$(tasks_in "$home" show revisit-hold --full)
   assert_contains "$show" "Captain hold freezes project: vernant" "re-holding an open call past its revisit date lost the freeze"
+  [ "$(printf '%s' "$show" | grep -o 'Captain hold freezes project: vernant' | wc -l | tr -d ' ')" = 1 ] \
+    || fail "re-holding an open call past its revisit date must keep exactly one freeze line: $show"
   out=$(run_captain "$home" frozen in-scope) || fail "re-holding an open call must not lift its freeze"
   assert_equals revisit-hold "$out" "the re-held call still freezes"
 
