@@ -111,6 +111,7 @@ import { Type } from "typebox";
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
 import { installTaskSessionProof, resolveLocalSecondmateTask } from "./lib/fm-task-session.ts";
 import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
+import { taskWorkerSession } from "./lib/fm-task-worker.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -798,6 +799,8 @@ type OmpWatchInstanceApi = {
 };
 
 export default function (pi: ExtensionAPI) {
+  // A task worker is not a home: it arms no watcher and writes no home state.
+  if (taskWorkerSession()) return;
   // A bind while the primary session already runs waits for proof; see the header.
   let awaitingPrimaryProof = primarySessionRunning(pi);
   const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state, { claim: !awaitingPrimaryProof });

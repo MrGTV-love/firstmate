@@ -84,7 +84,9 @@ export FM_MERGE_PRUNE=0
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
+# under the marker; the omp primary extensions it loads as a home also skip
+# their home setup under it (.omp/extensions/lib/fm-task-worker.ts). A case that
+# verifies either behavior sets FM_TASK_ID itself.
 unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks

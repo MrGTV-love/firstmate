@@ -3398,7 +3398,7 @@ else
       trap - EXIT HUP INT TERM
       set +e
       unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
-        FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+        FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND FM_TASK_ID 2>/dev/null || true
       cd "$ROOT" || exit 1
       if declare -F fm_duration_load >/dev/null 2>&1; then
         fm_duration_load >"$work/load_start"
