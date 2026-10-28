@@ -70,6 +70,9 @@ CONTINUE_LINE=${FM_GUARD_CONTINUE_LINE:-This is a supervision warning only; the 
 # Cleared when the home leaves the unhealthy state so a later episode re-arms.
 STALE_BANNER_MARKER="$STATE/.guard-watcher-stale-banner"
 
+# BEGIN temporary guard phase diagnostic boundary
+guard_phase_t0=${EPOCHREALTIME:-}
+# END temporary guard phase diagnostic boundary
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-tangle-lib.sh
@@ -80,6 +83,10 @@ STALE_BANNER_MARKER="$STATE/.guard-watcher-stale-banner"
 . "$SCRIPT_DIR/fm-supervision-liveness-lib.sh"
 # shellcheck source=bin/fm-lease-lib.sh
 . "$SCRIPT_DIR/fm-lease-lib.sh"
+# BEGIN temporary guard phase diagnostic boundary
+guard_phase_loading_status=$?
+guard_phase_t1=${EPOCHREALTIME:-}
+# END temporary guard phase diagnostic boundary
 
 # The current actor (fm_lease_actor is the one owner of that identity); a
 # malformed value is a wiring bug elsewhere, so the guard just warns as main.
@@ -159,6 +166,9 @@ fm_guard_clear_stale_banner() {
 # the primary is stranded on a feature branch - surface it loudly on the very next
 # fleet action, the same way the watcher-down banner does. Scoped to the primary
 # only: detached HEAD (linked worktrees, secondmate homes) never trips this.
+# BEGIN temporary guard phase diagnostic boundary
+guard_phase_t2=${EPOCHREALTIME:-}
+# END temporary guard phase diagnostic boundary
 tangle_branch=$(fm_primary_tangle_branch "$FM_ROOT" || true)
 if [ -n "$tangle_branch" ]; then
   tangle_default=$(fm_default_branch "$FM_ROOT" 2>/dev/null || echo main)
@@ -179,6 +189,10 @@ if [ -n "$tangle_branch" ]; then
     printf '●%s\n' "$trule"
   } >&2
 fi
+# BEGIN temporary guard phase diagnostic boundary
+guard_phase_tangle_status=$?
+guard_phase_t3=${EPOCHREALTIME:-}
+# END temporary guard phase diagnostic boundary
 
 # Compute the need counts through the shared grace-based predicate
 # (bin/fm-supervision-lib.sh), then ask the shared liveness owner for the
@@ -206,6 +220,42 @@ if [ "$needed" = true ]; then
     esac
   fi
 fi
+# BEGIN temporary guard phase diagnostic
+# Opt-in CI attribution only (FM_GUARD_PHASE_DURATION_FILE). Each boundary above
+# is one Bash 5 builtin EPOCHREALTIME read with no subprocess; it is wall clock,
+# not monotonic, and not CPU. A row's exit is the saved status of its shell list,
+# not proof every command inside passed. An unsupported shell, a malformed stamp
+# or a reversed pair records no row: nothing is clamped, guessed or zero-filled.
+guard_phase_status_liveness_status=$?
+guard_phase_t4=${EPOCHREALTIME:-}
+fm_guard_phase_us() {  # <epochrealtime>; sets guard_phase_us
+  [[ $1 =~ ^([0-9]{1,12})[.,]([0-9]{6})$ ]] || return 1
+  guard_phase_us=$((10#${BASH_REMATCH[1]} * 1000000 + 10#${BASH_REMATCH[2]}))
+}
+fm_guard_phase_row() {  # <key> <start> <end> <status>; appends one valid row
+  local start
+  fm_guard_phase_us "$2" || return 0
+  start=$guard_phase_us
+  fm_guard_phase_us "$3" || return 0
+  [ "$guard_phase_us" -ge "$start" ] || return 0
+  printf -v guard_phase_row '%s\t%s\t%s\t0\t\t\t0' "$1" "$(((guard_phase_us - start) / 1000))" "$4"
+  guard_phase_rows+=$guard_phase_row$'\n'
+}
+if [ -n "${FM_GUARD_PHASE_DURATION_FILE:-}" ]; then
+  guard_phase_rows=
+  fm_guard_phase_row diag.guard.force-override.loading \
+    "$guard_phase_t0" "$guard_phase_t1" "$guard_phase_loading_status"
+  fm_guard_phase_row diag.guard.force-override.tangle \
+    "$guard_phase_t2" "$guard_phase_t3" "$guard_phase_tangle_status"
+  fm_guard_phase_row diag.guard.force-override.status-liveness \
+    "$guard_phase_t3" "$guard_phase_t4" "$guard_phase_status_liveness_status"
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$SCRIPT_DIR/fm-duration-lib.sh"
+  FM_DURATION_FILE="$FM_GUARD_PHASE_DURATION_FILE" fm_duration_record_batch <<EOF
+$guard_phase_rows
+EOF
+fi
+# END temporary guard phase diagnostic
 if [ "$needed" = false ]; then
   # Leave the unhealthy state (nothing riding on the watcher): clear so a later
   # work or X-mode need + stale combination is a fresh episode even if the

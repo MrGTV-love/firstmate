@@ -31,7 +31,10 @@ test_local_only_force_overrides_unpushed() {
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
   rc=0
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  # Temporary CI attribution: the hosted runner keeps guard phase walls with
+  # the shard timing artifact; without RUNNER_TEMP nothing is measured.
+  FM_GUARD_PHASE_DURATION_FILE=${RUNNER_TEMP:+$RUNNER_TEMP/fm-test/guard-phase-durations.jsonl} \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"

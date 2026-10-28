@@ -271,7 +271,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fm-test-timing-portable-serial-${{ matrix.shard }}
-          path: ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
+          path: |
+            ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
+            ${{ runner.temp }}/fm-test/guard-phase-durations.jsonl
           if-no-files-found: warn
 
   # Required real-Herdr lane: pinned install, serial real-herdr-gated family,
