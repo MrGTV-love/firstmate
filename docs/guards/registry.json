@@ -535,7 +535,7 @@
       "remedy_verified": "fixture"
     },
     {
-      "decision": "warn",
+      "decision": "deny",
       "fail_direction": "closed",
       "proxy": false,
       "proxy_reason": "",
