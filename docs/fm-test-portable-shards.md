@@ -154,7 +154,7 @@ The six captain-hold group hints of that table were not slowest-run samples beca
 
 The former combined `tests/fm-captain-hold-lifecycle.test.sh` measured between 773304 ms and 1259266 ms in those eight runs against a 343658 ms hint.
 No lane packing could place a single 21-minute member beside the other shard-2 members inside a 30-minute job.
-Its 116 cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
+Its 117 cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
 
 | File | Area |
 |---|---|

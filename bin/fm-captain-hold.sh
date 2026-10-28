@@ -21,7 +21,10 @@
 #
 # Usage:
 #   fm-captain-hold.sh hold <task-id> --reason <reason> \
-#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD]
+#     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
+#     [--freeze-project <project>]
+#   fm-captain-hold.sh freeze <task-id> --project <project>
+#   fm-captain-hold.sh frozen <task-id>
 #   fm-captain-hold.sh answer <task-id> --decision-file <path> [--release]
 #   fm-captain-hold.sh answers [<legacy-origin> | --any-origin] --source <provenance>   (keyed answers on stdin)
 #   fm-captain-hold.sh reconcile-requests --source-id <source-id> --source <provenance>   (task ids on stdin)
@@ -60,6 +63,25 @@
 # `--until` records the captain's own deferral date through `tasks-axi hold
 # --until`, so a "revisit later" answer is stored as a date instead of a live
 # card.
+#
+# `--freeze-project` and `freeze` declare the one project the hold freezes: a
+# `Captain hold freezes project: <project>` line in the hold's header block (the
+# lines under the hold-set stamp, up to the first blank line), recorded by the
+# captain's own filing command and never inferred from a task name or the
+# hold's repo. `freeze` declares it on a hold that is already open; a second
+# `freeze` replaces the project. Re-holding released work starts a new lifecycle
+# with no freeze: the line lives only in the header block, which an answer moves
+# under the resolution record. `frozen` is the read-only owner predicate behind
+# "is this task frozen by an open captain hold": exit 0 prints the freezing
+# hold's id when an open captain hold in THIS home declares the project named
+# by the task's `project=` metadata, 1 means no open hold declares it, and 2
+# means the answer could not be established, which a mechanical closer must
+# treat as frozen. The idle reaper (bin/fm-idle-reap-lib.sh) asks it before any
+# automatic teardown. A secondmate home sees its parent's freeze through the
+# mirror hold it files in its own backlog (for example d7-hold-vernant-freeze),
+# which declares the same project here; no state crosses between homes.
+# A hold whose `--until` date has passed is no longer listed as held and
+# freezes nothing. docs/captain-hold-lifecycle.md owns the lifecycle.
 #
 # `answer` records the captain's exact words and resolves the call in the same
 # act. It requires a non-empty captain decision file of at most 8192 bytes and
@@ -1310,17 +1332,21 @@ task_identity() {
 }
 
 write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
-  local id=$1 body=$2 origin=$3 stamp rest new_body tmp
+  local id=$1 body=$2 origin=$3 stamp freeze rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its origin was recorded"
-  rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: /' \
+  freeze=$(body_hold_freeze_project "$body")
+  rest=$(printf '%s\n' "$body" | sed 1d | awk '!/^Captain hold origin: / && !/^Captain hold freezes project: /' \
     | awk 'NF || started { started = 1; print }')
   new_body=$stamp
   if [ -n "$origin" ]; then
     new_body=$(printf '%s\nCaptain hold origin: %s' "$stamp" "$origin")
+  fi
+  if [ -n "$freeze" ]; then
+    new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$freeze")
   fi
   if [ -n "$rest" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
@@ -1334,6 +1360,54 @@ write_hold_origin() {  # <task-id> <shown-body> <origin-or-empty>
   if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
     rm -f -- "$tmp"
     fail "could not record the hold origin on $id"
+  fi
+  rm -f -- "$tmp"
+}
+
+# The project a hold freezes is declared in the hold's header block: the lines
+# under the hold-set stamp, up to the first blank line. An answer moves the old
+# header under its resolution record, so a freeze never survives into a later
+# hold of the same task.
+body_hold_freeze_project() {  # <decoded-task-body>
+  printf '%s\n' "$1" | awk '
+    NR == 1 { if ($0 !~ /^Captain hold set: /) exit; next }
+    NF == 0 { exit }
+    /^Captain hold freezes project: [A-Za-z0-9._-]+$/ {
+      sub(/^Captain hold freezes project: /, "")
+      print
+      exit
+    }
+  '
+}
+
+write_hold_freeze() {  # <task-id> <shown-body> <project>
+  local id=$1 body=$2 project=$3 stamp after header rest new_body tmp
+  body=$(decode_shown_value "$body") \
+    || fail "could not decode the existing body for $id"
+  [ -n "$(body_hold_set_timestamp "$body")" ] \
+    || fail "task $id lost its hold-set stamp before its freeze was recorded"
+  stamp=$(printf '%s\n' "$body" | sed -n 1p)
+  after=$(printf '%s\n' "$body" | sed 1d)
+  header=$(printf '%s\n' "$after" | awk 'NF == 0 { exit } !/^Captain hold freezes project: / { print }')
+  rest=$(printf '%s\n' "$after" | awk 'found { print; next } NF == 0 { found = 1 }' \
+    | awk 'NF || started { started = 1; print }')
+  new_body=$stamp
+  if [ -n "$header" ]; then
+    new_body=$(printf '%s\n%s' "$new_body" "$header")
+  fi
+  new_body=$(printf '%s\nCaptain hold freezes project: %s' "$new_body" "$project")
+  if [ -n "$rest" ]; then
+    new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
+  fi
+  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-freeze.XXXXXX") \
+    || fail "cannot stage the hold freeze"
+  if ! printf '%s\n' "$new_body" > "$tmp"; then
+    rm -f -- "$tmp"
+    fail "cannot stage the hold freeze for $id"
+  fi
+  if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
+    rm -f -- "$tmp"
+    fail "could not record the hold freeze on $id"
   fi
   rm -f -- "$tmp"
 }
@@ -1400,7 +1474,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 }
 
 command_hold() {
-  local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
+  local id=${1:-} title='' reason='' repo='' origin='' until='' freeze_project='' freeze_given=0 show state existing_title body='' hold_kind hold_set occurrence
   local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
@@ -1411,6 +1485,7 @@ command_hold() {
       --repo) shift; repo=${1:-} ;;
       --origin) shift; origin=${1:-} ;;
       --until) shift; until=${1:-} ;;
+      --freeze-project) shift; freeze_project=${1:-}; freeze_given=1 ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
@@ -1421,6 +1496,9 @@ command_hold() {
   stored_reason=$(fm_hold_reason_encode "$reason") || fail "could not encode the hold reason"
   if [ -n "$origin" ]; then
     validate_slug origin-id "$origin"
+  fi
+  if [ "$freeze_given" = 1 ]; then
+    validate_slug freeze-project "$freeze_project"
   fi
   if [ -n "$until" ]; then
     case "$until" in
@@ -1517,6 +1595,9 @@ command_hold() {
   occurrence=$(( $(resolution_record_count "$(show_field "$show" body)") + 1 ))
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
     || fail "task $id lost its hold-set stamp while being held"
+  if [ -n "$freeze_project" ]; then
+    write_hold_freeze "$id" "$(show_field "$show" body)" "$freeze_project"
+  fi
   publish_parent_hold "$id" "$occurrence" needs-decision "$reason"
   printf '%s\n' "$id"
 }
@@ -2809,6 +2890,98 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent]
   exit 2
 }
 
+# Declare the project an already-open captain hold freezes (see the header).
+command_freeze() {
+  local id=${1:-} project='' have_project=0 show state
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --project) shift; project=${1:-}; have_project=1 ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+  [ "$have_project" = 1 ] || { usage >&2; exit 2; }
+  validate_slug task-id "$id"
+  validate_slug project "$project"
+  acquire_task_control_lock "$id"
+  require_tasks_axi
+  task_show_or_fail "$id" "task $id does not exist; hold it for the captain first"
+  state=$(show_field "$show" state)
+  [ "$state" != "done" ] \
+    && [ "$(show_field_value "$show" hold_kind)" = captain ] \
+    && [ "$(show_field_value "$show" held)" = yes ] \
+    || fail "task $id is not an open captain hold; hold it for the captain first"
+  write_hold_freeze "$id" "$(show_field "$show" body)" "$project"
+  printf '%s\n' "$id"
+}
+
+# Is this task's project frozen by an open captain hold of this home? Exit 0
+# prints the freezing hold's id, 1 means none declares it, 2 means it could not
+# be established (the header owns the contract). It lists the held rows once and
+# reads each row's own record, so a body that only quotes the declaration line
+# below its header block, or a closed or unheld row, freezes nothing.
+command_frozen() {
+  local id=${1:-} meta project data file root backend ids expected list_rc=0 hold show shown_body declared
+  [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+  case "$id" in
+    ''|*[!A-Za-z0-9._-]*)
+      printf 'fm-captain-hold: task id must be a non-empty privacy-safe slug: %s\n' "$id" >&2
+      exit 2
+      ;;
+  esac
+  meta="$STATE/$id.meta"
+  project=$(meta_value "$meta" project)
+  project=${project%/}
+  project=${project##*/}
+  # No recorded project means no declared scope can name this task.
+  [ -n "$project" ] || return 1
+  data=$(fm_backlog_data_absolute "$DATA") \
+    || { printf 'fm-captain-hold: data directory cannot be resolved: %s\n' "$DATA" >&2; exit 2; }
+  root=$(fm_backlog_root "$data") \
+    || { printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
+  if ! backend=$(fm_tasks_axi_backend_resolve "$root"); then
+    exit 2
+  fi
+  if [ "$backend" = markdown ]; then
+    file=$(fm_backlog_file "$data") \
+      || { printf 'fm-captain-hold: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2; exit 2; }
+    # A home with no backlog file records no captain holds.
+    if [ ! -e "$file" ] && [ ! -L "$file" ]; then
+      return 1
+    fi
+  fi
+  fm_tasks_axi_compatible || { printf 'fm-captain-hold: compatible tasks-axi is required\n' >&2; exit 2; }
+  ids=$(fm_backlog_row_list "$data" --state held) || list_rc=$?
+  expected=$(printf '%s\n' "$ids" | sed -n 's/^count: \([0-9][0-9]*\)$/\1/p' | head -1)
+  ids=$(printf '%s\n' "$ids" | sed -n 's/^  \([A-Za-z0-9._-][A-Za-z0-9._-]*\),.*/\1/p')
+  # A listing that cannot vouch for every held row must not read as "none freeze".
+  if [ "$list_rc" -ne 0 ] || [ -z "$expected" ] || [ "$(printf '%s' "$ids" | grep -c .)" -ne "$expected" ]; then
+    printf 'fm-captain-hold: could not list every held row\n' >&2
+    exit 2
+  fi
+  while IFS= read -r hold; do
+    [ -n "$hold" ] || continue
+    task_show "$hold" || {
+      printf 'fm-captain-hold: held row %s could not be read\n' "$hold" >&2
+      exit 2
+    }
+    show=$TASK_SHOW_OUTPUT
+    [ "$(show_field "$show" state)" != "done" ] || continue
+    [ "$(show_field_value "$show" hold_kind)" = captain ] || continue
+    shown_body=$(show_field "$show" body)
+    declared=$(body_hold_freeze_project "$(decode_shown_value "$shown_body")") || declared=
+    if [ "$declared" = "$project" ]; then
+      printf '%s\n' "$hold"
+      return 0
+    fi
+  done <<EOF
+$ids
+EOF
+  return 1
+}
+
 command_open_bound() {
   local source=${1:-} key=${2:-} origin resolved rc=0
   [ "$#" -eq 2 ] || return 2
@@ -2834,6 +3007,8 @@ case "${1:-}" in
   verify) shift; command_verify "$@" ;;
   open) shift; command_open "$@" ;;
   open-bound) shift; command_open_bound "$@" ;;
+  freeze) shift; command_freeze "$@" ;;
+  frozen) shift; command_frozen "$@" ;;
   diverged) shift; command_diverged "$@" ;;
   reconcile) shift; command_reconcile "$@" ;;
   -h|--help) usage ;;

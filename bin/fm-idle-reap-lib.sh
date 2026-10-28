@@ -61,6 +61,28 @@ fm_idle_reap_exited_by_control() {  # <state> <id>
   fm_mp_pane_agent_gone "$1/$2.meta"
 }
 
+# A captain hold that declares this task's project frozen stops every automatic
+# cleanup of it, whether or not the task has a hold of its own. The answer is
+# bin/fm-captain-hold.sh frozen; an answer it cannot establish also stops
+# cleanup. Sets the parked class and its reason and returns 0 when the task is
+# frozen or unsure, and returns 1 when nothing freezes it.
+fm_idle_reap_frozen() {  # <home> <state> <data> <id>
+  local out rc=0 project
+  out=$(FM_HOME="$1" FM_STATE_OVERRIDE="$2" FM_DATA_OVERRIDE="$3" \
+    "$FM_IDLE_REAP_LIB_DIR/fm-captain-hold.sh" frozen "$4" 2>/dev/null) || rc=$?
+  case "$rc" in
+    0)
+      project=$(fm_meta_get "$2/$4.meta" project)
+      project=${project%/}
+      IDLE_REAP_DETAIL="frozen by captain hold ${out%%$'\n'*}: project ${project##*/} is frozen until the captain releases it"
+      ;;
+    1) return 1 ;;
+    *) IDLE_REAP_DETAIL="captain freeze unreadable; cleanup ineligible" ;;
+  esac
+  IDLE_REAP_CLASS=parked
+  return 0
+}
+
 fm_idle_reap_classify() {
   local home=$1 state=$2 data=$3 id=$4 meta="$2/$4.meta" pr remote busy verb note status declared msg evidence open age now hold_rc=0
   local grace=1800 memo_applies=1
@@ -101,6 +123,9 @@ fm_idle_reap_classify() {
     busy=$(fm_busy_classify_meta "$meta" "$id" "$state")
     if [ "${busy%% *}" = busy ]; then
       IDLE_REAP_DETAIL="busy state $busy"
+      return 0
+    fi
+    if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
       return 0
     fi
     fm_epoch_seconds_to now
@@ -157,6 +182,9 @@ fm_idle_reap_classify() {
     else
       IDLE_REAP_DETAIL="captain hold unreadable; cleanup ineligible"
     fi
+    return 0
+  fi
+  if fm_idle_reap_frozen "$home" "$state" "$data" "$id"; then
     return 0
   fi
   if ! open=$(status_open_decisions "$status" "$IDLE_REAP_KIND"); then

@@ -1689,6 +1689,79 @@ test_hold_ledger_records_creation_direct_answer_and_reconcile() {
   pass "ledger on: a created call, a direct answer, and a reconciliation each write one record; an existing item or a replay writes none"
 }
 
+# A hold declares the one project it freezes in its own header block. `frozen`
+# answers for a task from that declaration only: the task's recorded project must
+# equal it, a plain hold or a quoted declaration below the header freezes nothing,
+# rewriting the origin keeps the declaration, and an answer ends it for good, even
+# when the same task is held again.
+test_freeze_declaration_scopes_one_project() {
+  local home out rc show
+  home=$(make_home freeze-scope)
+  printf 'window=w:in-scope\nkind=ship\nproject=%s/projects/vernant\n' "$home" > "$home/state/in-scope.meta"
+  printf 'window=w:out-scope\nkind=ship\nproject=%s/projects/sample\n' "$home" > "$home/state/out-scope.meta"
+  printf 'window=w:no-project\nkind=ship\n' > "$home/state/no-project.meta"
+
+  run_captain "$home" hold plain-hold --title "Plain" --reason "a question" --repo vernant >/dev/null \
+    || fail "plain hold failed"
+  rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "a hold with no declaration freezes nothing, whatever its repo"
+
+  printf 'Notes quoting the line.\n\nCaptain hold freezes project: vernant\n' > "$home/quoted-body.txt"
+  tasks_in "$home" add quoted-hold "Quotes the line" --kind captain --repo vernant \
+    --body-file "$home/quoted-body.txt" >/dev/null \
+    || fail "could not create the quoting hold"
+  run_captain "$home" hold quoted-hold --reason "quotes the declaration below its header" >/dev/null \
+    || fail "quoting hold failed"
+  rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "a declaration quoted below the header block freezes nothing"
+
+  rc=0; run_captain "$home" freeze plain-hold --project 'vernant/x' >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "a project that is not a plain name is refused"
+  rc=0; run_captain "$home" freeze missing-hold --project vernant >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "freezing a task that does not exist is refused"
+  rc=0; run_captain "$home" hold refused-empty --title "T" --reason "r" --freeze-project '' >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "an empty --freeze-project is refused instead of ignored"
+  run_captain "$home" freeze plain-hold --project vernant >/dev/null || fail "freeze failed"
+  out=$(run_captain "$home" frozen in-scope) || fail "frozen must exit 0 for the declared project"
+  assert_equals plain-hold "$out" "frozen names the freezing hold"
+  rc=0; run_captain "$home" frozen out-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "another project is not frozen"
+  rc=0; run_captain "$home" frozen no-project >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "a task that records no project is never frozen"
+
+  run_captain "$home" freeze plain-hold --project sample >/dev/null || fail "re-declaring the project failed"
+  rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "a second freeze replaces the first project"
+  out=$(run_captain "$home" frozen out-scope) || fail "the replaced project is now frozen"
+  assert_equals plain-hold "$out" "the replacement project is frozen"
+
+  run_captain "$home" hold plain-hold --reason "a question" --origin in-scope >/dev/null \
+    || fail "re-holding with an origin failed"
+  show=$(tasks_in "$home" show plain-hold --full)
+  assert_contains "$show" "Captain hold freezes project: sample" "a hold rewrite lost the freeze declaration"
+  out=$(run_captain "$home" frozen out-scope) || fail "rewriting the origin must not lift the freeze"
+
+  printf 'Not frozen any more.\n' > "$home/answer.txt"
+  run_captain "$home" answer plain-hold --decision-file "$home/answer.txt" --release >/dev/null \
+    || fail "answer --release failed"
+  rc=0; run_captain "$home" frozen out-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "an answered hold no longer freezes"
+  run_captain "$home" hold plain-hold --reason "asked again" >/dev/null || fail "re-hold failed"
+  rc=0; run_captain "$home" frozen out-scope >/dev/null 2>&1 || rc=$?
+  expect_code 1 "$rc" "re-holding released work starts a new lifecycle with no freeze"
+
+  run_captain "$home" hold filed-frozen --title "Frozen at filing" --reason "freeze at filing" \
+    --repo sample --freeze-project vernant >/dev/null || fail "hold --freeze-project failed"
+  out=$(run_captain "$home" frozen in-scope) || fail "a hold filed with --freeze-project must freeze"
+  assert_equals filed-frozen "$out" "the filing command declares the freeze"
+
+  rm -f "$home/.tasks.toml"
+  mkdir "$home/.tasks.toml"
+  rc=0; run_captain "$home" frozen in-scope >/dev/null 2>&1 || rc=$?
+  expect_code 2 "$rc" "an unreadable backlog cannot say a task is unfrozen"
+  pass "a freeze is the project a hold declares: scoped to it, kept through rewrites, ended by the answer"
+}
+
 tests=(
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
@@ -1703,6 +1776,7 @@ test_retained_body_keeps_its_utf8_bytes
 test_completion_gate_attests_and_transfers
 test_answer_records_and_closes
 test_release_frees_held_work
+test_freeze_declaration_scopes_one_project
 test_hold_stamp_precedes_hold_visibility
 test_interrupted_answer_preserves_hold_age
 test_deferral_leaves_captains_call_until_due

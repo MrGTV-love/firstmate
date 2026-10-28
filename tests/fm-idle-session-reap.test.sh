@@ -125,6 +125,12 @@ calls() {
   fi
 }
 
+# The task ids the stand-in teardown was asked about, one per line.
+calls_ids() {
+  [ -f "$STUB_LOG" ] || return 0
+  sed -n 's/.*|args=\([^|]*\)|home=.*/\1/p' "$STUB_LOG"
+}
+
 calls_at_least() { [ "$(calls)" -ge "$1" ]; }
 
 # --- selection -------------------------------------------------------------
@@ -709,6 +715,110 @@ test_captain_holds() {
   pass "durable and unreadable captain holds prevent automatic cleanup"
 }
 
+# A captain hold that declares a project frozen keeps the sweep, and the
+# teardown admission it relies on, away from every finished task of that
+# project, whatever the task is named. The scope is the project the hold
+# declares: a plain hold of the same repo freezes nothing, and a same-prefix
+# task of another project is still reaped. Answering the hold frees the task.
+test_project_freeze() {
+  local home out rc=0 pr=https://github.com/acme/widget/pull/41
+  home=$(make_home freeze)
+  mk_task "$home" vernant-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/vernant"
+  merge_marker "$home" vernant-merged acme/widget 41
+  mk_task "$home" other-name-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/vernant"
+  merge_marker "$home" other-name-merged acme/widget 41
+  mk_task "$home" vernant-sibling ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$home/projects/sample"
+  merge_marker "$home" vernant-sibling acme/widget 41
+  mk_task "$home" vernant-scout scout idle "done [at=$OLD]: report written" -- "project=$home/projects/vernant"
+  scout_report "$home" vernant-scout
+  mk_task "$home" no-project ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr"
+  merge_marker "$home" no-project acme/widget 41
+  printf 'Frozen by the captain.\n' > "$home/release.txt"
+
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "with no hold, the finished task is reap-ready"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant >/dev/null || fail "hold failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "a hold that declares no project freezes nothing, whatever its repo"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze vernant-freeze --project vernant >/dev/null \
+    || fail "freeze declaration failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged parked "an open freeze parks the finished ship of its project"
+  expect_class "$out" other-name-merged parked "the scope is the declared project, not a task-name prefix"
+  expect_class "$out" vernant-scout parked "a finished scout of the frozen project is parked too"
+  expect_class "$out" vernant-sibling reap "a same-prefix task of another project is still reaped"
+  expect_class "$out" no-project reap "a task that records no project is outside every declared scope"
+  case "$(row_detail "$out" vernant-merged)" in
+    *"frozen by captain hold vernant-freeze"*"project vernant"*) ;;
+    *) fail "the parked row must name the freezing hold and project: $(row_detail "$out" vernant-merged)" ;;
+  esac
+
+  : > "$STUB_LOG"
+  printf 'ok\n' > "$STUB_MODE_FILE"
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  case "$(calls_ids)" in
+    *vernant-merged*|*other-name-merged*|*vernant-scout*) fail "the sweep offered a frozen task to teardown: $(calls_ids)" ;;
+  esac
+  assert_present "$home/state/vernant-merged.meta" "a frozen task keeps its record"
+  assert_absent "$home/state/.idle-reap/vernant-merged.refused" "a frozen task is never offered to teardown, so no refusal memo is written"
+  assert_grep "frozen by captain hold vernant-freeze" "$home/state/idle-sessions.report" "the published report carries the freeze reason"
+  assert_absent "$home/state/vernant-sibling.meta" "the unfrozen sibling was reaped"
+
+  out=$(FM_HOME="$home" FM_IDLE_REAP_ADMISSION=1 "$ROOT/bin/fm-teardown.sh" vernant-merged 2>&1) || rc=$?
+  expect_code 1 "$rc" "automatic teardown admission refuses a frozen task"
+  case "$out" in *"automatic reap ineligible: parked: frozen by captain hold vernant-freeze"*) ;; *) fail "admission must refuse by the freeze: $out" ;; esac
+  assert_present "$home/state/vernant-merged.meta" "the refused admission left the task alone"
+
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/vernant-merged.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged parked "an interrupted teardown of a frozen project's task is not retried"
+  rm -f "$home/state/vernant-merged.teardown-return-pending"
+
+  FM_HOME="$home" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" answer vernant-freeze \
+    --decision-file "$home/release.txt" --release >/dev/null || fail "release failed"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-merged reap "releasing the hold makes the task eligible again"
+  expect_class "$out" other-name-merged reap "releasing the hold frees every task of the project"
+  pass "an open project freeze parks only the declared project's finished tasks until it is released"
+}
+
+# A secondmate home reads only its own backlog. It sees its parent's freeze
+# through the mirror hold it files itself, which declares the project there;
+# nothing crosses between homes, and the parent's hold freezes none of the
+# mate's tasks.
+test_secondmate_mirror_freeze() {
+  local main mate pr=https://github.com/acme/widget/pull/41 out
+  main=$(make_home freeze-main)
+  mate=$(make_home freeze-mate)
+  mk_task "$mate" vernant-mate-merged ship idle "done [at=$OLD]: PR $pr checks green" -- "pr=$pr" "project=$mate/projects/vernant"
+  merge_marker "$mate" vernant-mate-merged acme/widget 41
+
+  FM_HOME="$main" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold vernant-freeze \
+    --title "Vernant freeze" --reason "captain froze the Vernant lanes" --repo vernant --freeze-project vernant >/dev/null \
+    || fail "parent hold failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "a parent's freeze is not read across homes"
+
+  FM_HOME="$mate" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" hold mate-hold-vernant-freeze \
+    --title "Vernant freeze (mirror)" --reason "mirror of the parent's Vernant freeze" --repo vernant >/dev/null \
+    || fail "mirror hold failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged reap "a mirror hold that declares no project freezes nothing"
+
+  FM_HOME="$mate" TASKS_AXI_BACKEND=markdown "$ROOT/bin/fm-captain-hold.sh" freeze mate-hold-vernant-freeze --project vernant >/dev/null \
+    || fail "mirror freeze declaration failed"
+  out=$(run_reap "$mate" scan) || fail "scan failed: $out"
+  expect_class "$out" vernant-mate-merged parked "the mate's reaper honors the mirrored freeze"
+  case "$(row_detail "$out" vernant-mate-merged)" in
+    *"frozen by captain hold mate-hold-vernant-freeze"*) ;;
+    *) fail "the mate's parked row must name its mirror hold: $(row_detail "$out" vernant-mate-merged)" ;;
+  esac
+  pass "a secondmate home honors its parent's freeze through the mirror hold it declares"
+}
+
 test_stale_selection_is_revalidated() {
   local home out
   home=$(make_home stale)
@@ -837,6 +947,8 @@ test_unknown_times_and_fixed_grace
 test_canonical_forge_markers
 test_semantic_idle_sources
 test_captain_holds
+test_project_freeze
+test_secondmate_mirror_freeze
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
