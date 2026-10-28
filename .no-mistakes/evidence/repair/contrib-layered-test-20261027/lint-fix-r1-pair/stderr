@@ -1,0 +1,8 @@
+calibration: "0 of 5 samples for test.tests/fm-contributions.test.sh on Mac-Studio.local"
+fallback: "600s existing caller limit"
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5ZZ63JAS4614DN6YCZ5GM2S/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+calibration: "0 of 5 samples for test.tests/fm-gh-rest.test.sh on Mac-Studio.local"
+fallback: "600s existing caller limit"
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5ZZ63JAS4614DN6YCZ5GM2S/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M5ZZ63JAS4614DN6YCZ5GM2S/lint-fix-r1-pair/result.json
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M5ZZ63JAS4614DN6YCZ5GM2S/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"

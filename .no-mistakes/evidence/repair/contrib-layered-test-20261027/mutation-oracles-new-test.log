@@ -1,0 +1,8 @@
+== NEW test vs mutation reserve5
+not ok - expired wave must launch exactly core and six peers, without closing or a tail
+not ok - test_unmeasured_url_does_not_starve_the_tail failed
+exit=1
+== NEW test vs mutation norotation
+not ok - expired wave must launch exactly core and six peers, without closing or a tail
+not ok - test_unmeasured_url_does_not_starve_the_tail failed
+exit=1

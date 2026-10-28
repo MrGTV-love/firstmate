@@ -1,0 +1,11 @@
+== BASE (old) test vs clean
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+exit=0 secs=108
+== BASE (old) test vs reserve5
+not ok - a tail PR began without its observation reserve
+not ok - test_unmeasured_url_does_not_starve_the_tail failed
+exit=1 secs=19
+== BASE (old) test vs norotation
+not ok - a tail PR began without its observation reserve
+not ok - test_unmeasured_url_does_not_starve_the_tail failed
+exit=1 secs=39

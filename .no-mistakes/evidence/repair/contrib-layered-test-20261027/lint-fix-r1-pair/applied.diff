@@ -1,0 +1,27 @@
+diff --git a/tests/fm-spawn-acquisition-cleanup.test.sh b/tests/fm-spawn-acquisition-cleanup.test.sh
+index 8f394ccd..3f02a61d 100755
+--- a/tests/fm-spawn-acquisition-cleanup.test.sh
++++ b/tests/fm-spawn-acquisition-cleanup.test.sh
+@@ -190,8 +190,12 @@ PATH="$FM_GET_REAL_PATH" exec "$FM_GET_LAB_HELPER" run "$FM_GET_LAB_SESSION" "${
+ SH
+   chmod +x "$FAKEBIN/herdr"
+ fi
+-if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
++load_acquisition_herdr() {
+   . "$ROOT/bin/backends/herdr.sh"
++}
++
++if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
++  load_acquisition_herdr "$@"
+   parent_out=$("$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" workspace create --cwd "$PROJECT" --label firstmate --no-focus) \
+     || fail 'cannot establish projected acquisition parent'
+   HERDR_PANE_ID=$(printf '%s' "$parent_out" | jq -er '.result.root_pane.pane_id') || fail 'missing projected acquisition parent pane'
+@@ -305,7 +309,7 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
+ done
+ 
+ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
+-  . "$ROOT/bin/backends/herdr.sh"
++  load_acquisition_herdr "$@"
+   herdr_acquisition_pane() {
+     local tabs identity
+     tabs=$("$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" tab list) || return 1

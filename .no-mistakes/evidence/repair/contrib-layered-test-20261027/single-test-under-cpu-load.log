@@ -1,0 +1,4 @@
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+loaded run=1 hogs=36 exit=0 secs=75
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+loaded run=2 hogs=36 exit=0 secs=72

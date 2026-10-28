@@ -1,0 +1,8 @@
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+FORGE_LATENCY=unset exit=0 secs=45
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+FORGE_LATENCY=1 exit=0 secs=42
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+FORGE_LATENCY=3 exit=0 secs=42
+ok - rotation preserves timed-out records and refreshes every slow PR on successive cycles
+FORGE_LATENCY=6 exit=0 secs=43

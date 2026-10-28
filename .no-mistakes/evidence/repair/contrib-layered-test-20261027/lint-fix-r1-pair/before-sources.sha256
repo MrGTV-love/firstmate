@@ -1,0 +1,3 @@
+a4ad09897f13733ab920e28139f776cd4bdfe214dbaa301ac661b7a947232aa9  tests/fm-spawn-acquisition-cleanup.test.sh
+c97355f55acec4496058b3aa56c27358b0326a9ecdd544c6c70b286825dd7152  tests/fm-contributions.test.sh
+748d9fead6f6f2b26812674cdc98736dcc36271a478a65aed1c7e6ad4302a14f  tests/fm-gh-rest.test.sh
