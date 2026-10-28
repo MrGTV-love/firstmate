@@ -37,7 +37,7 @@ groups. Attribution is conservative; a rebase or later clean replay never
 drops an earlier run's author family. Runs and agent_invocations are read from
 <NM_HOME>/state.sqlite (default ~/.no-mistakes), opened with SQLite mode=ro. A
 database that exists but cannot be opened or queried, or a relative NM_HOME,
-adds family unknown and never clears evidence already read. A missing database
+adds family unknown and never clears evidence already read. A proven-absent database
 adds unknown when any subject starts exactly no-mistakes( or the task's
 recorded delivery mode is no-mistakes (an unrecorded mode counts as
 no-mistakes); a direct-PR or local-only task without either has no pipeline
@@ -358,13 +358,15 @@ def derived_authors(home, pr, head, task, base):
     root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
     unknown = modelled("unknown", "pipeline model")
     models = []
-    if root.is_absolute() and not os.path.lexists(root / "state.sqlite"):
-        if prefixed or (meta.get("mode") or "no-mistakes") == "no-mistakes":
-            models.append(unknown)
-    else:
+    try:
+        if not root.is_absolute():
+            raise OSError(f"relative NM_HOME {root} is not author evidence")
         try:
-            if not root.is_absolute():
-                raise OSError(f"relative NM_HOME {root} is not author evidence")
+            os.lstat(root / "state.sqlite")
+        except FileNotFoundError:
+            if prefixed or (meta.get("mode") or "no-mistakes") == "no-mistakes":
+                models.append(unknown)
+        else:
             with contextlib.closing(sqlite3.connect(root.resolve().as_uri() + "/state.sqlite?mode=ro", uri=True)) as db:
                 runs = db.execute("SELECT id FROM runs WHERE pr_url = ? "
                                   "OR (branch = ? AND repo_id IN (SELECT id FROM repos WHERE working_path IN (?, ?)))",
@@ -380,10 +382,10 @@ def derived_authors(home, pr, head, task, base):
                             elif item["family"] != provider:
                                 item["family"] = "unknown"
                         models.append(item)
-        except (sqlite3.Error, OSError):
-            models.append(unknown)
-        if prefixed and not models:
-            models.append(unknown)
+    except (sqlite3.Error, OSError):
+        models.append(unknown)
+    if prefixed and not models:
+        models.append(unknown)
     for item in {(item["model"], item["family"]): item for item in models}.values():
         groups.setdefault(f"no-mistakes:{item['family']}", []).append(item)
     return task, groups

@@ -17,7 +17,11 @@ test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command rewritten
   url=https://github.com/example/repo/pull/9
   groups='{"ship":["gpt-5.1-codex"],"no-mistakes:anthropic":["claude-sonnet-5-5"]}'
-  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct fail-typed-group; do
+  for scenario in claude-only two-readers ship-only omitted-pipeline unreadable named-ship-only exact-head-fail config-fallback changed-config head-mismatch ship-history ship-prior ship-multi-read ship-default ship-reused ship-all-extra typed-unknown alias-command relative-nm-home unknown-captain-word ship-unknown-reader mixed-unknown cancelled-claude errored-omp rebased-openai rebase-claude rebase-deepseek rebase-two-readers rebase-unreadable all-prefixed fail-partial review-only-run rebase-then-clean unopenable-ship query-fails missing-db-nm missing-db-direct denied-parent fail-typed-group; do
+    if [ "$scenario" = denied-parent ] && [ "$(id -u)" = 0 ]; then
+      printf 'skip: denied-parent (chmod 0 does not deny root)\n'
+      continue
+    fi
     case_dir=$(make_case "derived-$scenario")
     rm "$case_dir/fakebin/git"
     : > "$case_dir/explicit-review"
@@ -35,7 +39,7 @@ test_derived_author_coverage() {
       git -C "$case_dir/wt" commit -q --amend --allow-empty -m 'no-mistakes(review): worker-amended implementation'
     fi
     case "$scenario" in
-      ship-*|rebase-*|review-only-run|unopenable-ship|query-fails|missing-db-*|fail-typed-group) ;;
+      ship-*|rebase-*|review-only-run|unopenable-ship|query-fails|missing-db-*|denied-parent|fail-typed-group) ;;
       *) git -C "$case_dir/wt" commit -q --allow-empty -m 'no-mistakes(review): repair consumer behavior' ;;
     esac
     head=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -75,7 +79,9 @@ PY
         printf 'unreadable sqlite record\n' > "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
       missing-db-*) rm "$case_dir/user-home/.no-mistakes/state.sqlite" ;;
     esac
-    [ "$scenario" != missing-db-direct ] || printf 'mode=direct-PR\n' >> "$case_dir/state/task-x1.meta"
+    case "$scenario" in
+      missing-db-direct|denied-parent) printf 'mode=direct-pr\n' >> "$case_dir/state/task-x1.meta" ;;
+    esac
     case "$scenario" in
       ship-history|ship-multi-read|ship-default|ship-reused)
         printf 'spawn_gen=gen-current\n' >> "$case_dir/state/task-x1.meta" ;;
@@ -102,6 +108,8 @@ PY
     case "$scenario" in
       ship-only|omitted-pipeline|ship-prior|ship-default|ship-reused|missing-db-direct)
         record_review "$case_dir" "$url" "$head" >/dev/null || fail "record $scenario" ;;
+      denied-parent)
+        record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex"]}' >/dev/null || fail 'record ship-only Claude read' ;;
       ship-history)
         # Main instruction 006: a Claude read covers the OpenAI author and an
         # OpenAI read covers the Claude author of one Claude-then-OpenAI ship group.
@@ -164,6 +172,15 @@ PY
     rc=0
     if [ "$scenario" = relative-nm-home ]; then
       (cd "$case_dir/wt" && NM_HOME=.no-mistakes run_pr_merge "$case_dir" task-x1 "$url") > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    elif [ "$scenario" = denied-parent ]; then
+      mkdir -p "$case_dir/denied/nm"
+      cp "$case_dir/user-home/.no-mistakes/state.sqlite" "$case_dir/denied/nm/state.sqlite"
+      (
+        trap 'chmod 700 "$case_dir/denied"' EXIT
+        chmod 0 "$case_dir/denied"
+        NM_HOME="$case_dir/denied/nm" review_record_command "$case_dir" verify \
+          --pr "$url" --head "$head" --task task-x1 --base "$base"
+      ) > "$case_dir/stderr" 2>&1 || rc=$?
     else
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     fi
@@ -236,7 +253,7 @@ PY
           fail-partial) expected='no later exact-head PASS covers group no-mistakes:anthropic, family anthropic, that this FAIL read' ;;
           all-prefixed) expected='uncovered commit group ship, family openai' ;;
           head-mismatch) expected='head mismatch' ;;
-          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp|rebase-unreadable|unopenable-ship|query-fails|missing-db-nm) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
+          unreadable|config-fallback|changed-config|relative-nm-home|mixed-unknown|errored-omp|rebase-unreadable|unopenable-ship|query-fails|missing-db-nm|denied-parent) expected='uncovered commit group no-mistakes:unknown, family unknown' ;;
           ship-prior) expected='uncovered commit group ship, family anthropic,openai' ;;
           ship-default) expected='uncovered commit group ship, family openai,unknown' ;;
           typed-unknown) expected='family unknown' ;;
