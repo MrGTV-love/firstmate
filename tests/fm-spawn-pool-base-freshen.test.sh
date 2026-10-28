@@ -1012,7 +1012,7 @@ test_freshness_removed_slot_owner_refuses() { run_freshness_slot_case removed sh
 # Local-only chooses a qualified descendant of both defaults, not arbitrary HEAD.
 # These ungoverned selector controls do not claim project attestation compatibility.
 run_local_only_source_case() { # <local|equal|remote|diverged|missing|feature|dirty|publish|scout|no-origin|named>
-  local shape=$1 id rec out rc=0 local_sha remote_sha before token real_git moved_sha args=()
+  local shape=$1 id rec out rc=0 local_sha remote_sha before token real_git moved_sha origin_url origin_gitdir args=()
   id="pool-local-$shape-$(date +%s)-$$"
   rec=$(make_case "$id" "$id")
   read_case_record "$rec"
@@ -1023,11 +1023,11 @@ run_local_only_source_case() { # <local|equal|remote|diverged|missing|feature|di
   git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
   remote_sha=$(git -C "$PROJECT_DIR" rev-parse origin/main)
   case "$shape" in
-    local|equal|feature|dirty|publish|scout|no-origin|named|moved|alias|dirty-copy)
+    local|equal|feature|dirty|publish|scout|no-origin|named|moved|alias|dirty-copy|origin-*)
       git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null ;;
   esac
   case "$shape" in
-    local|feature|dirty|publish|scout|no-origin|named|diverged|moved|alias|dirty-copy)
+    local|feature|dirty|publish|scout|no-origin|named|diverged|moved|alias|dirty-copy|origin-*)
       printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
       git -C "$PROJECT_DIR" add accepted-a.txt
       git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
@@ -1048,6 +1048,47 @@ run_local_only_source_case() { # <local|equal|remote|diverged|missing|feature|di
       git -C "$PROJECT_DIR" branch alias-default main
       git -C "$PROJECT_DIR" symbolic-ref refs/heads/main refs/heads/alias-default ;;
     dirty-copy) printf 'preserve assigned dirt\n' > "$POOL_DIR/README.md" ;;
+    origin-copy-missing|origin-primary-missing)
+      origin_url=$(git -C "$PROJECT_DIR" remote get-url origin)
+      git -C "$PROJECT_DIR" config --local --remove-section remote.origin
+      git config -f "$CASE_DIR/qualified-origin.config" remote.origin.url "$origin_url"
+      if [ "$shape" = origin-copy-missing ]; then
+        origin_gitdir=$(git -C "$PROJECT_DIR" rev-parse --absolute-git-dir)
+      else
+        origin_gitdir=$(git -C "$POOL_DIR" rev-parse --absolute-git-dir)
+      fi
+      git -C "$PROJECT_DIR" config --local "includeIf.gitdir:$origin_gitdir.path" "$CASE_DIR/qualified-origin.config"
+      ;;
+    origin-early|origin-late|origin-freshness)
+      real_git=$(command -v git)
+      {
+        printf '#!/usr/bin/env bash\n'
+        printf 'real=%q\nproject=%q\nshape=%q\nmarker=%q\n' \
+          "$real_git" "$PROJECT_DIR" "$shape" "$CASE_DIR/origin-removed"
+        cat <<'SH'
+if [ "${1:-}" = -C ] && [ "${2:-}" = "$project" ] && [ ! -e "$marker" ]; then
+  mutate=0
+  if [ "$shape" = origin-early ] && [ "${3:-}" = rev-parse ] && [ "${*: -1}" = 'refs/heads/main^{commit}' ]; then mutate=1; fi
+  if [ "$shape" = origin-late ] && [ "${3:-}" = merge-base ] && [ "${4:-}" = --is-ancestor ]; then mutate=1; fi
+  if [ "$shape" = origin-freshness ] && [ "${3:-}" = merge-base ] && [ "${4:-}" = --is-ancestor ]; then
+    count=0
+    [ ! -f "$marker.count" ] || read -r count < "$marker.count"
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$marker.count"
+    [ "$count" != 3 ] || mutate=1
+  fi
+  if [ "$mutate" = 1 ]; then
+    "$real" "$@" || exit $?
+    "$real" -C "$project" config --local --remove-section remote.origin || exit $?
+    printf 'removed actual origin config\n' > "$marker"
+    exit 0
+  fi
+fi
+exec "$real" "$@"
+SH
+      } > "$FAKEBIN_DIR/git"
+      chmod +x "$FAKEBIN_DIR/git"
+      ;;
     moved)
       real_git=$(command -v git)
       moved_sha=$(printf 'concurrent accepted commit\n' | git -C "$PROJECT_DIR" \
@@ -1082,8 +1123,15 @@ SH
   [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail 'task temp already exists'
   [ ! -e "/tmp/fm-$id+$token" ] && [ ! -L "/tmp/fm-$id+$token" ] || fail 'staging temp already exists'
   out=$(run_spawn "$id" "${args[@]}" 2>&1) || rc=$?
+  case "$shape" in origin-*)
+    printf 'origin_control=%s task=%s exit=%s expected_local=%s assigned_before=%s assigned_after=%s\n' \
+      "$shape" "$id" "$rc" "$local_sha" "$before" "$(git -C "$POOL_DIR" rev-parse HEAD)"
+    if [ -f "$POOL_DIR/accepted-a.txt" ]; then printf 'A_FILE_PRESENT\n'; else printf 'A_FILE_MISSING\n'; fi
+    printf '%s\n' "$out"
+    ;;
+  esac
   case "$shape" in
-    diverged|missing|named|alias|moved|dirty-copy)
+    diverged|missing|named|alias|moved|dirty-copy|origin-*)
       [ "$rc" -ne 0 ] || fail "$shape local-only source unexpectedly admitted"
       [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail 'refusal changed assigned source'
       [ ! -f "$HOME_DIR/state/$id.meta" ] || fail 'refusal published task metadata'
@@ -1099,6 +1147,11 @@ SH
           cmp "$POOL_DIR/README.md" <(printf 'preserve assigned dirt\n') || fail 'assigned dirt lost'
           assert_contains "$out" 'not clean' 'dirty assigned copy reason missing' ;;
         named) assert_contains "$out" 'local-only' 'named-base refusal reason missing' ;;
+        origin-early|origin-late|origin-freshness)
+          [ -f "$CASE_DIR/origin-removed" ] || fail 'origin control did not mutate real config'
+          assert_contains "$out" 'origin qualification' 'changed-origin refusal reason missing' ;;
+        origin-copy-missing|origin-primary-missing)
+          assert_contains "$out" 'origin qualification' 'mismatched-origin refusal reason missing' ;;
       esac
       ;;
     *)
@@ -1114,10 +1167,16 @@ SH
   esac
   if [ "$shape" != no-origin ]; then
     [ "$(git -C "$PROJECT_DIR" rev-parse origin/main)" = "$remote_sha" ] || fail 'local work mislabeled as origin'
-    [ "$(git -C "$PROJECT_DIR" ls-remote origin refs/heads/main | cut -f1)" = "$remote_sha" ] || fail 'remote changed'
+    [ "$(git -C "$CASE_DIR/origin.git" rev-parse refs/heads/main)" = "$remote_sha" ] || fail 'remote changed'
   fi
   pass "local-only source selection: $shape"
 }
+
+test_local_only_origin_early() { run_local_only_source_case origin-early; }
+test_local_only_origin_late() { run_local_only_source_case origin-late; }
+test_local_only_origin_freshness() { run_local_only_source_case origin-freshness; }
+test_local_only_origin_copy_missing() { run_local_only_source_case origin-copy-missing; }
+test_local_only_origin_primary_missing() { run_local_only_source_case origin-primary-missing; }
 
 test_local_only_source_selection() {
   local shape
@@ -1225,7 +1284,7 @@ test_local_only_unprepared_retry() { run_local_only_binding_case unprepared; }
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1235,6 +1294,11 @@ fi
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry
+test_local_only_origin_early
+test_local_only_origin_late
+test_local_only_origin_freshness
+test_local_only_origin_copy_missing
+test_local_only_origin_primary_missing
 test_freshness_introduces_slot_owner
 test_freshness_introduces_scout_slot_owner
 test_freshness_slot_owner_requires_scope
