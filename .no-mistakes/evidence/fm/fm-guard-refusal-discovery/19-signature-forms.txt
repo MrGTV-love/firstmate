@@ -1,0 +1,58 @@
+### discovery result per line of the two lab fixture files (SITE=found, blank=not a site)
+== bin/fm-lab-forms.sh
+             1 #!/usr/bin/env bash
+             2 set -u
+             3 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+             4 # REFUSED: this comment is not a site
+             5 lab_one() {
+             6   cat >&2 <<EOF
+SITE[B]      7 error: refusing to retire the lab slot while it is busy
+             8 EOF
+             9   return 1
+            10 }
+            11 lab_two() {
+SITE[B]     12   msg="refusing to reuse a busy lab slot"
+            13   printf '%s\n' "$msg" >&2
+            14 }
+            15 lab_three() {
+SITE[C]     16   fm_refuse "lab slot busy" "rerun later"
+            17 }
+            18 lab_four() {
+SITE[E]     19   "$SCRIPT_DIR/fm-guard-event.sh" lab-forms deny --source-ok true 2>/dev/null || true
+            20 }
+            21 lab_five() {
+            22   printf '%s\n' \
+            23     "error: cannot proceed, lab slot busy" >&2
+            24   return 1
+            25 }
+            26 lab_six() {
+            27   refused=0
+            28   if [ "$refused" = 1 ]; then rm -f "$1.refused"; fi
+            29   case "$2" in refused*) : ;; esac
+            30   cat > "$1/notes.txt" <<EOF
+            31 this data file says refusing but is not printed
+            32 EOF
+            33 }
+            34 lab_seven() {
+            35   "$SCRIPT_DIR/fm-guard-event.sh" lab-forms allow --source-ok true 2>/dev/null || true
+            36 }
+== bin/fm_lab_forms.py
+             1 #!/usr/bin/env python3
+             2 """Module docstring: this module refuses nothing at import."""
+             5 def check(slot):  # don't touch
+             6     """A docstring that says it refuses busy slots."""
+             7     if slot == 'refused':
+             8         return
+SITE[B]      9     raise SystemExit(f"refusing to reuse busy slot {slot}")
+            12 def check_multi(slot):
+            13     raise SystemExit("""error: the slot is busy;
+SITE[B]     14 refusing to reuse it""")
+$ bin/fm-guard-lint.sh --mode new-or-touched --base d24987018285185467ca6b8b9caa227fb3f956c2
+VIOLATION S1 site:bin/fm-lab-forms.sh:7297488fbb: bin/fm-lab-forms.sh:7 [B] error: refusing to retire the lab slot while it is busy maps to no registry entry: add a sites
+VIOLATION S1 site:bin/fm-lab-forms.sh:8224638ab5: bin/fm-lab-forms.sh:12 [B] msg="refusing to reuse a busy lab slot" maps to no registry entry: add a sites marker to the 
+VIOLATION S1 site:bin/fm-lab-forms.sh:8e719d851a: bin/fm-lab-forms.sh:16 [C] fm_refuse "lab slot busy" "rerun later" maps to no registry entry: add a sites marker to the 
+VIOLATION S1 site:bin/fm-lab-forms.sh:50f159bfd7: bin/fm-lab-forms.sh:19 [E] "$SCRIPT_DIR/fm-guard-event.sh" lab-forms deny --source-ok true 2>/dev/null || true maps to n
+VIOLATION S1 site:bin/fm_lab_forms.py:27b9e2c1c3: bin/fm_lab_forms.py:9 [B] raise SystemExit(f"refusing to reuse busy slot {slot}") maps to no registry entry: add a sites
+VIOLATION S1 site:bin/fm_lab_forms.py:f55212a791: bin/fm_lab_forms.py:14 [B] refusing to reuse it""") maps to no registry entry: add a sites marker to the guard that owns
+LINT_SUMMARY mode=new-or-touched guards=37 violations=851 allowlisted=845 stale=0 shown=6 sites=901
+exit=1

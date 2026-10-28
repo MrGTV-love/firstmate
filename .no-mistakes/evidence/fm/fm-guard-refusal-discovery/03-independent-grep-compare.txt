@@ -1,0 +1,4 @@
+independent git grep REFUSED: lines: 199
+discovery A-signature sites: 199
+grep hits NOT found as A sites: 0
+A sites not in grep: 0

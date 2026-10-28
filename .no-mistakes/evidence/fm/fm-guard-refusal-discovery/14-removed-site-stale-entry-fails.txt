@@ -1,0 +1,12 @@
+### scenario: a legacy allowlisted site disappears (marker reworded)
+### change vs base:
+ bin/fm-teardown.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode enforce
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=1 shown=0 sites=894
+exit=1
+$ bin/fm-guard-lint.sh --mode new-or-touched --base d24987018285185467ca6b8b9caa227fb3f956c2
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=844 allowlisted=844 stale=1 shown=0 sites=894
+exit=0

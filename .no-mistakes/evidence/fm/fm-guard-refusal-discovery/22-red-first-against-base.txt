@@ -1,0 +1,7 @@
+### red-first: head tests/fm-guard-lint.test.sh and tests/fm-guard-audit-closure.test.sh run against the BASE lint (7c2041054), no discovery helper
+$ bash tests/fm-guard-lint.test.sh
+not ok - S1 finds a REFUSED: marker site: an unmapped site must fail
+not-ok count: 1  exit=1
+$ bash tests/fm-guard-audit-closure.test.sh
+not ok - the lint's own fixture suite is red
+not-ok count: 1  exit=1

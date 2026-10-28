@@ -1,0 +1,5 @@
+### registry diff, base 7c2041054 -> head: every changed key per guard
+guards added: []  removed: []
+changed keys across all guards: ['group_reason', 'sites']
+top-level keys changed: []
+changed files: ['.github/workflows/ci.yml', 'bin/fm-guard-lint.sh', 'bin/fm-guard-sites.py', 'docs/guard-spec.md', 'docs/guards/lint-allowlist.json', 'docs/guards/registry.json', 'docs/scripts.md', 'tests/fm-guard-audit-closure.test.sh', 'tests/fm-guard-lint.test.sh']

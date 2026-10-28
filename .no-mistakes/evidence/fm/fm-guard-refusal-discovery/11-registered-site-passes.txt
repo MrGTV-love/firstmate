@@ -1,0 +1,11 @@
+### scenario: the same site registered with full spec fields (incl. telemetry)
+### change vs base:
+ bin/fm-lab-newguard.sh    |   7 ++
+ docs/guards/registry.json | 212 ++++++++++++++++++++++++++++++++++++++--------
+ 2 files changed, 183 insertions(+), 36 deletions(-)
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=38 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
+$ bin/fm-guard-lint.sh --mode new-or-touched --base d24987018285185467ca6b8b9caa227fb3f956c2
+LINT_SUMMARY mode=new-or-touched guards=38 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
