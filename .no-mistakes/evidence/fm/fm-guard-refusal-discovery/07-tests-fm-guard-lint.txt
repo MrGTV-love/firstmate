@@ -1,0 +1,78 @@
+ok - a complete single-guard registry is clean
+ok - R1 fails a duplicate id
+ok - R1 fails a duplicate invariant
+ok - R2 fails a prose-only remedy
+ok - R2 fails a remedy naming a missing script
+ok - R2 fails an empty remedy
+ok - R3 fails a proxy source with no reason
+ok - R3 accepts a proxy source with a reason
+ok - R4 fails an undeclared fail direction
+ok - R5 fails a budget above three with no reason
+ok - R5 accepts a declared budget exception
+ok - R6 fails a post-write guard with no precheck_gap
+ok - R7 fails a nonexistent owner file
+ok - R7 fails a nonexistent test file
+ok - R8 fails a guard with no telemetry target
+ok - R8 accepts an instrumented guard that calls the writer
+ok - R8 fails an instrumented guard that never calls the writer
+ok - R9 fails an exemption with no derivation
+ok - a retired guard with a live retirement test is clean
+ok - a retired guard that is still registered fails
+ok - a guard registered after the audit balances the inventory only when it is named
+ok - post-audit active guards named in beyond_audit_active and beyond_audit_retired points stay outside the audited inventory
+ok - a guard added after the audit fails the count until it is accounted for
+ok - a post-audit guard in beyond_audit_active keeps the audited size unchanged
+ok - a post-audit entry must name a registered guard
+ok - an allowlisted violation passes
+ok - a stale allowlist entry fails, so the allowlist can only shrink
+ok - report mode prints a violation and exits 0
+ok - new-or-touched ignores an unchanged offending guard
+ok - new-or-touched fails for a touched guard
+ok - a malformed registry fails
+ok - S1 finds a REFUSED: marker site
+ok - S1 finds a refusing message site
+ok - S1 finds a message split across lines
+ok - S1 finds a message built in a variable
+ok - S1 finds a call to a refuse helper whose message has no refusal word
+ok - a helper definition is not a site, only its call
+ok - S1 finds a refuse helper call inside a one-line function definition
+ok - a one-line wrapper's helper call is a site, the helper's own definition is not
+ok - S1 finds a guard event deny inside a one-line function definition
+ok - S1 finds a call to a Python refuse helper
+ok - S1 finds a hook permission deny
+ok - S1 finds the bare exit 2 of a hook script
+ok - a usage exit 2 in a hook script is not a deny
+ok - S1 fails an unmapped || exit 2 of a hook script
+ok - an argument-count exit 2 in a hook script is not a deny
+ok - a || exit 2 hook site passes once a registered entry maps it
+ok - S1 finds an unquoted refusal in a heredoc printed to stderr
+ok - S1 finds a refusal in the .dsh adapter
+ok - S1 finds an opencode plugin throw
+ok - S1 finds a guard event deny
+ok - a guard event allow is not a site
+ok - comments, heredoc bodies, docstrings, test directories, variables, paths and compared values are not sites
+ok - S1 fails a refusal site that maps to no registry entry
+ok - a refusal site passes once a registered entry maps it with a sites marker
+ok - a site inside the owner file passes when its marker names it
+ok - S1 fails a new site added inside an already-mapped owner file
+ok - S2 fails a sites marker that matches no site
+ok - S2 fails a marker that matches more sites than its count declares
+ok - S3 fails an entry that maps several sites without a group_reason
+ok - a group entry with a counted marker and a group_reason passes
+ok - S2 fails a site that two entries map
+ok - S4 fails a typed unregistered count that disagrees with the scan
+ok - a typed unregistered count equal to the scan raises no S4
+ok - --counts prints the computed unregistered count
+ok - an allowlisted legacy site passes enforce
+ok - an allowlisted legacy site still counts as unregistered
+ok - deleting a site makes its allowlist entry stale, so the burn-down list only shrinks
+ok - a duplicate of an allowlisted line is a new site
+ok - new-or-touched ignores a legacy site on an unchanged line
+ok - new-or-touched fails a touched legacy site that is still unmapped
+ok - new-or-touched passes a touched legacy site once it is mapped
+ok - new-or-touched fails a new refusal site that maps to nothing
+ok - new-or-touched passes a new refusal site once its guard entry maps it
+ok - S5 fails an allowlist that grew against the base
+ok - S5 fails an allowlist that drops back below the sealed schema
+ok - fm-guard-lint
+bash tests/fm-guard-lint.test.sh  8.82s user 13.48s system 67% cpu 32.938 total

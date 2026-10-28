@@ -1,0 +1,39 @@
+independent grep 'REFUSED' non-comment lines in bin/: 236
+of those, found by discovery: 200
+not found: 36
+  bin/backends/herdr-server-start.py:193 if error.errno == errno.ENOENT or (error.errno == errno.ECONNREFUSED
+  bin/fm-bootstrap.sh:798 elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
+  bin/fm-claude-stop-autoarm.sh:467 && [ -n "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  bin/fm-claude-stop-autoarm.sh:471 && [ "${FM_RECOVERY_MARKER_TOKEN##*:}" = "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  bin/fm-duration.py:221 REFUSED = []
+  bin/fm-duration.py:268 REFUSED.append(reason)
+  bin/fm-idle-session-reap.sh:222 REFUSED*|error:*|refused*)
+  bin/fm-merge-prune.sh:284 REFUSED*|error:*|refused*) printf '%s' "$line"; return 0 ;;
+  bin/fm-merge-prune.sh:317 REFUSED*|error:*|refused*) ;;
+  bin/fm-secondmate-liveness-lib.sh:291 FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
+  bin/fm-secondmate-liveness-lib.sh:323 FM_SM_LIVE_POLICY_REFUSED=1
+  bin/fm-teardown-nested-lib.sh:109 TEARDOWN_REFUSED_COPIES=()
+  bin/fm-teardown-nested-lib.sh:149 TEARDOWN_REFUSED_COPIES+=("$3")
+  bin/fm-teardown-nested-lib.sh:161 TEARDOWN_REFUSED_COPIES+=("$3")
+  bin/fm-teardown-nested-lib.sh:607 TEARDOWN_FOREIGN_REFUSED=0
+  bin/fm-teardown-nested-lib.sh:631 TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
+  bin/fm-teardown-nested-lib.sh:635 [ "$swept" = 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
+  bin/fm-teardown-nested-lib.sh:636 [ "$TEARDOWN_FOREIGN_REFUSED" -gt 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || return 0
+  bin/fm-teardown-nested-lib.sh:96 TEARDOWN_FOREIGN_REFUSED=0
+  bin/fm-teardown.sh:2664 TEARDOWN_TREEHOUSE_LOCK_REFUSED=2
+  bin/fm-teardown.sh:2667 TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=5
+  bin/fm-teardown.sh:2725 return "$TEARDOWN_TREEHOUSE_LOCK_REFUSED"
+  bin/fm-teardown.sh:2757 for allowed in ${TEARDOWN_REFUSED_COPIES[@]+"${TEARDOWN_REFUSED_COPIES[@]}"}; do
+  bin/fm-teardown.sh:2787 || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2814 || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2843 || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2855 return "$TEARDOWN_TREEHOUSE_LOCK_REFUSED"
+  bin/fm-teardown.sh:2901 require_registered_slot_copies "$owner" "$wt" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:4387 && [ "$TEARDOWN_FOREIGN_REFUSED" = 0 ]; then
+  bin/fm-teardown.sh:5501 if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+  bin/fm-teardown.sh:5502 || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+  bin/fm-teardown.sh:5563 if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+  bin/fm-teardown.sh:5564 || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+  bin/fm-wake-lib.sh:2427 FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=
+  bin/fm-wake-lib.sh:2449 FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=$FM_AUTOARM_RECOVERY
+  bin/fm-watch.sh:1214 elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then

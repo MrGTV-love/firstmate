@@ -1,0 +1,122 @@
+
+=================== A: new fm_refuse in an already-registered owner file (bin/fm-teardown.sh) fails
+6307 C None [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal: no task named"
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-teardown.sh:b7d0571beb: bin/fm-teardown.sh:6307 [C] [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal: no task named" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S1 site:bin/fm-teardown.sh:b7d0571beb: bin/fm-teardown.sh:6307 [C] [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal: no task named" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+
+=================== B: the same site mapped by a registry sites marker passes
+6307 C teardown-unlanded [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal: no task named"
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=896
+exit=0
+
+=================== B2: marker that silently absorbs a second new site fails on count
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S2 teardown-unlanded: site marker 'lab probe refusal' in bin/fm-teardown.sh matches 2 sites, the entry declares 1; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=897
+exit=1
+
+=================== C: refuse call after a shell case-arm pattern fails
+62 B None printf 'report refused: %s\n' "$1" >&2
+93 C None || refuse "only the supervision branch reports outcomes; MAIN acts on them instead"
+96 C None ''|*[!A-Za-z0-9._-]*) refuse "no supervision wake is being handled by this shell" ;;
+97 C None labbad) refuse "lab probe case arm" ;;
+105 C None || refuse "the wake this shell was handling is over; report only while handling a wake"
+107 C None || refuse "the wake this shell was handling is over; report only while handling a wake"
+114 C None refuse "the wake being handled (row $(turn_field rows)) names ${TASKS:-no task}, not $TASK; report o
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-branch-report.sh:412081928b: bin/fm-branch-report.sh:97 [C] labbad) refuse "lab probe case arm" ;; maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+
+=================== D: fm_refuse and guard-event deny inside one-line function bodies fail
+7779 C None fm_live_probe2() { [ -n "$1" ] || fm_refuse spawn probe "no task named"; }
+7780 E None fm_live_probe5() { "$DIR/fm-guard-event.sh" spawn-probe deny --source-ok true; }
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-spawn.sh:0550a18fb9: bin/fm-spawn.sh:7779 [C] fm_live_probe2() { [ -n "$1" ] || fm_refuse spawn probe "no task named"; } maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-spawn.sh:795dece454: bin/fm-spawn.sh:7780 [E] fm_live_probe5() { "$DIR/fm-guard-event.sh" spawn-probe deny --source-ok true; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=847 allowlisted=845 stale=0 shown=2 sites=897
+exit=1
+
+=================== E: a refusal printed by a stderr heredoc body is discovered
+157 B None error: refusing to retire the lab slot
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-branch-report.sh:d4f4783734: bin/fm-branch-report.sh:157 [B] error: refusing to retire the lab slot maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+
+=================== F: non-refusals (variable, .refused path, startswith test, == test, stdout heredoc) are not sites
+sites before=895 after=895
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+
+=================== G1: rewording an allowlisted legacy site (shared-slot teardown guard) fails
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-teardown.sh:0ccbad24c1: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease (lab) before retiring i maps to no registry entry: add a sites marker to the guard that owns it
+STALE S1 site:bin/fm-teardown.sh:20c9180465: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=844 stale=1 shown=1 sites=895
+exit=1
+
+=================== G2: whitespace-only touch of an allowlisted legacy site (same id) still fails
+ bin/fm-teardown.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+
+=================== H: removing a legacy site makes its allowlist entry STALE
+$ bin/fm-guard-lint.sh --mode enforce
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=1 shown=0 sites=894
+exit=1
+
+=================== I: allowlist cannot grow against the base (S5)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+STALE S1 site:bin/fm-lab.sh:0000000000: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=1 shown=0 sites=895
+VIOLATION S5 site:bin/fm-lab.sh:0000000000: allowlist entry S1 is not in labbase; the allowlist may only shrink
+exit=1
+
+=================== J: a typed unregistered count that disagrees with the scan fails (S4); the computed one passes
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S4 inventory: the registry types unregistered=37 but the scan computes 845; remove the typed count
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=895
+exit=1
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+
+=================== K: '|| exit 2' in a hook script is a D site; an argc check is not
+601 D None lab_check "$STATE" || exit 2
+posttool argc probe sites:
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-turnend-guard.sh:f5b7eba2c5: bin/fm-turnend-guard.sh:601 [D] lab_check "$STATE" || exit 2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+
+=================== L: a refusal added to .dsh/ adapter code is discovered
+320 B None console.error("refusing the lab probe turn");
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:.dsh/fm-primary.mjs:428164dfae: .dsh/fm-primary.mjs:320 [B] console.error("refusing the lab probe turn"); maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1
+
+=================== N: an untracked new script with a refusal fails new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base labbase
+VIOLATION S1 site:bin/fm-lab-new.sh:1d705d9b16: bin/fm-lab-new.sh:2 [A,B] echo "REFUSED: lab probe new file" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=1

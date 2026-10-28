@@ -1,0 +1,123 @@
+
+===== S0 untouched copy of the real tree passes enforce and new-or-touched =====
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+===== S3 add a NEW unregistered refusal inside an already-registered owner file bin/fm-turnend-guard.sh =====
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-turnend-guard.sh:beb5a4f26b: bin/fm-turnend-guard.sh:600 [A,B] fm_live_probe() { echo "REFUSED: live probe refusal with no guard" >&2; return 1; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+exit=1
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S1 site:bin/fm-turnend-guard.sh:beb5a4f26b: bin/fm-turnend-guard.sh:600 [A,B] fm_live_probe() { echo "REFUSED: live probe refusal with no guard" >&2; return 1; } maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+exit=1
+
+===== S4 register the same site with a sites marker on turnend-supervision-block =====
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD --counts
+INFO inventory: active=37 retired=13 beyond_audit=12 excluded=1 unregistered=842 audited=30 beyond_audit_active=9 sites=893 mapped=51
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=893
+exit=0
+$ bin/fm-guard-lint.sh --mode enforce --counts
+INFO inventory: active=37 retired=13 beyond_audit=12 excluded=1 unregistered=842 audited=30 beyond_audit_active=9 sites=893 mapped=51
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=893
+exit=0
+
+===== S5a touch the legacy allowlisted shared-slot refusal in bin/fm-teardown.sh (re-indent only) =====
+line 4015
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does
+exit=1
+
+===== S5b grow the allowlist: excuse a brand-new site by adding it to docs/guards/lint-allowlist.json =====
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+exit=0
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+VIOLATION S1 site:bin/fm-turnend-guard.sh:beb5a4f26b: bin/fm-turnend-guard.sh:600 [A,B] fm_live_probe() { echo "REFUSED: live probe refusal with no guard" >&2; return 1; } is on a changed line and maps to no registry entry; the allowlist does not excuse a touc
+VIOLATION S5 site:bin/fm-turnend-guard.sh:beb5a4f26b: allowlist entry S1 is not in HEAD; the allowlist may only shrink
+exit=1
+
+===== S5c delete a legacy refusal line: its allowlist entry goes stale and enforce fails =====
+deleting line 4047
+$ bin/fm-guard-lint.sh --mode enforce
+STALE S1 site:bin/fm-teardown.sh:cf9181c4c5: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=841 allowlisted=841 stale=1 shown=0 sites=891
+exit=1
+
+===== S6 a typed unregistered count in the registry that disagrees with the scan =====
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S4 inventory: the registry types unregistered=37 but the scan computes 842; remove the typed count
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=892
+exit=1
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+===== S7 adversarial: refusals in other signatures are caught (fm_refuse helper call, hook || exit 2, .dsh adapter, stderr heredoc) =====
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:.dsh/fm-primary.mjs:197229c15c: .dsh/fm-primary.mjs:320 [B] console.error("the adapter is refusing to relay"); maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-teardown.sh:9b096e32a0: bin/fm-teardown.sh:6308 [B] error: refusing to retire the slot maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-turnend-guard.sh:b6fc1cac26: bin/fm-turnend-guard.sh:600 [D] fm_live_reset "$STATE" || exit 2 maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=842 stale=0 shown=3 sites=895
+exit=1
+
+===== S8 adversarial: non-refusals are NOT counted (variable named refused, .refused path, == compare, startswith, argc exit 2 in hook) =====
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD --counts
+INFO inventory: active=37 retired=13 beyond_audit=12 excluded=1 unregistered=842 audited=30 beyond_audit_active=9 sites=892 mapped=50
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+===== S9 adversarial: a refusal helper call / guard-event deny on the same line as a one-line function definition (GAP PROBE) =====
+# appended: one-line fm_refuse wrapper + one-line guard-event deny wrapper to bin/fm-spawn.sh; multi-line fm_refuse wrapper to bin/fm-turnend-guard.sh
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-turnend-guard.sh:457514a3ff: bin/fm-turnend-guard.sh:601 [C] [ -n "$1" ] || fm_refuse spawn probe "no task named" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+exit=1
+
+===== S10 CI ratchet base: merge commit checked against HEAD^1 is not fooled when main advanced afterwards =====
+# HEAD = merge commit of pr into the old main; main has since advanced (edited a legacy site + shrank the allowlist)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+# contrast: the old CI behaviour diffed against the moving main tip
+$ bin/fm-guard-lint.sh --mode new-or-touched --base main
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does
+VIOLATION S5 site:bin/fm-teardown.sh:20c9180465: allowlist entry S1 is not in main; the allowlist may only shrink
+exit=1
+
+===== S9b only the two one-line wrappers added to bin/fm-spawn.sh: the lint passes, so the new refusals would merge =====
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+VIOLATION S1 site:bin/fm-teardown.sh:2a5290a993: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool-slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla maps to no registry entry: add a sites marker to the guard that owns i
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=841 stale=0 shown=1 sites=892
+exit=0
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S1 site:bin/fm-teardown.sh:2a5290a993: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool-slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla maps to no registry entry: add a sites marker to the guard that owns i
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=841 stale=0 shown=1 sites=892
+exit=1
+
+===== R red-first: the new fixture test against the base-commit lint (7ec635f41) fails =====
+exit=1
+ok - new-or-touched fails for a touched guard
+ok - a malformed registry fails
+not ok - S1 finds a REFUSED: marker site: an unmapped site must fail
+ok - a malformed registry fails
+not ok - S1 finds a REFUSED: marker site: an unmapped site must fail
+8bbe1d6 base
+
+===== S9c (clean base, supersedes S9b) only two one-line wrappers added to bin/fm-spawn.sh: a fm_refuse call and a guard-event deny =====
+ bin/fm-spawn.sh | 4 ++++
+ 1 file changed, 4 insertions(+)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0

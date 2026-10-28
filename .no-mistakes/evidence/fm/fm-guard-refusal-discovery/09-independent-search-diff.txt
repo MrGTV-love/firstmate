@@ -1,0 +1,134 @@
+# Independent search vs discovery on the current tree (bin .claude .codex .cursor .dsh .grok .omp .opencode .pi, tests excluded)
+non-comment lines with 'REFUSED:' : 198, missed by discovery: 0
+lines with 'REFUSED' at all: 244; the 44 not found are comments, variable names, case patterns, or ECONNREFUSED:
+  bin/backends/herdr-server-start.py:193: if error.errno == errno.ENOENT or (error.errno == errno.ECONNREFUSED
+  bin/fm-bootstrap.sh:798: elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
+  bin/fm-claude-stop-autoarm.sh:467: && [ -n "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  bin/fm-claude-stop-autoarm.sh:471: && [ "${FM_RECOVERY_MARKER_TOKEN##*:}" = "$FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY" ] \
+  bin/fm-copy-sweep.sh:1481: # REFUSED line on stderr, because the library's envelope names a teardown command
+  bin/fm-copy-sweep.sh:207: # The sweep prints its own REFUSED line: preservation failure ends in a human-only
+  bin/fm-duration.py:221: REFUSED = []
+  bin/fm-duration.py:268: REFUSED.append(reason)
+  bin/fm-idle-session-reap.sh:222: REFUSED*|error:*|refused*)
+  bin/fm-merge-prune.sh:284: REFUSED*|error:*|refused*) printf '%s' "$line"; return 0 ;;
+  bin/fm-merge-prune.sh:317: REFUSED*|error:*|refused*) ;;
+  bin/fm-project-mode.sh:70: #   direct-PR and is REFUSED on local-only, which publishes nothing: that mode
+  bin/fm-project-mode.sh:93: # closed set - which is REFUSED in the default and --forge output forms: nothing
+  bin/fm-public-followup.sh:101: #       is REFUSED rather than posted again.
+  bin/fm-secondmate-liveness-lib.sh:291: FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
+  bin/fm-secondmate-liveness-lib.sh:323: FM_SM_LIVE_POLICY_REFUSED=1
+  bin/fm-teardown-nested-lib.sh:109: TEARDOWN_REFUSED_COPIES=()
+  bin/fm-teardown-nested-lib.sh:149: TEARDOWN_REFUSED_COPIES+=("$3")
+  bin/fm-teardown-nested-lib.sh:161: TEARDOWN_REFUSED_COPIES+=("$3")
+  bin/fm-teardown-nested-lib.sh:505: # the refusal, so a copy that stays held leaves no REFUSED text in the output of a
+  bin/fm-teardown-nested-lib.sh:597: # REFUSED line is printed for a close that succeeds. A provable copy inside an
+  bin/fm-teardown-nested-lib.sh:607: TEARDOWN_FOREIGN_REFUSED=0
+  bin/fm-teardown-nested-lib.sh:631: TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
+  bin/fm-teardown-nested-lib.sh:635: [ "$swept" = 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1
+  bin/fm-teardown-nested-lib.sh:636: [ "$TEARDOWN_FOREIGN_REFUSED" -gt 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || return 0
+  bin/fm-teardown-nested-lib.sh:96: TEARDOWN_FOREIGN_REFUSED=0
+  bin/fm-teardown.sh:2664: TEARDOWN_TREEHOUSE_LOCK_REFUSED=2
+  bin/fm-teardown.sh:2667: TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=5
+  bin/fm-teardown.sh:2725: return "$TEARDOWN_TREEHOUSE_LOCK_REFUSED"
+  bin/fm-teardown.sh:2757: for allowed in ${TEARDOWN_REFUSED_COPIES[@]+"${TEARDOWN_REFUSED_COPIES[@]}"}; do
+  bin/fm-teardown.sh:2787: || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2814: || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2843: || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:2855: return "$TEARDOWN_TREEHOUSE_LOCK_REFUSED"
+  bin/fm-teardown.sh:2901: require_registered_slot_copies "$owner" "$wt" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  bin/fm-teardown.sh:4387: && [ "$TEARDOWN_FOREIGN_REFUSED" = 0 ]; then
+  bin/fm-teardown.sh:5501: if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+  bin/fm-teardown.sh:5502: || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+  bin/fm-teardown.sh:5563: if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+  bin/fm-teardown.sh:5564: || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+  bin/fm-wake-lib.sh:2416: # Returns 0 with FM_AUTOARM_MY_GEN and FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY
+  bin/fm-wake-lib.sh:2427: FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=
+  bin/fm-wake-lib.sh:2449: FM_AUTOARM_PREVIOUS_REFUSED_RECOVERY=$FM_AUTOARM_RECOVERY
+  bin/fm-watch.sh:1214: elif [ "$FM_SM_LIVE_POLICY_REFUSED" = 1 ]; then
+
+# Non-comment lines with a refuse-word inside quotes that discovery skips: 68
+  .pi/extensions/fm-primary-pi-watch.ts:728: lifecycle("arm-refused", { reason: "superseded-instance", current: instance.current()?.id });
+  bin/fm-afk-contract.sh:317: if (version != "1" || ($0 != "clauses:" && $0 != "refused:" && $0 != "merge_grants:")) {
+  bin/fm-branch-prompt.sh:106: - merge a PR or land local-only work (`bin/fm-pr-merge.sh` and `bin/fm-merge-local.sh` refuse your actor);
+  bin/fm-branch-prompt.sh:107: - spawn new tasks or workers (`bin/fm-spawn.sh` refuses your actor);
+  bin/fm-branch-prompt.sh:108: - answer a decision or an ask-user finding (`bin/fm-send.sh --resolve-key` refuses your actor for a decision key), approve anything, or exercise any c
+  bin/fm-branch-prompt.sh:124: A red pull request, or one with a required check that has not reported, is never merged while away, whatever the words say, and `--allow-red` and `--a
+  bin/fm-branch-prompt.sh:128: - `bin/fm-merge-local.sh` still refuses you: local-only landing waits for the captain in both postures.
+  bin/fm-branch-prompt.sh:69: Claim the task's lease and run `bin/fm-teardown.sh <task>` with no flags: the script proves the work landed and refuses otherwise, so a refusal is rep
+  bin/fm-branch-prompt.sh:72: A second mate's status log is a relay channel for its child work, not a record of its own completion: a `done:` or merged-PR line there is a child's o
+  bin/fm-branch-report.sh:96: ''|*[!A-Za-z0-9._-]*) refuse "no supervision wake is being handled by this shell" ;;
+  bin/fm-brief.sh:509: In Claude Code that `until` loop in a single Bash call is the sanctioned foreground wait: when the harness refuses a sleep-then-check command and poin
+  bin/fm-brief.sh:645: '   It re-checks refuse-default immediately before stop and again immediately before delete, and fails closed on ambiguity.' \
+  bin/fm-brief.sh:646: '4. If an experiment requires a deliberate mid-run session stop, use only `"$HERDR_LAB_HELPER" stop "$HERDR_LAB_SESSION"`; it performs the same immedi
+  bin/fm-brief.sh:686: `no-mistakes axi status`. If the daemon socket refuses connections or is missing, append
+  bin/fm-claude-stop-autoarm.sh:313: [ "$1" != refused ] || recovery=$HELD_CLOSE_RECOVERY
+  bin/fm-claude-trust.sh:261: . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/fm-gate-refuse-lib.sh"
+  bin/fm-control.sh:285: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-copy-sweep.sh:320: . "$SCRIPT_DIR/fm-refuse-lib.sh"
+  bin/fm-dod-lib.sh:776: ${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - that is not a fail
+  bin/fm-dod-lib.sh:782: ${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - reattach at once b
+  bin/fm-dod-lib.sh:821: 1. Run \`git fetch origin\` so the server's branch tip is in this repository; \`gerrit-axi\` reads its base off the server and refuses when that tip i
+  bin/fm-dod-lib.sh:831: A \`done:\` whose URL is not the canonical \`https://<host>/c/<project>/+/<number>\` change URL is refused.
+  bin/fm-gate-refuse-lib.sh:176: echo "fm-gate-refuse: gate agent lifecycle permitted only against lab home $FM_HOME" >&2
+  bin/fm-git-strip-ai-trailers.sh:176: echo "fm-git-strip-ai-trailers: cannot resolve this repository's hooks directory; refusing to skip its \$name hook" >&2
+  bin/fm-guard-sites.py:154: """The message part of a shell case arm; a pattern such as *"connection refused"*) tests text and does not emit it."""
+  bin/fm-herdr-lab-viewer.py:18: ``SCRUBBED_ENV`` below. Herdr refuses to launch a nested viewer inside one of
+  bin/fm-idle-reap-lib.sh:108: && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+  bin/fm-idle-reap-lib.sh:199: && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+  bin/fm-idle-reap-lib.sh:39: [ "$version" = fm-idle-reap-refused-v1 ] || return 1
+  bin/fm-idle-session-reap.sh:132: tmp=$(mktemp "$REAP_DIR/.refused.XXXXXX" 2>/dev/null) || return 0
+  bin/fm-idle-session-reap.sh:133: if printf 'fm-idle-reap-refused-v1\n%s\n%s\n%s\n' "$NOW" "$2" "$(clean_detail "$3")" > "$tmp" \
+  bin/fm-idle-session-reap.sh:134: && chmod 0600 "$tmp" && mv -f -- "$tmp" "$REAP_DIR/$1.refused"; then
+  bin/fm-idle-session-reap.sh:145: for memo in "$REAP_DIR"/*.refused; do
+  bin/fm-idle-session-reap.sh:238: rm -f -- "$REAP_DIR/$id.refused"
+  bin/fm-jev-guard.ts:234: if (device.effect === "refused") {
+  bin/fm-lab-home.sh:43: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-pr-ready-reconcile.sh:145: || fm_wake_append check "pr-ready-refused:$id" \
+  bin/fm-pr-ready-reconcile.sh:83: local ready='' refusal="$CACHE/$2.refused" refused_at output age previous='' rc=0
+  bin/fm-proc-info.py:2: """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
+  bin/fm-raw-launch.py:31: a forced pattern and the forced `$~`, `$=` or `$^` forms refuse everywhere,
+  bin/fm-reboot-recover.sh:43: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-refuse-lib.sh:35: "${FM_FRICTION_REVISION_FILE:-$FM_REFUSE_LIB_DIR/fm-refuse-lib.sh}" || true
+  bin/fm-review-record.py:40: captain's own turn. captain-word itself refuses (exit 2) while the state directory
+  bin/fm-send.sh:223: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-session-launch-policy-lib.sh:51: key="session-launch-refused-$id-$generation-${fingerprint// /-}"
+  bin/fm-session-launch-policy-lib.sh:56: marker="$state/.session-launch-refused-$id"
+  bin/fm-sessionstart-nudge.sh:14: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-sessionstart-run.sh:57: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-spawn.sh:990: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-teardown.sh:1617: "$STATE/.session-launch-refused-$ID"
+  bin/fm-teardown.sh:2030: "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
+  bin/fm-teardown.sh:2768: if [ "$refused" = 1 ]; then
+  bin/fm-teardown.sh:6150: "$STATE/.session-launch-refused-$ID"
+  bin/fm-teardown.sh:697: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm-teardown.sh:747: . "$SCRIPT_DIR/fm-refuse-lib.sh"
+  bin/fm-voice-client.py:505: """Open a device-backed end of the audio, or refuse in one line with a next step.
+  bin/fm-voice-relay.py:1204: """Fill in what this home configures, refusing rather than guessing.
+  bin/fm-voice-relay.py:287: """Return (credentials, expiry) exported from an AWS profile, or refuse by name."""
+  bin/fm-wake-lib.sh:2447: if [ "$FM_AUTOARM_OUTCOME" = refused ]; then
+  bin/fm-watch-arm.sh:115: . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+  bin/fm_model_picker/aadb.py:244: """Calibration tables FIRST, then the benchmark matrix. Idempotent; refuses a newer schema."""
+  bin/fm_model_picker/embedded.py:232: assert len(refused) == len(unsafe) and all("slug" in r["reason"] for r in refused), "a slug that is not a plain word is rejected with a reason"
+  bin/fm_model_picker/routes.json:4: "comment": "Explicit route -> Artificial Analysis projection table for the shadow model picker. A route is a concrete harness:model from config/crew-d
+  bin/fm_model_picker/shadow.py:243: family's creator must both match, else the projection is refused."""
+  bin/fm_slack_watch.py:488: if not pending['accepted'] and not any(line.startswith(('skipped: ', 'refused: ')) for line in lines):
+  bin/fm_slack_watch.py:817: if state == 'refused' and command != 'check':
+  bin/fm_voice_records.py:237: """Return a setting, or refuse naming the file to write and the variable to set."""
+  bin/ten-levels/SOURCE.md:45: Confinement-owned effects record `confinement_owner: T5` before egress authorization, so a compound skill-bearing `learn` retains its write owner even
+
+# REAL MISSES: refusal-helper calls written right after a shell case-arm pattern ")" (signature C, not a documented limitation)
+  3
+  bin/fm-branch-report.sh:96: ''|*[!A-Za-z0-9._-]*) refuse "no supervision wake is being handled by this shell" ;;
+  bin/fm-claude-trust.sh:293: *) refuse "CLAUDE_CONFIG_DIR '$CLAUDE_CONFIG_DIR' is a relative path, so the store the worker reads cannot be guaranteed to be the one writt
+  bin/fm-claude-trust.sh:447: *) refuse "'$sub_dir' resolves to '$sub_dir_real', outside the home, so '$TARGET_REAL' is not a safe secondmate home" ;;
+
+# Diff touches no guard runtime script (no change to any guard decision):
+  .github/workflows/ci.yml
+  bin/fm-guard-lint.sh
+  bin/fm-guard-sites.py
+  docs/guard-spec.md
+  docs/guards/lint-allowlist.json
+  docs/guards/registry.json
+  docs/scripts.md
+  tests/fm-guard-audit-closure.test.sh
+  tests/fm-guard-lint.test.sh

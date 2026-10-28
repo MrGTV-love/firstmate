@@ -1,0 +1,11 @@
+PR merge commit 425150e34, HEAD^1=c5d0b882c
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+VIOLATION S1 site:bin/fm-teardown.sh:db151fbf60: bin/fm-teardown.sh:6307 [C] [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal in a PR" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=
+$ bin/fm-guard-lint.sh --mode enforce --counts
+VIOLATION S1 site:bin/fm-teardown.sh:db151fbf60: bin/fm-teardown.sh:6307 [C] [ -n "${1:-}" ] || fm_refuse teardown lab-probe "lab probe refusal in a PR" maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=enforce guards=37 violations=846 allowlisted=845 stale=0 shown=1 sites=896
+exit=
+exit of bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1: 1
+exit of bin/fm-guard-lint.sh --mode enforce --counts: 1

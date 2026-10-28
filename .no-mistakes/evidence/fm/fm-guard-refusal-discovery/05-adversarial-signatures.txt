@@ -1,0 +1,108 @@
+================ ADV1 one-line function body calling fm_refuse (round-1 regression)
+--- appended to bin/fm-spawn.sh:
+    fm_live_probe2() { [ -n "$1" ] || fm_refuse spawn probe "no task named"; }
+--- discovery:
+    bin/fm-spawn.sh:7778 [C] fm_live_probe2() { [ -n "$1" ] || fm_refuse spawn probe "no task named"; }
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-spawn.sh:0550a18fb9: bin/fm-spawn.sh:7778 [C] fm_live_probe2() { [ -n "$1" ] || fm_refuse spawn probe "no task named"; } maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV2 one-line function body recording a guard-event deny (round-1 regression)
+--- appended to bin/fm-spawn.sh:
+    fm_live_probe5() { "$DIR/fm-guard-event.sh" spawn-probe deny --source-ok true; }
+--- discovery:
+    bin/fm-spawn.sh:7778 [E] fm_live_probe5() { "$DIR/fm-guard-event.sh" spawn-probe deny --source-ok true; }
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-spawn.sh:795dece454: bin/fm-spawn.sh:7778 [E] fm_live_probe5() { "$DIR/fm-guard-event.sh" spawn-probe deny --source-ok true; } maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV3 case-arm call of the refuse helper (pattern) refuse ...)
+--- appended to bin/fm-branch-report.sh:
+    case "${FM_LAB_PROBE:-}" in
+      bad) refuse "lab probe case arm" ;;
+    esac
+--- discovery:
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+================ ADV3b same call on its own line inside the case arm (control)
+--- appended to bin/fm-branch-report.sh:
+    case "${FM_LAB_PROBE:-}" in
+      bad)
+        refuse "lab probe case arm own line" ;;
+    esac
+--- discovery:
+    bin/fm-branch-report.sh:156 [C] refuse "lab probe case arm own line" ;;
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-branch-report.sh:452f07c453: bin/fm-branch-report.sh:156 [C] refuse "lab probe case arm own line" ;; maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV4 refusal message in a heredoc printed to stderr
+--- appended to bin/fm-spawn.sh:
+    if [ -n "${FM_LAB_PROBE:-}" ]; then
+    cat >&2 <<EOF
+    error: refusing to retire the slot (lab probe)
+    EOF
+    exit 1
+    fi
+--- discovery:
+    bin/fm-spawn.sh:7780 [B] error: refusing to retire the slot (lab probe)
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-spawn.sh:d4bc0098ab: bin/fm-spawn.sh:7780 [B] error: refusing to retire the slot (lab probe) maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV5 hook script || exit 2 (D site)
+--- appended to bin/fm-turnend-guard.sh:
+    fm_lab_probe_check "$STATE" || exit 2
+--- discovery:
+    bin/fm-turnend-guard.sh:599 [D] fm_lab_probe_check "$STATE" || exit 2
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-turnend-guard.sh:58656a8545: bin/fm-turnend-guard.sh:599 [D] fm_lab_probe_check "$STATE" || exit 2 maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV6 message built across lines: refusal word on the echo line only via a variable
+--- appended to bin/fm-spawn.sh:
+    probe_msg="lab probe: cannot continue; refusing"
+    echo "$probe_msg" >&2; exit 1
+--- discovery:
+    bin/fm-spawn.sh:7778 [B] probe_msg="lab probe: cannot continue; refusing"
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-spawn.sh:3863e60ce8: bin/fm-spawn.sh:7778 [B] probe_msg="lab probe: cannot continue; refusing" maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV7 python refusal string
+--- appended to bin/fm_slack_watch.py:
+    PROBE_MSG = "refused: lab probe python site"
+--- discovery:
+    bin/fm_slack_watch.py:934 [B] PROBE_MSG = "refused: lab probe python site"
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm_slack_watch.py:effe932057: bin/fm_slack_watch.py:934 [B] PROBE_MSG = "refused: lab probe python site" maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ ADV8 TS hook deny decision
+--- appended to .pi/extensions/fm-primary-pi-watch.ts:
+    const probeDecision = { decision: "block", reason: "lab probe" };
+--- discovery:
+    .pi/extensions/fm-primary-pi-watch.ts:1479 [D] const probeDecision = { decision: "block", reason: "lab probe" };
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:.pi/extensions/fm-primary-pi-watch.ts:98021cbba3: .pi/extensions/fm-primary-pi-watch.ts:1479 [D] const probeDecision = { decision: "block", reason: "lab probe" }; maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+

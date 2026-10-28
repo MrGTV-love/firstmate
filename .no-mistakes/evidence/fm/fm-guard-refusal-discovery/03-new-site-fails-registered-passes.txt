@@ -1,0 +1,54 @@
+================ S3: new unregistered REFUSED in an already-registered owner file (bin/fm-teardown.sh owns teardown-unlanded)
+ bin/fm-teardown.sh | 2 ++
+ 1 file changed, 2 insertions(+)
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-teardown.sh:9085859621: bin/fm-teardown.sh:6306 [A,B] if [ -n "${FM_LAB_PROBE:-}" ]; then echo "REFUSED: lab probe refusal with no guard entry" >&2; exit 1; fi maps to no registry entry: add a sites marker to the guard that owns it
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+exit=1
+
+### enforce
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=893
+VIOLATION S1 site:bin/fm-teardown.sh:9085859621: bin/fm-teardown.sh:6306 [A,B] if [ -n "${FM_LAB_PROBE:-}" ]; then echo "REFUSED: lab probe refusal with no guard entry" >&2; exit 1; fi maps to no registry entry: add a sites marker to the guard that owns it
+exit=1
+
+================ S4: same site registered as a new guard with full spec fields and a sites marker
+{
+  "id": "lab-probe-refusal",
+  "owner": "bin/fm-teardown.sh",
+  "invariant": "a lab probe never runs teardown while FM_LAB_PROBE is set",
+  "layer": "runtime-block",
+  "decision": "deny",
+  "remedy": "land the work first: bin/fm-pr-merge.sh <pr>, or ask the captain for explicit discard authority and rerun bin/fm-teardown.sh <task> --force",
+  "fail_direction": "closed",
+  "budget": 1,
+  "telemetry": "state/guard-events.jsonl",
+  "test": "tests/fm-teardown.test.sh",
+  "sites": [
+    {
+      "file": "bin/fm-teardown.sh",
+      "match": "lab probe refusal with no guard entry"
+    }
+  ]
+}
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=38 violations=842 allowlisted=842 stale=0 shown=0 sites=893
+LINT_SUMMARY mode=new-or-touched guards=38 violations=842 allowlisted=842 stale=0 shown=0 sites=893
+exit=0
+
+### enforce --counts
+$ bin/fm-guard-lint.sh --mode enforce --counts
+LINT_SUMMARY mode=enforce guards=38 violations=842 allowlisted=842 stale=0 shown=0 sites=893
+exit=0
+
+================ S4b: marker count drift - a second identical site silently absorbed by an existing marker
+### enforce (marker declares 1, two sites match)
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S2 lab-probe-refusal: site marker 'lab probe refusal with no guard entry' in bin/fm-teardown.sh matches 2 sites, the entry declares 1; review whether every new site shares the entry's invariant, then update count
+LINT_SUMMARY mode=enforce guards=38 violations=843 allowlisted=842 stale=0 shown=1 sites=894
+VIOLATION S2 lab-probe-refusal: site marker 'lab probe refusal with no guard entry' in bin/fm-teardown.sh matches 2 sites, the entry declares 1; review whether every new site shares the entry's invariant, then update count
+exit=1
+

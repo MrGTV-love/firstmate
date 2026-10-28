@@ -1,0 +1,35 @@
+main burn-down: allowlist 845 -> 844
+main-lab enforce after burn-down:
+LINT_SUMMARY mode=enforce guards=37 violations=844 allowlisted=844 stale=0 shown=0 sites=894
+HEAD=f093a673231b48aecd3244dbb429e111f0ea8860  HEAD^1=c5d0b882c  main-lab tip=e115c2146
+
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1   # the CI step as shipped
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+exit=0
+
+$ bin/fm-guard-lint.sh --mode new-or-touched --base main-lab   # the moving branch tip the fix replaced
+LINT_SUMMARY mode=new-or-touched guards=37 violations=845 allowlisted=845 stale=0 shown=0 sites=895
+VIOLATION S1 site:bin/fm-teardown.sh:cf9181c4c5: bin/fm-teardown.sh:4047 [A,B] echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-teardown.sh:cf9181c4c5: allowlist entry S1 is not in main-lab; the allowlist may only shrink
+exit=1
+
+CI workflow step (from .github/workflows/ci.yml):
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+      - name: Prove complete regression partition
+        run: bin/fm-test-run.sh --check-coverage
+      # The guard audit's Stage 0 machine: a registered hook path that does not
+      # exist, a registry path that does not resolve, or a retired guard named
+      # again in live code fails here instead of silently claiming coverage.
+      - name: Prove guard wiring and retirement references
+        run: bin/fm-guard-refcheck.sh
+      - name: Enforce the guard registry contract and its ratchet
+        run: bin/fm-guard-lint.sh --mode enforce --counts
+      # New work cannot add debt: a refusal site on a changed line must map to a
+      # guard, and the burn-down allowlist may not grow against the PR base.
+      - name: Enforce the guard ratchet against the pull request base
+        if: github.event_name == 'pull_request'
+        run: bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1

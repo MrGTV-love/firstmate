@@ -1,0 +1,15 @@
+$ python3 bin/fm-guard-sites.py | jq  (sites in fm-task-copy-lib.sh lines 631-680 and fm-teardown.sh shared-slot guard)
+bin/fm-task-copy-lib.sh:660 [B] entry=null key=site:bin/fm-task-copy-lib.sh:cff030a213
+    remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
+bin/fm-task-copy-lib.sh:672 [B] entry=null key=site:bin/fm-task-copy-lib.sh:6df0fed844
+    echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+bin/fm-teardown.sh:4015 [A,B] entry=null key=site:bin/fm-teardown.sh:20c9180465
+    echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset
+bin/fm-teardown.sh:4047 [A,B] entry=null key=site:bin/fm-teardown.sh:cf9181c4c5
+    echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
+
+# are these keys in docs/guards/lint-allowlist.json as S1 burn-down debt?
+site:bin/fm-task-copy-lib.sh:cff030a213 allowlisted=1
+site:bin/fm-task-copy-lib.sh:6df0fed844 allowlisted=1
+site:bin/fm-teardown.sh:20c9180465 allowlisted=1
+site:bin/fm-teardown.sh:cf9181c4c5 allowlisted=1

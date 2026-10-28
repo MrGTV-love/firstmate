@@ -1,0 +1,14 @@
+merge commit HEAD=cc1352059d1a3246ee82c2076d775cfef46ce5ee  HEAD^1=fdbcf3f  moving main tip=39dacaa
+### CI step as shipped: --base HEAD^1 (merge's first parent)
+$ bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+### old approach: --base <moving main tip>
+$ bin/fm-guard-lint.sh --mode new-or-touched --base main
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+

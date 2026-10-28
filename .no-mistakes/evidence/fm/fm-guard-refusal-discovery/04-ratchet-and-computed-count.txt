@@ -1,0 +1,70 @@
+================ S5a: remove a legacy allowlisted site (the shared-slot REFUSED line, bin/fm-teardown.sh:4015) -> its stale entry fails
+ bin/fm-teardown.sh | 1 -
+ 1 file changed, 1 deletion(-)
+### enforce
+$ bin/fm-guard-lint.sh --mode enforce
+STALE S1 site:bin/fm-teardown.sh:20c9180465: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=841 allowlisted=841 stale=1 shown=0 sites=891
+STALE S1 site:bin/fm-teardown.sh:20c9180465: allowlisted violation no longer occurs; remove the entry
+exit=1
+
+================ S5b: allowlist grows (one new S1 entry added) -> new-or-touched fails S5
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+STALE S1 site:bin/fm-teardown.sh:deadbeef00: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=1 shown=0 sites=892
+VIOLATION S5 site:bin/fm-teardown.sh:deadbeef00: allowlist entry S1 is not in base; the allowlist may only shrink
+STALE S1 site:bin/fm-teardown.sh:deadbeef00: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=1 shown=0 sites=892
+VIOLATION S5 site:bin/fm-teardown.sh:deadbeef00: allowlist entry S1 is not in base; the allowlist may only shrink
+exit=1
+
+================ S5c: new unregistered site AND an allowlist entry to excuse it -> enforce passes, new-or-touched still fails (touched + S5)
+new site key: site:bin/fm-teardown.sh:8524191fbb
+### enforce
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+exit=0
+
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+VIOLATION S5 site:bin/fm-teardown.sh:8524191fbb: allowlist entry S1 is not in base; the allowlist may only shrink
+LINT_SUMMARY mode=new-or-touched guards=37 violations=843 allowlisted=843 stale=0 shown=0 sites=893
+VIOLATION S1 site:bin/fm-teardown.sh:8524191fbb: bin/fm-teardown.sh:6305 [A,B] echo "REFUSED: lab probe sneaking in through the allowlist" >&2 is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+VIOLATION S5 site:bin/fm-teardown.sh:8524191fbb: allowlist entry S1 is not in base; the allowlist may only shrink
+exit=1
+
+================ S5d: touch an allowlisted legacy site without changing its text (re-indent line 4015) -> new-or-touched fails, enforce passes
+diff --git a/bin/fm-teardown.sh b/bin/fm-teardown.sh
+index 29a3bbe..04bc89b 100755
+--- a/bin/fm-teardown.sh
++++ b/bin/fm-teardown.sh
+@@ -4015 +4015 @@ require_shared_task_worktree_slot() {
+-        echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so an
++          echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so 
+### enforce
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+
+### new-or-touched
+$ bin/fm-guard-lint.sh --mode new-or-touched --base base
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+LINT_SUMMARY mode=new-or-touched guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+VIOLATION S1 site:bin/fm-teardown.sh:20c9180465: bin/fm-teardown.sh:4015 [A,B] echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its cla is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site
+exit=1
+
+================ S6: typed unregistered count
+### enforce with typed unregistered=5
+$ bin/fm-guard-lint.sh --mode enforce
+VIOLATION S4 inventory: the registry types unregistered=5 but the scan computes 842; remove the typed count
+LINT_SUMMARY mode=enforce guards=37 violations=843 allowlisted=842 stale=0 shown=1 sites=892
+VIOLATION S4 inventory: the registry types unregistered=5 but the scan computes 842; remove the typed count
+exit=1
+
+### enforce with typed unregistered=842 (equals computed)
+$ bin/fm-guard-lint.sh --mode enforce
+LINT_SUMMARY mode=enforce guards=37 violations=842 allowlisted=842 stale=0 shown=0 sites=892
+exit=0
+

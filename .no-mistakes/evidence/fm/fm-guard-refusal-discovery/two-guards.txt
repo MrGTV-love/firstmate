@@ -1,0 +1,5 @@
+bin/fm-task-copy-lib.sh:371 [A,B] entry=null echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+bin/fm-task-copy-lib.sh:660 [B] entry=null remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
+bin/fm-task-copy-lib.sh:672 [B] entry=null echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing al
+bin/fm-teardown.sh:4015 [A,B] entry=null echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's re
+bin/fm-teardown.sh:4047 [A,B] entry=null echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
