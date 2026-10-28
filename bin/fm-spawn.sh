@@ -104,10 +104,14 @@
 #   <spawn_gen> <prior spawn_gen> <model> line to state/<id>.launch-models under
 #   the task metadata lock, before publishing replacement metadata. A fresh
 #   spawn leaves the prior field empty; relaunch names the replaced spawn_gen and
-#   also appends the prior meta model under the new spawn_gen. History is never
-#   truncated or unwound on launch failure. fm-review-record.py counts only the
-#   lines reached from the current meta's spawn_gen through prior links, so a
-#   reused task id never inherits an earlier incarnation's authors. A confined
+#   also appends the prior meta model under the new spawn_gen. An omp launch
+#   also appends each native fallback model of its state/<id>.omp-fallback.yml
+#   chain under the same spawn_gen, because the session can switch to it without
+#   a relaunch; the worker-owned live-model record is never author evidence.
+#   History is never truncated or unwound on launch failure.
+#   fm-review-record.py counts only the lines reached from the current meta's
+#   spawn_gen through prior links, so a reused task id never inherits an
+#   earlier incarnation's authors. A confined
 #   worker cannot write this history; fm-write-confinement.py denies it.
 #   Relaunch refuses unless the endpoint is
 #   agent-free on a backend with a recovery-grade agent-state classifier (tmux
@@ -6346,6 +6350,7 @@ BUSY_GEN=
     fi
     ;;
   esac
+  native_fallback='[]'
   case "$WIRING_HARNESS" in
   claude*)
     # Semantic busy-state hooks (bin/fm-busy-lib.sh): UserPromptSubmit opens
@@ -6601,7 +6606,6 @@ EOF
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
-    native_fallback='[]'
     while IFS= read -r candidate; do
       fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
       candidate_harness=$(jq -r .harness <<<"$candidate")
@@ -7013,6 +7017,7 @@ fi
     printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${SPAWN_PRIOR_MODEL:-unknown}"
   fi
   printf '%s\t%s\t%s\n' "$SPAWN_GEN" "$SPAWN_PRIOR_GEN" "${MODEL:-default}"
+  jq -r --arg gen "$SPAWN_GEN" --arg prior "$SPAWN_PRIOR_GEN" '.[] | [$gen, $prior, .model] | join("\t")' <<<"$native_fallback"
 } >> "$SPAWN_MODEL_HISTORY" || {
   echo "error: could not append launch-model history: $SPAWN_MODEL_HISTORY" >&2
   exit 1
