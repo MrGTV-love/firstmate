@@ -819,17 +819,33 @@ hold_fixture_task() {
     || fail "could not place the fixture task under a captain hold"
 }
 
-# The same fixture task held with a declared owner, for a secondmate home: its
-# parent channel carries the captain's calls and the parent's own. Args:
-# case_dir owner(captain|parent)
+# The same fixture task held for a secondmate home. A captain-owned call is
+# filed with --owner captain. A call the parent owns is never held, so the only
+# parent-owned hold is a legacy hold filed before owners were recorded and then
+# classified as the parent's. Args: case_dir owner(captain|parent)
 hold_fixture_task_owned() {
-  local case_dir=$1 owner=$2
-  FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
-    TASKS_AXI_BACKEND=markdown \
+  local case_dir=$1 owner=$2 home=$1/home
+  if [ "$owner" = captain ]; then
+    FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+      "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
+        --title 'Fixture call' --owner captain \
+        --reason 'the landing choice has not been made yet' >/dev/null \
+      || fail "could not place the fixture task under a captain-owned hold"
+    return 0
+  fi
+  mv "$home/.fm-secondmate-home" "$case_dir/premate-home"
+  mv "$home/.fm-secondmate-parent" "$case_dir/premate-parent"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
-      --title 'Fixture call' --owner "$owner" \
-      --reason 'the landing choice has not been made yet' >/dev/null \
-    || fail "could not place the fixture task under a $owner-owned hold"
+      --title 'Fixture call' --reason 'the landing choice has not been made yet' >/dev/null \
+    || fail "could not place the fixture task under a legacy hold"
+  mv "$case_dir/premate-home" "$home/.fm-secondmate-home"
+  mv "$case_dir/premate-parent" "$home/.fm-secondmate-parent"
+  printf '%s\n' 'the question was the main firstmate'"'"'s: one retry' > "$case_dir/classify-evidence"
+  FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
+    "$ROOT/bin/fm-captain-hold.sh" classify task-x1 --owner parent \
+      --evidence-file "$case_dir/classify-evidence" --reason 'the retry was the main firstmate call' >/dev/null \
+    || fail "could not classify the fixture task as the parent's"
 }
 
 # Count the guard events in <log> matching a guard and decision, so a test can

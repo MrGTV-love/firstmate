@@ -266,26 +266,32 @@ A mate that held a decision the main firstmate makes itself, such as an ask-user
 The only closes were the captain's words, which the captain never gave, and an evidence-backed `reconcile close`, which refuses unfinished worker-owned work.
 The merge gate then refused the task with no honest path forward.
 That happened on 2026-10-10 twice and again on 2026-10-28 for a Mac mini mate's ship task.
+On the retry the captain's words were that it should not have been a decision point and should have just been done.
+So a call the main firstmate owns, such as an ask-user finding, a retry, or a hygiene call, is never held.
+The home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
+`hold` is for captain calls only.
 
 ### Owner recorded at filing
 
 `hold` writes the owner on a `Decision owner:` line directly beneath the hold-set stamp.
 The owner is a fact written at filing and is never inferred from the reason text.
 A main home needs no `--owner`, because no parent exists and the owner is the captain.
-A main home refuses `--owner parent` for the same reason.
-A secondmate home must pass `--owner`, so a mate cannot file a call without deciding whose it is.
+A secondmate home must pass `--owner captain`, so a mate cannot file a call without saying it needs the captain's own words.
+Any other owner is refused, in either home, with a message that names the routing to Main.
 A hold filed before owners were recorded has no line.
 It reads as the captain's in a main home and as `unrecorded` in a secondmate home.
 
-A parent-owned hold is an `external` hold carrying `Decision owner: parent`, so it is never a captain call.
+The only parent-owned hold is a legacy hold that `classify --owner parent` filed as the parent's (below).
+It is an `external` hold carrying `Decision owner: parent`, so it is never a captain call.
 The captain predicate `open`, the Bearings captain section, the divergence guard, and `answer` all ignore or refuse it.
 It still publishes a `needs-decision` line on the parent channel under the same `captain-hold-<task>-<n>` key family, with the label `parent decision`, so the parent is woken.
-The owner is fixed while a hold is open: neither owner can be re-filed as the other until the first is released.
+The captain reverses it by re-holding with `--owner captain`.
 
 ### Closing a parent-owned call
 
-`decide` records the parent's decision text as a `Parent decision:` block marked `Not a captain answer.`.
-It lifts the hold so the work item resumes without closing, and it publishes the matching `resolved` line.
+`decide` records the parent's decision text as a `Parent decision:` block marked `Not a captain answer.`, and it publishes the matching `resolved` line.
+Like `answer` without `--release`, it closes a question-shaped row: a `captain`-kind row that no worker owns.
+Otherwise it lifts the hold so the gated work item resumes without closing.
 An exact replay is accepted and publishes nothing twice.
 It refuses every hold whose recorded owner is not the parent, so it cannot release a captain call.
 
@@ -304,14 +310,19 @@ Bearings and the divergence guard read only open captain-kind holds, so a withdr
 
 The one eligibility fact is `--ruling <id>`, a closed captain call in this home, live or archived, whose newest record carries the captain's recorded words.
 An evidence-only close, a release, a parent decision, and another withdrawal are not rulings.
-The ruling must also name the withdrawn task id in its own records, written before the withdrawal: its title (the recorded question), its hold reason, or its body with the captain's recorded answer.
+The ruling must also name the withdrawn task id in its title, its hold reason (its question), or the text of its recorded captain answer.
+Origin, owner, and other metadata lines in its body never count, so a call filed with `--origin <task>` does not name that task by its origin alone.
+The answer text is the block under `Captain decision:` whose digest matches the record's own `Decision digest:`.
 A ruling that never names the hold is refused, and the refusal says what was missing.
 A name written only at withdraw time, such as in the evidence file, never counts, because it would let any closed ruling release any hold.
+The ruling's answer must also be recorded after this hold's current `Captain hold set:` stamp.
+That binds the ruling to one hold occurrence: a ruling made before the hold, including one an earlier withdrawal of the same task cited, is refused.
+A hold with no stamp cannot show that any ruling postdates it, so it is refused too.
 The basis works on any captain hold, including one recorded as the captain's or filed before owners were recorded, because the captain has already ruled on it.
 
 There is no weaker basis for `withdraw`.
 A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
-A call the parent owns is filed as such with `--owner parent` and released with `decide`.
+A legacy hold that was the parent's call is classified with `classify --owner parent` and resolved with `decide`.
 
 ### Classifying a hold filed before owners were recorded
 
@@ -733,12 +744,12 @@ It uses a stubbed tasks-axi that fails any markdown file override, and proves th
 
 The owner, parent decision, classification, and withdrawal paths are pinned in `tests/fm-captain-hold-owner.test.sh`, and the merge gate cases in `tests/fm-pr-merge-checks.test.sh`:
 
-- A secondmate home refuses a hold with no owner or an unknown one, and a main home refuses `--owner parent`.
-- A parent-owned hold is an external hold with the owner recorded, reads as no captain call, publishes a `parent decision` line once, and refuses re-filing as the captain's.
-- The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases the hold, leaves the work item open, closes the channel key, and replays once.
+- A secondmate home refuses a hold with no owner, `--owner parent`, or an unknown owner, and a main home refuses `--owner parent`.
+- A classified parent-owned hold is an external hold with the owner recorded and reads as no captain call.
+- The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases a gated work item with the work left open, closes a question-shaped row, closes the channel key, and replays once.
 - A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
 - `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
-  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, and a missing evidence file.
+  It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that names the task only by its origin, a ruling reused after the task was re-held, and a missing evidence file.
 - `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
 - `classify` moves a legacy hold to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.

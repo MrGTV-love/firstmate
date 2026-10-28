@@ -29,9 +29,9 @@ Do not close a captain-held task merely because the originating investigation co
 Holding the work item the question gates is safe for exactly that reason: cleanup keeps such a row open with the finished work's deliverable recorded and returns it to the queue, so it still reads as the captain's own call.
 Only `answer` with the captain's words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling may resolve it.
 
-Every hold records who owns the decision it waits on, and a secondmate home must say which when it files one.
-File `--owner parent` for a call the main firstmate makes itself, such as an ask-user finding, a retry, or a hygiene call, and `--owner captain` only for a call that needs the captain's own words.
-A parent-owned hold is never a captain call: only `bin/fm-captain-hold.sh decide` with the parent's decision releases it, and the captain's `answer` refuses it.
+A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
+A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
+The only parent-owned hold is a legacy hold already on record that `classify --owner parent` filed as the parent's: it is never a captain call, only `bin/fm-captain-hold.sh decide` with the parent's decision resolves it, and the captain's `answer` refuses it.
 A captain-owned hold is never released by `decide`, and no actor other than the captain's own words can release one.
 
 Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.

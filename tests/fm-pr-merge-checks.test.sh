@@ -1664,8 +1664,8 @@ test_held_task_refusal_prints_the_exact_release_command() {
   pass "fm-pr-merge prints the exact captain-hold release command with the real task id"
 }
 
-# A secondmate home's parent channel carries two kinds of held call. A call the
-# parent firstmate owns blocks the merge until the parent's decision is recorded,
+# A secondmate home can carry two kinds of held call. A legacy call classified as
+# the parent firstmate's blocks the merge until the parent's decision is recorded,
 # and that decision, not the captain's words, releases it. A call the captain
 # owns is never released by the parent's decision. Recorded 2026-10-28: a Mac
 # mini mate's ship task was held as a captain call although the question was the
