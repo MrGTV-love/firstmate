@@ -1,0 +1,17 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M60X7EHPFP3WC1T7VVP0W6VM/r5/p2-A/stdout.log
+  pid 57843: presafety cpu=0.41s wall=0.500s
+  pid 69383: presafety cpu=0.40s wall=0.484s
+  pid 76598: presafety cpu=0.38s wall=0.477s
+  pid 88660: presafety cpu=0.43s wall=0.586s
+  pid 97048: presafety cpu=0.42s wall=0.526s
+  pid 9794: presafety cpu=0.41s wall=0.508s
+  pid 17063: presafety cpu=0.40s wall=0.496s
+  pid 31253: presafety cpu=0.33s wall=0.399s
+  pid 36457: presafety cpu=0.35s wall=0.414s
+  pid 44758: presafety cpu=0.37s wall=0.445s
+  pid 49838: presafety cpu=0.34s wall=0.419s
+  pid 59799: presafety cpu=0.30s wall=0.362s
+  pid 63805: presafety cpu=0.30s wall=0.356s
+  pid 71166: presafety cpu=0.34s wall=0.404s
+  pid 75740: presafety cpu=0.35s wall=0.414s
+  TOTAL invocations=15 presafety_cpu=5.53s presafety_wall=6.788s

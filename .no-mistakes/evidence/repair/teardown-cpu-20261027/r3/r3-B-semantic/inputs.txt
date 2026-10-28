@@ -1,0 +1,1 @@
+tree=/Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/B run_tmp=/Users/charlesabrooker/tmp/nm-r3sem-B.giw2rP bash=/bin/bash GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)

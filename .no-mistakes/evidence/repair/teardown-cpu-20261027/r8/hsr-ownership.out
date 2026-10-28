@@ -1,0 +1,3 @@
+ok - parent cancellation fences both acquisition paths after validation
+ok - reclaim waits for publication, accounting, and release critical sections
+ok - three acquired failures escalate and release despite blocked logging

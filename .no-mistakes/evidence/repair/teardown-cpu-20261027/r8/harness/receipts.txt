@@ -1,0 +1,8 @@
+c1361 nested-bash rc=1 secs=7 owned_tmp=empty_rmdir_ok
+c1361 nested-default rc=1 secs=7 owned_tmp=empty_rmdir_ok
+c1361 held-worker rc=1 secs=6 owned_tmp=empty_rmdir_ok
+c1361 escape rc=1 secs=8 owned_tmp=empty_rmdir_ok
+head nested-bash rc=0 secs=9 owned_tmp=empty_rmdir_ok
+head nested-default rc=0 secs=9 owned_tmp=empty_rmdir_ok
+head held-worker rc=0 secs=11 owned_tmp=empty_rmdir_ok
+head escape rc=0 secs=10 owned_tmp=empty_rmdir_ok

@@ -1,0 +1,5 @@
+tree=/Users/charlesabrooker/tmp/nm-r5-trees.G0m2ne/B run_tmp=/Users/charlesabrooker/tmp/nm-meta-r5-B-bash32.mFmlxi
+/bin/bash
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+fm_meta_get_to BUSY_GEN "$META" busy_gen
+fm_meta_get_to ORCA_WORKTREE_ID "$META" orca_worktree_id

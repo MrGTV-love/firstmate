@@ -1,0 +1,53 @@
+head=1e980ec8cf4d1aefeaf071945399d746528596c3 bash=3.2.57(1)-release root=<R>
+== 1. registry UNSET (default product path): --detach
+exit=0 return_secs=0.27
+published: fm-secondmate-home-summary.v1
+files in root other than unset-home: 0
+
+== 2. registry SET: --detach
+exit=0
+registry immediately after return:
+<R>/registry.XXXXXX	fm-home-summary-refresh.sh --detach	wait
+first record filled at return: yes pid=40638
+published: fm-secondmate-home-summary.v1
+record labels:
+   1 fm-home-summary-refresh.sh --detach	wait
+   1 fm_run_progress	wait
+   1 fm_run_timed	wait
+-- fm_test_wait_processes on that registry (bound 60 s):
+  wait rc=0
+records left: 0  registry kept: no
+34c34
+<   "home": "<R>/unset-home",
+---
+>   "home": "<R>/reg-home",
+summary unset vs set: identical except generated fields
+
+== 3. ADVERSARIAL registry set to a missing file: --detach
+fm-home-summary-refresh.sh --detach: could not register with the fixture process registry <R>/missing-registry
+exit=1
+home created: no; missing registry created: no
+
+== 4. fm-duration.py keep-going --record fills the child group pid
+child pid=53868 pgid=53868
+exit=0
+record content: 0000000 5 3 8 6 8 \n 
+0000006
+-- keep-going without --record (default) still runs:
+plain-ok
+exit=0
+
+== 5. ADVERSARIAL wait records (fm_test_wait_processes, bound 1 s)
+live pid=54551 partial prefix=5455 (prefix alive: n)
+fm_test_wait_processes: owned writers still running after 1s: pending:<R>/adv-reg.XXXXXX (pending-empty) pending:<R>/adv-reg.XXXXXX (partial-no-newline); kept <R>/adv-reg
+  wait rc=1
+registry kept: yes; records kept: 2
+fm_test_wait_processes: owned writers still running after 1s: 54551 (live-full); kept <R>/adv2
+  live full record wait rc=1
+  after exact kill of 54551: wait rc=0
+adv2 records left: 0
+fm_test_wait_processes: owned writers still running after 1s: unreadable:<R>/adv3.XXXXXX (junk); kept <R>/adv3
+  non-numeric record wait rc=1
+
+== cleanup of owned root (evidence retained above)
+root removed: yes

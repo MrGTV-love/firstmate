@@ -1,0 +1,1 @@
+not ok - escaped-group: cleanup found no running writer while a group below the stopped worker was held

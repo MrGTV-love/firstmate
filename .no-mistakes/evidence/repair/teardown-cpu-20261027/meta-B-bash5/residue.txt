@@ -1,0 +1,6 @@
+total 8
+drwxr-xr-x  3 charlesabrooker  staff  96 Oct 28 04:31 .
+drwxr-xr-x  3 charlesabrooker  staff  96 Oct 28 04:31 ..
+-rw-r--r--  1 charlesabrooker  staff  77 Oct 28 04:31 .home-summary-refresh.log
+--- log:
+[2026-10-28T09:31:53Z] summary producer returned a malformed ledger document

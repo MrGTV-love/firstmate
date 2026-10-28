@@ -1,0 +1,12 @@
+residue listing 2026-10-28T09:29:38Z
+drwx------  4 charlesabrooker  staff  128 Oct 28 04:29 /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V
+drwx------  3 charlesabrooker  staff  96 Oct 28 04:29 /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4
+-rw-------  1 charlesabrooker  staff  274 Oct 28 04:28 /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/.fm-test-cleanup.80293.nrfXce
+drwxr-xr-x  3 charlesabrooker  staff  96 Oct 28 04:29 /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm
+drwxr-xr-x  2 charlesabrooker  staff  64 Oct 28 04:29 /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm/state
+--- registry
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-drop-words.8GdKnW
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-test-slots.AbDqiV
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-procevent-claims.TYbP5v
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4
+--- processes naming the run root

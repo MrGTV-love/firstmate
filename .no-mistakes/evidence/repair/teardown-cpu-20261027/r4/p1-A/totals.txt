@@ -1,0 +1,24 @@
+p1-A/stdout.log
+  interval unattributed_launch valid=False cpu=None
+  interval unattributed_startup suite.start->test_local_only_force_overrides_unpushed.start valid=True cpu=0.22 wall_s=0.307
+  interval test_local_only_force_overrides_unpushed test_local_only_force_overrides_unpushed.start->test_local_only_force_overrides_unpushed.end valid=True cpu=1.9000000000000001 wall_s=3.171
+  interval unattributed_gap test_local_only_force_overrides_unpushed.end->test_docker_all_failure_channels_retain_forced_tasks_until_retry.start valid=True cpu=0.0 wall_s=0.033
+  interval test_docker_all_failure_channels_retain_forced_tasks_until_retry test_docker_all_failure_channels_retain_forced_tasks_until_retry.start->test_docker_all_failure_channels_retain_forced_tasks_until_retry.end valid=True cpu=30.959999999999997 wall_s=46.819
+  interval unattributed_tail test_docker_all_failure_channels_retain_forced_tasks_until_retry.end->target.exit valid=False cpu=None wall_s=0.993
+  target_exit returncode=0 boundaries_missing=False
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry helper cli: valid=14 cpu=28.29s wall=42.318s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry helper setup: valid=7 cpu=1.52s wall=2.164s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product backend: valid=14 cpu=0.84s wall=1.453s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product docker: valid=7 cpu=1.92s wall=2.496s invalid=7
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product preflight: valid=14 cpu=1.70s wall=2.727s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product runtime: valid=14 cpu=5.11s wall=6.742s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product safety: valid=14 cpu=0.00s wall=0.514s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product startup: valid=14 cpu=4.75s wall=6.393s invalid=0
+  phase test_local_only_force_overrides_unpushed helper cli: valid=1 cpu=1.66s wall=2.778s invalid=0
+  phase test_local_only_force_overrides_unpushed helper setup: valid=1 cpu=0.19s wall=0.258s invalid=0
+  phase test_local_only_force_overrides_unpushed product backend: valid=1 cpu=0.06s wall=0.085s invalid=0
+  phase test_local_only_force_overrides_unpushed product docker: valid=1 cpu=0.17s wall=0.283s invalid=0
+  phase test_local_only_force_overrides_unpushed product preflight: valid=1 cpu=0.10s wall=0.150s invalid=0
+  phase test_local_only_force_overrides_unpushed product runtime: valid=1 cpu=0.34s wall=0.442s invalid=0
+  phase test_local_only_force_overrides_unpushed product safety: valid=1 cpu=0.00s wall=0.025s invalid=0
+  phase test_local_only_force_overrides_unpushed product startup: valid=1 cpu=0.28s wall=0.379s invalid=0

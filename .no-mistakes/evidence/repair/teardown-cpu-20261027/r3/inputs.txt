@@ -1,0 +1,21 @@
+scratch=/Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK
+A=737f390b tree 554f78869110a6990b00814718119137a03d655e
+B=b576c5b9 tree a9e46242a123be9b8d320e78a26ee14d1a9db329
+--- diff -r A B:
+diff: /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/A/.claude/mods/firstmate-calm: Directory loop detected
+diff: /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/B/.claude/mods/firstmate-calm: Directory loop detected
+diff: /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/A/.claude/skills: Directory loop detected
+diff: /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/B/.claude/skills: Directory loop detected
+diff -r /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/A/bin/fm-teardown.sh /Users/charlesabrooker/tmp/nm-r3-trees.wDxfgK/B/bin/fm-teardown.sh
+1697c1697
+< BUSY_GEN=$(fm_meta_get "$META" busy_gen)
+---
+> fm_meta_get_to BUSY_GEN "$META" busy_gen
+1701c1701
+< ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
+---
+> fm_meta_get_to ORCA_WORKTREE_ID "$META" orca_worktree_id
+diff_exit=1
+Darwin Mac-Studio.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:06:40 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6050 arm64
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+d59c6f2312e551e9c46497329d435b6ec74fbc46e9155b84170f377127ed004e  /bin/bash

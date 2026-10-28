@@ -1,0 +1,16 @@
+suite_exit=1
+outer_wall_ms=47071
+date_end=2026-10-28T09:29:09Z
+--- receipt immediately after exit: find /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/.fm-test-cleanup.80293.nrfXce
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm/state
+--- receipt after 15s settle: find /Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/.fm-test-cleanup.80293.nrfXce
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm
+/Users/charlesabrooker/tmp/nm-ab-p1-A.9mA12V/fm-teardown-tests.SmEjt4/docker-failure-volume-rm/state
+owned_tmp_residue=retained (cleanup failure; stop)

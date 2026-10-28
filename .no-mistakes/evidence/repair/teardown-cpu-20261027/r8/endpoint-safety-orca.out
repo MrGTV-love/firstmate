@@ -1,0 +1,3 @@
+ok - cleanup identity: an Orca record's real composite worktree id validates while a separatorless or newline-carrying id refuses
+ok - forced recursive descendant cleanup leaves an uninspected Orca backend copy intact
+ok - fm-teardown: an Orca close its missing CLI never attempted refuses even under --force, keeping the record naming the terminal

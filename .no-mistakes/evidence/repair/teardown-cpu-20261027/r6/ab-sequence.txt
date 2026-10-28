@@ -1,0 +1,5 @@
+p1-A rc=0 2 ok-lines; owned_tmp_removed=empty_rmdir_ok
+p1-B rc=0 2 ok-lines; owned_tmp_removed=empty_rmdir_ok
+p2-B rc=0 2 ok-lines; owned_tmp_removed=empty_rmdir_ok
+p2-A rc=0 2 ok-lines; owned_tmp_removed=empty_rmdir_ok
+done

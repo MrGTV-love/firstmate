@@ -1,0 +1,9 @@
+fm-home-summary-refresh-ownership exit=0 secs=41 ok=3 notok=0 owned_tmp=empty_rmdir_ok
+fm-test-fixture-cleanup exit=0 secs=13 ok=7 notok=0 owned_tmp=empty_rmdir_ok
+fm-timeout-lib exit=1 secs=52 ok=23 notok=0 owned_tmp=empty_rmdir_ok
+fm-work-progress exit=0 secs=209 ok=26 notok=0 owned_tmp=empty_rmdir_ok
+fm-nm-read-cache exit=0 secs=93 ok=17 notok=0 owned_tmp=empty_rmdir_ok
+fm-duration exit=0 secs=127 ok=12 notok=0 owned_tmp=kept:/Users/charlesabrooker/tmp/nm-r7-fm-duration.HjY8MX
+rerun-after-shadow-fix fm-timeout-lib exit=0 secs=48 ok=24 notok=0 owned_tmp=empty_rmdir_ok
+rerun-after-shadow-fix fm-duration exit=0 secs=128 ok=12 notok=0 owned_tmp=kept:/Users/charlesabrooker/tmp/nm-r7b-fm-duration.T57Uql
+rerun-after-shadow-fix fm-work-progress exit=0 secs=216 ok=26 notok=0 owned_tmp=empty_rmdir_ok

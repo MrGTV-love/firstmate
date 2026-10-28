@@ -1,0 +1,7 @@
+run   target_exit presafety_cpu presafety_wall  ordinary_case_cpu docker_case_cpu  cli_n cli_cpu cli_wall
+p1-A            0          5.59          7.571              1.90           30.96     15   29.95   45.096
+p1-B            0          5.52          6.828              2.05           31.13     15   30.24   46.110
+p2-B            0          5.51          6.861              2.09           31.55     15   30.72   46.192
+p2-A            0          5.99          7.754              2.26           32.95     15   32.19   49.055
+pair1 (A then B) A-B: presafety_cpu 0.07 s, ordinary_case_cpu -0.15 s, docker_case_cpu -0.17 s, cli_cpu -0.29 s
+pair2 (B then A) A-B: presafety_cpu 0.48 s, ordinary_case_cpu 0.17 s, docker_case_cpu 1.40 s, cli_cpu 1.47 s

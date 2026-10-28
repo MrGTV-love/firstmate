@@ -1,0 +1,8 @@
+driver_exit=0
+--- owned tmp after 10s:
+/Users/charlesabrooker/tmp/nm-meta-B-bash5.nK3V5p
+/Users/charlesabrooker/tmp/nm-meta-B-bash5.nK3V5p/fm-teardown-tests.JYzeug
+/Users/charlesabrooker/tmp/nm-meta-B-bash5.nK3V5p/fm-teardown-tests.JYzeug/v-orca-id-non-orca-backend
+/Users/charlesabrooker/tmp/nm-meta-B-bash5.nK3V5p/fm-teardown-tests.JYzeug/v-orca-id-non-orca-backend/state
+/Users/charlesabrooker/tmp/nm-meta-B-bash5.nK3V5p/fm-teardown-tests.JYzeug/v-orca-id-non-orca-backend/state/.home-summary-refresh.log
+owned_tmp_residue=retained

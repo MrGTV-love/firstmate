@@ -1,0 +1,190 @@
+== variant exact (sidecar kept=0)
+-- meta tail (od -c, gen redacted):
+0000000    t   e   s   t   s   .   2   k   x   2   d   u   /   v   -   e
+0000020    x   a   c   t   /   p   r   o   j   e   c   t  \n   k   i   n
+0000040    d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a
+0000060    l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n
+0000100    =   t   e   a   r   d   o   w   n   -   t   e   s   t   -   t
+0000120    a   s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =
+0000140    <   G   E   N   >  \n                                        
+0000146
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-exact/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-exact/data/backlog.md). Update <ROOT>/v-exact/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant exact-with-sidecar (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    u   /   v   -   e   x   a   c   t   -   w   i   t   h   -   s
+0000020    i   d   e   c   a   r   /   p   r   o   j   e   c   t  \n   k
+0000040    i   n   d   =   s   h   i   p  \n   m   o   d   e   =   l   o
+0000060    c   a   l   -   o   n   l   y  \n   s   p   a   w   n   _   g
+0000100    e   n   =   t   e   a   r   d   o   w   n   -   t   e   s   t
+0000120    -   t   a   s   k   -   x   1  \n   b   u   s   y   _   g   e
+0000140    n   =   <   G   E   N   >  \n                                
+0000150
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-exact-with-sidecar/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-exact-with-sidecar/data/backlog.md). Update <ROOT>/v-exact-with-sidecar/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant last-match-wins (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    s   /   p   r   o   j   e   c   t  \n   k   i   n   d   =   s
+0000020    h   i   p  \n   m   o   d   e   =   l   o   c   a   l   -   o
+0000040    n   l   y  \n   s   p   a   w   n   _   g   e   n   =   t   e
+0000060    a   r   d   o   w   n   -   t   e   s   t   -   t   a   s   k
+0000100    -   x   1  \n   b   u   s   y   _   g   e   n   =   s   t   a
+0000120    l   e   -   g   e   n  \n   b   u   s   y   _   g   e   n   =
+0000140    <   G   E   N   >  \n                                        
+0000146
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-last-match-wins/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-last-match-wins/data/backlog.md). Update <ROOT>/v-last-match-wins/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant last-bogus-wins (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    s   /   p   r   o   j   e   c   t  \n   k   i   n   d   =   s
+0000020    h   i   p  \n   m   o   d   e   =   l   o   c   a   l   -   o
+0000040    n   l   y  \n   s   p   a   w   n   _   g   e   n   =   t   e
+0000060    a   r   d   o   w   n   -   t   e   s   t   -   t   a   s   k
+0000100    -   x   1  \n   b   u   s   y   _   g   e   n   =   <   G   E
+0000120    N   >  \n   b   u   s   y   _   g   e   n   =   s   t   a   l
+0000140    e   -   g   e   n  \n                                        
+0000146
+exit=1
+meta_present=1 busy_state_present=1 busy_gen_sidecar_present=1
+-- stderr:
+error: stale busy-state gen for task-x1 (event rejected)
+-- stdout:
+== variant empty-falls-back-to-sidecar (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    -   t   e   s   t   s   .   2   k   x   2   d   u   /   v   -
+0000020    e   m   p   t   y   -   f   a   l   l   s   -   b   a   c   k
+0000040    -   t   o   -   s   i   d   e   c   a   r   /   p   r   o   j
+0000060    e   c   t  \n   k   i   n   d   =   s   h   i   p  \n   m   o
+0000100    d   e   =   l   o   c   a   l   -   o   n   l   y  \n   s   p
+0000120    a   w   n   _   g   e   n   =   t   e   a   r   d   o   w   n
+0000140    -   t   e   s   t   -   t   a   s   k   -   x   1  \n   b   u
+0000160    s   y   _   g   e   n   =  \n                                
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-empty-falls-back-to-sidecar/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-empty-falls-back-to-sidecar/data/backlog.md). Update <ROOT>/v-empty-falls-back-to-sidecar/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant empty-no-sidecar (sidecar kept=0)
+-- meta tail (od -c, gen redacted):
+0000000    f   m   -   t   e   a   r   d   o   w   n   -   t   e   s   t
+0000020    s   .   2   k   x   2   d   u   /   v   -   e   m   p   t   y
+0000040    -   n   o   -   s   i   d   e   c   a   r   /   p   r   o   j
+0000060    e   c   t  \n   k   i   n   d   =   s   h   i   p  \n   m   o
+0000100    d   e   =   l   o   c   a   l   -   o   n   l   y  \n   s   p
+0000120    a   w   n   _   g   e   n   =   t   e   a   r   d   o   w   n
+0000140    -   t   e   s   t   -   t   a   s   k   -   x   1  \n   b   u
+0000160    s   y   _   g   e   n   =  \n                                
+exit=0
+meta_present=0 busy_state_present=1 busy_gen_sidecar_present=0
+-- stderr:
+<TREE>/bin/fm-home-summary-refresh.sh: child setpgid (54871 to 54871): Operation not permitted
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-empty-no-sidecar/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-empty-no-sidecar/data/backlog.md). Update <ROOT>/v-empty-no-sidecar/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant absent-falls-back-to-sidecar (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    -   t   e   a   r   d   o   w   n   -   t   e   s   t   s   .
+0000020    2   k   x   2   d   u   /   v   -   a   b   s   e   n   t   -
+0000040    f   a   l   l   s   -   b   a   c   k   -   t   o   -   s   i
+0000060    d   e   c   a   r   /   p   r   o   j   e   c   t  \n   k   i
+0000100    n   d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c
+0000120    a   l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e
+0000140    n   =   t   e   a   r   d   o   w   n   -   t   e   s   t   -
+0000160    t   a   s   k   -   x   1  \n                                
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-absent-falls-back-to-sidecar/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-absent-falls-back-to-sidecar/data/backlog.md). Update <ROOT>/v-absent-falls-back-to-sidecar/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant absent-no-sidecar (sidecar kept=0)
+-- meta tail (od -c, gen redacted):
+0000000    2   .   S   d   L   d   j   4   /   f   m   -   t   e   a   r
+0000020    d   o   w   n   -   t   e   s   t   s   .   2   k   x   2   d
+0000040    u   /   v   -   a   b   s   e   n   t   -   n   o   -   s   i
+0000060    d   e   c   a   r   /   p   r   o   j   e   c   t  \n   k   i
+0000100    n   d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c
+0000120    a   l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e
+0000140    n   =   t   e   a   r   d   o   w   n   -   t   e   s   t   -
+0000160    t   a   s   k   -   x   1  \n                                
+exit=0
+meta_present=0 busy_state_present=1 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-absent-no-sidecar/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-absent-no-sidecar/data/backlog.md). Update <ROOT>/v-absent-no-sidecar/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant carriage-return (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    d   u   /   v   -   c   a   r   r   i   a   g   e   -   r   e
+0000020    t   u   r   n   /   p   r   o   j   e   c   t  \n   k   i   n
+0000040    d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a
+0000060    l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n
+0000100    =   t   e   a   r   d   o   w   n   -   t   e   s   t   -   t
+0000120    a   s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =
+0000140    <   G   E   N   >  \r  \n                                    
+0000147
+exit=1
+meta_present=1 busy_state_present=1 busy_gen_sidecar_present=1
+-- stderr:
+error: invalid --gen
+-- stdout:
+== variant equals-backslash (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    e   q   u   a   l   s   -   b   a   c   k   s   l   a   s   h
+0000020    /   p   r   o   j   e   c   t  \n   k   i   n   d   =   s   h
+0000040    i   p  \n   m   o   d   e   =   l   o   c   a   l   -   o   n
+0000060    l   y  \n   s   p   a   w   n   _   g   e   n   =   t   e   a
+0000100    r   d   o   w   n   -   t   e   s   t   -   t   a   s   k   -
+0000120    x   1  \n   b   u   s   y   _   g   e   n   =   <   G   E   N
+0000140    >   =   x   \   y  \n                                        
+0000146
+exit=1
+meta_present=1 busy_state_present=1 busy_gen_sidecar_present=1
+-- stderr:
+error: invalid --gen
+-- stdout:
+== variant unterminated-final-line (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    t   e   r   m   i   n   a   t   e   d   -   f   i   n   a   l
+0000020    -   l   i   n   e   /   p   r   o   j   e   c   t  \n   k   i
+0000040    n   d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c
+0000060    a   l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e
+0000100    n   =   t   e   a   r   d   o   w   n   -   t   e   s   t   -
+0000120    t   a   s   k   -   x   1  \n   b   u   s   y   _   g   e   n
+0000140    =   <   G   E   N   >                                        
+0000146
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-unterminated-final-line/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-unterminated-final-line/data/backlog.md). Update <ROOT>/v-unterminated-final-line/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== variant orca-id-non-orca-backend (sidecar kept=1)
+-- meta tail (od -c, gen redacted):
+0000000    o   n   l   y  \n   s   p   a   w   n   _   g   e   n   =   t
+0000020    e   a   r   d   o   w   n   -   t   e   s   t   -   t   a   s
+0000040    k   -   x   1  \n   b   u   s   y   _   g   e   n   =   <   G
+0000060    E   N   >  \n   o   r   c   a   _   w   o   r   k   t   r   e
+0000100    e   _   i   d   =   a   =   b   \   c  \r  \n   o   r   c   a
+0000120    _   w   o   r   k   t   r   e   e   _   i   d   =   l   a   s
+0000140    t   :   :   /   x  \n                                        
+0000146
+exit=0
+meta_present=0 busy_state_present=0 busy_gen_sidecar_present=0
+-- stderr:
+-- stdout:
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree <ROOT>/v-orca-id-non-orca-backend/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at <ROOT>/v-orca-id-non-orca-backend/data/backlog.md). Update <ROOT>/v-orca-id-non-orca-backend/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.

@@ -1,0 +1,17 @@
+T=/Users/charlesabrooker/tmp/nm-r5-trees.G0m2ne
+B = git archive c1361cda (tree 7d367b73e03ec2abd9f05b0cc286727a74b5ae16)
+A = git archive c1361cda with bin/fm-teardown.sh replaced by 737f390b:bin/fm-teardown.sh (blob 1011cf96f9de875417df65e0851132a66c3eb072); HEAD blob 16de762144c1d3f67b325808e7bd9e1b5c06f3b8
+--- diff -r A B (excluding .claude symlink loops)
+diff -r -x .claude /Users/charlesabrooker/tmp/nm-r5-trees.G0m2ne/A/bin/fm-teardown.sh /Users/charlesabrooker/tmp/nm-r5-trees.G0m2ne/B/bin/fm-teardown.sh
+1697c1697
+< BUSY_GEN=$(fm_meta_get "$META" busy_gen)
+---
+> fm_meta_get_to BUSY_GEN "$META" busy_gen
+1701c1701
+< ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
+---
+> fm_meta_get_to ORCA_WORKTREE_ID "$META" orca_worktree_id
+--- diff of .claude
+(empty = identical)
+Darwin Mac-Studio.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:06:40 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6050 arm64
+Python 3.13.6

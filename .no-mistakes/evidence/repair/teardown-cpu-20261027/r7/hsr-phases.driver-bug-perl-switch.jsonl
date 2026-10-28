@@ -1,0 +1,3 @@
+{"label": "c1361-idle", "hogs": 0, "run": 0, "rc": "killed-after-60s(-9)", "elapsed": 60.053, "phases": [], "root": "/Users/charlesabrooker/tmp/nm-r7-hsr-c1361-idle.y9l8px0y", "root_removed": true}
+{"label": "c1361-idle", "hogs": 0, "run": 1, "rc": "killed-after-60s(-9)", "elapsed": 60.221, "phases": [], "root": "/Users/charlesabrooker/tmp/nm-r7-hsr-c1361-idle.r1avhohf", "root_removed": true}
+{"label": "c1361-idle", "hogs": 0, "run": 2, "rc": "killed-after-60s(-9)", "elapsed": 60.045, "phases": [], "root": "/Users/charlesabrooker/tmp/nm-r7-hsr-c1361-idle.gwdzksfi", "root_removed": true}

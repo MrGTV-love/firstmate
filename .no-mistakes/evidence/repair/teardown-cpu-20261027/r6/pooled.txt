@@ -1,0 +1,10 @@
+round pair  A_presafety B_presafety A-B
+r4    p1           5.59        5.52 +0.07
+r4    p2           5.99        5.51 +0.48
+r5    p1           5.77        5.57 +0.20
+r5    p2           5.53        5.96 -0.43
+r6    p1           5.73        5.70 +0.03
+r6    p2           5.46        5.21 +0.25
+n_pairs=6 mean(A-B)=+0.100 s sd=0.304 se=0.124 t=0.80 (|t|<2.57 for df=5 at 95%: not distinguishable from 0)
+A mean 5.68 s (range 5.46-5.99); B mean 5.58 s (range 5.21-5.96)
+pairs with A>B: 5/6

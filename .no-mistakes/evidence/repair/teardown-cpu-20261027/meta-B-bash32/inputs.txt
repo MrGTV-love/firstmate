@@ -1,0 +1,5 @@
+tree=/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M60X7EHPFP3WC1T7VVP0W6VM/.nm-test-scratch/B run_tmp=/Users/charlesabrooker/tmp/nm-meta-B-bash32.JscBU6
+/bin/bash
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+fm_meta_get_to BUSY_GEN "$META" busy_gen
+fm_meta_get_to ORCA_WORKTREE_ID "$META" orca_worktree_id

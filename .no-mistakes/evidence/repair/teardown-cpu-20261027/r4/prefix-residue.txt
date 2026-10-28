@@ -1,0 +1,4 @@
+/Users/charlesabrooker/tmp/fm-lifetime-child.DeT2bV
+/Users/charlesabrooker/tmp/fm-lifetime-child.DeT2bV/home
+/Users/charlesabrooker/tmp/fm-lifetime-child.DeT2bV/home/state
+/Users/charlesabrooker/tmp/fm-lifetime-child.DeT2bV/home/state/.home-summary-refresh.log

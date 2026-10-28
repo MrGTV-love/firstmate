@@ -1,0 +1,80 @@
+3c3
+< 0000000    t   e   s   t   s   .   e   9   0   4   B   x   /   v   -   e
+---
+> 0000000    t   e   s   t   s   .   2   k   x   2   d   u   /   v   -   e
+19,26c19,26
+< 0000000    v   -   e   x   a   c   t   -   w   i   t   h   -   s   i   d
+< 0000020    e   c   a   r   /   p   r   o   j   e   c   t  \n   k   i   n
+< 0000040    d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a
+< 0000060    l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n
+< 0000100    =   t   e   a   r   d   o   w   n   -   t   e   s   t   -   t
+< 0000120    a   s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =
+< 0000140    <   G   E   N   >  \n                                        
+< 0000146
+---
+> 0000000    u   /   v   -   e   x   a   c   t   -   w   i   t   h   -   s
+> 0000020    i   d   e   c   a   r   /   p   r   o   j   e   c   t  \n   k
+> 0000040    i   n   d   =   s   h   i   p  \n   m   o   d   e   =   l   o
+> 0000060    c   a   l   -   o   n   l   y  \n   s   p   a   w   n   _   g
+> 0000100    e   n   =   t   e   a   r   d   o   w   n   -   t   e   s   t
+> 0000120    -   t   a   s   k   -   x   1  \n   b   u   s   y   _   g   e
+> 0000140    n   =   <   G   E   N   >  \n                                
+> 0000150
+51,58c51,58
+< 0000000    i   n   s   /   p   r   o   j   e   c   t  \n   k   i   n   d
+< 0000020    =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a   l
+< 0000040    -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n   =
+< 0000060    t   e   a   r   d   o   w   n   -   t   e   s   t   -   t   a
+< 0000100    s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =   <
+< 0000120    G   E   N   >  \n   b   u   s   y   _   g   e   n   =   s   t
+< 0000140    a   l   e   -   g   e   n  \n                                
+< 0000150
+---
+> 0000000    s   /   p   r   o   j   e   c   t  \n   k   i   n   d   =   s
+> 0000020    h   i   p  \n   m   o   d   e   =   l   o   c   a   l   -   o
+> 0000040    n   l   y  \n   s   p   a   w   n   _   g   e   n   =   t   e
+> 0000060    a   r   d   o   w   n   -   t   e   s   t   -   t   a   s   k
+> 0000100    -   x   1  \n   b   u   s   y   _   g   e   n   =   <   G   E
+> 0000120    N   >  \n   b   u   s   y   _   g   e   n   =   s   t   a   l
+> 0000140    e   -   g   e   n  \n                                        
+> 0000146
+66c66
+< 0000000    -   t   e   s   t   s   .   e   9   0   4   B   x   /   v   -
+---
+> 0000000    -   t   e   s   t   s   .   2   k   x   2   d   u   /   v   -
+83c83
+< 0000020    s   .   e   9   0   4   B   x   /   v   -   e   m   p   t   y
+---
+> 0000020    s   .   2   k   x   2   d   u   /   v   -   e   m   p   t   y
+92a93
+> <TREE>/bin/fm-home-summary-refresh.sh: child setpgid (54871 to 54871): Operation not permitted
+99c100
+< 0000020    e   9   0   4   B   x   /   v   -   a   b   s   e   n   t   -
+---
+> 0000020    2   k   x   2   d   u   /   v   -   a   b   s   e   n   t   -
+114,116c115,117
+< 0000000    2   .   k   g   E   Z   d   L   /   f   m   -   t   e   a   r
+< 0000020    d   o   w   n   -   t   e   s   t   s   .   e   9   0   4   B
+< 0000040    x   /   v   -   a   b   s   e   n   t   -   n   o   -   s   i
+---
+> 0000000    2   .   S   d   L   d   j   4   /   f   m   -   t   e   a   r
+> 0000020    d   o   w   n   -   t   e   s   t   s   .   2   k   x   2   d
+> 0000040    u   /   v   -   a   b   s   e   n   t   -   n   o   -   s   i
+130,137c131,138
+< 0000000    x   /   v   -   c   a   r   r   i   a   g   e   -   r   e   t
+< 0000020    u   r   n   /   p   r   o   j   e   c   t  \n   k   i   n   d
+< 0000040    =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a   l
+< 0000060    -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n   =
+< 0000100    t   e   a   r   d   o   w   n   -   t   e   s   t   -   t   a
+< 0000120    s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =   <
+< 0000140    G   E   N   >  \r  \n                                        
+< 0000146
+---
+> 0000000    d   u   /   v   -   c   a   r   r   i   a   g   e   -   r   e
+> 0000020    t   u   r   n   /   p   r   o   j   e   c   t  \n   k   i   n
+> 0000040    d   =   s   h   i   p  \n   m   o   d   e   =   l   o   c   a
+> 0000060    l   -   o   n   l   y  \n   s   p   a   w   n   _   g   e   n
+> 0000100    =   t   e   a   r   d   o   w   n   -   t   e   s   t   -   t
+> 0000120    a   s   k   -   x   1  \n   b   u   s   y   _   g   e   n   =
+> 0000140    <   G   E   N   >  \r  \n                                    
+> 0000147

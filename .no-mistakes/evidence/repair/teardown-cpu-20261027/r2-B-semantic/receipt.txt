@@ -1,0 +1,5 @@
+cleanup_exit=0
+endpoint_exit=0
+--- owned tmp after 10s:
+/Users/charlesabrooker/tmp/nm-r2sem-B.2BO17B
+entries_below_root=0

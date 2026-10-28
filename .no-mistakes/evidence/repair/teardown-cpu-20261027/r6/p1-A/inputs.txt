@@ -1,0 +1,17 @@
+label=p1-A tree=/Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A run_tmp=/Users/charlesabrooker/tmp/nm-ab-r6-p1-A.bnVyR9
+date_start=2026-10-28T10:40:55Z
+/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M60X7EHPFP3WC1T7VVP0W6VM/.nm-test-scratch/bash-build/inst/bin/bash
+GNU bash, version 5.2.37(1)-release (aarch64-apple-darwin27.0.0)
+fbbfd46d88031ba3c6f2443556ab67d4aaf067429204569011e74594bcd36894  /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M60X7EHPFP3WC1T7VVP0W6VM/.nm-test-scratch/bash-build/inst/bin/bash
+6b5f952740fcf5699c3e75bb3d8be99d9c54c18203784659bab4fa79c7af85ed  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/bin/fm-teardown.sh
+3daabf52684fa174caae1f2f94579f41919f24f751227ad929182b81621f5d58  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/bin/fm-backend.sh
+0c7f181f9ccf1c75f685360ca523a36c76e1ffbbce36899b93e085e5d80ffbc1  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/tests/fm-teardown-cleanup.test.sh
+7ab4bbfb6634b5a507d3f5f7d733c69f87e9c56082831a3008b6caa702a09126  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/tests/fm-teardown-helpers.sh
+84cb215cd30b89bc3685dc2cf40d765f704811b5f8b65333302b30809355711c  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/tests/fm-teardown-cpu-probe.py
+61acef64768cd7dc0674571ae41430c049ed508348f1db5b2325f1f1b6c80618  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/bin/fm-duration.py
+1967b786e7e8f29c415653ad1243e1629c6587426524f69326b9a6988b06837c  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/tests/lib.sh
+d88863b1d235d6397c8767cc7b92f53e5defda7cc9c01fd99dd4c1641a75d21b  /Users/charlesabrooker/tmp/nm-r6-trees.NmdxXJ/A/bin/fm-home-summary-refresh.sh
+BUSY_GEN=$(fm_meta_get "$META" busy_gen)
+ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)
+Darwin Mac-Studio.local 27.0.0 Darwin Kernel Version 27.0.0: Tue Aug 11 21:06:40 PDT 2026; root:xnu-13432.1.9~1/RELEASE_ARM64_T6050 arm64
+Python 3.13.6

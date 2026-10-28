@@ -1,0 +1,8 @@
+suite_exit=0
+outer_wall_ms=56262
+date_end=2026-10-28T10:17:47Z
+--- receipt immediately after exit: find /Users/charlesabrooker/tmp/nm-ab-r4-p2-A.fdNglZ
+/Users/charlesabrooker/tmp/nm-ab-r4-p2-A.fdNglZ
+--- receipt after 15s settle: find /Users/charlesabrooker/tmp/nm-ab-r4-p2-A.fdNglZ
+/Users/charlesabrooker/tmp/nm-ab-r4-p2-A.fdNglZ
+owned_tmp_removed=empty_rmdir_ok

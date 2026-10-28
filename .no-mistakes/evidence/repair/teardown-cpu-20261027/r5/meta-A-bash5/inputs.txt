@@ -1,0 +1,5 @@
+tree=/Users/charlesabrooker/tmp/nm-r5-trees.G0m2ne/A run_tmp=/Users/charlesabrooker/tmp/nm-meta-r5-A-bash5.1ekoNm
+/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M60X7EHPFP3WC1T7VVP0W6VM/.nm-test-scratch/bash-build/inst/bin/bash
+GNU bash, version 5.2.37(1)-release (aarch64-apple-darwin27.0.0)
+BUSY_GEN=$(fm_meta_get "$META" busy_gen)
+ORCA_WORKTREE_ID=$(fm_meta_get "$META" orca_worktree_id)

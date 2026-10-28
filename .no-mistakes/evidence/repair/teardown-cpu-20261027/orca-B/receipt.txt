@@ -1,0 +1,5 @@
+endpoint_exit=0
+cleanup_exit=0
+--- owned tmp after 10s:
+/Users/charlesabrooker/tmp/nm-orca-B.50H7vO
+owned_tmp_removed=empty_rmdir_ok

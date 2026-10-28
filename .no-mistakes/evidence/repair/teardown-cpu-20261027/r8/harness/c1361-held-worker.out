@@ -1,0 +1,2 @@
+not ok - held-worker: cleanup found no running writer while an orphaned child of the refresh was held
+fm-home-summary-refresh: could not register with the fixture process registry /Users/charlesabrooker/tmp/nm-r8-life-c1361-held-worker.x5S4UY/fm-r8-lifetime.2xTw0b/.held-worker-registry.QF0dX8

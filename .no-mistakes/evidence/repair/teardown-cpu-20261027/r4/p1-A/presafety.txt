@@ -1,0 +1,17 @@
+p1-A/stdout.log
+  pid 75299: presafety cpu=0.31s wall=0.421s
+  pid 85169: presafety cpu=0.45s wall=1.094s
+  pid 99501: presafety cpu=0.42s wall=0.649s
+  pid 11988: presafety cpu=0.39s wall=0.460s
+  pid 18615: presafety cpu=0.35s wall=0.434s
+  pid 28314: presafety cpu=0.35s wall=0.423s
+  pid 32073: presafety cpu=0.33s wall=0.400s
+  pid 40230: presafety cpu=0.40s wall=0.497s
+  pid 48445: presafety cpu=0.43s wall=0.572s
+  pid 63670: presafety cpu=0.39s wall=0.492s
+  pid 70647: presafety cpu=0.39s wall=0.478s
+  pid 79493: presafety cpu=0.36s wall=0.429s
+  pid 83871: presafety cpu=0.35s wall=0.421s
+  pid 90482: presafety cpu=0.34s wall=0.412s
+  pid 94928: presafety cpu=0.33s wall=0.389s
+  TOTAL invocations=15 presafety_cpu=5.59s presafety_wall=7.571s

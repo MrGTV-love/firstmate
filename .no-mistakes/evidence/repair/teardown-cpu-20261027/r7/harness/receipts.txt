@@ -1,0 +1,10 @@
+wip nested-bash rc=0 secs=7 owned_tmp=empty_rmdir_ok
+wip nested-default rc=0 secs=9 owned_tmp=empty_rmdir_ok
+wip held-worker rc=0 secs=9 owned_tmp=empty_rmdir_ok
+wip escape rc=0 secs=8 owned_tmp=kept:/Users/charlesabrooker/tmp/nm-r7-life-wip-escape.39lvZL/fm-fleet-tasks.97636-Wed_Oct_28_06_27_48_2026.VOZpVm /Users/charlesabrooker/tmp/nm-r7-life-wip-escape.39lvZL/fm-fleet-snapshot.97636-Wed_Oct_28_06_27_48_2026.wTu3Wo /Users/charlesabrooker/tmp/nm-r7-life-wip-escape.39lvZL/fm-fleet-tasks.97636-Wed_Oct_28_06_27_48_2026.VOZpVm/co-task.meta /Users/charlesabrooker/tmp/nm-r7-life-wip-escape.39lvZL/fm-fleet-tasks.97636-Wed_Oct_28_06_27_48_2026.VOZpVm/co-task.json /Users/charlesabrooker/tmp/nm-r7-life-wip-escape.39lvZL/fm-fleet-snapshot.97636-Wed_Oct_28_06_27_48_2026.wTu3Wo/contribution-input.json 
+c1361 nested-bash rc=1 secs=16 owned_tmp=empty_rmdir_ok
+c1361 nested-default rc=1 secs=17 owned_tmp=empty_rmdir_ok
+c1361 held-worker rc=1 secs=16 owned_tmp=empty_rmdir_ok
+c1361 escape rc=1 secs=18 owned_tmp=empty_rmdir_ok
+removed own leaked snapshot scratch of first wip escape run (killed fleet-snapshot tmp dirs): ~/tmp/nm-r7-life-wip-escape.39lvZL
+wip2 escape rc=0 secs=9 owned_tmp=empty_rmdir_ok

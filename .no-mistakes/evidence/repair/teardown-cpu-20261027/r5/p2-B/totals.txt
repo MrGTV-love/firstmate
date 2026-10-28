@@ -1,0 +1,24 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M60X7EHPFP3WC1T7VVP0W6VM/r5/p2-B/stdout.log
+  interval unattributed_launch valid=False cpu=None
+  interval unattributed_startup suite.start->test_local_only_force_overrides_unpushed.start valid=True cpu=0.23 wall_s=0.301
+  interval test_local_only_force_overrides_unpushed test_local_only_force_overrides_unpushed.start->test_local_only_force_overrides_unpushed.end valid=True cpu=2.28 wall_s=4.619
+  interval unattributed_gap test_local_only_force_overrides_unpushed.end->test_docker_all_failure_channels_retain_forced_tasks_until_retry.start valid=True cpu=0.0 wall_s=0.307
+  interval test_docker_all_failure_channels_retain_forced_tasks_until_retry test_docker_all_failure_channels_retain_forced_tasks_until_retry.start->test_docker_all_failure_channels_retain_forced_tasks_until_retry.end valid=True cpu=32.72 wall_s=50.291
+  interval unattributed_tail test_docker_all_failure_channels_retain_forced_tasks_until_retry.end->target.exit valid=False cpu=None wall_s=1.160
+  target_exit returncode=0 boundaries_missing=False
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry helper cli: valid=14 cpu=29.96s wall=44.480s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry helper setup: valid=7 cpu=1.60s wall=3.276s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product backend: valid=14 cpu=0.89s wall=1.497s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product docker: valid=7 cpu=2.08s wall=2.761s invalid=7
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product preflight: valid=14 cpu=1.88s wall=3.068s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product runtime: valid=14 cpu=5.31s wall=6.611s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product safety: valid=14 cpu=0.00s wall=0.467s invalid=0
+  phase test_docker_all_failure_channels_retain_forced_tasks_until_retry product startup: valid=14 cpu=5.02s wall=6.543s invalid=0
+  phase test_local_only_force_overrides_unpushed helper cli: valid=1 cpu=2.01s wall=3.938s invalid=0
+  phase test_local_only_force_overrides_unpushed helper setup: valid=1 cpu=0.23s wall=0.313s invalid=0
+  phase test_local_only_force_overrides_unpushed product backend: valid=1 cpu=0.05s wall=0.084s invalid=0
+  phase test_local_only_force_overrides_unpushed product docker: valid=1 cpu=0.20s wall=0.298s invalid=0
+  phase test_local_only_force_overrides_unpushed product preflight: valid=1 cpu=0.12s wall=0.182s invalid=0
+  phase test_local_only_force_overrides_unpushed product runtime: valid=1 cpu=0.40s wall=0.516s invalid=0
+  phase test_local_only_force_overrides_unpushed product safety: valid=1 cpu=0.00s wall=0.034s invalid=0
+  phase test_local_only_force_overrides_unpushed product startup: valid=1 cpu=0.35s wall=0.421s invalid=0

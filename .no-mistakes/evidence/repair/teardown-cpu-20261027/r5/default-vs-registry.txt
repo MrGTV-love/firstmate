@@ -1,0 +1,35 @@
+== A. registry UNSET (default product path): --detach
+exit=0 return_secs=0.289
+published: {"schema":"fm-secondmate-home-summary.v1","home_id":"/Users/charlesabrooker/tmp/nm-r5-default.oyOLIe/unset-home"}
+lock present: no
+failure log: none
+registry-like files in root: 0
+
+== B. registry SET to existing file: --detach
+exit=0 return_secs=0.473
+registry immediately after return:
+<R>/registry.95025	fm-home-summary-refresh.sh	wait
+published: {"schema":"fm-secondmate-home-summary.v1"}
+registry after publish:
+<R>/registry.95025	fm-home-summary-refresh.sh	wait
+<R>/registry.96155	fm-home-summary-refresh.sh	wait
+  registry.95025: 95025	Wed Oct 28 05:26:49 2026    
+  registry.96155: 96155	Wed Oct 28 05:26:50 2026    
+fm_test_wait_processes on it:
+(eval):17: command not found: fm_test_wait_processes
+  wait rc=127
+registry exists after wait: yes; pidfiles left: 2
+
+== C. ADVERSARIAL registry SET to missing file: --detach
+fm-home-summary-refresh: detached refresh 99782 did not register with the fixture process registry /Users/charlesabrooker/tmp/nm-r5-default.oyOLIe/missing-registry
+exit=1
+state dir created: no; missing registry created: no
+== B (cont). fm_test_wait_processes (bash) on the registry from B
+  wait rc=0
+registry exists after wait: no; pidfiles left: 0
+remaining in root:
+.
+..
+badreg-home
+reg-home
+unset-home

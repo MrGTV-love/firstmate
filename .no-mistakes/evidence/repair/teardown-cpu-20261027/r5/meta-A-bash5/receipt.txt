@@ -1,0 +1,4 @@
+driver_exit=0
+--- owned tmp after 10s:
+/Users/charlesabrooker/tmp/nm-meta-r5-A-bash5.1ekoNm
+owned_tmp_removed=empty_rmdir_ok

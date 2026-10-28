@@ -1,0 +1,10 @@
+hsr exit=0 secs=190 ok=38 notok=0 owned_tmp=empty_rmdir_ok
+cleanup-selected exit=0 secs=62 ok=4 notok=0 owned_tmp=empty_rmdir_ok
+timeout-lib exit=0 secs=43 ok=24 notok=0 owned_tmp=empty_rmdir_ok
+fixture-cleanup exit=0 secs=9 ok=7 notok=0 owned_tmp=empty_rmdir_ok
+hsr-ownership exit=0 secs=37 ok=3 notok=0 owned_tmp=empty_rmdir_ok
+endpoint-safety-orca exit=0 secs=15 ok=3 notok=0 owned_tmp=empty_rmdir_ok
+work-progress exit=0 secs=205 ok=26 notok=0 owned_tmp=empty_rmdir_ok
+nm-read-cache exit=0 secs=84 ok=17 notok=0 owned_tmp=empty_rmdir_ok
+duration exit=0 secs=126 ok=12 notok=0 owned_tmp=kept:/Users/charlesabrooker/tmp/nm-r8-duration.mxqT5l
+scratch removed: trees, 2 python temp roots
