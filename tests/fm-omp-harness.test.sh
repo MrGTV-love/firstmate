@@ -4250,6 +4250,78 @@ EOF
   pass ".omp watch extension: a dead arm owner is replaced and reported started, a live one is left alone"
 }
 
+# A recorded arm child whose pid is gone before Node reaps it (exit state still
+# unset) is logged as ended-unreaped, gets no SIGTERM, and is replaced.
+test_watch_extension_labels_an_ended_unreaped_arm_owner() {
+  local repo home out status
+  repo="$TMP_ROOT/watch-unreaped/repo"; home="$TMP_ROOT/watch-unreaped/home"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+exec sleep 60
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+    FM_ARM_LOG="$home/arms.log" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { ChildProcess } from "node:child_process";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const home = process.env.FM_HOME;
+writeFileSync(`${home}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool(t) { tool = t; }, sendUserMessage() { return undefined; } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const armPids = () => existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n").filter(Boolean).map((l) => Number(l.slice(4))) : [];
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await handlers.get("session_start")({ type: "session_start" }, { isIdle: () => true });
+for (let i = 0; i < 100 && armPids().length < 1; i += 1) await sleep(50);
+await sleep(500);
+const [stalePid] = armPids();
+if (!stalePid) throw new Error("the first arm did not start");
+const realKill = process.kill;
+const realChildKill = ChildProcess.prototype.kill;
+const childKills = [];
+try {
+  // The pid is gone to a liveness probe while the handle still has no exit state.
+  process.kill = function (pid, signal) {
+    if (Number(pid) === stalePid && signal === 0) {
+      const error = new Error("kill ESRCH"); error.code = "ESRCH"; throw error;
+    }
+    return realKill.call(process, pid, signal);
+  };
+  ChildProcess.prototype.kill = function (signal) {
+    if (this.pid === stalePid) childKills.push(signal ?? "SIGTERM");
+    return realChildKill.call(this, signal);
+  };
+  const repaired = await tool.execute();
+  process.kill = realKill;
+  ChildProcess.prototype.kill = realChildKill;
+  if (!/^watcher: started omp extension arm child 2;/.test(repaired.content[0].text)) throw new Error(`the repair did not start a new arm: ${repaired.content[0].text}`);
+  if (childKills.length) throw new Error(`an ended arm child was sent ${childKills.join(",")}`);
+  const record = readFileSync(`${home}/state/extensions/omp-primary-watch/lifecycle.log`, "utf8");
+  if (!record.includes(`event=arm-owner-stale pid=${stalePid} exit=ended-unreaped`)) throw new Error(`the lifecycle record lacks the ended-unreaped label:\n${record}`);
+  if (record.includes("exit=alive-unverified")) throw new Error(`an ended arm child was labelled alive:\n${record}`);
+} finally {
+  process.kill = realKill;
+  ChildProcess.prototype.kill = realChildKill;
+  try { process.kill(stalePid); } catch {}
+  await handlers.get("session_shutdown")({}, {});
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension ended-unreaped arm owner: $out"
+  [ -z "$out" ] || fail "omp watch extension ended-unreaped test printed output: $out"
+  pass ".omp watch extension: an ended-unreaped arm owner is labelled so, not killed, and replaced"
+}
+
 # The arm ends at its process exit, not at "close": an arm whose process exits
 # while a descendant still holds its output pipe is observed without a repair
 # call. An exit after "watcher: started" earns the bounded retry, and an exit
@@ -4803,6 +4875,7 @@ test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home
 test_watch_extension_repairs_a_stale_arm_owner
+test_watch_extension_labels_an_ended_unreaped_arm_owner
 test_watch_extension_observes_an_arm_exit_held_open_by_a_descendant
 test_watch_extension_keeps_the_home_from_a_helper_session
 test_watch_extension_rebound_primary_keeps_the_home

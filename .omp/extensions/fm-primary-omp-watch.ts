@@ -80,6 +80,7 @@
 //   - An arm child counts as owned only while its process is alive and its
 //     readiness has not failed; a child whose process ended is replaced, and
 //     the repair call reports started, not unchanged.
+//   - A child that printed "watcher: FAILED" is not verified, so it does not own the watch.
 //   - An arm ends at its process exit. "close" also waits for every descendant
 //     that still holds an output pipe, so after the exit the remaining output
 //     is drained for at most FM_WATCH_ARM_RETIRE_TIMEOUT_MS, and then the
@@ -1722,12 +1723,13 @@ export default function (pi: ExtensionAPI) {
       // The recorded child is gone or failed: its process ended, or its close
       // is held open by a descendant. A flag naming it is not ownership.
       const stale = owner.child;
+      const staleAlive = stale.pid !== undefined && pidAlive(String(stale.pid));
       lifecycle("arm-owner-stale", {
         pid: stale.pid,
-        exit: stale.exitCode ?? stale.signalCode ?? "alive-unverified",
+        exit: stale.exitCode ?? stale.signalCode ?? (staleAlive ? "alive-unverified" : "ended-unreaped"),
       });
       owner.child = null;
-      if (stale.exitCode === null && stale.signalCode === null) {
+      if (!armChildExited(stale) && staleAlive) {
         armRetired.add(stale);
         stale.kill("SIGTERM");
       }
