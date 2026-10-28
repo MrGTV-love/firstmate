@@ -84,11 +84,13 @@
 # original pool (some ShellChecks reach several GB); the per-root address-space
 # limit is enforced only where ulimit -v works, and native macOS cannot enforce it.
 # On native macOS, where the enforced envelope below does not apply, each root's
-# process tree is instead watched for resident memory (FM_LINT_ROOT_RSS_KIB,
-# default 8388608 = 8 GiB, a positive decimal integer or lint exits 2 on every
-# host). A root that crosses it is ended and takes the memory retry described
-# below. Linux runs are never watched, and CI runs under FM_LINT_REQUIRE_BOUNDS=1
-# keep their ulimit envelope.
+# process tree is instead watched for memory, the larger of its resident size
+# and its physical footprint (FM_LINT_ROOT_RSS_KIB, default 8388608 = 8 GiB, a
+# positive decimal integer or lint exits 2 on every host). A root that crosses
+# it is ended and takes the memory retry described below, and the roots log's
+# last end-record column counts the samples each source gave (libproc, or ps
+# where libproc could not read the root). Linux runs are never watched, and CI
+# runs under FM_LINT_REQUIRE_BOUNDS=1 keep their ulimit envelope.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
 # Slot directory, file, or locking failures warn and run ungated rather than failing lint.
@@ -231,6 +233,15 @@ fm_lint_root_rss() {  # <rss-file>
     END { if (found) print value }
   ' "$file" 2>/dev/null)
   printf '%s\n' "${kib:-unavailable}"
+}
+
+# Samples each source gave the macOS resident-memory watch across a root's
+# attempts, as libproc:<n>,ps:<n>, or none when no watch sampled the root.
+fm_lint_root_rss_samples() {  # <rss-file>...
+  cat "$@" 2>/dev/null | awk -F '[=:,]' '
+    /^rss_samples=/ { for (i = 2; i < NF; i += 2) count[$i] += $(i + 1); found = 1 }
+    END { if (found) printf "libproc:%d,ps:%d\n", count["libproc"], count["ps"]; else print "none" }
+  '
 }
 
 fm_lint_max_root_rss() {  # <rss-kib> <rss-kib>
@@ -456,10 +467,10 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     calibration=1
   fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      "$load_start" "$load_end" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" "$(fm_lint_root_rss_samples "$rss_file" "$fallback_rss")" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
@@ -1690,7 +1701,7 @@ ROOT_GRACE=${FM_LINT_ROOT_GRACE:-5}
 # under its cap. The roots sidecar records peak RSS even without bounds; roots
 # peaking above about 3 GiB resident remain source-graph reduction candidates.
 ROOT_MEMORY_KIB=${FM_LINT_ROOT_MEMORY_KIB:-12582912}
-# 8 GiB of resident memory per analysis tree on native macOS without the enforced envelope.
+# 8 GiB of memory (resident size or footprint) per analysis tree on native macOS without the enforced envelope.
 # Native macOS has no ulimit -v, so a source-following root there could grow
 # without bound (tests/fm-spawn-acquisition-cleanup.test.sh reached 65 GB);
 # the resident-memory watch ends such a root and takes the memory retry.

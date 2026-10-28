@@ -3358,7 +3358,7 @@ test_pr_merge_groups_partition_one_inventory() {
 test_pr_merge_groups_partition_one_inventory
 
 # The four fm-lint groups partition one former suite. The union of their
-# registered lists must be the same 78 cases, each registered by the file that
+# registered lists must be the same 79 cases, each registered by the file that
 # also defines it, with no case twice.
 test_fm_lint_groups_partition_one_inventory() {
   local group file registered defined union total dup name
@@ -3390,9 +3390,9 @@ test_fm_lint_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "an fm-lint case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 78 ] \
-    || fail "the fm-lint groups register $total cases, not the 78-case inventory they partition"
-  pass "the fm-lint groups are a duplicate-free 78-case cover, each case registered by the file that defines it"
+  [ "$total" = 79 ] \
+    || fail "the fm-lint groups register $total cases, not the 79-case inventory they partition"
+  pass "the fm-lint groups are a duplicate-free 79-case cover, each case registered by the file that defines it"
 }
 
 test_fm_lint_groups_partition_one_inventory

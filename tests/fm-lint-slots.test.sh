@@ -1562,9 +1562,10 @@ test_resident_watch_ends_its_command_when_its_owner_dies() {
 # A shim reached again below itself (FM_TEST_RSS_SHIM_DEPTH already set) refuses
 # with status 99, so a real path that resolves back to a shim cannot recurse.
 # Every entry appends its pid to FM_TEST_SHIM_TRACE when that is set. The ps
-# shim logs how many processes each call listed to FM_TEST_PS_LOG, or refuses
-# as a sandbox does under FM_TEST_PS_REFUSE=1; the python3 shim logs each
-# call's arguments to FM_TEST_PY_LOG.
+# shim logs how many processes each call listed to FM_TEST_PS_LOG; the python3 shim logs each
+# call's arguments to FM_TEST_PY_LOG, fails at once under FM_TEST_PY_REFUSE=1,
+# and with FM_TEST_PY_MEMORY set answers each line a mem-tree reader is sent
+# with that value instead of reading memory.
 fm_lint_write_rss_shims() {  # <dir>
   local guard
   guard=$(cat <<'SH'
@@ -1580,7 +1581,6 @@ SH
   {
     printf '%s\n' "$guard"
     cat <<'SH'
-[ "${FM_TEST_PS_REFUSE:-0}" = 0 ] || exit 1
 out=$("$FM_TEST_REAL_PS" "$@") || exit
 printf '%s\n' "$out" | grep -c . >> "$FM_TEST_PS_LOG"
 printf '%s\n' "$out"
@@ -1590,6 +1590,11 @@ SH
     printf '%s\n' "$guard"
     cat <<'SH'
 printf '%s\n' "$*" >> "$FM_TEST_PY_LOG"
+[ "${FM_TEST_PY_REFUSE:-0}" = 0 ] || exit 1
+if [ -n "${FM_TEST_PY_MEMORY:-}" ] && [ "${2:-}" = mem-tree ]; then
+  while read -r _; do printf '%s\n' "$FM_TEST_PY_MEMORY"; done
+  exit 0
+fi
 exec "$FM_TEST_REAL_PYTHON" "$@"
 SH
   } > "$1/python3"
@@ -1617,7 +1622,7 @@ test_rss_shim_that_resolves_to_itself_is_refused() {
 }
 
 test_resident_watch_reads_only_its_own_tree() {
-  local tmp shims real_ps real_python refuse rc decoy_pid count
+  local tmp shims real_ps real_python refuse rc decoy_pid count samples
   if [ "$(uname)" != Darwin ]; then
     pass "SKIP (the resident-memory watch runs only on macOS): own-tree sampling check"
     return
@@ -1645,31 +1650,81 @@ perl -MPOSIX -e 'POSIX::setpgid(0, 0); my $held = "x" x (160 * 1024 * 1024); sle
 echo "$!" > "$1"
 sleep 3
 SH
+  # The libproc reader samples first; refusing it leaves ps as the fallback.
   for refuse in 0 1; do
     : > "$tmp/ps.log"
     : > "$tmp/py.log"
     rm -f "$tmp/rss" "$tmp/decoy.pid"
     rc=0
     "$ROOT/bin/fm-proc-budget.sh" 200 -- env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
-      FM_TEST_PS_REFUSE="$refuse" FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
+      FM_TEST_PY_REFUSE="$refuse" FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
       FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
       bash "$tmp/decoy-parent.sh" "$tmp/decoy.pid" > /dev/null 2>&1 || rc=$?
     decoy_pid=$(cat "$tmp/decoy.pid" 2>/dev/null || true)
     [ -z "$decoy_pid" ] || kill -KILL "$decoy_pid" 2>/dev/null || true
     [ -n "$decoy_pid" ] || fail "the decoy did not start"
-    [ "$rc" -eq 0 ] && [ ! -e "$tmp/rss" ] \
-      || fail "the watch counted a process outside its command's tree (exit $rc, ps refused=$refuse)"
+    if [ "$rc" -ne 0 ] || grep -q '^max_rss_kib=' "$tmp/rss"; then
+      fail "the watch counted a process outside its command's tree (exit $rc, libproc refused=$refuse)"
+    fi
+    samples=$(sed -n 's/^rss_samples=//p' "$tmp/rss")
+    [ "$(grep -c 'mem-tree' "$tmp/py.log")" -eq 1 ] \
+      || fail "the watch did not start exactly one libproc reader"$'\n'"$(cat "$tmp/py.log")"
     if [ "$refuse" = 0 ]; then
-      [ -s "$tmp/ps.log" ] || fail "the watch never sampled through ps"
+      [ ! -s "$tmp/ps.log" ] || fail "the watch ran ps while the libproc reader answered"
+      case "$samples" in libproc:[1-9]*,ps:0) ;; *) fail "the libproc samples were not recorded: $samples" ;; esac
+    else
+      [ -s "$tmp/ps.log" ] || fail "the watch never fell back to ps when libproc was refused"
       while read -r count; do
         [ "$count" -le 5 ] || fail "a ps sample listed $count processes, not only the watched tree"
       done < "$tmp/ps.log"
-    else
-      grep -q 'rss-tree' "$tmp/py.log" || fail "the watch did not fall back to the libproc reader when ps was refused"
+      case "$samples" in libproc:0,ps:[1-9]*) ;; *) fail "the ps fallback samples were not recorded: $samples" ;; esac
     fi
   done
   pass "the resident-memory watch samples only its command's own tree"
+}
+
+# A reader that reports a resident size under the bound and a footprint over it
+# stands for compressed pages: resident size leaves them out and jetsam counts
+# them, so the root is ended and retried narrower all the same.
+test_resident_watch_bounds_footprint_beyond_resident() {
+  local tmp fakebin shims real_python fixture flags_log out rc roots_log rss_kib
+  if [ "$(uname)" != Darwin ]; then
+    pass "SKIP (the resident-memory watch runs only on macOS): footprint bound check"
+    return
+  fi
+  tmp=$(fm_test_tmproot fm-lint-rss-footprint)
+  fakebin=$(fm_fakebin "$tmp")
+  shims="$tmp/shims"
+  real_python=$(command -v python3) || fail "python3 is not on PATH"
+  case "$real_python" in
+    "$tmp"/*|[!/]*) fail "python3 did not resolve to an absolute path outside the shims: $real_python" ;;
+  esac
+  mkdir -p "$shims"
+  fm_lint_write_rss_shims "$shims"
+  fixture="$tmp/footprint.sh"
+  flags_log="$tmp/flags.log"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$fixture"
+  fm_lint_write_growing_shellcheck "$fakebin"
+  : > "$flags_log"
+  rc=0
+  out=$("$ROOT/bin/fm-proc-budget.sh" 300 -- env -u FM_TEST_RSS_SHIM_DEPTH PATH="$fakebin:$shims:$PATH" \
+    FM_TEST_REAL_PS=/bin/ps FM_TEST_REAL_PYTHON="$real_python" \
+    FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" FM_TEST_PY_MEMORY="1024 204800" \
+    FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \
+    FM_TEST_FLAGS_LOG="$flags_log" FM_TEST_PID_FILE="$tmp/footprint.pid" FM_TEST_GROW_STEPS=1 FM_TEST_GROW_HOLD=4 \
+    "$LINT" --telemetry "$tmp/pass.tsv" "$fixture" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "a root over the bound by footprint did not pass its narrower retry (exit $rc)"$'\n'"$out"
+  [ "$(cat "$flags_log")" = "$(printf 'yes\nno')" ] \
+    || fail "a root over the bound by footprint alone was not ended and retried narrower"$'\n'"$(cat "$flags_log")"
+  assert_contains "$out" "hit the memory ceiling with --external-sources (reason=memory rc=98)" \
+    "the footprint-bound end was not identified in the output"
+  roots_log="$tmp/pass.roots.tsv"
+  awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ && $10 == "memory-fallback" && $16 ~ /(^|,)libproc:[1-9]/ { found=1 } END { exit !found }' \
+    "$roots_log" || fail "the roots log did not mark the footprint end with its libproc samples"$'\n'"$(cat "$roots_log")"
+  rss_kib=$(awk -F '\t' '$1 == "end" && $3 ~ /footprint\.sh$/ { print $11 }' "$roots_log")
+  [ "$rss_kib" = 204800 ] || fail "the roots log peak $rss_kib KiB is not the 204800 KiB footprint"
+  pass "a root whose footprint crosses the bound while its resident size does not is ended and retried narrower"
 }
 
 fm_lint_test_cases=(
@@ -1696,6 +1751,7 @@ test_unbounded_root_under_resident_bound_is_untouched
 test_resident_watch_ends_its_command_when_its_owner_dies
 test_rss_shim_that_resolves_to_itself_is_refused
 test_resident_watch_reads_only_its_own_tree
+test_resident_watch_bounds_footprint_beyond_resident
 test_cache_key_wait_preserves_root_retry_budget
 )
 fm_lint_run "$@"

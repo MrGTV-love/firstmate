@@ -2,7 +2,7 @@
 """Read process facts on macOS without the setuid ps that sandbox-exec refuses.
 
 Usage: fm-proc-info.py count-uid UID | ppid PID | pgid PID | comm PID | args PID |
-       lstart PID | identity PID | cpu-tree PID | rss-tree PID | table FIELDS
+       lstart PID | identity PID | cpu-tree PID | mem-tree PID | table FIELDS
 
 count-uid prints how many processes have real user id UID. ppid and pgid print
 a process's parent and process group, comm its argv[0] and args its argv joined
@@ -19,11 +19,14 @@ lstart and command, like `ps -axo <field>=,...`; stat carries the state letters
 macOS ps derives from the kernel (Z zombie, T stopped, R with a running thread,
 else S) and E for a process that is exiting. cpu-tree prints the
 whole centiseconds of CPU used by PID and its live descendants, including their
-reaped children, as macOS `ps -S` counts them. rss-tree prints the whole KiB of
-resident memory held right now by PID and its live descendants in PID's
-process group, reading only that group's processes, summed from libproc's
-ri_resident_size. Facts come from sysctl KERN_PROC
-and KERN_PROCARGS2, and CPU and resident size from libproc's proc_pid_rusage. A process or fact
+reaped children, as macOS `ps -S` counts them. mem-tree keeps running and
+answers each line read on stdin with one line, `<resident> <footprint>`: the
+whole KiB of resident memory and of physical footprint (which also counts
+compressed pages) held right now by PID and its live descendants in PID's
+process group, reading only that group's processes and summed from libproc's
+ri_resident_size and ri_phys_footprint; it prints `-` for a sample that cannot
+be read and exits at the end of stdin. Facts come from sysctl KERN_PROC
+and KERN_PROCARGS2, and CPU and memory from libproc's proc_pid_rusage. A process or fact
 that cannot be read prints nothing and exits 1, so a caller never mistakes a
 failed read for an answer.
 """
@@ -171,27 +174,38 @@ def cpu_tree(root):
     return round(total * timebase.numer / timebase.denom / 1e7)
 
 
-def rss_kib(pid):
+def memory(pid):
     usage = RusageInfoV2()
     if libc.proc_pid_rusage(pid, RUSAGE_INFO_V2, ctypes.byref(usage)):
         raise LookupError(pid)
-    return usage.ri_resident_size // 1024
+    return usage.ri_resident_size, usage.ri_phys_footprint
 
 
-def rss_tree(root):
+def mem_tree(root):
     group = struct.unpack_from("i", kinfo(root), E_PGID)[0]
     children = {}
     for pid, ppid in processes(KERN_PROC_PGRP, group):
         children.setdefault(ppid, []).append(pid)
-    total, queue = rss_kib(root), list(children.get(root, []))
+    (resident, footprint), queue = memory(root), list(children.get(root, []))
     while queue:
         pid = queue.pop()
         queue.extend(children.get(pid, []))
         try:
-            total += rss_kib(pid)
+            more_resident, more_footprint = memory(pid)
         except LookupError:
             continue
-    return total
+        resident, footprint = resident + more_resident, footprint + more_footprint
+    return f"{resident // 1024} {footprint // 1024}"
+
+
+def mem_watch(root):
+    while sys.stdin.readline():
+        try:
+            answer = mem_tree(root)
+        except (OSError, LookupError, struct.error, IndexError):
+            answer = "-"
+        print(answer, flush=True)
+    return 0
 
 
 def main(argv_):
@@ -201,6 +215,8 @@ def main(argv_):
         return 2
     command = argv_[1]
     number = 0 if fields else int(argv_[2])
+    if command == "mem-tree":
+        return mem_watch(number)
     try:
         if command == "table":
             value = table(fields)
@@ -225,8 +241,6 @@ def main(argv_):
             value = " ".join(argv(number))
         elif command == "cpu-tree":
             value = cpu_tree(number)
-        elif command == "rss-tree":
-            value = rss_tree(number)
         else:
             return 2
     except (OSError, LookupError, struct.error, IndexError):
