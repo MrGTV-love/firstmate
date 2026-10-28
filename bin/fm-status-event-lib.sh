@@ -610,14 +610,14 @@ _fm_status_wait_episode_scan() {  # <resolve-verb> <legacy-captain-re> <verb> <k
 # restated thousands of times costs one classified line. A keyless wait is its own
 # newest line, so its lines are kept as they are.
 _fm_status_episode_candidates() {  # <key> <base>
-  local -a rc
+  local -a pipe_rc
   if [ -z "$1" ]; then
     _fm_status_event_candidates numbered "$2"
     return
   fi
   _fm_status_event_candidates numbered "$2" | LC_ALL=C awk '{ t = $0; sub(/^[^\t]*\t/, "", t); if (NR == 1 || t != prev) print; prev = t }'
-  rc=("${PIPESTATUS[@]}")
-  [ "${rc[0]}" -eq 0 ] && [ "${rc[1]}" -eq 0 ]
+  pipe_rc=("${PIPESTATUS[@]}")
+  [ "${pipe_rc[0]}" -eq 0 ] && [ "${pipe_rc[1]}" -eq 0 ]
 }
 
 # Continue an episode still open at byte <start> of the log back through the bytes before
