@@ -1,0 +1,22 @@
+== S9 bad calls refuse before running the command (driven from bash, args word-split)
+$ bin/fm-proc-budget.sh --memory-kib 0 -- touch ran
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib abc -- touch ran
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib 012 -- touch ran
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib 1234567890123456 -- touch ran
+fm-proc-budget: memory limit is too large
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib -- touch ran
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib 100 --memory-kib 200 -- touch ran
+fm-proc-budget: usage: fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>
+exit status: 2; command ran: no
+$ bin/fm-proc-budget.sh --memory-kib 100 touch -- touch ran
+fm-proc-budget: extra must be a positive decimal integer, got 'touch'
+exit status: 2; command ran: no

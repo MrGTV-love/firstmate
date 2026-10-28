@@ -1,0 +1,14 @@
+sandbox profile (worker-like: setuid ps refused):
+(version 1)
+(allow default)
+(deny process-exec (literal "/bin/ps"))
+$ sandbox-exec -f no-ps.sb /bin/ps -o pid= -p $$
+sandbox-exec: execvp() of '/bin/ps' failed: Operation not permitted
+ps exit status: 71
+$ sandbox-exec -f no-ps.sb bin/fm-proc-budget.sh --memory-kib 262144 -- python3 grow.py s3.pids
+exit status: 99
+stderr:
+fm-proc-budget: command tree exceeded 262144 KiB memory limit at 350816 KiB; ended
+root 12562 gone
+child 12603 gone
+grandchild 12607 gone

@@ -1,0 +1,18 @@
+== S7 supervisor SIGKILLed mid-run: dead-man reader ends the tree (incl. a TERM-ignoring job)
+$ bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c "(trap "" TERM; sleep 300) & echo job $! >>s7.pids; echo root $$ >>s7.pids; sleep 300" &
+supervisor pid 89044 is now: /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mista
+command group before:
+    PID  PPID  PGID STAT COMMAND
+  89266 89044 89266 S    bash -c (trap "" TERM; sleep 300) & echo job $! >>/tmp/fmpb-drive/s7.pids; echo root $$
+  89268 89044 89266 S    /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mi
+  89340 89266 89266 S    bash -c (trap "" TERM; sleep 300) & echo job $! >>/tmp/fmpb-drive/s7.pids; echo root $$
+  89343 89340 89266 S    sleep 300
+  89344 89266 89266 S    sleep 300
+$ kill -9 89044
+wrapper exit status: 137 (137 = SIGKILL)
+command group after 2.5 s:
+    PID STAT COMMAND
+ps exit 0 (1 = no member left)
+job 89340 gone
+root 89266 gone
+note: macOS ps printed only its header line after the kill, so no group member was left.

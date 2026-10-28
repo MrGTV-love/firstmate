@@ -1,0 +1,12 @@
+$ bin/fm-proc-budget.sh --memory-kib 2097152 -- bin/fm-proc-budget.sh --memory-kib 262144 -- python3 grow.py s1.pids   # grandchild grows 32 MiB/0.1s to 1 GiB
+exit status: 99
+elapsed: 2.67 s
+stderr:
+fm-proc-budget: command tree exceeded 262144 KiB memory limit at 350944 KiB; ended
+started processes:
+root 71997
+grandchild 72043
+child 72039
+root 71997 gone
+grandchild 72043 gone
+child 72039 gone

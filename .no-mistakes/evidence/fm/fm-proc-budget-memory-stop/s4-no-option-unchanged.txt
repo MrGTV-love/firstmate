@@ -1,0 +1,17 @@
+$ bin/fm-proc-budget.sh -- bash -c 'printf "[%s]" "$@"; echo; echo "pid=$$ ulimit-u=$(ulimit -u)"; exit 7' _ "a b" c   (run in background; compare $!)
+wrapper pid $!=26945; process at that pid now: bash -c printf "[%s]" "$@"; echo; echo "pid=$$ ulimit-u=$(ulimit -u)"; sleep 1; exit 7 _ a b c
+python supervisor in tree: 0 process(es)
+exit status: 7
+[a b][c]
+pid=26945 ulimit-u=2334
+--- 200 extra:
+ulimit -u=1031
+exit status: 0
+$ bin/fm-proc-budget.sh -- /no/such/cmd
+bin/fm-proc-budget.sh: line 187: /no/such/cmd: No such file or directory
+bin/fm-proc-budget.sh: line 187: exec: /no/such/cmd: cannot execute: No such file or directory
+exit status: 126
+$ bin/fm-proc-budget.sh --memory-kib 2097152 -- /no/such/cmd
+fm-proc-budget: /no/such/cmd: No such file or directory
+fm-proc-budget: line 0: exec: /no/such/cmd: cannot execute: No such file or directory
+exit status: 126

@@ -1,0 +1,10 @@
+== S10 the incident tool (ShellCheck) as one wrapper command, no hand-built watcher
+$ bin/fm-proc-budget.sh --memory-kib 2097152 -- shellcheck -x bin/fm-proc-budget.sh bin/fm-brief.sh
+fm-proc-budget: command tree exceeded 2097152 KiB memory limit at 2251952 KiB; ended
+exit status: 99 (13 s)
+$ bin/fm-proc-budget.sh --memory-kib 2097152 -- shellcheck -s bash <(printf "echo \$x\n")   # a real finding keeps its status
+exit status: 1 (shellcheck finding status passes through)
+$ bin/fm-proc-budget.sh --memory-kib 4096 -- shellcheck -x bin/fm-brief.sh   # 4 MiB stop, far below ShellCheck RSS
+fm-proc-budget: command tree exceeded 4096 KiB memory limit at 111200 KiB; ended
+exit status: 99
+no shellcheck process left

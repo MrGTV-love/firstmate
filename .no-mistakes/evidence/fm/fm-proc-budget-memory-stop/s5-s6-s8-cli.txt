@@ -1,0 +1,17 @@
+== S5 normal command under the memory stop: args, stdin, stdout, status
+$ printf "in-line
+" | bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c 'read -r l; printf "[%s]" "$@" "$l"; echo; sleep 2; exit 7' _ "a b" c
+[a b][c][in-line]
+exit status: 7
+
+== S6 command exits leaving a background job: wrapper returns at once, job is ended
+$ out=$(bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c "sleep 600 & echo job=\$!; echo done")
+exit status: 0, seconds: 0
+job=57247
+done
+job 57247 gone
+
+== S8 caller fd 3 reaches the command
+$ bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c "echo inherited >&3" 3>fd3.log
+exit status: 0; fd3.log: inherited
+

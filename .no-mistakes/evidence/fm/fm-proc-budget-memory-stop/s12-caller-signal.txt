@@ -1,0 +1,11 @@
+== S12 caller signals the supervisor of a background (&) run
+$ bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c "sleep 300 & ...; sleep 300" &      (from a non-interactive bash)
+$ kill -INT 67328
+  -> no effect. A non-interactive bash starts & jobs with SIGINT ignored; the wrapper keeps an
+     inherited ignore (header: "HUP, INT and TERM that the caller ignores ... stay ignored").
+     ps 30+ s later: supervisor 67328, root 67566, sleeps 67613/67616 still running (expected).
+$ kill -TERM 67328
+exit status: 143
+job 67613 gone
+root 67566 gone
+$ ps -p 67566,67613,67616 -o pid,stat,command   -> header only, ps rc=1 (no member left)

@@ -1,0 +1,9 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.dBzCXb
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.dBzCXb/data/fmpb-lab-task/brief.md (ship, mode=local-only; replace {TASK}, {FIRSTMATE_SPEC}, and the task Definition of Done placeholders {DOD_CAPABILITY}, {DOD_MANDATORY_ITEMS}, {DOD_SUPPORTING_ITEMS}, {DOD_HARD_GATES}, {DOD_HONESTY_RULE}, and fill ### Out of scope (or write None) before spawn)
+fm-brief exit: 0
+-rw-r--r--  1 charlesabrooker  staff  17234 Oct 28 04:23 /Users/charlesabrooker/tmp/fm-lab.dBzCXb/data/fmpb-lab-task/brief.md
+--- rule 9 as written into the brief:
+106:9. Run any shim, lab, or measurement script through `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60RJ02D2FY0H43S035HJGF9/bin/fm-proc-budget.sh' -- <command...>`: a runaway process tree then stops at its own limit instead of starving every lane of fork. When the task requires a memory stop, use `'/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60RJ02D2FY0H43S035HJGF9/bin/fm-proc-budget.sh' --memory-kib <limit-in-KiB> -- <command...>` (see the wrapper header for supported hosts and failure statuses).
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60RJ02D2FY0H43S035HJGF9/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.dBzCXb && rm -rf /Users/charlesabrooker/tmp/fm-lab.dBzCXb
+lab torn down: /Users/charlesabrooker/tmp/fm-lab.dBzCXb
+lab path removed

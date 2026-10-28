@@ -1,0 +1,15 @@
+$ bin/fm-proc-budget.sh --memory-kib 2097152 -- bash -c "sleep 300 & echo job \$! >>s2.pids; echo root \$\$ >>s2.pids; sleep 300"  &
+wrapper/supervisor pid 88621, command root 89019
+process tree before:
+    PID  PPID  PGID STAT COMMAND
+  89019 88621 89019 SN   bash -c sleep 300 & echo job $! >>/tmp/fmpb-drive/s2.pids; echo root $$ >>/tmp/fmpb-drive/s2.pids; sleep 300
+  89024 88621 89019 SN   /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M60RJ02D2FY0H43S035HJGF9/bin/fm-proc-info.py rss-tree 89019
+  89089 89019 89019 SN   sleep 300
+  89091 89019 89019 SN   sleep 300
+memory reader pid: 89024  -> kill -9 (simulate the reader dying, like the ps watcher did)
+exit status: 125
+stderr:
+fm-proc-budget: cannot sample command-tree memory (reader returned an unreadable sample); ended
+job 89089 gone
+root 89019 gone
+rc=1 (1 = none of 89091/89024 alive)
