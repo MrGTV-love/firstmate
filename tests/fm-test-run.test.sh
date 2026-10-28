@@ -3508,8 +3508,8 @@ test_herdr_ci_family_run_has_a_step_timeout
 test_aggregate_json
 
 # The three control-relaunch groups partition one former suite: every case a
-# group file defines is registered by that file or run by name from a registered
-# case (the omp adoption cases), and no case is registered by two groups.
+# group file defines is registered by that file or run as a command from another
+# line of it (the omp adoption cases), and no case is registered by two groups.
 test_control_relaunch_groups_partition_one_inventory() {
   assert_partition_exact control-relaunch array-nested control_relaunch_test_cases '' fm-control-relaunch fm-control-relaunch-recovery fm-control-relaunch-backends
   pass "the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it"
