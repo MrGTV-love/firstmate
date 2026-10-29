@@ -1062,21 +1062,20 @@ test_suite_tree_leash_survives_neighbours_on_a_slow_host() {
 }
 
 test_suite_tree_leash_stops_a_runaway_tree() {
-  local bomb="$TMP_ROOT/leash-bomb" log="$TMP_ROOT/leash-bomb.log" pids="$TMP_ROOT/leash-bomb.pids"
-  local err="$TMP_ROOT/leash-bomb.err" depth rc
-  make_bomb "$bomb"
-  : >"$log"
+  local tree="$TMP_ROOT/leash-held" pids="$TMP_ROOT/leash-held.pids" err="$TMP_ROOT/leash-held.err" rc levels
+  make_held_tree "$tree"
   : >"$pids"
-  fm_test_tree_leash env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_PIDS="$pids" SHIM_MAX_DEPTH=1500 \
-    date +%s >"$TMP_ROOT/leash-bomb.out" 2>"$err"
+  fm_test_tree_leash env HOLD_PIDS="$pids" HOLD_LEVELS=200 "$tree/member.sh" \
+    >"$TMP_ROOT/leash-held.out" 2>"$err"
   rc=$?
   expect_code 98 "$rc" "a suite tree past the leash"
-  depth=$(tail -1 "$log")
-  [ -n "$depth" ] && [ "$depth" -gt 20 ] || fail "the bomb did not recurse (depth ${depth:-none}): the case would be vacuous"
-  [ "$depth" -lt 1500 ] || fail "the leash did not stop the runaway tree (depth $depth)"
+  levels=$(wc -l <"$pids")
+  [ "$levels" -ge "$FM_TEST_TREE_PROCS" ] || fail "the tree never outgrew the leash (${levels} members recorded): the case would be vacuous: $(cat "$err")"
   assert_contains "$(grep 'fm-proc-budget:' "$err")" "over the own-tree limit of $FM_TEST_TREE_PROCS" "the reason names the leash"
+  assert_not_contains "$(cat "$err")" "Resource temporarily unavailable" "the tree was stopped by the leash, not the kernel"
+  [ "$(grep -c 'fm-proc-budget:' "$err")" -eq 1 ] || fail "a leash stop must emit exactly one reason"
   wait_pids_ended "$pids"
-  pass "a runaway suite tree is stopped by the leash (depth $depth) and leaves no process behind"
+  pass "a runaway suite tree is stopped by the leash and leaves no process behind"
 }
 
 test_own_procs_reads_a_linux_stat_row() {
