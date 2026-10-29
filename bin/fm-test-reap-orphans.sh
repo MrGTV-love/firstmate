@@ -72,8 +72,9 @@
 #                   `cleanup` file naming the fixture roots that shell made. Only
 #                   those records and roots are read, so the cost depends on how
 #                   many records exist and never on what else the shared temp dir
-#                   holds, apart from the fmlab.* labs in the directory that
-#                   holds DIR, which are read as the default scan reads them; DIR
+#                   holds, apart from the fmlab.* labs and fm-test-run.* runner
+#                   containers in the directory that holds DIR, which are read
+#                   as the default scan reads them; DIR
 #                   itself need not exist. The ownership proof is the default
 #                   scan's: a root's own marker must name a dead owner. A root the
 #                   record does not name is found only by the default scan or
@@ -303,12 +304,13 @@ scan_deep() {
 }
 
 # scan_owners <owners-dir>: the same markers, read only from the per-shell
-# records, the roots each names, and the fmlab.* labs beside the owners dir.
+# records, the roots each names, and the fmlab.* labs and fm-test-run.* runner
+# containers beside the owners dir.
 scan_owners() {
   local dir=$1 shell root
   local -a deep=()
   printf '%s\0' "${dir%/*}"/fmlab.*/.fm-live-lab
-  for root in "${dir%/*}"/fmlab.*; do
+  for root in "${dir%/*}"/fmlab.* "${dir%/*}"/fm-test-run.*; do
     scan_one_container "$root"
   done
   for shell in "$dir"/*; do

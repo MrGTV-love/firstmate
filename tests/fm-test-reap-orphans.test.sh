@@ -460,9 +460,8 @@ wait_file "$TMP_ROOT/nested-killed.pid" 5 || fail "the killed parallel test did 
 NESTED_KILLED_STUB=$(cat "$TMP_ROOT/nested-killed.pid")
 track "$NESTED_KILLED_STUB" "$(cat "$TMP_ROOT/nested-killed.pid.identity")"
 alive "$NESTED_KILLED_STUB" || fail "the parallel test's stub did not outlive its owner"
-# Startup recovery is the wide sweep bin/fm-test-run.sh runs once at its start.
 # shellcheck disable=SC2016 # The child shell, not this one, expands $FM_TEST_LIB.
-env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 FM_TEST_SWEEP_ALL=1 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
+env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
 wait_gone "$NESTED_KILLED_STUB" 10 || fail "startup recovery left the killed parallel test's nested stub running"
 alive "$NESTED_LIVE_STUB" || fail "startup recovery stopped a live test's nested stub"
 alive "$NESTED_UNMARKED_STUB" || fail "startup recovery stopped an unmarked nested stub"

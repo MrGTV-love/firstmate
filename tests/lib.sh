@@ -219,6 +219,10 @@ FM_TEST_TMPDIR=$(fm_test_tmpdir) || return 1
 # without enumerating the rest of the shared temp dir (fm_test_reap_orphans).
 FM_TEST_OWNERS_DIR="$FM_TEST_TMPDIR/fm-test-owners"
 (umask 077; mkdir -p "$FM_TEST_OWNERS_DIR") || return 1
+if [ ! -d "$FM_TEST_OWNERS_DIR" ] || [ -L "$FM_TEST_OWNERS_DIR" ] || [ ! -O "$FM_TEST_OWNERS_DIR" ]; then
+  printf 'tests/lib.sh: %s is not a directory this user owns\n' "$FM_TEST_OWNERS_DIR" >&2
+  return 1
+fi
 FM_TEST_SHELL_DIR=$(umask 077; mktemp -d "$FM_TEST_OWNERS_DIR/$$.XXXXXX") || return 1
 FM_TEST_SHELL_DIR=$(cd -P -- "$FM_TEST_SHELL_DIR" && pwd -P) || return 1
 
@@ -548,9 +552,9 @@ fm_test_reap_orphans() {
   local -a markers=() candidates=() reaper_args=()
   [ "${FM_TEST_SWEEP_ALL:-0}" != 1 ] || pattern='fm-*'
   for shell in "$FM_TEST_OWNERS_DIR"/*; do
-    [ -d "$shell" ] && [ ! -L "$shell" ] || continue
+    [ -d "$shell" ] && [ ! -L "$shell" ] && [ -O "$shell" ] || continue
     # A shell's fixture roots go before its record, which is removed last.
-    if [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ]; then
+    if [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ] && [ -O "$shell/cleanup" ]; then
       while IFS= read -r root; do
         [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] || continue
         markers+=("$root/.fm-test-fixture")

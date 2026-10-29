@@ -140,6 +140,24 @@ sweep_seconds() {
   printf '%s\n' "$best"
 }
 
+test_owners_dir_must_be_ours() {
+  local tmp="$TMP_ROOT/planted" elsewhere="$TMP_ROOT/planted-target" out status=0
+  mkdir -p "$tmp" "$elsewhere/evil"
+  ln -s "$elsewhere" "$tmp/fm-test-owners"
+  printf '%s\n' "$elsewhere/victim" > "$elsewhere/evil/cleanup"
+  mkdir -p "$elsewhere/victim"
+  printf '1\nnot-an-identity\n' > "$elsewhere/victim/.fm-test-fixture"
+  touch -t 202001010000 "$elsewhere/victim/.fm-test-fixture"
+  out=$(sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0 2>&1) || status=$?
+  [ "$status" -ne 0 ] || fail "sourcing tests/lib.sh accepted an owners directory that is a symlink"
+  assert_contains "$out" "is not a directory this user owns" "the refusal did not name the owners directory"
+  assert_present "$elsewhere/victim" "a sweep removed a root named by a record behind a symlinked owners directory"
+  [ -z "$(find "$elsewhere" -mindepth 1 -maxdepth 1 ! -name evil ! -name victim)" ] \
+    || fail "sourcing tests/lib.sh wrote a record through a symlinked owners directory"
+  pass "tests/lib.sh refuses an owners directory it does not own and touches nothing behind it"
+}
+
 test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it
+test_owners_dir_must_be_ours
 test_sweep_keeps_live_owner_and_unmarked_entries
 test_sweep_cost_does_not_follow_unrelated_entries

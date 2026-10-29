@@ -26,18 +26,13 @@
 # uses this library with its own empty TMPDIR. bin/fm-scratch-legacy-reap.sh
 # removes the unowned entries commands made before this library existed.
 
-fm_scratch_container() {  # <prefix>
-  local base=${TMPDIR:-/tmp}
-  printf '%s/%s.scratch\n' "${base%/}" "$1"
-}
-
 fm_scratch_owned() {  # <container>: a real directory of this user, not a symlink
   [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ]
 }
 
 fm_scratch_reap() {  # <prefix>
-  local container entry name pid
-  container=$(fm_scratch_container "$1")
+  local container entry name pid base=${TMPDIR:-/tmp}
+  container=${base%/}/$1.scratch
   fm_scratch_owned "$container" || return 0
   for entry in "$container"/[0-9]*.??????; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -48,13 +43,12 @@ fm_scratch_reap() {  # <prefix>
     ! kill -0 "$pid" 2>/dev/null || continue
     rm -rf -- "$entry"
   done
-  rmdir "$container" 2>/dev/null || true
 }
 
 fm_scratch_new() {  # <f|d> <prefix>
   local kind=$1 container path dir='' base=${TMPDIR:-/tmp}
   [ "$kind" != d ] || dir=1
-  container=$(fm_scratch_container "$2")
+  container=${base%/}/$2.scratch
   fm_scratch_reap "$2"
   # A concurrent release removes the container once it is empty, which can fall
   # between mkdir and mktemp; only a container that vanished is worth a retry.
