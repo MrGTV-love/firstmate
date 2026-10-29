@@ -211,7 +211,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
 
     facts()
     report = call("baseline",code=75)
-    assert any("at least two readings" in r and "has 1" in r for r in report["reasons"]), report
+    assert any("at least two probe readings" in r and "has 0" in r for r in report["reasons"]), report
     assert not (state / ".memory-baseline.json").exists()
     report = call("admit")
     assert report["admission"] == "admit" and report["baseline"] is None
@@ -220,15 +220,21 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     call("probe")
     call("probe")
     assert rows("memory-health-uncalibrated") == 1 and "admission is unaffected" in queue()
+    # A confined worker's admission cannot read other users' RSS, so its lower
+    # maximum must neither fake spread nor lower the episode floor.
+    facts(rss=[{**daemon,"rss_bytes":gib//4},dict(fleet),dict(child)])
+    call("admit")
+    call("sample")
+    facts()
     report = call("baseline",code=75)
-    assert any("varies" in r for r in report["reasons"]), report
+    assert any("varies" in r and "all 2" in r for r in report["reasons"]), report
     assert not (state / ".memory-baseline.json").exists()
     facts(rss=[{**daemon,"rss_bytes":gib//2},dict(fleet),dict(child)])
-    call("sample")
+    call("probe")
     facts()
     baseline = call("baseline")["baseline"]
     assert baseline["non_fleet_max_bytes"] == gib and baseline["smallest_reading_max_bytes"] == gib//2, baseline
-    assert baseline["samples"] == 7 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
+    assert baseline["samples"] == 3 and baseline["first_checked_at"] < baseline["last_checked_at"], baseline
     report = call("admit")
     assert report["anonymous_bytes"] == 16*gib and report["compressor_bytes"] == gib//2
     assert report["unused_bytes"] == 1100*16384 and report["swap_used_bytes"] > 0
@@ -236,7 +242,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     original = (state / ".memory-baseline.json").read_bytes()
     call("baseline",code=75)
     assert (state / ".memory-baseline.json").read_bytes() == original
-    print("ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs varying healthy readings and never silently grows")
+    print("ok - a missing alarm baseline never defers admission; only the probe reports calibration once; baseline needs varying root probe readings, ignores confined admission samples and never silently grows")
 
     worker = subprocess.Popen(["sleep","120"])
     try:
@@ -268,7 +274,7 @@ with tempfile.TemporaryDirectory(prefix="fm-memory-admission-") as temp:
     report = call("probe")
     assert len(report["alarms"]) == 1 and report["alarms"][0]["pid"] == 101
     assert rows("memory-health") == before+1
-    assert "xprotectd PID 101" in queue() and "across 7 healthy readings" in queue()
+    assert "xprotectd PID 101" in queue() and "across 3 healthy readings" in queue()
     assert "restarting any system daemon requires" in queue()
     facts(rss=[{**daemon,"pid":102,"started":"start-102","rss_bytes":gib+2},dict(fleet),dict(child)])
     call("probe")

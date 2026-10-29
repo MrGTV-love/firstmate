@@ -39,9 +39,12 @@ Recorded admission modes (sample, baseline, admit, probe; wrapper also owns run)
   - The non-fleet RSS alarm is separate from admission: a missing, invalid or
     other-host baseline never defers work and is reported as calibration.
     A reading with errors judges neither record.
-  - baseline derives that alarm boundary from every recorded reading beside the
-    baseline file with no errors, native pressure 1, and this host/RAM/fixture:
-    the boundary is the largest non-fleet RSS observed across them, and the
+  - baseline derives that alarm boundary only from the root home's probe
+    readings beside the baseline file with no errors, native pressure 1, and
+    this host/RAM/fixture. Admission, run, sample and baseline readings never
+    count: a confined worker's admission cannot read other users' RSS, so its
+    lower maximum would fake spread and lower the episode floor.
+    Across those readings the boundary is the largest non-fleet RSS, and the
     record keeps the sample count, time span, smallest per-reading maximum,
     share of RAM, and readings with unreadable RSS (lower bounds). The
     readings must show variation: fewer than two, or maxima that are all
@@ -521,9 +524,9 @@ def admission_evaluate(report, baseline):
 
 
 def baseline_derive(report, readings_path):
-    """Observed non-fleet envelope across recorded healthy readings, or the missing input."""
+    """Observed non-fleet envelope across recorded healthy root probe readings, or the missing input."""
     def healthy(row):
-        return (not row.get("errors") and row.get("pressure_level") == 1 and
+        return (row.get("source") == "probe" and not row.get("errors") and row.get("pressure_level") == 1 and
                 row.get("host") == report["host"] and row.get("total_bytes") == report["total_bytes"] and
                 row.get("fixture") == report["fixture"] and type(row.get("non_fleet_max_bytes")) is int)
     rows = []
@@ -535,15 +538,13 @@ def baseline_derive(report, readings_path):
                 continue
             if isinstance(row, dict) and healthy(row):
                 rows.append(row)
-    if healthy(report):
-        rows.append(report)
     if len(rows) < 2:
-        return None, (f"baseline needs at least two readings with no errors, native pressure 1, a readable "
-                      f"non-fleet RSS and this host/RAM; {readings_path} plus this reading has {len(rows)}")
+        return None, (f"baseline needs at least two probe readings with no errors, native pressure 1, a "
+                      f"readable non-fleet RSS and this host/RAM; {readings_path} has {len(rows)}")
     maxima = [row["non_fleet_max_bytes"] for row in rows]
     if min(maxima) == max(maxima):
-        return None, (f"baseline needs healthy readings whose largest non-fleet RSS varies; all {len(rows)} "
-                      f"readings in {readings_path} plus this reading show {maxima[0]} bytes")
+        return None, (f"baseline needs healthy probe readings whose largest non-fleet RSS varies; all "
+                      f"{len(rows)} in {readings_path} show {maxima[0]} bytes")
     return {"schema": "fm-memory-baseline.v1", "checked_at": report["checked_at"],
             "host": report["host"], "total_bytes": report["total_bytes"],
             "non_fleet_max_bytes": max(maxima), "non_fleet_max_share": max(maxima) / report["total_bytes"],
@@ -551,7 +552,7 @@ def baseline_derive(report, readings_path):
             "first_checked_at": min(row["checked_at"] for row in rows),
             "last_checked_at": max(row["checked_at"] for row in rows),
             "incomplete_samples": sum(1 for row in rows if row.get("rss_unreadable_pids")),
-            "derivation": "largest non-fleet RSS observed across recorded healthy readings; "
+            "derivation": "largest non-fleet RSS observed across recorded healthy root probe readings; "
                           "incomplete samples are lower bounds"}, None
 
 
