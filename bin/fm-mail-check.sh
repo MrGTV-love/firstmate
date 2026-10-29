@@ -35,11 +35,10 @@
 # while a mail: row is still waiting in the wake queue, judged from the queue,
 # so mail queued by a poll that was later stopped still doorbells.
 #
-# The poll runs through fm_duration_progress under the mail-check.poll key:
-# its sample is recorded, and only output and process-tree CPU silence past
-# that key's measured bound (15-second cold start) stops it. FM_MAIL_TIMEOUT
-# still bounds each IMAP/SMTP socket read. A stopped poll is unknown, retry
-# next pass, never a clean inbox or mail failure.
+# The poll has no stop of its own. FM_MAIL_TIMEOUT bounds each IMAP/SMTP
+# socket read, and the whole check runs under the watcher's check progress
+# rule. A check the watcher stops is unknown and retried next pass, never a
+# clean inbox or mail failure.
 set -u
 export LC_ALL=C
 
@@ -83,9 +82,6 @@ die_usage() {
   usage >&2
   exit 2
 }
-
-# shellcheck source=bin/fm-duration-lib.sh
-. "$SCRIPT_DIR/fm-duration-lib.sh"
 
 record_epoch_now() {
   case "${FM_MAIL_CHECK_NOW:-}" in
@@ -184,10 +180,8 @@ action_check() {
   if [ ! -x "$MAIL_BIN" ]; then
     line="fm-mail.sh is missing next to this check ($MAIL_BIN)"
   else
-    out=$(fm_duration_progress mail-check.poll 15 "$MAIL_BIN" poll 2>&1) || rc=$?
-    if [ "${rc:-0}" -eq 124 ]; then
-      line="poll stopped making progress; result unknown, retry next pass"
-    elif [ "${rc:-0}" -ne 0 ]; then
+    out=$("$MAIL_BIN" poll 2>&1) || rc=$?
+    if [ "${rc:-0}" -ne 0 ]; then
       line=$(poll_summary "$rc" "$out")
     elif printf '%s\n' "$out" | grep '^fm-mail: woke for ' >/dev/null; then
       # A successful poll can still surface new mail: the poll itself already

@@ -47,8 +47,9 @@
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_duration_progress under a stable
 # contributions.read.<read> key: its sample is recorded, and only output and
-# process-tree CPU silence past that key's measured bound (five-second cold
-# start) stops it. There is no sweep deadline or observation reservation. A
+# process-tree CPU silence past that key's bound stops it. The bound starts at
+# 30 seconds, main's per-check allowance, so no read stops sooner than on main;
+# measured samples can only raise it. There is no sweep deadline or observation reservation. A
 # stopped read is unknown: keep that URL's saved observation untouched, go on
 # with the other URLs, and retry next pass. Every pass prints a
 # contribution-wake line for each contribution row still waiting in the wake
@@ -218,7 +219,7 @@ forge() {
     set -- gh "$@"
   fi
   if [ "$rc" -eq 0 ]; then
-    fm_duration_progress "contributions.read.${read%.err}" 5 env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+    fm_duration_progress "contributions.read.${read%.err}" 30 env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
       "$@" 2> "$forge_err" || rc=$?
   fi
   if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
