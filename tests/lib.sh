@@ -549,7 +549,7 @@ fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity shell root entry
   local pattern='fm-test-*'
   local seen=$'\n'
-  local -a markers=() candidates=() reaper_args=()
+  local -a markers=() fm_test_sweep_candidates=() reaper_args=()
   [ "${FM_TEST_SWEEP_ALL:-0}" != 1 ] || pattern='fm-*'
   for shell in "$FM_TEST_OWNERS_DIR"/*; do
     [ -d "$shell" ] && [ ! -L "$shell" ] && [ -O "$shell" ] || continue
@@ -567,7 +567,7 @@ fm_test_reap_orphans() {
     [ -e "$marker" ] || continue
     case "$seen" in *$'\n'"$marker"$'\n'*) continue ;; esac
     markers+=("$marker")
-    candidates+=("${marker%/.fm-test-fixture}")
+    fm_test_sweep_candidates+=("${marker%/.fm-test-fixture}")
   done
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
     # Registries from before the per-shell records lived beside the fixture roots.
@@ -592,7 +592,7 @@ fm_test_reap_orphans() {
     reaper_args=(--tmpdir "$FM_TEST_TMPDIR")
   else
     reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
-    for dir in ${candidates[@]+"${candidates[@]}"}; do
+    for dir in ${fm_test_sweep_candidates[@]+"${fm_test_sweep_candidates[@]}"}; do
       reaper_args+=(--candidate "$dir")
     done
   fi

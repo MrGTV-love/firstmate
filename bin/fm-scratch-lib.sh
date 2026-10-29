@@ -46,8 +46,8 @@ fm_scratch_reap() {  # <prefix>
 }
 
 fm_scratch_new() {  # <f|d> <prefix>
-  local kind=$1 container path dir='' base=${TMPDIR:-/tmp}
-  [ "$kind" != d ] || dir=1
+  local kind=$1 container fm_scratch_path fm_scratch_dir='' base=${TMPDIR:-/tmp}
+  [ "$kind" != d ] || fm_scratch_dir=1
   container=${base%/}/$2.scratch
   fm_scratch_reap "$2"
   # A concurrent release removes the container once it is empty, which can fall
@@ -57,11 +57,11 @@ fm_scratch_new() {  # <f|d> <prefix>
       return 1
     fi
     if [ -L "$container" ] || { [ -e "$container" ] && ! fm_scratch_owned "$container"; }; then
-      (umask 077; mktemp ${dir:+"-d"} "${base%/}/$2.XXXXXX")
+      (umask 077; mktemp ${fm_scratch_dir:+"-d"} "${base%/}/$2.XXXXXX")
       return
     fi
-    if path=$(umask 077; mktemp ${dir:+"-d"} "$container/$$.XXXXXX" 2>/dev/null); then
-      printf '%s\n' "$path"
+    if fm_scratch_path=$(umask 077; mktemp ${fm_scratch_dir:+"-d"} "$container/$$.XXXXXX" 2>/dev/null); then
+      printf '%s\n' "$fm_scratch_path"
       return 0
     fi
     [ ! -d "$container" ] || return 1
