@@ -2473,12 +2473,35 @@ clock['now'] = now + 3600
 first = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 kept = next(r for r in first['rows'] if r['id'] == row['id'])
 assert kept['stale'] and kept['last_seen'] == now and row['id'] in first['handling']['actions'], first
-assert row['id'] not in first['handling']['episodes'], 'a published row that is no longer overdue closes its episode'
+assert row['id'] in first['handling']['episodes'], 'a row an incomplete pass keeps stale keeps its episode'
 clock['now'] = now + 86400
 second = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 assert row['id'] not in {r['id'] for r in second['rows']}, second
 assert row['id'] not in second['handling']['actions'], 'a returning stall starts a fresh row history'
 assert row['id'] not in second['handling']['presentations']['main'], second
+clock['now'] = now
+
+# A stale-retained row is unconfirmed, not no longer overdue: its episode survives the incomplete pass, so a steer
+# sent before a deferral does not count again once a complete pass presents the same row.
+home, ledger, row, call, ok, drain, ack = case('stale-episode')
+_, boundary = drain()
+inbox(home, '040.msg', offset=-60)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck',
+   dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat())
+assert ack(boundary).returncode == 0
+assert json.loads(ledger.read_text())['handling']['episodes'][row['id']]['start'] == now, 'a deferral restarts the episode'
+clock['now'] = now + 60
+incomplete = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert not incomplete['complete'] and next(r for r in incomplete['rows'] if r['id'] == row['id'])['stale'], incomplete
+assert incomplete['handling']['episodes'][row['id']]['start'] == now, 'a stale-retained row keeps its episode'
+clock['now'] = now + 700
+record = json.loads(ledger.read_text())
+record.update(complete=True, generated_epoch=clock['now'], rows=[dict(row, age_seconds=row['age_seconds'] + 700)])
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: complete pass"', '_', code / 'bin/fm-wake-lib.sh')
+drain()
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '040.msg')
+assert again.returncode == 1 and 'became overdue' in again.stdout, ('a steer older than the deferral stays refused', again)
 clock['now'] = now
 
 home, ledger, row, call, ok, drain, ack = case('recheck')
@@ -3921,6 +3944,8 @@ from pathlib import Path
 p = json.loads((Path(os.environ['FM_HOME']) / 'forge.json').read_text())
 url = sys.argv[2]
 if '/pulls?' in url: value = [p]
+elif '/check-runs' in url and (Path(os.environ['FM_HOME']) / 'checks-pending').exists():
+    value = {'check_runs': [{'name': 'ci', 'status': 'in_progress', 'conclusion': None, 'id': 1, 'app': {'id': 1}}]}
 elif '/check-runs' in url:
     value = {'check_runs': [{'name': 'Behavior portable serial 17', 'status': 'completed', 'conclusion': 'failure',
                              'completed_at': '2026-10-28T00:00:00Z', 'id': 1, 'app': {'id': 1}}]}
@@ -4160,8 +4185,21 @@ inside = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--eviden
 assert inside.returncode == 0, ('a delivery inside the episode counts after a re-presentation', inside.stdout)
 assert fx['ack'](boundary).returncode == 0
 fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A complete pass whose row is no longer overdue closes its episode: a PR update resets the open PR's age.
+fx = wait_fixture('episode-closes')
+(fx['home'] / 'checks-pending').write_text('')
+pending = next(r for r in fx['publish']()['rows'] if r['subject'] == pr)
+assert pending['category'] == 'open_pr' and pending['overdue'], pending
+fx['drain']()
+assert pending['id'] in json.loads(fx['ledger'].read_text())['handling']['episodes'], 'presentation opens the episode'
+forge = json.loads((fx['home'] / 'forge.json').read_text())
+(fx['home'] / 'forge.json').write_text(json.dumps(dict(forge, updated_at=iso(now))))
+closed = fx['publish']()
+row = next(r for r in closed['rows'] if r['id'] == pending['id'])
+assert closed['complete'] and not row['overdue'] and not row.get('stale'), row
+assert pending['id'] not in closed['handling']['episodes'], 'a published row that is no longer overdue closes its episode'
 print('PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; '
-      'one older than the episode is refused', flush=True)
+      'one older than the episode is refused; a row no longer overdue closes its episode', flush=True)
 
 # Only a PR row waits on a task by reason alone; a question or unlanded-commit row cites a delivery naming it.
 fx = wait_fixture('reason-scope')

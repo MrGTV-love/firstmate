@@ -1202,9 +1202,9 @@ class Collector:
                                          for actor, pending in handling["presentations"].items()}
             handling["presented_at"] = {actor: {ident: stamp for ident, stamp in stamps.items() if ident in published}
                                         for actor, stamps in handling.get("presented_at", {}).items()}
-            overdue = {row["id"] for row in report["rows"] if row.get("overdue")}
+            open_episodes = {row["id"] for row in report["rows"] if row.get("overdue") or row.get("stale")}
             handling["episodes"] = {ident: episode for ident, episode in handling.get("episodes", {}).items()
-                                    if ident in overdue}
+                                    if ident in open_episodes}
             for row in report["rows"]:
                 if captain_visible(handling["actions"].get(row["id"], {}), row, self.now):
                     row["captain_visible"] = True
