@@ -2767,6 +2767,10 @@ Writes are allowed by default; the profile denies writes to these named protecte
 
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
+In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
+Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
+The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
+When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
 Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
