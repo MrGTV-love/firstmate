@@ -410,13 +410,16 @@ test_stopped_check_wakes_once_per_episode() {
       || fail 'registration of a-flaky failed'
   }
   arm_flaky
-  for run in stop repeat complete again rearmed; do
+  for run in stop repeat complete again reregistered rearmed; do
     case "$run" in complete) rm -f "$state/hang" ;; *) : > "$state/hang" ;; esac
-    if [ "$run" = rearmed ]; then
-      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-unregister.sh" a-flaky >/dev/null \
-        || fail 'disarming a-flaky failed'
-      arm_flaky
-    fi
+    case "$run" in
+      reregistered) arm_flaky ;;
+      rearmed)
+        FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-unregister.sh" a-flaky >/dev/null \
+          || fail 'disarming a-flaky failed'
+        arm_flaky
+        ;;
+    esac
     rm -f "$state/.last-check"
     : > "$state/.wake-queue"
     # Each later run is the successor started after the previous run's wake.
@@ -440,7 +443,7 @@ test_stopped_check_wakes_once_per_episode() {
       *) [ "$notices" = 0 ] || fail "the $run sweep gave $notices unknown wakes, not none" ;;
     esac
   done
-  pass 'a stopped check wakes once per episode; its next completed run or a disarm and re-arm starts a new episode'
+  pass 'a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one'
 }
 
 test_check_stderr_capture_keeps_a_capped_tail() {

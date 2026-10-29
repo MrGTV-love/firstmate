@@ -120,8 +120,10 @@ case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
 . "$SCRIPT_DIR/fm-duration-lib.sh"
 TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
+DEFERRED_TMP=
 cleanup() {
   [ "$LOCK_HELD" = 0 ] || fm_lock_release "$STATE/.contributions.lock" || true
+  [ -z "$DEFERRED_TMP" ] || rm -f -- "$DEFERRED_TMP"
   fm_scratch_release "$TMP"
 }
 trap cleanup EXIT
@@ -394,7 +396,7 @@ settle_final() { # canonical-url task... : copy the URL's final observation to e
 }
 
 poll() {
-  local task url old kind error observed deferred_tmp
+  local task url old kind error observed
   local -a row
   acquire
   get_input
@@ -486,9 +488,10 @@ poll() {
       publish_pending "$task" "$url" "$TMP/row.json"
     done
   done < "$TMP/known.tsv"
-  deferred_tmp=$(mktemp "$STATE/.contributions-deferred.XXXXXX")
-  printf '%s\n' "$DEFERRED" | grep -Fx -f <(cut -f1 "$TMP/live.tsv") > "$deferred_tmp" || true
-  mv -f -- "$deferred_tmp" "$STATE/.contributions-deferred"
+  DEFERRED_TMP=$(mktemp "$STATE/.contributions-deferred.XXXXXX")
+  printf '%s\n' "$DEFERRED" | grep -Fx -f <(cut -f1 "$TMP/live.tsv") > "$DEFERRED_TMP" || true
+  mv -f -- "$DEFERRED_TMP" "$STATE/.contributions-deferred"
+  DEFERRED_TMP=
   [ "$QUOTA_ANNOUNCE" -eq 0 ] || printf 'contributions: %s; last observations kept, marked stale\n' "$QUOTA_REASON"
   ring_undrained
 }
