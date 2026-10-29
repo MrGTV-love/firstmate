@@ -1,0 +1,36 @@
+
+### setup (free)
+old pool folder (record's copy): /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-b0770d
+current pool folder (pool-dir):  /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-3c1788
+record worktree=/private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-b0770d/1/project
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-3c1788/1/project  (detached)
+2     available    /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-3c1788/2/project  (detached)
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-b0770d/1/project","leased":null,"lease_holder":null,"owner_pid":76591}
+
+### run new: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6096BGK9ZGV7CY52F575F3Q/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: pool slot <W>/th/.treehouse/project-b0770d/1/project is in a superseded Treehouse pool folder (treehouse status from <W>/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it
+warning: Docker container listing failed
+failed to connect to the docker API at unix:///Users/charlesabrooker/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/charlesabrooker/.docker/run/docker.sock: connect: no such file or directory
+warning: Docker could not be listed for live-old-task and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=fm.task=live-old-task
+🌳 Worktree returned to pool.
+teardown live-old-task complete (window firstmate:fm-live-old-task, worktree <W>/th/.treehouse/project-b0770d/1/project)
+Backlog: live-old-task just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/tmp/fm-lab.YCgNMG/data/backlog.md - move live-old-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+### after (free)
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-3c1788/1/project  (detached)
+2     available    /private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-3c1788/2/project  (detached)
+-- current pool state byte-identical to before the new teardown?
+IDENTICAL
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-free.LnUSfN/th/.treehouse/project-b0770d/1/project","leased":null,"lease_holder":null,"owner_pid":null}
+-- task record present? no
+-- old copy:  HEAD=HEAD
+-- old slot claim: 

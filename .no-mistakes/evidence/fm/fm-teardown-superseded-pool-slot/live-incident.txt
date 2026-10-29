@@ -1,0 +1,65 @@
+
+### setup (incident-replay)
+old pool folder (record's copy): /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-f2249a
+current pool folder (pool-dir):  /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757
+record worktree=/private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-f2249a/1/project
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/1/project  (detached)
+2     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/2/project  (detached)
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-f2249a/1/project","leased":null,"lease_holder":null,"owner_pid":2171}
+
+### run base-first: /tmp/fmbase.unqekV/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+🌳 Leased worktree 1 at <W>/th/.treehouse/project-8b8757/1/project. Run 'treehouse return <W>/th/.treehouse/project-8b8757/1/project' to release it.
+<W>/th/.treehouse/project-8b8757/1/project
+REFUSED: pool slot <W>/th/.treehouse/project-f2249a/1/project was not proved durably leased after reservation; retaining its task record and contents
+exit=1
+-- current pool after base teardown #1:
+base  main  (repository default)
+1     leased       /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/1/project  (detached)  (held by live-old-task)
+2     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/2/project  (detached)
+
+### run base-second: /tmp/fmbase.unqekV/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+worktree 1 is already leased (holder: "live-old-task")
+exit=1
+-- current pool after base teardown #2:
+base  main  (repository default)
+1     leased       /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/1/project  (detached)  (held by live-old-task)
+2     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/2/project  (detached)
+
+### run new: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6096BGK9ZGV7CY52F575F3Q/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: pool slot <W>/th/.treehouse/project-f2249a/1/project is in a superseded Treehouse pool folder (treehouse status from <W>/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it
+🌳 Worktree returned to pool.
+teardown: released the lease on <W>/th/.treehouse/project-8b8757/1/project that an earlier teardown took by slot name in the project's current pool
+warning: Docker container listing failed
+failed to connect to the docker API at unix:///Users/charlesabrooker/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/charlesabrooker/.docker/run/docker.sock: connect: no such file or directory
+warning: Docker could not be listed for live-old-task and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=fm.task=live-old-task
+🌳 Worktree returned to pool.
+teardown live-old-task complete (window firstmate:fm-live-old-task, worktree <W>/th/.treehouse/project-f2249a/1/project)
+Backlog: live-old-task just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/tmp/fm-lab.YCgNMG/data/backlog.md - move live-old-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+### after (incident-replay)
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/1/project  (detached)
+2     available    /private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-8b8757/2/project  (detached)
+-- current pool state byte-identical to before the new teardown?
+CHANGED:
+6,9d5
+<       "lease_holder": "live-old-task",
+<       "lease_id": "e5d0af5a0f2764a37e86be2cc05729d9",
+<       "leased": true,
+<       "leased_at": "2026-10-29T14:03:15.05351-05:00",
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-incident.fT8cwU/th/.treehouse/project-f2249a/1/project","leased":null,"lease_holder":null,"owner_pid":null}
+-- task record present? no
+-- old copy:  HEAD=HEAD
+-- old slot claim: 

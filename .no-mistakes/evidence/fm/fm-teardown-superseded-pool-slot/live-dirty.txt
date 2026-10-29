@@ -1,0 +1,34 @@
+
+### setup (dirty)
+old pool folder (record's copy): /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-a60041
+current pool folder (pool-dir):  /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-403961
+record worktree=/private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-a60041/1/project
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-403961/1/project  (detached)
+2     available    /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-403961/2/project  (detached)
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-a60041/1/project","leased":null,"lease_holder":null,"owner_pid":6109}
+
+### run new: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6096BGK9ZGV7CY52F575F3Q/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: worktree <W>/th/.treehouse/project-a60041/1/project has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  unfinished.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+
+### after (dirty)
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-403961/1/project  (detached)
+2     available    /private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-403961/2/project  (detached)
+-- current pool state byte-identical to before the new teardown?
+IDENTICAL
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-dirty.Lb3QWl/th/.treehouse/project-a60041/1/project","leased":null,"lease_holder":null,"owner_pid":6109}
+-- task record present? yes
+-- old copy: ?? unfinished.txt  HEAD=fm/live-old-task
+-- old slot claim: task=live-old-task home=/Users/charlesabrooker/tmp/fm-lab.YCgNMG 

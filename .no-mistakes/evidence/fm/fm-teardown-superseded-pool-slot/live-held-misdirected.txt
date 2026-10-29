@@ -1,0 +1,51 @@
+🌳 Leased worktree 1 at /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/1/project. Run 'treehouse return /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/1/project' to release it.
+
+### setup (held-misdirected)
+old pool folder (record's copy): /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-742324
+current pool folder (pool-dir):  /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f
+record worktree=/private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-742324/1/project
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     leased       /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/1/project  (detached)  (held by live-old-task)
+2     available    /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/2/project  (detached)
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-742324/1/project","leased":null,"lease_holder":null,"owner_pid":36678}
+
+### run new: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6096BGK9ZGV7CY52F575F3Q/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warning: pool slot <W>/th/.treehouse/project-742324/1/project is in a superseded Treehouse pool folder (treehouse status from <W>/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it
+🌳 Leased worktree 1 at <W>/th/.treehouse/project-742324/1/project. Run 'treehouse return <W>/th/.treehouse/project-742324/1/project' to release it.
+🌳 Worktree returned to pool.
+teardown: released the lease on <W>/th/.treehouse/project-a0e60f/1/project that an earlier teardown took by slot name in the project's current pool
+warning: Docker container listing failed
+failed to connect to the docker API at unix:///Users/charlesabrooker/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/charlesabrooker/.docker/run/docker.sock: connect: no such file or directory
+warning: Docker could not be listed for live-old-task and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=fm.task=live-old-task
+notice: the slot return is deferred: the foreign copies listed below hold work that exists nowhere else, and teardown never deletes, moves or rewrites a foreign copy.
+notice: held foreign copy <W>/th/.treehouse/project-742324/1/project/.claude/worktrees/fc-one stays in pool slot <W>/th/.treehouse/project-742324/1/project: its HEAD 5bd48d0acbc7 is not proved landed.
+notice: next step for the owner of <W>/th/.treehouse/project-742324/1/project/.claude/worktrees/fc-one: list the commits only it holds with git -C <W>/th/.treehouse/project-742324/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes, land them, remove the copy with git -C <W>/th/.treehouse/project-742324/1/project worktree remove <W>/th/.treehouse/project-742324/1/project/.claude/worktrees/fc-one (a copy locked by Vernant's creation lock goes through scripts/git-stability/closeout_pr.py --cleanup-worktree <W>/th/.treehouse/project-742324/1/project/.claude/worktrees/fc-one --execute-cleanup, run from the slot), and when no copy is left in the slot return it with (cd <W>/project && treehouse return <W>/th/.treehouse/project-742324/1/project --if-lease-holder live-old-task </dev/null).
+notice: pool slot <W>/th/.treehouse/project-742324/1/project is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files.
+notice: each held copy is also listed in /Users/charlesabrooker/tmp/fm-lab.YCgNMG/data/held-foreign-copies.log.
+teardown live-old-task complete (window firstmate:fm-live-old-task; the task's own work is landed and its record is closed, but pool slot <W>/th/.treehouse/project-742324/1/project is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)
+Backlog: live-old-task just finished (config/backlog-backend selects manual editing). Update /Users/charlesabrooker/tmp/fm-lab.YCgNMG/data/backlog.md - move live-old-task to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+### after (held-misdirected)
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/1/project  (detached)
+2     available    /private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-a0e60f/2/project  (detached)
+-- current pool state byte-identical to before the new teardown?
+CHANGED:
+6,9d5
+<       "lease_holder": "live-old-task",
+<       "lease_id": "55d5b8a2e42a5d052758223ee6f50175",
+<       "leased": true,
+<       "leased_at": "2026-10-29T14:05:31.070493-05:00",
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-held-misdirected.A9GJXU/th/.treehouse/project-742324/1/project","leased":true,"lease_holder":"live-old-task","owner_pid":null}
+-- task record present? no
+-- old copy:  HEAD=fm/live-old-task
+-- old slot claim: task=live-old-task home=/Users/charlesabrooker/tmp/fm-lab.YCgNMG 
+-- foreign held copy: present HEAD unchanged? yes
+-- old slot still exists? yes

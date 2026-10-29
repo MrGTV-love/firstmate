@@ -1,0 +1,33 @@
+
+### setup (unlanded-commit)
+old pool folder (record's copy): /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-af5a78
+current pool folder (pool-dir):  /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-49dd1a
+record worktree=/private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-af5a78/1/project
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-49dd1a/1/project  (detached)
+2     available    /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-49dd1a/2/project  (detached)
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-af5a78/1/project","leased":null,"lease_holder":null,"owner_pid":85511}
+
+### run new: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M6096BGK9ZGV7CY52F575F3Q/bin/fm-teardown.sh live-old-task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.YCgNMG
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+a1c53d5 task work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+
+### after (unlanded-commit)
+-- treehouse status from the project (current pool):
+base  main  (repository default)
+1     available    /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-49dd1a/1/project  (detached)
+2     available    /private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-49dd1a/2/project  (detached)
+-- current pool state byte-identical to before the new teardown?
+IDENTICAL
+-- old folder state:
+{"name":"1","path":"/private/tmp/fmlive-unlanded-commit.CrjjK2/th/.treehouse/project-af5a78/1/project","leased":null,"lease_holder":null,"owner_pid":85511}
+-- task record present? yes
+-- old copy:  HEAD=fm/live-old-task
+-- old slot claim: task=live-old-task home=/Users/charlesabrooker/tmp/fm-lab.YCgNMG 
