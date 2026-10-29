@@ -1630,6 +1630,9 @@ test_rss_shim_that_resolves_to_itself_is_refused() {
   for name in ps python3; do
     : > "$tmp/trace"
     rc=0
+    # Harm: a runaway tree, here a shim that recurses into itself. Observable:
+    # the tree's own member count. Expiry: the tree is stopped and the wrapper
+    # exits 98. The ceiling of 50 is unchanged.
     err=$("$ROOT/bin/fm-proc-budget.sh" --own-procs 50 -- env -u FM_TEST_RSS_SHIM_DEPTH FM_TEST_SHIM_TRACE="$tmp/trace" \
       FM_TEST_REAL_PS="$shims/ps" FM_TEST_REAL_PYTHON="$shims/python3" \
       FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" "$shims/$name" -c 0 2>&1 >/dev/null) || rc=$?
