@@ -763,7 +763,9 @@ test_own_procs_stops_a_runaway_tree() {
   rc=$?
   expect_code 98 "$rc" "a tree past its own limit"
   levels=$(wc -l <"$pids")
-  [ "$levels" -gt 100 ] || fail "the tree never outgrew the limit (${levels} members): the case would be vacuous: $(cat "$err")"
+  # Each member records itself before it forks the next, so a stop above 100
+  # members leaves at least 100 lines even if the newest was frozen unrecorded.
+  [ "$levels" -ge 100 ] || fail "the tree never outgrew the limit (${levels} members recorded): the case would be vacuous: $(cat "$err")"
   assert_contains "$(grep 'fm-proc-budget:' "$err")" "over the own-tree limit of 100" "the reason names the limit"
   assert_not_contains "$(cat "$err")" "Resource temporarily unavailable" "the tree was stopped by its own count, not the kernel"
   [ "$(grep -c 'fm-proc-budget:' "$err")" -eq 1 ] || fail "an own-tree stop must emit exactly one reason"
