@@ -180,6 +180,8 @@ case "${1:-} ${2:-}" in
   "mr view")
     [ -z "${FM_FAKE_GLAB_READ_LOG:-}" ] || printf '%s|%s\n' "${GITLAB_HOST:-}" "$*" >> "$FM_FAKE_GLAB_READ_LOG"
     [ "${FM_FAKE_GLAB_READ_FAIL:-0}" = 1 ] && exit 1
+    # A forge answer that is late: silent for this many seconds (a network wait).
+    [ -z "${FM_FAKE_GLAB_READ_DELAY:-}" ] || sleep "$FM_FAKE_GLAB_READ_DELAY"
     printf '{"state":"%s"}\n' "${FM_FAKE_GLAB_STATE:-merged}"
     exit 0 ;;
 esac
@@ -371,6 +373,7 @@ reset_fakes() {
   FM_FAKE_PR_STATE_AXI=merged
   FM_FAKE_GLAB_STATE=merged
   FM_FAKE_GLAB_READ_FAIL=0
+  FM_FAKE_GLAB_READ_DELAY=
   FM_FAKE_GLAB_READ_LOG=
   FM_FAKE_TEA_STATE=closed
   FM_FAKE_TEA_MERGED=true
@@ -387,7 +390,7 @@ reset_fakes() {
   export FM_FAKE_DAEMON_DOWN FM_FAKE_DAEMON_TIMEOUT FM_FAKE_DAEMON_PROBE_LOG FM_FAKE_AXI_HOME
   export FM_FAKE_AXI_HOME_ERROR FM_FAKE_AXI_STATUS_RUN_ERROR FM_FAKE_AXI_STATUS_ERROR
   export FM_FAKE_PR_STATE FM_FAKE_PR_MERGED FM_FAKE_PR_READ_FAIL FM_FAKE_PR_READ_LOG FM_FAKE_PR_STATE_AXI
-  export FM_FAKE_GLAB_STATE FM_FAKE_GLAB_READ_FAIL FM_FAKE_GLAB_READ_LOG
+  export FM_FAKE_GLAB_STATE FM_FAKE_GLAB_READ_FAIL FM_FAKE_GLAB_READ_DELAY FM_FAKE_GLAB_READ_LOG
   export FM_FAKE_TEA_STATE FM_FAKE_TEA_MERGED FM_FAKE_TEA_READ_FAIL FM_FAKE_TEA_READ_LOG
   export FM_FAKE_GERRIT_STATUS FM_FAKE_GERRIT_CHANGE FM_FAKE_GERRIT_URL_JSON
   export FM_FAKE_GERRIT_READ_FAIL FM_FAKE_GERRIT_READ_LOG
@@ -1792,6 +1795,37 @@ test_terminal_passed_with_merged_gitlab_mr_reports_merged() {
   out=$(run_crew_state "$d" feat-dgitlabmerged)
   assert_contains "$out" "run passed: PR merged" "merged GitLab MR is reported merged"
   pass "terminal passed run reads merged GitLab MR state"
+}
+
+# A forge read cannot show progress, so its bound is this host's measured one, and
+# running out of it says nothing about the PR. A host where the same read has taken
+# three seconds gets nine: a read that takes eight is slow, not hung, and must name
+# the PR's state. One that never answers is stopped and the state is unknown, said as
+# "timed out; try again" so it is not mistaken for a read that failed.
+test_forge_read_bound_follows_the_measured_ledger() {
+  reset_fakes
+  local d out ledger i
+  d=$(new_case passed-forge-read-measured)
+  make_repo_on_branch "$d/wt" fm/feat-dforgeslow
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-dforgeslow.meta" "window=fm:fm-feat-dforgeslow" \
+    "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/14"
+  ledger="$d/durations.jsonl"
+  for i in 1 2 3 4 5; do
+    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 3000 0 >/dev/null 2>&1 \
+      || fail "could not seed the duration ledger"
+  done
+  FM_FAKE_GLAB_STATE=opened
+  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dforgeslow https://gitlab.com/group/repo/-/merge_requests/14)"
+  FM_FAKE_GLAB_READ_DELAY=8
+  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  assert_contains "$out" "run passed: PR open" "a forge read slower than the cold-start floor but inside the measured bound was dropped"
+  FM_FAKE_GLAB_READ_DELAY=40
+  out=$(FM_DURATION_FILE="$ledger" run_crew_state "$d" feat-dforgeslow)
+  assert_contains "$out" "run passed: PR state unknown (forge read timed out; try again)" "a forge read that never answered was not reported as a timeout"
+  assert_not_contains "$out" "(unreadable)" "a timed-out forge read was reported as an unreadable one"
+  assert_not_contains "$out" "PR merged" "a timed-out forge read must not be reported merged"
+  pass "a forge read gets its host's measured bound: slow names the state, silent is unknown and retryable"
 }
 
 test_terminal_passed_with_failed_gitlab_read_reports_unknown() {
@@ -6203,6 +6237,7 @@ test_terminal_passed_with_open_gitlab_mr_does_not_claim_merged
 test_terminal_passed_with_forgejo_pull_reports_its_state
 test_terminal_passed_with_merged_gitlab_mr_reports_merged
 test_terminal_passed_with_failed_gitlab_read_reports_unknown
+test_forge_read_bound_follows_the_measured_ledger
 test_terminal_passed_with_open_gerrit_change_does_not_claim_merged
 test_terminal_passed_with_merged_gerrit_change_reports_merged
 test_terminal_passed_with_unreadable_gerrit_change_reports_unknown

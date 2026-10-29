@@ -17,10 +17,14 @@
 # mapping logic, and terminal passed-run PR detail from bounded evidence only,
 # with no heuristics and no LLM.
 # For a terminal passed no-mistakes run, a matching merge-poll retirement
-# receipt is local merged evidence; otherwise a 5s-bounded forge read is tried.
+# receipt is local merged evidence; otherwise one forge read is tried. Its bound
+# comes from this host's measured forge-read durations (fm_duration_timed, key
+# crew-state.forge-read, with a cold-start fallback of 5s), so a loaded host
+# stretches it instead of cutting a healthy read.
 # FM_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
 # An absent or unreadable PR identity yields an honest unknown, never an
-# optimistic merged claim.
+# optimistic merged claim, and so does a forge read that hit its bound: the PR
+# state is then reported unknown (forge read timed out; try again).
 # Output is one stable, parseable, token-tight line firstmate can read every
 # heartbeat:
 #
@@ -242,6 +246,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
 
@@ -373,11 +379,17 @@ fi
 # named-head reachability gate: that claim is blocked so a disposable copy is
 # not treated as finished-and-safe.
 emit_ship_status_done() {  # [extra-detail]
-  local extra=${1:-} reason
+  local extra=${1:-} reason rc=0
   meta_value_to META_MODE mode
   meta_value_to META_PROJECT project
-  if reason=$(fm_dod_accept_ship_done "$KIND" "$META_MODE" "$WT" "$META_PROJECT" "$LOG_LINE" "$STATE" "$ID" "$META"); then
+  reason=$(fm_dod_accept_ship_done "$KIND" "$META_MODE" "$WT" "$META_PROJECT" "$LOG_LINE" "$STATE" "$ID" "$META") || rc=$?
+  if [ "$rc" -eq 0 ]; then
     emit "done" status-log "$(status_line_note "$LOG_LINE")${extra:+${SEP}$extra}"
+  fi
+  # A run that did not answer is unknown, not a refusal: a finished ship must not
+  # read as blocked because its daemon was slow to reply.
+  if [ "$rc" -eq 2 ]; then
+    emit unknown status-log "$reason"
   fi
   emit blocked status-log "$reason"
 }
@@ -492,59 +504,65 @@ nm_field() {  # <key>
   fm_nm_field "$RUN_OUT" "$1"
 }
 
+# One forge read of a PR's state and merged flag, run as <inner-script> in its own
+# bash with fm-pr-lib.sh sourced as $1. The read is the one thing here that cannot
+# be watched for progress (a network call is quiet until it answers), so its bound
+# is the measured one for this host. Failing to answer in time is not a verdict on
+# the PR: FORGE_READ_TIMED_OUT lets the caller report unknown, try again.
+FORGE_READ_TIMED_OUT=0
+forge_read_record_bounded() {  # <inner-script> <args...>
+  local script=$1 record state merged rc=0
+  shift
+  FORGE_READ_TIMED_OUT=0
+  record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    ! fm_timed_out "$rc" || FORGE_READ_TIMED_OUT=1
+    return 1
+  fi
+  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
+  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
+  [ -n "$state" ] || return 1
+  [ "$merged" = true ] || [ "$merged" = false ] || return 1
+  FM_PR_RECORD_STATE=$state
+  FM_PR_RECORD_MERGED=$merged
+}
+
+# The unknown reading for a forge read that gave no answer: a read that hit its
+# bound says nothing about the PR, and says so.
+forge_read_unknown() {
+  if [ "$FORGE_READ_TIMED_OUT" = 1 ]; then
+    printf 'run passed: PR state unknown (forge read timed out; try again)'
+  else
+    printf 'run passed: PR state unknown (unreadable)'
+  fi
+}
+
 pr_read_record_bounded() {  # <owner> <repo> <number>
-  local record state merged
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     fm_pr_github_read_record "$2" "$3" "$4" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" "$3" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2" "$3"
 }
 
 host_pull_read_record_bounded() {  # <provider: gitlab|forgejo> <host> <path> <number>
-  local record state merged
   case "$1" in gitlab|forgejo) ;; *) return 1 ;; esac
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     "fm_pr_${2}_read_record" "$3" "$4" "$5" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" "$3" "$4" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2" "$3" "$4"
 }
 
 change_read_record_bounded() {  # <host> <number>
-  local record state merged
   # shellcheck disable=SC2016  # The inner script expands after bash -c receives positional args.
-  if ! record=$(fm_run_timed 5 bash -c '
+  forge_read_record_bounded '
     . "$1"
     fm_pr_gerrit_read_record "$2" "$3" || exit 1
     printf "state=%s\nmerged=%s\n" "$FM_PR_RECORD_STATE" "$FM_PR_RECORD_MERGED"
-  ' _ "$SCRIPT_DIR/fm-pr-lib.sh" "$1" "$2" 2>/dev/null); then
-    return 1
-  fi
-  state=$(printf '%s\n' "$record" | sed -n 's/^state=//p' | head -1)
-  merged=$(printf '%s\n' "$record" | sed -n 's/^merged=//p' | head -1)
-  [ -n "$state" ] || return 1
-  [ "$merged" = true ] || [ "$merged" = false ] || return 1
-  FM_PR_RECORD_STATE=$state
-  FM_PR_RECORD_MERGED=$merged
+  ' "$1" "$2"
 }
 
 passed_pr_detail() {
@@ -585,7 +603,7 @@ passed_pr_detail() {
       owner=${path%%/*}
       repo=${path#*/}
       if ! pr_read_record_bounded "$owner" "$repo" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -601,7 +619,7 @@ passed_pr_detail() {
       ;;
     gitlab)
       if ! host_pull_read_record_bounded gitlab "$host" "$path" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -617,7 +635,7 @@ passed_pr_detail() {
       ;;
     forgejo)
       if ! host_pull_read_record_bounded forgejo "$host" "$path" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then
@@ -635,7 +653,7 @@ passed_pr_detail() {
       ;;
     gerrit)
       if ! change_read_record_bounded "$host" "$number"; then
-        printf 'run passed: PR state unknown (unreadable)'
+        forge_read_unknown
         return
       fi
       if [ "$FM_PR_RECORD_MERGED" = true ]; then

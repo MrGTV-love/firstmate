@@ -825,47 +825,63 @@ test_empty_write_prune_from_the_environment_widens_the_probe() {
 }
 
 # The probe's walk runs synchronously inside the poll that was about to escalate, so
-# it must be wall-clock bounded: -xdev keeps it out of a nested mount, but a worktree
-# root that is ITSELF on a hung mount would otherwise stall the very supervisor that
-# exists to notice a wedge. A fake find that never returns in time stands in for that
-# mount. Hitting the bound must read as NO evidence, exactly like every other
-# negative outcome, so the caller's escalation schedule is untouched.
-test_worktree_write_probe_is_wall_clock_bounded() {
-  local dir state anchor wt slowbin fastbin started elapsed
+# a walk that is hung must be stopped: -xdev keeps it out of a nested mount, but a
+# worktree root that is ITSELF on a hung mount would otherwise stall the very
+# supervisor that exists to notice a wedge. What identifies the hang is silence (no
+# output and no CPU), not elapsed time, and a stopped walk is UNKNOWN (2): it never
+# looked, so it must not read as "the crew wrote nothing". A walk that is merely slow
+# on a loaded host keeps burning CPU and must finish with its answer. Both stand-ins
+# below take far longer than the bound; only one of them is silent.
+test_worktree_write_probe_stops_on_silence_not_on_time() {
+  local dir state anchor wt slowbin fastbin burnbin hangbin real_find rc pid
   dir=$(make_case classify-write-probe-bound); state="$dir/state"
   anchor="$state/anchor"; wt="$dir/wt"; slowbin="$dir/slowbin"; fastbin="$dir/fastbin"
-  mkdir -p "$wt/src" "$slowbin" "$fastbin"
+  burnbin="$dir/burnbin"; hangbin="$dir/hangbin"
+  mkdir -p "$wt/src" "$slowbin" "$fastbin" "$burnbin" "$hangbin"
   : > "$anchor"
   set_mtime "$(( $(date +%s) - 120 ))" "$anchor"
   printf 'window=test:fm-slow\nkind=ship\nworktree=%s\n' "$wt" > "$state/slow.meta"
-  # Both stand-ins report the same hit; only one of them takes longer than the bound
-  # to do it, so the prompt one shows what a positive outcome looks like and the
-  # bounded assertion below cannot pass merely because the fake failed.
+  # A prompt walk shows what a positive outcome looks like, so the assertions
+  # below cannot pass merely because the fakes failed.
   cat > "$fastbin/find" <<'SH'
 #!/usr/bin/env bash
 set -u
 printf '%s\n' "$1/hit"
 SH
-  cat > "$slowbin/find" <<'SH'
+  # Five times the bound of work, all of it CPU: a busy host, not a hung one.
+  cat > "$burnbin/find" <<'SH'
 #!/usr/bin/env bash
 set -u
-sleep 30
+end=$((SECONDS + 5))
+while [ "$SECONDS" -lt "$end" ]; do :; done
 printf '%s\n' "$1/hit"
 SH
-  chmod +x "$fastbin/find" "$slowbin/find"
+  # Silent for far longer than the bound: no output, no CPU. It records its pid so
+  # the test can see the stop took the walk down with it.
+  cat > "$hangbin/find" <<SH
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "\$\$" > "$dir/hang.pid"
+exec sleep 60
+SH
+  chmod +x "$fastbin/find" "$burnbin/find" "$hangbin/find"
   PATH="$fastbin:$PATH" \
     bash -c '. "$1"; crew_worktree_written_since slow "$2" "$3"' _ \
     "$ROOT/bin/fm-classify-lib.sh" "$state" "$anchor" \
-    || fail "a walk that reported a hit inside its bound was not read as write evidence"
-  started=$(date +%s)
-  PATH="$slowbin:$PATH" FM_WORKTREE_WRITE_TIMEOUT=1 \
+    || fail "a walk that reported a hit was not read as write evidence"
+  PATH="$burnbin:$PATH" FM_WORKTREE_WRITE_TIMEOUT=1 \
     bash -c '. "$1"; crew_worktree_written_since slow "$2" "$3"' _ \
     "$ROOT/bin/fm-classify-lib.sh" "$state" "$anchor" \
-    && fail "a walk that outlived its bound was reported as write evidence"
-  elapsed=$(( $(date +%s) - started ))
-  [ "$elapsed" -lt 10 ] \
-    || fail "the worktree write probe was not wall-clock bounded: one walk held the caller for ${elapsed}s"
-  pass "the worktree write probe is wall-clock bounded, and hitting the bound reads as no write evidence"
+    || fail "a walk that kept working for five times its quiet bound was cut off and lost its write evidence"
+  rc=0
+  PATH="$hangbin:$PATH" FM_WORKTREE_WRITE_TIMEOUT=1 \
+    bash -c '. "$1"; crew_worktree_written_since slow "$2" "$3"' _ \
+    "$ROOT/bin/fm-classify-lib.sh" "$state" "$anchor" || rc=$?
+  [ "$rc" -eq 2 ] || fail "a silent walk was read as status $rc, not unknown (2)"
+  pid=$(cat "$dir/hang.pid" 2>/dev/null || true)
+  [ -n "$pid" ] || fail "the silent walk never started"
+  ! kill -0 "$pid" 2>/dev/null || { kill -KILL "$pid" 2>/dev/null || true; fail "the silent walk was left running after the probe gave up"; }
+  pass "the worktree write probe stops a silent walk as unknown and lets a slow, working one finish"
 }
 
 # signal_crew_provably_working: a no-verb "signal:" wake is benign ONLY when EVERY
@@ -6646,6 +6662,95 @@ test_wedge_escalation_deferred_while_worktree_is_written() {
   FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the stalled-crew escalation failed"
   grep "$(printf '\tstale\t')" "$drain_out" | grep -F "$window" >/dev/null || fail "the stalled-crew escalation was not queued"
   pass "a quiet pane writing its own worktree is deferred, while one writing nothing still wedge-escalates on the unchanged schedule"
+}
+
+# The probe's third answer, end to end. A quiet pane whose worktree walk is hung
+# (a stalled mount) proves nothing about the crew, so the watcher must not read the
+# silence as the wedge it would otherwise escalate: the idle timer restarts, the
+# escalation counter stays put, nothing is queued as a wedge, and the same chain
+# marker still re-surfaces the pane later, worded as an unreadable worktree. The
+# same fixture then runs with a prompt, quiet walk and must wedge-escalate on the
+# unchanged schedule, so the deferral is the hung walk's doing and nothing else's.
+test_hung_write_probe_defers_instead_of_wedge_escalating() {
+  local dir state fakebin findbin out drain_out capture_file window key pane_hash sig pid wt back real_find
+  dir=$(make_case wedge-worktree-hung-probe); state="$dir/state"; fakebin="$dir/fakebin"; findbin="$dir/findbin"
+  out="$dir/watch.out"; drain_out="$dir/drain.out"; capture_file="$dir/pane.txt"
+  window="test:fm-hungwalk"; wt="$dir/wt"
+  mkdir -p "$wt/src" "$findbin"
+  real_find=$(command -v find)
+  # Only the probe's walk (the one with -newer) hangs; every other find is real.
+  cat > "$findbin/find" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -newer "*) [ ! -e "$dir/walk-prompt" ] || exit 0; exec sleep 60 ;;
+esac
+exec "$real_find" "\$@"
+SH
+  chmod +x "$findbin/find"
+  printf 'idle building output' > "$capture_file"
+  printf 'window=%s\nkind=ship\nworktree=%s\n' "$window" "$wt" > "$state/hungwalk.meta"
+  printf 'working: implementing\n' > "$state/hungwalk.status"
+  sig=$(seen_sig "$state/hungwalk.status"); printf '%s' "$sig" > "$state/.seen-hungwalk_status"
+  key=$(printf '%s' "$window" | tr ':/.' '___')
+  pane_hash=$(hash_text "idle building output")
+  printf '%s' "$pane_hash" > "$state/.hash-$key"
+  printf '1\n' > "$state/.count-$key"
+  printf '%s' "$pane_hash" > "$state/.stale-$key"
+  back=$(( $(date +%s) - 500 ))
+  echo "$back" > "$state/.stale-since-$key"
+  set_mtime "$back" "$state/.stale-since-$key"
+
+  PATH="$findbin:$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_STALE_ESCALATE_SECS=240 \
+    FM_PAUSE_RESURFACE_SECS=999 FM_WORKTREE_WRITE_TIMEOUT=1 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  if ! wait_poll_cycle "$state" "$pid"; then
+    reap "$pid"; fail "watcher wedge-escalated a quiet pane whose worktree walk could not finish: $(cat "$out")"
+  fi
+  [ ! -s "$out" ] || { reap "$pid"; fail "an unknown-probe deferral printed a wake reason: $(cat "$out")"; }
+  [ ! -s "$state/.wake-queue" ] || { reap "$pid"; fail "an unknown-probe deferral enqueued a wake"; }
+  [ -e "$state/.writing-since-$key" ] || { reap "$pid"; fail "the deferral chain marker was not recorded for an unknown probe"; }
+  [ ! -e "$state/.wedge-escalations-$key" ] || { reap "$pid"; fail "an unknown probe advanced the wedge escalation counter"; }
+  [ "$(cat "$state/.stale-since-$key" 2>/dev/null || echo 0)" -gt "$back" ] \
+    || { reap "$pid"; fail "an unknown probe did not restart the idle timer, so the next window cannot look again"; }
+  reap "$pid"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the intentional unknown-probe watcher stop"
+
+  # The chain has been deferring for 500s, so the bounded cadence re-surfaces it,
+  # worded as an unreadable worktree and never as a wedge.
+  : > "$state/.writing-since-$key"
+  set_mtime "$back" "$state/.writing-since-$key"
+  echo "$back" > "$state/.stale-since-$key"
+  set_mtime "$back" "$state/.stale-since-$key"
+  : > "$out"
+  PATH="$findbin:$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_STALE_ESCALATE_SECS=240 \
+    FM_PAUSE_RESURFACE_SECS=240 FM_WORKTREE_WRITE_TIMEOUT=1 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "an unknown-probe deferral never re-surfaced on the bounded cadence"
+  grep -F "stale: $window" "$out" >/dev/null || fail "the unknown-probe recheck did not print a stale wake"
+  grep -F "could not finish" "$out" >/dev/null || fail "the unknown-probe recheck was not worded as an unfinished probe"
+  grep -F "possible wedge" "$out" >/dev/null && fail "an unknown-probe recheck was mislabeled a possible wedge"
+  [ ! -e "$state/.wedge-escalations-$key" ] || fail "an unknown-probe recheck advanced the wedge escalation counter"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$drain_out" 2>/dev/null || fail "drain after the unknown-probe recheck failed"
+  grep "$(printf '\tstale\t')" "$drain_out" | grep -F "$window" >/dev/null || fail "the unknown-probe recheck was not queued"
+
+  # Same fixture, walk now prompt and quiet: the unchanged schedule still fires.
+  : > "$dir/walk-prompt"
+  rm -f "$state/.writing-since-$key" "$state/.writing-resurfaced-$key"
+  echo "$back" > "$state/.stale-since-$key"
+  set_mtime "$back" "$state/.stale-since-$key"
+  : > "$out"
+  PATH="$findbin:$fakebin:$PATH" FM_FAKE_TMUX_WINDOW="$window" FM_FAKE_TMUX_CAPTURE="$capture_file" \
+    FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_STALE_ESCALATE_SECS=240 \
+    FM_PAUSE_RESURFACE_SECS=999 FM_WORKTREE_WRITE_TIMEOUT=1 FM_POLL=1 FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out" &
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "a stalled crew with a prompt, empty walk did not wedge-escalate on the existing schedule"
+  grep -F "possible wedge" "$out" >/dev/null || fail "the stalled-crew escalation did not flag a possible wedge: $(cat "$out")"
+  pass "a hung worktree walk defers the wedge escalation and re-surfaces as unknown, while a prompt empty walk still escalates"
 }
 
 # A deferral is not silence. A worktree can churn without real progress (a

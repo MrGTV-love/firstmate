@@ -1128,6 +1128,59 @@ test_pipeline_input_rewritten_by_pipeline_allows() {
   pass "merged PR accepts the local input that the recorded run rewrote and extended"
 }
 
+# The run-record read is a query against a database a busy daemon may hold. It is
+# stopped by silence, never by how long it takes: a read that burns CPU for longer
+# than the ten seconds it used to be allowed is slow, not hung, and must prove the
+# copy landed. A read that really is silent still cannot prove anything, so teardown
+# refuses, but the refusal says the record did not answer instead of that it was
+# unreadable, so nobody goes hunting a corrupt database that is merely quiet.
+install_quiet_record_reader() {  # <case-dir> <burn|hang>
+  local case_dir=$1 mode=$2 real_python
+  real_python=$(command -v python3)
+  printf '%s\n' "$mode" > "$case_dir/record-reader-mode"
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ] && [ -f "$case_dir/record-reader-mode" ]; then
+  case "\$(cat "$case_dir/record-reader-mode")" in
+    hang) exec sleep 60 ;;
+    burn)
+      rm -f "$case_dir/record-reader-mode"
+      end=\$((SECONDS + 13))
+      while [ "\$SECONDS" -lt "\$end" ]; do :; done ;;
+  esac
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+}
+
+test_pipeline_input_slow_record_read_still_proves_the_copy() {
+  local case_dir pr_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-slow-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-slow-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNSLOW "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" burn
+
+  rc=$(FM_TEARDOWN_NM_STALL_SECS=2 run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-slow-read: a slow, working record read should still prove the copy"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-slow-read: teardown printed a REFUSED line"
+  pass "a slow but working run-record read still proves the copy was the pipeline's input"
+}
+
+test_pipeline_input_silent_record_read_is_unknown() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-silent-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-silent-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNSILENT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  install_quiet_record_reader "$case_dir" hang
+
+  FM_TEARDOWN_NM_STALL_SECS=2 assert_pipeline_input_refusal "$case_dir" pipeline-input-silent-read "$local_head" \
+    "did not answer" "unknown" "retry teardown"
+  pass "a silent run-record read still refuses teardown, and says the record did not answer"
+}
+
 # A copy that lags the run's input head is not the input the run started from.
 test_pipeline_input_refuses_copy_behind_the_input_head() {
   local case_dir pr_head input_head local_head
@@ -2566,6 +2619,8 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_squash_merged_prerebase_copy_with_a_later_main_merge_allows
 test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
+test_pipeline_input_slow_record_read_still_proves_the_copy
+test_pipeline_input_silent_record_read_is_unknown
 test_pipeline_input_refuses_copy_behind_the_input_head
 test_pipeline_input_ties_the_run_by_pushed_head_allows
 test_pipeline_input_refuses_commit_made_after_the_run_started

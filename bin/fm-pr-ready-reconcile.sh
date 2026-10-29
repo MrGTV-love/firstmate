@@ -21,7 +21,7 @@
 # draft, restored tool, transient forge failure or finished pipeline registers
 # without manual action. fm-pr-check.sh keeps its own authority for the named
 # head. fm-teardown.sh removes the task's marker.
-# The watcher runs this single-flight pass detached under a hard time limit.
+# The watcher runs this single-flight pass detached under the same stall rule.
 # Persist the cursor before each admission, so even a permanently hung forge
 # call cannot keep later records behind it on the next pass. This script never
 # merges, steers, or writes a status log; fm-pr-check.sh is the only pr= writer.
@@ -53,21 +53,29 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 SCRATCH=$(mktemp "$CACHE/pass.XXXXXX")
-# Ten minutes is a Firstmate policy choice, not a measurement.
-# measured: value=600 date=2026-10-20 host=Mac-Studio.local margin=170.9 (basis: 600 s / 3.51 s, the measured cost of one registration attempt in the cited run; real-time live run at a 1-second tick: refusal at +1s, zero forge reads through +600s, retry registered at +603s, 3 forge reads in total)
+# Back-off between retries of one task's refused registration, so a permanently
+# refused PR costs one forge call per ten minutes instead of one per pass. It is a
+# cadence, not a bound on any work: nothing is cut when it elapses, and a slower
+# host only stretches the gap. Ten minutes is a Firstmate policy choice, not a
+# measurement.
 REFUSAL_RETRY_SECS=600
 
 CREW_STATE_BIN=${FM_CREW_STATE_BIN:-$SCRIPT_DIR/fm-crew-state.sh}
 READY_DETAIL='checks green: PR ready for review'
-# measured: value=10 date=2026-10-27 host=Mac-Studio.local margin=2.62 (basis: 10 s / 3.81 s, the slowest of ten real FM_CREW_STATE_NO_FORGE=1 fm-crew-state.sh reads of this home's unrecorded no-mistakes ships with the full ci log; eight such reads plus eight 3.51 s registrations take 8 x 13.51 = 108.08 s, inside the watcher's 120 s pass limit)
-CREW_STATE_READ_SECS=10
+# Seconds the crew-state read of one ship may go silent before it is stopped. The
+# watcher hands down its own pass stall interval; a standalone run uses the
+# repo-wide quiet interval. The read searches a full ci log and asks a daemon that
+# can sit quiet while the host is busy, so how long it takes says nothing about
+# whether it is hung; only silence does.
+CREW_STATE_STALL_SECS=${FM_PR_READY_RECONCILE_STALL_SECS:-}
+case "$CREW_STATE_STALL_SECS" in ''|*[!0-9]*|0*) CREW_STATE_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
 
 # The PR URL fm-crew-state.sh names in its checks-green reading, if any; 124
-# when the read exceeded its own bound.
+# when the read made no progress for its stall interval (unknown, not "no PR").
 crew_state_ready_url() {  # <id>
   local line component rc=0
-  line=$(fm_run_timed "$CREW_STATE_READ_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_READ_SECS" \
+  line=$(fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_STALL_SECS" \
     "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
   ! fm_timed_out "$rc" || return 124
   [ "$rc" -eq 0 ] || return 1
@@ -125,7 +133,7 @@ reconcile_one() {  # <meta> <id>
   else
     [ "$mode" = no-mistakes ] || return 0
     url=$(crew_state_ready_url "$id") || rc=$?
-    [ "$rc" -ne 124 ] || printf 'pr-ready: %s: run reading exceeded %ss; skipped this pass\n' "$id" "$CREW_STATE_READ_SECS"
+    [ "$rc" -ne 124 ] || printf 'pr-ready: %s: run reading made no progress for %ss, so its PR is unknown; read again next pass\n' "$id" "$CREW_STATE_STALL_SECS"
     [ "$rc" -eq 0 ] || return 0
   fi
   fm_pr_url_parse "$url" || return 0
@@ -135,6 +143,10 @@ reconcile_one() {  # <meta> <id>
   if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
     printf 'pr-ready: %s: registered %s\n' "$id" "$url"
+  elif [ "$?" -eq 75 ]; then
+    # The run did not answer, so nothing was refused: no refusal memo and no wake,
+    # and the next pass reads it again.
+    printf 'pr-ready: %s: the run did not answer, so registration of %s is unknown; read again next pass\n' "$id" "$url"
   else
     # Only the registrar's own error lines are the reason: the fm-guard.sh
     # banner it also prints changes from pass to pass.

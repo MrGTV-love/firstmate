@@ -709,6 +709,75 @@ EOF
   pass "a recorded Gerrit change is direct-PR publication proof while no-mistakes still requires custody and task-bound validation"
 }
 
+# The completion gate reads the run through a daemon that can sit quiet on a busy
+# host. A read that goes silent is UNKNOWN (2): nothing was refused and the claim is
+# judged again later, so a finished ship is not turned into a refusal by a slow
+# daemon. A read that is slow but keeps working is a read, and gets its real answer.
+test_silent_nm_read_is_unknown_and_a_slow_one_is_answered() {
+  local repo wt state meta reason rc url head passed_status
+  repo="$TMP_ROOT/nmquiet-repo"
+  wt="$TMP_ROOT/nmquiet-wt"
+  state="$TMP_ROOT/nmquiet-state"
+  mkdir -p "$state" "$TMP_ROOT/nmquiet-bin"
+  fm_git_worktree "$repo" "$wt" fm/gerrit
+  cat > "$TMP_ROOT/nmquiet-bin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-} ${2:-}" = "axi status" ] || exit 2
+case "${FM_TEST_NM_MODE:-}" in
+  hang) exec sleep 60 ;;
+  burn)
+    # The first read only: sixteen seconds of CPU, eight times the stall interval.
+    if [ ! -e "$FM_TEST_NM_COUNT" ]; then
+      : > "$FM_TEST_NM_COUNT"
+      end=$((SECONDS + 16))
+      while [ "$SECONDS" -lt "$end" ]; do :; done
+    fi ;;
+esac
+printf '%s\n' "${FM_TEST_NM_STATUS:-}"
+SH
+  chmod +x "$TMP_ROOT/nmquiet-bin/no-mistakes"
+  url=https://review.example.com/c/proj/+/43
+  meta="$state/gerrit.meta"
+  printf 'kind=ship\nmode=no-mistakes\nworktree=%s\nproject=%s\npr=%s\n' "$wt" "$repo" "$url" > "$meta"
+
+  reason=$(PATH="$TMP_ROOT/nmquiet-bin:$PATH" FM_TEST_NM_MODE=hang FM_DOD_NM_STALL_SECS=2 \
+    FM_CREW_STATE_NO_FORGE=1 accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta"); rc=$?
+  [ "$rc" -eq 2 ] || fail "a silent run read was judged $rc, not unknown (2): $reason"
+  case "$reason" in
+    *"did not answer"*"unknown"*) ;;
+    *) fail "the unknown answer did not say the run did not answer: $reason" ;;
+  esac
+
+  head=$(git -C "$wt" rev-parse HEAD)
+  passed_status=$(cat <<EOF
+run:
+  id: "SLOWRUN"
+  branch: fm/gerrit
+  status: completed
+  head_sha: $head
+outcome: passed
+branch_sync:
+  state: synchronized
+  local:
+    head: $head
+  pipeline:
+    current_head: $head
+EOF
+)
+  rm -f "$TMP_ROOT/nmquiet-count"
+  reason=$(PATH="$TMP_ROOT/nmquiet-bin:$PATH" FM_TEST_NM_MODE=burn FM_TEST_NM_COUNT="$TMP_ROOT/nmquiet-count" \
+    FM_TEST_NM_STATUS="$passed_status" FM_DOD_NM_STALL_SECS=2 \
+    FM_CREW_STATE_NO_FORGE=1 accept_done ship no-mistakes "$wt" "$repo" \
+    "done: PR $url published for review" "$state" gerrit "$meta"); rc=$?
+  [ "$rc" -eq 1 ] || fail "a slow, working run read was judged $rc instead of reaching the evidence gate: $reason"
+  case "$reason" in
+    *"verification-plan"*) ;;
+    *) fail "a slow, working run read did not reach the verification-plan evidence: $reason" ;;
+  esac
+  pass "a silent run read is unknown (2) and a slow, working one is answered by the evidence gate"
+}
+
 # A direct-PR worker pushes from its own copy: a commit made after the PR's
 # recorded head, never pushed, is the named head and is refused.
 test_direct_pr_recorded_head_does_not_cover_unpushed_commit() {
@@ -1483,6 +1552,7 @@ test_merge_marker_binds_to_the_named_pr
 test_forge_recorded_head_is_accepted_without_local_object
 test_pipeline_fix_commit_past_worker_head_binds_evidence
 test_gerrit_no_forge_keeps_publication_and_validation_distinct
+test_silent_nm_read_is_unknown_and_a_slow_one_is_answered
 test_direct_pr_recorded_head_does_not_cover_unpushed_commit
 test_ci_ready_requires_pr_reference
 test_ci_ready_variants_are_gated

@@ -79,6 +79,11 @@ if [ -f "$FM_READY_CASE/crew-state-hang.$1" ]; then
   printf '%s\n' "$$" > "$FM_READY_CASE/crew-state-hung.pid"
   exec sleep 600
 fi
+if [ -f "$FM_READY_CASE/crew-state-burn.$1" ]; then
+  # A loaded host: the same reading, all of it CPU, and slower than any short cap.
+  end=$((SECONDS + 12))
+  while [ "$SECONDS" -lt "$end" ]; do :; done
+fi
 if [ -f "$FM_READY_CASE/crew-state.$1" ]; then cat "$FM_READY_CASE/crew-state.$1";
 else printf 'state: working · source: run-step · validating (running) · run: 01RUN\n'; fi
 SH
@@ -314,8 +319,8 @@ assert_registered ready https://github.com/example/project/pull/192
 [ "$before" -eq "$(($(occupancy) + 1))" ] || fail 'green run past the log tail did not release its place'
 pass 'a green run whose marker is 60 base-advance lines back still registers through the real crew-state reading'
 
-# A run reading that never answers is cut at its own bound and skipped, so the
-# ready ship after it still registers in the same pass.
+# A run reading that goes silent is stopped by its stall interval and reported as
+# unknown, so the ready ship after it still registers in the same pass.
 make_case crew-state-hang
 write_ship a-slow
 write_ship b-ready
@@ -323,17 +328,65 @@ printf 'working [at=1792479210]: validating with /no-mistakes\n' > "$CASE/home/s
 : > "$CASE/crew-state-hang.a-slow"
 rc=0
 fm_run_timed 60 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
-  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" \
+  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_STALL_SECS=2 \
   FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
   PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1 || rc=$?
 out=$(cat "$CASE/pass.out")
 [ "$rc" -eq 0 ] || fail "pass with a hung run reading did not finish on its own: $rc $out"
-[ "$(printf '%s\n' "$out" | grep -c 'a-slow: run reading exceeded 10s; skipped this pass')" -eq 1 ] \
-  || fail "hung run reading was not reported once: $out"
-! kill -0 "$(cat "$CASE/crew-state-hung.pid")" 2>/dev/null || fail 'hung run reading outlived its bound'
+[ "$(printf '%s\n' "$out" | grep -c 'a-slow: run reading made no progress for 2s, so its PR is unknown; read again next pass')" -eq 1 ] \
+  || fail "hung run reading was not reported once as unknown: $out"
+! kill -0 "$(cat "$CASE/crew-state-hung.pid")" 2>/dev/null || fail 'hung run reading outlived its stall interval'
 assert_unregistered a-slow
 assert_registered b-ready
-pass 'a hung run reading is cut at its own bound and the later ready ship registers in the same pass'
+pass 'a silent run reading is stopped as unknown and the later ready ship registers in the same pass'
+
+# The same reading on a loaded host: slower than the stall interval by a factor of
+# six, but burning CPU the whole time. Slow is not hung, so it finishes and its
+# ship registers instead of being skipped on every pass forever.
+make_case crew-state-slow
+write_ship a-slow
+printf 'working [at=1792479210]: validating with /no-mistakes\n' > "$CASE/home/state/a-slow.status"
+printf 'state: done · source: run-step · checks green: PR ready for review (still monitoring for merge/close): https://github.com/example/project/pull/193 · run: 01RUN\n' \
+  > "$CASE/crew-state.a-slow"
+: > "$CASE/crew-state-burn.a-slow"
+rc=0
+fm_run_timed 120 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
+  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_STALL_SECS=2 \
+  FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
+  PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1 || rc=$?
+out=$(cat "$CASE/pass.out")
+[ "$rc" -eq 0 ] || fail "pass over a slow, working run reading did not finish: $rc $out"
+printf '%s\n' "$out" | grep -q 'run reading' && fail "a slow, working run reading was reported as stopped: $out"
+assert_registered a-slow https://github.com/example/project/pull/193
+pass 'a run reading that is slow but working finishes and registers its ship'
+
+# The registrar answers 75 when the no-mistakes run did not answer: nothing was
+# refused, so the pass keeps no refusal memo and queues no wake, and the very next
+# pass asks again instead of waiting out the ten-minute back-off a real refusal earns.
+make_case registrar-unknown
+write_ship ready
+cp -R "$ROOT/bin" "$CASE/bin"
+cat > "$CASE/bin/fm-pr-check.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_READY_CASE/pr-check.calls"
+echo 'error: the no-mistakes run for this copy did not answer (no output or CPU progress), so whether its fixes are recovered is unknown and not refused for good; read it again' >&2
+exit 75
+SH
+chmod +x "$CASE/bin/fm-pr-check.sh"
+for attempt in 1 2; do
+  out=$(FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
+    FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
+    FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:$PATH" \
+    bash "$CASE/bin/fm-pr-ready-reconcile.sh" 2>&1)
+  printf '%s\n' "$out" | grep -q 'ready: the run did not answer, so registration of .* is unknown; read again next pass' \
+    || fail "pass $attempt did not report the unanswered run as unknown: $out"
+  printf '%s\n' "$out" | grep -q 'registration refused' && fail "pass $attempt reported the unanswered run as a refusal: $out"
+done
+[ "$(wc -l < "$CASE/pr-check.calls")" -eq 2 ] || fail 'the second pass did not ask the registrar again'
+[ ! -e "$CASE/home/state/.pr-ready-reconcile/ready.refused" ] || fail 'an unanswered run left a refusal memo'
+[ "$(refusal_wakes ready)" -eq 0 ] || fail 'an unanswered run queued a refusal wake'
+assert_unregistered ready
+pass 'a registrar that reports an unanswered run is unknown: no refusal memo, no wake, asked again next pass'
 
 make_case registration
 write_ship ready

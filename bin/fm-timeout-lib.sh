@@ -113,6 +113,17 @@ fm_run_progress() {
   fi
 }
 
+# fm_progress_quiet_secs: the repo-wide quiet interval for work that has no
+# better-known one, printed in whole seconds. It is the same policy value
+# bin/fm-duration.py applies to every operational runner (its header owns the
+# 15 minutes and the FM_DURATION_NO_PROGRESS_SECS override), so a caller that
+# only needs "stop it when it goes silent" names no number of its own.
+fm_progress_quiet_secs() {
+  local secs=${FM_DURATION_NO_PROGRESS_SECS:-}
+  case "$secs" in ''|*[!0-9]*|0*) secs=900 ;; esac
+  printf '%s\n' "$secs"
+}
+
 # fm_posix_python: 0 when python3 is a POSIX interpreter able to run
 # fm-duration.py's process-group runners. A native Windows python3 on a Git Bash
 # PATH is not, so callers fall back instead of failing every read. The answer is

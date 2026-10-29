@@ -1384,6 +1384,79 @@ EOF
   pass "teardown refuses before reap or removal when a task-owned run remains parked"
 }
 
+# A no-mistakes daemon that goes quiet is not a daemon with no run to abort.
+# Reading that silence as "nothing is parked" would remove the worker that a parked
+# gate is waiting on and orphan the run, so teardown stops with the retry status
+# (75), closes nothing, and says the answer is unknown.
+test_silent_daemon_leaves_the_parked_run_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-daemon-silent: a silent daemon should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-daemon-silent: teardown did not say the answer is unknown"
+  assert_present "$case_dir/wt" "parked-run-daemon-silent: teardown removed the worktree"
+  assert_present "$case_dir/state/task-x1.meta" "parked-run-daemon-silent: teardown removed the task record"
+  assert_absent "$case_dir/nm-abort.log" "parked-run-daemon-silent: teardown aborted a run it could not see"
+  pass "a silent daemon leaves teardown unknown and closing nothing, not fail-open"
+}
+
+# The same lookup on a loaded host: the daemon answers, but only after burning CPU
+# for longer than the ten seconds this read used to be allowed. A slow answer is an
+# answer; the parked run is found and aborted before the worker goes.
+test_slow_working_daemon_still_finds_the_parked_run() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-slow)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_BURN_SECS=13 FM_FAKE_NM_BURN_MARK="$case_dir/nm-burned" FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-slow: a slow, working daemon should not block teardown"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-daemon-slow: the parked run was not found and aborted"
+  pass "a slow, working daemon still lets teardown find and abort the parked run"
+}
+
+# After the abort is sent, only the confirming read goes quiet. That is not "still
+# parked": nothing is known yet, and a later teardown confirms it.
+test_silent_confirmation_after_abort_is_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-confirmation-silent: a silent confirmation should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-confirmation-silent: teardown did not say the confirmation is unknown"
+  if grep -q 'is still parked after axi abort' "$case_dir/stderr"; then
+    fail "parked-run-confirmation-silent: a silent confirmation was reported as still parked"
+  fi
+  assert_present "$case_dir/wt" "parked-run-confirmation-silent: teardown removed the worktree"
+  pass "a silent confirmation after the abort is unknown, not a still-parked verdict"
+}
+
 test_another_branchs_parked_run_is_never_touched() {
   local case_dir rc
   case_dir=$(make_case parked-run-not-ours)
@@ -6120,6 +6193,9 @@ test_parked_run_behind_diverged_newer_row_is_never_aborted
 test_parked_advanced_run_ambiguous_rows_are_never_aborted
 test_ledger_proven_continuation_never_aborts_active_run
 test_parked_own_run_refuses_when_abort_is_unconfirmed
+test_silent_daemon_leaves_the_parked_run_unknown
+test_slow_working_daemon_still_finds_the_parked_run
+test_silent_confirmation_after_abort_is_unknown
 test_mismatched_run_after_abort_refuses_unconfirmed
 test_empty_status_after_abort_refuses_unconfirmed
 test_not_found_status_after_abort_confirms_completion

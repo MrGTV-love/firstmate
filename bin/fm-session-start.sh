@@ -283,6 +283,8 @@ stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
 
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 
@@ -388,9 +390,12 @@ STATUS_TAIL=${FM_SESSION_START_STATUS_TAIL:-5}
 case "$STATUS_TAIL" in ''|*[!0-9]*) STATUS_TAIL=5 ;; esac
 QUEUED_LIMIT=${FM_SESSION_START_QUEUED_LIMIT:-20}
 case "$QUEUED_LIMIT" in ''|*[!0-9]*|0) QUEUED_LIMIT=20 ;; esac
-# One per-task endpoint read may never outlive this bound: a hung backend CLI
-# becomes that task's endpoint: error line instead of the digest's whole
-# runtime budget.
+# One per-task endpoint read may never outlive its bound: a hung backend CLI
+# becomes that task's endpoint: unknown line instead of the digest's whole
+# runtime budget. The read is a backend CLI call that cannot show progress, so
+# its bound is this host's measured one (fm_duration_timed, key
+# session-start.endpoint-read); this value is only the cold-start floor until the
+# ledger holds enough samples, and a measured limit can raise it, never lower it.
 ENDPOINT_TIMEOUT=${FM_SESSION_START_ENDPOINT_TIMEOUT:-10}
 case "$ENDPOINT_TIMEOUT" in ''|*[!0-9]*) ENDPOINT_TIMEOUT=10 ;; esac
 [ "$ENDPOINT_TIMEOUT" -gt 0 ] 2>/dev/null || ENDPOINT_TIMEOUT=10
@@ -579,15 +584,16 @@ print_status_tail() {
 # a per-task backend liveness read that dies mid-read would otherwise take
 # every later stage with it. Isolation turns any death, hang, or nonzero
 # surprise in one task's read into that task's own endpoint line - never a
-# silently missing rest of digest. The inner bash re-sources fm-backend.sh
+# silently missing rest of digest. A read that only ran out of time (124) is
+# reported unknown, because not answering says nothing about the endpoint. The inner bash re-sources fm-backend.sh
 # per read; that cost is a few milliseconds per task and buys the isolation.
 fm_session_start_endpoint_read() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 label=${3:-}
   # shellcheck disable=SC2016  # Positional parameters expand inside the child bash, not here.
-  fm_run_timed "$ENDPOINT_TIMEOUT" bash -c '
+  fm_duration_timed session-start.endpoint-read "$ENDPOINT_TIMEOUT" bash -c '
     . "$1"
     fm_backend_target_exists "$2" "$3" "$4"
-  ' _ "$SCRIPT_DIR/fm-backend.sh" "$backend" "$target" "$label"
+  ' _ "$SCRIPT_DIR/fm-backend.sh" "$backend" "$target" "$label" 2>/dev/null
 }
 
 hash_file_sha256() {
@@ -970,9 +976,12 @@ for meta in "$STATE"/*.meta; do
       printf 'endpoint: alive (backend=%s window=%s)\n' "$backend" "$window"
     elif [ "$backend" = tmux ] && [ "$endpoint_rc" -eq 2 ]; then
       printf 'endpoint: unknown (backend=%s window=%s - endpoint inventory unreadable)\n' "$backend" "$window"
-    elif [ "$endpoint_rc" -eq 124 ] || [ "$endpoint_rc" -ge 128 ]; then
-      printf 'endpoint: error (backend=%s window=%s - the endpoint read died or hit its %ss bound; the digest continued past it)\n' \
-        "$backend" "$window" "$ENDPOINT_TIMEOUT"
+    elif [ "$endpoint_rc" -eq 124 ]; then
+      printf 'endpoint: unknown (backend=%s window=%s - the endpoint read did not answer in time; this is not a dead verdict, read it again with bin/fm-crew-state.sh %s)\n' \
+        "$backend" "$window" "$id"
+    elif [ "$endpoint_rc" -ge 128 ]; then
+      printf 'endpoint: error (backend=%s window=%s - the endpoint read died; the digest continued past it)\n' \
+        "$backend" "$window"
     else
       printf 'endpoint: dead (backend=%s window=%s)\n' "$backend" "$window"
     fi
