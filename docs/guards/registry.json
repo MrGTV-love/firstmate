@@ -9,6 +9,7 @@
     "jev-github-write-op",
     "omp-worker-url-reads-off",
     "spawn-brief-out-of-scope",
+    "verification-plan-dod-shape",
     "git-commit-credential-shapes",
     "git-push-credential-shapes",
     "spawn-confinement-coverage",
@@ -309,6 +310,33 @@
       "emitters": [
         "bin/fm-spawn.sh"
       ]
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "verification-plan-dod-shape",
+      "owner": "bin/fm-dod-lib.sh",
+      "sites": [
+        {"file": "bin/fm-dod-lib.sh", "match": "verification plan refuses", "count": 2}
+      ],
+      "invariant": "a verification plan is never built from a Definition of Done that holds no mandatory item in the shape fm-dod-lib.sh --shape prints",
+      "layer": "runtime-block",
+      "source": "brief ## Definition Of Done (task) section body or its DoD file",
+      "trigger": "fm_dod_criteria_text_problem finds an empty section, a mandatory item with no id, a duplicate id, or an item with a missing or empty field",
+      "remedy": "edit <brief> so each mandatory item reads as bash bin/fm-dod-lib.sh --shape prints it; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
+      "budget": 1,
+      "test": "tests/fm-dod-lib.test.sh",
+      "tier": "B",
+      "harm": "reversible",
+      "remedy_verified": "fixture"
     },
     {
       "decision": "deny",
