@@ -318,8 +318,8 @@ test_memory_root_exit_ends_leftovers() {
   # Once its processes are gone, an absent mark proves the wrapper ended it.
   output=$(PATH="$TMP_ROOT/sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/sleep.pids" \
     "$WRAP" --memory-kib 262144 -- bash -c '
-      sh -c '\''echo "$$" >>"$FM_SLEEP_PIDS"; sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
-      echo done' _ "$natural")
+      sh -c '\''sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
+      echo "$!" >>"$FM_SLEEP_PIDS"; echo done' _ "$natural")
   rc=$?
   expect_code 0 "$rc" "root status after a leftover background job is ended"
   assert_equals 'done' "$output" "the command's output is untouched"
@@ -799,8 +799,8 @@ test_own_procs_leftovers_end_with_the_command() {
   # Once its processes are gone, an absent mark proves the wrapper ended it.
   out=$(PATH="$TMP_ROOT/own-sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/own-sleep.pids" \
     "$WRAP" --own-procs 50 -- bash -c '
-      sh -c '\''echo "$$" >>"$FM_SLEEP_PIDS"; sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
-      echo done' _ "$natural")
+      sh -c '\''sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
+      echo "$!" >>"$FM_SLEEP_PIDS"; echo done' _ "$natural")
   rc=$?
   expect_code 0 "$rc" "root status after a leftover background job is ended"
   assert_equals 'done' "$out" "the command's output is untouched"
@@ -933,6 +933,9 @@ stop_neighbours() {
 
 make_slow_tree() {
   local dir="$TMP_ROOT/slow-tree"
+  # The interpreter itself, not a version-manager shim that forks before the
+  # tree starts, so a starved control fails at the tree's own fork.
+  SLOW_TREE_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
   mkdir -p "$dir/shim"
   # Every sleep the tree asks for lasts five times as long.
   cat >"$dir/shim/sleep" <<'SH'
@@ -962,7 +965,7 @@ run_slow_tree() {
   local dir="$TMP_ROOT/slow-tree" neighbours=$1 wrapper rc
   shift
   rm -f "$dir/ready" "$dir/go" "$dir/done"
-  PATH="$dir/shim:$PATH" "$WRAP" "$@" -- python3 "$dir/tree.py" "$dir/ready" "$dir/go" "$dir/done" \
+  PATH="$dir/shim:$PATH" "$WRAP" "$@" -- "$SLOW_TREE_PYTHON" "$dir/tree.py" "$dir/ready" "$dir/go" "$dir/done" \
     2>"$dir/err" &
   wrapper=$!
   wait_for_file "$dir/ready" "$wrapper" || { wait "$wrapper"; echo $?; return; }
@@ -977,16 +980,16 @@ run_slow_tree() {
 test_own_procs_survives_neighbours_on_a_slow_host() {
   local dir="$TMP_ROOT/slow-tree" rc
   make_slow_tree
-  # Control: the positional extra of 128 is spent by 600 neighbour processes, so
-  # the rest of the user would have to free 472 processes to leave it unstarved.
-  rc=$(run_slow_tree 600 128)
+  # Control: the positional extra of 16 is spent by 300 neighbour processes, so
+  # the rest of the user would have to free 284 processes to leave it unstarved.
+  rc=$(run_slow_tree 300 16)
   [ "$rc" != 0 ] || fail "the control was not starved: the scenario would be vacuous"
   assert_absent "$dir/done" "the starved control must not have finished"
   assert_contains "$(cat "$dir/err")" "BlockingIOError" "the control lost its forks to the neighbours"
   rc=$(run_slow_tree 300 --own-procs 128)
   expect_code 0 "$rc" "a tree under its own limit while neighbours spend the shared count"
   assert_present "$dir/done" "the slowed tree finished its work"
-  pass "neighbours starve the positional extra of 128 but not --own-procs 128, with the tree's work five times slower"
+  pass "neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower"
 }
 
 test_own_procs_reads_a_linux_stat_row() {
