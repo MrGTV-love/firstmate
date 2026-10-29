@@ -1,0 +1,20 @@
+$ bash tests/fm-test-fixtures.test.sh
+ok - init/doctor no-mistakes stub touches markers and refuses other verbs
+ok - fake gh authenticates and fake gh-axi reports the shared version
+ok - spawn fakebin answers pane path, logs -l payloads, and installs extra tools
+ok - send stubs log typed text and fake ssh records argv with a controllable exit
+ok - spawn-home layout writes harness pin, beat, and brief
+ok - an unknown case name is refused with a message naming it, exit 2, and no case runs
+ok - a name that is not a defined test_ function is refused rather than executed
+ok - the selected case's own status is the file's status, and an empty selector runs everything
+ok - a registry limits the cases, keeps registration order, runs the before hook for every registered case, and stops at the first failing case
+ok - a case that changes errexit fails the file in a full run and when run alone
+ok - the selector check names each read outside lib.sh by file and line, and skips comments, lib.sh and other variables
+ok - no test file reads FM_TEST_ONLY outside fm_test_only in tests/lib.sh
+exit=0
+$ FM_TEST_ONLY="fail" bash tests/fm-watcher-lock.test.sh  -> exit=2  | ok - disposable watcher refuses inherited state outside its marked lab Unknown test case: fail (not defined by fm-watcher-lock.test.sh)
+$ FM_TEST_ONLY="pass" bash tests/fm-watcher-lock.test.sh  -> exit=2  | ok - disposable watcher refuses inherited state outside its marked lab Unknown test case: pass (not defined by fm-watcher-lock.test.sh)
+$ FM_TEST_ONLY="rm -rf x" bash tests/fm-watcher-lock.test.sh  -> exit=2  | ok - disposable watcher refuses inherited state outside its marked lab Unknown test case: rm -rf x (not defined by fm-watcher-lock.test.sh)
+$ FM_TEST_ONLY="test_lock_wait_breadcrumb;echo pwned" bash tests/fm-watcher-lock.test.sh  -> exit=2  | ok - disposable watcher refuses inherited state outside its marked lab Unknown test case: test_lock_wait_breadcrumb;echo pwned (not defined by fm-watcher-lock.test.sh)
+$ FM_TEST_ONLY="fm_test_only" bash tests/fm-watcher-lock.test.sh  -> exit=2  | ok - disposable watcher refuses inherited state outside its marked lab Unknown test case: fm_test_only (not defined by fm-watcher-lock.test.sh)
+$ bash tests/fm-teardown-endpoint-safety.test.sh fail -> exit=2 | Unknown test case: fail (not defined by fm-teardown-endpoint-safety.test.sh)

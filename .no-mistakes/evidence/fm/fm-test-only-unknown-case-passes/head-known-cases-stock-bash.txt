@@ -1,0 +1,22 @@
+$ FM_TEST_ONLY=test_first_register_succeeds_with_empty_lock_list_under_bash32 /bin/bash tests/fm-public-followup.test.sh
+ok - first register succeeds with an empty lock list under /bin/bash
+exit=0
+$ FM_TEST_ONLY=test_turn_ended_churn_existing_marker_absorbed /bin/bash tests/fm-watch-triage.test.sh
+ok - a churning turn-end inside an already-open deferral window is absorbed without re-marking
+exit=0
+$ FM_TEST_ONLY=test_backend_source_requires_adapter_file FM_TEST_BASH=/bin/bash /bin/bash tests/fm-backend.test.sh
+ok - fm_backend_source: missing adapter fails before lifecycle continuation
+ok - fm_backend_source: unreadable adapter fails before lifecycle continuation
+exit=0
+$ /bin/bash tests/fm-fork-free-helpers.test.sh   (full file, no selector)
+ok - fm_dirname_to and fm_basename_to match dirname and basename on every edge case
+ok - fm_epoch_seconds_to reads the clock like date +%s and forks date at most as often
+ok - signal seen paths and absolute lock paths are byte-identical to the dirname/basename/tr forms
+ok - recovery marker reads accept exactly the one-line records wc -l accepted
+ok - window_to_task resolves every recorded window exactly as the grep/tail/cut pipeline did
+ok - classify stat helpers resolve the kernel name once per process
+exit=0
+$ FM_TEST_ONLY=test_lock_wait_breadcrumb bash tests/fm-watcher-lock.test.sh
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - waiter warns after 60s once per owner and continues to acquire
+exit=0

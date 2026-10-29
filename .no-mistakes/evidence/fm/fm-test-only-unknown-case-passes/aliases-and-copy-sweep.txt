@@ -1,0 +1,17 @@
+$ FM_TEST_ONLY=lavish-reader bash tests/fm-procevent.test.sh -> exit=0
+   | ok - read preserves all nine captured list items including messages and nested targets
+   | ok - list choices preserve keyed answers, close mode, and latest-selection precedence
+   | ok - list items with image attachments keep their words, choices, and attachment paths
+   | ok - read never certifies an item whose attachments cannot all be decoded
+$ FM_TEST_ONLY=restart-connection-failure bash tests/fm-procevent.test.sh -> exit=0
+   | ok - the exact connection failure keeps the same runner through two later answers (retry gap 5.32743400000618s)
+   | ok - connection retries are bounded; other error variants retain exact bytes and refuse relisten
+$ FM_TEST_ONLY=test_launch_episodes bash tests/fm-procevent.test.sh -> exit=0
+   | ok - a launch that cannot confirm is announced once per failure episode
+   | ok - a failed append's rollback and the next reconcile's failure keep one durable episode
+   | ok - late durable startup evidence suppresses an obsolete failure
+   | ok - late live ownership suppresses an obsolete failure
+$ FM_TEST_ONLY=lavish bash tests/fm-procevent.test.sh -> exit=2
+   | Unknown test case: lavish (not defined by fm-procevent.test.sh)
+$ FM_TEST_ONLY=test_help_and_bad_calls bash tests/fm-copy-sweep.test.sh -> exit=0
+   | ok - help carries the hourly command and bad calls are refused

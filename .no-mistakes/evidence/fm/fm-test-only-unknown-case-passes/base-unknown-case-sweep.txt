@@ -1,0 +1,7 @@
+base(541b9ff6c) env rc=0   fm-watcher-lock.test.sh              tests/fm-watcher-lock.test.sh: line 3040: test_renamed_away: command not found
+base(541b9ff6c) env rc=0   fm-arm-pretool-check.test.sh         tests/fm-arm-pretool-check.test.sh: line 572: test_renamed_away: command not found
+base(541b9ff6c) env rc=0   fm-backend.test.sh                   tests/fm-backend.test.sh: line 1208: test_renamed_away: command not found
+base(541b9ff6c) env rc=127 fm-launch-proof.test.sh              tests/fm-launch-proof.test.sh: line 335: test_renamed_away: command not found
+base(541b9ff6c) env rc=0   fm-public-followup.test.sh           tests/fm-public-followup.test.sh: line 3946: test_renamed_away: command not found
+base(541b9ff6c) env rc=127 fm-fork-free-helpers.test.sh         tests/fm-fork-free-helpers.test.sh: line 229: test_renamed_away: command not found
+base(541b9ff6c) env rc=127 fm-supervision-fork-budget.test.sh   tests/fm-supervision-fork-budget.test.sh: line 654: test_renamed_away: command not found

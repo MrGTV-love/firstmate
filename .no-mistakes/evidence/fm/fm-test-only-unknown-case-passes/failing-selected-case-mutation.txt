@@ -1,0 +1,8 @@
+head(77f5f6c14)  FM_TEST_ONLY=test_lock_wait_breadcrumb bash tests/fm-watcher-lock.test.sh  (case mutated: 'return 5')  exit=5
+   | ok - disposable watcher refuses inherited state outside its marked lab
+head(77f5f6c14)  bash tests/fm-backend-orca.test.sh test_capture_reads_terminal_tail_json  (case mutated: 'return 4')  exit=4
+   | 
+base(541b9ff6c)  FM_TEST_ONLY=test_lock_wait_breadcrumb bash tests/fm-watcher-lock.test.sh  (case mutated: 'return 5')  exit=0
+   | ok - disposable watcher refuses inherited state outside its marked lab
+base(541b9ff6c)  bash tests/fm-backend-orca.test.sh test_capture_reads_terminal_tail_json  (case mutated: 'return 4')  exit=4
+   | 
