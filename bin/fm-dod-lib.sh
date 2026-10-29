@@ -1663,7 +1663,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         '       bash bin/fm-dod-lib.sh --shape' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
+        'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
         '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>, --shape (or --help)' >&2; exit 2 ;;
