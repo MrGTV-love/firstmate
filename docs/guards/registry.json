@@ -1038,7 +1038,7 @@
       "trigger": "bin/fm-open-loops.sh action <row-id> deferred on a row whose one deferral was used and no longer stands, whose category is review_pass_not_merged, or whose action carries a captain-visible or requires_followup mark",
       "decision": "deny",
       "fail_direction": "closed",
-      "remedy": "record a real action: bin/fm-open-loops.sh action <row-id> steered --evidence <NNN.msg>, merged --evidence <PR-URL>, waiting --prerequisite-task <task-id> --evidence <reason> --recheck <UTC-time>, or escalated --evidence <escalation>",
+      "remedy": "record a real action: bin/fm-open-loops.sh action <row-id> steered --evidence <NNN.msg>, merged --evidence <PR-URL>, for an open_pr or red_check row waiting --prerequisite-task <task-id> --evidence <reason> --recheck <UTC-time>, or escalated --evidence <escalation>",
       "budget": 1,
       "telemetry": "state/guard-events.jsonl",
       "test": "tests/fm-open-loops.test.sh",

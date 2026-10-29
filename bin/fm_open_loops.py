@@ -1514,7 +1514,7 @@ class WaitVerifier:
         if state not in LIVE_STATES:
             raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
                              " follow up on it")
-        pr = self.task_pr(path, fields, verdict)
+        pr = self.task_pr(path, fields)
         if state == "done" and not pr:
             raise ValueError("prerequisite task is done with no PR; its report is its delivery; follow up on its result")
         if pr and merge_marker(c.state, pr):
@@ -1527,24 +1527,27 @@ class WaitVerifier:
         return dict(c.task_source(task), generation=fingerprint(fields["spawn_gen"]), kind="task-live",
                     stream=[stat.st_dev, stat.st_ino])
 
-    def task_pr(self, path, fields, verdict):
-        """A task's PR: its recorded pr=, or for a ship the PR its done note names or its no-mistakes run's ready PR."""
+    def task_pr(self, path, fields):
+        """A task's PR: its recorded pr=, or for a local ship the PR its done note names or its no-mistakes run records.
+
+        A done-note or run PR counts only when bin/fm-pr-lib.sh's fm_pr_url_parse accepts it, the shape the PR
+        registrar (bin/fm-pr-ready-reconcile.sh) needs, so a PR no merge can be recorded for never keeps a task live.
+        """
         if fields.get("pr"):
             return fields["pr"]
-        if fields.get("kind") != "ship":
+        if fields.get("kind") != "ship" or fields.get("remote_host"):
             return ""
-        named = self.collector.bash('. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; '
-                                    'line=$(last_status_line "$2") || exit 0; case "$line" in done*) ;; *) exit 0 ;; '
-                                    'esac; status_line_note "$line" note; fm_dod_pr_url_from_done_note "$note" || :',
-                                    BIN, path).strip()
-        if named:
-            return named
-        ready = " · checks green: PR ready for review"
-        if verdict.startswith("state: done · ") and ready in verdict:
-            component = verdict.split(ready, 1)[1].split(" · ", 1)[0]
-            if ": " in component:
-                return component.rsplit(": ", 1)[1]
-        return ""
+        return self.collector.bash(
+            '. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; . "$1/fm-pr-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
+            'pr() { fm_pr_url_parse "$1" 2>/dev/null && printf "%s\\n" "$FM_PR_URL"; }; '
+            'if line=$(last_status_line "$2") && [[ $line == done* ]]; then status_line_note "$line" note; '
+            'pr "$(fm_dod_pr_url_from_done_note "$note")" && exit 0; fi; '
+            '[ -n "$3" ] && [ -d "$3" ] && command -v no-mistakes >/dev/null 2>&1 || exit 0; '
+            'branch=$(git -C "$3" symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0; '
+            'out=$(fm_nm_run_bounded "$3" 30 axi status 2>/dev/null) || exit 0; '
+            '[ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" branch)")" = "$branch" ] || exit 0; '
+            'pr "$(fm_nm_strip_quotes "$(fm_nm_field "$out" pr)")" || :',
+            BIN, path, fields.get("worktree", "")).strip()
 
     def verify_source(self, source):
         if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):
@@ -1931,8 +1934,11 @@ def record_action(args, state, now, report, waits, waits_error):
                 if ident in marked:
                     marked[ident] = now
             write_ledger(state, report, receipt=True)
-            raise ValueError("second deferral refused; row is captain-visible; steer, merge, wait on a named live"
-                             " task or escalate it")
+            category = by_id[ident]["category"]
+            remedy = ("steer, merge, wait on a named live task or escalate it" if category in REASON_WAITABLE
+                      else "steer, wait on a task through a delivery naming the row or escalate it"
+                      if category in TASK_WAITABLE else "steer, merge or escalate it")
+            raise ValueError("second deferral refused; row is captain-visible; " + remedy)
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck and args.kind != "waiting":

@@ -3839,6 +3839,7 @@ result, boundary = drain()
 shown = printed_visibility(result, row['id'])
 second = act('deferred', 'still running', '--recheck', iso(now + 1300))
 assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
+assert 'wait on' not in second.stdout, ('a row that cannot take a wait is not told to wait', second.stdout)
 assert shown == 'true', ('a row whose deferral check refuses must print captain_visible true', shown)
 assert stored()['handling']['actions'][row['id']]['captain_visible'] is True
 assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
@@ -3853,6 +3854,20 @@ assert repeat.returncode == 1 and 'already stands' in repeat.stdout and 'captain
 action = stored()['handling']['actions'][row['id']]
 assert not action['captain_visible'] and 'requires_followup' not in action, action
 assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a refused repeat must not void the standing deferral'
+# The refusal names a wait only for a row that can take one.
+for category, named in (('red_check', 'wait on a named live task'),
+                        ('unanswered_question', 'wait on a task through a delivery naming the row')):
+    home, ledger, row, call, ok, wake, drain, ack, act, stored = case('visibility-' + category, category=category)
+    clock['now'] = now
+    _, boundary = drain()
+    assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
+    assert ack(boundary).returncode == 0
+    clock['now'] = now + 700
+    wake('lapsed')
+    drain()
+    second = act('deferred', 'still running', '--recheck', iso(now + 1300))
+    assert second.returncode == 1 and 'second deferral refused' in second.stdout and named in second.stdout, second
+clock['now'] = now
 print('PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check', flush=True)
 
 # 4. A dependency wait on a named live task, for a red PR row whose worker is parked on purpose.
@@ -3872,10 +3887,15 @@ case "$1" in
   *) exit 1 ;;
 esac
 ''')
+# The crew-state read (FM_CREW_STATE_NO_FORGE=1) sees no run, so the verdict comes from the status log; the
+# ledger's own run read sees the run and its pr field once run-pr exists.
 executable(fake / 'no-mistakes', '''#!/usr/bin/env python3
-import sys
+import os, sys
 args = sys.argv[1:]
-if args in (['axi'], ['axi', 'status']) or args[:2] == ['daemon', 'status'] or args[:1] == ['runs']:
+run_pr = os.path.join(os.environ.get('FM_HOME', ''), 'run-pr')
+if args == ['axi', 'status'] and os.environ.get('FM_CREW_STATE_NO_FORGE') != '1' and os.path.exists(run_pr):
+    print('run:\\n  id: run-1\\n  branch: fm/repair-owner\\n  pr: ' + open(run_pr).read().strip())
+elif args in (['axi'], ['axi', 'status']) or args[:2] == ['daemon', 'status'] or args[:1] == ['runs']:
     pass
 else:
     raise AssertionError(args)
@@ -4048,6 +4068,29 @@ assert renewed.returncode == 0, ('a done note naming an open PR accepts a new wa
 (fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
     'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
 assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the PR its done note named merged'
+# A done note whose PR URL does not parse names no PR, so the task has landed.
+fx = waiting_fixture('done-note-malformed')
+fx['ok']('git', '-C', world / 'evidence-tree-done-note-malformed', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290, checks green\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a malformed done-note PR URL is no PR'
+malformed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                       '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert malformed.returncode == 1 and 'done with no PR' in malformed.stdout, malformed
+# A ship's no-mistakes run records its PR even when the done note names none and pr= is not registered yet.
+fx = waiting_fixture('run-pr')
+fx['ok']('git', '-C', world / 'evidence-tree-run-pr', 'update-ref', 'refs/remotes/origin/fm/repair-owner', 'HEAD')
+(fx['home'] / 'run-pr').write_text('https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: checks green on PR #290\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, "the run's PR carries the wait"
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ("the run's open PR accepts a new wait", renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, "the run's PR merged"
 # A done scout whose done note names another task's PR has landed: only a ship's done note names its own PR.
 fx = waiting_fixture('done-scout-note')
 (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('kind=ship', 'kind=scout'))
