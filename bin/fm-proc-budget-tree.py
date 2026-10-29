@@ -17,6 +17,13 @@ verdict: only the first one, taken before the command starts, refuses the
 launch, because a tree that can never be watched must not run as if it were.
 The table comes from /proc on Linux and from libproc through fm-proc-info.py
 on Darwin; neither needs ps, which a confined worker's sandbox may refuse.
+The dead-man link is fm-proc-budget-memory.py's: its gate holds the command
+until a Reader has joined the command's group, and that Reader reads a pipe
+only this supervisor writes. It is never sampled here and is neither counted
+nor signalled by this supervisor. If this supervisor dies, the Reader sees the
+end of its stdin and ends the group: on Darwin it sends TERM, then KILL after
+at most one second, to the group and its descendants; on Linux, where its
+libproc read cannot run, it KILLs the group at once.
 """
 import os
 from pathlib import Path
@@ -111,9 +118,9 @@ class Table:
         return self.proc.process_identity(self.proc.kinfo(pid))
 
 
-def members_of(rows, root, known, me):
+def members_of(rows, root, known, skip):
     """Select the tree: root, its group, and descendants; keep orphans by identity."""
-    rows = {pid: row for pid, row in rows.items() if pid != me}
+    rows = {pid: row for pid, row in rows.items() if pid not in skip}
     children = {}
     for pid, (ppid, _, _, _) in rows.items():
         children.setdefault(ppid, []).append(pid)
@@ -143,7 +150,9 @@ def reason(message):
 
 def run(limit, command):
     table = Table()
-    me = os.getpid()
+    memory = SimpleNamespace(**runpy.run_path(str(Path(__file__).with_name("fm-proc-budget-memory.py"))))
+    skip = {os.getpid()}
+    guardian = None
     known = {}
     seen = {}
     caught = 0
@@ -155,7 +164,7 @@ def run(limit, command):
         caught = number
 
     def snapshot(root):
-        selected = members_of(table.read(), root, known, me)
+        selected = members_of(table.read(), root, known, skip)
         seen.update(known)
         return selected
 
@@ -223,8 +232,22 @@ def run(limit, command):
     # bash replaces itself with the command, so a command that cannot start
     # gets the status and message exec gives it without the option (126, 127,
     # a script with no shebang run under the shell), and no extra process stays.
-    child = subprocess.Popen(["/bin/bash", "-c", 'exec "$@"', "fm-proc-budget", *command],
-                             preexec_fn=os.setpgrp)
+    child = None
+    try:
+        child, release = memory.start_gated(command)
+        try:
+            guardian = memory.Reader(child.pid, child.pid)
+            skip.add(guardian.process.pid)
+            os.write(release, b"\n")
+        finally:
+            os.close(release)
+    except (OSError, subprocess.SubprocessError) as error:
+        if guardian is not None:
+            guardian.close()
+        if child is not None:
+            child.wait()
+        reason(f"cannot start the command under its dead-man guardian ({error}); command not started")
+        return 125
     try:
         while True:
             if caught:
@@ -257,6 +280,7 @@ def run(limit, command):
         if child.poll() is None:
             end_tree(child.pid)
             child.wait()
+        guardian.close(memory.STARTUP_SECONDS + LEFTOVER_GRACE if errors else 0)
 
 
 if __name__ == "__main__":

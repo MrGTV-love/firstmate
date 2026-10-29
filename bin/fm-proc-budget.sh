@@ -18,8 +18,10 @@
 # kernel limit below stays in force at its default as the safety net, so a
 # tree that outruns the sampling still meets it. Zombies of the tree count,
 # threads do not, and the command runs as a background job for a terminal
-# exactly as it does with --memory-kib. A supervisor that dies leaves the
-# command running under the kernel limit only. It works on Linux and Darwin.
+# exactly as it does with --memory-kib. It shares the --memory-kib dead-man
+# link: the command starts only after a reader has joined its group, and if the
+# supervisor dies (for example SIGKILL from a kill of the caller's group), that
+# reader ends every member of the command's group. It works on Linux and Darwin.
 # Pass it instead of a small <extra>: a small positive <extra> below counts the
 # whole user and is the form that neighbour lanes starve.
 #
@@ -100,8 +102,8 @@
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
 # recursive shim and an unbudgeted probe that must keep forking alongside it,
-# for the own-tree stop with neighbours spending the shared count, and for the
-# memory stop.
+# for the own-tree stop with neighbours spending the shared count and its
+# dead-man link, and for the memory stop.
 set -u
 FM_PROC_BUDGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 

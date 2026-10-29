@@ -810,6 +810,31 @@ test_own_procs_term_ends_the_tree() {
   pass "TERM to the wrapper ends the whole tree and returns 128 plus the signal"
 }
 
+# The dead-man link. The supervisor is killed mid-run: alone, and as a runner
+# such as bin/fm-duration.py ends the caller's group (TERM, then KILL at once).
+# The members ignore TERM, so only a KILL from the group's reader ends them.
+test_own_procs_supervisor_death_ends_the_tree() {
+  local pids="$TMP_ROOT/own-deadman.pids" target supervisor
+  for target in supervisor group; do
+    rm -f "$pids"
+    perl -e 'setpgrp(0, 0); exec @ARGV or die' "$WRAP" --own-procs 50 -- bash -c '
+      trap "" TERM; sleep 5003 & first=$!; sleep 5003 &
+      echo "$$ $first $!" >"$0.tmp"; mv "$0.tmp" "$0"; wait' "$pids" &
+    supervisor=$!
+    wait_for_file "$pids" "$supervisor" || fail "the own-procs command never started"
+    if [ "$target" = supervisor ]; then
+      kill -KILL "$supervisor"
+    else
+      kill -TERM -- "-$supervisor"
+      kill -KILL -- "-$supervisor"
+    fi
+    wait "$supervisor" 2>/dev/null
+    tr ' ' '\n' <"$pids" >"$pids.list"
+    wait_pids_ended "$pids.list"
+  done
+  pass "a supervisor killed mid-run, alone or with its caller's group, leaves no tree member running"
+}
+
 # An unreadable sample is "unknown, try again next sample". Only an unreadable
 # table before launch refuses; one the command already runs under never ends it.
 own_procs_driver() {  # <mode> <state-file>
@@ -988,6 +1013,7 @@ test_own_procs_passes_status_and_arguments_through
 test_own_procs_unreadable_samples_are_unknown
 test_own_procs_leftovers_end_with_the_command
 test_own_procs_term_ends_the_tree
+test_own_procs_supervisor_death_ends_the_tree
 test_own_procs_stops_a_runaway_tree
 test_own_procs_nested_wrapper
 test_own_procs_keeps_the_kernel_limit
