@@ -14,12 +14,12 @@ ok - owner-exit authority requires the original owner identity as well as its PI
 ok - the owner-exit sweep stops a hidden stub and everything below it
 ok - a test that exits normally leaves no stub of its own behind
 ok - sourcing the test library reaps the stub a killed test left behind
-tests/fm-test-reap-orphans.test.sh: line 458: 35957 Killed: 9               env TMPDIR="$NESTED_WORKER_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_MODE=killed FM_TEST_PIDFILE="$TMP_ROOT/nested-killed.pid" FM_TEST_SKIP_ORPHAN_REAP=1 bash "$TMP_ROOT/child.sh" > /dev/null 2>&1
+tests/fm-test-reap-orphans.test.sh: line 458: 43654 Killed: 9               env TMPDIR="$NESTED_WORKER_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_MODE=killed FM_TEST_PIDFILE="$TMP_ROOT/nested-killed.pid" FM_TEST_SKIP_ORPHAN_REAP=1 bash "$TMP_ROOT/child.sh" > /dev/null 2>&1
 ok - startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries
 ok - nested marked lab watchers are reaped while unmarked nested homes are left alone
 ok - a lab home two levels below a marked herdr-layout root is found and reaped
 ok - the owners sweep finds and reaps a dead creator's lab beside the owner records
 ok - the sweep never enters unrelated fm-* entries, so host clutter cannot set its cost
-tests/lib.sh: line 310:  9621 Killed: 9               bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release"
-tests/lib.sh: line 310: 13953 Killed: 9               ( cd "$GO_ROOT/package" && exec "$TMP_ROOT/go-build-cwd/package.test" )
-tests/lib.sh: line 310: 46080 Killed: 9               sleep 120
+tests/lib.sh: line 415: 96833 Killed: 9               bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release"
+tests/lib.sh: line 415:  9867 Killed: 9               ( cd "$GO_ROOT/package" && exec "$TMP_ROOT/go-build-cwd/package.test" )
+tests/lib.sh: line 415: 83693 Killed: 9               sleep 120

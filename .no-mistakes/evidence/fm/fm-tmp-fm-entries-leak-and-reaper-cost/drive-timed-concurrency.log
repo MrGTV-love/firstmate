@@ -1,0 +1,2 @@
+workers=24 calls/worker=40 fm_run_timed ok=960 failed=0 (timeout bin: /opt/homebrew/bin/timeout)
+entries left in TMPDIR: 0

@@ -1,0 +1,25 @@
+$ fm-scratch-legacy-reap.sh --tmpdir D            (dry run)
+would remove D/fm-timeout-status.AAAAA1: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove D/fm-gh-rest.AAAAA1: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove D/fm-remote-reply-ingest.OLDDIR: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove D/fm-contributions.AAAAA1: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove D/fm-session-start-stage.AAAAA1: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+  exit=0
+entries after dry run: 12
+$ fm-scratch-legacy-reap.sh --tmpdir D --apply
+removed D/fm-timeout-status.AAAAA1
+removed D/fm-gh-rest.AAAAA1
+removed D/fm-remote-reply-ingest.OLDDIR
+removed D/fm-contributions.AAAAA1
+removed D/fm-session-start-stage.AAAAA1
+entries kept:
+   fm-drop-words.AAAAAA
+   fm-fleet-tasks.SYMLNK
+   fm-gh-rest.FRESH1
+   fm-lavish-poll.NEWFIL
+   fm-test-reap.INUSE1
+   fm-timeout-status.scratch
+   other-file.AAAAAA
+$ fm-scratch-legacy-reap.sh --apply   (no --tmpdir)
+  exit=2
+/Users/charlesabrooker/.no-mistakes/evidence/01M64W8G504PF5VC3WQ7N8XRP2/drive-legacy-reap.sh: line 24: 37013 Terminated: 15          ( cd "$D/fm-test-reap.INUSE1" && exec sleep 300 )

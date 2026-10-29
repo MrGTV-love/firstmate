@@ -1,0 +1,30 @@
+== base: entries while a read is in flight:
+   ./fm-gh-rest.37Ic92
+   ./fm-gh-rest.37Ic92/raw.697314336
+   ./fm-gh-rest.37Ic92/raw.697314336.cache
+   ./fm-gh-rest.37Ic92/raw.697314336.err
+== base: entries after KILL of the read:
+   ./fm-gh-rest.37Ic92
+   ./fm-gh-rest.37Ic92/raw.697314336
+   ./fm-gh-rest.37Ic92/raw.697314336.cache
+   ./fm-gh-rest.37Ic92/raw.697314336.err
+   next normal read exit=0
+== base: entries after the next normal read: 4
+   ./fm-gh-rest.37Ic92
+   ./fm-gh-rest.37Ic92/raw.697314336
+   ./fm-gh-rest.37Ic92/raw.697314336.cache
+   ./fm-gh-rest.37Ic92/raw.697314336.err
+== target: entries while a read is in flight:
+   ./fm-gh-rest.scratch
+   ./fm-gh-rest.scratch/38335.UUVE4Z
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788.cache
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788.err
+== target: entries after KILL of the read:
+   ./fm-gh-rest.scratch
+   ./fm-gh-rest.scratch/38335.UUVE4Z
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788.cache
+   ./fm-gh-rest.scratch/38335.UUVE4Z/raw.326095788.err
+   next normal read exit=0
+== target: entries after the next normal read: 0

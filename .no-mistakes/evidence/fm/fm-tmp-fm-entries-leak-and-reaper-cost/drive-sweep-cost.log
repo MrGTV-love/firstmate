@@ -1,0 +1,3 @@
+base: sourcing shell, empty temp dir: 1.59s ; with 20000 unrelated fm-* entries: 7.68s
+target: sourcing shell, empty temp dir: 1.34s ; with 20000 unrelated fm-* entries: 1.26s
+unrelated entries still present after sweeps: 20201 (expect 20200)

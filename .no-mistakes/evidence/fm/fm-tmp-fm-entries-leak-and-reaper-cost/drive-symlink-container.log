@@ -1,0 +1,7 @@
+fm_run_timed rc=0 out=ran
+fm_scratch_new d gave: fm-gh-rest.Ccs9HP
+victim dir after (must still hold only 99999999.AAAAAA):
+   99999999.AAAAAA
+TMPDIR after:
+   lrwxr-xr-x fm-gh-rest.scratch -> /Users/charlesabrooker/tmp/nm-drive-sym.GnK3pO/victim
+   lrwxr-xr-x fm-timeout-status.scratch -> /Users/charlesabrooker/tmp/nm-drive-sym.GnK3pO/victim

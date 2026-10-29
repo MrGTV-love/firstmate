@@ -1,0 +1,11 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M64W8G504PF5VC3WQ7N8XRP2/drive-killed-test-shell.sh: line 15:  5935 Killed: 9               env -u FM_TEST_SWEEP_ALL TMPDIR="$T/tmp" bash -c '
+  . "$1/tests/lib.sh"
+  r=$(fm_test_tmproot fm-scratch-leaks)
+  ( cd "$r" && exec perl -e "sleep 300" ) </dev/null >/dev/null 2>&1 & disown
+  echo $! > "$2/stray.pid"; echo "$r" > "$2/root"
+  kill -KILL $$' _ "$WT" "$T" > /dev/null 2>&1
+after KILL: root exists=yes, stray alive=yes
+temp dir: fm-scratch-leaks.A7CbKO fm-test-owners 
+after 1st new test shell: stray alive=no, root exists=yes (root is younger than the age floor)
+after markers backdated past the floor + 2nd new test shell: root exists=no
+temp dir: fm-test-owners  ; owner records: 0
