@@ -650,18 +650,16 @@ SH
   pass "a multi-line ps command column is trimmed line by line, exactly as sed did"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-else
-  test_run_ledger_scan_starts_no_subshell_per_row
-  test_toon_readers_match_the_pipelines_they_replace
-  test_status_signature_matches_the_od_pipeline
-  test_quiet_signal_scan_costs_one_stat_per_log
-  test_lagging_marker_scan_costs_no_signature_decode
-  test_quiet_heartbeat_scan_starts_no_owned_capture
-  test_heartbeat_marker_path_matches_the_tr_pipeline
-  test_recorded_windows_reads_each_task_without_a_subshell
-  test_owner_watchdog_tick_subshell_budget
-  test_state_root_checks_do_not_depend_on_ifs
-  test_pid_identity_trim_matches_sed_for_multiline_commands
-fi
+fm_test_only
+
+test_run_ledger_scan_starts_no_subshell_per_row
+test_toon_readers_match_the_pipelines_they_replace
+test_status_signature_matches_the_od_pipeline
+test_quiet_signal_scan_costs_one_stat_per_log
+test_lagging_marker_scan_costs_no_signature_decode
+test_quiet_heartbeat_scan_starts_no_owned_capture
+test_heartbeat_marker_path_matches_the_tr_pipeline
+test_recorded_windows_reads_each_task_without_a_subshell
+test_owner_watchdog_tick_subshell_budget
+test_state_root_checks_do_not_depend_on_ifs
+test_pid_identity_trim_matches_sed_for_multiline_commands

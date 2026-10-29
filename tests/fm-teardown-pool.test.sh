@@ -2963,40 +2963,15 @@ test_tasktmp_preserves_reassociated_copy_git_storage
 test_subordinate_slot_cleanup_preserves_ancestor_custody
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${teardown_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-teardown-pool.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
 # In the combined tests/fm-teardown.test.sh run,
 # test_local_only_fork_remote_allows left set -e in force for every case
 # registered after it. test_reassigned_dirty_slot_retires_only_finished_task
 # is the first such case here, so restore that errexit state once before it.
 errexit_restored=false
-for test_case in "${teardown_test_cases[@]}"; do
-  if [ "$errexit_restored" = false ] && [ "$test_case" = test_reassigned_dirty_slot_retires_only_finished_task ]; then
+fm_test_before_case() {
+  if [ "$errexit_restored" = false ] && [ "$1" = test_reassigned_dirty_slot_retires_only_finished_task ]; then
     set -e
     errexit_restored=true
   fi
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+}
+fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
