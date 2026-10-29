@@ -1,0 +1,7 @@
+# Project has a loose branch named 'archive' (refs/heads/archive is a file)
+created branch archive; refs/heads/archive is a file: yes
+builder exit=0
+branch archive removed (unconfined)
+$ (sandboxed) git branch archive/tp8-submitted-0123abcd
+fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-0123abcd': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-0123abcd
+-> exit 128 ; exists: no

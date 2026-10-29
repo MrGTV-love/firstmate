@@ -1,0 +1,293 @@
+# Live drive 2026-10-29T07:53:09Z on macOS 27.0.1; lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.lSKggL; worktree commit 04638d71b
+== [head-omp] builder=fm-write-confinement.py harness=omp task=tp8 S=4c2c3534 P=4672fdfe
+-- custody route step 2 (as the confined worker)
+$ (sandboxed) git branch archive/tp8-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    -> exit 0
+$ (sandboxed) git fetch --no-tags /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-omp.git refs/no-mistakes/recover/run1
+    From /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-omp
+     * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+    -> exit 0
+    FETCH_HEAD=4672fdfe expect 4672fdfe
+$ (sandboxed) git branch archive/tp8-pipeline-4672fdfe 4672fdfeac6e41e7594b4a59a3a334054f70454a
+    -> exit 0
+$ (sandboxed) git branch archive/tp8-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: a branch named 'archive/tp8-submitted-4c2c3534' already exists
+    -> exit 128
+    archive submitted -> 4c2c3534 ; pipeline -> 4672fdfe
+-- custody route step 4: adopt P
+$ (sandboxed) git reset --keep refs/heads/archive/tp8-pipeline-4672fdfe
+    -> exit 0
+    fm/tp8 -> 4672fdfe
+-- adversarial: refs the worker must never write
+$ (sandboxed) git branch archive/other-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/other-submitted-4c2c3534': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/other-submitted-4c2c3534.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-2-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/tp8-2-submitted-4c2c3534': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-2-submitted-4c2c3534.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/tp-submitted-4c2c3534': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp-submitted-4c2c3534.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/xtp8-submitted-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/xtp8-submitted-4c2c3534': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/xtp8-submitted-4c2c3534.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-other-4c2c3534 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/tp8-other-4c2c3534': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-other-4c2c3534.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-submitted-4c2c353 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-4c2c353': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-4c2c353.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git update-ref refs/heads/fm/other 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git update-ref refs/heads/main 4c2c3534a9bc4cd0f40e6af6cfce74a6f6577cae
+    fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/main.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git -C /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj symbolic-ref HEAD refs/heads/fm/other
+    error: cannot lock ref 'HEAD': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/HEAD.lock': Operation not permitted
+    -> exit 1
+$ (sandboxed) git update-ref -d refs/heads/fm/other
+    error: cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 1
+    main unchanged: yes; fm/other unchanged: yes; primary HEAD unchanged: yes
+== [head-claude] builder=fm-write-confinement.py harness=claude task=tp8 S=4da56863 P=1c1fe0ba
+-- custody route step 2 (as the confined worker)
+$ (sandboxed) git branch archive/tp8-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    -> exit 0
+$ (sandboxed) git fetch --no-tags /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-claude.git refs/no-mistakes/recover/run1
+    From /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-claude
+     * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+    -> exit 0
+    FETCH_HEAD=1c1fe0ba expect 1c1fe0ba
+$ (sandboxed) git branch archive/tp8-pipeline-1c1fe0ba 1c1fe0ba76b84c502bebe48c76997fa301557112
+    -> exit 0
+$ (sandboxed) git branch archive/tp8-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: a branch named 'archive/tp8-submitted-4da56863' already exists
+    -> exit 128
+    archive submitted -> 4da56863 ; pipeline -> 1c1fe0ba
+-- custody route step 4: adopt P
+$ (sandboxed) git reset --keep refs/heads/archive/tp8-pipeline-1c1fe0ba
+    -> exit 0
+    fm/tp8 -> 1c1fe0ba
+-- adversarial: refs the worker must never write
+$ (sandboxed) git branch archive/other-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/other-submitted-4da56863': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/other-submitted-4da56863.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-2-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/tp8-2-submitted-4da56863': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-2-submitted-4da56863.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/tp-submitted-4da56863': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp-submitted-4da56863.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/xtp8-submitted-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/xtp8-submitted-4da56863': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/xtp8-submitted-4da56863.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-other-4da56863 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/tp8-other-4da56863': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-other-4da56863.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-submitted-4da5686 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-4da5686': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-4da5686.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git update-ref refs/heads/fm/other 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git update-ref refs/heads/main 4da568633391ab5c063ab930dac9fbccc496842d
+    fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/main.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git -C /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj symbolic-ref HEAD refs/heads/fm/other
+    error: cannot lock ref 'HEAD': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/HEAD.lock': Operation not permitted
+    -> exit 1
+$ (sandboxed) git update-ref -d refs/heads/fm/other
+    error: cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 1
+    main unchanged: yes; fm/other unchanged: yes; primary HEAD unchanged: yes
+== [head-omp-folders-removed] builder=fm-write-confinement.py harness=omp task=tp8 S=5ee9b572 P=53583f34
+(archive folders removed after profile build: yes)
+-- custody route step 2 (as the confined worker)
+$ (sandboxed) git branch archive/tp8-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    -> exit 0
+$ (sandboxed) git fetch --no-tags /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-omp-folders-removed.git refs/no-mistakes/recover/run1
+    From /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-omp-folders-removed
+     * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+    -> exit 0
+    FETCH_HEAD=53583f34 expect 53583f34
+$ (sandboxed) git branch archive/tp8-pipeline-53583f34 53583f34f2bec71ac09197d5b20fdb305164ec42
+    -> exit 0
+$ (sandboxed) git branch archive/tp8-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: a branch named 'archive/tp8-submitted-5ee9b572' already exists
+    -> exit 128
+    archive submitted -> 5ee9b572 ; pipeline -> 53583f34
+-- custody route step 4: adopt P
+$ (sandboxed) git reset --keep refs/heads/archive/tp8-pipeline-53583f34
+    -> exit 0
+    fm/tp8 -> 53583f34
+-- adversarial: refs the worker must never write
+$ (sandboxed) git branch archive/other-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/other-submitted-5ee9b572': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/other-submitted-5ee9b572.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-2-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/tp8-2-submitted-5ee9b572': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-2-submitted-5ee9b572.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/tp-submitted-5ee9b572': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp-submitted-5ee9b572.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/xtp8-submitted-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/xtp8-submitted-5ee9b572': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/xtp8-submitted-5ee9b572.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-other-5ee9b572 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/tp8-other-5ee9b572': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-other-5ee9b572.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-submitted-5ee9b57 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-5ee9b57': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-5ee9b57.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git update-ref refs/heads/fm/other 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git update-ref refs/heads/main 5ee9b572a74a705ff63cecf01737fa2d1af5d9bf
+    fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/main.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git -C /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj symbolic-ref HEAD refs/heads/fm/other
+    error: cannot lock ref 'HEAD': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/HEAD.lock': Operation not permitted
+    -> exit 1
+$ (sandboxed) git update-ref -d refs/heads/fm/other
+    error: cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 1
+    main unchanged: yes; fm/other unchanged: yes; primary HEAD unchanged: yes
+== [head-claude-folders-removed] builder=fm-write-confinement.py harness=claude task=tp8 S=5c91c14d P=26e57d3b
+(archive folders removed after profile build: yes)
+-- custody route step 2 (as the confined worker)
+$ (sandboxed) git branch archive/tp8-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    -> exit 0
+$ (sandboxed) git fetch --no-tags /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-claude-folders-removed.git refs/no-mistakes/recover/run1
+    From /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-head-claude-folders-removed
+     * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+    -> exit 0
+    FETCH_HEAD=26e57d3b expect 26e57d3b
+$ (sandboxed) git branch archive/tp8-pipeline-26e57d3b 26e57d3b6b368e39058d50442985e00dde711769
+    -> exit 0
+$ (sandboxed) git branch archive/tp8-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: a branch named 'archive/tp8-submitted-5c91c14d' already exists
+    -> exit 128
+    archive submitted -> 5c91c14d ; pipeline -> 26e57d3b
+-- custody route step 4: adopt P
+$ (sandboxed) git reset --keep refs/heads/archive/tp8-pipeline-26e57d3b
+    -> exit 0
+    fm/tp8 -> 26e57d3b
+-- adversarial: refs the worker must never write
+$ (sandboxed) git branch archive/other-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/other-submitted-5c91c14d': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/other-submitted-5c91c14d.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-2-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/tp8-2-submitted-5c91c14d': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-2-submitted-5c91c14d.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/tp-submitted-5c91c14d': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp-submitted-5c91c14d.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/xtp8-submitted-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/xtp8-submitted-5c91c14d': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/xtp8-submitted-5c91c14d.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-other-5c91c14d 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/tp8-other-5c91c14d': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-other-5c91c14d.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-submitted-5c91c14 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-5c91c14': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-5c91c14.lock': Operation not permitted
+    -> exit 128
+    exists after: no
+$ (sandboxed) git update-ref refs/heads/fm/other 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git update-ref refs/heads/main 5c91c14d29ed7395cf67dd2e75b45f8c8abfa5f2
+    fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/main.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git -C /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj symbolic-ref HEAD refs/heads/fm/other
+    error: cannot lock ref 'HEAD': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/HEAD.lock': Operation not permitted
+    -> exit 1
+$ (sandboxed) git update-ref -d refs/heads/fm/other
+    error: cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 1
+    main unchanged: yes; fm/other unchanged: yes; primary HEAD unchanged: yes
+== [base-541b9ff-omp] builder=base-builder.py harness=omp task=tp8 S=347fd1be P=2b67df72
+-- custody route step 2 (as the confined worker)
+$ (sandboxed) git branch archive/tp8-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-347fd1be
+    -> exit 128
+$ (sandboxed) git fetch --no-tags /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-base-541b9ff-omp.git refs/no-mistakes/recover/run1
+    From /Users/charlesabrooker/tmp/fm-archive-drive.CqFHI0/gate-base-541b9ff-omp
+     * branch            refs/no-mistakes/recover/run1 -> FETCH_HEAD
+    -> exit 0
+    FETCH_HEAD=2b67df72 expect 2b67df72
+$ (sandboxed) git branch archive/tp8-pipeline-2b67df72 2b67df727192d0e7bc710958f5e92b3831eea773
+    fatal: cannot lock ref 'refs/heads/archive/tp8-pipeline-2b67df72': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-pipeline-2b67df72
+    -> exit 128
+$ (sandboxed) git branch archive/tp8-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-347fd1be
+    -> exit 128
+    archive submitted ->  ; pipeline -> 
+-- custody route step 4: adopt P
+$ (sandboxed) git reset --keep refs/heads/archive/tp8-pipeline-2b67df72
+    fatal: ambiguous argument 'refs/heads/archive/tp8-pipeline-2b67df72': unknown revision or path not in the working tree.
+    Use '--' to separate paths from revisions, like this:
+    'git <command> [<revision>...] -- [<file>...]'
+    -> exit 128
+    fm/tp8 -> 347fd1be
+-- adversarial: refs the worker must never write
+$ (sandboxed) git branch archive/other-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/other-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/other-submitted-347fd1be
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-2-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp8-2-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-2-submitted-347fd1be
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp-submitted-347fd1be
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/xtp8-submitted-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/xtp8-submitted-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/xtp8-submitted-347fd1be
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-other-347fd1be 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp8-other-347fd1be': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-other-347fd1be
+    -> exit 128
+    exists after: no
+$ (sandboxed) git branch archive/tp8-submitted-347fd1b 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: cannot lock ref 'refs/heads/archive/tp8-submitted-347fd1b': unable to create directory for /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/archive/tp8-submitted-347fd1b
+    -> exit 128
+    exists after: no
+$ (sandboxed) git update-ref refs/heads/fm/other 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git update-ref refs/heads/main 347fd1be47e5dc21274c2359f4d7bd0f0adcbf91
+    fatal: update_ref failed for ref 'refs/heads/main': cannot lock ref 'refs/heads/main': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/main.lock': Operation not permitted
+    -> exit 128
+$ (sandboxed) git -C /Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj symbolic-ref HEAD refs/heads/fm/other
+    error: cannot lock ref 'HEAD': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/HEAD.lock': Operation not permitted
+    -> exit 1
+$ (sandboxed) git update-ref -d refs/heads/fm/other
+    error: cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fm-lab.lSKggL/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+    -> exit 1
+    main unchanged: yes; fm/other unchanged: yes; primary HEAD unchanged: yes
