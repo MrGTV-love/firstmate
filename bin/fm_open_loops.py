@@ -1373,6 +1373,7 @@ class WaitVerifier:
         self.backlog = None
         self.backlog_error = None
         self.decisions = {}
+        self.unread = {}  # prerequisite task -> state, where its PR source gave no answer this pass
 
     def backlog_records(self):
         """This home's canonical backlog records, read once, or the first read's error when it is unavailable."""
@@ -1500,6 +1501,9 @@ class WaitVerifier:
         is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
         standing; a finished or parked run's verdict can outlast its session. A replacement, a gone, dead or
         unreadable endpoint with no run verdict, a failure, a merge or trouble ends it.
+
+        A PR source that gave no answer (a stalled or failed no-mistakes status read) is unknown, never a verdict:
+        a standing wait stays, the drain notes it, and the next pass reads again; only an answering read ends it.
         """
         c = self.collector
         fields = c.read_fields(c.state / (task + ".meta"))
@@ -1515,9 +1519,11 @@ class WaitVerifier:
             raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
                              " follow up on it")
         pr = self.task_pr(path, fields)
-        if state == "done" and not pr:
+        if pr is None:
+            self.unread[task] = state  # unknown, not a verdict: the wait stands and the read repeats next pass
+        elif state == "done" and not pr:
             raise ValueError("prerequisite task is done with no PR; its report is its delivery; follow up on its result")
-        if pr and merge_marker(c.state, pr):
+        elif merge_marker(c.state, pr):
             raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
                and row.get("overdue") and not row.get("informational") and not row.get("stale")
@@ -1532,22 +1538,24 @@ class WaitVerifier:
 
         A done-note or run PR counts only when bin/fm-pr-lib.sh's fm_pr_url_parse accepts it, the shape the PR
         registrar (bin/fm-pr-ready-reconcile.sh) needs, so a PR no merge can be recorded for never keeps a task live.
+        Returns "" when the sources answer that there is no PR, and None when the run read gave no answer.
         """
         if fields.get("pr"):
             return fields["pr"]
         if fields.get("kind") != "ship":
             return ""
-        return self.collector.bash(
+        out = self.collector.bash(
             '. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; . "$1/fm-pr-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
             'pr() { fm_pr_url_parse "$1" 2>/dev/null && printf "%s\\n" "$FM_PR_URL"; }; '
             'if line=$(last_status_line "$2") && [[ $line == done* ]]; then status_line_note "$line" note; '
             'pr "$(fm_dod_pr_url_from_done_note "$note")" && exit 0; fi; '
             '[ -n "$3" ] && [ -d "$3" ] && command -v no-mistakes >/dev/null 2>&1 || exit 0; '
             'branch=$(git -C "$3" symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0; '
-            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || exit 0; '
+            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || { echo "?"; exit 0; }; '
             '[ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" branch)")" = "$branch" ] || exit 0; '
             'pr "$(fm_nm_strip_quotes "$(fm_nm_field "$out" pr)")" || :',
             BIN, path, fields.get("worktree", ""), str(self.collector.timeout)).strip()
+        return None if out == "?" else out
 
     def verify_source(self, source):
         if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):
@@ -1588,6 +1596,8 @@ class WaitVerifier:
                                  " (NNN.msg) whose body names open-loop-row: " + row["id"])
             # Free-text evidence is the reason for the wait; the prerequisite's own live state is the proof.
             dep_source = self.current_source(dict(c.source_context(), kind="task-live", task=task))
+            if self.unread.get(task) == "done":
+                raise ValueError("prerequisite task is done and its PR source could not be read; try again next pass")
             return dict(source=source, dependency=dep_source, reason=evidence)
         dep_source = self.current_source(dict(c.source_context(), kind="task", task=task))
         proof_row = dict(owner="worker:" + task, subject=task)
@@ -1786,6 +1796,9 @@ def ledger_action(args, state, now, batch=()):
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
+        if waits is not None and waits.unread:
+            print("note: PR source unreadable this pass for " + ", ".join(sorted(waits.unread))
+                  + "; its standing wait is unchanged and the read repeats next pass", file=sys.stderr)
         if needing:
             print(render_overdue(needing))
             if standing:
