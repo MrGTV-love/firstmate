@@ -1956,6 +1956,7 @@ test_off_queue_auto_merges_only_where_github_merges_at_once() {
     if [ "$state" = unreadable ]; then
       "$JQ_BIN" -c '.mergeStateStatus = null' "$case_dir/github-view.json" > "$case_dir/view.tmp"
     else
+      # shellcheck disable=SC2016  # $s is a jq variable bound by --arg.
       "$JQ_BIN" -c --arg s "$state" '.mergeStateStatus = $s' "$case_dir/github-view.json" > "$case_dir/view.tmp"
     fi
     mv "$case_dir/view.tmp" "$case_dir/github-view.json"
