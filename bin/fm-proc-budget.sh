@@ -94,7 +94,8 @@
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
 # With --own-procs, 98 is a crossed own-tree limit and 125 also covers a table
-# that cannot be read before launch or a failed cleanup after the command exits.
+# that cannot be read before launch, a supervisor or dead-man reader that
+# cannot start, or a failed cleanup after the command exits.
 # With --memory-kib, 99 is a crossed memory limit, 125 also covers a failed
 # memory sample or a failed cleanup after the command exits. A command that
 # cannot start gets bash's own exec status and message (127 or 126), as without
