@@ -1,0 +1,21 @@
+### scenario: s1-stale-head-pr188-after
+### product: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC (a106187e5 worktree or base archive)
+### head: 21ead009df640793bc968f9233cf87de87ed3e17   merge args: 
+### exit code: 1
+### stderr of bin/fm-pr-merge.sh:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head 21ead009df640793bc968f9233cf87de87ed3e17 lacks the current tip 7b5c75cc2ddaa62357dcc0a5c3b858035fec1af9 of base branch main (28 commits behind): it was built on main at df74c94b31b4638cf5fbd049460c75cb02980cdb, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 7b5c75cc2ddaa62357dcc0a5c3b858035fec1af9 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M61XDCY9YVQP6FS868BSHFHC/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+### forge calls (gh.log) - compare / merge lines:
+api repos/example/repo/compare/main...21ead009df640793bc968f9233cf87de87ed3e17?per_page=1
+FORWARDED-READ-ONLY: gh api repos/MrGTV-love/firstmate/compare/main...21ead009df640793bc968f9233cf87de87ed3e17?per_page=1
+### guard events:
+{"ts":"2026-10-29T03:03:16Z","guard":"merge-held-task","version":"1","system":"firstmate","session":"pid-77755","decision":"allow","source_ok":true,"elapsed_ms":0,"cleared_by":"retry","repeat":1,"override":false}
+{"ts":"2026-10-29T03:03:26Z","guard":"merge-green-head","version":"1","system":"firstmate","session":"pid-18027","decision":"deny","source_ok":true,"elapsed_ms":0,"cleared_by":"","repeat":1,"override":false}

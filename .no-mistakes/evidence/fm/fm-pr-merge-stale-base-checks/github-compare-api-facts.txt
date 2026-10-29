@@ -1,0 +1,12 @@
+# Read-only GitHub API facts (MrGTV-love/firstmate), 2026-10-28
+$ gh api repos/MrGTV-love/firstmate/pulls/287 + /pulls/188
+{"base":"f41e945be7030bad8c65ff16e223256917d1a318","head":"a3814abc7a7a562be3a8de83079ee851a633eb9b","merge_commit_sha":"b34192a213f406add8809a34224315cdc9073798","merged_at":"2026-10-28T15:28:58Z","number":287}
+{"base":"f41e945be7030bad8c65ff16e223256917d1a318","head":"21ead009df640793bc968f9233cf87de87ed3e17","merge_commit_sha":"a9838c1a3c40d501e3bfdedb42453e9e8ec3e0eb","merged_at":"2026-10-28T15:49:30Z","number":188}
+
+# What the compare API (the read github_read_base_containment uses) said about PR 188 head vs main at the moment 188 merged (b34192a = 287 merge commit):
+$ gh api repos/MrGTV-love/firstmate/compare/b34192a213f406add8809a34224315cdc9073798...21ead009df640793bc968f9233cf87de87ed3e17?per_page=1
+{"ahead_by":43,"base_commit":"b34192a213f406add8809a34224315cdc9073798","behind_by":6,"merge_base_commit":"df74c94b31b4638cf5fbd049460c75cb02980cdb","status":"diverged"}
+
+# Live branch-name form the script uses (base given as branch name main):
+$ gh api repos/MrGTV-love/firstmate/compare/main...7b9e555b2a55e8c69a9d3522ffedf7b8c2375595?per_page=1
+{"ahead_by":0,"base_commit":"7b5c75cc2ddaa62357dcc0a5c3b858035fec1af9","behind_by":16,"merge_base_commit":"7b9e555b2a55e8c69a9d3522ffedf7b8c2375595","status":"behind"}
