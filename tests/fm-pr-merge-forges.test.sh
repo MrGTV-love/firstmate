@@ -25,11 +25,9 @@ test_bundled_repo_override_args_refuse_before_recording() {
   add_gh_mocks "$case_dir" abababababababababababababababababababab
   : > "$case_dir/gh-axi.log"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/right/repo/pull/6 -- -dR wrong/repo \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "bundled-repo-override: fm-pr-merge should refuse a bundled repo override"
   assert_grep 'extra merge arguments must not override the repository' "$case_dir/stderr" \
@@ -43,11 +41,9 @@ test_bundled_repo_override_args_refuse_before_recording() {
 
   case_dir=$(make_gitlab_case bundled-repo-override-gitlab)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" -- -yR https://other.example/g/p \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "bundled-repo-override-gitlab: fm-pr-merge should refuse a bundled instance override"
   assert_grep 'extra merge arguments must not override the repository' "$case_dir/stderr" \
@@ -66,11 +62,9 @@ test_bundled_repo_override_args_refuse_before_recording() {
   add_gh_mocks "$case_dir" bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
   : > "$case_dir/gh-axi.log"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/8 -- -d \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "bundled-non-repo-cluster: -d is branch deletion and must be refused"
   assert_grep 'pass --attended-override only for an explicit captain instruction' "$case_dir/stderr" \
     "bundled-non-repo-cluster: refusal did not name --attended-override"
@@ -134,11 +128,9 @@ test_github_still_forwards_sha_arg() {
   add_gh_mocks "$case_dir" dddddddddddddddddddddddddddddddddddddddd
   : > "$case_dir/gh-axi.log"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/44 -- --sha abc123 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-sha-arg: a caller --sha must be refused on GitHub too"
   assert_grep 'extra merge arguments must not override the head commit' "$case_dir/stderr" \
     "github-sha-arg: refusal did not name the head override"
@@ -151,11 +143,9 @@ test_gitlab_url_resolves_and_merges() {
   local case_dir rc merge_line
   case_dir=$(make_gitlab_case gitlab-merges)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "gitlab-merges: a well-formed merge request URL should merge, not error"
   assert_grep "pr=$MR_URL" "$case_dir/state/task-x1.meta" \
@@ -179,11 +169,9 @@ test_gitlab_host_comes_from_the_url() {
   url="$project_url/-/merge_requests/31"
   case_dir=$(make_gitlab_case gitlab-host-from-url)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "gitlab-host-from-url: a self-hosted merge request should merge"
   assert_grep "GITLAB_HOST=$host mr view 31 -R $project_url -F json" "$case_dir/glab.log" \
@@ -201,11 +189,9 @@ test_gitlab_imposes_no_merge_method() {
   local case_dir rc merge_line flag
   case_dir=$(make_gitlab_case gitlab-no-method)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "gitlab-no-method: merge should succeed"
   merge_line=$(glab_merge_line "$case_dir/glab.log")
@@ -221,22 +207,18 @@ test_gitlab_extra_args_forwarded() {
   local case_dir rc merge_line
   case_dir=$(make_gitlab_case gitlab-extra-args)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" -- --remove-source-branch \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "gitlab-extra-args: source-branch deletion must be refused without --attended-override"
   assert_grep 'pass --attended-override only for an explicit captain instruction' "$case_dir/stderr" \
     "gitlab-extra-args: refusal did not name --attended-override"
   [ ! -s "$case_dir/glab.log" ] || fail "gitlab-extra-args: glab ran despite the denylist"
 
   case_dir=$(make_gitlab_case gitlab-extra-args-attended)
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" --attended-override -- --remove-source-branch \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "gitlab-extra-args-attended: attended override should merge"
   merge_line=$(glab_merge_line "$case_dir/glab.log")
   [ "$merge_line" = "GITLAB_HOST=$MR_HOST mr merge 7 -R $MR_PROJECT_URL --sha $MR_HEAD --yes --remove-source-branch" ] \
@@ -249,11 +231,9 @@ test_gitlab_merge_failure_propagates() {
   case_dir=$(make_gitlab_case gitlab-merge-fails)
   : > "$case_dir/glab-merge-fails"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gitlab-merge-fails: a failing glab merge should not report success"
   assert_grep "pr=$MR_URL" "$case_dir/state/task-x1.meta" \
@@ -281,11 +261,9 @@ test_gitlab_each_condition_refuses_independently() {
     spec=${spec#*|}
     case_dir=$(make_gitlab_case "gitlab-refuse-$name" "${spec%%|*}")
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "gitlab-refuse-$name: fm-pr-merge should refuse"
     assert_grep "error: refusing to merge $MR_URL" "$case_dir/stderr" \
@@ -308,11 +286,9 @@ test_gitlab_reports_every_failing_condition() {
     state=closed detail=conflict conflicts=true discussions=false \
     pipeline_status=failed "pipeline_sha=$MR_STALE_HEAD")
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gitlab-refuse-all: fm-pr-merge should refuse"
   for expected in \
@@ -337,11 +313,9 @@ test_gitlab_stale_recorded_head_is_reported() {
   # for a GitLab task, so reading it afterwards would find nothing at all.
   printf 'pr_head=%s\n' "$MR_STALE_HEAD" >> "$case_dir/state/task-x1.meta"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "gitlab-stale-head: the live head satisfies every condition, so it should merge"
   assert_grep "recorded head $MR_STALE_HEAD disagrees with the live head $MR_HEAD" \
@@ -368,11 +342,9 @@ test_gitlab_unreadable_state_refuses() {
       split-value) write_mr_json "$case_dir/mr.json" 'state=opened\nnot-a-field' ;;
     esac
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "gitlab-unreadable-$name: fm-pr-merge should refuse"
     assert_grep 'could not read the GitLab merge request state before merging' \
@@ -387,11 +359,9 @@ test_gitlab_invalid_head_refuses() {
   local case_dir rc
   case_dir=$(make_gitlab_case gitlab-invalid-head head=not-a-sha)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gitlab-invalid-head: fm-pr-merge should refuse"
   assert_grep 'could not read the GitLab merge request head commit before merging' \
@@ -412,16 +382,14 @@ test_gitlab_missing_tool_refuses_before_recording() {
     PATH="$case_dir/no$tool" command -v "$other" >/dev/null 2>&1 \
       || fail "gitlab-no-$tool: the $tool-free search path lost the $other mock as well"
 
-    set +e
+    rc=0
     FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$case_dir/state" \
     FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
     FM_TEST_GLAB_LOG="$case_dir/glab.log" \
     FM_TEST_GLAB_JSON="$case_dir/mr.json" \
     PATH="$case_dir/no$tool" \
-      "$PR_MERGE" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      "$PR_MERGE" task-x1 "$MR_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "gitlab-no-$tool: fm-pr-merge should refuse"
     assert_grep "error: merging a GitLab merge request requires $tool on PATH" \
@@ -438,11 +406,9 @@ test_forgejo_url_resolves_and_merges() {
   local case_dir rc merge_line
   case_dir=$(make_forgejo_case forgejo-merges)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "forgejo-merges: a well-formed pull request URL should merge, not error"
   assert_grep "pr=$FJ_URL" "$case_dir/state/task-x1.meta" \
@@ -468,11 +434,9 @@ test_forgejo_login_resolves_from_the_host() {
   write_tea_logins_json "$case_dir/tea-logins.json" \
     other "https://unrelated.example" "$FJ_LOGIN" "https://$host:3000"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "forgejo-login-from-host: the matching login (port stripped) should be resolved and merge"
   assert_grep "--login $FJ_LOGIN --repo $FJ_OWNER/$FJ_REPO /repos/{owner}/{repo}/pulls/12" "$case_dir/tea.log" \
@@ -491,11 +455,9 @@ test_forgejo_refuses_when_login_is_ambiguous() {
       two) write_tea_logins_json "$case_dir/tea-logins.json" a "https://$FJ_HOST" b "https://$FJ_HOST" ;;
     esac
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "forgejo-login-$name: fm-pr-merge should refuse"
     assert_grep "requires exactly one 'tea login' registered for that host" "$case_dir/stderr" \
@@ -520,11 +482,9 @@ test_forgejo_each_condition_refuses_independently() {
     spec=${spec#*|}
     case_dir=$(make_forgejo_case "forgejo-refuse-$name" "${spec%%|*}")
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "forgejo-refuse-$name: fm-pr-merge should refuse"
     assert_grep "error: refusing to merge $FJ_URL" "$case_dir/stderr" \
@@ -546,11 +506,9 @@ test_forgejo_unconfigured_ci_refuses_as_none() {
   case_dir=$(make_forgejo_case forgejo-ci-none)
   write_forgejo_status_json "$case_dir/tea-status.json" total_count=0
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "forgejo-ci-none: an open, mergeable PR with no configured CI should still refuse"
   assert_grep 'the combined commit status is "none", not success' "$case_dir/stderr" \
@@ -568,11 +526,9 @@ test_forgejo_combined_status_reads_every_page() {
   case_dir=$(make_forgejo_case forgejo-status-page2-red)
   write_forgejo_status_json "$case_dir/tea-status-page2.json" state=failure
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "forgejo-status-page2-red: a failing context on page 2 should refuse"
   assert_grep 'the combined commit status is "failure", not success' "$case_dir/stderr" \
@@ -583,11 +539,9 @@ test_forgejo_combined_status_reads_every_page() {
   case_dir=$(make_forgejo_case forgejo-status-page2-green)
   write_forgejo_status_json "$case_dir/tea-status-page2.json"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "forgejo-status-page2-green: every green page should merge"
   assert_grep 'page=2' "$case_dir/tea.log" \
@@ -603,11 +557,9 @@ test_forgejo_stale_recorded_head_is_reported() {
   # for a Forgejo task, so reading it afterwards would find nothing at all.
   printf 'pr_head=%s\n' "$FJ_STALE_HEAD" >> "$case_dir/state/task-x1.meta"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "forgejo-stale-head: the live head satisfies every condition, so it should merge"
   assert_grep "recorded head $FJ_STALE_HEAD disagrees with the live head $FJ_HEAD" \
@@ -626,11 +578,9 @@ test_forgejo_invalid_head_refuses() {
   local case_dir rc
   case_dir=$(make_forgejo_case forgejo-invalid-head head=not-a-sha)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "forgejo-invalid-head: fm-pr-merge should refuse"
   assert_grep 'could not read the Forgejo pull request head commit before merging' \
@@ -649,15 +599,13 @@ test_forgejo_missing_tool_refuses_before_recording() {
     PATH="$case_dir/no$tool" command -v "$other" >/dev/null 2>&1 \
       || fail "forgejo-no-$tool: the $tool-free search path lost the $other mock as well"
 
-    set +e
+    rc=0
     FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$case_dir/state" \
     FM_TEST_GH_AXI_LOG="$case_dir/gh-axi.log" \
     FM_TEST_TEA_LOG="$case_dir/tea.log" \
     PATH="$case_dir/no$tool" \
-      "$PR_MERGE" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      "$PR_MERGE" task-x1 "$FJ_URL" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expect_code 1 "$rc" "forgejo-no-$tool: fm-pr-merge should refuse"
     assert_grep "error: merging a Forgejo pull request requires $tool on PATH" \
@@ -680,11 +628,9 @@ test_forgejo_rejected_merge_is_never_trusted_by_exit_status() {
   case_dir=$(make_forgejo_case forgejo-rejected-merge)
   : > "$case_dir/tea-merge-fails"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "forgejo-rejected-merge: a rejected merge must fail even though tea api itself exits 0"
   assert_grep "Forgejo did not confirm $FJ_URL as merged" "$case_dir/stderr" \
@@ -700,11 +646,9 @@ test_forgejo_transient_confirm_read_failure_still_persists_authority() {
   case_dir=$(make_forgejo_case forgejo-confirm-retry)
   printf '2\n' > "$case_dir/tea-post-merge-view-failures"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "forgejo-confirm-retry: a landed merge must not fail on a transient read-back failure"
   [ -e "$case_dir/tea-merged" ] || fail "forgejo-confirm-retry: the mock did not record the merge"
@@ -750,11 +694,9 @@ test_forgejo_merge_method_and_extra_args() {
       unknown) printf '{"default_merge_style":"manually-merged"}\n' > "$case_dir/tea-repo.json" ;;
       missing) printf '{"message":"not found"}\n' > "$case_dir/tea-repo.json" ;;
     esac
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 "$FJ_URL" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "forgejo-default-$variant: a merge with no readable default style must be refused"
     assert_grep "the repository's default merge style could not be read" "$case_dir/stderr" \
       "forgejo-default-$variant: refusal did not name the unreadable default style"
@@ -770,11 +712,9 @@ test_forgejo_merge_method_and_extra_args() {
     || fail "forgejo-squash-method: --squash did not select Do=squash"
 
   case_dir=$(make_forgejo_case forgejo-unsupported-arg)
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" -- --admin-something-unrecognized \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "forgejo-unsupported-arg: an unrecognized extra argument must be refused"
   assert_grep 'extra merge arguments are not yet supported for Forgejo merges' "$case_dir/stderr" \
     "forgejo-unsupported-arg: refusal did not name the unsupported-argument reason"
@@ -788,11 +728,9 @@ test_gitlab_head_override_args_refuse_before_recording() {
   local case_dir rc
   case_dir=$(make_gitlab_case gitlab-head-override)
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" -- --sha "$MR_STALE_HEAD" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gitlab-head-override: fm-pr-merge should refuse a caller head override"
   assert_grep 'extra merge arguments must not override the head commit' "$case_dir/stderr" \
@@ -902,11 +840,9 @@ test_failed_merge_reports_nothing() {
   add_gh_mocks_merge_fails "$case_dir"
   : >"$case_dir/gh-axi.log"
 
-  set +e
+  rc=0
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/63 \
-    >"$case_dir/stdout" 2>"$case_dir/stderr"
-  rc=$?
-  set -e
+    >"$case_dir/stdout" 2>"$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "failed-merge-silent: a failed merge should propagate"
   # The registration's ready line is a fact of its own; only a merge line
@@ -923,11 +859,9 @@ test_gitlab_refusal_reports_nothing() {
   printf '%s\n' mate-x >"$case_dir/home/.fm-secondmate-home"
   printf 'schema=fm-secondmate-parent.v1\nroute=remote\n' >"$case_dir/home/.fm-secondmate-parent"
 
-  set +e
+  rc=0
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    >"$case_dir/stdout" 2>"$case_dir/stderr"
-  rc=$?
-  set -e
+    >"$case_dir/stdout" 2>"$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gitlab-refusal-silent: a refused GitLab merge should exit non-zero"
   # Registration succeeds before the later GitLab pre-merge refusal, so the
@@ -1070,11 +1004,9 @@ test_secondmate_without_parent_binding_is_loud() {
   # let three real merges land in silence.
   printf '%s\n' mate-x >"$case_dir/home/.fm-secondmate-home"
 
-  set +e
+  rc=0
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    >"$case_dir/stdout" 2>"$case_dir/stderr"
-  rc=$?
-  set -e
+    >"$case_dir/stdout" 2>"$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "unbound-secondmate: the merge itself landed and must not be reported as failed"
   assert_grep 'could not report it upward' "$case_dir/stderr" \
@@ -1097,11 +1029,9 @@ test_absent_backlog_still_merges() {
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/data/backlog.md"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/61 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "absent-backlog-merges: a home with no backlog must still merge"
   assert_no_grep 'held for the captain' "$case_dir/stderr" \
@@ -1118,11 +1048,9 @@ test_unreadable_backlog_refuses_the_merge() {
   : > "$case_dir/gh-axi.log"
   chmod 000 "$case_dir/home/data/backlog.md"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/62 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod 644 "$case_dir/home/data/backlog.md"
 
   expect_code 1 "$rc" "unreadable-backlog-refuses: an unreadable authority record must refuse"
@@ -1142,11 +1070,9 @@ test_unreadable_backend_config_refuses_the_merge() {
   rm -f "$case_dir/home/data/backlog.md"
   chmod 000 "$case_dir/home/.tasks.toml"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/63 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod 644 "$case_dir/home/.tasks.toml"
 
   expect_code 1 "$rc" "unreadable-backend-config-refuses: an unreadable authority route must refuse"
@@ -1168,12 +1094,10 @@ test_unreadable_user_backend_config_refuses_the_merge() {
   printf '%s\n' 'backend = "beads"' > "$user_config"
   chmod 000 "$user_config"
 
-  set +e
+  rc=0
   FM_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/64 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod 644 "$user_config"
 
   expect_code 1 "$rc" "unreadable-user-backend-config-refuses: an unreadable authority route must refuse"
@@ -1195,12 +1119,10 @@ test_untraversable_user_backend_config_directory_refuses_the_merge() {
   printf '%s\n' 'backend = "beads"' > "$user_config"
   chmod 000 "${user_config%/*}"
 
-  set +e
+  rc=0
   FM_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/66 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod 755 "${user_config%/*}"
 
   expect_code 1 "$rc" "untraversable-user-backend-config-directory-refuses: an unreadable authority route must refuse"
@@ -1219,12 +1141,10 @@ test_absent_user_backend_config_directory_and_backlog_still_merge() {
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
 
-  set +e
+  rc=0
   FM_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/67 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "absent-user-backend-config-directory-and-backlog-merges: sound defaults and no backlog must permit merging"
   [ "$(grep -c '^pr merge ' "$case_dir/gh.log")" -eq 1 ] \
@@ -1244,12 +1164,10 @@ test_backend_override_bypasses_unreadable_user_config() {
   printf '%s\n' 'backend = "beads"' > "$user_config"
   chmod 000 "$user_config"
 
-  set +e
+  rc=0
   TASKS_AXI_BACKEND=markdown FM_TEST_USER_HOME="$case_dir/user-home" \
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/65 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod 644 "$user_config"
 
   expect_code 0 "$rc" "backend-override-bypasses-unreadable-user-config: an explicit backend must bypass config"
@@ -1265,11 +1183,9 @@ test_github_red_checks_refuse_and_allow_red_waives_named() {
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/80 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-red: a red check must refuse"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "github-red: the red check was not named"

@@ -2250,11 +2250,9 @@ exec "$FM_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
 
-  set +e
+  rc=0
   PATH="$fakebin:$PATH" FM_TEST_REAL_MV="$real_mv" FM_TEST_PUBLISH_MARKER="$state/.watcher-down" \
-    append_wake "$state" signal task.status "signal: publish failure"
-  rc=$?
-  set -e
+    append_wake "$state" signal task.status "signal: publish failure" || rc=$?
   [ "$rc" -ne 0 ] || fail "recovery publication failure allowed wake append to succeed"
   [ "$(cat "$state/.watcher-down")" = 'pending:handling:existing' ] \
     || fail "failed atomic publication erased existing recovery evidence"
@@ -2621,12 +2619,10 @@ exec "$FM_TEST_REAL_MV" "$@"
 SH
   chmod +x "$fakebin/mv"
 
-  set +e
+  rc=0
   PATH="$fakebin:$PATH" FM_TEST_REAL_MV="$real_mv" FM_TEST_ACK_MARKER="$state/.watcher-down" \
     FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through 0 --recovery-generation "$generation" \
-      > "$dir/drain.out" 2> "$dir/drain.err"
-  rc=$?
-  set -e
+      > "$dir/drain.out" 2> "$dir/drain.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "recovery acknowledgement failure was reported as success"
   grep -F 'recovery episode could not be retired safely' "$dir/drain.err" >/dev/null \
     || fail "recovery acknowledgement failure had no explicit diagnostic"
@@ -2667,10 +2663,8 @@ test_interruption_before_and_after_raw_commit() {
   done
   [ "$i" -lt 100 ] || { kill "$pid" 2>/dev/null || true; fail "pre-commit drain never entered its serialized read boundary"; }
   kill -TERM "$pid" 2>/dev/null || fail "could not interrupt drain before raw commitment"
-  set +e
-  wait "$pid"
-  rc=$?
-  set -e
+  rc=0
+  wait "$pid" || rc=$?
   [ "$rc" -ne 0 ] || fail "pre-commit interruption unexpectedly succeeded"
   FM_STATE_OVERRIDE="$state" "$DRAIN" > "$replay_out" 2> "$dir/replay.err" || fail "restored pre-commit wake did not drain"
   count=$(awk -F '\t' 'NF == 5 { count++ } END { print count + 0 }' "$replay_out")
@@ -2688,9 +2682,7 @@ test_interruption_before_and_after_raw_commit() {
   [ -s "$state/.wake-queue" ] \
     || { kill "$pid" 2>/dev/null || true; fail "post-commit drain consumed its raw row before handling acknowledgement"; }
   kill -TERM "$pid" 2>/dev/null || fail "could not interrupt drain after raw presentation"
-  set +e
-  wait "$pid"
-  set -e
+  wait "$pid" || true
   FM_STATE_OVERRIDE="$state" "$DRAIN" > "$empty_out" 2> "$dir/after-replay.err" \
     || fail "drain after post-presentation interruption failed"
   count=$(awk -F '\t' 'NF == 5 { count++ } END { print count + 0 }' "$empty_out")
@@ -4291,11 +4283,7 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
-  "$FM_TEST_ONLY"
-  exit $?
-fi
+fm_test_only
 
 test_queued_preserves_rows_and_state_until_acknowledgement
 test_queued_empty_and_missing_state_succeed_without_writes

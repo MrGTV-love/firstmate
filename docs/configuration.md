@@ -103,7 +103,8 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
-- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns its format.
+- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
+- The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
@@ -122,7 +123,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 ### Friction ledger
 
-The pilot refusal instrument records teardown nested-copy/preservation predicates in the explicit owning `FM_HOME/state/friction.jsonl`.
+The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev guard pre-tool refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
@@ -169,7 +170,9 @@ A short/crashed append leaves its existing bytes intact; subsequent writes diagn
 A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
-The Jev guard writes no friction events; its mandatory audit's `AuditUnavailableError` behavior is unchanged.
+The Jev guard records each pre-tool refusal as a `blocked` event with `guard_id` `FM-JEV-GUARD` right after the refusal's own `state/jev-guard.jsonl` audit row is appended: `rule_id` is that row's typed `branch` value, `subject.kind` is its hook and tool, and the task and subject identities are the writer's digests.
+A refusal whose audit row could not be written is not mirrored, and the audit's `AuditUnavailableError` behavior is unchanged.
+The mirror is bounded by a short telemetry timeout and never changes the guard's allow or deny: a writer that ran prints its own `fm-friction:` diagnostic, and a writer that could not start or was stopped at that timeout is reported by one guard-side `fm-friction:` line, both on the guard process's stderr, which the Claude hook wrapper discards with every other stderr line.
 [`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
@@ -826,7 +829,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
-| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
+| `review_pass_not_merged` | the review-record owner verifies an independent PASS (see `review_lanes` below) for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable, so coverage is incomplete; an unsupported forge is instead an informational skip | 0 s |
 
@@ -989,7 +992,10 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
-For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
+The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
+For a configured repository, the ledger asks `bin/fm-review-record.py verify --task <owning task> --base <live base sha> --review-only --json` once for an owned PR's exact live head and consumes that single atomic owner output; a PR no task owns is not checked.
+That owner is the only authority: it applies the merge gate's exact-head, derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
+A missing, stale-head, FAIL, same-family, unknown-family, or yes-trigger record is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
@@ -1858,8 +1864,8 @@ The address selects the existing shared server; it does not authorize starting o
 ## Task Definition of Done (ship and scout briefs)
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
-Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
-The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
+The grading section says a session that did not build the work grades it; that each mandatory item is graded pass, fail, or unresolved; that a downstream-pending item is never a pass but does not by itself block proceeding, while any other unresolved item blocks; that supporting items never offset a failed mandatory one; and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
@@ -1872,6 +1878,14 @@ A fresh spawn of a brief with no such section at all is not refused: it prints o
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
 The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.
+`bin/fm-dod-lib.sh` also owns the one mandatory item shape: each item starts its own line with a unique id and carries every field nonempty, with Authority taken from a fixed set; `bash bin/fm-dod-lib.sh --shape` prints the id pattern, lead and trailing fields, allowed Authority values, one-line item form that a criteria refusal names, and the rule sentence that the scaffold and a verification-plan refusal print.
+It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
+A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
+A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head is the task's recorded forge `pr_head` or attributes to the copy's `HEAD` (equal to it, a descendant of it such as a pipeline fix commit, or carrying its tree), and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
+A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
+The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
+This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
 A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
@@ -2785,7 +2799,11 @@ Writes are allowed by default; the profile denies writes to these named protecte
 
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
-Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`.
+In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
+Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
+The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
+When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
 The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
@@ -4376,7 +4394,7 @@ FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dis
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
-FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set
+FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set, and the omp primary extensions skip their home markers, home watch, and home digest while it is set (.omp/extensions/lib/fm-task-worker.ts)
 FM_TASK_INBOX=          # internal: absolute path of the task's steering inbox (state/<id>.inbox) that fm-spawn.sh exports into every ship, scout, and secondmate launch, never set by hand; the steering doorbell names "$FM_TASK_INBOX"
 HERDR_SESSION=default  # herdr-only: named session for normal backend ops; not enough for destructive cleanup (docs/herdr-backend.md)
 FM_BACKEND_HERDR_SUBMIT_POLLS=6  # herdr-only: agent-state samples spread across each Enter attempt's budget when confirming a submit (docs/herdr-backend.md "Current transport behavior")

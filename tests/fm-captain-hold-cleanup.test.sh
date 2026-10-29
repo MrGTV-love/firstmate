@@ -532,7 +532,7 @@ test_retained_row_artifacts_survive_captain_answers() {
     --repo sample --start >/dev/null || fail "could not create the approved merge fixture"
   fm_write_meta "$home/state/$approved_id.meta" \
     "window=firstmate:fm-$approved_id" "endpoint_task_id=$approved_id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$approved_pr" "spawn_gen=fixture-$approved_id"
   printf 'done: PR %s merged\n' "$approved_pr" > "$home/state/$approved_id.status"
   run_captain "$home" hold "$approved_id" --reason "captain merge approval pending" \
@@ -559,7 +559,7 @@ test_retained_row_artifacts_survive_captain_answers() {
     --repo sample --start >/dev/null || fail "could not create the released local fixture"
   fm_write_meta "$home/state/$local_id.meta" \
     "window=firstmate:fm-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
-    "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
+    "project=$local_repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   printf 'done: local merge ready\n' > "$home/state/$local_id.status"
   run_captain "$home" hold "$local_id" --reason "captain local merge approval pending" \
@@ -702,13 +702,11 @@ exit 1
 SH
   chmod +x "$home/fakebin/treehouse"
 
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
   assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
     "cleanup failed before the injected worktree return failure"
@@ -764,13 +762,11 @@ exit 1
 SH
     chmod +x "$home/fakebin/treehouse"
 
-    set +e
+    rc=0
     PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
       FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
       FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-      > "$home/teardown.out" 2> "$home/teardown.err"
-    rc=$?
-    set -e
+      > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
     [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
     assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
       "cleanup failed before the injected worktree return failure"
@@ -1061,7 +1057,7 @@ test_captain_close_before_cleanup_replay_records_task_closed_once() {
     || fail "could not create the held Gerrit fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$gerrit_url" "spawn_gen=fixture-$id"
   printf 'done: change landed\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain must choose the follow-up" >/dev/null \
@@ -1119,7 +1115,7 @@ test_answer_before_cleanup_replay_notes_a_retained_gerrit_change() {
     --repo sample --start >/dev/null || fail "could not create the held Gerrit answer fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$gerrit_url" "spawn_gen=fixture-$id"
   printf 'done: change landed\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain must choose the follow-up" >/dev/null \
@@ -1144,13 +1140,11 @@ exit 1
 SH
   chmod +x "$home/fakebin/treehouse"
 
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
   assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
     "cleanup failed before the injected worktree return failure"
@@ -1191,13 +1185,11 @@ exit 1
 SH
   chmod +x "$home/fakebin/treehouse"
 
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
   assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
     "cleanup failed before the injected worktree return failure"
@@ -1207,10 +1199,8 @@ SH
   mv "$marker.rewritten" "$marker"
 
   printf 'Proceed with the reported result.\n' > "$home/answer.txt"
-  set +e
-  err=$(run_captain "$home" answer "$id" --decision-file "$home/answer.txt" 2>&1 >/dev/null)
-  rc=$?
-  set -e
+  rc=0
+  err=$(run_captain "$home" answer "$id" --decision-file "$home/answer.txt" 2>&1 >/dev/null) || rc=$?
   [ "$rc" -ne 0 ] || fail "the unusable pending-close record was answered as if it were valid"
   assert_contains "$err" "$marker" \
     "the refusal did not name the pending-close record the captain must repair"
@@ -1263,13 +1253,11 @@ exit 1
 SH
   chmod +x "$home/fakebin/treehouse"
 
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "relocated cleanup succeeded despite the failed worktree return"
   assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
     "cleanup failed before the injected worktree return failure"
@@ -1395,7 +1383,7 @@ test_teardown_retains_a_gerrit_captain_call_with_its_change_url() {
     --repo sample --start >/dev/null || fail "could not create the held Gerrit fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$gerrit_url" "spawn_gen=fixture-$id"
   printf 'done: change landed\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain must choose the follow-up" >/dev/null \
@@ -1446,7 +1434,7 @@ test_merge_approval_releases_before_zero_done_retention() {
     --repo sample --start >/dev/null || fail "could not create the zero-retention fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain merge approval pending" >/dev/null \
@@ -1488,17 +1476,15 @@ test_pr_merge_entrypoint_refuses_a_captain_held_task() {
     --repo sample --start >/dev/null || fail "could not create the held PR fixture"
   fm_write_meta "$home/state/$pr_id.meta" \
     "window=firstmate:fm-$pr_id" "endpoint_task_id=$pr_id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$pr_id"
   run_captain "$home" hold "$pr_id" --reason "captain merge approval pending" >/dev/null \
     || fail "could not hold the PR entrypoint fixture"
 
   # Without the entrypoint guard, this run reaches gh and returns success even
   # though the task is still held for the captain.
-  set +e
-  run_pr_merge "$home" "$pr_id" "$pr" > "$home/pr.out" 2> "$home/pr.err"
-  rc=$?
-  set -e
+  rc=0
+  run_pr_merge "$home" "$pr_id" "$pr" > "$home/pr.out" 2> "$home/pr.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "the PR merge entrypoint accepted a still-held task"
   assert_no_grep 'pr merge 31 ' "$home/gh.log" \
     "the PR merge entrypoint reached the irreversible forge call for a held task"
@@ -1524,7 +1510,7 @@ test_local_merge_entrypoint_refuses_a_captain_held_task() {
     --repo sample --start >/dev/null || fail "could not create the held local fixture"
   fm_write_meta "$home/state/$local_id.meta" \
     "window=firstmate:fm-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
-    "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
+    "project=$local_repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   run_captain "$home" hold "$local_id" --reason "captain local merge approval pending" \
     >/dev/null || fail "could not hold the local entrypoint fixture"
@@ -1532,13 +1518,11 @@ test_local_merge_entrypoint_refuses_a_captain_held_task() {
 
   # Without the entrypoint guard, this run fast-forwards main while the task
   # still carries the captain hold.
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-merge-local.sh" "$local_id" \
-    > "$home/local.out" 2> "$home/local.err"
-  rc=$?
-  set -e
+    > "$home/local.out" 2> "$home/local.err" || rc=$?
   after=$(git -C "$local_repo" rev-parse main)
   [ "$rc" -ne 0 ] || fail "the local merge entrypoint accepted a still-held task"
   [ "$after" = "$before" ] || fail "the local merge entrypoint moved main for a held task"
@@ -1560,10 +1544,8 @@ test_pr_merge_entrypoint_separates_an_unreadable_record_from_an_absent_one() {
   # A backlog that exists but cannot be read may hide a live captain hold, so
   # the merge must refuse without reaching the forge.
   chmod 000 "$home/data/backlog.md"
-  set +e
-  run_pr_merge "$home" "$id" "$pr" > "$home/missing-pr.out" 2> "$home/missing-pr.err"
-  rc=$?
-  set -e
+  rc=0
+  run_pr_merge "$home" "$id" "$pr" > "$home/missing-pr.out" 2> "$home/missing-pr.err" || rc=$?
   chmod 644 "$home/data/backlog.md"
   [ "$rc" -ne 0 ] || fail "the PR merge entrypoint accepted an unreadable captain-hold authority record"
   assert_grep "could not determine whether task $id is still held for the captain" "$home/missing-pr.err" \
@@ -1594,19 +1576,17 @@ test_local_merge_entrypoint_separates_an_unreadable_record_from_an_absent_one() 
     commit -qm 'untracked local delivery'
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=local-only" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$id"
   before=$(git -C "$repo" rev-parse main)
 
   # Unreadable authority record: refuse, and leave the default branch where it was.
   chmod 000 "$home/data/backlog.md"
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-merge-local.sh" "$id" \
-    > "$home/missing-local.out" 2> "$home/missing-local.err"
-  rc=$?
-  set -e
+    > "$home/missing-local.out" 2> "$home/missing-local.err" || rc=$?
   chmod 644 "$home/data/backlog.md"
   after=$(git -C "$repo" rev-parse main)
   [ "$rc" -ne 0 ] || fail "the local merge entrypoint accepted an unreadable captain-hold authority record"
@@ -1632,14 +1612,12 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
   configure_merged_github "$home"
 
   pr_state="$home/missing-pr-state"
-  set +e
+  rc=0
   fm_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$pr_state" \
     "$ROOT/bin/fm-pr-merge.sh" sample-missing-pr-state \
     https://github.com/sample/sample/pull/41 \
-    > "$home/missing-pr-state.out" 2> "$home/missing-pr-state.err"
-  rc=$?
-  set -e
+    > "$home/missing-pr-state.out" 2> "$home/missing-pr-state.err" || rc=$?
   # Without pre-lock state validation, the lock library creates the missing
   # directory before the entrypoint discovers that no task record exists.
   [ "$rc" -ne 124 ] || fail "the PR merge waited forever for a missing state directory"
@@ -1649,13 +1627,11 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
     "the PR merge did not identify its missing state directory"
 
   local_state="$home/missing-local-state"
-  set +e
+  rc=0
   fm_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$local_state" \
     "$ROOT/bin/fm-merge-local.sh" sample-missing-local-state \
-    > "$home/missing-local-state.out" 2> "$home/missing-local-state.err"
-  rc=$?
-  set -e
+    > "$home/missing-local-state.out" 2> "$home/missing-local-state.err" || rc=$?
   # Without pre-lock state validation, the lock library creates the missing
   # directory before the entrypoint discovers that no task record exists.
   [ "$rc" -ne 124 ] || fail "the local merge waited forever for a missing state directory"
@@ -1665,13 +1641,11 @@ test_merge_entrypoints_validate_identity_and_state_before_locking() {
     "the local merge did not identify its missing state directory"
 
   bad_id=sample/bad-local-id
-  set +e
+  rc=0
   fm_run_timed 2 env PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
     "$ROOT/bin/fm-merge-local.sh" "$bad_id" \
-    > "$home/bad-local-id.out" 2> "$home/bad-local-id.err"
-  rc=$?
-  set -e
+    > "$home/bad-local-id.out" 2> "$home/bad-local-id.err" || rc=$?
   # Without canonical ID validation, the slash creates a nested lock path whose
   # absent parent makes the blocking acquisition retry until the bound expires.
   [ "$rc" -ne 124 ] || fail "the local merge waited forever on a slash-containing task id"
@@ -1705,7 +1679,7 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
     --repo sample --start >/dev/null || fail "could not create the original PR task"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$old_wt" \
-    "project=$old_repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$old_repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=original-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
 
@@ -1744,10 +1718,8 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   fi
 
   : > "$teardown_release"
-  set +e
-  wait "$teardown_pid"
-  teardown_rc=$?
-  set -e
+  teardown_rc=0
+  wait "$teardown_pid" || teardown_rc=$?
   if [ "$teardown_rc" -ne 0 ]; then
     : > "$merge_release"
     wait "$merge_pid" 2>/dev/null || true
@@ -1760,14 +1732,12 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   tasks_in "$home" reopen "$id" >/dev/null || fail "could not reopen the reused PR task"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$new_wt" \
-    "project=$new_repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$new_repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=replacement-$id"
   tasks_in "$home" start "$id" >/dev/null || fail "could not start the reused PR task"
   : > "$merge_release"
-  set +e
-  wait "$merge_pid"
-  merge_rc=$?
-  set -e
+  merge_rc=0
+  wait "$merge_pid" || merge_rc=$?
 
   # Without the pre-wait generation capture and locked comparison, the waiter
   # records and merges pull request 42 against the replacement task record.
@@ -1839,10 +1809,8 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   fi
 
   : > "$local_teardown_release"
-  set +e
-  wait "$local_teardown_pid"
-  local_teardown_rc=$?
-  set -e
+  local_teardown_rc=0
+  wait "$local_teardown_pid" || local_teardown_rc=$?
   if [ "$local_teardown_rc" -ne 0 ]; then
     : > "$local_merge_release"
     wait "$local_merge_pid" 2>/dev/null || true
@@ -1866,10 +1834,8 @@ test_merge_entrypoints_refuse_a_reused_task_incarnation() {
   tasks_in "$local_home" start "$local_id" >/dev/null \
     || fail "could not start the reused local task"
   : > "$local_merge_release"
-  set +e
-  wait "$local_merge_pid"
-  local_merge_rc=$?
-  set -e
+  local_merge_rc=0
+  wait "$local_merge_pid" || local_merge_rc=$?
   after=$(git -C "$local_new_repo" rev-parse main)
 
   # Without the pre-wait generation capture and locked comparison, the waiter
@@ -1901,7 +1867,7 @@ test_merge_entrypoints_serialize_forced_teardown_before_task_reads() {
     --repo sample --start >/dev/null || fail "could not create the PR teardown-race fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain merge approval pending" >/dev/null \
@@ -1942,13 +1908,11 @@ SH
     wait "$merge_pid" 2>/dev/null || true
     fail "the PR merge did not reach the post-metadata synchronization point"
   fi
-  set +e
+  teardown_rc=0
   PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/race-pr-teardown.out" 2> "$home/race-pr-teardown.err"
-  teardown_rc=$?
-  set -e
+    > "$home/race-pr-teardown.out" 2> "$home/race-pr-teardown.err" || teardown_rc=$?
   : > "$release"
   wait "$merge_pid"
   merge_rc=$?
@@ -1978,7 +1942,7 @@ SH
     --repo sample --start >/dev/null || fail "could not create the local teardown-race fixture"
   fm_write_meta "$local_home/state/$local_id.meta" \
     "window=firstmate:fm-$local_id" "endpoint_task_id=$local_id" "worktree=$local_wt" \
-    "project=$local_repo" "harness=codex" "kind=ship" "mode=local-only" \
+    "project=$local_repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=local-only" \
     "spawn_gen=fixture-$local_id"
   printf 'done: local merge ready\n' > "$local_home/state/$local_id.status"
   run_captain "$local_home" hold "$local_id" \
@@ -2025,13 +1989,11 @@ SH
     wait "$local_pid" 2>/dev/null || true
     fail "the local merge did not reach the post-validation synchronization point"
   fi
-  set +e
+  local_teardown_rc=0
   PATH="$local_home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$local_home" \
     FM_STATE_OVERRIDE="$local_home/state" FM_DATA_OVERRIDE="$local_home/data" \
     FM_CONFIG_OVERRIDE="$local_home/config" "$TEARDOWN" "$local_id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$local_home/race-local-teardown.out" 2> "$local_home/race-local-teardown.err"
-  local_teardown_rc=$?
-  set -e
+    > "$local_home/race-local-teardown.out" 2> "$local_home/race-local-teardown.err" || local_teardown_rc=$?
   : > "$local_release"
   wait "$local_pid"
   local_merge_rc=$?
@@ -2068,7 +2030,7 @@ test_released_merge_passes_the_entrypoint_and_lands() {
     --repo sample --start >/dev/null || fail "could not create the released merge fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
-    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "project=$repo" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=no-mistakes" \
     "pr=$pr" "spawn_gen=fixture-$id"
   printf 'done: merge ready\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain merge approval pending" >/dev/null \
@@ -2111,7 +2073,7 @@ test_teardown_refuses_a_ship_when_the_captain_hold_cannot_be_read() {
     --repo sample --start >/dev/null || fail "could not create the unreadable-hold fixture"
   fm_write_meta "$home/state/$id.meta" \
     "window=firstmate:fm-$id" "worktree=$home/projects/missing-$id" \
-    "project=$home/projects/sample" "harness=codex" "kind=ship" "mode=direct-PR" \
+    "project=$home/projects/sample" "harness=codex" "model=gpt-5.1-codex" "kind=ship" "mode=direct-PR" \
     "spawn_gen=fixture-$id"
   printf 'done: PR https://github.com/sample/sample/pull/7\n' > "$home/state/$id.status"
   run_captain "$home" hold "$id" --reason "captain must approve the sample change" >/dev/null \
@@ -2126,14 +2088,12 @@ exec "${REAL_TASKS_AXI:?}" "$@"
 SH
   chmod +x "$home/fakebin/tasks-axi"
 
-  set +e
+  rc=0
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     TASKS_AXI_FAIL_SHOW_ID="$id" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "cleanup treated an unreadable captain hold as permission to close"
   assert_present "$home/state/$id.meta" "read uncertainty must refuse before removing the task record"
   assert_absent "$home/state/$id.backlog-close" "read uncertainty staged a pending transition anyway"
