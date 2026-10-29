@@ -1,0 +1,98 @@
+== [target e1c624b] setup: refs/heads/fm/other packed only? loose file exists: no
+
+### S1 forge another task's packed branch with a plain file write
+fm/other real SHA: 8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1
+
+$ [confined] sed 's/^[0-9a-f]* refs\/heads\/fm\/other$/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef refs\/heads\/fm\/other/' /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs > /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.tmp-forge && cat /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.tmp-forge > /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs
+/bin/bash: /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs: Operation not permitted
+-> exit 1
+after: git rev-parse fm/other = 8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1
+RESULT S1: fm/other unchanged
+
+### S2 rename a forged file onto packed-refs
+
+$ [confined] sed 's/^[0-9a-f]* refs\/heads\/fm\/other$/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef refs\/heads\/fm\/other/' /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs > /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.lock && mv /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.lock /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs
+mv: rename /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.lock to /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs: Operation not permitted
+-> exit 1
+RESULT S2: fm/other unchanged
+fatal: Unable to create '/private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.lock': File exists.
+
+Another git process seems to be running in this repository, or the lock file may be stale
+
+### S3 git pack-refs --all from the worktree
+
+$ [confined] git pack-refs --all
+fatal: unable to write new packed-refs: unable to create file /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.new: Operation not permitted
+-> exit 128
+RESULT S3: fm/other unchanged
+
+### S4 own work keeps working: commit, stash push/pop, push -u, fetch
+
+$ [confined] echo hi > f.txt && git add f.txt && git commit -q -m own && git rev-parse --abbrev-ref HEAD
+fm-task
+-> exit 0
+
+$ [confined] echo dirty >> f.txt && git stash push -q -m nm-scen-tag && git stash list && git stash pop -q && git status --short
+stash@{0}: On fm-task: nm-scen-tag
+ M f.txt
+-> exit 0
+
+$ [confined] git push -q -u origin fm-task && git config --get branch.fm-task.remote
+origin
+-> exit 0
+
+### S5 fetch after origin deleted a branch whose remote-tracking ref is packed (repo fetch.prune=true)
+packed line present: 1
+
+$ [confined] git fetch origin
+error: could not delete reference refs/remotes/origin/gone: unable to create file /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.new: Operation not permitted
+From /private/tmp/nm-pr-scen/run.8sQx/origin
+ - [deleted]         (none)     -> origin/gone
+-> exit 1
+(above: without the fm-spawn prefix)
+
+$ [confined] fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; git config --get fetch.prune; git fetch origin
+false
+-> exit 0
+(above: with the exact fm-spawn.sh launch prefix)
+origin/gone still resolves: yes
+
+### S6 delete the task's own packed archive
+
+$ [confined] git branch -D archive/fm-task-submitted-0123abcd
+error: could not delete reference refs/heads/archive/fm-task-submitted-0123abcd: unable to create file /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.new: Operation not permitted
+-> exit 1
+archive still resolves: yes
+
+### S7 another task's packed branch delete
+
+$ [confined] git branch -D fm/other
+error: could not delete reference refs/heads/fm/other: cannot lock ref 'refs/heads/fm/other': unable to create directory for /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/refs/heads/fm/other
+-> exit 1
+RESULT S7: fm/other unchanged
+
+### S8 write a replace ref
+
+$ [confined] git replace -f 8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1 $(git rev-parse HEAD)
+error: cannot lock ref 'refs/replace/8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1': unable to create directory for /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/refs/replace/8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1
+-> exit 255
+refs/replace entries: 0
+
+### S9 packed refs/stash: push, pack, pop last entry
+
+$ [confined] git stash pop
+On branch fm-task
+Your branch is up to date with 'origin/fm-task'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   f.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+error: unable to create file /private/tmp/nm-pr-scen/run.8sQx/home/projects/proj/.git/packed-refs.new: Operation not permitted
+Dropped refs/stash@{0} (63f0b2275d83a2d3186655a1d3ea47a01a322531)
+-> exit 0
+stash list: []  refs/stash still -> 63f0b2275d83a2d3186655a1d3ea47a01a322531 (pushed 63f0b2275d83a2d3186655a1d3ea47a01a322531)
+
+packed-refs final, fm/other: 8c3db66b821e00b928b8b3ec7004c7bc8c75c7f1 refs/heads/fm/other

@@ -1,0 +1,90 @@
+== [base 8cd7049] setup: refs/heads/fm/other packed only? loose file exists: no
+
+### S1 forge another task's packed branch with a plain file write
+fm/other real SHA: 0c3613c2f78ab61d44097ceb27712464bb8de7f8
+
+$ [confined] sed 's/^[0-9a-f]* refs\/heads\/fm\/other$/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef refs\/heads\/fm\/other/' /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs > /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs.tmp-forge && cat /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs.tmp-forge > /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs
+-> exit 0
+after: git rev-parse fm/other = deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+fatal: git show-ref: bad ref refs/heads/fm/other (deadbeefdeadbeefdeadbeefdeadbeefdeadbeef)
+RESULT S1: fm/other FORGED/CHANGED
+
+### S2 rename a forged file onto packed-refs
+
+$ [confined] sed 's/^[0-9a-f]* refs\/heads\/fm\/other$/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef refs\/heads\/fm\/other/' /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs > /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs.lock && mv /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs.lock /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/packed-refs
+-> exit 0
+RESULT S2: fm/other FORGED/CHANGED
+
+### S3 git pack-refs --all from the worktree
+
+$ [confined] git pack-refs --all
+-> exit 0
+RESULT S3: fm/other unchanged
+
+### S4 own work keeps working: commit, stash push/pop, push -u, fetch
+
+$ [confined] echo hi > f.txt && git add f.txt && git commit -q -m own && git rev-parse --abbrev-ref HEAD
+fm-task
+-> exit 0
+
+$ [confined] echo dirty >> f.txt && git stash push -q -m nm-scen-tag && git stash list && git stash pop -q && git status --short
+stash@{0}: On fm-task: nm-scen-tag
+ M f.txt
+-> exit 0
+
+$ [confined] git push -q -u origin fm-task && git config --get branch.fm-task.remote
+origin
+-> exit 0
+
+### S5 fetch after origin deleted a branch whose remote-tracking ref is packed (repo fetch.prune=true)
+packed line present: 1
+
+$ [confined] git fetch origin
+From /private/tmp/nm-pr-scen/run.riA7/origin
+ - [deleted]         (none)     -> origin/gone
+-> exit 0
+(above: without the fm-spawn prefix)
+
+$ [confined] fm_n=${GIT_CONFIG_COUNT:-0}; export "GIT_CONFIG_KEY_$fm_n=fetch.prune" "GIT_CONFIG_VALUE_$fm_n=false" GIT_CONFIG_COUNT=$((fm_n + 1)); unset fm_n; git config --get fetch.prune; git fetch origin
+false
+-> exit 0
+(above: with the exact fm-spawn.sh launch prefix)
+origin/gone still resolves: no
+
+### S6 delete the task's own packed archive
+
+$ [confined] git branch -D archive/fm-task-submitted-0123abcd
+Deleted branch archive/fm-task-submitted-0123abcd (was 0c3613c).
+-> exit 0
+archive still resolves: no
+
+### S7 another task's packed branch delete
+
+$ [confined] git branch -D fm/other
+error: could not delete reference refs/heads/fm/other: cannot lock ref 'refs/heads/fm/other': unable to create directory for /private/tmp/nm-pr-scen/run.riA7/home/projects/proj/.git/refs/heads/fm/other
+-> exit 1
+RESULT S7: fm/other unchanged
+
+### S8 write a replace ref
+
+$ [confined] git replace -f 0c3613c2f78ab61d44097ceb27712464bb8de7f8 $(git rev-parse HEAD)
+-> exit 0
+refs/replace entries: 1
+
+### S9 packed refs/stash: push, pack, pop last entry
+
+$ [confined] git stash pop
+On branch fm-task
+Your branch is up to date with 'origin/fm-task'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   f.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (f1348ef8b66650d658b0dea3835102f408622ba7)
+-> exit 0
+stash list: []  refs/stash still -> none (pushed f1348ef8b66650d658b0dea3835102f408622ba7)
+
+packed-refs final, fm/other: 0c3613c2f78ab61d44097ceb27712464bb8de7f8 refs/heads/fm/other

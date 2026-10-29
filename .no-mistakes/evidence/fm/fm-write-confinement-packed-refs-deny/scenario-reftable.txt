@@ -1,0 +1,7 @@
+ref format: reftable
+$ [target] fm-write-confinement.py --worktree <reftable linked worktree> ...
+error: cannot prepare worker write confinement: a repository with reftable ref storage cannot be confined
+-> exit 1 ; profile written: no
+$ [base] fm-write-confinement.py --worktree <reftable linked worktree> ...
+error: cannot prepare worker write confinement: [Errno 17] File exists: '/private/tmp/nm-pr-scen/rt/home/projects/proj/.git/refs/heads'
+-> exit 1 ; profile written: no
