@@ -6,7 +6,9 @@
 # These cases drive the wrapper as a separate process: the limit arithmetic
 # against a stub `ps`, the refusals, and the incident reproduction - a shim
 # whose `basename` is itself, run under a small budget - which must stop inside
-# the budgeted tree while an unbudgeted probe keeps forking.
+# the budgeted tree while an unbudgeted probe keeps forking. --own-procs cases
+# prove the tree's own count, not the user's, decides the stop: neighbours that
+# spend the shared headroom starve the positional form and leave --own-procs alone.
 # Child commands are single-quoted on purpose: they expand in the child bash.
 # shellcheck disable=SC2016
 set -u
@@ -14,8 +16,6 @@ set -o pipefail
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
-# shellcheck source=bin/fm-timeout-lib.sh
-. "$ROOT/bin/fm-timeout-lib.sh"
 
 WRAP="$ROOT/bin/fm-proc-budget.sh"
 TMP_ROOT=$(fm_test_tmproot fm-proc-budget)
@@ -162,6 +162,7 @@ make_bomb() {  # <dir>
 #!/usr/bin/env bash
 SHIM_DEPTH=$(( ${SHIM_DEPTH:-0} + 1 )); export SHIM_DEPTH
 printf '%s\n' "$SHIM_DEPTH" >> "$SHIM_LOG"
+[ -z "${SHIM_PIDS:-}" ] || printf '%s\n' "$$" >> "$SHIM_PIDS"
 [ "$SHIM_DEPTH" -le "$SHIM_MAX_DEPTH" ] || exit 99
 n=$(basename "$0")
 exec "$n" "$@"
@@ -187,7 +188,9 @@ test_budget_stops_a_runaway_tree_inside_the_tree() {
   ' _ "$true_bin" "$TMP_ROOT/probe.stop" "$probe" 2>"$TMP_ROOT/probe.err" &
   probe_pid=$!
 
-  fm_run_timed 90 "$WRAP" 300 -- env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_MAX_DEPTH=1500 \
+  # No wall-clock cap: SHIM_MAX_DEPTH bounds a regressed wrapper and the
+  # runner's inactivity stop owns a hang.
+  "$WRAP" 300 -- env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_MAX_DEPTH=1500 \
     date +%s >"$TMP_ROOT/bomb.out" 2>"$err"
   rc=$?
   : >"$TMP_ROOT/probe.stop"
@@ -305,22 +308,26 @@ test_memory_setuid_member_is_not_counted() {
 }
 
 test_memory_root_exit_ends_leftovers() {
-  local start output rc pid
+  local output rc pid natural="$TMP_ROOT/memory-leftover.finished"
   mkdir -p "$TMP_ROOT/sleep-shim"
   printf '#!/bin/sh\necho "$$" >>"$FM_SLEEP_PIDS"\nexec /bin/sleep "$@"\n' >"$TMP_ROOT/sleep-shim/sleep"
   chmod +x "$TMP_ROOT/sleep-shim/sleep"
   : >"$TMP_ROOT/sleep.pids"
-  start=$SECONDS
+  rm -f "$natural"
+  # The leftover holds no stdout and marks its own natural finish after 600 s.
+  # Once its processes are gone, an absent mark proves the wrapper ended it.
   output=$(PATH="$TMP_ROOT/sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/sleep.pids" \
-    "$WRAP" --memory-kib 262144 -- bash -c 'sleep 600 & echo done')
+    "$WRAP" --memory-kib 262144 -- bash -c '
+      sh -c '\''sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
+      echo "$!" >>"$FM_SLEEP_PIDS"; echo done' _ "$natural")
   rc=$?
   expect_code 0 "$rc" "root status after a leftover background job is ended"
   assert_equals 'done' "$output" "the command's output is untouched"
-  [ $((SECONDS - start)) -lt 30 ] || fail "memory stop waited for a leftover descendant"
   # A job ended before its first line records no PID and leaves no sleep.
   while read -r pid; do
     assert_memory_pid_ended "$pid"
   done <"$TMP_ROOT/sleep.pids"
+  assert_absent "$natural" "the leftover ran to its natural finish instead of being ended"
   pass "the command's exit ends a background job orphaned before the first sample and returns at once"
 }
 
@@ -660,3 +667,411 @@ test_retained_soft_limit_seals_the_hard_limit
 test_exit_status_and_arguments_pass_through
 test_refusals_never_run_the_command
 test_budget_stops_a_runaway_tree_inside_the_tree
+
+# --- --own-procs: the tree's own count, never the user's ---------------------
+#
+# These waits have no wall-clock cap. They wait for an outcome the test itself
+# causes (a marker file, a process gone), and a hang is the runner's inactivity
+# stop to catch, not a guessed number of seconds here.
+wait_for_file() {  # <file> [<pid whose death ends the wait>]
+  while [ ! -e "$1" ]; do
+    [ -z "${2:-}" ] || kill -0 "$2" 2>/dev/null || return 1
+    sleep 0.05
+  done
+}
+
+pid_alive() {  # a zombie is not alive: it holds no work, only a table row
+  local state
+  kill -0 "$1" 2>/dev/null || return 1
+  if [ -r "/proc/$1/stat" ]; then
+    state=$(sed -e 's/.*) //' -e 's/ .*//' "/proc/$1/stat" 2>/dev/null)
+  else
+    # A confined worker's sandbox refuses ps, so the Darwin table comes from
+    # bin/fm-proc-info.py; elsewhere ps answers.
+    state=$(python3 "$ROOT/bin/fm-proc-info.py" table pid,stat 2>/dev/null | while read -r candidate status; do
+      [ "$candidate" != "$1" ] || printf '%s' "$status"
+    done)
+    [ -n "$state" ] || state=$(ps -o stat= -p "$1" 2>/dev/null | tr -d '[:space:]')
+  fi
+  case "$state" in
+    Z*) return 1 ;;
+  esac
+  return 0
+}
+
+wait_pids_ended() {  # <file of pids>
+  local pid
+  while read -r pid; do
+    while pid_alive "$pid"; do sleep 0.05; done
+  done <"$1"
+}
+
+test_own_procs_invalid_calls() {
+  local args marker="$TMP_ROOT/own-bad-ran"
+  for args in 0 01 -1 nope 1.5 1234567890; do
+    "$WRAP" --own-procs "$args" -- touch "$marker" 2>/dev/null
+    expect_code 2 $? "invalid own-procs limit $args"
+    assert_absent "$marker" "invalid own-procs limit $args cannot run the command"
+  done
+  "$WRAP" --own-procs -- touch "$marker" 2>/dev/null
+  expect_code 2 $? "own-procs without a value"
+  "$WRAP" --own-procs 5 --own-procs 6 -- touch "$marker" 2>/dev/null
+  expect_code 2 $? "own-procs given twice"
+  "$WRAP" --own-procs 50 --memory-kib 262144 -- touch "$marker" 2>/dev/null
+  expect_code 2 $? "own-procs combined with memory-kib"
+  "$WRAP" --memory-kib 262144 --own-procs 50 -- touch "$marker" 2>/dev/null
+  expect_code 2 $? "memory-kib combined with own-procs"
+  assert_absent "$marker" "a refused own-procs call must not run the command"
+  pass "invalid or combined own-procs calls refuse before launch"
+}
+
+test_own_procs_passes_status_and_arguments_through() {
+  local rc out
+  "$WRAP" --own-procs 50 -- bash -c 'exit 7'
+  rc=$?
+  expect_code 7 "$rc" "the child's exit status is the wrapper's"
+  out=$("$WRAP" --own-procs 50 -- printf '%s|' 'a b' c) || fail "arguments were not passed through"
+  assert_equals 'a b|c|' "$out" "arguments reach the child intact"
+  pass "own-procs passes the exit status and arguments through"
+}
+
+# The leash: a recursive tree is stopped by its own count, before the kernel
+# limit (left at its default here) is anywhere near.
+test_own_procs_stops_a_runaway_tree() {
+  local bomb="$TMP_ROOT/own-bomb" log="$TMP_ROOT/own-bomb.log" pids="$TMP_ROOT/own-bomb.pids"
+  local err="$TMP_ROOT/own-bomb.err" depth rc
+  make_bomb "$bomb"
+  : >"$log"
+  : >"$pids"
+  "$WRAP" --own-procs 100 -- env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_PIDS="$pids" SHIM_MAX_DEPTH=1500 \
+    date +%s >"$TMP_ROOT/own-bomb.out" 2>"$err"
+  rc=$?
+  expect_code 98 "$rc" "a tree past its own limit"
+  depth=$(tail -1 "$log")
+  [ -n "$depth" ] || fail "the bomb never started: $(cat "$err")"
+  [ "$depth" -gt 20 ] || fail "the bomb did not recurse (depth $depth): the case would be vacuous"
+  [ "$depth" -lt 1500 ] || fail "the own-tree stop did not stop the runaway tree (depth $depth)"
+  assert_contains "$(grep 'fm-proc-budget:' "$err")" "over the own-tree limit of 100" "the reason names the limit"
+  assert_not_contains "$(cat "$err")" "Resource temporarily unavailable" "the tree was stopped by its own count, not the kernel"
+  [ "$(grep -c 'fm-proc-budget:' "$err")" -eq 1 ] || fail "an own-tree stop must emit exactly one reason"
+  wait_pids_ended "$pids"
+  pass "a runaway tree is stopped at its own limit (depth $depth) and leaves no process behind"
+}
+
+test_own_procs_nested_wrapper() {
+  local rc pid pids="$TMP_ROOT/own-nested.pids"
+  : >"$pids"
+  "$WRAP" --own-procs 40 -- "$WRAP" --own-procs 100000 -- \
+    bash -c 'for _ in $(seq 1 80); do sleep 5001 & echo "$!" >>"$0"; done; wait' "$pids" \
+    2>"$TMP_ROOT/own-nested.err"
+  rc=$?
+  expect_code 98 "$rc" "the outer limit covers a nested wrapper's tree"
+  assert_contains "$(cat "$TMP_ROOT/own-nested.err")" "over the own-tree limit of 40" "the outer bound stops the payload"
+  [ -s "$pids" ] || fail "the nested payload never started"
+  while read -r pid; do
+    ! pid_alive "$pid" || fail "the nested payload outlived the outer stop"
+  done <"$pids"
+  pass "a lower outer own-tree limit counts and ends a nested wrapper's tree"
+}
+
+# The kernel limit is the safety net and keeps its meaning.
+test_own_procs_keeps_the_kernel_limit() {
+  local bomb="$TMP_ROOT/net-bomb" log="$TMP_ROOT/net-bomb.log" err="$TMP_ROOT/net-bomb.err" depth
+  make_bomb "$bomb"
+  : >"$log"
+  "$WRAP" 300 --own-procs 1000000 -- env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_MAX_DEPTH=1500 \
+    date +%s >"$TMP_ROOT/net-bomb.out" 2>"$err"
+  depth=$(tail -1 "$log")
+  [ -n "$depth" ] && [ "$depth" -gt 20 ] || fail "the bomb did not recurse (depth ${depth:-none})"
+  [ "$depth" -lt 1500 ] || fail "the kernel limit did not stop the runaway tree (depth $depth)"
+  assert_contains "$(cat "$err")" "Resource temporarily unavailable" "an out-of-reach own limit leaves the kernel limit to stop the tree"
+  pass "the kernel limit still stops a tree the own-tree limit cannot reach"
+}
+
+test_own_procs_leftovers_end_with_the_command() {
+  local out rc natural="$TMP_ROOT/own-leftover.finished"
+  mkdir -p "$TMP_ROOT/own-sleep-shim"
+  printf '#!/bin/sh\necho "$$" >>"$FM_SLEEP_PIDS"\nexec /bin/sleep "$@"\n' >"$TMP_ROOT/own-sleep-shim/sleep"
+  chmod +x "$TMP_ROOT/own-sleep-shim/sleep"
+  : >"$TMP_ROOT/own-sleep.pids"
+  rm -f "$natural"
+  # The leftover holds no stdout and marks its own natural finish after 600 s.
+  # Once its processes are gone, an absent mark proves the wrapper ended it.
+  out=$(PATH="$TMP_ROOT/own-sleep-shim:$PATH" FM_SLEEP_PIDS="$TMP_ROOT/own-sleep.pids" \
+    "$WRAP" --own-procs 50 -- bash -c '
+      sh -c '\''sleep 600; : >"$1"'\'' _ "$1" >/dev/null 2>&1 &
+      echo "$!" >>"$FM_SLEEP_PIDS"; echo done' _ "$natural")
+  rc=$?
+  expect_code 0 "$rc" "root status after a leftover background job is ended"
+  assert_equals 'done' "$out" "the command's output is untouched"
+  wait_pids_ended "$TMP_ROOT/own-sleep.pids"
+  assert_absent "$natural" "the leftover ran to its natural finish instead of being ended"
+  pass "a background job left behind by a finished command is ended and the wrapper returns"
+}
+
+test_own_procs_term_ends_the_tree() {
+  local pids="$TMP_ROOT/own-term.pids" wrapper rc
+  rm -f "$pids"
+  "$WRAP" --own-procs 50 -- bash -c 'sleep 5002 & echo "$$ $!" >"$0.tmp"; mv "$0.tmp" "$0"; wait' "$pids" &
+  wrapper=$!
+  wait_for_file "$pids" "$wrapper" || fail "the own-procs command never started"
+  kill -TERM "$wrapper"
+  wait "$wrapper"
+  rc=$?
+  expect_code 143 "$rc" "a TERM sent to the wrapper"
+  tr ' ' '\n' <"$pids" >"$pids.list"
+  wait_pids_ended "$pids.list"
+  pass "TERM to the wrapper ends the whole tree and returns 128 plus the signal"
+}
+
+# A TERM that lands right after the release, before the first sample, still
+# ends the started command through the tree cleanup.
+test_own_procs_term_at_release_ends_the_command() {
+  local rc finished="$TMP_ROOT/own-release-term.finished"
+  rm -f "$finished"
+  python3 - "$ROOT/bin/fm-proc-budget-tree.py" "$finished" <<'PY'
+import os
+import runpy
+import signal
+import sys
+
+tree = runpy.run_path(sys.argv[1], run_name="tree")
+real = os.write
+
+def write(fd, data):
+    written = real(fd, data)
+    if data == b"\n":
+        os.kill(os.getpid(), signal.SIGTERM)
+    return written
+
+os.write = write
+sys.exit(tree["run"](50, ["bash", "-c", 'sleep 30; : >"$1"', "_", sys.argv[2]]))
+PY
+  rc=$?
+  expect_code 143 "$rc" "a TERM caught as the command is released"
+  assert_absent "$finished" "the released command ran to its end instead of being ended"
+  pass "a TERM caught at the release ends the started command and returns 128 plus the signal"
+}
+
+# The dead-man link. The supervisor is killed mid-run: alone, and as a runner
+# such as bin/fm-duration.py ends the caller's group (TERM, then KILL at once).
+# The members ignore TERM, so only a KILL from the group's reader ends them.
+test_own_procs_supervisor_death_ends_the_tree() {
+  local pids="$TMP_ROOT/own-deadman.pids" target supervisor
+  for target in supervisor group; do
+    rm -f "$pids"
+    perl -e 'setpgrp(0, 0); exec @ARGV or die' "$WRAP" --own-procs 50 -- bash -c '
+      trap "" TERM; sleep 5003 & first=$!; sleep 5003 &
+      echo "$$ $first $!" >"$0.tmp"; mv "$0.tmp" "$0"; wait' "$pids" &
+    supervisor=$!
+    wait_for_file "$pids" "$supervisor" || fail "the own-procs command never started"
+    if [ "$target" = supervisor ]; then
+      kill -KILL "$supervisor"
+    else
+      kill -TERM -- "-$supervisor"
+      kill -KILL -- "-$supervisor"
+    fi
+    wait "$supervisor" 2>/dev/null
+    tr ' ' '\n' <"$pids" >"$pids.list"
+    wait_pids_ended "$pids.list"
+  done
+  pass "a supervisor killed mid-run, alone or with its caller's group, leaves no tree member running"
+}
+
+# An unreadable sample is "unknown, try again next sample". Only an unreadable
+# table before launch refuses; one the command already runs under never ends it.
+own_procs_driver() {  # <mode> <state-file>
+  python3 - "$ROOT/bin/fm-proc-budget-tree.py" "$1" "$2" <<'PY'
+import runpy
+import sys
+
+tree = runpy.run_path(sys.argv[1], run_name="tree")
+mode, state = sys.argv[2], sys.argv[3]
+real = tree["Table"].read
+calls = [0]
+
+def flaky(self):
+    calls[0] += 1
+    if mode == "launch":
+        raise tree["SampleError"]("injected: table unreadable")
+    # Call 1 is the launch check. The next three samples are unreadable; the
+    # command only exits after the third, so each one happened while it ran.
+    if 1 < calls[0] <= 4:
+        if calls[0] == 4:
+            open(state, "w").close()
+        raise tree["SampleError"]("injected: sample unreadable")
+    return real(self)
+
+tree["Table"].read = flaky
+script = 'if [ "$1" = launch ]; then touch "$2.ran"; exit 0; fi; while [ ! -e "$2" ]; do sleep 0.01; done; exit 7'
+sys.exit(tree["run"](50, ["bash", "-c", script, "_", mode, state]))
+PY
+}
+
+test_own_procs_unreadable_samples_are_unknown() {
+  local rc err="$TMP_ROOT/own-unreadable.err"
+  rm -f "$TMP_ROOT/own-state" "$TMP_ROOT/own-state.ran"
+  own_procs_driver sample "$TMP_ROOT/own-state" 2>"$err"
+  rc=$?
+  expect_code 7 "$rc" "samples that cannot be read while the command runs"
+  assert_contains "$(cat "$err")" "3 own-tree sample(s) were unreadable and skipped" "the skipped samples are reported once"
+  own_procs_driver launch "$TMP_ROOT/own-state" 2>"$err"
+  rc=$?
+  expect_code 125 "$rc" "a table that cannot be read before launch"
+  assert_absent "$TMP_ROOT/own-state.ran" "an unwatchable tree must not run"
+  assert_contains "$(cat "$err")" "command not started" "the refusal says the command did not start"
+  pass "an unreadable sample is skipped and reported; only an unreadable launch table refuses"
+}
+
+# The slow-host case. A neighbour lane spends the user's shared process count
+# while this tree runs, and every delay in the tree's work is five times longer.
+# The positional extra is headroom over the WHOLE user's count, so the tree
+# loses its forks; --own-procs counts only the tree and the same work succeeds.
+start_neighbours() {  # <count>
+  local dir="$TMP_ROOT/neighbours"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  cat >"$dir/spawn.py" <<'PY'
+import os
+import subprocess
+import sys
+
+count, ready, pids = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+kids = []
+try:
+    for _ in range(count):
+        kids.append(subprocess.Popen(["/bin/sleep", "86400"]))
+    with open(pids + ".tmp", "w") as handle:
+        handle.write(" ".join(str(kid.pid) for kid in kids))
+    os.rename(pids + ".tmp", pids)
+    open(ready, "w").close()
+    sys.stdin.read()  # the test closes the pipe, or dies, to release the neighbours
+finally:
+    for kid in kids:
+        kid.kill()
+    for kid in kids:
+        kid.wait()
+PY
+  mkfifo "$dir/hold"
+  python3 "$dir/spawn.py" "$1" "$dir/ready" "$dir/pids" <"$dir/hold" &
+  NEIGHBOUR_PID=$!
+  exec 8>"$dir/hold"
+  wait_for_file "$dir/ready" "$NEIGHBOUR_PID" || { stop_neighbours; return 1; }
+}
+
+stop_neighbours() {
+  exec 8>&-
+  wait "$NEIGHBOUR_PID"
+}
+
+make_slow_tree() {
+  local dir="$TMP_ROOT/slow-tree"
+  # The interpreter itself, not a version-manager shim that forks before the
+  # tree starts, so a starved control fails at the tree's own fork.
+  SLOW_TREE_PYTHON=$(python3 -c 'import sys; print(sys.executable)')
+  mkdir -p "$dir/shim"
+  # Every sleep the tree asks for lasts five times as long.
+  cat >"$dir/shim/sleep" <<'SH'
+#!/bin/sh
+exec /bin/sleep "$(awk -v n="$1" 'BEGIN { print n * 5 }')"
+SH
+  chmod +x "$dir/shim/sleep"
+  cat >"$dir/tree.py" <<'PY'
+import os
+import subprocess
+import sys
+import time
+
+ready, go, done = sys.argv[1:4]
+open(ready, "w").close()
+while not os.path.exists(go):
+    time.sleep(0.05)
+for _ in range(5):
+    subprocess.run(["/usr/bin/true"], check=True)  # a starved fork raises here
+    subprocess.run(["sleep", "0.1"], check=True)   # the shim makes it 0.5 s
+open(done, "w").close()
+PY
+}
+
+# run_slow_tree <neighbours> <wrapper args...>: prints the wrapper's exit status.
+run_slow_tree() {
+  local dir="$TMP_ROOT/slow-tree" neighbours=$1 wrapper rc
+  shift
+  rm -f "$dir/ready" "$dir/go" "$dir/done"
+  PATH="$dir/shim:$PATH" "$WRAP" "$@" -- "$SLOW_TREE_PYTHON" "$dir/tree.py" "$dir/ready" "$dir/go" "$dir/done" \
+    2>"$dir/err" &
+  wrapper=$!
+  wait_for_file "$dir/ready" "$wrapper" || { wait "$wrapper"; echo $?; return; }
+  start_neighbours "$neighbours" || {
+    kill "$wrapper"
+    wait "$wrapper"
+    fail "the neighbours never started (fork limit reached?)"
+  }
+  : >"$dir/go"
+  wait "$wrapper"
+  rc=$?
+  stop_neighbours
+  echo "$rc"
+}
+
+test_own_procs_survives_neighbours_on_a_slow_host() {
+  local dir="$TMP_ROOT/slow-tree" rc
+  make_slow_tree
+  # Control: the positional extra of 16 is spent by 300 neighbour processes, so
+  # the rest of the user would have to free 284 processes to leave it unstarved.
+  rc=$(run_slow_tree 300 16) || exit 1
+  [ "$rc" != 0 ] || fail "the control was not starved: the scenario would be vacuous"
+  assert_absent "$dir/done" "the starved control must not have finished"
+  assert_contains "$(cat "$dir/err")" "BlockingIOError" "the control lost its forks to the neighbours"
+  rc=$(run_slow_tree 300 --own-procs 128) || exit 1
+  expect_code 0 "$rc" "a tree under its own limit while neighbours spend the shared count"
+  assert_present "$dir/done" "the slowed tree finished its work"
+  pass "neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower"
+}
+
+test_own_procs_reads_a_linux_stat_row() {
+  python3 - "$ROOT/bin/fm-proc-budget-tree.py" <<'PY' || fail "the Linux /proc row was misread"
+import runpy
+import sys
+
+parse = runpy.run_path(sys.argv[1], run_name="tree")["Table"].parse_stat
+# pid (comm) state ppid pgrp session tty tpgid flags minflt cminflt majflt cmajflt
+# utime stime cutime cstime priority nice threads itrealvalue starttime ...
+tail = b"%s 4321 4300 4300 0 -1 4194560 11 0 0 0 1 2 0 0 20 0 1 0 987654 1000 100"
+assert parse(b"4400 (bash) " + tail % b"S") == (4321, 4300, 987654, False)
+assert parse(b"4400 (a b) (c)) " + tail % b"R") == (4321, 4300, 987654, False), "parentheses in the name"
+assert parse(b"4400 (sleep) " + tail % b"Z") == (4321, 4300, 987654, True), "a zombie"
+assert parse(b"4400 (sleep) " + tail % b"X") == (4321, 4300, 987654, True), "a dead row"
+assert parse(b"4400 (half) S 1") is None, "a half-read row is skipped, not guessed"
+assert parse(b"") is None
+PY
+  pass "a Linux /proc row yields parent, group, start identity and zombie state"
+}
+
+test_own_procs_command_start_matches_exec() {
+  local target plain own
+  printf 'echo ran-as-script\n' >"$TMP_ROOT/own-no-shebang"
+  chmod +x "$TMP_ROOT/own-no-shebang"
+  : >"$TMP_ROOT/own-not-executable"
+  for target in "$TMP_ROOT/no-such-command" fm-proc-budget-no-such-command "$TMP_ROOT/own-not-executable" "$TMP_ROOT/own-no-shebang"; do
+    plain=$("$WRAP" -- "$target" 2>/dev/null; echo "rc=$?")
+    own=$("$WRAP" --own-procs 50 -- "$target" 2>/dev/null; echo "rc=$?")
+    assert_equals "$plain" "$own" "own-procs starts $target as exec does"
+  done
+  assert_equals $'ran-as-script\nrc=0' "$own" "a script without a shebang runs under the shell"
+  pass "a command that cannot start, or a script without a shebang, behaves as without the option"
+}
+
+test_own_procs_invalid_calls
+test_own_procs_reads_a_linux_stat_row
+test_own_procs_command_start_matches_exec
+test_own_procs_passes_status_and_arguments_through
+test_own_procs_unreadable_samples_are_unknown
+test_own_procs_leftovers_end_with_the_command
+test_own_procs_term_ends_the_tree
+test_own_procs_term_at_release_ends_the_command
+test_own_procs_supervisor_death_ends_the_tree
+test_own_procs_stops_a_runaway_tree
+test_own_procs_nested_wrapper
+test_own_procs_keeps_the_kernel_limit
+test_own_procs_survives_neighbours_on_a_slow_host

@@ -41,10 +41,8 @@ EOF
       and (.reports | any(.id == "sample-route-review"))
   ' >/dev/null || fail "the pre-policy omission shape was not reproduced: $json"
 
-  set +e
-  run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "completed investigation teardown erased a report-only unresolved captain call"
   assert_present "$home/state/$id.meta" "refused completion must preserve investigation metadata"
   assert_grep "REFUSED" "$home/teardown.err" "refusal must be explicit"
@@ -826,11 +824,9 @@ test_secondmate_reconcile_publishes_before_request_retirement() {
   request="$mate/state/reconcile-requests/reconcile-channel-call.request"
 
   chmod 0500 "$mate/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$mate" reconcile close reconcile-channel-call \
-    --evidence-file "$evidence" 2>&1)
-  rc=$?
-  set -e
+    --evidence-file "$evidence" 2>&1) || rc=$?
   chmod 0700 "$mate/state/reconcile-requests"
   [ "$rc" -ne 0 ] || fail "failed reconcile request retirement reported success"
   assert_contains "$out" "reconcile-channel-call" \
@@ -859,10 +855,8 @@ test_secondmate_reconcile_publishes_before_request_retirement() {
   printf 'Proceed with the release.\n' > "$mate/answer.txt"
   request="$mate/state/reconcile-requests/answer-channel-call.request"
   chmod 0500 "$mate/state/reconcile-requests"
-  set +e
-  out=$(run_captain "$mate" answer answer-channel-call --decision-file "$mate/answer.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$mate" answer answer-channel-call --decision-file "$mate/answer.txt" 2>&1) || rc=$?
   chmod 0700 "$mate/state/reconcile-requests"
   [ "$rc" -ne 0 ] || fail "failed normal-answer request retirement reported success"
   show=$(tasks_in "$mate" show answer-channel-call --full)

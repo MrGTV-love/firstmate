@@ -132,10 +132,8 @@ start_slot_worker() {  # <case>
 
 assert_refused_without_mutation() {  # <case> <id> <description>
   local dir=$1 id=$2 description=$3 rc
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "$description: teardown unexpectedly succeeded"
   assert_present "$dir/home/state/$id.meta" "$description: metadata changed before refusal"
   assert_present "$dir/worktree/sentinel" "$description: worktree changed before refusal"
@@ -209,10 +207,8 @@ test_control_lock_contention_refuses_before_mutation() {
     "window=isolated:fm-$id" "endpoint_task_id=other-task" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown unexpectedly succeeded under lifecycle lock contention"
   assert_present "$dir/home/state/$id.meta" "contended teardown removed task metadata"
   assert_present "$dir/worktree/sentinel" "contended teardown changed the worktree"
@@ -364,10 +360,8 @@ test_supported_backend_endpoint_records_validate() {
   fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid cmux endpoint refused"
 
   for backend in tmux herdr zellij orca cmux; do
-    set +e
-    fm_backend_kill "$backend" "" >/dev/null 2>&1
-    target=$?
-    set -e
+    target=0
+    fm_backend_kill "$backend" "" >/dev/null 2>&1 || target=$?
     [ "$target" -ne 0 ] || fail "$backend generic kill accepted an empty target"
   done
   pass "cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses"
@@ -404,12 +398,10 @@ test_orca_composite_worktree_id_validates() {
 test_tmux_empty_target_refuses_without_invocation() {
   local dir rc
   dir=$(make_case direct-empty)
-  set +e
+  rc=0
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
     bash -c '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_tmux_kill ""' _ "$ROOT" \
-    > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+    > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "direct empty tmux target unexpectedly succeeded"
   [ ! -s "$dir/runtime.log" ] || fail "direct empty tmux target invoked tmux"
   pass "tmux backend: direct empty target returns nonzero without invoking tmux"
@@ -470,26 +462,22 @@ SH
 
   fm_write_meta "$dir/home/state/invalid.meta" \
     "window=" "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" invalid --force --drop-file "$(fm_test_drop_file)" \
-    > "$dir/invalid.out" 2> "$dir/invalid.err"
-  rc=$?
-  set -e
+    > "$dir/invalid.out" 2> "$dir/invalid.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "isolated invalid endpoint unexpectedly succeeded"
   [ ! -s "$dir/runtime.log" ] || fail "isolated invalid endpoint reached tmux"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "$control" || fail "invalid cleanup removed control window"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "$target" || fail "invalid cleanup removed target window"
 
-  set +e
+  rc=0
   # shellcheck disable=SC2016 # $1 expands inside the isolated child shell.
   env -u TMUX -u TMUX_PANE FM_TEST_TMUX_SOCKET="$socket_id" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" bash -c \
     '. "$1/bin/fm-backend.sh"; fm_backend_source tmux; fm_backend_tmux_kill ""' _ "$ROOT" \
-    > "$dir/empty.out" 2> "$dir/empty.err"
-  rc=$?
-  set -e
+    > "$dir/empty.out" 2> "$dir/empty.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "isolated direct empty target unexpectedly succeeded"
   [ ! -s "$dir/runtime.log" ] || fail "isolated direct empty target reached tmux"
   isolated_tmux_window_exists "$dir" "$socket" "$session" "$control" || fail "direct empty cleanup removed control window"
@@ -565,10 +553,8 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
   start_slot_worker "$dir"
   worker=$SLOT_WORKER
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
 
   [ "$rc" -ne 0 ] || fail "teardown returned a pool slot a second task record still holds"
   kill -0 "$worker" 2>/dev/null || fail "teardown killed the worker holding the reused pool slot"
@@ -593,10 +579,8 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "home=$dir/worktree" \
     "project=$dir/project" "kind=secondmate"
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown returned a pool slot a secondmate home record still holds"
   assert_present "$dir/worktree/sentinel" "teardown reset a pool slot a secondmate home record still holds"
   assert_present "$dir/home/state/$other.meta" "teardown removed the secondmate record"
@@ -611,10 +595,8 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   ln "$dir/home/state/$id.meta" "$dir/home/state/$other.meta"
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown returned a pool slot a hardlinked second task record still holds"
   assert_present "$dir/worktree/sentinel" "teardown reset a pool slot a hardlinked second task record still holds"
   assert_contains "$(cat "$dir/stderr")" "$other" \
@@ -643,10 +625,8 @@ test_cross_home_pool_slot_collision_refuses() {
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$second_project" "kind=scout"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown returned a pool slot held by another firstmate home"
   assert_present "$dir/home/state/$id.meta" "cross-home collision removed stale metadata"
   assert_present "$second_home/state/$other.meta" "cross-home collision removed live metadata"
@@ -872,10 +852,8 @@ test_project_lock_anchors_at_the_local_root_across_home_layouts() {
   # Everything other than a remote route still fails closed.
   printf 'schema=fm-secondmate-parent.v1\nroute=sideways\n' \
     > "$remote_child/.fm-secondmate-parent"
-  set +e
-  resolve_project_lock "$remote_child" "$remote_child/projects/project" >/dev/null 2>&1
-  rc=$?
-  set -e
+  rc=0
+  resolve_project_lock "$remote_child" "$remote_child/projects/project" >/dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail "an unsupported parent route resolved a project lock instead of refusing"
 
   pass "Treehouse project locking anchors at the local root for main-home, local-secondmate, and remote-seeded layouts"
@@ -890,10 +868,8 @@ test_remote_seeded_home_returns_its_uncontested_slot() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "teardown in a remote-seeded home refused its own uncontested slot: $(cat "$dir/stderr")"
   assert_absent "$dir/home/state/$id.meta" "remote-seeded teardown left the task record"
@@ -935,10 +911,8 @@ test_remote_seeded_home_still_refuses_a_slot_its_child_holds() {
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$child_project" "kind=scout"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] \
     || fail "a remote-seeded home returned a pool slot its own local child still holds"
   assert_present "$dir/home/state/$id.meta" "remote-layout collision removed stale metadata"
@@ -1006,10 +980,8 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   for ticket in "$lock.queue"/ticket-*; do [ ! -L "$ticket" ] || tickets=$((tickets + 1)); done
   [ "$tickets" = 1 ] || fail "the remote-layout teardown did not register on the shared project queue: $(cat "$dir/stderr")"
   assert_present "$dir/home/state/$id.meta" "the queued remote-layout teardown removed the task record before admission"
-  set +e
-  wait "$waiter"
-  rc=$?
-  set -e
+  rc=0
+  wait "$waiter" || rc=$?
 
   [ "$rc" -ne 0 ] \
     || fail "a remote-seeded home returned a pool slot while its local child held the shared lock"
@@ -1072,10 +1044,8 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   start_slot_worker "$dir"
   worker=$SLOT_WORKER
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
 
   [ "$rc" -eq 0 ] || fail "teardown of a task whose slot was reassigned failed: $(cat "$dir/stderr")"
   kill -0 "$worker" 2>/dev/null || fail "teardown killed the worker holding the reassigned pool slot"
@@ -1101,12 +1071,10 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   start_slot_worker "$dir"
   worker=$SLOT_WORKER
 
-  set +e
+  rc=0
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
-    "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+    "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -eq 0 ] || fail "teardown of a clean ship task whose slot was reassigned failed: $(cat "$dir/stderr")"
   kill -0 "$worker" 2>/dev/null || fail "teardown killed the worker holding the clean reassigned pool slot"
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "clean reassigned slot without --force"
@@ -1122,10 +1090,8 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   printf 'not-a-claim\n' > "$dir/pool/1/.fm-slot-owner"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown returned a pool slot whose claim could not be read"
   assert_present "$dir/worktree/sentinel" "teardown reset a pool slot whose claim could not be read"
   assert_present "$dir/pool/1/.fm-slot-owner" "teardown removed an unreadable slot claim"
@@ -1155,10 +1121,8 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down() {
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   claim_pool_slot "$dir" "$other"
 
-  set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -eq 0 ] || fail "records-only teardown of a stale record on a claimed slot failed: $(cat "$dir/stderr")"
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "stale record beside the claimant's record"
   assert_present "$dir/worktree/sentinel" "records-only teardown reset the claimant's slot"
@@ -1204,12 +1168,10 @@ SH
   git -C "$dir/pool/1/project" status --porcelain --untracked-files=all > "$dir/status-before"
   git -C "$dir/pool/1/project" rev-parse HEAD > "$dir/head-before"
 
-  set +e
+  rc=0
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
   FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
-    "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr"
-  rc=$?
-  set -e
+    "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
   [ "$rc" -eq 0 ] || fail "non-forcing records-only teardown of a stale ship on a claimed slot failed: $(cat "$dir/stderr")"
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "stale ship beside the claimant's record without --force"
   cmp -s "$dir/other-before" "$dir/home/state/$other.meta" || fail "non-forcing records-only teardown changed the claimant's record"
@@ -1327,13 +1289,11 @@ test_failed_endpoint_close_refuses_before_removing_the_record() {
 
   write_endpoint_close_meta "$dir" "$id" "$session:fm-$id"
 
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
-    > "$dir/failed.out" 2> "$dir/failed.err"
-  rc=$?
-  set -e
+    > "$dir/failed.out" 2> "$dir/failed.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "teardown reported success after a close that failed: $(cat "$dir/failed.err")"
   assert_no_grep "teardown $id complete" "$dir/failed.out" \
     "teardown announced a completed cleanup after a close that failed"
@@ -1387,13 +1347,11 @@ test_forced_teardown_continues_past_a_close_it_could_not_make() {
   # Exactly the same case run twice, so the only difference is the operator's
   # explicit authority. Unforced it still refuses, which is what makes --force
   # an override rather than the absence of a gate.
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
-    > "$dir/unforced.out" 2> "$dir/unforced.err"
-  rc=$?
-  set -e
+    > "$dir/unforced.out" 2> "$dir/unforced.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "the unforced run did not refuse a close that failed: $(cat "$dir/unforced.err")"
   assert_present "$dir/home/state/$id.meta" "the unforced refusal removed the task record"
   grep -qF -- "--force" "$dir/unforced.err" \
@@ -1435,13 +1393,11 @@ test_unreadable_close_read_refuses_while_a_definitive_absence_completes() {
   write_close_failing_tmux_shim "$dir" "$socket" "$REAL_TMUX"
   write_endpoint_close_meta "$dir" "$id" "$session:fm-$id"
 
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 FM_TEST_UNREADABLE_LIST=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$id" \
-    > "$dir/unreadable.out" 2> "$dir/unreadable.err"
-  rc=$?
-  set -e
+    > "$dir/unreadable.out" 2> "$dir/unreadable.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "an unreadable inventory passed for proof the window closed: $(cat "$dir/unreadable.err")"
   awk '/^tmux <kill-window>/ { closed = 1; next } closed && /^tmux <list-windows>/ { reread = 1 } END { exit !reread }' \
     "$dir/runtime.log" || fail "the refusal did not come from the inventory re-read after the failed close"
@@ -1506,13 +1462,11 @@ test_forced_secondmate_child_close_failure_still_refuses() {
   # --force cannot also be the way past it: honoring force here would delete
   # the refusal rather than override it, and discard a child home whose
   # endpoint is still live.
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE FM_TEST_BLOCK_KILL=1 \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$PATH" "$TEARDOWN" "$parent" --force --drop-file "$(fm_test_drop_file)" \
-    > "$dir/child.out" 2> "$dir/child.err"
-  rc=$?
-  set -e
+    > "$dir/child.out" 2> "$dir/child.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "forced secondmate cleanup continued past a child close that failed: $(cat "$dir/child.err")"
   assert_grep "child $child" "$dir/child.err" \
     "the refusal did not name the child whose endpoint could not be closed"
@@ -1589,13 +1543,11 @@ test_orca_close_failure_refuses_even_under_force() {
     "worktree=$dir/nonexistent-worktree" "project=$dir/nonexistent-project" \
     "backend=orca" "orca_worktree_id=worktree-9::/orca/worktree-9" "kind=ship" "mode=no-mistakes"
 
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$dir/orca-forced.out" 2> "$dir/orca-forced.err"
-  rc=$?
-  set -e
+    > "$dir/orca-forced.out" 2> "$dir/orca-forced.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "a forced Orca cleanup continued past a close that never happened: $(cat "$dir/orca-forced.err")"
   assert_grep "could not be closed" "$dir/orca-forced.err" \
     "the forced Orca run did not report the close it could not make"
@@ -1611,13 +1563,11 @@ test_orca_close_failure_refuses_even_under_force() {
   # stops - unlike the generic site, where
   # test_forced_teardown_continues_past_a_close_it_could_not_make proves the
   # same operator authority does get through.
-  set +e
+  rc=0
   env -u TMUX -u TMUX_PANE \
     FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" FM_RUNTIME_LOG="$dir/runtime.log" \
     PATH="$dir/fakebin:$orca_free" "$TEARDOWN" "$id" \
-    > "$dir/orca-unforced.out" 2> "$dir/orca-unforced.err"
-  rc=$?
-  set -e
+    > "$dir/orca-unforced.out" 2> "$dir/orca-unforced.err" || rc=$?
   [ "$rc" -ne 0 ] || fail "an unforced Orca cleanup completed with no CLI to close its terminal: $(cat "$dir/orca-unforced.err")"
   assert_present "$dir/home/state/$id.meta" \
     "the unforced Orca refusal removed the only durable record naming the terminal"
@@ -1668,17 +1618,7 @@ test_already_gone_endpoint_still_completes_without_a_refusal() {
 }
 
 # Optional positional test function names select cases without changing the default suite.
-if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
-    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
-  done
-  for selected_test in "$@"; do
-    "$selected_test" || exit "$?"
-  done
-  exit 0
-fi
-
+tests=(
 test_invalid_endpoint_records_refuse_before_mutation
 test_control_lock_contention_refuses_before_mutation
 test_non_pool_teardown_ignores_task_set_lock
@@ -1708,3 +1648,5 @@ test_local_home_walk_refuses_an_unreadable_registry
 test_remote_seeded_home_returns_its_uncontested_slot
 test_remote_seeded_home_still_refuses_a_slot_its_child_holds
 test_remote_layout_homes_serialize_on_one_project_lock
+)
+fm_test_run_cases "${tests[@]}" -- "$@"
