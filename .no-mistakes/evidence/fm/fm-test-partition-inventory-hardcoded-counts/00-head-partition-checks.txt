@@ -1,0 +1,21 @@
+### Scenario 0: real repo at head - every partition check, run through bin/fm-proc-budget.sh
+$ FM_TEST_ONLY=test_partition_checks_judge_loss_and_duplication bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+ok - the partition checks catch an unregistered, ghost, duplicated, or unlisted case and accept an added test
+exit=0
+$ FM_TEST_ONLY=test_teardown_groups_register_each_case_once bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+$ FM_TEST_ONLY=test_control_relaunch_groups_partition_one_inventory bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+not ok - unknown test: test_control_relaunch_groups_partition_one_inventory
+exit=1
+$ FM_TEST_ONLY=test_watch_triage_waits_groups_partition_one_inventory bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+not ok - unknown test: test_watch_triage_waits_groups_partition_one_inventory
+exit=1
+$ FM_TEST_ONLY=test_pr_merge_groups_partition_one_inventory bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+not ok - unknown test: test_pr_merge_groups_partition_one_inventory
+exit=1
+$ FM_TEST_ONLY=test_fm_lint_groups_partition_one_inventory bin/fm-proc-budget.sh -- bash tests/fm-test-run.test.sh
+not ok - unknown test: test_fm_lint_groups_partition_one_inventory
+exit=1
+### grep for hard-coded totals at head:
+(none)

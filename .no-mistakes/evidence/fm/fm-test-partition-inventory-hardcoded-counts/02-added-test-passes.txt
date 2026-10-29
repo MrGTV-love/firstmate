@@ -1,0 +1,73 @@
+### S0 sanity: unmodified copy of head, all five real-suite partition checks
+--- head checker:
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the watch-triage scripts call each helper-defined case exactly once
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+
+### S1 a PR adds ONE registered test to tests/fm-pr-merge-checks.test.sh (the PR 295-297 failure)
++test_lab_new_merge_case() {
++  pass "test_lab_new_merge_case"
++}
++  test_lab_new_merge_case
+--- head checker:
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+--- base checker (commit 87351484b, before the change):
+not ok - the fm-pr-merge groups register 159 cases, not the 158-case inventory they partition
+exit=1
+
+### S2 a PR adds ONE registered test to tests/fm-teardown-cleanup.test.sh
++test_lab_new_teardown_case() {
++  pass "test_lab_new_teardown_case"
++}
++  test_lab_new_teardown_case
+--- head checker:
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+--- base checker (commit 87351484b, before the change):
+not ok - tests/fm-teardown-cleanup.test.sh must register exactly the cases it defines; mismatch: test_lab_new_teardown_case 
+exit=1
+
+### S3 a PR adds ONE registered test to tests/fm-control-relaunch-recovery.test.sh and one to tests/fm-lint-slots.test.sh
++test_lab_new_relaunch_case() {
++  pass "test_lab_new_relaunch_case"
++}
++  test_lab_new_relaunch_case
++test_lab_new_lint_case() {
++  pass "test_lab_new_lint_case"
++}
++  test_lab_new_lint_case
+--- head checker:
+ok - the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+--- base checker (commit 87351484b, before the change):
+not ok - the control-relaunch groups register 161 cases, not the 160-case inventory they partition
+not ok - the fm-lint groups register 87 cases, not the 86-case inventory they partition
+exit=1
+
+### S4 a PR adds ONE watch-triage case to the helper and calls it from tests/fm-watch-triage-waits-away.test.sh
++test_lab_new_wait_case() {
++  pass "lab"
++}
++test_lab_new_wait_case
+--- head checker:
+ok - the watch-triage scripts call each helper-defined case exactly once
+exit=0
+--- base checker (commit 87351484b, before the change):
+not ok - the watch-triage-waits groups call 68 cases, not the 67-case inventory they partition
+exit=1
+### S2b a PR adds ONE registered test to tests/fm-teardown-cleanup.test.sh, written in that file's own unindented registry style
++test_lab_new_teardown_case() {
++  pass "test_lab_new_teardown_case"
++}
++test_lab_new_teardown_case
+--- head checker:
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+--- base checker (commit 87351484b, before the change):
+not ok - the teardown groups register 341 cases, not the 340-case inventory they partition
+exit=1

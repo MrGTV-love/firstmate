@@ -1,0 +1,118 @@
+### H1 lost case: a test defined in tests/fm-pr-merge-forges.test.sh but never registered
++test_lab_orphan_case() {
++  pass "never runs"
++}
+--- head checker:
+not ok - the fm-pr-merge groups do not partition their suite: tests/fm-pr-merge-forges.test.sh defines test_lab_orphan_case but does not register it
+exit=1
+
+### H2 ghost case: tests/fm-lint-report.test.sh registers a test it never defines
++test_lab_ghost_case
+--- head checker:
+not ok - the fm-lint groups do not partition their suite: tests/fm-lint-report.test.sh registers test_lab_ghost_case but does not define it
+exit=1
+
+### H3 copy that should have moved: a teardown case from fm-teardown.test.sh is also defined and registered in fm-teardown-pool.test.sh
+case: test_local_only_fork_remote_allows
++test_local_only_fork_remote_allows() {
++  pass "test_local_only_fork_remote_allows"
++}
++test_local_only_fork_remote_allows
+--- head checker:
+not ok - the teardown groups do not partition their suite: registered in more than one group: test_local_only_fork_remote_allows ;defined in more than one group: test_local_only_fork_remote_allows 
+exit=1
+--- base checker (commit 87351484b, before the change):
+not ok - a teardown case is registered in more than one group: test_local_only_fork_remote_allows
+exit=1
+
+### H4 lost case: drop one real registration line from tests/fm-teardown-cleanup.test.sh, keep its definition
+case: test_teardown_never_holds_up_a_steer_to_another_task
+-test_teardown_never_holds_up_a_steer_to_another_task
+--- head checker:
+not ok - the teardown groups do not partition their suite: tests/fm-teardown-cleanup.test.sh defines test_teardown_never_holds_up_a_steer_to_another_task but does not register it
+exit=1
+
+### H5 same name twice in one file: a new case in tests/fm-teardown-cleanup.test.sh reuses an existing name (bash keeps only the last body)
+case: test_teardown_never_holds_up_a_steer_to_another_task
++test_teardown_never_holds_up_a_steer_to_another_task() {
++  pass "second body"
++}
+--- head checker:
+not ok - the teardown groups do not partition their suite: tests/fm-teardown-cleanup.test.sh defines test_teardown_never_holds_up_a_steer_to_another_task twice
+exit=1
+--- base checker (commit 87351484b, before the change):
+not ok - tests/fm-teardown-cleanup.test.sh must register exactly the cases it defines; mismatch: test_teardown_never_holds_up_a_steer_to_another_task 
+exit=1
+
+### H6 false heredoc opener in a comment hides an unregistered case before a real <<'SH' heredoc (tests/fm-pr-merge-checks.test.sh)
++# the stub is written with <<'SH' below
++test_lab_hidden_case() {
++  cat > /dev/null <<'SH'
++x
++SH
++}
+--- head checker:
+not ok - the fm-pr-merge groups do not partition their suite: tests/fm-pr-merge-checks.test.sh:1807: heredoc <<SH opens inside the <<SH heredoc from line 1805, so the cases between are unjudged
+exit=1
+--- base checker (commit 87351484b, before the change):
+ok - the fm-pr-merge groups are a duplicate-free 158-case cover, each case registered by the file that defines it
+exit=0
+
+### H7 control-relaunch: an unregistered case in tests/fm-control-relaunch-backends.test.sh that nothing calls
++test_lab_uncalled_case() {
++  pass "never runs"
++}
+--- head checker:
+not ok - the control-relaunch groups do not partition their suite: tests/fm-control-relaunch-backends.test.sh defines test_lab_uncalled_case but does not register it
+exit=1
+--- base checker (commit 87351484b, before the change):
+ok - the control-relaunch groups are a duplicate-free 160-case cover, each case registered by the file that defines it
+exit=0
+
+### H8 watch-triage: a helper case that no script calls
++test_lab_uncalled_wait() {
++  pass "never runs"
++}
+--- head checker:
+not ok - the watch-triage groups do not partition their suite: tests/fm-watch-triage-helpers.sh defines test_lab_uncalled_wait but no listed script calls it
+exit=1
+
+### H9 watch-triage: one existing helper case called by two scripts
+case: test_terminal_stale_surfaced
++test_terminal_stale_surfaced
+--- head checker:
+not ok - the watch-triage groups do not partition their suite: registered in more than one group: test_terminal_stale_surfaced 
+exit=1
+
+### H10 a stray script declares the fm-pr-merge registry but is not a listed group
+pr_merge_test_cases=(
+test_lab_stray
+)
+test_lab_stray() { :; }
+--- head checker:
+not ok - the fm-pr-merge groups do not partition their suite: tests/fm-pr-merge-stray.test.sh uses the same suite but is not a listed group
+exit=1
+
+### H11 legit move: one case (definition + registration) moved from fm-pr-merge-checks to fm-pr-merge-forges
+case: test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
+ tests/fm-pr-merge-checks.test.sh | 18 ------------------
+ tests/fm-pr-merge-forges.test.sh | 19 +++++++++++++++++++
+ 2 files changed, 19 insertions(+), 18 deletions(-)
+--- head checker:
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
+
+### H12 a listed group file disappears (tests/fm-lint-slots.test.sh removed)
+ D tests/fm-lint-slots.test.sh
+--- head checker:
+not ok - the fm-lint groups do not partition their suite: missing group file: tests/fm-lint-slots.test.sh
+exit=1
+
+### after reset: copy is clean again
+--- head checker:
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the watch-triage scripts call each helper-defined case exactly once
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0
