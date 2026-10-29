@@ -8,8 +8,8 @@
 # or required facts are unreadable. No new work runs after that return, and no
 # existing work is stopped. Neither the recorded one-run peak and headroom
 # margin shown in each reading nor the non-fleet RSS alarm baseline affects
-# that result. baseline derives the alarm envelope from recorded healthy
-# readings; the engine header owns every record's contents and derivation.
+# that result. baseline derives the alarm envelope from recorded healthy root
+# probe readings; the engine header owns every record's contents and derivation.
 # run checks once and execs a NEW run only; reattach/respond directly so pressure
 # cannot prevent supervising existing work. admit, run and sample only record a
 # reading in the invoking home's state.
