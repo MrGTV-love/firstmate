@@ -1,0 +1,33 @@
+commit=0959c15be2a1c179893d95deda3409925550368b
+$ progress-check rec 0 default
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+exit=2
+$ progress-check rec 0 default --while-alive /Users/charlesabrooker/tmp/r2-cli.yz9rrA/f
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+exit=2
+$ progress-check rec -5 1
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+exit=2
+$ progress-check rec 39673 default --while-alive   (live sleep peer, twice)
+exit=0
+exit=0 (900s default window not expired)
+$ progress-check rec2 39673 0.3 --while-alive   (live silent peer, 0.3s window)
+exit=0
+no_progress: "pid=39673 no CPU or watched-file progress for 0.8s"
+exit=124 (124 = silent for inactivity window)
+peer still alive after verdicts (never signalled)
+$ progress-check rec 39673 default --while-alive   (peer now dead)
+exit=3 (3 = dead peer)
+$ progress-check rec 39673 default   (dead peer, without --while-alive)
+exit=0 (0 = never authorizes a stop)
+$ progress-check rec3 0 0.3 journal   (file-only, journal changing each 0.2s)
+exit=0
+exit=0
+exit=0
+exit=0
+$ same, journal stops changing
+no_progress: "pid=0 no CPU or watched-file progress for 0.7s"
+exit=124 (124 = quiet journal)

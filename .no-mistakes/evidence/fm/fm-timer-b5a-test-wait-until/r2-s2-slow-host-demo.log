@@ -1,0 +1,11 @@
+commit=0959c15be2a1c179893d95deda3409925550368b
+host load with 4 CPU-burn neighbours: load averages: 16.25 22.24 29.15
+helper=main dilation=1x rc=0 waited=3s result=published
+helper=main dilation=5x rc=1 waited=11s result=published
+helper=branch dilation=1x rc=0 waited=4s result=published
+helper=branch dilation=5x rc=0 waited=11s result=published
+--- harm still caught (branch helper, default 900s inactivity) ---
+dead peer: rc=1 waited=1s stderr=fm_test_wait_until: condition unmet (3, pid=78152)
+silent live peer (--inactivity 2): rc=1 waited=3s peer_still_alive=yes stderr=no_progress: "pid=79387 no CPU or watched-file progress for 2.7s" fm_test_wait_until: condition unmet (124, pid=79387) 
+live poller never publishing (--cycles 4, 0.5s cycles): rc=1 waited=2s stderr=fm_test_wait_until: condition unmet after 4 peer cycles (0 -> 4 in /Users/charlesabrooker/tmp/slow-host-demo.GXFDqY/poll.count)
+exit=0

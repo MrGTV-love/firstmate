@@ -1,0 +1,13 @@
+mutant=reaper (solo re-run, no other suites running): bin/fm-test-reap-orphans.sh:467:exit 0  # MUTANT: report reaped, never signal 
+12:49  up 1 day,  2:49, 4 users, load averages: 15.01 17.89 22.97
+no_progress: "pid=62018 no CPU or watched-file progress for 1.4s"
+fm_test_wait_until: condition unmet (124, pid=62018)
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+ok - the reaper stops a stub whose owning run has ended
+ok - the reaper leaves live-parent, unrelated and prefix-sharing processes alone
+ok - the reaper is idempotent
+ok - lab creation records its caller and ended scratch-copy watchers are reaped
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+ok - go-build-only argv is attributed by cwd without crossing ownership boundaries
+rc=143 elapsed=96s

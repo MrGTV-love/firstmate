@@ -1,0 +1,8 @@
+mutant=reaper (private TMPDIR=/Users/charlesabrooker/tmp/r2-private.FJsc6u, not scanned by other runs' reapers): bin/fm-test-reap-orphans.sh:467:exit 0  # MUTANT: report reaped, never signal 
+12:51  up 1 day,  2:51, 4 users, load averages: 13.68 16.46 21.79
+no_progress: "pid=57617 no CPU or watched-file progress for 1.3s"
+fm_test_wait_until: condition unmet (124, pid=57617)
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+not ok - the orphaned stub of an ended run survived the reaper
+rc=1 elapsed=266s

@@ -1,0 +1,10 @@
+mutant=reaper: bin/fm-test-reap-orphans.sh:467:exit 0  # MUTANT: report reaped, never signal 
+no_progress: "pid=28267 no CPU or watched-file progress for 1.6s"
+fm_test_wait_until: condition unmet (124, pid=28267)
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+ok - the reaper stops a stub whose owning run has ended
+ok - the reaper leaves live-parent, unrelated and prefix-sharing processes alone
+ok - the reaper is idempotent
+not ok - the ended lab's scratch-copy watcher survived
+rc=1 elapsed=486s
