@@ -100,6 +100,8 @@ Every other case keeps the refusal and names how to close the picker: a task who
 The state read happens only while the picker is showing, is bounded by `FM_CONTROL_CREW_STATE_WAIT`, and skips the forge read.
 `stay` sends nothing on any screen that is not exactly the recognised picker, on any harness other than Claude, or to a stopped agent.
 It never sends Ctrl+C or Ctrl+D, which the picker is configured to treat as an exit request.
+For a remotely placed secondmate, the parent routes `stay` to the owning host's ordinary local control plane, which verifies those same postconditions there; no local endpoint is touched by the parent.
+The [remote operation guide](remote-secondmates.md#release-a-background-task-exit-picker) describes the retained route and steering behavior.
 The [verification record](verification/runtime-backends.md#claude-background-task-exit-picker) states what is measured and what is read from the vendor's source.
 
 ## Transactional relaunch
@@ -325,7 +327,7 @@ When no active record owns it, such as a finished record's nested copy left afte
 A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
 A copy whose work is not proved landed stays, and teardown writes the reason.
 The task's own nested copy that Vernant's creation lock holds takes the same driver route in place of a forced removal, once it also passes the record, process, launcher and ignored-file proofs above; an own copy that is not locked is removed as before.
-Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, regenerable build caches such as `.next`, `*.tsbuildinfo`, `graphify-out`, `.import_linter_cache`, `.tac/tmp` and `.tac/uv-cache`, and anything ignored under its `.claude` and `.opencode` trees).
+Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, regenerable build caches such as `.next`, `*.tsbuildinfo`, `graphify-out`, `.import_linter_cache`, `.tac/tmp` and `.tac/uv-cache`, graft's generated `graft/` and `.ignore` at the copy root as `teardown_graft_generated` defines them, and anything ignored under its `.claude` and `.opencode` trees).
 Every other ignored entry, including durable `.tac` state such as `.tac/loop-state`, is preserved as the proof above requires, just before the copy is removed.
 Removal therefore loses no unique content, because it is preserved; no commit, because the work is landed; and no tracked change, because the clean proof refuses one.
 The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
@@ -629,9 +631,10 @@ The runtime lifecycle verbs have the boundaries below; metadata-only authorizati
 - Targeting is exact.
   Only a bare task id with a `state/<id>.meta` record in this home is accepted, and that record must pass the shared endpoint-identity validation.
   A legacy `fm-<id>` window label, an explicit `session:window` endpoint, and a record whose `endpoint_task_id` names another task are all refused.
-- A remotely placed secondmate is refused by name.
+- A remotely placed secondmate is refused by name for `interrupt`, `exit`, and `relaunch`.
   Its agent runs on another host, so none of the postconditions this plane verifies could be read for it here; local endpoint validation would refuse the record regardless, because `window=remote:<id>` can never match a local backend's required shape.
   Drive that lifecycle on its own host and reconcile it through the secondmate recovery path.
+  `stay` is the one verb the parent delegates: it runs `bin/fm-on.sh <id> fm-remote-secondmate-control.sh stay <id>`, so the owning host's ordinary control plane proves the picker, task attribution, and live agent beside the endpoint ([remote picker release](remote-secondmates.md#release-a-background-task-exit-picker)).
   For `relaunch`, drive the host through [`bin/fm-remote-secondmate-relaunch.sh`](../bin/fm-remote-secondmate-relaunch.sh), which runs `bin/fm-on.sh <id> fm-remote-secondmate-control.sh relaunch ...` and then republishes this home's route record from the identity the host confirmed; the host-local leg runs this same plane against a record that is ordinary and local there, so every checkpoint, journal, rollback, and postcondition below applies unchanged ([`docs/remote-secondmates.md`](remote-secondmates.md)); `interrupt` and `exit` have no such route.
 - An unverified harness is refused rather than guessed at.
 - An implicit relaunch from a prefixed raw-command basename is refused before the agent or durable state is touched because its original launch command cannot be reconstructed.

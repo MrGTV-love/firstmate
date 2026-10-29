@@ -204,6 +204,195 @@ if (($ARGV[0] // '') eq 'gate') {
     exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
 }
 
+# Private resident-memory watch. Usage: perl fm-lint-cache.pl rsswatch <limit-kib> <rss-file> -- <command...>
+# fm-lint.sh runs this only on native macOS, which cannot apply ulimit -v and so
+# has no other memory bound on a root. It runs the command in a process group
+# of its own and samples once a second that command's process tree within that
+# group, reading only the group's own processes and never the whole host's.
+# Each sample is the larger of the tree's resident size and its physical
+# footprint, which also counts the compressed pages jetsam counts, both read by
+# a long-lived libproc reader (fm-proc-info.py mem-tree) started at the first
+# tick, so a command that ends sooner starts none. Each reader runs under the
+# interpreter fm-lint.sh resolved once (FM_LINT_INTERNAL_PYTHON), or python3
+# when that is unset. A reader's first reply may take 2 s, which covers its
+# start-up; each later reply has 0.5 s. A tick whose reply is late or malformed
+# is sampled by ps, which gives resident size alone; that reply is discarded
+# and a new reader starts for the next tick. A replacement that cannot start,
+# or that fails before it replies, is one failed restart, and the next tick
+# tries again. The reader is given up for the rest
+# of the command, with ps sampling every later tick, only when libproc cannot
+# read the command, the command's first reader exits before its first reply,
+# or three restarts in a row fail; a good reply resets that count. The reason
+# is then appended to <rss-file> once as rss_reader_unavailable=<reason>. Crossing the limit ends the group with
+# KILL, records the peak sampled as max_rss_kib=<KiB> in <rss-file> (the file
+# /usr/bin/time would have written), names the bound on stderr, and exits 98,
+# which fm-lint.sh reports as a memory failure so the root takes its narrower
+# retry. Any other end passes the command's own status straight through.
+# Every end appends to
+# <rss-file> how many samples each source gave, as
+# rss_samples=libproc:<n>,ps:<n>, for the roots log. A signal to the watch, or
+# the loss of its parent, ends the group within about one tick (about 1 s, or
+# about 6 s if the command ignores TERM) after the lint that started it ends;
+# the watch itself sits in a group of its own, out of reach of its owner's
+# group sweep. Samples that keep failing warn once and sampling goes on each
+# later tick rather than failing lint.
+if (($ARGV[0] // '') eq 'rsswatch') {
+    require POSIX;
+    require Time::HiRes;
+    my (undef, $limit, $rss_file, $dashes, @command) = @ARGV;
+    die "fm-lint-rsswatch: invalid private invocation\n"
+        unless defined $dashes && $dashes eq '--' && @command && defined $rss_file
+            && ($limit // '') =~ /\A[1-9][0-9]*\z/;
+    my $helper = dirname(abs_path($0)) . '/fm-proc-info.py';
+    my $owner = getppid();
+    # The watch keeps a process group of its own, apart from its owner's and
+    # its command's, so an owner's group sweep cannot kill it before it has
+    # ended the command's group (it notices the lost parent within a tick).
+    POSIX::setpgid(0, 0);
+    my $python = $ENV{FM_LINT_INTERNAL_PYTHON} || 'python3';
+    my ($to_reader, $from_reader, $reader_pid, $reader_fresh, $reader_down, $reader_answered);
+    my ($reader_failures, %samples) = (0, libproc => 0, ps => 0);
+    my $stop_reader = sub {
+        return unless $reader_pid;
+        kill 'KILL', $reader_pid;
+        waitpid($reader_pid, 0);
+        close $to_reader;
+        close $from_reader;
+        undef $reader_pid;
+    };
+    # The reader stays in the watch's own group, so the bound never counts or
+    # ends it, and it exits when the watch closes its input.
+    my $start_reader = sub {
+        my ($root_pid) = @_;
+        require IPC::Open2;
+        no warnings 'exec';
+        my $first = !defined $reader_fresh;
+        $reader_pid = -r $helper
+            ? eval { IPC::Open2::open2($from_reader, $to_reader, $python, $helper, 'mem-tree', $root_pid) } : undef;
+        ($reader_fresh, $reader_answered) = ($first && $reader_pid ? 1 : 0, 0);
+        return if $reader_pid;
+        $reader_down = $first ? 'exited-at-start' : ++$reader_failures > 3 ? 'restarts-failed' : undef;
+    };
+    # KiB of the group leader <pid> and its live descendants in its group, the
+    # larger of footprint and resident size, or undef when unreadable.
+    my $tree_rss = sub {
+        my ($root_pid) = @_;
+        $start_reader->($root_pid) unless $reader_pid || $reader_down;
+        if ($reader_pid) {
+            local $SIG{PIPE} = 'IGNORE';
+            my ($answer, $ready) = ('', '');
+            vec($ready, fileno($from_reader), 1) = 1;
+            my $gone = !syswrite($to_reader, "\n");
+            my $wait = $reader_answered ? 0.5 : 2;
+            while (!$gone && $answer !~ /\n/ && select(my $readable = $ready, undef, undef, $wait) > 0) {
+                $gone = !sysread($from_reader, $answer, 64, length $answer);
+            }
+            if ($answer =~ /\A([0-9]+) ([0-9]+)\n\z/) {
+                ($reader_failures, $reader_fresh, $reader_answered) = (0, 0, 1);
+                $samples{libproc}++;
+                return $1 > $2 ? $1 + 0 : $2 + 0;
+            }
+            my $fresh = $reader_fresh;
+            $stop_reader->();
+            $reader_down = $answer eq "-\n" ? 'libproc-unreadable'
+                : $gone && $fresh ? 'exited-at-start'
+                : ++$reader_failures > 3 ? 'restarts-failed' : undef;
+            $start_reader->($root_pid) unless $reader_down;
+        }
+        my (%parent, %rss);
+        {
+            no warnings 'exec';
+            if (open(my $ps, '-|', 'ps', '-o', 'pid=,ppid=,rss=', '-g', $root_pid)) {
+                while (my $line = <$ps>) {
+                    next unless $line =~ /\A\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*\z/;
+                    ($parent{$1}, $rss{$1}) = ($2, $3);
+                }
+                close $ps;
+            }
+        }
+        return undef unless exists $rss{$root_pid};
+        $samples{ps}++;
+        my (%children, $total, @queue);
+        push @{$children{$parent{$_}}}, $_ for keys %parent;
+        @queue = ($root_pid);
+        while (defined(my $pid = shift @queue)) {
+            $total += $rss{$pid} // 0;
+            push @queue, @{$children{$pid} // []};
+        }
+        return $total;
+    };
+    my ($child, $caught, $term_at, $over, $warned);
+    my ($peak, $misses) = (0, 0);
+    my %signal_number = (HUP => 1, INT => 2, TERM => 15);
+    for my $name (keys %signal_number) {
+        $SIG{$name} = sub {
+            $caught = $name;
+            $term_at //= Time::HiRes::time();
+            kill 'TERM', -$child if $child;
+        };
+    }
+    # Perl restarts waitpid after a handled signal, so the sampling runs in the
+    # timer's handler while the main flow blocks in waitpid.
+    my $busy;
+    my $sample = sub {
+        if (!$caught && getppid() != $owner) {
+            $caught = 'TERM';
+            $term_at = Time::HiRes::time();
+            kill 'TERM', -$child;
+        }
+        kill 'KILL', -$child if $caught && Time::HiRes::time() - $term_at >= 5;
+        return if $caught || $over;
+        my $rss = $tree_rss->($child);
+        # A root that exits mid-sample is a zombie no sampler can read, so only
+        # three misses in a row mean the sampler is failing.
+        if (!defined $rss) {
+            return unless kill 0, $child;
+            return if ++$misses < 3 || $warned;
+            warn "fm-lint: resident-memory watch cannot sample this root; the per-root resident bound applies only once a sample succeeds\n";
+            $warned = 1;
+            return;
+        }
+        $misses = 0;
+        $peak = $rss if $rss > $peak;
+        return unless $rss > $limit;
+        $over = 1;
+        kill 'KILL', -$child;
+        if (open(my $fh, '>', $rss_file)) { printf {$fh} "max_rss_kib=%d\n", $peak; close $fh; }
+        warn sprintf("fm-lint: root exceeded the %d KiB resident-memory bound (FM_LINT_ROOT_RSS_KIB) at %d KiB; ended\n", $limit, $peak);
+    };
+    $SIG{ALRM} = sub {
+        local ($?, $!);
+        return if $busy || !$child;
+        $busy = 1;
+        $sample->();
+        $busy = 0;
+    };
+    $child = fork();
+    die "fm-lint-rsswatch: fork: $!\n" unless defined $child;
+    if (!$child) {
+        POSIX::setpgid(0, 0);
+        exec {$command[0]} @command;
+        warn "fm-lint-rsswatch: exec $command[0]: $!\n";
+        POSIX::_exit(127);
+    }
+    POSIX::setpgid($child, $child);
+    kill 'TERM', -$child if $caught;
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 1, 1);
+    my $reaped = waitpid($child, 0);
+    my $status = $reaped == $child ? $? : 127 << 8;
+    Time::HiRes::setitimer(Time::HiRes::ITIMER_REAL(), 0, 0);
+    kill 'KILL', -$child if $over || $caught;
+    $stop_reader->();
+    if (open(my $fh, '>>', $rss_file)) {
+        printf {$fh} "rss_samples=libproc:%d,ps:%d\n", @samples{qw(libproc ps)};
+        print {$fh} "rss_reader_unavailable=$reader_down\n" if $reader_down;
+        close $fh;
+    }
+    exit 98 if $over;
+    exit 128 + $signal_number{$caught} if $caught;
+    exit(($status & 127) ? 128 + ($status & 127) : $status >> 8);
+}
+
 my ($mode, $root, @args) = @ARGV;
 my $cache;
 if (defined $mode && $mode eq 'check') {

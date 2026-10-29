@@ -84,7 +84,9 @@ export FM_MERGE_PRUNE=0
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
+# under the marker; the omp primary extensions it loads as a home also skip
+# their home setup under it (.omp/extensions/lib/fm-task-worker.ts). A case that
+# verifies either behavior sets FM_TASK_ID itself.
 unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
@@ -109,6 +111,21 @@ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
 # operator host) silently stretches every arm fixture past its assertion
 # deadline. A case that verifies the override sets it itself.
 unset FM_ARM_CONFIRM_TIMEOUT
+
+# Clear the operator's no-mistakes home. An inherited NM_HOME outranks a
+# fixture's HOME, so author-evidence cases would read the operator's live
+# pipeline database instead of their own. A case that needs one sets it itself.
+unset NM_HOME
+
+# fm_test_empty_pipeline_db <nm-home>: an existing, readable no-mistakes home
+# whose pipeline database records no run. Author evidence treats a missing
+# database as unknown for a no-mistakes task, so merge fixtures point NM_HOME
+# (or HOME/.no-mistakes) here rather than at whatever the host happens to hold.
+fm_test_empty_pipeline_db() {  # <nm-home>
+  mkdir -p "$1"
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$1/state.sqlite"
+}
 
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
@@ -1083,6 +1100,45 @@ fm_git_add_origin() {
   git -C "$repo" remote add origin "file://$remote_abs"
 }
 
+# fm_test_dod_item <id> [<field>=<value>|-<field>]...: one mandatory DoD item
+# line built from `bash bin/fm-dod-lib.sh --shape`, the single owner of the item
+# shape, so a shape edit needs no fixture edit. Every field gets a nonempty
+# value and the authority field its first allowed value; <field>=<value>
+# overrides one field and -<field> omits it. A field outside the shape fails.
+fm_test_dod_item() {
+  local id=$1 shape lead fields authority_field authorities arg name field value line omit
+  local -a names
+  shift
+  shape=$(bash "$ROOT/bin/fm-dod-lib.sh" --shape) || return 1
+  lead=$(printf '%s\n' "$shape" | sed -n 's/^lead=//p')
+  fields=$(printf '%s\n' "$shape" | sed -n 's/^fields=//p')
+  authority_field=$(printf '%s\n' "$shape" | sed -n 's/^authority_field=//p')
+  authorities=$(printf '%s\n' "$shape" | sed -n 's/^authorities=//p')
+  for arg in "$@"; do
+    name=${arg#-}
+    name=${name%%=*}
+    case "|$lead|$fields|" in
+      *"|$name|"*) ;;
+      *) printf 'fm_test_dod_item: %s is not a field of the item shape\n' "$name" >&2; return 1 ;;
+    esac
+  done
+  IFS='|' read -ra names <<<"$lead|$fields"
+  line="- $id"
+  for field in "${names[@]}"; do
+    value="$id $field value"
+    [ "$field" != "$authority_field" ] || value=${authorities%%|*}
+    omit=0
+    for arg in "$@"; do
+      case "$arg" in
+        "-$field") omit=1 ;;
+        "$field="*) value=${arg#*=} ;;
+      esac
+    done
+    [ "$omit" = 1 ] || line+=" $field: ${value%.}."
+  done
+  printf '%s\n' "$line"
+}
+
 # fm_git_worktree <repo> <worktree> <branch>: initialize <repo> with one commit
 # and a local bare origin, then add a worktree on a fresh branch.
 fm_git_worktree() {
@@ -1090,6 +1146,52 @@ fm_git_worktree() {
   fm_git_init_commit "$repo"
   fm_git_add_origin "$repo" "$repo.origin.git"
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
+}
+
+# fm_test_graft_output <copy>: the output graft's session hook leaves at the root
+# of a worker copy, taken from a real worker: its .ignore overlay byte for byte,
+# and a graft/ index with a card, the graph and caches. The copy's git ignores
+# both, as graft's own global ignore does on a worker host.
+fm_test_graft_output() {
+  local copy=$1
+  printf '/.ignore\n/graft/\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  cat > "$copy/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+  mkdir -p "$copy/graft/.graph" "$copy/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$copy/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$copy/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$copy/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$copy/graft/work.md"
+  cat > "$copy/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
+}
+
+# fm_fake_ship_review_history <fakebin>: legacy forge/hold fixtures have symbolic
+# heads, not Git objects. Mock only the author-history query shapes with one ship
+# commit; real attribution regressions must NOT install this adapter.
+fm_fake_ship_review_history() {
+  local fakebin=$1
+  printf '#!/usr/bin/env bash\nREAL_GIT=%q\n' "$(command -v git)" > "$fakebin/git"
+  cat >> "$fakebin/git" <<'SH'
+if [ "${GIT_NO_REPLACE_OBJECTS:-}" = 1 ] && [ "${1:-}" = -C ]; then
+  case "${3:-} ${4:-}" in
+    'cat-file -e') exit 0 ;;
+    'rev-parse --verify')
+      case "${5:-}" in *'^{commit}') printf '%040d\n' 0; exit 0 ;; esac ;;
+    'merge-base '*)
+      if [ "${5:-}" = 0000000000000000000000000000000000000000 ]; then printf '%040d\n' 0; exit 0; fi ;;
+    'log --format=%H%x00%s') printf '%s\000ship fixture implementation\n' "${5##*..}"; exit 0 ;;
+  esac
+fi
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$fakebin/git"
 }
 
 # --- state/<id>.meta writers ------------------------------------------------

@@ -828,7 +828,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_HOME changed charter bytes compared with the same absolute home"
-  assert_grep ">> '$home/state/relative-home.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$home/state/relative-home.status'" "$brief" \
     "relative FM_HOME did not render an absolute secondmate status path"
 
   brief="$home/data/relative-state/brief.md"
@@ -844,7 +844,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_STATE_OVERRIDE changed charter bytes compared with the same absolute state directory"
-  assert_grep ">> '$state_override/relative-state.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$state_override/relative-state.status'" "$brief" \
     "relative FM_STATE_OVERRIDE did not render an absolute secondmate status path"
 
   brief="$data_override/relative-data/brief.md"
@@ -860,7 +860,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_DATA_OVERRIDE changed charter bytes compared with the same absolute data directory"
-  assert_grep ">> '$home/state/relative-data.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$home/state/relative-data.status'" "$brief" \
     "relative FM_DATA_OVERRIDE changed the absolute default status path"
 
   err="$root/unresolved.err"
@@ -937,7 +937,7 @@ test_pause_verb_override_renders_all_brief_scaffolds() {
     # may not carry an unevaluated substitution that a file-write tool would
     # copy through verbatim.
     # shellcheck disable=SC2016 # Match literal backticks in the generated interface.
-    append=$(sed -n '/`echo "{state}/s/.*`\(echo .*\)`.*/\1/p' "$brief")
+    append=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$brief")
     now=$(date +%s)
     append=${append//\{state\}/done}
     append=${append//\{one short line\}/test event}
@@ -1131,8 +1131,6 @@ test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
     for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
       assert_grep "$token" "$brief" "$id: brief missing the $token placeholder"
     done
-    assert_grep "Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader)" "$brief" \
-      "$id: brief missing the mandatory item shape"
     assert_grep "A session that did not build this work grades it" "$brief" "$id: brief does not name who grades"
     assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
     assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
@@ -1971,9 +1969,10 @@ test_generated_verification_plan_command() {
   content=${content//'{TASK}'/'Fix the badge refresh.'}
   content=${content//'{FIRSTMATE_SPEC}'/'Keep the renderer. Out of scope is recorded below.'}
   content=${content//'### Out of scope'/$'### Out of scope\n- Do not redesign the dashboard.'}
-  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+  for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
     content=${content//"$token"/'The badge updates after refresh.'}
   done
+  content=${content//'{DOD_MANDATORY_ITEMS}'/"$(fm_test_dod_item M1)"}
   printf '%s\n' "$content" > "$brief"
   command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$brief")
   [ -n "$command" ] || fail 'no generated plan-build command'

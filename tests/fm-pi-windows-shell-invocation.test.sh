@@ -22,10 +22,6 @@ cat >"$project/bin/fm-sessionstart-run.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'sessionstart:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
 SH
-cat >"$project/bin/fm-cd-pretool-check.sh" <<'SH'
-#!/usr/bin/env bash
-printf 'cd:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
-SH
 cat >"$project/bin/fm-arm-pretool-check.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'arm:%s\n' "$*" >> "$FM_WINDOWS_SHELL_LOG"
@@ -103,7 +99,6 @@ if (
 const calls = readFileSync(process.env.FM_WINDOWS_SHELL_LOG, "utf8");
 for (const expected of [
   "sessionstart:--source startup --pi-prerequisite",
-  "cd:--command printf test",
   "arm:--command printf test",
   "turnend:",
   "operational:classify",

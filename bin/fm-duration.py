@@ -20,10 +20,11 @@ Each nested runner keeps its own bound, so a hung inner read is stopped by its
 own owner and an outer owner sees an inner sampler's CPU only until then.
 Process-tree CPU comes from a readable FM_PROC_ROOT_OVERRIDE or /proc
 (/proc/<pid>/stat, as Git Bash/MSYS exposes it), otherwise ps (with libproc CPU
-on Darwin, whose ps omits waited-child time). Where a confined worker's sandbox
-refuses to execute setuid ps, the process table, the process-group check
-behind a Darwin EPERM group signal and a slot holder's start time come from
-bin/fm-proc-info.py instead. Without a complete sample,
+on Darwin, whose ps omits waited-child time). A failed native root read makes
+the sample blind; only non-root members may fall back to ps CPU. Where a
+confined worker's sandbox refuses to execute setuid ps, the process table, the
+process-group check behind a Darwin EPERM group signal and a slot holder's
+start time come from bin/fm-proc-info.py instead. Without a complete sample,
 including unavailable native imports, one cpu_telemetry_unavailable line names
 the platform and nothing is stopped for inactivity: a missing sample is neither
 progress nor a stall.
@@ -97,11 +98,18 @@ command only at a true extreme: no output and no process-tree CPU progress for
 call whose client waits quietly on the shared daemon, is exempt from the
 no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
 forwarded signal or the absolute stop began still follows the cleanup rule
-below for every key. Polling cadence is observation, not a failure
-deadline, and neither an idle or failed sample nor an elapsed read wait kills
-work. Completion of the command's leader, a forwarded signal, or one of those
-two extremes ends the run; descendants that outlive the leader and still hold
-its output streams are neither awaited nor counted as live work.
+below for every key. Outside a cleanup, every key also keeps only the 6 hour
+absolute stop while no complete process-tree CPU sample exists (a failed
+native root read, ps and fm-proc-info.py both unavailable, or native imports
+that cannot load): run then makes no no-progress decision and prints one
+cpu_telemetry_unavailable line, because a missing sample is neither progress
+nor a stall. Once a forwarded signal or the absolute stop begins a cleanup,
+the cleanup SIGKILL rule below still applies. Polling cadence is observation,
+not a failure deadline, and neither an idle or failed sample nor an elapsed
+read wait kills work. Completion of the command's leader, a forwarded signal,
+or one of those two extremes ends the run; descendants that outlive the
+leader and still hold its output streams are neither awaited nor counted as
+live work.
 An expiry or the first forwarded signal sends SIGTERM to the process group and
 then waits for the leader to exit, with no guessed grace number, so a leader's
 own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
@@ -680,6 +688,8 @@ def tree_cpu(pid, observed):
         if child in table:
             _, seconds, identity, running = table[child]
             native = None if native_cpu is None else native_cpu(child)
+            if child == pid and native_cpu is not None and native is None:
+                return None, False  # ps omits the root's waited-child CPU on Darwin.
             if native is not None:
                 seconds = native
             runnable = runnable or running
@@ -1128,7 +1138,7 @@ def run(key, command, calibration_file, *, inactivity=None):
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
                 sample, runnable = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
-                blind = sample is None and inactivity is not None  # Missing evidence cannot prove a stall.
+                blind = sample is None  # Missing evidence cannot prove a stall.
                 if blind and not warned_blind:
                     warned_blind = True
                     warn_blind_telemetry()

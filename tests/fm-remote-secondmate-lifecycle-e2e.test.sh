@@ -606,6 +606,40 @@ assert_grep '- seed-keep ' "$TMP_ROOT/seed-parent/data/secondmates.md" "failed s
 assert_present "$TMP_ROOT/seed-keep-home/.fm-secondmate-home" "serialized seed lost its published remote home"
 pass "remote seed rollback preserves serialized competing routes"
 
+# The parent's code root and the remote host's code clone are different directories on
+# different machines. The charter's status command runs a helper from the code root, so
+# the seeded copy must run it from <remote-root>, and that command must work there: run
+# from the remote home as the remote worker would run it, it appends one line to the
+# remote relay log through the capped writer.
+SEED_PARENT_ROOT="$TMP_ROOT/seed-parent-code"
+mkdir -p "$SEED_PARENT_ROOT"
+(cd "$ROOT" && tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .) | (cd "$SEED_PARENT_ROOT" && tar -xf -)
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" init -q -b main
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" add .
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" -c user.email=test@example.com -c user.name=Test commit -qm 'parent fixture root'
+[ "$SEED_PARENT_ROOT" != "$REMOTE_ROOT" ] || fail "the fixture's parent and remote code roots must differ"
+FM_SECONDMATE_CHARTER='Two roots charter.' FM_SECONDMATE_SCOPE='two roots' \
+  seed_env env FM_ROOT_OVERRIDE="$SEED_PARENT_ROOT" "$SEED_PARENT_ROOT/bin/fm-remote-home-seed.sh" \
+  seed-roots remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-roots-home" --no-projects \
+  > "$TMP_ROOT/seed-roots.out" 2>&1 \
+  || fail "seeding with a parent code root that differs from the remote root failed: $(cat "$TMP_ROOT/seed-roots.out")"
+SEED_ROOTS_CHARTER="$TMP_ROOT/seed-roots-home/data/charter.md"
+assert_present "$SEED_ROOTS_CHARTER" "the two-root seed published no charter"
+assert_no_grep "$SEED_PARENT_ROOT/bin/" "$SEED_ROOTS_CHARTER" "the remote charter still names a helper in the parent machine's code root"
+assert_grep "$REMOTE_ROOT/bin/fm-status-append.sh" "$SEED_ROOTS_CHARTER" "the remote charter does not run the status helper from the remote code root"
+# shellcheck disable=SC2016 # The sed program matches literal backticks in the charter.
+seed_roots_cmd=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$SEED_ROOTS_CHARTER" | head -1)
+[ -n "$seed_roots_cmd" ] || fail "the remote charter carries no status command"
+seed_roots_cmd=${seed_roots_cmd//\{state\}/working}
+seed_roots_cmd=${seed_roots_cmd//\{one short line\}/from the remote worker}
+seed_roots_cmd=${seed_roots_cmd//<epoch>/1790000000}
+mkdir -p "$TMP_ROOT/seed-roots-home/state"
+(cd "$TMP_ROOT/seed-roots-home" && bash -c "$seed_roots_cmd") >/dev/null 2>"$TMP_ROOT/seed-roots-cmd.err" \
+  || fail "the remote charter's status command failed on the remote host: $(cat "$TMP_ROOT/seed-roots-cmd.err")"
+assert_grep 'working [at=1790000000]: from the remote worker' "$TMP_ROOT/seed-roots-home/state/parent-replies.status" \
+  "the remote charter's status command did not append to the remote relay log"
+pass "a remote charter runs its status helper from the remote code root, and the command works there"
+
 : > "$DOCTOR_LOG"
 if FM_SECONDMATE_CHARTER='Unknown readiness charter.' FM_SECONDMATE_SCOPE='unknown readiness' \
   FM_FAKE_SSH_MODE=doctor-fix-unknown seed_env "$ROOT/bin/fm-remote-home-seed.sh" \
@@ -981,6 +1015,35 @@ assert_contains "$out" "schema=fm-remote-secondmate-control.v1" "ordinary host-l
 cmp -s "$TMP_ROOT/remote-before-policy.meta" "$REMOTE_HOME/state/parent-route/ios.meta" || fail "ordinary alive reuse changed endpoint metadata"
 pass "host-local launch refuses policy before dead-endpoint removal and keeps ordinary alive reuse"
 
+# The host's stay runs the ordinary local control plane against this endpoint's
+# private state. The fixture's synthetic agent cannot prove live launch
+# ownership, so it must stop at that gate without sending any pane input, and
+# only the exact one-argument form is accepted.
+cp "$REMOTE_HOME/state/parent-route/ios.meta" "$TMP_ROOT/remote-before-stay.meta"
+herdr_input_count() { grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true; }
+stay_inputs=$(herdr_input_count)
+stay_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios 2>&1)
+stay_rc=$?
+[ "$stay_rc" -ne 0 ] || fail "host-local stay accepted an agent it cannot attribute to the task"
+assert_contains "$stay_out" 'cannot positively attribute its live Herdr agent to this task; refusing lifecycle input' \
+  "host-local stay did not reach the ordinary control plane's ownership gate"
+[ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a refused host-local stay sent pane or tab input"
+for stay_extra in '' 'extra'; do
+  if [ -z "$stay_extra" ]; then
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay 2>&1)
+  else
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios "$stay_extra" 2>&1)
+  fi
+  stay_arity_rc=$?
+  [ "$stay_arity_rc" -ne 0 ] || fail "host-local stay accepted the wrong number of arguments (extra='$stay_extra')"
+  assert_contains "$stay_arity_out" 'fm-remote-secondmate-control.sh stay <id>' \
+    "host-local stay arity refusal did not print usage (extra='$stay_extra')"
+  [ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a wrong-arity host-local stay sent pane or tab input (extra='$stay_extra')"
+done
+cmp -s "$TMP_ROOT/remote-before-stay.meta" "$REMOTE_HOME/state/parent-route/ios.meta" \
+  || fail "a refused host-local stay rewrote endpoint metadata"
+pass "host-local stay reaches the ordinary control plane's ownership gate, accepts exactly one id, and sends nothing"
+
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-default-session.meta"
 legacy_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
@@ -995,6 +1058,7 @@ cp "$HERDR_LOG" "$TMP_ROOT/herdr-before-default-session.log"
 if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh route ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh send ios probe >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh key ios Enter >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh capture ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh observe ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh retire ios --force >/dev/null 2>&1 \

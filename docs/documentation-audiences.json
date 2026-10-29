@@ -437,10 +437,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "docs/cd-guard.md",
-      "audience": "maintainer-architecture"
-    },
-    {
       "path": "docs/cmux-backend.md",
       "audience": "operator-current"
     },
