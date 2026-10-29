@@ -3319,7 +3319,7 @@ test_watch_triage_waits_groups_partition_one_inventory
 test_split_suites_stay_selectable_in_their_families
 
 # The three fm-pr-merge groups partition one former suite. The union of their
-# registered lists must be the same 158 cases, each registered by the file that
+# registered lists must be the same 160 cases, each registered by the file that
 # also defines it, with no case twice.
 test_pr_merge_groups_partition_one_inventory() {
   local group file registered defined union total dup name
@@ -3351,9 +3351,9 @@ test_pr_merge_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "an fm-pr-merge case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 158 ] \
-    || fail "the fm-pr-merge groups register $total cases, not the 158-case inventory they partition"
-  pass "the fm-pr-merge groups are a duplicate-free 158-case cover, each case registered by the file that defines it"
+  [ "$total" = 160 ] \
+    || fail "the fm-pr-merge groups register $total cases, not the 160-case inventory they partition"
+  pass "the fm-pr-merge groups are a duplicate-free 160-case cover, each case registered by the file that defines it"
 }
 
 test_pr_merge_groups_partition_one_inventory
