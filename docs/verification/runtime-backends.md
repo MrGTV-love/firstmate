@@ -8,7 +8,7 @@ Exact task chronology, branch names, temporary homes, local paths, process ids, 
 
 ## macOS worker write confinement
 
-Verified on 2026-10-28 on macOS 27 arm64.
+Verified on 2026-10-29 on macOS 27 arm64.
 The configuration owner is [Worker OS write confinement](../configuration.md#worker-os-write-confinement).
 Refresh with these model-free executable entry points:
 
@@ -24,11 +24,12 @@ Every confined check was true for both profiles:
 - the task's own custody archives `archive/<task>-submitted-<8 hex>` and `archive/<task>-pipeline-<8 hex>` created with `git branch` (a second create refused), moved with `git update-ref` with a reflog, and deleted with `git branch -D`, after the empty `refs/heads/archive` and `logs/refs/heads/archive` folders were removed between the profile build and the confined run;
 - a project branch named `archive` left the profile build working and the branch in place, and with no archive grant the confined create of the task's own archive was refused after that branch was deleted;
 - own Git commit, inbox handling, the real busy writer, native session proof and task audit;
-- a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`;
+- a push to the task's own gate through the no-mistakes `pre-receive` and `post-receive` hooks, with `push -u`, `fetch` and `stash`, all run with another task's branch packed;
 - a duration record appended through `bin/fm-duration.py`, and its process table, inactivity stop, stale slot holder and zombie process-group completion check read through `bin/fm-proc-info.py` while `ps` is refused, a procevent board registered, polled once by its runner and retired through `bin/fm-procevent.sh`, a process budget through `bin/fm-proc-budget.sh`, a session-lock ancestry walk, a fleet-ledger append through `bin/fm-fleet-ledger.sh`, and a tool-cache write under HOME;
 - one refused write per protected asset class: project and home primary checkouts, the primary index, nested and pool worktrees of other tasks, other task state, data and temp roots, the shared legacy audit, Main-owned `meta`, `control-relaunch` and `git-hooks` records, `config/`, `.env`, another branch, another task's archive branch, archive names of task ids that contain or extend this one, archive names outside the two documented shapes, the primary `HEAD`, another Firstmate home and another project's gate, including a push to that gate;
 - refused writes to every Claude and omp file that loads code or instructions, `~/.codex` and `~/.dsh`, while the running harness's measured runtime state stayed writable;
-- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/`, the shared Git `refs/` and `worktrees/` folders and another session's Claude temp directory;
+- refused renames of another task's data directory, a worktree's parent folder, the gate store, `state/`, the shared Git `refs/` and `worktrees/` folders, the shared `packed-refs` file and another session's Claude temp directory;
+- another task's branch that exists only in `packed-refs` kept its commit when a write replaced the file in place, when `packed-refs.lock` was renamed onto it, when `packed-refs.new` was created, and when `git update-ref -d` and `git pack-refs --all` tried to rewrite it; a `git replace` ref in the shared Git directory was refused; and a repository with reftable ref storage was refused by the profile builder before any profile was written;
 - a `~/tmp` entry of a task whose id extends this task's id stays protected, while this task's own entry stays writable when another task's id is part of its id.
 
 The unconfined control produced `false` for a, b, c, both foreign-status rewrites, the foreign-audit denial, the symlink escape and every refused check, while the positive operations remained successful.

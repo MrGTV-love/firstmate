@@ -10,9 +10,9 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
-from this task's directory and the duration ledger, other tasks' branches (this
-task keeps its declared branch and its archive/<task>-{submitted,pipeline}-<hex8>
-recovery branches), temp roots, Main-owned
+from this task's directory and the duration ledger, other tasks' branches, loose
+or packed (this task keeps its declared branch and its
+archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
@@ -109,6 +109,10 @@ def build(args):
         ["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
     if gitdir == common:
         raise ValueError("worker must use an isolated linked worktree")
+    if (Path(common) / "reftable").exists():
+        # Reftable keeps every branch in files this profile cannot tell apart
+        # from the task's own, so a launch over it would confine nothing.
+        raise ValueError("a repository with reftable ref storage cannot be confined")
     data = canonical(args.data)
     data_root = str(Path(data).parent)
     state = canonical(args.state)
@@ -195,10 +199,19 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
-    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads")]
+    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):
+        lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
+    # A branch Git has packed exists only as a line in packed-refs, which the
+    # refs/heads rules above never see. Git rewrites the file through
+    # packed-refs.new and a rename onto packed-refs, so refusing both refuses
+    # the rewrite however the bytes arrive. packed-refs.lock stays writable:
+    # Git takes it to delete any ref, the task's own archives included, and
+    # holding it changes no ref. Deleting a packed ref, pruning one and gc's
+    # pack-refs step rewrite the file, so they fail here.
+    for name in ("packed-refs", "packed-refs.new"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
     # sibling /tmp/fm-<id>+<token>, and ~/tmp entries whose name carries the id.
