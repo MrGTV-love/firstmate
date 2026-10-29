@@ -97,8 +97,8 @@ fm_backend_is_known() {  # <name>
 # HERDR_ENV=1 in that nested case. herdr injects HERDR_ENV=1 (plus
 # HERDR_SOCKET_PATH/HERDR_PANE_ID) into every process it manages a pane for;
 # HERDR_ENV=1 alone (no $TMUX) selects herdr. Firstmate's Claude launch boundary
-# replaces that native-hook activation marker with FM_HERDR_RUNTIME=1; this
-# runtime-only marker selects the same backend without registering bare resumes.
+# replaces HERDR_ENV in that child with FM_HERDR_RUNTIME=1, a Firstmate-only
+# marker that selects the same backend.
 # Neither marker grants pane/lifecycle ownership. cmux injects CMUX_WORKSPACE_ID
 # (plus CMUX_SURFACE_ID/CMUX_SOCKET_PATH and the legacy CMUX_TAB_ID/
 # CMUX_PANEL_ID aliases) into every terminal surface it spawns - verified from

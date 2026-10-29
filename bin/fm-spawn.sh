@@ -7294,7 +7294,8 @@ elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ] && [ "$WRITE_CONFINEMENT" 
 fi
 # Herdr's Claude SessionStart integration otherwise registers a native bare
 # `claude --resume`, bypassing the TeamClaude launch boundary after a reboot.
-# Suppress only this child's native integration; keep the pane identity and
+# Unset HERDR_ENV only in this child, intended to stop that registration (not
+# yet proven on installed Herdr); keep the pane identity and
 # Firstmate's own busy hooks, and do not alter other panes or session settings.
 if [ "$HARNESS" = claude ]; then
   if [ "$BACKEND" = herdr ]; then
