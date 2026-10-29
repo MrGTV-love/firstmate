@@ -1068,6 +1068,76 @@ test_retired_pr_poll_starts_a_new_stop_episode() {
   pass 'a PR poll retired and re-armed before any sweep starts a new stop episode'
 }
 
+# Every disarm or retirement path must end a check's stop episode, so the check's
+# first stop after a re-arm still reaches firstmate. A new disarm or retirement
+# path must be added to this table.
+test_every_disarm_path_starts_a_new_stop_episode() {
+  local row home failed=
+  for row in copy-sweep startup-growth mail tool-updates contributions custom delivery x-watch; do
+    home=$(new_home "disarm-path-$row")
+    forge_home "$home"
+    printf '%s\n' 'FM_MAIL_USER=test@example.invalid' 'FM_MAIL_PASS=test-pass' \
+      'FM_IMAP_HOST=imap.test.invalid' 'FM_SMTP_HOST=smtp.test.invalid' > "$home/.env"
+    printf '{"tools":[{"name":"herdr","command":"herdr"}]}\n' > "$home/config/watched-tools.json"
+    printf '#!/usr/bin/env bash\nsleep 30\n' > "$home/silent.sh"
+    cat > "$home/disarm-path.sh" <<'SH'
+#!/usr/bin/env bash
+# <watcher> <repo-root> <row> <silent-check> <home> <base-path>
+. "$1"
+ROOT=$2 ROW=$3 SILENT=$4 HOME_DIR=$5 BASE_PATH=$6
+WATCHER_PID=$$
+trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+watcher_beat force
+CHECK_TIMEOUT=1
+x_mode() {  # on|off
+  grep -v '^FMX_PAIRING_TOKEN=' "$HOME_DIR/.env" > "$HOME_DIR/.env.next" || true
+  [ "$1" = off ] || printf 'FMX_PAIRING_TOKEN=tok-episode\n' >> "$HOME_DIR/.env.next"
+  mv -f -- "$HOME_DIR/.env.next" "$HOME_DIR/.env"
+  env -u FM_ROOT_OVERRIDE PATH="$BASE_PATH" "$ROOT/bin/fm-bootstrap.sh"
+}
+row_arm() {
+  case "$ROW" in
+    copy-sweep) "$ROOT/bin/fm-copy-sweep.sh" arm ;;
+    startup-growth) "$ROOT/bin/fm-startup-growth-check.sh" arm ;;
+    mail) "$ROOT/bin/fm-mail-check.sh" arm ;;
+    tool-updates) "$ROOT/bin/fm-tool-update-check.sh" arm ;;
+    contributions) "$ROOT/bin/fm-contributions.sh" arm ;;
+    custom)
+      printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/custom.check.sh" && chmod 0700 "$STATE/custom.check.sh" \
+        && "$ROOT/bin/fm-check-register.sh" custom ;;
+    delivery) "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 ;;
+    x-watch) x_mode on && [ -e "$STATE/x-watch.check.sh" ] ;;
+  esac > /dev/null 2>&1
+}
+row_disarm() {
+  case "$ROW" in
+    copy-sweep) "$ROOT/bin/fm-copy-sweep.sh" disarm ;;
+    startup-growth) "$ROOT/bin/fm-startup-growth-check.sh" disarm ;;
+    mail) "$ROOT/bin/fm-mail-check.sh" disarm ;;
+    tool-updates) "$ROOT/bin/fm-tool-update-check.sh" disarm ;;
+    contributions|custom) "$ROOT/bin/fm-check-unregister.sh" "$ROW" ;;
+    delivery)
+      fm_pr_poll_snapshot_capture "$STATE" delivery "$SCRIPT_DIR/fm-pr-poll.sh" \
+        && fm_pr_poll_retirement_publish "$STATE" delivery "$SCRIPT_DIR/fm-pr-poll.sh" merged \
+        && fm_pr_poll_retirement_recover_one "$STATE" delivery "$SCRIPT_DIR/fm-pr-poll.sh" ;;
+    x-watch) x_mode off && [ ! -e "$STATE/x-watch.check.sh" ] ;;
+  esac > /dev/null 2>&1
+}
+row_arm || exit 20
+run_check_capture "$ROW" "$SILENT" || exit 21
+[ -n "$FM_CHECK_STOP_NOTICE" ] || exit 22
+row_disarm || exit 23
+row_arm || exit 24
+run_check_capture "$ROW" "$SILENT" || exit 25
+[ -n "$FM_CHECK_STOP_NOTICE" ] || exit 26
+SH
+    with_home "$home" bash "$home/disarm-path.sh" "$ROOT/bin/fm-watch.sh" "$ROOT" "$row" "$home/silent.sh" "$home" "$PATH" \
+      > "$home/disarm-path.out" 2> "$home/disarm-path.err" || failed="$failed $row(rc=$?)"
+  done
+  [ -z "$failed" ] || fail "these disarm or retirement paths kept the old stop episode or failed:$failed"
+  pass 'every disarm or retirement path starts a new stop episode after a re-arm before any sweep'
+}
+
 test_reads_are_independent_of_watcher_interval() {
   local home out
   home=$(new_home independent-read)
@@ -1467,7 +1537,7 @@ test_http_shim_preserves_backend_failures() {
 }
 
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_quiet_read_inside_its_cold_start_returns_rows test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_quiet_read_inside_its_cold_start_returns_rows test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_stop_while_writing_the_order_leaves_no_temporary test_retired_pr_poll_starts_a_new_stop_episode test_every_disarm_path_starts_a_new_stop_episode test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
