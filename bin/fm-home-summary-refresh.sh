@@ -31,9 +31,9 @@
 # short critical-section mutex, not the refresh itself (the refresh lock above
 # coalesces concurrent refreshes), so a waiter cannot skip it: it still has to hand
 # off, publish, or account. It waits only while another live process holds the fence
-# (or is publishing it) and fails at once when the home's state directory is gone (a
-# retired home or a removed test fixture can never grant it), when nothing holds the
-# fence yet it cannot be created, or when its holder is gone and the existing
+# (or is publishing it) and fails at once when nothing holds the fence yet it cannot
+# be created (as when the home's state directory is gone: a retired home or a removed
+# test fixture can never grant it), or when its holder is gone and the existing
 # stale-owner reclaim in fm_lock_try_acquire_steal_mutex could not take it over.
 # No reader can observe temporary output through the ledger path.
 #
@@ -325,14 +325,9 @@ home_summary_fence() {
   local holder gone_holder=
   case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
   while ! fm_lock_try_acquire_steal_mutex "$REFRESH_LOCK.steal"; do
-    # The mutex cannot be created in a state directory that is gone, and the
-    # progress owner reads this loop's forks as progress, so end it here.
-    if [ ! -d "$STATE" ]; then
-      home_summary_fail "refresh home is gone: $STATE"
-      return 1
-    fi
     # Waiting helps only while another actor holds the fence. FM_LOCK_BUSY is 0
-    # when the refusal was an acquisition error that no wait can clear.
+    # when the refusal was an acquisition error that no wait can clear, such as
+    # a state directory that is gone.
     if [ "${FM_LOCK_BUSY:-0}" != 1 ]; then
       home_summary_fail "could not create the refresh fence and no process holds it"
       return 1
