@@ -1,0 +1,240 @@
+=== idle default base exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle default prev exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle default head exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle optin base exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle optin prev exit=0 artifact=exists:0lines
+--- stdout
+--- stderr
+--- artifact
+=== idle optin head exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle forged base exit=0 artifact=absent
+--- stdout
+--- stderr
+=== idle forged prev exit=0 artifact=exists:3lines
+--- stdout
+--- stderr
+--- artifact
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.loading","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T15:59:55.083813+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.tangle","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T15:59:55.084249+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.status-liveness","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T15:59:55.084310+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+=== idle forged head exit=0 artifact=absent
+--- stdout
+--- stderr
+=== stale default base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale default prev exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale default head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale optin base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale optin prev exit=0 artifact=exists:0lines
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- artifact
+=== stale optin head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale forged base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== stale forged prev exit=0 artifact=exists:3lines
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- artifact
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.loading","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:00.163149+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.tangle","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:00.163641+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.status-liveness","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:00.163804+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+=== stale forged head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 0s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs <FIX>/root/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle default base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle default prev exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle default head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle optin base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle optin prev exit=0 artifact=exists:0lines
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- artifact
+=== tangle optin head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle forged base exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+=== tangle forged prev exit=0 artifact=exists:3lines
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- artifact
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.loading","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:04.445825+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.tangle","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:04.447940+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"diag.guard.force-override.status-liveness","duration_ms":0,"exit":0,"recorded_at":"2026-10-29T16:00:04.448002+00:00","load_start":null,"load_end":null,"cpus":18,"sample_id":null,"calibration":false,"timed_out":false}
+=== tangle forged head exit=0 artifact=absent
+--- stdout
+--- stderr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WORKTREE TANGLE - PRIMARY CHECKOUT IS ON A FEATURE BRANCH
+●  <FIX>/root is on 'feature/x', not its default branch 'main'.
+●  A crewmate likely branched/committed in the primary instead of its own worktree.
+●  The work is SAFE on the 'feature/x' ref.
+●  Restore the primary to 'main':
+●      git -C <FIX>/root checkout main
+●  then re-validate 'feature/x' in a proper isolated worktree.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

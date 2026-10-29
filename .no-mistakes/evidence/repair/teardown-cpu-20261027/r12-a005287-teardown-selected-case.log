@@ -1,0 +1,17 @@
+RUNNER_TEMP=/Users/charlesabrooker/tmp/fm-runner-temp.TNtH69
+11:00  up 1 day,  1:01, 4 users, load averages: 46.20 58.32 49.02
+FM_TEARDOWN_CPU {"event": "launch", "monotonic_ns": 90043712176916, "outer_cpu_includes_observer": true, "platform": "darwin", "root_pid": 99505, "selectors": ["test_local_only_force_overrides_unpushed"]}
+FM_TEARDOWN_CPU {"cpu_seconds": 0, "event": "boundary", "mark": "suite.start", "monotonic_ns": 90043794690708, "root_pid": 99505, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "suite.start", "event": "interval", "invalid_reason": "missing_endpoint", "region": "unattributed_launch", "start_mark": null, "valid": false, "wall_ns": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 12.46, "event": "boundary", "mark": "test_local_only_force_overrides_unpushed.start", "monotonic_ns": 90061108067375, "root_pid": 99505, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 12.46, "end_mark": "test_local_only_force_overrides_unpushed.start", "event": "interval", "invalid_reason": null, "region": "unattributed_startup", "start_mark": "suite.start", "valid": true, "wall_ns": 17313376667}
+FM_TEARDOWN_CPU {"case": "test_local_only_force_overrides_unpushed", "cpu_seconds": null, "enabled": true, "event": "phase_scope", "excluded": "other_cases,nested_or_unmatched_products,unsupported_sender_identity", "measurement": "eligible", "scope": "source_proven_serial_helpers_and_direct_product_only"}
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+FM_TEARDOWN_CPU {"cpu_seconds": 15.19, "event": "boundary", "mark": "test_local_only_force_overrides_unpushed.end", "monotonic_ns": 90071363020833, "root_pid": 99505, "runnable": false, "telemetry_error": null}
+FM_TEARDOWN_CPU {"cpu_seconds": 2.7299999999999986, "end_mark": "test_local_only_force_overrides_unpushed.end", "event": "interval", "invalid_reason": null, "region": "test_local_only_force_overrides_unpushed", "start_mark": "test_local_only_force_overrides_unpushed.start", "valid": true, "wall_ns": 10254953458}
+FM_TEARDOWN_CPU {"cpu_seconds": null, "end_mark": "target.exit", "event": "interval", "invalid_reason": "root_reaped_no_cpu_endpoint", "region": "unattributed_tail", "start_mark": "test_local_only_force_overrides_unpushed.end", "valid": false, "wall_ns": 2374428542}
+FM_TEARDOWN_CPU {"boundaries_missing": false, "event": "target_exit", "monotonic_ns": 90073737449375, "partial_mark_bytes": 0, "pipe_eof_observed": true, "returncode": 0}
+suite_exit=0
+--- RUNNER_TEMP contents after run:
+.
+guard-phase-durations.jsonl: ABSENT
