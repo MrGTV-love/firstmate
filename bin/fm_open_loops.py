@@ -54,6 +54,8 @@ GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
 PIPELINE_ENDED = {"completed", "failed", "cancelled", "aborted"}
 STOP_STATES = {"done", "parked", "paused"}
+# fm-crew-state.sh verdicts of a live session; unknown covers a gone, dead or unreadable one.
+LIVE_STATES = {"working", "blocked"} | STOP_STATES
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
                        r"|\b(?-i:E[A-Z][A-Z0-9_]{2,})\b", re.I)
@@ -1476,10 +1478,11 @@ class WaitVerifier:
         raise ValueError("unsupported waiting source; recollect before binding it")
 
     def live_task(self, task):
-        """A named prerequisite is live: assigned, provably working, unmerged, and neither stalled nor failed.
+        """A named prerequisite is live: assigned, its session alive, unmerged, and neither stalled nor failed.
 
-        It binds the prerequisite's launch generation and status stream, not its latest status line, so ordinary
-        progress keeps the wait standing while a replacement, a stop, a merge or trouble ends it.
+        It binds the prerequisite's launch generation and status stream, not its latest status line or whether it
+        is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
+        standing while a replacement, a dead or missing session, a failure, a merge or trouble ends it.
         """
         c = self.collector
         fields = c.read_fields(c.state / (task + ".meta"))
@@ -1488,12 +1491,12 @@ class WaitVerifier:
         path = c.state / (task + ".status")
         if path.is_symlink() or not path.is_file():
             raise ValueError("prerequisite status is unavailable")
-        working = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
-                         'if crew_is_provably_working "$3"; then last_status_line "$2" || '
-                         '{ echo "prerequisite status is past the read limits and cannot be verified" >&2; exit 2; }; fi',
-                         BIN, path, task).strip()
-        if not working:
-            raise ValueError("prerequisite task is not live and working; follow up on its result or wait")
+        verdict = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; "$FM_CREW_STATE_BIN" "$2"',
+                         BIN, task).strip()
+        state = verdict.split(" ", 2)[1] if verdict.startswith("state: ") else ""
+        if state not in LIVE_STATES:
+            raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
+                             " follow up on it")
         if fields.get("pr") and merge_marker(c.state, fields["pr"]):
             raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
@@ -1548,7 +1551,8 @@ class WaitVerifier:
             raise ValueError("prerequisite delivery namespace must not be redirected")
         sent = steer_record_epoch(c.state, proof_row, evidence)
         if sent is None or sent < boundary:
-            raise ValueError("waiting requires a new prerequisite-task delivery after presentation")
+            raise ValueError("waiting requires a prerequisite-task delivery sent after this row became overdue"
+                             " or its evidence last changed")
         proof = next((p for p in (inbox / evidence, inbox / "handled" / evidence) if p.is_file()), None)
         if proof is None or proof.is_symlink():
             raise ValueError("waiting delivery is unavailable")
@@ -1848,12 +1852,10 @@ def record_action(args, state, now, report, waits, waits_error):
     if args.kind == "waiting":
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("waiting requires --recheck at a future UTC time within 24 hours")
-        boundary = stamps.get(actor, {}).get(ident)
-        if boundary is None:
-            boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
         if waits is None:
             raise ValueError("waiting evidence unavailable: " + waits_error)
-        binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence, boundary)
+        binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence,
+                                episode_boundary(controls, by_id[ident], actor, now))
         if binding.get("delivery"):
             delivery = f"waiting:{args.prerequisite_task}:{args.evidence}"
             if delivery in cited:

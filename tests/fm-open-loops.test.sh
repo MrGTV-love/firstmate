@@ -3813,6 +3813,10 @@ fake.mkdir()
 def executable(path, text):
     path.write_text(text); path.chmod(0o755)
 executable(fake / 'tmux', '''#!/usr/bin/env bash
+if [ -e "$FM_HOME/session-gone" ]; then
+  [ "$1" = list-windows ] && exit 0
+  exit 1
+fi
 case "$1" in
   list-windows) printf 'fm-repair-owner\\n' ;;
   display-message) printf '%%1\\n' ;;
@@ -3960,20 +3964,69 @@ assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequi
 fx = waiting_fixture('replaced')
 (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'].replace('s-repair', 's-replacement'))
 assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a replacement worker cannot inherit the wait'
+fx = waiting_fixture('session-missing')
+fx['activity']('idle')
+(fx['home'] / 'session-gone').write_text('')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the prerequisite session is missing'
+fx = waiting_fixture('absent-record')
+(fx['home'] / 'state/repair-owner.status').unlink()
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an absent task record is not live'
+# A live prerequisite need not be busy right now: idle between turns, or parked with its PR awaiting review.
+fx = waiting_fixture('idle-turn')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an idle prerequisite between turns still carries the wait'
+for parked in (f'done [at={now}]: PR 290 opened; awaiting other-family review\n',
+               f'needs-decision [at={now}] [key=review]: PR 290 parked awaiting review\n'):
+    (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + parked)
+    assert fx['call'](fx['loops'], '--check-actions').returncode == 0, ('a parked prerequisite still carries the wait', parked)
 fx = wait_fixture('idle')
 boundary = fx['drain']()
 fx['activity']('idle')
-refused = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
-                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
-assert refused.returncode == 1 and 'working' in refused.stdout, refused
+idle = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert idle.returncode == 0, ('a wait on an idle live prerequisite is recorded', idle.stdout)
+(fx['home'] / 'session-gone').write_text('')
+gone = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert gone.returncode == 1 and 'not live' in gone.stdout, gone
 missing = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
                      '--prerequisite-task', 'no-such-task', '--recheck', iso(now + 3600))
 assert missing.returncode == 1, missing
 own = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
                  '--prerequisite-task', 'parked-job', '--recheck', iso(now + 3600))
 assert own.returncode == 1 and 'distinct' in own.stdout, own
-assert fx['red']['id'] not in json.loads(fx['ledger'].read_text())['handling']['actions']
-print('PASS: a red PR row waits on a named live task and resurfaces when it merges, fails, stalls, is replaced or comes due; '
-      'a prerequisite that is not live is refused', flush=True)
+assert json.loads(fx['ledger'].read_text())['handling']['actions'][fx['red']['id']]['evidence'] == reason
+print('PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, '
+      'loses its session or record, is replaced or comes due; a prerequisite that is not live is refused', flush=True)
+
+# The delivery form of a task wait shares the steer's boundary: the start of the row's current overdue episode.
+def delivery(fx, record, sent):
+    path = fx['home'] / 'state/repair-owner.inbox' / record
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f'schema=fm-task-inbox.v1\nat={iso(sent)}\n--\nopen-loop-row: {fx["red"]["id"]}\nland the red-main fix\n')
+fx = wait_fixture('delivery-episode')
+boundary = fx['drain']()
+episode = json.loads(fx['ledger'].read_text())['handling']['episodes'][fx['red']['id']]['start']
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 60)
+delivery(fx, '001.msg', now + 60)
+delivery(fx, '002.msg', now - 60)
+assert fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                  '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 200)).returncode == 0
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 300)
+boundary = fx['drain']()
+stored = json.loads(fx['ledger'].read_text())['handling']
+assert stored['presented_at']['main'][fx['red']['id']] == now + 300, 'the due recheck re-presented the unchanged row'
+assert stored['episodes'][fx['red']['id']]['start'] == episode, 're-presenting an unchanged row keeps its episode'
+older = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '002.msg',
+                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert older.returncode == 1 and 'became overdue' in older.stdout, ('a delivery older than the episode is refused', older.stdout)
+inside = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', '001.msg',
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert inside.returncode == 0, ('a delivery inside the episode counts after a re-presentation', inside.stdout)
+assert fx['ack'](boundary).returncode == 0
+fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+print('PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; '
+      'one older than the episode is refused', flush=True)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
