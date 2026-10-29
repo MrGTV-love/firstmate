@@ -262,7 +262,7 @@ PY
   FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" run_memory_case \
     "$WRAP" --memory-kib 131072 -- python3 "$TMP_ROOT/memory-tree.py" 2>"$TMP_ROOT/memory.err"
   rc=$?
-  expect_code 99 "$rc" "over-limit command tree"
+  expect_code 99 "$rc" "over-limit command tree: $(<"$TMP_ROOT/memory.err")"
   assert_contains "$(cat "$TMP_ROOT/memory.err")" "exceeded 131072 KiB" "over-limit reason names the bound"
   [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
   [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
