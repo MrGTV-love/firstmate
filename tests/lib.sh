@@ -1323,6 +1323,33 @@ fm_test_base_path_sans() {
   printf '%s\n' "$dir"
 }
 
+# fm_test_refresh_fence_stub <dir>
+# Writes a stub ln into <dir> (put it first on PATH) that pins the instant a
+# home-summary refresh worker, which already owns the refresh lock, first reaches
+# for its fence (the lock's steal mutex): with FM_TEST_FENCE_ACTION=remove it
+# removes FM_TEST_FENCE_HOME, with =refuse it creates
+# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex, and in every
+# other case, or for any other target, it runs the real ln. A refresh bound
+# for a fence it cannot take is reproduced this way without timing luck.
+fm_test_refresh_fence_stub() {
+  mkdir -p "$1" || return 1
+  FM_TEST_REAL_LN=$(command -v ln)
+  export FM_TEST_REAL_LN
+  cat > "$1/ln" <<'SH'
+#!/usr/bin/env bash
+case "${*: -1}" in
+  */.home-summary-refresh.lock.steal)
+    case "${FM_TEST_FENCE_ACTION:-}" in
+      remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
+      refuse) : > "${FM_TEST_FENCE_HOME:?}/state/.test-fence-refused"; exit 1 ;;
+    esac
+    ;;
+esac
+exec "${FM_TEST_REAL_LN:?}" "$@"
+SH
+  chmod +x "$1/ln"
+}
+
 # fm_test_wait_until <seconds> <command> [args...]
 # Polls until the command succeeds or the ceiling passes. For a result that a
 # detached background job publishes, such as bin/fm-home-summary-refresh.sh

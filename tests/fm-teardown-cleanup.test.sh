@@ -29,6 +29,45 @@ test_local_only_force_overrides_unpushed() {
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"
 }
 
+# A teardown starts a detached home-summary refresh, which outlives the teardown
+# and, once the fixture that owned the home is cleaned up, can never be stopped
+# by anything that looks at the fixture: its command line names only the shared
+# code. The child runs a real teardown case with its refresh worker held at the
+# fence, then exits so its own fixture cleanup runs; no worker may remain.
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
+  local child out stub worker identity
+  child="$TMP_ROOT/fixture-cleanup-child.sh"
+  out="$TMP_ROOT/fixture-cleanup-worker"
+  stub="$TMP_ROOT/fixture-cleanup-stub"
+  fm_test_refresh_fence_stub "$stub" || fail "could not write the fence stub"
+  cat > "$child" <<'CHILD'
+#!/usr/bin/env bash
+set -u
+# shellcheck source=tests/fm-teardown-helpers.sh
+. "$1/tests/fm-teardown-helpers.sh"
+case_dir=$(make_case leak-child)
+write_meta "$case_dir" local-only ship
+wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
+export FM_TEST_FENCE_ACTION=refuse FM_TEST_FENCE_HOME="$case_dir"
+FM_TEARDOWN_TEST_PATH="$2:$PATH" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+  > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "the child teardown failed: $(cat "$case_dir/stderr")"
+fm_test_wait_until 30 test -e "$case_dir/state/.test-fence-refused" \
+  || fail "the refresh worker never reached the refused fence"
+worker=$(cat "$case_dir/state/.home-summary-refresh.lock/pid") || fail "the worker did not record its lock pid"
+printf '%s\t%s\n' "$worker" "$(fm_test_pid_identity "$worker")" > "$3"
+CHILD
+  bash "$child" "$ROOT" "$stub" "$out" || fail "the fixture child failed"
+  IFS=$'\t' read -r worker identity < "$out" || fail "the child recorded no worker"
+  [ -n "$worker" ] && [ -n "$identity" ] || fail "the child recorded no worker identity"
+  # shellcheck disable=SC2329 # Invoked through fm_test_wait_until.
+  worker_gone() { [ "$(fm_test_pid_identity "$worker" 2>/dev/null || true)" != "$identity" ]; }
+  if ! fm_test_wait_until 20 worker_gone; then
+    kill -KILL "$worker" 2>/dev/null || true
+    fail "the home-summary refresh worker $worker outlived its fixture's cleanup"
+  fi
+  pass "fixture cleanup after a teardown leaves no home-summary refresh worker"
+}
+
 # Registering a PR inside a secondmate home publishes the child's ready line
 # with the canonical URL on the parent channel from fm-pr-check itself, once;
 # a main home publishes nothing.
@@ -6037,6 +6076,7 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 }
 
 teardown_test_cases=(
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker

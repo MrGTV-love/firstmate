@@ -26,6 +26,11 @@
 # keeps running. bin/fm-duration.py owns progress detection and signal cleanup.
 # Failure logging, streak accounting, and owner-checked release have independent
 # deadlines of 4, 10, and 4 seconds, so logging failure cannot skip the latter two.
+# The progress owner counts a polling loop's forks as progress, so waiting for the
+# fence has its own end: it fails at once when the home's state directory is gone
+# (a retired home or a removed test fixture can never grant it) and otherwise after
+# FM_HOME_SUMMARY_FENCE_TIMEOUT seconds (default 60), the way fm_lock_acquire_wait
+# already gives up on a lock whose directory is gone.
 # No reader can observe temporary output through the ledger path.
 #
 # With --best-effort, a failure is appended to the bounded home-local
@@ -72,6 +77,8 @@ ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
 # Match fm-duration.py's 15-minute no-progress policy, not a wall deadline.
 HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-$((15 * 60))}
 HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
+# measured: value=60 date=2026-10-29 host=Mac-Studio margin=3.7x (eight processes contending for the fence mutex around the production wait loop, 200 acquisitions at load average 80, waited 16.2 s at the slowest and 1.5 s on average; real contention is at most three)
+HOME_SUMMARY_FENCE_TIMEOUT=${FM_HOME_SUMMARY_FENCE_TIMEOUT:-60}
 BEST_EFFORT=0
 DETACH=0
 HOME_SUMMARY_MODE=parent
@@ -110,6 +117,10 @@ case "$ERROR_LOG_MAX_BYTES" in
 esac
 case "$HOME_SUMMARY_TIMEOUT" in
   ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=$((15 * 60)) ;;
+esac
+case "$HOME_SUMMARY_FENCE_TIMEOUT" in
+  # measured: value=60 date=2026-10-29 host=Mac-Studio margin=3.7x (the default bound above)
+  ''|*[!0-9]*|0) HOME_SUMMARY_FENCE_TIMEOUT=60 ;;
 esac
 case "$HOME_SUMMARY_IF_IDLE" in
   0|1) ;;
@@ -313,8 +324,19 @@ home_summary_unfence() {
 
 home_summary_fence() {
   local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-} owner_pid=${1:-${FM_HOME_SUMMARY_PARENT_PID:-}}
+  local deadline=$((SECONDS + HOME_SUMMARY_FENCE_TIMEOUT))
   case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
   while ! fm_lock_try_acquire_steal_mutex "$REFRESH_LOCK.steal"; do
+    # The mutex cannot be created in a state directory that is gone, and the
+    # progress owner reads this loop's forks as progress, so end it here.
+    if [ ! -d "$STATE" ]; then
+      home_summary_fail "refresh home is gone: $STATE"
+      return 1
+    fi
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      home_summary_fail "could not take the refresh fence within ${HOME_SUMMARY_FENCE_TIMEOUT} seconds"
+      return 1
+    fi
     sleep 0.1
   done
   HOME_SUMMARY_FENCE_HELD=1

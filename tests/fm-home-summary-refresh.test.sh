@@ -1521,3 +1521,56 @@ for big in 1 2; do
     || fail "the checkpoint-seeded summary of big-task-$big lost or added decisions: published [$published], expected [$expected]"
 done
 pass "publication on a large history reads only what was appended and retains decisions from before and after the checkpoint"
+
+# A refresh worker waits for its fence (the lock's steal mutex) only while that
+# wait can still end: a worker whose home is removed under it, as a test
+# fixture's cleanup does, or one whose mutex never frees, must end in bounded
+# time instead of polling forever. The stub ln of fm_test_refresh_fence_stub pins
+# the instant the worker, which already owns the refresh lock, first reaches for
+# the fence mutex, and removes the home or refuses the mutex there.
+# The code reaches the worker through a code-root/bin symlink, as in the teardown
+# fixtures, so every process of its tree names this home in its command line and
+# the checks are scoped to this home alone.
+FENCE_BIN="$TMP_ROOT/fence-bin"
+fm_test_refresh_fence_stub "$FENCE_BIN" || fail "could not write the fence stub"
+
+refresh_workers_of() {  # <home> -> pids of its refresh processes
+  pgrep -f -- "$1/code-root/bin/fm-home-summary-refresh\\.sh" 2>/dev/null || true
+}
+
+no_refresh_workers_of() {  # <home>
+  [ -z "$(refresh_workers_of "$1")" ]
+}
+
+# Starts a detached refresh whose worker meets the stub ln's action at its fence,
+# and waits until the worker exists. Sets FENCE_HOME; it assigns a global because
+# `fail` in a command substitution would not end the suite.
+start_fenced_refresh() {  # <name> <action> [env assignment...]
+  local home name=$1 action=$2
+  shift 2
+  home=$(new_bare_home "$name")
+  FENCE_HOME=$home
+  mkdir -p "$home/code-root"
+  ln -s "$ROOT/bin" "$home/code-root/bin"
+  env ${1+"$@"} FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" \
+    PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
+    "$home/code-root/bin/fm-home-summary-refresh.sh" --detach \
+    || fail "could not start the detached refresh for $name"
+}
+
+start_fenced_refresh gone-home remove FM_HOME_SUMMARY_FENCE_TIMEOUT=300
+GONE_HOME=$FENCE_HOME
+fm_test_wait_until 20 test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
+fm_test_wait_until 20 no_refresh_workers_of "$GONE_HOME" \
+  || fail "a refresh worker for a removed home was still running 20 seconds later: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
+pass "a refresh worker whose home is removed as it reaches its fence ends instead of polling forever"
+
+start_fenced_refresh stuck-fence-home refuse FM_HOME_SUMMARY_FENCE_TIMEOUT=2
+STUCK_HOME=$FENCE_HOME
+fm_test_wait_until 20 test -e "$STUCK_HOME/state/.test-fence-refused" \
+  || fail "the worker never reached the refused fence"
+fm_test_wait_until 20 no_refresh_workers_of "$STUCK_HOME" \
+  || fail "a refresh worker behind a fence that never frees was still running 20 seconds later: $(refresh_workers_of "$STUCK_HOME" | tr '\n' ' ')"
+fm_test_wait_until 5 grep -q 'refresh fence' "$STUCK_HOME/state/.home-summary-refresh.log" \
+  || fail "the fence timeout was not logged: $(cat "$STUCK_HOME/state/.home-summary-refresh.log" 2>&1)"
+pass "a refresh worker behind a fence that never frees gives up at its deadline and logs why"
