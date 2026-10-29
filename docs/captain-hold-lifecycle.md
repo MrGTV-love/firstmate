@@ -335,8 +335,8 @@ The captain reverses it by re-holding with `--owner captain`.
 ### Closing a parent-owned call
 
 `decide` records the parent's decision text as a `Parent decision:` block marked `Not a captain answer.`, and it publishes the matching `resolved` line.
-Like `answer` without `--release`, it closes a question-shaped row: a `captain`-kind row that no worker owns.
-Otherwise it lifts the hold so the gated work item resumes without closing.
+Like `answer` without `--release`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its `Deliverable of the finished work:` line.
+Otherwise it lifts the hold so the unfinished work item resumes without closing.
 An exact replay is accepted and publishes nothing twice.
 It refuses every hold whose recorded owner is not the parent, so it cannot release a captain call.
 
@@ -355,9 +355,9 @@ A retried `decide` or `withdraw` whose record is already written for the current
 ### Withdrawing a call that a captain ruling made moot
 
 `withdraw` is the honest release for a captain-kind hold on an open work item whose question a recorded captain ruling has already settled.
-It never writes the captain's words and never completes a work item.
-It lifts the hold so a ship or scout work item resumes queued and unheld.
-Like `decide`, it closes a question-shaped row (a `captain`-kind row that no worker owns), so a moot question never returns as dispatchable work.
+It never writes the captain's words and never completes unfinished work.
+It lifts the hold so an unfinished ship or scout work item resumes queued and unheld.
+Like `decide`, it closes a row that no worker owns when the row is question-shaped (a `captain`-kind row) or is finished work that teardown retained with its deliverable, so neither a moot question nor finished work returns as dispatchable work.
 It writes a `Resolution mode: withdrawn` record that names the ruling, the owner the hold was filed with, and the home role it ran from (derived, never typed).
 It also records the evidence file and the line `Not a captain answer.`, and it publishes a `resolved` line saying the call was withdrawn.
 The record carries a `Withdrawal evidence:` label instead of `Captain decision:`, so every reader that recognizes a captain answer skips it.
@@ -816,6 +816,7 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
 - A secondmate home refuses a hold with no owner, `--owner parent`, or an unknown owner, and a main home refuses `--owner parent`.
 - A classified parent-owned hold is an external hold with the owner recorded and reads as no captain call.
 - The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases a gated work item with the work left open, closes a question-shaped row, closes the channel key, and replays once.
+- After teardown retains a finished work item that has an open parent decision, `decide` closes it with its deliverable and `tasks-axi ready` does not list it, while unfinished work under the same decision is only released.
 - A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
 - `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
   A withdrawn question-shaped row is closed and is absent from `tasks-axi ready`, while a withdrawn work item stays queued and unheld.

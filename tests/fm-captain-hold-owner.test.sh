@@ -837,6 +837,57 @@ test_the_gate_accepts_an_archived_parent_decision() {
   pass "the completion gate accepts an archived parent decision and never lists it as an answer"
 }
 
+# Teardown keeps a finished work item open while the parent's decision on it is
+# open, recording its deliverable. That decision then closes the finished row,
+# as an answer does, and never returns it to the dispatchable queue; unfinished
+# work under the same decision is only released.
+test_decide_closes_finished_work_teardown_retained() {
+  local mate parent decision id show
+  mate=$(make_mate_home retained-decide)
+  decision="$mate/decision.txt"
+  printf 'Retry once, unchanged head.\n' > "$decision"
+  id=retained-scout
+  mkdir -p "$mate/data/$id"
+  tasks_in "$mate" add "$id" "Retained scout" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the finished work item"
+  write_origin_meta "$mate" "$id"
+  printf 'done: report complete\n' > "$mate/state/$id.status"
+  printf '# Retained scout\n\nMain decides the retry.\n' > "$mate/data/$id/report.md"
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET in_premate_home "$mate" run_captain "$mate" hold "$id" \
+    --reason "$(parent_relayed_reason "$mate" "retry or fix one red check")" >/dev/null \
+    || fail "could not file the legacy hold on the finished work item"
+  classify_as_parent "$mate" "$id"
+  complete_through_sibling "$mate" "$id" >/dev/null || fail "the completion gate refused the finished work item"
+  # The parent registers the mate, as it does before any child is torn down.
+  parent=$(sed -n 's/^parent_home=//p' "$mate/.fm-secondmate-parent")
+  printf -- '- retained-decide-id - synthetic scope (home: %s; scope: sample; projects: sample; added 2026-07-14)\n' \
+    "$mate" > "$parent/data/secondmates.md"
+  fm_write_secondmate_meta "$parent/state/retained-decide-id.meta" "$mate" "firstmate:fm-retained-decide-id" sample
+  run_teardown "$mate" "$id" > "$mate/teardown.out" 2> "$mate/teardown.err" \
+    || fail "teardown of the finished work item failed: $(cat "$mate/teardown.err")"
+  show=$(tasks_in "$mate" show "$id" --full)
+  assert_contains "$show" "state: queued" "teardown did not retain the finished row"
+  assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
+    "teardown did not record the deliverable on the retained row"
+  assert_absent "$mate/state/$id.meta" "teardown left the worker record behind"
+
+  run_captain "$mate" decide "$id" --decision-file "$decision" >/dev/null || fail "decide refused the retained row"
+  show=$(tasks_in "$mate" show "$id" --full)
+  assert_contains "$show" "state: done" "decide returned finished work to the queue"
+  assert_contains "$show" "data/$id/report.md" "decide closed the finished row without its deliverable"
+  assert_contains "$show" "Parent decision:" "the decision text was not recorded on the retained row"
+  assert_not_contains "$(tasks_in "$mate" ready)" "$id" "decide made finished work dispatchable"
+
+  make_legacy_mate_hold "$mate" open-work "$(parent_relayed_reason "$mate" "retry or fix one red check")"
+  classify_as_parent "$mate" open-work
+  run_captain "$mate" decide open-work --decision-file "$decision" >/dev/null || fail "decide refused unfinished work"
+  show=$(tasks_in "$mate" show open-work --full)
+  assert_contains "$show" "held: no" "decide did not release unfinished work"
+  assert_not_contains "$show" "state: done" "decide closed unfinished work"
+  assert_contains "$(tasks_in "$mate" ready)" "open-work" "decide did not return unfinished work to the queue"
+  pass "decide closes finished work teardown retained, with its deliverable, and only releases unfinished work"
+}
+
 # A dated hold whose date has passed reads `held: no` but still blocks every
 # reader, so the release commands must still reach it; and a plain completion
 # never closes a row while the parent's decision is open.
@@ -890,6 +941,7 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
 test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records
 test_a_retried_decide_or_withdraw_finishes_without_a_second_record
 test_the_gate_accepts_an_archived_parent_decision
+test_decide_closes_finished_work_teardown_retained
 test_an_expired_dated_hold_still_releases_and_a_parent_hold_blocks_completion
 )
 captain_hold_run_tests "$@"

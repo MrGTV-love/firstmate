@@ -91,16 +91,18 @@
 # `decide` records the parent firstmate's decision text (a non-empty file of at
 # most 8192 bytes) as a `Parent decision:` block marked `Not a captain answer.`
 # and publishes the matching `resolved` line on the parent channel. Like `answer`
-# without `--release`, it closes a question-shaped row (a `captain`-kind row that
-# no worker owns); otherwise it lifts the hold so the gated work item resumes
-# without closing. It refuses every hold whose
+# without `--release`, it closes a row no worker owns that is a question-shaped
+# row (a `captain`-kind row) or finished work teardown retained with its
+# `Deliverable of the finished work:` line; otherwise it lifts the hold so the
+# unfinished work item resumes without closing. It refuses every hold whose
 # recorded owner is not the parent, so it can never release a captain call.
 #
 # `withdraw` is the honest release of a captain-kind hold that a recorded
 # captain ruling made moot. It never writes the captain's words and never
-# completes a work item: it lifts the hold, or, like `decide`, closes a
-# question-shaped row (a `captain`-kind row that no worker owns) so a moot
-# question never returns as dispatchable work. It records the basis, the owner
+# completes unfinished work: it lifts the hold, or, like `decide`, closes a row
+# no worker owns that is question-shaped (a `captain`-kind row) or finished work
+# teardown retained with its deliverable, so neither a moot question nor
+# finished work returns as dispatchable work. It records the basis, the owner
 # the hold was filed with, the home role it ran from, and the evidence file, and
 # marks the record `Not a captain answer.`. The one eligibility fact is
 # `--ruling <id>`: a closed captain call in this home (live or archived) that
@@ -1938,6 +1940,17 @@ live_work_item() {  # <task-id> <backlog-state>
   [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
 }
 
+# True when a decision that is not the captain's closes the row rather than
+# lifting its hold: no worker owns it, and it is either a question-shaped row or
+# finished work teardown retained with its deliverable. Lifting the hold on
+# either would return a row with nothing left to do to the dispatchable queue.
+closes_on_decision() {  # <task-id> <backlog-state> <kind> <shown-body>
+  live_work_item "$1" "$2" && return 1
+  [ "$3" = captain ] && return 0
+  fm_backlog_retained_close_args "$(decode_shown_value "$4")"
+  [ "${#FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}" -gt 0 ]
+}
+
 close_answered() {  # <task-id> <release-0-or-1> [<answer-source>]
   if [ "$2" = 1 ]; then
     tasks_axi unhold "$1" >/dev/null || return $?
@@ -2116,8 +2129,9 @@ WITHDRAW_RUN_ROLE=''
 # That is an external hold carrying the parent owner line, and only this command
 # releases it: the captain's `answer` is never involved, and this command
 # refuses every hold whose recorded owner is not the parent. A question-shaped
-# row closes on the decision, as `answer` closes one without --release; a gated
-# work item is only released.
+# row, or finished work teardown retained with its deliverable, closes on the
+# decision, as `answer` closes one without --release; unfinished work is only
+# released.
 command_decide() {
   local id=${1:-} decision_file='' show state hold_kind body owner occurrence cur
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
@@ -2163,7 +2177,7 @@ command_decide() {
   else
     write_resolution_record "$id" decided "$body"
   fi
-  if [ "$(show_field_value "$show" kind)" = captain ] && ! live_work_item "$id" "$state"; then
+  if closes_on_decision "$id" "$state" "$(show_field_value "$show" kind)" "$body"; then
     apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for parent-decided task $id"
     tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \
       || fail "could not close parent-decided task $id"
@@ -2245,8 +2259,9 @@ text_names_task() {  # <text> <task-id>
 }
 
 # An honest release of a hold that was never the captain's. It never writes the
-# captain's words and never completes a work item; it lifts the hold (closing a
-# question-shaped row, as decide does), records who decided and why, and marks
+# captain's words and never completes unfinished work; it lifts the hold
+# (closing a question-shaped row or retained finished work, as decide does),
+# records who decided and why, and marks
 # the record as not a captain answer.
 command_withdraw() {
   local id=${1:-} evidence_file='' ruling='' show state hold_kind body owner occurrence hold_set replay=0
@@ -2310,7 +2325,7 @@ command_withdraw() {
   else
     write_resolution_record "$id" withdrawn "$body"
   fi
-  if [ "$(show_field_value "$show" kind)" = captain ] && ! live_work_item "$id" "$state"; then
+  if closes_on_decision "$id" "$state" "$(show_field_value "$show" kind)" "$body"; then
     apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for withdrawn task $id"
     tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \
       || fail "could not close withdrawn task $id"
