@@ -61,7 +61,7 @@ test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it() {
 }
 
 test_sweep_keeps_live_owner_and_unmarked_entries() {
-  local tmp="$TMP_ROOT/keep" pid tries=0 root unmarked unmarked_old
+  local tmp="$TMP_ROOT/keep" pid tries=0 root unmarked unmarked_old dead_pid
   mkdir -p "$tmp"
   env TMPDIR="$tmp" bash -c '
     . "$1"
@@ -78,15 +78,27 @@ test_sweep_keeps_live_owner_and_unmarked_entries() {
   mkdir -p "$unmarked/inner" "$unmarked_old/inner"
   touch -t 202001010000 "$unmarked" "$unmarked/inner" "$unmarked_old" "$unmarked_old/inner"
   touch -t 202001010000 "$root/.fm-test-fixture" "$tmp"/fm-test-owners/*/.fm-test-fixture
+  # Registries the old lib.sh left beside the roots, named by their owner's PID.
+  bash -c 'exit 0' &
+  dead_pid=$!
+  wait "$dead_pid" 2>/dev/null || true
+  : > "$tmp/.fm-test-cleanup.$pid.CCCCCC"
+  : > "$tmp/.fm-test-watcher.$pid.DDDDDD"
+  : > "$tmp/.fm-test-cleanup.$dead_pid.EEEEEE"
+  touch -t 202001010000 "$tmp/.fm-test-cleanup.$pid.CCCCCC" "$tmp/.fm-test-watcher.$pid.DDDDDD" \
+    "$tmp/.fm-test-cleanup.$dead_pid.EEEEEE"
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0 FM_TEST_SWEEP_ALL=1
   assert_present "$root" "the sweep removed a fixture root whose owner is still running"
   assert_present "$unmarked" "the sweep removed an unmarked fm-test-* entry"
   assert_present "$unmarked_old" "the wide sweep removed an unmarked fm-* entry"
+  assert_present "$tmp/.fm-test-cleanup.$pid.CCCCCC" "the wide sweep removed a live owner's legacy cleanup registry"
+  assert_present "$tmp/.fm-test-watcher.$pid.DDDDDD" "the wide sweep removed a live owner's legacy watcher registry"
+  assert_absent "$tmp/.fm-test-cleanup.$dead_pid.EEEEEE" "the wide sweep left a dead owner's legacy registry"
   kill -TERM "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   assert_absent "$root" "the live shell's own teardown left its fixture root"
-  pass "the sweep keeps a live owner's roots and every unmarked entry, narrow or wide"
+  pass "the sweep keeps a live owner's roots and registries and every unmarked entry, narrow or wide"
 }
 
 test_sweep_cost_does_not_follow_unrelated_entries() {

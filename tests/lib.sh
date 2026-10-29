@@ -561,6 +561,8 @@ fm_test_reap_orphans() {
   done
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
     # Registries from before the per-shell records lived beside the fixture roots.
+    # They record no owner identity, so any live process with the owner's PID
+    # keeps one; only a PID with no process proves the owner dead.
     for entry in "$FM_TEST_TMPDIR"/.fm-test-cleanup.* "$FM_TEST_TMPDIR"/.fm-test-procevent.* \
       "$FM_TEST_TMPDIR"/.fm-test-watcher.* "$FM_TEST_TMPDIR"/.fm-test-process.*; do
       [ -f "$entry" ] && [ ! -L "$entry" ] && [ -O "$entry" ] || continue

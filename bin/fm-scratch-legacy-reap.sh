@@ -18,11 +18,12 @@
 #   2. it is not a symlink and this user owns it;
 #   3. nothing under it was modified for --min-age-days days (default 2; the
 #      longest bounded command is 6 hours), judged by the newest file in it;
-#   4. no process has it open or as its working directory, read from lsof.
-# lsof must run and answer for every batch; if it cannot, nothing is removed.
+#   4. no process has it, or anything under it, open or as its working
+#      directory, read from one lsof listing of every open file.
+# lsof must run and answer; if it cannot, nothing is removed.
 #
-# Without --apply it only prints the entries it would remove. With --apply it
-# removes them and prints one `removed` line each. It never touches anything
+# Without --apply it only prints each entry it would remove and why. With
+# --apply it removes them and prints one `removed` line each. It never touches anything
 # outside DIR (default: $TMPDIR, else /tmp) and never recurses into a candidate
 # that is a symlink.
 #
@@ -64,7 +65,8 @@ done
 [ "${#candidates[@]}" -gt 0 ] || exit 0
 
 # Old enough: no file at or under the entry is newer than the cutoff. One find
-# over all candidates, so the cost is the entries' own size.
+# per candidate that stops at its first young file, so the cost is the
+# candidates' own size.
 aged=()
 while IFS= read -r -d '' entry; do
   aged+=("$entry")
@@ -77,37 +79,29 @@ done < <(
 )
 [ "${#aged[@]}" -gt 0 ] || exit 0
 
-# Not in use: ask lsof about each batch of entries. lsof exits 1 with no output
-# when nothing has them open; any other failure means we cannot tell.
+# Not in use: one lsof listing of every open file and working directory. Each
+# path under DIR marks the top-level entry it lies in, so a file open or a cwd
+# deep inside a candidate keeps the whole candidate.
+open_paths=$(lsof -n -P -w -F n 2>/dev/null)
+status=$?
+if [ "$status" -ne 0 ] || [ -z "$open_paths" ]; then
+  echo "fm-scratch-legacy-reap: lsof failed (status $status); removing nothing" >&2
+  exit 1
+fi
 in_use=$'\n'
-batch=()
-flush_batch() {
-  local out status line
-  [ "${#batch[@]}" -gt 0 ] || return 0
-  out=$(lsof -F n -- "${batch[@]}" 2>/dev/null)
-  status=$?
-  case "$status" in
-    0|1) ;;
-    *) echo "fm-scratch-legacy-reap: lsof failed (status $status); removing nothing" >&2; exit 1 ;;
-  esac
-  while IFS= read -r line; do
-    case "$line" in n*) in_use+="${line#n}"$'\n' ;; esac
-  done <<EOF
-$out
+while IFS= read -r line; do
+  case "$line" in "n$DIR"/*) ;; *) continue ;; esac
+  path=${line#"n$DIR"/}
+  in_use+="$DIR/${path%%/*}"$'\n'
+done <<EOF
+$open_paths
 EOF
-  batch=()
-}
-for entry in "${aged[@]}"; do
-  batch+=("$entry")
-  [ "${#batch[@]}" -lt 100 ] || flush_batch
-done
-flush_batch
 
 for entry in "${aged[@]}"; do
   case "$in_use" in *$'\n'"$entry"$'\n'*) continue ;; esac
   if [ "$APPLY" -eq 1 ]; then
     rm -rf -- "$entry" && printf 'removed %s\n' "$entry"
   else
-    printf 'would remove %s\n' "$entry"
+    printf 'would remove %s: legacy scratch entry of this user, nothing under it changed for %s days, open in no process\n' "$entry" "$MIN_AGE_DAYS"
   fi
 done

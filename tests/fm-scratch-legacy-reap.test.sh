@@ -31,9 +31,24 @@ mkdir "$TMP_ROOT/elsewhere"; : > "$TMP_ROOT/elsewhere/data"
 ln -s "$TMP_ROOT/elsewhere" "$DIR/fm-gh-rest.HHHHHH"                  # a symlink
 : > "$DIR/fm-session-start-stage.IIIIII"; old "$DIR/fm-session-start-stage.IIIIII"
 exec 7< "$DIR/fm-session-start-stage.IIIIII"                          # held open by this shell
+mkdir -p "$DIR/fm-gh-rest.JJJJJJ/sub"; : > "$DIR/fm-gh-rest.JJJJJJ/sub/page.1"
+old "$DIR/fm-gh-rest.JJJJJJ/sub/page.1" "$DIR/fm-gh-rest.JJJJJJ/sub" "$DIR/fm-gh-rest.JJJJJJ"
+(exec 3< "$DIR/fm-gh-rest.JJJJJJ/sub/page.1" && exec sleep 120) &     # a file open inside a subdirectory
+holder_pid=$!
+mkdir -p "$DIR/fm-contributions.KKKKKK/sub"; old "$DIR/fm-contributions.KKKKKK/sub" "$DIR/fm-contributions.KKKKKK"
+(cd "$DIR/fm-contributions.KKKKKK/sub" && exec sleep 120) &           # a working directory inside a subdirectory
+cwd_pid=$!
+tries=0
+until lsof -a -p "$holder_pid" -F n 2>/dev/null | grep -qx "n$DIR/fm-gh-rest.JJJJJJ/sub/page.1" &&
+  lsof -a -p "$cwd_pid" -d cwd -F n 2>/dev/null | grep -qx "n$DIR/fm-contributions.KKKKKK/sub"; do
+  tries=$((tries + 1))
+  [ "$tries" -lt 100 ] || fail "the holder processes never opened their paths"
+  sleep 0.05
+done
 
 out=$(bash "$REAPER" --tmpdir "$DIR")
-assert_contains "$out" "would remove $DIR/fm-gh-rest.AAAAAA" "dry run did not list an old directory"
+assert_contains "$out" "would remove $DIR/fm-gh-rest.AAAAAA: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process" \
+  "dry run did not list an old directory with its reason"
 assert_absent "$DIR/none" "sanity"
 [ -d "$DIR/fm-gh-rest.AAAAAA" ] || fail "a dry run removed an entry"
 
@@ -50,9 +65,15 @@ assert_present "$DIR/fm-gh-rest.GGGGGGG" "an entry with a seven-character suffix
 assert_present "$DIR/fm-gh-rest.HHHHHH" "a symlink was removed"
 assert_present "$TMP_ROOT/elsewhere/data" "the target of a symlink was removed"
 assert_present "$DIR/fm-session-start-stage.IIIIII" "an entry that a process holds open was removed"
+assert_present "$DIR/fm-gh-rest.JJJJJJ/sub/page.1" "an entry with a file open in its subdirectory was removed"
+assert_present "$DIR/fm-contributions.KKKKKK/sub" "an entry holding a process's working directory was removed"
 exec 7<&-
+kill -KILL "$holder_pid" "$cwd_pid" 2>/dev/null || true
+wait "$holder_pid" "$cwd_pid" 2>/dev/null || true
 out=$(bash "$REAPER" --tmpdir "$DIR" --apply)
 assert_contains "$out" "removed $DIR/fm-session-start-stage.IIIIII" "the entry was not removed once nothing held it"
+assert_contains "$out" "removed $DIR/fm-gh-rest.JJJJJJ" "the subdirectory-open entry was not removed once nothing held it"
+assert_contains "$out" "removed $DIR/fm-contributions.KKKKKK" "the subdirectory-cwd entry was not removed once nothing held it"
 pass "the legacy reaper removes only old, unowned, unused entries of the known prefixes"
 
 if bash "$REAPER" --tmpdir "$DIR" --min-age-days nope >/dev/null 2>&1; then
