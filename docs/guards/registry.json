@@ -552,7 +552,7 @@
       "layer": "runtime-block",
       "source": "treehouse status from the project, which lists only the current pool folder, and treehouse lease --help for --path",
       "trigger": "a slot that must stay held is in a pool folder treehouse status no longer lists, and the installed treehouse has no lease --path or its lease by path cannot be proved",
-      "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, and rerun bin/fm-teardown.sh <task>",
+      "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, or, when its lease by path cannot be proved, run the printed treehouse lease --path <slot> --lease-holder <task> from the project, and rerun bin/fm-teardown.sh <task>",
       "budget": 1,
       "test": "tests/fm-teardown-cleanup.test.sh",
       "tier": "C",
