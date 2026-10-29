@@ -218,7 +218,9 @@ def build(args):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # A commondir file makes the primary checkout read every ref from the Git
     # directory it names, and a reftable folder holds every ref once the
-    # writable config selects reftable storage, so both stay refused.
+    # writable config selects reftable storage. Both denies cover only these
+    # default locations: an extensions.refStorage path in the writable config
+    # still sends ref reads to a folder this profile does not name.
     lines.append(f"(deny file-write* (literal {quoted(Path(common) / 'commondir')}))")
     lines.append(f"(deny file-write* (subpath {quoted(Path(common) / 'reftable')}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch

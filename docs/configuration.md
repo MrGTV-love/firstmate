@@ -2787,8 +2787,9 @@ These commands need a `packed-refs` rewrite and cannot complete in a confined wo
 Another task's packed branch is refused earlier, at its loose lock: `git branch -d`, `-D` or `git update-ref -d` of it prints `cannot lock ref '<ref>': Unable to create '<common>/refs/heads/<branch>.lock': Operation not permitted`, or `cannot lock ref '<ref>': unable to create directory for <common>/refs/heads/<branch>` when the branch's parent folder is missing, and never reaches `packed-refs`.
 The shared `info/grafts` and `shallow` files stay writable, so a worker can still change the history the primary checkout sees through them; the `refs/replace` deny does not close that route.
 A repository with reftable ref storage refuses the launch, because its refs are not in files this profile can name.
-In a repository with files ref storage, the shared `commondir` file and the shared `reftable` folder refuse every write, so a worker cannot point the primary checkout at another Git directory's refs or plant a reftable that would hold its refs.
-The shared `config` stays writable, so a worker can still set `extensions.refStorage=reftable`; Git in the primary checkout then fails to resolve any ref until that config is restored, but it cannot resolve a forged ref.
+In a repository with files ref storage, the shared `commondir` file and the shared `reftable` folder refuse every write; these denies cover only those default locations.
+The shared `config` stays writable, so a confined worker can still forge a ref the primary checkout resolves: it sets `core.repositoryformatversion=1` and `extensions.refStorage=files://<path>` or `reftable:///<path>`, and Git then reads every ref from a folder the worker wrote.
+This config route predates this change and is not closed here.
 Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.

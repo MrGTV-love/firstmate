@@ -584,6 +584,8 @@ def packed_refs_results(manifest, primary, worktree):
     commondir.unlink(missing_ok=True)
     # The shared config is writable, so it can select reftable storage; a
     # reftable folder built elsewhere would then hold every ref Git reads.
+    # This covers only the payload-less value; a reftable:///<path> or
+    # files://<path> value is not refused.
     forged_reftable = scratch / "forged-reftable.git"
     assert git("init", "-q", "--bare", "--ref-format=reftable", str(forged_reftable)).returncode == 0
     (forged_reftable / "objects/info/alternates").write_text(str(Path(primary) / ".git/objects") + "\n")
