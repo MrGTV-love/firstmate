@@ -1563,7 +1563,7 @@ fm_test_export_owner_guard_counter() {
 # min(1, inactivity / 4) seconds (communicate_progress in bin/fm-duration.py),
 # and at once when kill -0 first shows the peer gone.
 fm_test_wait_until() (
-  local pid=0 inactivity=default record rc cycles=0 tally='' base='' count reached
+  local pid=0 inactivity=default progress_record rc cycles=0 tally='' base='' count reached
   local cadence=10 tick=0 exited=0
   local paths=() observer=()
   while [ "$#" -gt 0 ]; do
@@ -1601,9 +1601,9 @@ fm_test_wait_until() (
   }
   [ -z "$tally" ] || ! read_count || base=$count
   if ( "$@" ) >/dev/null 2>&1; then return 0; fi
-  record=$(mktemp "$FM_TEST_TMPDIR/.fm-test-wait.XXXXXX") || return 2
-  trap 'rm -f "$record"' EXIT
-  observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$record" "$pid" "$inactivity")
+  progress_record=$(mktemp "$FM_TEST_TMPDIR/.fm-test-wait.XXXXXX") || return 2
+  trap 'rm -f "$progress_record"' EXIT
+  observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$progress_record" "$pid" "$inactivity")
   [ "${#paths[@]}" -eq 0 ] || observer+=("${paths[@]}")
   [ "$pid" -eq 0 ] || observer+=(--while-alive)
   [ "$inactivity" = default ] \
