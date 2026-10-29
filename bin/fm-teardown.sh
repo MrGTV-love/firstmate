@@ -84,7 +84,8 @@
 # equivalent patches in that head.
 # The PR head must match its forge-reported merge commit on every changed path.
 # Forced discard, unavailable proof, non-ancestor merge commits, checked-out
-# archives, or a concurrently moved ref keep the archive and name it; another
+# archives, an archive that is a symbolic ref or a filesystem symlink, or a
+# concurrently moved ref keep the archive and name it; another
 # task's refs and records-only shared/reassigned slots remain untouched.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
@@ -2472,10 +2473,10 @@ task_archive_pr_matches_merge() {
 }
 
 reap_task_archive_branches() {
-  local refs ref sha branch target head cherry merges checked_out reason
+  local refs ref sha symref branch target head cherry merges checked_out common reason
   local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
   [ "$KIND" = ship ] && teardown_owns_worktree || return 0
-  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname)' \
+  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname) %(symref)' \
     "refs/heads/archive/$ID-submitted-$hex8" "refs/heads/archive/$ID-pipeline-$hex8") || {
     echo "warning: could not enumerate task $ID's archive branches; keeping them" >&2
     return 0
@@ -2496,11 +2497,17 @@ reap_task_archive_branches() {
   fi
   checked_out=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null) \
     || reason="checked-out branch inventory could not be read"
-  while read -r ref sha; do
+  common=$(git -C "$PROJ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || reason="shared Git directory could not be located"
+  while read -r ref sha symref; do
     [ -n "$ref" ] || continue
     branch=${ref#refs/heads/}
     if [ -n "$reason" ]; then
       echo "notice: keeping $branch ($reason)" >&2
+      continue
+    fi
+    if [ -n "$symref" ] || [ -L "$common/$ref" ]; then
+      echo "notice: keeping $branch (archive is a link to another ref)" >&2
       continue
     fi
     if printf '%s\n' "$checked_out" | grep -qxF "branch $ref"; then
@@ -2524,7 +2531,7 @@ reap_task_archive_branches() {
     fi
     # The expected old value prevents a concurrently moved archive from being
     # deleted on proof about its previous head. Never detach another copy.
-    if git -C "$PROJ" update-ref -d "$ref" "$sha" 2>/dev/null; then
+    if git -C "$PROJ" update-ref --no-deref -d "$ref" "$sha" 2>/dev/null; then
       echo "teardown: reaped $branch (carried by the merged PR lineage)" >&2
     else
       echo "notice: keeping $branch (archive deletion could not be completed at its proven head)" >&2
