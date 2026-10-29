@@ -1688,6 +1688,20 @@ assert_no_projection_mutation_since "$START" "agent-free duplicate-token recover
 lab workspace get "$DUP1_WSID" >/dev/null 2>&1 || fail "duplicate-token recovery removed the first quarantined workspace"
 lab workspace get "$DUP2_WSID" >/dev/null 2>&1 || fail "duplicate-token recovery removed the second quarantined workspace"
 
+# Herdr drops a registration whose pane runs no agent process, so the live
+# duplicate is a real agent-named foreground process plus its registration.
+DUP_AGENT_DIR="$TMP_ROOT/duplicate-agent"
+mkdir -p "$DUP_AGENT_DIR"
+ln -s "$(command -v sleep)" "$DUP_AGENT_DIR/codex" || fail "could not name the duplicate agent stand-in"
+lab pane run "$DUP1_PANE" "'$DUP_AGENT_DIR/codex' 600" >/dev/null \
+  || fail "could not start the duplicate-live-agent risk fixture"
+DUP_AGENT_STATE=
+for _ in $(seq 1 100); do
+  DUP_AGENT_STATE=$(fm_backend_herdr_pane_process_state "$HERDR_LAB_SESSION" "$DUP1_PANE")
+  [ "$DUP_AGENT_STATE" != agent ] || break
+  sleep 0.1
+done
+[ "$DUP_AGENT_STATE" = agent ] || fail "the duplicate pane never ran its agent stand-in (state: $DUP_AGENT_STATE)"
 lab pane report-agent "$DUP1_PANE" --source fm-projection-e2e --agent test-agent --state idle >/dev/null \
   || fail "could not register the duplicate-live-agent risk fixture"
 START=$(log_line_count)

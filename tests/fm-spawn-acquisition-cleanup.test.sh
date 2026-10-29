@@ -106,6 +106,10 @@ if [ "\$MODE" = exits ] || [ "\$MODE" = laterexit ] || [ "\$MODE" = earlyexit ];
 fi
 cd "\$DEST" || exit 1
 touch "\$ARRIVED"
+if [ "\$MODE" = busy ]; then
+  # Hold the pane in a foreground program that never reads a typed line.
+  while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
+fi
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
 SH
 chmod +x "$FAKEBIN/treehouse"
@@ -138,7 +142,12 @@ if [ "$BACKEND" = tmux ]; then
   LAB_TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$FM_HOME") || fail "cannot isolate tmux"
   export TMUX_TMPDIR="$LAB_TMUX_DIR"
   unset TMUX
-  "$REAL_TMUX" -f /dev/null new-session -d -s firstmate -n sentinel '/bin/sleep 300' || fail "cannot start private tmux"
+  # The unrelated sentinel lives exactly as long as this test process, so only
+  # spawn, never a wall-clock expiry, can remove it before teardown.
+  "$REAL_TMUX" -f /dev/null new-session -d -s firstmate -n sentinel \
+    "while kill -0 $$ 2>/dev/null; do /bin/sleep 1; done" || fail "cannot start private tmux"
+  SENTINEL_WINDOW=$("$REAL_TMUX" display-message -p -t firstmate:sentinel '#{window_id}') || fail 'cannot identify sentinel window'
+  SENTINEL_PID=$("$REAL_TMUX" display-message -p -t firstmate:sentinel '#{pane_pid}') || fail 'cannot identify sentinel pane'
   "$REAL_TMUX" set-option -g default-shell /bin/bash
   "$REAL_TMUX" set-option -g default-command '/bin/bash --noprofile --norc'
   "$REAL_TMUX" set-environment -g PATH "$FAKEBIN:$PATH"
@@ -297,9 +306,15 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   ! kill -0 "$pid" 2>/dev/null || fail "$MODE left get subshell $pid alive"
   [ "$MODE" != slow ] || [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
   if [ "$BACKEND" = tmux ]; then
-    tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_name}') || fail 'spawn destroyed unrelated session'
+    tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_id} #{window_name}') || fail 'spawn destroyed unrelated session'
     assert_not_contains "$tmux_windows" "fm-$ID" 'refused attempt pane remained'
-    assert_contains "$tmux_windows" sentinel 'spawn closed a pane it did not create'
+    case $'\n'"$tmux_windows"$'\n' in
+      *$'\n'"$SENTINEL_WINDOW sentinel"$'\n'*) ;;
+      *)
+        if kill -0 "$SENTINEL_PID" 2>/dev/null; then sentinel_state=alive; else sentinel_state=exited; fi
+        fail "spawn closed a pane it did not create: sentinel window $SENTINEL_WINDOW is gone while its pane process $SENTINEL_PID is $sentinel_state"
+        ;;
+    esac
   fi
   if [ "$BACKEND" = herdr ]; then
     "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" pane get "$sentinel" >/dev/null || fail 'spawn closed an unrelated Herdr pane'
@@ -625,6 +640,91 @@ PY
   [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$SLOT_ID" ] || fail 'real-pane provisioning admitted the wrong branch'
   assert_absent "$SLOT_COPY/.claude/worktrees" 'real-pane provisioning created nested isolation'
   pass 'tmux provisioning runs in the acquired shell ancestry before admitting its worker'
+
+  # The acquired-pane wait is bounded by the acquisition budgets, and a stop
+  # ends only this attempt's own provisioner before the checkout is restored.
+  # Each case owns its project, copy, endpoint and task id; its clock moves only
+  # once the owned gate opens, so a busy host cannot spend a budget early.
+  run_slot_wait_case() { # <busy|stalled>
+    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before gate get_mode lock out rc pid
+    wproject="$wcase/project" wcopy="$wcase/copy"
+    mkdir -p "$wcase"
+    fm_git_worktree "$wproject" "$wcopy" "slot-wait-$shape-before"
+    mkdir -p "$wproject/scripts/git-stability"
+    cat > "$wproject/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import os
+import signal
+import time
+from pathlib import Path
+case = Path(os.environ["FM_TEST_SLOT_WAIT_CASE"])
+(case / "provisioner.pid").write_text(str(os.getpid()))
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+while not (case / "release").exists():
+    time.sleep(0.05)
+(case / "late-pass").write_text("PASS")
+print('{"state": "PASS"}')
+PY
+    git -C "$wproject" add scripts
+    git -C "$wproject" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture stalled provisioner'
+    git -C "$wproject" push -q origin main
+    before=$(git -C "$wcopy" rev-parse HEAD)
+    get_mode=success
+    gate="$wcase/provisioner.pid"
+    if [ "$shape" = busy ]; then
+      get_mode=busy
+      gate="$wcase/get-pid"
+    fi
+    : > "$wcase/ticks"
+    printf 'MODE=%s\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+      "$get_mode" "$wcase/lease" "$wcase/get-pid" "$wcase/release" "$wcase/arrived" "$wcopy" "$wcase/ticks" > "$TMP_ROOT/get-config"
+    [ ! -e "/tmp/fm-$wid" ] && [ ! -L "/tmp/fm-$wid" ] || fail "task temp already exists: /tmp/fm-$wid"
+    fm_test_spawn_brief "$FM_HOME" "$wid" 'Bound the acquired-pane provisioning wait.'
+    "$REAL_TMUX" set-environment -g FM_TEST_SLOT_WAIT_CASE "$wcase"
+    out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" BASH_ENV="$TMP_ROOT/clock.sh" \
+      FM_TEST_TICK_SECONDS=60 FM_TEST_TICK_GATE="$gate" \
+      bash "$ROOT/bin/fm-spawn.sh" "$wid" "$wproject" --backend tmux --harness codex --allow-api-key \
+        --mode local-only --yolo off --owned-path scripts 2>&1)
+    rc=$?
+    "$REAL_TMUX" set-environment -gu FM_TEST_SLOT_WAIT_CASE
+    [ "$rc" -ne 0 ] || fail "$shape provisioning wait admitted a worker: $out"
+    if [ "$shape" = busy ]; then
+      assert_contains "$out" 'did not start provisioning within 600s' 'a shell that never started the helper was not bounded'
+    else
+      assert_contains "$out" 'provisioning reached the absolute extreme 1800s' 'a stalled provisioner was not bounded'
+      pid=$(cat "$wcase/provisioner.pid") || fail 'stalled provisioner never started'
+      ! kill -0 "$pid" 2>/dev/null || fail "stalled provisioner $pid survived its cancelled attempt"
+    fi
+    assert_contains "$out" 'its helper is stopped and no worker admitted' "$shape refusal did not confirm its helper stopped"
+    assert_grep 'recovery=slot-provision-refused' "$FM_HOME/state/$wid.meta" "$shape refusal lost recovery metadata"
+    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$before" ] || fail "$shape refusal did not restore the assigned checkout"
+    [ "$(git -C "$wcopy" branch --show-current)" = "slot-wait-$shape-before" ] || fail "$shape refusal changed the prior branch"
+    [ -e "$wcase/lease" ] || fail "$shape refusal released its assigned copy lease"
+    "$REAL_TMUX" list-windows -t firstmate -F '#{window_name}' | grep -qx "fm-$wid" || fail "$shape refusal closed its retained endpoint"
+    "$REAL_TMUX" list-windows -t firstmate -F '#{window_id}' | grep -qx "$SENTINEL_WINDOW" || fail "$shape refusal closed the unrelated sentinel"
+    kill -0 "$SENTINEL_PID" 2>/dev/null || fail "$shape refusal ended the unrelated sentinel process"
+    lock=$(fm_treehouse_project_lock_path "$wproject") || fail 'cannot resolve the case project lock'
+    (. "$ROOT/bin/fm-project-lock-lib.sh" && fm_project_lock_try "$lock" probe && fm_project_lock_release "$lock") \
+      || fail "$shape refusal still holds its project lock"
+    # Releasing the stalled program afterwards can neither start nor finish a helper.
+    touch "$wcase/release"
+    if [ "$shape" = busy ]; then
+      for _ in $(seq 1 200); do
+        "$REAL_TMUX" capture-pane -p -t "firstmate:fm-$wid" | grep -q 'No such file' && break
+        /bin/sleep 0.05
+      done
+      "$REAL_TMUX" capture-pane -p -t "firstmate:fm-$wid" | grep -q 'No such file' || fail 'the late shell never reached the cancelled helper line'
+      [ ! -e "$wcase/provisioner.pid" ] || fail 'a shell that started late ran the cancelled provisioner'
+    else
+      /bin/sleep 1
+    fi
+    [ ! -e "$wcase/late-pass" ] || fail "$shape cancelled provisioner wrote a late PASS"
+    [ ! -e "$FM_HOME/state/$wid.meta" ] || ! grep -q '^slot_manifest=' "$FM_HOME/state/$wid.meta" || fail "$shape refusal recorded a manifest"
+    pass "tmux $shape provisioning wait is bounded and stops only its own helper before restoring the copy"
+  }
+  run_slot_wait_case busy
+  run_slot_wait_case stalled
+  printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+    "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
 
   # A contract fixture supplies a transient refusal. The public control path,
   # real terminal/process liveness, prior refs and checkout are not mocked.

@@ -2245,16 +2245,23 @@ if [ "${1:-}" = --jev-guard ]; then
   exit 0
 fi
 
-# Invalid relaunch scope refuses at the public control boundary, before the
+# Invalid relaunch scope, a missing governed scope and a governed copy that
+# cannot pass attestation all refuse at the public control boundary, before the
 # live worker is stopped or its record changes; fm-spawn stays the final guard.
 test_owned_path_relaunch_refuses_before_stop() {
-  local shape dir id out rc before meta note_args
-  for shape in scoped ungoverned secondmate; do
+  local shape dir id out rc before meta note_args scope_args
+  for shape in scoped ungoverned secondmate empty multiline unscoped dirty; do
     id="rl-owned-$shape-$$"
     [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail "task temp already exists: /tmp/fm-$id"
     dir=$(new_case "owned-$shape" "$id")
     meta="$dir/home/state/$id.meta"
     note_args=(--note 'scope the existing task')
+    scope_args=(--owned-path scripts)
+    case "$shape" in
+      empty) scope_args=(--owned-path=) ;;
+      multiline) scope_args=(--owned-path "$(printf 'scripts\nREADME.md')") ;;
+      unscoped|dirty) scope_args=() ;;
+    esac
     if [ "$shape" = secondmate ]; then
       note_args=()
       mkdir -p "$dir/home/config" "$dir/home/data/$id"
@@ -2271,27 +2278,36 @@ test_owned_path_relaunch_refuses_before_stop() {
       printf '%s' "$dir/smhome" > "$dir/fake/cwd"
     else
       add_ship_task "$dir" "$id" claude
-      if [ "$shape" = scoped ]; then
+      if [ "$shape" != ungoverned ]; then
         mkdir -p "$dir/proj/scripts/git-stability"
         printf 'raise SystemExit(2)\n' > "$dir/proj/scripts/git-stability/provision_existing_slot.py"
-        printf 'slot_owned_path=README.md\n' >> "$meta"
       fi
+      case "$shape" in scoped|dirty) printf 'slot_owned_path=README.md\n' >> "$meta" ;; esac
+      [ "$shape" != dirty ] || printf 'in-progress edit\n' > "$dir/wt/in-progress.txt"
     fi
     before=$(cat "$meta")
-    out=$(run_control "$dir" "$id" relaunch --owned-path scripts ${note_args[@]+"${note_args[@]}"}); rc=$?
-    expect_code 1 "$rc" "$shape --owned-path relaunch must refuse: $out"
-    if [ "$shape" = scoped ]; then
-      assert_contains "$out" 'cannot override it' 'recorded scope override reason missing'
-    else
-      assert_contains "$out" 'only scopes a governed task with no recorded slot scope' "$shape scope refusal reason missing"
-    fi
+    out=$(run_control "$dir" "$id" relaunch ${scope_args[@]+"${scope_args[@]}"} ${note_args[@]+"${note_args[@]}"}); rc=$?
+    expect_code 1 "$rc" "$shape relaunch must refuse: $out"
+    case "$shape" in
+      scoped) assert_contains "$out" 'cannot override it' 'recorded scope override reason missing' ;;
+      ungoverned|secondmate)
+        assert_contains "$out" 'only scopes a governed task with no recorded slot scope' "$shape scope refusal reason missing" ;;
+      empty|multiline)
+        assert_contains "$out" 'must be a nonempty single-line tracked path' "$shape scope value refusal reason missing"
+        assert_contains "$out" 'refused invalid --owned-path' "$shape scope value was not refused by control" ;;
+      unscoped) assert_contains "$out" 'governed slot provisioning requires --owned-path' 'missing governed scope remedy missing' ;;
+      dirty)
+        assert_contains "$out" 'dirty_worktree' 'dirty governed copy reason missing'
+        assert_contains "$out" 'cannot pass slot attestation' 'dirty governed copy was not refused by control'
+        [ "$(cat "$dir/wt/in-progress.txt")" = 'in-progress edit' ] || fail 'dirty refusal lost the in-progress edit' ;;
+    esac
     assert_contains "$out" 'the running agent was not stopped' "$shape refusal did not report the worker untouched"
     [ "$(cat "$dir/fake/command")" = claude ] || fail "$shape scope refusal stopped the running agent"
     [ ! -s "$dir/fake/literal" ] || fail "$shape scope refusal sent lifecycle input"
     [ "$before" = "$(cat "$meta")" ] || fail "$shape scope refusal changed the task record"
     [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$shape scope refusal opened a relaunch transaction"
   done
-  pass "fm-control relaunch: invalid --owned-path refuses before stopping a live worker"
+  pass "fm-control relaunch: invalid scope or an unattestable governed copy refuses before stopping a live worker"
 }
 
 control_relaunch_test_cases=(

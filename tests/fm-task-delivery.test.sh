@@ -2160,6 +2160,47 @@ PY
   pass 'governed promotion preserves scout metadata, instructions and checkout on actual refusal'
 }
 
+# Recorded scope is Firstmate's own frozen contract: a caller's --owned-path is
+# refused before the project owner runs or the record is rewritten.
+test_promotion_refuses_recorded_scope_override() {
+  local rec home proj fakebin id="promote-scope-override-$$" slot meta brief out status
+  rec=$(make_home promote-scope-override)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  slot="$TMP_ROOT/promote-scope-override/slot"
+  git -C "$proj" symbolic-ref HEAD refs/heads/main
+  fm_git_worktree "$proj" "$slot" scout-retained
+  mkdir -p "$proj/scripts/git-stability"
+  cat > "$proj/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import os
+from pathlib import Path
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text("called", encoding="utf-8")
+raise SystemExit(2)
+PY
+  git -C "$proj" add scripts
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
+  git -C "$proj" push -q origin main
+  git -C "$slot" merge --ff-only main >/dev/null
+  meta="$home/state/$id.meta"
+  brief="$home/data/$id/brief.md"
+  write_brief "$home" "$id"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts\n' "$proj" "$slot" "$id" > "$meta"
+  cp "$meta" "$meta.before"
+  cp "$brief" "$brief.before"
+  out=$(FM_TEST_PROVISION_CALLED="$TMP_ROOT/promote-scope-override/called" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" bash "$PROMOTE" "$id" --mode local-only --yolo off --owned-path README.md 2>&1)
+  status=$?
+  [ "$status" -ne 0 ] || fail 'promotion replaced recorded scope'
+  assert_contains "$out" 'cannot override it' 'promotion scope override refusal reason missing'
+  assert_absent "$TMP_ROOT/promote-scope-override/called" 'scope override reached the project owner'
+  cmp -s "$meta" "$meta.before" || fail 'scope override changed scout metadata'
+  cmp -s "$brief" "$brief.before" || fail 'scope override changed the scout contract'
+  assert_absent "$home/data/$id/ship-instructions.md" 'scope override published ship instructions'
+  pass 'promotion refuses to override recorded slot scope before provisioning or rewriting the record'
+}
+
 test_governed_promotion_preserves_scout_on_refusal
+test_promotion_refuses_recorded_scope_override
 
 echo "# all fm-task-delivery tests passed"

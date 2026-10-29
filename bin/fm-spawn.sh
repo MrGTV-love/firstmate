@@ -549,6 +549,11 @@
 #   remains the owner. Spawn executes it through the acquired shell, retaining
 #   the primary-project Python cwd, so get/bash holders are actual ancestors;
 #   unrelated live holders remain the provisioner's refusal, not a PID allow-list.
+#   The shell must start that helper within the same ten-minute no-progress
+#   budget as treehouse get, and the attempt ends at the thirty-minute absolute
+#   extreme. Either stop, or a vanished endpoint, ends only that attempt's own
+#   provisioner process group before any checkout restore or refusal record,
+#   and a shell that starts late finds the attempt already claimed and runs nothing.
 #   It uses the assigned copy, never another worktree. Governed
 #   scouts start on fm/<id> so default promotion can adopt the same declaration.
 #   Relaunch reuses recorded scope and must pass the actual clean-slot contract;
@@ -1895,6 +1900,11 @@ SPAWN_LOCAL_SHA=
 SLOT_SOURCE_REF=
 SLOT_SOURCE_SHA=
 SPAWN_FRESH_SOURCE=0
+# One owner for the acquired-pane budgets: ten minutes without progress and a
+# thirty-minute absolute extreme bound both treehouse get and slot provisioning.
+SPAWN_ACQUIRE_STALL=600
+SPAWN_ACQUIRE_CEILING=1800
+SPAWN_SLOT_UNQUIESCED=0
 SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
 SPAWN_BASE_ERROR=
@@ -6115,8 +6125,8 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # the wait but is not itself progress: a hung get must still end eventually.
   # The existing acquisition EXIT cleanup retains ownership of any lease.
   # Sample output at most every five seconds; print a waiting line each minute.
-  acquire_stall=600
-  acquire_ceiling=1800
+  acquire_stall=$SPAWN_ACQUIRE_STALL
+  acquire_ceiling=$SPAWN_ACQUIRE_CEILING
   acquire_notice=60
   acquire_start=$SECONDS
   acquire_progress=$SECONDS
@@ -6215,7 +6225,9 @@ spawn_slot_refused() {
   HERDR_PROJECTION_ABORT_CLEANUP=0
   ORCA_ABORT_CLEANUP=0
   SPAWN_SLOT_CLAIMED=0
-  fm_slot_restore_base "$WT" || echo "error: could not restore the slot's original checkout; all branches remain preserved" >&2
+  if [ "$SPAWN_SLOT_UNQUIESCED" = 0 ]; then
+    fm_slot_restore_base "$WT" || echo "error: could not restore the slot's original checkout; all branches remain preserved" >&2
+  fi
   if [ "$RELAUNCH" -eq 0 ]; then
     {
       echo "window=$window"
@@ -6365,34 +6377,93 @@ if [ "$KIND" != secondmate ] && [ "$SLOT_GOVERNED" = 0 ] && fm_slot_required "$P
   BRANCH=${BRANCH:-fm/$ID}
   fm_slot_prepare_base "$PROJ_ABS" "$WT" "$ID" || spawn_slot_refused
 fi
+# Stop this attempt's own helper before any checkout restore, lock release or
+# refusal record. The attempt directory is private to this spawn: the claim is
+# created exclusively, so a helper that has not started can never start, and a
+# started helper's provisioner runs in the process group it recorded itself.
+spawn_slot_cancel_helper() { # <attempt-dir>
+  local attempt=$1 job pid pgid target i
+  if (set -C; : >"$attempt/claim") 2>/dev/null; then
+    return 0
+  fi
+  : >"$attempt/cancel" || return 1
+  if IFS= read -r job <"$attempt/job" 2>/dev/null && [ -n "$job" ] && [ "${job#*[!0-9]}" = "$job" ]; then
+    pgid=$(ps -o pgid= -p "$job" 2>/dev/null | tr -d ' ')
+    target=-$job
+    [ -z "$pgid" ] || [ "$pgid" = "$job" ] || target=$job
+    if kill -0 -- "$target" 2>/dev/null; then
+      kill -TERM -- "$target" 2>/dev/null
+      for i in $(seq 1 50); do
+        kill -0 -- "$target" 2>/dev/null || break
+        sleep 0.1
+      done
+      kill -KILL -- "$target" 2>/dev/null
+      for i in $(seq 1 50); do
+        kill -0 -- "$target" 2>/dev/null || break
+        sleep 0.1
+      done
+      ! kill -0 -- "$target" 2>/dev/null || return 1
+    fi
+  fi
+  for i in $(seq 1 50); do
+    [ ! -f "$attempt/result" ] || return 0
+    if IFS= read -r pid <"$attempt/claim" 2>/dev/null && [ -n "$pid" ] && [ "${pid#*[!0-9]}" = "$pid" ] &&
+      ! kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
 spawn_slot_run_in_pane() { # <project> <report> <provisioner> <arg>...
-  local project=$1 report=$2 script result rc
+  local project=$1 report=$2 attempt script claim job cancel result rc started stop=
   shift 2
-  script=$(umask 077; mktemp "$DATA/$ID/.slot-provision.XXXXXX") || return 1
-  result="$script.result"
+  attempt=$(umask 077; mktemp -d "$DATA/$ID/.slot-provision.XXXXXX") || return 1
+  script="$attempt/run" claim="$attempt/claim" job="$attempt/job" cancel="$attempt/cancel" result="$attempt/result"
   {
-    # shellcheck disable=SC2016 # PATH belongs to the acquired shell.
-    printf 'set +e\numask 077\n( cd -- %q && PATH=%q:"$PATH" PYTHONDONTWRITEBYTECODE=1 python3' "$project" "$project/.venv/bin"
+    # shellcheck disable=SC2016 # The acquired Bash records its own identity and status.
+    printf 'set +e\numask 077\nset -C\n{ printf '\''%%s\\n'\'' "$$" >%q; } 2>/dev/null || exit 0\nset +C -m\n' "$claim"
+    # shellcheck disable=SC2016 # The job's shell records its own process group and PATH.
+    printf '/bin/sh -c '\''printf "%%s\\n" "$$" >"$1.part" && mv -- "$1.part" "$1" && [ ! -e "$2" ] && cd -- "$3" && PATH="$4:$PATH" && shift 4 && PYTHONDONTWRITEBYTECODE=1 exec python3 "$@"'\'' sh %q %q %q %q' \
+      "$job" "$cancel" "$project" "$project/.venv/bin"
     printf ' %q' "$@"
     # shellcheck disable=SC2016 # The acquired Bash records its own exit status.
-    printf ' ) >%q 2>&1\nslot_rc=$?\nprintf '\''%%s\\n'\'' "$slot_rc" >%q\nmv -- %q %q\n' "$report" "$result.part" "$result.part" "$result"
+    printf ' </dev/null >%q 2>&1 &\nslot_job=$!\nwait "$slot_job"\nslot_rc=$?\nprintf '\''%%s\\n'\'' "$slot_rc" >%q\nmv -- %q %q\n' \
+      "$report" "$result.part" "$result.part" "$result"
   } >"$script" || return 1
   # This is an agent-free acquired shell, not a lifecycle command to a worker.
   # Running here makes its get/bash cwd holders real ancestors of the actual
-  # provisioner; no PID exclusions or ownership policy are changed.
-  spawn_send_text_line "$WT_TARGET" "bash -- $(shell_quote "$script")" || {
-    echo "error: could not submit assigned-copy provisioning to $T; no worker admitted" >&2
+  # provisioner; no PID exclusions or ownership policy are changed. The shell
+  # must start the helper within the no-progress budget, and the attempt ends
+  # at the absolute extreme; either stop cancels only this attempt's helper.
+  started=$SECONDS
+  if spawn_send_text_line "$WT_TARGET" "bash -- $(shell_quote "$script")"; then
+    while [ ! -f "$result" ]; do
+      if ! fm_backend_target_exists "$BACKEND" "$T" "$W"; then
+        stop="assigned endpoint $T became unreadable before provisioning completed"
+      elif [ $((SECONDS - started)) -ge "$SPAWN_ACQUIRE_CEILING" ]; then
+        stop="provisioning reached the absolute extreme ${SPAWN_ACQUIRE_CEILING}s"
+      elif [ ! -e "$claim" ] && [ $((SECONDS - started)) -ge "$SPAWN_ACQUIRE_STALL" ]; then
+        stop="the acquired shell did not start provisioning within ${SPAWN_ACQUIRE_STALL}s"
+      fi
+      [ -z "$stop" ] || break
+      sleep 1
+    done
+  else
+    stop="could not submit assigned-copy provisioning to $T"
+  fi
+  if [ -n "$stop" ]; then
+    if ! spawn_slot_cancel_helper "$attempt"; then
+      SPAWN_SLOT_UNQUIESCED=1
+      echo "error: $stop, and its helper in $attempt could not be confirmed stopped; refused without restoring the assigned checkout; report: $report" >&2
+      spawn_slot_refused
+    fi
+    rm -rf -- "$attempt"
+    echo "error: $stop; its helper is stopped and no worker admitted; report: $report" >&2
     return 1
-  }
-  while [ ! -f "$result" ]; do
-    fm_backend_target_exists "$BACKEND" "$T" "$W" || {
-      echo "error: assigned endpoint $T became unreadable before provisioning completed; report: $report" >&2
-      return 1
-    }
-    sleep 0.2
-  done
+  fi
   IFS= read -r rc <"$result" || rc=invalid
-  rm -f -- "$script" "$result"
+  rm -rf -- "$attempt"
   case "$rc" in
     ''|*[!0-9]*) echo 'error: assigned-copy provisioner completion status is invalid' >&2; return 1 ;;
   esac

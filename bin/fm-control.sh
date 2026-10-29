@@ -33,6 +33,9 @@
 # docs/configuration.md#model-freshness owns the model freshness gate.
 # --owned-path is relaunch-only and passed through to fm-spawn, which accepts
 # it only to scope a governed task that has no recorded slot scope.
+# Before stopping the running agent, a governed relaunch also refuses an invalid
+# or missing scope and an assigned copy that cannot pass slot attestation, such
+# as one with uncommitted work; fm-spawn's own checks remain the final guard.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -2635,7 +2638,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home owned_copy
+  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
   local -a spawn_args
   local owned_path
 
@@ -2729,15 +2732,26 @@ do_relaunch() {
   require_live_task_attribution \
     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
+  slot_copy=$WT
+  [ "$RELOCATING" = 0 ] || slot_copy=$RELOCATE_DEST
+  slot_project=$(fm_meta_get "$META" project)
+  if [ "$KIND" != secondmate ] &&
+    { grep -q '^slot_manifest=' "$META" || fm_slot_required "$slot_project" "$slot_copy"; }; then
+    slot_governed=1
+  fi
   if [ "${#OWNED_PATHS[@]}" -gt 0 ]; then
     ! grep -q '^slot_owned_path=' "$META" \
       || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
-    owned_copy=$WT
-    [ "$RELOCATING" = 0 ] || owned_copy=$RELOCATE_DEST
-    if [ "$KIND" = secondmate ] \
-      || ! { grep -q '^slot_manifest=' "$META" || fm_slot_required "$(fm_meta_get "$META" project)" "$owned_copy"; }; then
-      die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
-    fi
+    [ "$slot_governed" = 1 ] \
+      || die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+    fm_slot_require_scope "${OWNED_PATHS[@]}" \
+      || die "refused invalid --owned-path for $ID; the running agent was not stopped"
+  fi
+  if [ "$slot_governed" = 1 ]; then
+    [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
+      || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
+    fm_slot_check_copy "$slot_project" "$slot_copy" \
+      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
   fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
