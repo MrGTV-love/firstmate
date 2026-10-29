@@ -1,0 +1,4 @@
+1268c1268
+<         cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+---
+>         cwd: home, env, input: JSON.stringify(payload), stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,

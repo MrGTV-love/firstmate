@@ -1,0 +1,10 @@
+warning: re-init: ignored --initial-branch=main
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.WmESDB/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.WmESDB/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.WmESDB/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.WmESDB/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+warning: re-init: ignored --initial-branch=main
+ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+bash "$R/run.sh"  5.11s user 13.11s system 60% cpu 29.983 total
+exit=0

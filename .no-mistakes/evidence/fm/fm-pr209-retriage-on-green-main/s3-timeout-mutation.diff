@@ -1,0 +1,8 @@
+1268c1268
+<         cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 15000,
+---
+>         cwd: home, env, stdio: [stdinFd, 'pipe', 'pipe'], encoding: 'utf8', timeout: 1,
+1373c1373
+<                     encoding: 'utf8', timeout: 15000,
+---
+>                     encoding: 'utf8', timeout: 1,
