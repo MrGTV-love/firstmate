@@ -212,7 +212,7 @@ if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
   if [ "${FM_PR_CHECK_MERGE:-}" = 1 ] && [ -n "$PR_HEAD" ] \
     && fm_dod_task_owns_several_prs "$STATE" "$ID" "$META" "$URL"; then
     :
-  elif ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META"); then
+  elif ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META" "${FM_PR_CHECK_MERGE:+registration}"); then
     echo "error: $GATE_REASON" >&2
     exit 1
   fi

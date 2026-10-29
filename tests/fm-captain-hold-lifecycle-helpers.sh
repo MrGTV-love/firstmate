@@ -19,6 +19,9 @@ set -u
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 BEARINGS="$ROOT/bin/fm-bearings-snapshot.sh"
 TMP_ROOT=$(fm_test_tmproot fm-captain-hold)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 TASKS_AXI_BIN=$(command -v tasks-axi || true)
 
 command -v jq >/dev/null 2>&1 || { echo "skip: jq not found"; exit 0; }
@@ -38,6 +41,7 @@ make_home() {  # <name>
 EOF
   fakebin=$(fm_fakebin "$home")
   fm_fake_exit0 "$fakebin" tmux treehouse no-mistakes gh gh-axi
+  fm_fake_ship_review_history "$fakebin"
   # Cleanup removes a task's own Docker objects, so without a stand-in it would
   # reach this host's real Docker daemon.
   fm_fake_docker "$fakebin"
@@ -150,7 +154,7 @@ case "${1:-} ${2:-}" in
         printf 'MERGED\t%s\t%s\n' "${FM_TEST_MERGED_HEAD:-}" "${FM_TEST_MERGED_PR:-}"
         ;;
       *mergeStateStatus*)
-        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main"}'
+        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main","baseRefOid":"0000000000000000000000000000000000000000"}'
         ;;
       *headRefOid*) printf '%s\n' 1111111111111111111111111111111111111111 ;;
     esac
@@ -273,6 +277,7 @@ write_origin_meta() {  # <home> <id> [kind]
     "worktree=$home/projects/missing-$id" \
     "project=$home/projects/sample" \
     "harness=codex" \
+    "model=gpt-5.1-codex" \
     "kind=$kind" \
     "mode=$kind" \
     "spawn_gen=fixture-$id"
@@ -418,20 +423,8 @@ SH
 # Runs this suite's `tests` array, or only the named cases, then proves cleanup
 # left no process-event runner or watchdog behind.
 captain_hold_run_tests() {  # [case-name...]
-  local requested candidate selected selected_test
-  if [ "$#" -gt 0 ]; then
-    for requested in "$@"; do
-      selected=0
-      for candidate in "${tests[@]}"; do
-        [ "$requested" != "$candidate" ] || selected=1
-      done
-      [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
-    done
-    tests=("$@")
-  fi
-  for selected_test in "${tests[@]}"; do
-    "$selected_test" || exit "$?"
-  done
+  # shellcheck disable=SC2154 # Each suite assigns its tests array before calling this.
+  fm_test_run_cases "${tests[@]}" -- "$@"
 
   # Run the ordinary home-scoped cleanup before checking actual process state.
   # The watchdog may be asleep until its next owner check after a runner exits.

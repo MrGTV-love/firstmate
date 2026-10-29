@@ -22,6 +22,9 @@ This record owns concurrent isolation evidence for the portable parallel candida
 
 ## Candidate set
 
+The historical summary and raw JSON above include one since-retired suite; the candidate and duration lists below omit it.
+The original count and wall duration remain historical measurements, not a new run of the retained suites.
+
 - `tests/fm-arm-pretool-check.test.sh`
 - `tests/fm-backend-herdr.test.sh`
 - `tests/fm-brief.test.sh`
@@ -31,7 +34,6 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-captain-hold-lifecycle.test.sh`
 - `tests/fm-captain-hold-reconcile.test.sh`
 - `tests/fm-captain-hold-sweep.test.sh`
-- `tests/fm-cd-pretool-check.test.sh`
 - `tests/fm-composer-ghost.test.sh`
 - `tests/fm-composer-lib.test.sh`
 - `tests/fm-crew-state.test.sh`
@@ -104,7 +106,6 @@ The portable parallel lanes are the confirmation for the three new paths, and a 
 | 27529 | 0 | 1 | `tests/fm-arm-pretool-check.test.sh` |
 | 20922 | 0 | 21 | `tests/fm-test-run.test.sh` |
 | 17558 | 0 | 8 | `tests/fm-crew-state.test.sh` |
-| 16582 | 0 | 5 | `tests/fm-cd-pretool-check.test.sh` |
 | 9766 | 0 | 12 | `tests/fm-lint.test.sh` |
 | 9562 | 0 | 11 | `tests/fm-herdr-lab.test.sh` |
 | 6768 | 0 | 10 | `tests/fm-grok-harness.test.sh` |
@@ -239,6 +240,8 @@ That run is not a clean pass, so the family was run again.
 `tests/fm-open-loops.test.sh` exited 0 in that run (757127 ms), and the three fm-pr-merge groups exited 0 at 350116 ms for `fm-pr-merge-checks`, 246981 ms for `fm-pr-merge-forges`, and 265749 ms for `fm-pr-merge`.
 This clean run covers the 15-member family, so `fm-pr-merge-forges` and `fm-pr-merge-checks` keep the family's four-worker admission.
 It does not admit them to the proven-isolated portable set; the [fm-pr-merge split re-check](#fm-pr-merge-split-re-check) owns that decision.
+`tests/fm-review-record.test.sh` joined this family after that date, so the fifteen-member result does not cover it.
+A 2026-10-27 fourteen-member run on the pre-split family passed with the new test, but the current seventeen-member family has not been re-proved, so the 2026-10-24 fifteen-member result remains the recorded admission for the members it measured.
 
 ### secondmate: admitted
 

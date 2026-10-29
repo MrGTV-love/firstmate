@@ -497,7 +497,7 @@ Verify projected workspace behavior for $id.
 Capability in plain words: The isolated Herdr fixture $id exhibits its scenario's expected workspace presentation and lifecycle behavior.
 
 ### Mandatory items
-- Source: $description
+- M1 Source: $description
   Expected: $id reaches the spawn, flat fallback, refusal, teardown, or recovery outcome specified by its owning test case.
   Verify: run tests/fm-backend-herdr-presentation-e2e.test.sh through bin/fm-test-run.sh and satisfy every applicable existing assertion.
   Edge/negative: failed operations and lock contention preserve the asserted exact endpoint ownership and captain focus.

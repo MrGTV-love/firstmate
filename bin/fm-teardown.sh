@@ -84,7 +84,8 @@
 # equivalent patches in that head.
 # The PR head must match its forge-reported merge commit on every changed path.
 # Forced discard, unavailable proof, non-ancestor merge commits, checked-out
-# archives, or a concurrently moved ref keep the archive and name it; another
+# archives, an archive that is a symbolic ref or a filesystem symlink, or a
+# concurrently moved ref keep the archive and name it; another
 # task's refs and records-only shared/reassigned slots remain untouched.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
@@ -669,6 +670,8 @@ for _teardown_source in \
   fm-status-event-lib.sh \
   fm-status-wake-lib.sh \
   fm-status-io-lib.sh \
+  fm-file-identity-lib.sh \
+  fm-status-cap-lib.sh \
   fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \
@@ -1741,7 +1744,7 @@ remote_secondmate_teardown() {
     "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
     "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
     "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-    "$STATE/.session-launch-refused-$ID"
+    "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
   printf 'teardown %s complete (remote %s:%s)\n' "$ID" "$remote_host" "$remote_home"
   return "$rc"
 }
@@ -2597,10 +2600,10 @@ task_archive_pr_matches_merge() {
 }
 
 reap_task_archive_branches() {
-  local refs ref sha branch target head cherry merges checked_out reason
+  local refs ref sha symref branch target head cherry merges checked_out common reason
   local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
   [ "$KIND" = ship ] && teardown_owns_worktree || return 0
-  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname)' \
+  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname) %(symref)' \
     "refs/heads/archive/$ID-submitted-$hex8" "refs/heads/archive/$ID-pipeline-$hex8") || {
     echo "warning: could not enumerate task $ID's archive branches; keeping them" >&2
     return 0
@@ -2621,11 +2624,17 @@ reap_task_archive_branches() {
   fi
   checked_out=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null) \
     || reason="checked-out branch inventory could not be read"
-  while read -r ref sha; do
+  common=$(git -C "$PROJ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || reason="shared Git directory could not be located"
+  while read -r ref sha symref; do
     [ -n "$ref" ] || continue
     branch=${ref#refs/heads/}
     if [ -n "$reason" ]; then
       echo "notice: keeping $branch ($reason)" >&2
+      continue
+    fi
+    if [ -n "$symref" ] || [ -L "$common/$ref" ]; then
+      echo "notice: keeping $branch (archive is a link to another ref)" >&2
       continue
     fi
     if printf '%s\n' "$checked_out" | grep -qxF "branch $ref"; then
@@ -2649,7 +2658,7 @@ reap_task_archive_branches() {
     fi
     # The expected old value prevents a concurrently moved archive from being
     # deleted on proof about its previous head. Never detach another copy.
-    if git -C "$PROJ" update-ref -d "$ref" "$sha" 2>/dev/null; then
+    if git -C "$PROJ" update-ref --no-deref -d "$ref" "$sha" 2>/dev/null; then
       echo "teardown: reaped $branch (carried by the merged PR lineage)" >&2
     else
       echo "notice: keeping $branch (archive deletion could not be completed at its proven head)" >&2
@@ -4168,7 +4177,7 @@ require_shared_task_worktree_slot() {
           echo "Several other root records name this slot; select the live one whose work stays in it as <remaining-task>. Each candidate's last recorded status:" >&2
           for ((i=0; i < ${#sharers[@]}; i++)); do
             last=
-            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -1 "${sharer_metas[$i]%.meta}.status" 2>/dev/null)
+            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -c 65536 "${sharer_metas[$i]%.meta}.status" 2>/dev/null | head -c 65536 | tail -1)
             echo "  ${sharers[$i]}: ${last:-(no status recorded)}" >&2
           done
         fi
@@ -5735,7 +5744,7 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
       "$sub_state/$child_id.cursor-session" "$sub_state/$child_id.reconcile-nudged" \
       "$sub_state/$child_id.claude-settings.json" "$sub_state/$child_id.devin-config.json" \
-      "$sub_state/.$child_id.branch-outcome-index"
+      "$sub_state/.$child_id.branch-outcome-index" "$sub_state/.$child_id.wait-identity"
     chmod u+w "$sub_state/$child_id.git-hooks" 2>/dev/null || true
     rm -rf "$sub_state/$child_id.git-hooks"
   done
@@ -6300,7 +6309,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$STATE/.$ID.branch-outcome-index" \
   "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
   "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-  "$STATE/.session-launch-refused-$ID"
+  "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
 # The steering inbox (bin/fm-task-inbox-lib.sh) is runtime state for the
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.

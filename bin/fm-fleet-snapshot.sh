@@ -162,8 +162,10 @@ esac
 # hang or explode the parent snapshot.
 FM_SNAPSHOT_SECONDMATES=${FM_SNAPSHOT_SECONDMATES:-20}
 # Local reads use fm-duration.py's 15-minute no-output/no-CPU policy so a slow
-# source finishes and contributes its observation. This inactivity bound still
-# recovers truly hung sources; there is no per-task wall-clock cutoff.
+# source finishes and contributes its observation. This inactivity bound recovers
+# genuinely stalled readers, not slow hosts. An expired read is unknown evidence,
+# never proof that a peer is down. Historical *_TIMEOUT overrides select inactivity
+# intervals, not wall-clock caps.
 FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-$((15 * 60))}
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=${FM_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
 FM_SNAPSHOT_BUDGET=${FM_SNAPSHOT_BUDGET:-5}
@@ -174,15 +176,15 @@ FM_SNAPSHOT_SECONDMATE_QUEUED=${FM_SNAPSHOT_SECONDMATE_QUEUED:-20}
 FM_SNAPSHOT_SECONDMATE_DECISIONS=${FM_SNAPSHOT_SECONDMATE_DECISIONS:-20}
 FM_SNAPSHOT_TERMINAL_LINES=${FM_SNAPSHOT_TERMINAL_LINES:-8}
 FM_SNAPSHOT_TERMINAL_BYTES=${FM_SNAPSHOT_TERMINAL_BYTES:-4096}
-FM_SNAPSHOT_TERMINAL_TIMEOUT=${FM_SNAPSHOT_TERMINAL_TIMEOUT:-2}
+FM_SNAPSHOT_TERMINAL_TIMEOUT=${FM_SNAPSHOT_TERMINAL_TIMEOUT:-$((15 * 60))}
 FM_SNAPSHOT_PARENT_ACTIVITY_LINES=${FM_SNAPSHOT_PARENT_ACTIVITY_LINES:-256}
 FM_SNAPSHOT_PARENT_ACTIVITY_BYTES=${FM_SNAPSHOT_PARENT_ACTIVITY_BYTES:-65536}
 FM_SNAPSHOT_PARENT_ACTIVITIES=${FM_SNAPSHOT_PARENT_ACTIVITIES:-20}
-FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=${FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT:-2}
+FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=${FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT:-$((15 * 60))}
 FM_SNAPSHOT_REGISTRY_LINES=${FM_SNAPSHOT_REGISTRY_LINES:-256}
 FM_SNAPSHOT_REGISTRY_BYTES=${FM_SNAPSHOT_REGISTRY_BYTES:-65536}
 FM_SNAPSHOT_REGISTRY_RECORDS=${FM_SNAPSHOT_REGISTRY_RECORDS:-40}
-FM_SNAPSHOT_REGISTRY_TIMEOUT=${FM_SNAPSHOT_REGISTRY_TIMEOUT:-2}
+FM_SNAPSHOT_REGISTRY_TIMEOUT=${FM_SNAPSHOT_REGISTRY_TIMEOUT:-$((15 * 60))}
 validate_positive_bound() {  # <name> <value>
   case "$2" in
     ''|*[!0-9]*|0)
@@ -234,9 +236,19 @@ esac
 . "$SCRIPT_DIR/fm-ff-lib.sh"  # validate_secondmate_home: shared seeded-home boundary checks
 # shellcheck source=bin/fm-timeout-lib.sh
 # shellcheck disable=SC1091
-. "$SCRIPT_DIR/fm-timeout-lib.sh"  # fm_run_timed: the shared hard bound
+. "$SCRIPT_DIR/fm-timeout-lib.sh"  # Shared progress and bounded read ownership.
 # Answer the Python capability probe once here: each lane read runs in a subshell.
 fm_posix_python || true
+# Supplemental reads run serially, once per secondmate. A Python start per read
+# (0.2-0.5 s on a loaded host) doubled 15-mate snapshot wall time, so they use the
+# Perl-core runner's same inactivity rule when Perl is present.
+snapshot_run_progress() {  # <no-progress-seconds> <command...>
+  if command -v perl >/dev/null 2>&1; then
+    fm_run_perl_progress "$@"
+  else
+    fm_run_progress "$@"
+  fi
+}
 # shellcheck source=bin/fm-landed-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-landed-lib.sh"  # FM_LANDED_JQ_DEFS: the shared landed selector
@@ -296,6 +308,11 @@ FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT, with truncation disclosed in the result.
 The registered secondmate table uses FM_SNAPSHOT_REGISTRY_LINES,
 FM_SNAPSHOT_REGISTRY_BYTES, FM_SNAPSHOT_REGISTRY_RECORDS, and
 FM_SNAPSHOT_REGISTRY_TIMEOUT, with unavailability and truncation disclosed.
+These three *_TIMEOUT settings select the same inactivity policy as the crew-state
+reader (default 900 seconds without output or process-tree CPU progress), not wall
+limits. A stalled registry or activity scan is explicitly unavailable; a stalled
+terminal supplement has unknown freshness. None proves a peer dead, and each is
+retried by the next snapshot. Byte, line and record limits still bound payloads.
 Every captain hold carries hold_bucket, decided only from structured fields and
 never from hold reason or body prose: "blocked", "dated", "aged", or "live".
 An undated hold ages once its hold-set timestamp is at least
@@ -689,18 +706,6 @@ snapshot_wait_current_read_slot() {
   done
 }
 
-snapshot_capture_optional() {  # <source> <destination>
-  local source=$1 destination=$2
-  [ -f "$source" ] || return 0
-  cp -p -- "$source" "$destination" && return 0
-  # Teardown may remove an optional observation after the existence check.
-  if [ ! -e "$source" ]; then
-    rm -f -- "$destination"
-    return 0
-  fi
-  return 1
-}
-
 snapshot_mark_optional_present() {  # <source> <destination>
   local source=$1 destination=$2
   [ -f "$source" ] || return 0
@@ -724,6 +729,56 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
   fi
 }
 
+# Copy a task's status log into the snapshot. A log past the read limit
+# (bin/fm-status-cap-lib.sh) is refused, named on stderr, and not copied: the task is
+# then observed without a status log, its <destination>.refused marker says why so the
+# task record reports its open decisions as unreadable rather than as none, and one
+# runaway log neither fills the disk a second time nor fails the whole snapshot.
+# A log within the limit is copied up to ONE endpoint, the size that was checked, and
+# never past it: a writer that appends after the check grows the source but not the
+# copy, so the check bounds the bytes written, not just the bytes seen. The copy takes
+# the source's mtime as read with that size, before the copy, as cp -p would have.
+snapshot_capture_status() {  # <source> <destination>
+  local source=$1 destination=$2 size mtime endpoint limit copied
+  [ -f "$source" ] || return 0
+  size=$(_fm_status_file_size "$source" 2>/dev/null) || size=''
+  size=${size//[[:space:]]/}
+  mtime=$(_fm_status_file_mtime "$source" 2>/dev/null) || mtime=''
+  mtime=${mtime//[[:space:]]/}
+  fm_status_read_limit_bytes limit
+  case "$size" in
+    ''|*[!0-9]*)
+      # No size to check: the copy is still bounded, by one byte past the read limit.
+      size=''
+      endpoint=$((limit + 1))
+      ;;
+    *)
+      fm_status_read_allowed "$source" "$size" || { : > "$destination.refused"; return 0; }
+      endpoint=$size
+      ;;
+  esac
+  if head -c "$endpoint" -- "$source" > "$destination" 2>/dev/null; then
+    if [ -z "$size" ]; then
+      copied=$(LC_ALL=C wc -c < "$destination") || copied=0
+      copied=${copied//[[:space:]]/}
+      if ! fm_status_read_allowed "$source" "$copied"; then
+        rm -f -- "$destination"
+        : > "$destination.refused"
+        return 0
+      fi
+    fi
+    case "$mtime" in
+      ''|*[!0-9]*) touch -r "$source" "$destination" 2>/dev/null || true ;;
+      *) perl -e 'utime($ARGV[0], $ARGV[0], $ARGV[1])' "$mtime" "$destination" 2>/dev/null || true ;;
+    esac
+    return 0
+  fi
+  # Teardown may remove an optional observation after the existence check.
+  rm -f -- "$destination"
+  [ -e "$source" ] || return 0
+  return 1
+}
+
 prefetch_task_observations() {  # <meta> <id>
   local meta=$1 id=$2 remote_host current_file endpoint_file current_pid='' current_rc=0
   local status_log status_capture status_ident report_path report_capture
@@ -739,7 +794,7 @@ prefetch_task_observations() {  # <meta> <id>
   snapshot_task_generation_is_current "$meta" "$id" || generation_current=0
   if [ "$generation_current" = 1 ]; then
     status_ident=$(_fm_open_decisions_file_ident "$status_log" 2>/dev/null) || status_ident=''
-    snapshot_capture_optional "$status_log" "$status_capture" || current_rc=1
+    snapshot_capture_status "$status_log" "$status_capture" || current_rc=1
     status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
     snapshot_mark_optional_present "$report_path" "$report_capture" || current_rc=1
   fi
@@ -847,7 +902,7 @@ task_json_one() {  # <captured-meta> - prints one task record
   local remote_host remote_root current_file endpoint_file observation_line
   local pr pr_source pr_head current_json endpoint_exists agent_alive last_event_raw last_event_verb last_event_note
   local last_event_epoch last_event_age status_present report_present report_marker_present pr_from_status
-  local open_decisions_tsv worktree_present home_present observed_meta_present
+  local open_decisions_tsv open_decisions_unreadable worktree_present home_present observed_meta_present
 
   # Each task is one jq program fed by in-shell reads: a metadata key, a status
   # line, or a path test costs no subprocess, so the per-task cost stays flat as
@@ -928,7 +983,10 @@ task_json_one() {  # <captured-meta> - prints one task record
   # never clear another concern's keyed decision. A parked/blocked state, or a
   # non-authoritative status-log/none read on a still-live task, keeps the fold's
   # open decision surfacing.
-  open_decisions_tsv=$(status_open_decisions "$status_log" "$kind")
+  open_decisions_unreadable=false
+  [ ! -e "$status_log.refused" ] || open_decisions_unreadable=true
+  open_decisions_tsv=$(status_open_decisions "$status_log" "$kind") \
+    || { open_decisions_tsv=''; open_decisions_unreadable=true; }
 
   endpoint_exists=null
   agent_alive=not_checked
@@ -983,6 +1041,7 @@ task_json_one() {  # <captured-meta> - prints one task record
     --arg last_event_verb "$last_event_verb" \
     --arg last_event_note "$last_event_note" \
     --arg open_decisions_tsv "$open_decisions_tsv" \
+    --argjson open_decisions_unreadable "$open_decisions_unreadable" \
     --argjson last_event_age "$last_event_age" \
     --argjson status_present "$status_present" \
     --argjson current_state "$current_json" \
@@ -1033,6 +1092,7 @@ task_json_one() {  # <captured-meta> - prints one task record
         pending_decision:any($open_decisions[]; .verb == "needs-decision"),
         blocked_event:any($open_decisions[]; .verb == "blocked"),
         open_decisions:$open_decisions,
+        open_decisions_unreadable:$open_decisions_unreadable,
         scout_report_present:$report_marker_present,
         last_event_text:$last_event_raw
       },
@@ -1414,7 +1474,7 @@ JQ
        ],lines_in_window:$lines_in_window,records_in_window:$records_in_window}
 JQ
   )
-  out=$(fm_run_timed "$FM_SNAPSHOT_REGISTRY_TIMEOUT" bash -c "$script" \
+  out=$(snapshot_run_progress "$FM_SNAPSHOT_REGISTRY_TIMEOUT" bash -c "$script" \
     fm-secondmate-registry "$reg" "$FM_SNAPSHOT_REGISTRY_LINES" \
     "$FM_SNAPSHOT_REGISTRY_BYTES" "$FM_SNAPSHOT_REGISTRY_RECORDS" "$reg" "$SNAPSHOT_NOW" \
     "$parse_filter" "$output_filter" 2>/dev/null)
@@ -1774,7 +1834,7 @@ bounded_parent_activities_json() {  # <status-file>
          records_in_window:$records_in_window}'
 BASH
   )
-  out=$(fm_run_timed "$FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT" bash -c "$script" \
+  out=$(snapshot_run_progress "$FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT" bash -c "$script" \
     fm-parent-activities "$SCRIPT_DIR/fm-classify-lib.sh" "$f" \
     "$FM_SNAPSHOT_PARENT_ACTIVITY_LINES" "$FM_SNAPSHOT_PARENT_ACTIVITY_BYTES" \
     "$FM_SNAPSHOT_PARENT_ACTIVITIES" "$SNAPSHOT_STAT_STYLE" 2>/dev/null)
@@ -1792,11 +1852,16 @@ BASH
 
 terminal_evidence_json() {  # <parent-task-json> <event-note> <evidence-contradicts>
   local task=$1 note=$2 evidence_contradicts=$3 backend target exists expected out rc clean bytes lines seen=false contradiction=false reason='' remote_host id captured_meta
-  backend=$(printf '%s' "$task" | jq -r '.backend // ""')
-  target=$(printf '%s' "$task" | jq -r '.endpoint.target // ""')
-  exists=$(printf '%s' "$task" | jq -r '.endpoint.exists // "unknown"')
-  remote_host=$(printf '%s' "$task" | jq -r '.remote.host // ""')
-  id=$(printf '%s' "$task" | jq -r '.id // ""')
+  {
+    IFS= read -r -d '' backend &&
+    IFS= read -r -d '' target &&
+    IFS= read -r -d '' exists &&
+    IFS= read -r -d '' remote_host &&
+    IFS= read -r -d '' id
+  } < <(printf '%s' "$task" | jq -j '
+    ((.backend // ""), (.endpoint.target // ""),
+     (.endpoint.exists // "unknown"),
+     (.remote.host // ""), (.id // "")) | tostring, "\u0000"') || return 1
   if [ -n "$remote_host" ]; then
     jq -n --arg observed "$SNAPSHOT_NOW" --arg reason "remote terminal evidence is not collected by the primary" \
       '{provenance:"remote-direct-report-terminal",trust:"untrusted-supplement",captured:false,observed_at:$observed,freshness:"not-collected",reason:$reason,lines:0,bytes:0,event_note_seen:false,contradiction:false}'
@@ -1816,7 +1881,7 @@ terminal_evidence_json() {  # <parent-task-json> <event-note> <evidence-contradi
     return 0
   fi
   # shellcheck disable=SC2016 # Positional parameters expand inside the child bash, not here.
-  out=$(fm_run_timed "$FM_SNAPSHOT_TERMINAL_TIMEOUT" bash -c \
+  out=$(snapshot_run_progress "$FM_SNAPSHOT_TERMINAL_TIMEOUT" bash -c \
     '. "$1"; fm_backend_capture "$2" "$3" "$4" "$5" | LC_ALL=C head -c "$6"; rc=${PIPESTATUS[0]}; [ "$rc" -eq 141 ] && rc=0; exit "$rc"' \
     fm-terminal-capture "$SCRIPT_DIR/fm-backend.sh" "$backend" "$target" "$FM_SNAPSHOT_TERMINAL_LINES" "$expected" "$FM_SNAPSHOT_TERMINAL_BYTES" 2>/dev/null)
   rc=$?
@@ -1959,23 +2024,34 @@ secondmate_current_json() {  # <parent-tasks-json-file> <output-file>
 
   while IFS= read -r row; do
     [ -n "$row" ] || continue
-    id=$(printf '%s' "$row" | jq -r '.id')
-    home=$(printf '%s' "$row" | jq -r '.home // ""')
-    host=$(printf '%s' "$row" | jq -r '.host // ""')
-    remote=$(printf '%s' "$row" | jq -r '.remote // false')
-    registered=$(printf '%s' "$row" | jq -r '.registered')
-    registry_error=$(printf '%s' "$row" | jq -r '.registry_error // ""')
-    task=$(printf '%s' "$row" | jq -c '.parent_task // {}')
-    sampled_spawn_gen=$(printf '%s' "$task" | jq -r '.spawn_gen // ""')
-    status_file=$(printf '%s' "$task" | jq -r '.paths.status_log.path // ""')
+    # Parse the row once, not once per field. NUL-separated shell-origin values
+    # preserve whitespace/newlines without eval or a fleet-sized argv payload.
+    {
+      IFS= read -r -d '' id &&
+      IFS= read -r -d '' home &&
+      IFS= read -r -d '' host &&
+      IFS= read -r -d '' remote &&
+      IFS= read -r -d '' registered &&
+      IFS= read -r -d '' registry_error &&
+      IFS= read -r -d '' task &&
+      IFS= read -r -d '' sampled_spawn_gen &&
+      IFS= read -r -d '' status_file &&
+      IFS= read -r -d '' event_raw &&
+      IFS= read -r -d '' event_note &&
+      IFS= read -r -d '' decisions &&
+      IFS= read -r -d '' event_age
+    } < <(printf '%s' "$row" | jq -j '
+      (.parent_task // {}) as $task
+      | (.id, (.home // ""), (.host // ""), (.remote // false), .registered,
+         (.registry_error // ""), $task, ($task.spawn_gen // ""),
+         ($task.paths.status_log.path // ""), ($task.paths.status_log.last_event.raw // ""),
+         ($task.paths.status_log.last_event.note // ""), ($task.hints.open_decisions // []),
+         ($task.paths.status_log.last_event.age_seconds // "null"))
+      | tostring, "\u0000"') || return 1
     status_observation_file=
     if [ -n "$status_file" ]; then status_observation_file="$SNAPSHOT_TASK_DIR/$id.status"; fi
-    event_raw=$(printf '%s' "$task" | jq -r '.paths.status_log.last_event.raw // ""')
-    event_note=$(printf '%s' "$task" | jq -r '.paths.status_log.last_event.note // ""')
     activity_scan=$(bounded_parent_activities_json "$status_observation_file")
     activities=$(printf '%s' "$activity_scan" | jq -c '.records')
-    decisions=$(printf '%s' "$task" | jq -c '.hints.open_decisions // []')
-    event_age=$(printf '%s' "$task" | jq -r '.paths.status_log.last_event.age_seconds // "null"')
     observed_epoch=$(file_mtime_epoch "$status_observation_file")
     observed_age=null
     if [ -n "$observed_epoch" ]; then

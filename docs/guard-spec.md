@@ -14,6 +14,7 @@ The machine-readable registry is `docs/guards/registry.json`.
 It is checked in, reviewed like code, and validated by `bin/fm-guard-lint.sh`.
 The retirement changelog is `docs/guards/retired.json`, owned by the same lint.
 The ratchet allowlist is `docs/guards/lint-allowlist.json`; it may only shrink.
+`bin/fm-guard-sites.py` is the discovery helper the lint calls for every refusal site in the runtime code; "Refusal sites" below owns what it finds.
 Guards registered after the audit are named in the registry's `beyond_audit_active` list, so `--counts` keeps the audited population arithmetic exact.
 
 `bin/fm-guard-refcheck.sh` owns the wiring proof: every hook registration
@@ -41,6 +42,7 @@ Registry-only fields carry what the audit scores: `tier`, `harm`,
 `emitters`. `emitters` lists host files that take the guard's decision and emit
 its event when the invariant is defined in a library the host calls; the writer
 call is then proven in the emitter rather than in the owner.
+`sites` maps the guard to its refusal sites; see "Refusal sites".
 An active guard added after the audit is named in the registry's
 `beyond_audit_active`, and a retirement beyond the audit is listed in its
 `beyond_audit_retired`; both stay outside the audited inventory that
@@ -89,6 +91,50 @@ because the captain or the runtime creates them per home.
 
 Rules 1, 2, 3, 4, 5, 6, 7, 8 and 9 are mechanically checked. A rule that
 cannot be checked mechanically belongs in the reviewer's checklist, not here.
+
+## Refusal sites
+
+A guard that lives only inside a script never got these fields, because nothing noticed it existed.
+`bin/fm-guard-sites.py` therefore enumerates the refusal sites of the runtime code, and `bin/fm-guard-lint.sh` requires every one to map to a registry entry.
+The scan covers `bin/`, `.claude/`, `.codex/`, `.cursor/`, `.dsh/`, `.grok/`, `.omp/`, `.opencode/` and `.pi/` (skipping test directories), plus every owner file the registry names.
+In a git work tree it reads only the files git tracks or would track, so a git-ignored file is never a site.
+A site is one code line that matches a signature outside comments, heredoc bodies and docstrings.
+A docstring is a triple-quoted string that opens a block, as the first statement after a header line that ends in `:` (such as `def` or `class`) or at the top of a file; a triple-quoted string anywhere else, such as an exception message, is runtime text and is scanned line by line:
+
+- `A` marker: the `REFUSED:` message marker that `bin/fm-refuse-lib.sh` prints.
+  The marker is a site even inside a heredoc body or a Python triple-quoted string.
+- `B` message: `refuse`, `refuses`, `refused` or `refusing` inside a string literal, as a whole word that is not part of a variable name or path.
+  A string compared with `==` or `!=`, passed to `startswith` or `endswith`, or used as a shell `case` pattern, tests a value and is not a message.
+- `C` helper call: a call to a function whose definition name has `refuse` as one of its underscore-separated words and does not end in `_text`, or is exactly `deny` or `block_stop`.
+  The scan derives these names from the definitions in the code and prints them under `helpers`.
+- `D` hook deny: a permission decision of deny, a decision field of deny or block, an object that sets `block: true` with a reason, `exit 2` alone on a line (or after `&&` or `||`) in a hook script outside a usage or argument-count check, or a `throw` in an opencode plugin.
+  A hook script is a script a hook registration file names, or one whose file name says hook, pretool, posttool or turnend.
+- `E` guard event: a call to `bin/fm-guard-event.sh` (or its `guard_event` wrappers) whose decision is not exactly `allow`.
+  The decision is the writer's second argument (`<guard-id> <decision>`), or the first argument of a wrapper that takes the decision first.
+  The call is split with shell quoting rules and ends at an unquoted `;`, `&`, `|`, `<`, `>`, parenthesis, lone closing brace, or `#` that starts a word.
+  A quoted `}` or `|`, and a `#` inside a word, are literal arguments, so the guard id, a later option and a following command never decide.
+
+A heredoc body is data unless its opener prints to stderr, in which case every body line is a message, or feeds `python`, `node`, `bun`, `deno` or `perl` (or is delimited by `PERL`), in which case the body is scanned as that language (a perl body with the shell rules, like a `.pl` file).
+A site that carries none of these is outside the scan: a refusal expressed only as an exit code, or with a message that never uses the vocabulary, is not enumerated, and neither is a refusal inside a heredoc that writes a script to disk.
+That limit is deliberate, because every error exit would be a site, and it is why a new guard should use `fm_refuse` or the `REFUSED:` marker.
+The scan follows only Python triple-quoted strings across lines, so it does not reliably recognize the inner lines of a shell or JavaScript string that spans lines: some may be reported and others missed.
+A refusal message should therefore stay on one line, or carry the `REFUSED:` marker on a line the scan does not read as a comment (one that starts with `#` in shell and Python, or with `//`, `*` or `/*` in JavaScript).
+
+A site maps to a registry entry through the entry's `sites` list.
+Each item names a `file` and a `match`, a fixed substring of the site's line, plus an optional `count` that defaults to 1.
+The lint requires the item to match exactly `count` sites, so a new site that a marker would silently absorb changes the count and fails until a reviewer updates it.
+Two entries may not map the same site, and a marker that matches nothing is stale.
+
+A site's id is `site:<file>:<hash of its normalized line>`, so it survives line moves.
+The lint computes the unregistered count as the number of sites that map to nothing.
+A registry may carry a typed `unregistered_ids` list only if its length equals the computed count.
+
+Rules 10 to 13 are mechanically checked on top of the nine rules above:
+
+10. **S1** Every refusal site maps to a registry entry.
+11. **S2** A `sites` item matches exactly the sites it declares, and no site has two owners.
+12. **S4** A typed `unregistered_ids` list has the computed length.
+13. **S5** The allowlist does not grow against the base (new-or-touched mode only).
 
 ## Tiers
 
@@ -151,10 +197,16 @@ previously blocked action now passes, one changelog line in
 The lint runs in three modes:
 
 - `report` prints violations and always exits 0.
-- `enforce --new-or-touched <base>` fails only for guards added or changed since
-  the base, so new work cannot add debt.
+- `new-or-touched --base <ref>` fails only for guards added or changed since
+  the base, for refusal-site violations the allowlist does not hold, for refusal
+  sites on a changed line, and for an allowlist that grew, so new work cannot add
+  debt.
 - `enforce` fails on every violation not listed in the allowlist, and also fails
   on an allowlisted entry whose violation no longer occurs, because that entry
   is stale.
 
+The legacy refusal sites that map to nothing sit in the allowlist as `S1` entries, once, as the burn-down list.
+Once the base allowlist is at `schema_version` 2, the lint also fails an entry the base does not hold, so the allowlist cannot grow.
 The allowlist therefore only shrinks, and an empty allowlist is the end state.
+A site on a changed line must map even when the allowlist holds it, because touching a legacy site is the moment to give it a guard entry.
+CI runs `enforce` on every change and `new-or-touched` against the pull request base.

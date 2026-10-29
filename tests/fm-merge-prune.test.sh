@@ -793,10 +793,10 @@ IGNORED_ENTRIES_BOTH_PASS=(
   .DS_Store .fm-grok-turnend .fm-kimi-turnend tsconfig.tsbuildinfo sub/.DS_Store
   .tac/tmp/ .tac/uv-cache/
   .claude/settings.local.json .opencode/plugins/fm-busy-state.js
-  scripts/hooks/_conformance_manifest.json
+  scripts/hooks/_conformance_manifest.json graft/
 )
 IGNORED_ENTRIES_BOTH_BLOCK=(
-  build/ data/unique.bin precious.local .tac/state.json
+  build/ data/unique.bin precious.local .tac/state.json .ignore sub/graft/
   scripts/hooks/other.json scripts/hooks/_conformance_manifest.json.bak
   scripts/_conformance_manifest.json sub/scripts/hooks/_conformance_manifest.json
 )
@@ -876,6 +876,106 @@ scn_wholly_ignored_tac_caches_are_the_named_exception() {
   [ "$(prune_ignored_verdict "$real")" = blocks ] || why "the exception hides .tac/state.json beside the caches" || return 1
   return 0
 }
+
+make_graft_output() {
+  make_world
+  fm_test_graft_output "$COPY"
+}
+
+scn_graft_output_is_removed() {
+  make_graft_output
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "a merged copy holding only generated graft output was kept: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "generated graft output raised a keep wake" || return 1
+}
+
+scn_non_graft_ignore_is_kept() {
+  local variant
+  for variant in custom appended extra-newline; do
+    make_graft_output
+    case "$variant" in
+      custom) printf 'project-private/\n' > "$COPY/.ignore" ;;
+      appended) printf 'project-private/\n' >> "$COPY/.ignore" ;;
+      extra-newline) printf '\n' >> "$COPY/.ignore" ;;
+    esac
+    go
+    [ -e "$COPY/.ignore" ] && [ "$(destroy_calls)" = 0 ] || why "$variant .ignore was discarded" || return 1
+    case "$(rec_field t1 reason)" in
+      *'holds an ignored file that is neither scratch nor on the preserve list: .ignore') ;;
+      *) why "$variant .ignore lost its existing keep reason: $(rec_field t1 reason)" || return 1 ;;
+    esac
+  done
+}
+
+# graft/ is an index graft rebuilds from the tracked source, so whatever shape
+# its output takes, an untracked graft/ at the copy root is scratch
+# (data/fm-merge-prune-graft-scratch/report.md). Each variant is one observed in
+# a real worker copy.
+scn_graft_output_variants_are_removed() {
+  local variant
+  for variant in session-without-host null-synced-at cache-only stale-card implements-edge project-cache; do
+    make_graft_output
+    case "$variant" in
+      session-without-host)
+        printf '{"graftReads":0,"sourceReads":3,"savedTokens":0,"injectedPointers":[],"nudges":0,"inputCostMicros":0,"inputTokensBilled":0,"lastBillingUuid":"7e1c2a54-0b8e-4c55-9d0a-3f1f0f6b2d11"}\n' \
+          > "$COPY/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json" ;;
+      null-synced-at)
+        printf '{"nodeCount":0,"edgeCount":0,"languages":[],"totalCount":0,"readyCount":0,"staleCount":0,"dirty":false,"syncing":false,"syncedAt":null,"lastFile":"work.txt"}\n' \
+          > "$COPY/graft/.cache/stats.json" ;;
+      cache-only)
+        rm -rf "$COPY/graft/.graph" "$COPY/graft/work.md" ;;
+      stale-card)
+        printf '# work.txt\n\n- old \xc2\xb7 function \xc2\xb7 L1-L2 \xe2\x80\x94 old()\n' > "$COPY/graft/work.md" ;;
+      implements-edge)
+        printf '{"version":1,"extractor":"780d32dc5ad1bdc9","files":{"work.txt":{"size":5,"mtimeMs":1,"hash":"0000000000000000000000000000000000000000000000000000000000000000","nodes":[],"rawEdges":[{"source":"work.txt","relation":"implements","file":"work.txt","name":"Base"}]}}}\n' \
+          > "$COPY/graft/.cache/extract.780d32dc5ad1bdc9.json" ;;
+      project-cache)
+        printf '{"lastSync":"2026-10-28T05:51:39.057Z"}\n' > "$COPY/graft/.cache/vernant-stop-sync.json" ;;
+    esac
+    go
+    [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "graft output with $variant was kept: $(rec_field t1 reason)" || return 1
+    [ "$(wake_count)" = 0 ] || why "graft output with $variant raised a keep wake" || return 1
+  done
+}
+
+# A clone below graft/ is not graft's output, even when its own proofs pass.
+scn_graft_with_a_nested_git_is_kept() {
+  make_graft_output
+  make_nested graft/n1
+  go
+  [ -e "$COPY/graft/n1/.git" ] && [ "$(destroy_calls)" = 0 ] || why "a clone under graft/ was discarded" || return 1
+  case "$(rec_field t1 reason)" in
+    *'holds an ignored file that is neither scratch nor on the preserve list: graft') ;;
+    *) why "a clone under graft/ did not keep the copy for graft: $(rec_field t1 reason)" || return 1 ;;
+  esac
+  [ "$(wake_count)" = 1 ] || why "a clone under graft/ did not raise a keep wake" || return 1
+}
+
+# Tracked content makes git list graft's ignored files one by one, not graft/
+# whole; none of those is scratch.
+scn_graft_with_tracked_content_is_kept() {
+  make_world
+  mkdir -p "$COPY/graft"
+  printf 'tracked notes\n' > "$COPY/graft/notes.md"
+  git -C "$COPY" add -f graft/notes.md
+  git -C "$COPY" commit -q -m "track graft notes"
+  git -C "$COPY" push -q origin fm/t1
+  squash_merge_into_main "$COPY"
+  printf '/graft/\n' >> "$W/project/.git/info/exclude"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$COPY/graft/work.md"
+  go
+  [ -e "$COPY/graft/work.md" ] && [ "$(destroy_calls)" = 0 ] || why "ignored output beside tracked graft content was discarded" || return 1
+  case "$(rec_field t1 reason)" in
+    *'holds an ignored file that is neither scratch nor on the preserve list: graft/work.md') ;;
+    *) why "ignored output beside tracked graft content did not keep the copy: $(rec_field t1 reason)" || return 1 ;;
+  esac
+}
+
+test_fallback_removes_only_generated_graft_output() { assert_scenario scn_graft_output_is_removed "a merged copy holding only graft output is removed without a keep wake"; }
+test_fallback_keeps_non_graft_ignore() { assert_scenario scn_non_graft_ignore_is_kept "custom .ignore content, including appended lines and newlines, keeps its existing reason"; }
+test_fallback_removes_every_graft_output_shape() { assert_scenario scn_graft_output_variants_are_removed "older sessions, null sync times, cache-only, stale cards, implements edges and project caches under graft/ are scratch"; }
+test_fallback_keeps_a_clone_under_graft() { assert_scenario scn_graft_with_a_nested_git_is_kept "a .git below graft/ keeps the copy"; }
+test_fallback_keeps_tracked_graft_content() { assert_scenario scn_graft_with_tracked_content_is_kept "graft/ content git tracks gets no scratch exemption"; }
 
 scn_unique_ignored_file_is_kept() {
   make_world
@@ -1540,7 +1640,7 @@ scn_partial_process_table_proves_no_agent_gone() {
   [ ! -s "$W/control.log" ] || why "the live agent was stopped on a partial process table: $(cat "$W/control.log")" || return 1
   rec_field t1 reason | grep -Eq 'automatic reap ineligible|terminal pane failed' || why "the prune did not back off on the failed read: $(rec_field t1 reason)" || return 1
   # The reap admission's own proof, asked directly: the pane's shell row alone is not "no agent".
-  if PATH="$W/bin:$PATH" bash -c '. "$1/fm-merge-prune-lib.sh"; fm_mp_pane_pid() { printf %s "$2"; }; fm_mp_pane_agent_gone "$3"' _ "$BIN_DIR" "$(cat "$W/pane.pid")" "$STATE/t1.meta" 2>/dev/null; then
+  if PATH="$W/bin:$PATH" bash -c '. "$1/fm-merge-prune-lib.sh"; test_pane_pid=$2; fm_mp_pane_pid() { printf %s "$test_pane_pid"; }; fm_mp_pane_agent_gone "$3"' _ "$BIN_DIR" "$(cat "$W/pane.pid")" "$STATE/t1.meta" 2>/dev/null; then
     why "the reap admission took a partly read process table for an agent that is gone" || return 1
   fi
   make_world
@@ -2756,6 +2856,11 @@ ALL_TESTS=(
   test_fallback_keeps_an_unignored_nested_clone_with_unpushed_work
   test_fallback_judges_ignored_entries_like_teardown
   test_fallback_counts_the_caches_of_a_wholly_ignored_tac_as_scratch
+  test_fallback_removes_only_generated_graft_output
+  test_fallback_keeps_non_graft_ignore
+  test_fallback_removes_every_graft_output_shape
+  test_fallback_keeps_a_clone_under_graft
+  test_fallback_keeps_tracked_graft_content
   test_fallback_keeps_unique_ignored_files
   test_fallback_keeps_a_non_pool_copy
   test_fallback_keeps_a_plain_git_tree_shaped_like_a_slot
@@ -2836,11 +2941,7 @@ ALL_TESTS=(
   test_over_strict_mutations_are_caught
 )
 if [ "$#" -gt 0 ]; then
-  for name in "$@"; do
-    declare -F "$name" >/dev/null || fail "unknown test case: $name"
-  done
-  ALL_TESTS=("$@")
+  fm_test_run_cases -- "$@"
+else
+  fm_test_run_cases "${ALL_TESTS[@]}" --
 fi
-for name in "${ALL_TESTS[@]}"; do
-  "$name"
-done

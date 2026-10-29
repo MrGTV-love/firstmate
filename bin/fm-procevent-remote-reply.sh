@@ -467,8 +467,8 @@ normalize_payload() { # <source> <destination>
 # instead, because delivery state can change between replays.
 # Returns 0 appended, 1 already present, 2 the write itself failed.
 append_status_once() { # <status-file> <line>
-  grep -Fqx -- "$2" "$1" 2>/dev/null && return 1
-  printf '%s\n' "$2" >> "$1" || return 2
+  fm_status_cat "$1" 2>/dev/null | grep -Fx -- "$2" >/dev/null && return 1
+  fm_status_append_line "$1" "$2" || return 2
   return 0
 }
 
@@ -478,10 +478,18 @@ append_status_once() { # <status-file> <line>
 # The record lives outside cursor state and survives adapter retirement because
 # the parent status stream it describes survives that retirement too.
 stage_mirror_lines() { # <source> <rewritten> <source-record> <status> <status-additions> <source-additions>
+  local bounded rc=0
+  # The "already present" set is built from an exact copy of the status stream taken
+  # through the read limit (bin/fm-status-cap-lib.sh), never the stream itself: awk
+  # keeps every line it reads in memory, and a stream past the limit is refused, so
+  # the set is then empty and the source record, which is the authoritative duplicate
+  # check, decides alone.
+  bounded=$(mktemp "${TMPDIR:-/tmp}/fm-mirror-window.XXXXXX") || return 1
+  fm_status_cat "$4" > "$bounded" 2>/dev/null || : > "$bounded"
   LC_ALL=C awk \
     -v rewritten_file="$2" \
     -v source_record="$3" \
-    -v status_file="$4" \
+    -v status_file="$bounded" \
     -v status_additions="$5" \
     -v source_additions="$6" '
     BEGIN {
@@ -514,7 +522,9 @@ stage_mirror_lines() { # <source> <rewritten> <source-record> <status> <status-a
       if (close(source_additions) != 0) failed = 1
       if (failed) exit 1
     }
-  ' "$1"
+  ' "$1" || rc=$?
+  rm -f -- "$bounded"
+  return "$rc"
 }
 
 cmd_ingest() {
@@ -642,8 +652,29 @@ EOF
   stage_mirror_lines "$normalized_payload" "$mirrored" "$source_record" "$status_file" \
     "$status_additions" "$source_additions" \
     || { fm_lock_release "$lock"; die "cannot stage remote reply mirror identity"; }
-  cat "$status_additions" >> "$status_file" \
-    || { fm_lock_release "$lock"; die "cannot append remote reply"; }
+  # The mirror writes through the capped append like every other writer of this log
+  # (bin/fm-status-cap-lib.sh). A refusal stops the ingest before anything else is
+  # committed: the cursor and the mirrored-source record stay where they were, so the
+  # delta is re-read whole and the lines that did land are recognised as present, and one
+  # keyed escalation names the log. Nothing is dropped and the log never grows unbounded.
+  # Exit 75 also covers a lock the append could not take within its wait; that refusal
+  # writes nothing, raises no escalation, and the next ingest retries the same delta.
+  append_rc=0
+  fm_status_append_file "$status_file" "$status_additions" 2> "$tmp/append.err" || append_rc=$?
+  cat "$tmp/append.err" >&2
+  if [ "$append_rc" -eq 75 ] && grep -q 'stayed locked by another writer' "$tmp/append.err"; then
+    fm_lock_release "$lock"
+    die "cannot append remote reply: $status_file stayed locked by another writer past the lock wait; nothing was written, the cursor was not advanced, and the next ingest retries the delta"
+  fi
+  if [ "$append_rc" -eq 75 ]; then
+    line="blocked [key=remote-reply-continuity-$id-capped]: remote reply mirror stopped for $id: the parent status log is past its size limit, so the remote delta at offset ${CURSOR_OFFSET} stays unread and nothing was dropped; free the log or retire the lane and the next ingest resumes"
+    if ! status_event_recorded "$status_file" "$line"; then
+      append_status_once "$status_file" "$(status_stamp_line "$line")" || :
+    fi
+    fm_lock_release "$lock"
+    die "cannot append remote reply: $status_file is at its size limit; the cursor was not advanced and the delta stays re-readable"
+  fi
+  [ "$append_rc" -eq 0 ] || { fm_lock_release "$lock"; die "cannot append remote reply"; }
   appended=$(LC_ALL=C awk 'END { print NR + 0 }' "$status_additions") \
     || { fm_lock_release "$lock"; die "cannot count appended remote replies"; }
   cat "$source_additions" >> "$source_record" \

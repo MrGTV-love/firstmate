@@ -1003,10 +1003,8 @@ pipeline_input_case() {
 # Run teardown on the fixture, keep its output in the case dir, echo the exit code.
 run_teardown_status() {
   local case_dir=$1 rc
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   printf '%s\n' "$rc"
 }
 
@@ -1240,10 +1238,8 @@ write_windowless_legacy_meta() {
 assert_windowless_record_refuses() {  # <case-dir> <description> <refusal>
   local case_dir=$1 description=$2 refusal=$3 rc before
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "$description: a windowless record outside the leftover class must refuse"
   grep -Fq "$refusal" "$case_dir/stderr" \
     || fail "$description: the refusal was not '$refusal': $(cat "$case_dir/stderr")"

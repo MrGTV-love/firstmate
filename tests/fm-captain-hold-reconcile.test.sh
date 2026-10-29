@@ -76,12 +76,10 @@ test_reconcile_never_closes_through_the_keyed_answer_intake() {
   run_captain "$home" hold sample-reconcile-gated --reason "waiting on the captain" >/dev/null \
     || fail "could not hold the gated work item"
 
-  set +e
+  rc=0
   out=$(printf 'sample-reconcile-call\treconcile\tReconcile\n%s\n' \
     "$(printf 'sample-reconcile-gated\treconcile\tReconcile\trelease')" \
-    | run_captain "$home" answers --source "captain chat" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" answers --source "captain chat" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the shared answer intake accepted reconcile as an answer"
   assert_contains "$out" "refused: sample-reconcile-call" \
     "the shared intake did not visibly refuse reconcile: $out"
@@ -101,11 +99,9 @@ test_reconcile_never_closes_through_the_keyed_answer_intake() {
   list=$(run_captain "$home" reconcile list) || fail "could not list the reconcile requests"
   assert_contains "$list" "reconcile-requests: 0" \
     "the shared answer intake created a reconcile request: $list"
-  set +e
+  rc=0
   out=$(printf 'sample-reconcile-call\n' \
-    | run_captain "$home" reconcile-requests --source-id unbound-src --source "captured board" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" reconcile-requests --source-id unbound-src --source "captured board" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an unbound captured source created a reconcile request"
   request_reconciles "$home" board-src sample-reconcile-call sample-reconcile-gated \
     || fail "the bound captured source did not create reconcile requests"
@@ -169,17 +165,13 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   printf '0.1.38 was published on 2026-09-05, so the 0.1.37 question is moot.\n' > "$home/evidence.txt"
   printf 'Still open: nothing has shipped and the choice is unchanged.\n' > "$home/note.txt"
 
-  set +e
-  out=$(run_captain "$home" reconcile close sample-moot-call --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-moot-call --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "reconcile closed a call without a pending board request"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the ungated close refusal did not name the missing board request: $out"
-  set +e
-  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "reconcile annotated a call without a pending board request"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the ungated note refusal did not name the missing board request: $out"
@@ -187,10 +179,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   request_reconciles "$home" board-src sample-moot-call sample-active-call sample-mode-call \
     || fail "could not file the reconcile requests"
 
-  set +e
-  out=$(run_captain "$home" reconcile close sample-moot-call 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-moot-call 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a reconcile close was accepted with no evidence"
   assert_contains "$out" "evidence" "the refusal did not name the missing evidence: $out"
 
@@ -198,10 +188,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   run_captain "$home" answer sample-mode-call --decision-file "$home/evidence.txt" >/dev/null \
     || fail "could not record the normal answer for the mode fixture"
   cp "$home/mode-request.backup" "$home/state/reconcile-requests/sample-mode-call.request"
-  set +e
-  out=$(run_captain "$home" reconcile close sample-mode-call --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-mode-call --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a normal captain answer replayed as a reconciliation"
   assert_contains "$out" "was not closed by reconciliation" \
     "the reconcile replay refusal did not identify the incompatible resolution mode: $out"
@@ -218,10 +206,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   case "$show" in
     *"Captain decision:"*) fail "a reconciled close was recorded as the captain's own words" ;;
   esac
-  set +e
-  out=$(run_captain "$home" answer sample-moot-call --decision-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" answer sample-moot-call --decision-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a reconciled resolution replayed as a captain answer"
   assert_contains "$out" "not a captain-answer replay" \
     "the answer replay refusal did not identify the incompatible resolution mode: $out"
@@ -236,10 +222,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   case "$show" in
     *"Resolution recorded by"*) fail "annotating a still-active call wrote a resolution record" ;;
   esac
-  set +e
-  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a retired reconcile request appended a duplicate note"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the duplicate-note refusal did not name the retired request: $out"
@@ -304,11 +288,9 @@ exec "$REAL_TASKS_AXI" "$@"
 SH
   chmod +x "$home/fakebin/tasks-axi"
 
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile close sample-reconcile-close-retry \
-    --evidence-file "$home/retry-evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --evidence-file "$home/retry-evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the forced reconcile close failure reported success"
   run_captain "$home" reconcile close sample-reconcile-close-retry \
     --evidence-file "$home/retry-evidence.txt" >/dev/null \
@@ -317,28 +299,22 @@ SH
   [ "$(printf '%s\n' "$show" | grep -c 'Resolution mode: reconciled')" -eq 1 ] \
     || fail "reconcile close duplicated its resolution record on retry"
 
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-note-retry \
-    --note-file "$home/retry-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the forced post-note probe failure reported success"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-note-retry \
-    --note-file "$home/retry-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a note retry succeeded after the request was retired"
   show=$(tasks_in "$home" show sample-reconcile-note-retry --full)
   [ "$(printf '%s\n' "$show" | grep -c 'Captain hold reconciled:')" -eq 1 ] \
     || fail "reconcile note duplicated its durable annotation"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile close sample-reconcile-close-retire \
-    --evidence-file "$home/close-retire-evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --evidence-file "$home/close-retire-evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a failed close request retirement reported success"
   assert_contains "$out" "sample-reconcile-close-retire" \
     "the close retirement failure did not name its task: $out"
@@ -351,11 +327,9 @@ SH
     || fail "the closed reconciliation could not finish request retirement"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" answer sample-answer-retire \
-    --decision-file "$home/answer-retire.txt" 2>&1)
-  rc=$?
-  set -e
+    --decision-file "$home/answer-retire.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a failed answer-boundary retirement reported success"
   show=$(tasks_in "$home" show sample-answer-retire --full)
   assert_contains "$show" "state: done" "retirement failure reversed the durable captain answer"
@@ -366,11 +340,9 @@ SH
     || fail "the answer replay could not finish request retirement"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-retire-retry \
-    --note-file "$home/retry-retire-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-retire-note.txt" 2>&1) || rc=$?
   chmod 0700 "$home/state/reconcile-requests"
   [ "$rc" -ne 0 ] || fail "a failed request retirement reported note success"
   assert_not_contains "$out" "still-open:" "failed retirement reported a successful outcome"
@@ -854,11 +826,9 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   printf 'Verified source captured.txt: the recorded answers settle this call.\n' > "$home/evidence.txt"
   before=$(cat "$home/state/lane.status")
 
-  set +e
+  rc=0
   out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-a \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -eq 6 ] || fail "an attended branch closed a captain call on evidence (rc=$rc): $out"
   assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
     "the verified close refusal lost its partition action label: $out"
@@ -866,11 +836,9 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   assert_contains "$show" "held: yes" "the refused verified close released the call"
   assert_not_contains "$show" "Resolution recorded by" "the refused verified close wrote a resolution"
 
-  set +e
+  rc=0
   out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-a \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -eq 6 ] || fail "an attended branch closed an operational key on evidence (rc=$rc): $out"
   assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
     "the key close refusal lost its partition action label: $out"
@@ -903,17 +871,13 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   # An archived record is absence: the attended refusal returns for the branch.
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-b \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 6 ] || fail "an archived away record still relocated the verified close (rc=$rc)"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-b \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 6 ] || fail "an archived away record still relocated the key close (rc=$rc)"
 
   # Main never meets the partition, attended or not.
@@ -997,6 +961,25 @@ test_operational_key_closes_with_durable_evidence_and_replay() {
   open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
   assert_contains "$open" "recorded" "replay refusal lost the reopened call"
   pass "status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety"
+}
+
+test_key_opening_binding_is_a_position_in_the_whole_log() {
+  local home binding
+  home=$(make_home key-opening-large-log)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  # 4500 padded lines, the keyed call as line 4501, then 200 more: about 5.3 MB, past the
+  # 4 MiB tail window. The staged evidence is bound to the opening's line number, which
+  # the log's append-only order keeps stable for its whole life, so it must be 4501
+  # however large the log is.
+  perl -e 'my $pad = "p" x 1100; print "working [at=$_]: step $_ $pad\n" for 1 .. 4500; print "needs-decision [key=big-call]: captain must choose\n"; print "working [at=$_]: later step $_ $pad\n" for 1 .. 200;' \
+    > "$home/state/lane.status"
+  printf 'Verified source captured.txt: the answer was recorded elsewhere.\n' > "$home/evidence.txt"
+  run_captain "$home" reconcile close-key lane --key big-call --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "the close of a key opened in a 5 MB log failed"
+  binding=$(find "$home/state/reconcile-evidence/lane" -name 'big-call-*.opening' -type f)
+  [ -f "$binding" ] || fail "the close staged no opening binding"
+  [ "$(cat "$binding")" = 4501 ] || fail "the opening binding is $(cat "$binding"), not the opening's line number 4501"
+  pass "a key close binds its staged evidence to the opening's true line number in a log past the tail window"
 }
 
 test_operational_key_close_refusals_and_interrupted_append() {
@@ -1110,10 +1093,8 @@ session:
 prompts[1]{uid,prompt,selector,tag,text}:
   "2","Only choice: yes\n\nContext data:\n{\n  \"question\": \"sample-only-call\",\n  \"answer\": \"yes\"\n}","form",choice,"Only choice: yes"
 EOF
-  set +e
-  out=$(run_captain "$home" binding "$sid" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" binding "$sid" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an unbound source reported a binding"
   [ -z "$out" ] || fail "an unbound source printed a binding: $out"
   show=$(tasks_in "$home" show sample-only-call --full)
@@ -1402,12 +1383,10 @@ SH
   assert_contains "$show" "answer sent to $id" "the chat-answered call lost its channel provenance"
 
   : > "$home/send.log"
-  set +e
   env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
-    "$ROOT/bin/fm-send.sh" "$id" --resolve-key sample-chat-reconcile reconcile >/dev/null 2>&1
-  set -e
+    "$ROOT/bin/fm-send.sh" "$id" --resolve-key sample-chat-reconcile reconcile >/dev/null 2>&1 || true
   show=$(tasks_in "$home" show sample-chat-reconcile --full)
   assert_contains "$show" "state: queued" "a chat reconcile answer closed the call"
   list=$(run_captain "$home" reconcile list)
@@ -1522,6 +1501,50 @@ EOF
   pass "a status resolution over a still-open captain-held task is signalled, not closed"
 }
 
+# `diverged` runs on every wake drain, over every lane's status log. It must never hand a
+# whole log to grep, so a runaway log cannot be read again by every drain: a log past the
+# read limit (bin/fm-status-cap-lib.sh) yields no key tokens and no report, and a log
+# inside it is reported exactly as before. A grep stand-in on PATH records any status log
+# it is handed as a file operand; the limit is set small so the fixture stays tiny.
+test_diverged_never_hands_a_status_log_to_grep_and_skips_one_past_the_limit() {
+  local home id out real_grep err
+  home=$(make_home divergence-bounded)
+  id=sample-route-review
+  tasks_in "$home" add "$id" "Investigate sample routing" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the investigation fixture"
+  write_origin_meta "$home" "$id"
+  run_captain "$home" hold sample-route-call \
+    --title "Choose route: north or south" --reason "captain route choice pending" \
+    --repo sample --origin "$id" >/dev/null \
+    || fail "could not register the captain call"
+  printf 'needs-decision [key=sample-route-call]: north or south\nresolved [key=sample-route-call]: answered: north\n' \
+    > "$home/state/$id.status"
+  real_grep=$(command -v grep)
+  err="$home/grep-operands.log"
+  : > "$err"
+  # shellcheck disable=SC2016 # The stand-in's own source is written literally.
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'for a in "$@"; do case "$a" in *.status) printf "%%s\\n" "$a" >> %q ;; esac; done\n' "$err"
+    printf 'exec %q "$@"\n' "$real_grep"
+  } > "$home/fakebin/grep"
+  chmod +x "$home/fakebin/grep"
+
+  out=$(FM_STATUS_CAP_BYTES=2048 FM_STATUS_CAP_RESERVE_BYTES=1024 run_captain "$home" diverged) \
+    || fail "diverged failed on a log inside the read limit"
+  printf '%s\n' "$out" | grep -F "sample-route-call	$id	sample-route-call" >/dev/null \
+    || fail "a log inside the read limit was no longer reported: $out"
+  [ ! -s "$err" ] || fail "diverged handed a status log to grep as a file operand: $(cat "$err")"
+
+  perl -e 'print "working: padding line to push the log past the limit\n" x 80' >> "$home/state/$id.status"
+  [ "$(wc -c < "$home/state/$id.status" | tr -d ' ')" -gt 3072 ] || fail "the fixture log is not past the read limit"
+  out=$(FM_STATUS_CAP_BYTES=2048 FM_STATUS_CAP_RESERVE_BYTES=1024 run_captain "$home" diverged) \
+    || fail "diverged failed on a log past the read limit"
+  [ -z "$out" ] || fail "a log past the read limit still produced a report: $out"
+  [ ! -s "$err" ] || fail "diverged handed a status log past the limit to grep: $(cat "$err")"
+  pass "diverged reports a log inside the read limit, skips one past it, and never hands a status log to grep"
+}
+
 # The false-signal boundary, driven by the shapes that are genuinely fine. A
 # captain call whose deliverable IS the decision has no routed work item at all,
 # and that is legitimate: routed work must never be part of the test. Nor may a
@@ -1597,6 +1620,7 @@ test_verified_close_retry_matrix
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_close_key_leaves_a_migrated_captain_hold_to_its_owner
 test_operational_key_closes_with_durable_evidence_and_replay
+test_key_opening_binding_is_a_position_in_the_whole_log
 test_operational_key_close_refusals_and_interrupted_append
 test_standalone_closes_follow_the_supervision_role_partition
 test_unbound_source_closes_no_hold
@@ -1605,6 +1629,7 @@ test_board_answer_reaches_the_keyed_answer_intake
 test_chat_channel_feeds_the_same_keyed_answer_intake
 test_origin_slug_validation_precedes_path_construction
 test_status_resolution_over_an_open_hold_is_signalled
+test_diverged_never_hands_a_status_log_to_grep_and_skips_one_past_the_limit
 test_legitimate_holds_produce_no_divergence_signal
 )
 captain_hold_run_tests "$@"

@@ -85,22 +85,52 @@ fm_secondmate_parent_record_parse() {
 # Everything else still fails closed: an unreadable or malformed binding, an
 # unreachable local parent, a cycle, and a chain deeper than the bound.
 fm_firstmate_root_home() {
-  local home=${1:-$FM_HOME} marker parent seen="|" depth=0
-  home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || return 1
+  local chain
+  chain=$(fm_local_home_chain "${1:-$FM_HOME}" 2>/dev/null) || return 1
+  printf '%s\n' "${chain##*$'\n'}"
+}
+
+# The one walk of local parent bindings: print <home> and then each local home
+# above it, one canonical path per line, ending at the top-most local home as
+# fm_firstmate_root_home describes. A failed walk prints the homes reached so
+# far, names the link that failed on stderr, and returns 1.
+fm_local_home_chain() {  # <home>
+  local home=$1 parent seen="|" depth=0
+  home=$(CDPATH='' cd -- "$home" 2>/dev/null && pwd -P) || {
+    printf 'home %s cannot be resolved\n' "$1" >&2
+    return 1
+  }
+  printf '%s\n' "$home"
   while [ -e "$home/.fm-secondmate-parent" ] || [ -L "$home/.fm-secondmate-parent" ]; do
-    marker="$home/.fm-secondmate-parent"
-    fm_secondmate_parent_record_parse "$marker" || return 1
+    fm_secondmate_parent_record_parse "$home/.fm-secondmate-parent" || {
+      printf 'the parent binding of %s cannot be read\n' "$home" >&2
+      return 1
+    }
     case "$FM_SECONDMATE_PARENT_ROUTE" in
       local) ;;
       remote) break ;;
-      *) return 1 ;;
+      *)
+        printf 'the parent binding of %s names no supported route\n' "$home" >&2
+        return 1
+        ;;
     esac
-    parent=$(CDPATH='' cd -- "$FM_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || return 1
-    case "$seen" in *"|$parent|"*) return 1 ;; esac
+    parent=$(CDPATH='' cd -- "$FM_SECONDMATE_PARENT_HOME" 2>/dev/null && pwd -P) || {
+      printf 'the parent home %s of %s cannot be reached\n' "$FM_SECONDMATE_PARENT_HOME" "$home" >&2
+      return 1
+    }
+    case "$seen" in
+      *"|$parent|"*)
+        printf 'the parent binding of %s loops back to %s\n' "$home" "$parent" >&2
+        return 1
+        ;;
+    esac
     seen="$seen$home|"
     home=$parent
     depth=$((depth + 1))
-    [ "$depth" -le 64 ] || return 1
+    [ "$depth" -le 64 ] || {
+      printf 'the parent chain above %s is deeper than 64 homes\n' "$1" >&2
+      return 1
+    }
+    printf '%s\n' "$home"
   done
-  printf '%s\n' "$home"
 }

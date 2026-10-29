@@ -84,7 +84,9 @@ export FM_MERGE_PRUNE=0
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
+# under the marker; the omp primary extensions it loads as a home also skip
+# their home setup under it (.omp/extensions/lib/fm-task-worker.ts). A case that
+# verifies either behavior sets FM_TASK_ID itself.
 unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
@@ -109,6 +111,21 @@ unset TASKS_AXI_FILE TASKS_AXI_BACKEND
 # operator host) silently stretches every arm fixture past its assertion
 # deadline. A case that verifies the override sets it itself.
 unset FM_ARM_CONFIRM_TIMEOUT
+
+# Clear the operator's no-mistakes home. An inherited NM_HOME outranks a
+# fixture's HOME, so author-evidence cases would read the operator's live
+# pipeline database instead of their own. A case that needs one sets it itself.
+unset NM_HOME
+
+# fm_test_empty_pipeline_db <nm-home>: an existing, readable no-mistakes home
+# whose pipeline database records no run. Author evidence treats a missing
+# database as unknown for a no-mistakes task, so merge fixtures point NM_HOME
+# (or HOME/.no-mistakes) here rather than at whatever the host happens to hold.
+fm_test_empty_pipeline_db() {  # <nm-home>
+  mkdir -p "$1"
+  python3 -c 'import sqlite3, sys; sqlite3.connect(sys.argv[1]).executescript("CREATE TABLE repos (id TEXT, working_path TEXT); CREATE TABLE runs (id TEXT, repo_id TEXT, branch TEXT, pr_url TEXT); CREATE TABLE agent_invocations (run_id TEXT, agent TEXT, model TEXT, model_provider TEXT);")' \
+    "$1/state.sqlite"
+}
 
 # Write the tracked default backlog configuration into a fixture home. Never copy
 # "$ROOT/.tasks.toml": an operator's primary checkout keeps a gitignored override
@@ -141,6 +158,111 @@ fail() {
 
 pass() {
   printf 'ok - %s\n' "$1"
+}
+
+# --- single-case selection --------------------------------------------------
+#
+# Every test file that can run one named case goes through this section, so one
+# rule decides which names are cases and what the file's exit status is. A bare
+# `"$FM_TEST_ONLY"; exit 0` ran an unknown name as a command, printed "command
+# not found", and exited 0, and it exited 0 for a case that returned nonzero, so
+# a renamed case left CI's stock-Bash lane green with nothing tested.
+#
+# fm_test_run_cases [registered-case...] -- [requested-case...]
+#   Refuses an unknown requested name before running anything: "Unknown test
+#   case: <name>" on stderr, exit 2. With registered cases, a requested name must
+#   be one of them and the requested cases run in registration order, or every
+#   registered case runs when none is requested. Without them, a requested name
+#   must be a defined test_ function and runs in the order given. The first case
+#   to return nonzero ends the file with that status, and a case that turns
+#   errexit (set -e) on or off fails the file, so a case sees the same errexit
+#   state in a full run as when it runs alone. A file that must prepare
+#   state at a particular point in its registry defines fm_test_before_case,
+#   which receives each registered case name in order, selected or not, so a
+#   selected case runs in the same shell state as in the full run.
+# fm_test_only [short-name=test_function...]
+#   For a file that selects one case by FM_TEST_ONLY: does nothing when the
+#   variable is empty, otherwise runs that case, or the case a given short name
+#   stands for, and exits with its status. No other file reads FM_TEST_ONLY.
+# fm_test_case_known <name> [registered-case...]
+#   The membership test both use.
+
+fm_test_case_known() {
+  local name=$1 registered
+  shift
+  if [ "$#" -gt 0 ]; then
+    for registered in "$@"; do
+      if [ "$name" = "$registered" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
+  case "$name" in
+    test_*[!A-Za-z0-9_]*) return 1 ;;
+    test_?*) declare -F "$name" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+fm_test_run_one() {
+  local rc errexit=${-//[!e]/}
+  "$1"
+  rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  [ "${-//[!e]/}" = "$errexit" ] || fail "$1 changed errexit (set -e); a case must leave it as it found it"
+}
+
+fm_test_run_cases() {
+  local -a registered=()
+  local name case_name selected
+  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+    registered+=("$1")
+    shift
+  done
+  [ "$#" -gt 0 ] || fail "fm_test_run_cases: put -- between the registered cases and the requested ones"
+  shift
+
+  for name in "$@"; do
+    if [ "${#registered[@]}" -gt 0 ]; then
+      if fm_test_case_known "$name" "${registered[@]}"; then continue; fi
+    elif fm_test_case_known "$name"; then
+      continue
+    fi
+    printf 'Unknown test case: %s (not defined by %s)\n' "$name" "$(basename "$0")" >&2
+    exit 2
+  done
+
+  if [ "${#registered[@]}" -eq 0 ]; then
+    for case_name in "$@"; do
+      fm_test_run_one "$case_name"
+    done
+    return 0
+  fi
+
+  for case_name in "${registered[@]}"; do
+    if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$case_name"; fi
+    if [ "$#" -gt 0 ]; then
+      selected=false
+      for name in "$@"; do
+        if [ "$name" = "$case_name" ]; then selected=true; fi
+      done
+      [ "$selected" = true ] || continue
+    fi
+    fm_test_run_one "$case_name"
+  done
+  return 0
+}
+
+# shellcheck disable=SC2120 # Most callers pass no short names.
+fm_test_only() {
+  local requested=${FM_TEST_ONLY:-} short_name
+  [ -n "$requested" ] || return 0
+  for short_name in "$@"; do
+    if [ "${short_name%%=*}" = "$requested" ]; then requested=${short_name#*=}; fi
+  done
+  fm_test_run_cases -- "$requested"
+  exit 0
 }
 
 # --- self-cleaning temp root ------------------------------------------------
@@ -1083,6 +1205,45 @@ fm_git_add_origin() {
   git -C "$repo" remote add origin "file://$remote_abs"
 }
 
+# fm_test_dod_item <id> [<field>=<value>|-<field>]...: one mandatory DoD item
+# line built from `bash bin/fm-dod-lib.sh --shape`, the single owner of the item
+# shape, so a shape edit needs no fixture edit. Every field gets a nonempty
+# value and the authority field its first allowed value; <field>=<value>
+# overrides one field and -<field> omits it. A field outside the shape fails.
+fm_test_dod_item() {
+  local id=$1 shape lead fields authority_field authorities arg name field value line omit
+  local -a names
+  shift
+  shape=$(bash "$ROOT/bin/fm-dod-lib.sh" --shape) || return 1
+  lead=$(printf '%s\n' "$shape" | sed -n 's/^lead=//p')
+  fields=$(printf '%s\n' "$shape" | sed -n 's/^fields=//p')
+  authority_field=$(printf '%s\n' "$shape" | sed -n 's/^authority_field=//p')
+  authorities=$(printf '%s\n' "$shape" | sed -n 's/^authorities=//p')
+  for arg in "$@"; do
+    name=${arg#-}
+    name=${name%%=*}
+    case "|$lead|$fields|" in
+      *"|$name|"*) ;;
+      *) printf 'fm_test_dod_item: %s is not a field of the item shape\n' "$name" >&2; return 1 ;;
+    esac
+  done
+  IFS='|' read -ra names <<<"$lead|$fields"
+  line="- $id"
+  for field in "${names[@]}"; do
+    value="$id $field value"
+    [ "$field" != "$authority_field" ] || value=${authorities%%|*}
+    omit=0
+    for arg in "$@"; do
+      case "$arg" in
+        "-$field") omit=1 ;;
+        "$field="*) value=${arg#*=} ;;
+      esac
+    done
+    [ "$omit" = 1 ] || line+=" $field: ${value%.}."
+  done
+  printf '%s\n' "$line"
+}
+
 # fm_git_worktree <repo> <worktree> <branch>: initialize <repo> with one commit
 # and a local bare origin, then add a worktree on a fresh branch.
 fm_git_worktree() {
@@ -1090,6 +1251,52 @@ fm_git_worktree() {
   fm_git_init_commit "$repo"
   fm_git_add_origin "$repo" "$repo.origin.git"
   git -C "$repo" worktree add --quiet -b "$branch" "$worktree"
+}
+
+# fm_test_graft_output <copy>: the output graft's session hook leaves at the root
+# of a worker copy, taken from a real worker: its .ignore overlay byte for byte,
+# and a graft/ index with a card, the graph and caches. The copy's git ignores
+# both, as graft's own global ignore does on a worker host.
+fm_test_graft_output() {
+  local copy=$1
+  printf '/.ignore\n/graft/\n' >> "$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)"
+  cat > "$copy/.ignore" <<'EOF'
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+EOF
+  mkdir -p "$copy/graft/.graph" "$copy/graft/.cache/session"
+  printf '{"repoId":"b5d31282-fadd-4ff7-bcdc-c1353176868a"}\n' > "$copy/graft/.cache/telemetry-repo-id.json"
+  printf '{"graftReads":0,"sourceReads":1,"savedTokens":0,"injectedPointers":[],"nudges":0,"promptAsks":1,"host":"claude-code"}\n' > "$copy/graft/.cache/session/0f42cd9a-42fc-492e-9b56-205df616a83d.json"
+  : > "$copy/graft/.cache/session/.prompts-dropped"
+  printf '# work.txt\n\n_No extracted symbols in this file._\n' > "$copy/graft/work.md"
+  cat > "$copy/graft/.graph/wiring.json" <<'EOF'
+{"meta":{"version":1,"nodeCount":1,"edgeCount":0,"languages":[],"scopes":[]},"nodes":[{"id":"work.txt","name":"work.txt","kind":"file","path":"work.txt","span":"L1-L1","signature":null,"exported":true,"origin":"generic","body_hash":"0000000000000000000000000000000000000000000000000000000000000000","summary_state":"pending","summary":null,"crux":null}],"edges":[]}
+EOF
+}
+
+# fm_fake_ship_review_history <fakebin>: legacy forge/hold fixtures have symbolic
+# heads, not Git objects. Mock only the author-history query shapes with one ship
+# commit; real attribution regressions must NOT install this adapter.
+fm_fake_ship_review_history() {
+  local fakebin=$1
+  printf '#!/usr/bin/env bash\nREAL_GIT=%q\n' "$(command -v git)" > "$fakebin/git"
+  cat >> "$fakebin/git" <<'SH'
+if [ "${GIT_NO_REPLACE_OBJECTS:-}" = 1 ] && [ "${1:-}" = -C ]; then
+  case "${3:-} ${4:-}" in
+    'cat-file -e') exit 0 ;;
+    'rev-parse --verify')
+      case "${5:-}" in *'^{commit}') printf '%040d\n' 0; exit 0 ;; esac ;;
+    'merge-base '*)
+      if [ "${5:-}" = 0000000000000000000000000000000000000000 ]; then printf '%040d\n' 0; exit 0; fi ;;
+    'log --format=%H%x00%s') printf '%s\000ship fixture implementation\n' "${5##*..}"; exit 0 ;;
+  esac
+fi
+exec "$REAL_GIT" "$@"
+SH
+  chmod +x "$fakebin/git"
 }
 
 # --- state/<id>.meta writers ------------------------------------------------
@@ -1219,6 +1426,61 @@ fm_test_base_path_sans() {
     done
   done
   printf '%s\n' "$dir"
+}
+
+# fm_test_refresh_fence_stub <dir>
+# Writes a stub ln into <dir> (put it first on PATH) that pins the instant a
+# home-summary refresh worker, which already owns the refresh lock, first reaches
+# for its fence (the lock's steal mutex). FM_TEST_FENCE_ACTION picks what happens
+# there: remove deletes FM_TEST_FENCE_HOME; refuse writes
+# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
+# holds it; await-removal records the worker's pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
+# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# that takes the mutex first, records its pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
+# FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
+# gone (or it is killed). Any other
+# case, or any other target, runs the real ln. A refresh waiting on a fence is
+# reproduced this way without timing luck.
+fm_test_refresh_fence_stub() {
+  mkdir -p "$1" || return 1
+  FM_TEST_REAL_LN=$(command -v ln)
+  FM_TEST_FENCE_LIB="$ROOT/bin/fm-wake-lib.sh"
+  export FM_TEST_REAL_LN FM_TEST_FENCE_LIB
+  cat > "$1/ln" <<'SH'
+#!/usr/bin/env bash
+case "${*: -1}" in
+  */.home-summary-refresh.lock.steal)
+    state=${FM_TEST_FENCE_HOME:-}/state
+    case "${FM_TEST_FENCE_ACTION:-}" in
+      remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
+      refuse) : > "$state/.test-fence-refused"; exit 1 ;;
+      await-removal)
+        printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        exit 1
+        ;;
+      hold)
+        if [ ! -e "$state/.test-fence-holder" ]; then
+          env -u FM_TEST_FENCE_ACTION nohup bash -c '
+            . "$1"
+            fm_lock_acquire_wait "$2"
+            printf "%s\n" "$$" > "$3"
+            while [ ! -e "$4" ] && [ -d "${4%/*}" ]; do sleep 0.1; done
+            fm_lock_release "$2"
+          ' _ "$FM_TEST_FENCE_LIB" "${*: -1}" "$state/.test-fence-holder" "$state/.test-fence-release" \
+            >/dev/null 2>&1 </dev/null &
+          i=0
+          while [ ! -s "$state/.test-fence-holder" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+        fi
+        ;;
+    esac
+    ;;
+esac
+exec "${FM_TEST_REAL_LN:?}" "$@"
+SH
+  chmod +x "$1/ln"
 }
 
 # fm_test_wait_until <seconds> <command> [args...]

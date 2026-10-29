@@ -12,14 +12,17 @@ permissions:
 # Per-PR supersession: a new push to the same PR replaces that PR's in-flight
 # CI instead of letting superseded heads keep the full hosted-runner fan-out.
 # The group uses the PR number for pull_request events, so every run of one PR
-# shares a group, and falls back to the unique run id for push events, so each
-# main push gets its own group and is never cancelled. Cancellation is likewise
-# limited to pull_request events. Evidence and rationale: the September 12
-# Actions starvation report, section 3 "Workflow mechanics to ship first".
+# shares a group, and falls back to the ref for push events, so every main push
+# shares one group. A group holds one running and one pending run; a newer
+# pending push run replaces the older pending one, so a burst of merges queues
+# one full run for the newest commit instead of one run per merge. Cancellation
+# stays limited to pull_request events, so the running main run always finishes.
+# Evidence and rationale: the September 12 Actions starvation report, section 3
+# "Workflow mechanics to ship first".
 # The compliance workflow deliberately keeps its own event-specific groups; do
 # not collapse it onto this simpler shape.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Timeout policy: docs/fm-test-portable-shards.md "Timeouts" owns the three
@@ -86,6 +89,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
       - name: Prove complete regression partition
         run: bin/fm-test-run.sh --check-coverage
       # The guard audit's Stage 0 machine: a registered hook path that does not
@@ -95,6 +100,11 @@ jobs:
         run: bin/fm-guard-refcheck.sh
       - name: Enforce the guard registry contract and its ratchet
         run: bin/fm-guard-lint.sh --mode enforce --counts
+      # New work cannot add debt: a refusal site on a changed line must map to a
+      # guard, and the burn-down allowlist may not grow against the PR base.
+      - name: Enforce the guard ratchet against the pull request base
+        if: github.event_name == 'pull_request'
+        run: bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
@@ -203,7 +213,7 @@ jobs:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -499,6 +509,11 @@ jobs:
             FM_TEST_BASH=/bin/bash \
             /bin/bash tests/fm-backend.test.sh)
           printf '%s\n' "$backend_output"
+
+          # The --memory-kib stop runs only on Darwin, with the real setuid
+          # /bin/ps and libproc; each memory-growing case has its own 2 GiB stop.
+          budget_output=$(/bin/bash tests/fm-proc-budget.test.sh)
+          printf '%s\n' "$budget_output"
 
   invariants:
     name: Repo invariants

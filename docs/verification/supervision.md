@@ -269,7 +269,7 @@ bash bin/fm-test-run.sh tests/fm-backlog-read-bound.test.sh tests/fm-work-progre
 # FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=214255
 ```
 
-These recorded runs predate the later unavailable-ctypes blind path, the Darwin per-member CPU fallback, the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
+These recorded runs predate the later unavailable-ctypes blind path, the Darwin non-root per-member CPU fallback, the blind sample in every runner mode whenever no complete process-tree CPU sample exists (a failed native root read, ps and fm-proc-info.py both unavailable, or native imports that cannot load), which leaves the default run mode only its 6 hour absolute stop outside a cleanup (a cleanup that a forwarded signal or that stop began still follows the cleanup SIGKILL rule), the exited-PID handling, the restriction of the Python-free membership rule to ps sampling and the truncation of native Darwin CPU to 0.01 s steps; this record does not cover those changes, which rest on the suites' own current results.
 
 The backlog fixture includes a short completion phase after its CPU worker is reaped, with the existing one-second inactivity interval unchanged.
 The progress suite observes a real shell before and after a complete CPU-producing child lifetime, verifies that the second observation does not prove inactivity, then verifies that subsequent real inactivity does.

@@ -3037,10 +3037,10 @@ SH
 }
 
 test_current_state_uses_captured_status_observation() {
-  local home fakebin real_cp worktree json
+  local home fakebin real_head worktree json
   home=$(make_home captured-status-race)
   fakebin=$(make_fakebin "$home")
-  real_cp=$(command -v cp)
+  real_head=$(command -v head)
   worktree="$home/projects/captured-status"
   mkdir -p "$worktree"
   cat > "$home/data/backlog.md" <<'EOF'
@@ -3056,9 +3056,11 @@ EOF
     "harness=claude" "kind=ship" "mode=no-mistakes" "spawn_gen=stable-generation"
   printf 'working: captured state\n' > "$home/state/captured-status.status"
   record_claude_state "$home/state" captured-status idle
-  cat > "$fakebin/cp" <<'SH'
+  # The snapshot copies a status log with head -c up to the size it checked, so the race
+  # hook sits on head: it appends right after the copy has been taken.
+  cat > "$fakebin/head" <<'SH'
 #!/usr/bin/env bash
-"$REAL_CP" "$@" || exit
+"$REAL_HEAD" "$@" || exit
 for arg in "$@"; do
   if [ "$arg" = "$RACE_STATUS" ] && mkdir "$RACE_ONCE" 2>/dev/null; then
     printf 'needs-decision[new]: appended after capture\n' >> "$RACE_STATUS"
@@ -3066,10 +3068,10 @@ for arg in "$@"; do
   fi
 done
 SH
-  chmod +x "$fakebin/cp"
+  chmod +x "$fakebin/head"
 
   json=$(PATH="$fakebin:$PATH" FM_HOME="$home" FM_SNAPSHOT_NOW=2026-07-11T18:00:00Z \
-    FM_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" REAL_CP="$real_cp" \
+    FM_SNAPSHOT_NOW_EPOCH=1783792800 NET_LOG="$home/net.log" REAL_HEAD="$real_head" \
     RACE_ONCE="$home/status-race-once" RACE_STATUS="$home/state/captured-status.status" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --json) \
     || fail "fleet snapshot failed during captured status race"

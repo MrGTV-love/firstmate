@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Pool copies left behind after a merge | [Pool-copy prune after a merge](#pool-copy-prune-after-a-merge-fm_merge_prune) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
@@ -94,6 +94,7 @@ Each effective `FM_HOME` contains private operational directories.
 
 - Task metadata, append-only status events, and endpoint signals.
 - Watcher and wake-queue coordination, away-mode state, and generated Relay artifacts.
+- The watcher's declared-wait identity cache `state/.<id>.wait-identity`, one line per task log written by `status_declared_wait_identity` in `bin/fm-status-event-lib.sh`; `bin/fm-teardown.sh` removes it with the task's other watcher state, and deleting it only makes the next poll walk the episode again.
 - Inactive terminal-outcome receipts under `state/terminal-outcomes/`.
 - Enabled extension working namespaces under `state/extensions/`.
 - Parent-side remote ledger copies under `state/secondmate-summary-cache/`.
@@ -102,7 +103,8 @@ Each effective `FM_HOME` contains private operational directories.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
-- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns its format.
+- The append-only review-verdict and captain-word ledger `state/review-records.jsonl`, written only by `bin/fm-review-record.py`, whose header owns author-evidence derivation, unknown-family refusal, named-group coverage, and its format.
+- The append-only launch author history `state/<id>.launch-models`, published by `bin/fm-spawn.sh`, whose header owns its format and relaunch behavior.
 - The append-only refusal friction ledger `state/friction.jsonl`, written only by `bin/fm-friction-ledger.py`; [Friction ledger](#friction-ledger) owns its schema and privacy contract.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
@@ -121,7 +123,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 ### Friction ledger
 
-The pilot refusal instrument records teardown nested-copy/preservation predicates in the explicit owning `FM_HOME/state/friction.jsonl`.
+The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev guard pre-tool refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
 It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
 Usage, queue contention and failures to read or write Git state alone are not policy events and print a plain `error:`.
 A landing check that could not ask (the forge or origin cannot be reached, or HEAD changed during the proof) and a `git worktree remove` that fails for any reason other than Git protecting the copy's contents also print a plain `error:`; only a proved not-landed result is `copy-landed`, and only Git's own refusal is `nonforced-removal`.
@@ -168,7 +170,9 @@ A short/crashed append leaves its existing bytes intact; subsequent writes diagn
 A complete line that fails the schema is diagnosed the same way, as invalid history, never as a fault of the new event.
 Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
 An omitted event remains missing evidence, not a guarded-operation failure.
-The Jev guard writes no friction events; its mandatory audit's `AuditUnavailableError` behavior is unchanged.
+The Jev guard records each pre-tool refusal as a `blocked` event with `guard_id` `FM-JEV-GUARD` right after the refusal's own `state/jev-guard.jsonl` audit row is appended: `rule_id` is that row's typed `branch` value, `subject.kind` is its hook and tool, and the task and subject identities are the writer's digests.
+A refusal whose audit row could not be written is not mirrored, and the audit's `AuditUnavailableError` behavior is unchanged.
+The mirror is bounded by a short telemetry timeout and never changes the guard's allow or deny: a writer that ran prints its own `fm-friction:` diagnostic, and a writer that could not start or was stopped at that timeout is reported by one guard-side `fm-friction:` line, both on the guard process's stderr, which the Claude hook wrapper discards with every other stderr line.
 [`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
 
 ### Format and lifecycle references
@@ -484,7 +488,10 @@ If the target is a symlink, the write replaces it with a regular file.
 Linking the code-root copy into the home therefore forks the queue on the first write instead of keeping the copies in sync.
 
 Run every routine Firstmate backlog command through [`bin/fm-tasks-axi.sh`](../bin/fm-tasks-axi.sh).
-Like lifecycle transitions, it addresses this home's backlog and archive from any working directory.
+Like lifecycle transitions, it addresses this home's backlog, archive, and opt-in fleet ledger from any working directory, including a caller-relative `FM_HOME`.
+Changing directories is not the correctness boundary: a bare relative write still addresses the caller's directory, while home-owned entry points resolve their destinations themselves.
+[`tests/fm-home-writes.test.sh`](../tests/fm-home-writes.test.sh) exercises those write paths from a project-like foreign directory, including a negative control reproducing the bare relative-append incident.
+[`tests/fm-tasks-axi.test.sh`](../tests/fm-tasks-axi.test.sh) also covers nested relative homes and caller-relative state/config overrides with the fleet ledger enabled.
 Bootstrap reports a code-root `data/backlog.md` or `data/done-archive.md` that is not this home's own file as a `BACKLOG_RECONCILE: code-root ...` line, even in a read-only session.
 
 ## Runtime backend (config/backend / FM_BACKEND)
@@ -750,7 +757,7 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - Every ignored file is scratch, a symlink, or on the preserve list.
 - No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
-Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, and Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`).
+Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, `scripts/hooks/_conformance_manifest.json`, Firstmate's own hook files (`.claude/settings.local.json`, `.opencode/plugins/fm-busy-state.js`, `.fm-grok-turnend`, `.fm-kimi-turnend`), and graft's generated output at the copy root: a `graft/` directory git tracks nothing in and that holds no `.git`, and a `.ignore` byte-identical to the one graft writes (`teardown_graft_generated` in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh)).
 These are the disposable entries of teardown's own list, and the test suite holds the prune to the same verdict as teardown for each of them, except one named shape.
 When a project ignores the whole `.tac/` directory, teardown preserves every child except `tmp` and `uv-cache`, and the prune counts a rebuildable cache child such as `.venv` or `node_modules` as scratch.
 Any other child of that `.tac/` still keeps the copy.
@@ -833,7 +840,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
-| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
+| `review_pass_not_merged` | the review-record owner verifies an independent PASS (see `review_lanes` below) for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable, so coverage is incomplete; an unsupported forge is instead an informational skip | 0 s |
 
@@ -911,20 +918,27 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
-`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt or already answered in the current handling turn follow in a `STANDING` block, and a drain whose only overdue rows stand or are answered prints neither block and opens no handling episode.
+`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no valid action recorded after its action requirement opened; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+Reads (`drain`, `--present-overdue`, and `--check-actions`) preserve recorded actions while the row's category, subject, owner, next action, and evidence remain unchanged and the receipt's time bound and any bound proof remain valid.
+Every elapsed-time token in a stalled worker's evidence (`45s`, `3m 12s`, `1h 2m`, whether a collector counter such as `Ns without progress` or a timer the worker's pane paints) grows with every heartbeat and never counts as a change; any other evidence change does.
+An ordinary action recorded since the row's current presentation answers it for at most four hours, even if that handling turn never closes; a deferral or dependency wait keeps its own recheck bound, and a bound captain hold is reverified before acknowledgement.
+A refused acknowledgement is a read-only check, never a new presentation; only successful acknowledgement through every row the actor presented closes its handling turn.
+A partial acknowledgement preserves the turn's receipts for its remaining rows.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
-The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
-The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt before acknowledging; on an unchanged firstmate-owned row without a verified hold this suppresses repeated presentation for four hours, not until somebody acts on the escalation.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), per-actor `completed` sequence watermarks written after successful acknowledgement, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, `requires_followup` mark, and captain-hold binding (`hold`: the bound task and its hold marker).
+The single-row and JSONL batch action forms share the same evidence checks; one invocation caches its fleet snapshot, including a failed read, rather than rescanning for each row, and the `help:` line that presents overdue rows names the batch form.
+Each batch line has an independent result and refusal, so a bad line does not undo successful siblings; [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) owns the input fields, output format, and stdin syntax.
 The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: first its `source.task` provenance (including PR rows whose subject is a URL), then its `worker:` owner or the task id leading its subject, with each candidate checked against the task-name pattern.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
 Escalation evidence is free text: no receipt is checked against the forge or against a delivered captain notification.
 A deferral's recheck time must be in the future and at most 24 hours ahead.
-Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
+Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible` and its prior receipt `requires_followup`, and requires steering, merging, or escalation before acknowledgement, even if that prior receipt otherwise stood.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
-A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
+A first deferral stands until its recheck time, except on a `review_pass_not_merged` row or after the row's category, subject, owner, next action, or evidence changes.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
 An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
 A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
@@ -933,13 +947,15 @@ The first of these that is currently held binds: the explicit `--hold TASK_ID`, 
 Task ids written in the evidence never bind.
 `--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
 An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
-An escalation that finds no held task answers only the turn it followed, which the command reports.
+An unbound escalation or steer on any firstmate-owned row stands until its category, subject, owner, next action, or evidence changes, or four hours (14400 seconds, fixed) elapse from the action time, whichever comes first, except for `review_pass_not_merged`.
+This bounded standing also applies when an optional hold could not be verified; an explicit unverifiable `--hold` still refuses.
+A bound hold ending or becoming unreadable restores the action requirement immediately, including within the turn the escalation was recorded, rather than falling back to the time-based receipt.
 When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
 Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
 When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
 An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
-A receipt recorded before this binding existed needs one new escalation to stand.
+A receipt recorded before this binding existed needs one new escalation to stand on a hold.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
@@ -987,7 +1003,10 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
-For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
+The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
+For a configured repository, the ledger asks `bin/fm-review-record.py verify --task <owning task> --base <live base sha> --review-only --json` once for an owned PR's exact live head and consumes that single atomic owner output; a PR no task owns is not checked.
+That owner is the only authority: it applies the merge gate's exact-head, derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
+A missing, stale-head, FAIL, same-family, unknown-family, or yes-trigger record is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
@@ -1202,6 +1221,146 @@ The 240-second ceiling keeps `poll + 60` at or under the 300-second guard-grace 
 A longer interval needs `FM_POLL` set in the environment of every process that derives the grace.
 `bin/fm-wake-lib.sh`'s `fm_watch_poll_seconds` owns the resolution and [`tests/fm-watch-idle-reap.test.sh`](../tests/fm-watch-idle-reap.test.sh) covers it, including a status change noticed within one longer interval.
 
+## Status log size bounds (FM_STATUS_CAP_BYTES)
+
+A status log (`state/<task>.status`) is an append-only record that every supervision reader walks: the watcher, the wake drain, the open-decisions fold, the fleet snapshot, and the status-event library.
+On 2026-10-18 a loop inside an agent harness appended to three of them until they held 140 GB, 265 GB and 122 GB, the disk filled, and each reader multiplied the damage by reading the whole file.
+Five bounds keep one runaway writer from doing that again.
+[`bin/fm-status-cap-lib.sh`](../bin/fm-status-cap-lib.sh) owns all of them.
+The environment can override the cap and the reserve with a variable for a test or a deliberate site choice, and a value that is not a positive integer falls back to the default.
+The other three are constants.
+
+| Variable | Default | What it bounds |
+| --- | --- | --- |
+| `FM_STATUS_CAP_BYTES` | `33554432` (32 MiB) | The size a status log may reach through the sanctioned writer, and the size at which the watcher raises its over-cap wake for any status log or per-task sidecar. |
+| `FM_STATUS_CAP_RESERVE_BYTES` | `1048576` (1 MiB) | Headroom above the cap that only a decision or terminal line may use. |
+
+The read limit is the cap plus the reserve: 34,603,008 bytes with the defaults.
+It is the most the sanctioned writer can make, so it is the most a reader that needs a log's history takes.
+The tail window is 4,194,304 bytes (4 MiB), the most a reader that needs only a log's latest events takes from its end.
+The line limit is 32,768 lines, the most a reader that walks an unread span line by line in the shell takes in one pass; such a span with more lines is refused, not clipped.
+A history reader of the whole log and an open-decisions fold take the byte limit alone, so a log under the read limit is always read, however many lines it has.
+Such a reader does not walk every line in the shell: one `grep` or `awk` pass first keeps only the lines its loop can act on (see Reading for which lines each keeps), so lines it drops cost the loop nothing however many there are.
+
+The cap is chosen from measurement, not from a formula.
+The largest status log in a healthy fleet on 2026-10-18 was 3,230,479 bytes (`state/vernant-d7-steward.status`, 5,338 lines).
+The cap is about ten times that, so no healthy log reaches it and any runaway does.
+The tail window is 1.3 times that log in bytes, so a healthy log is read whole by a tail reader too.
+The line limit is 6.1 times that log's line count.
+It exists because a shell loop costs about 2.7 ms per line in the watcher's span classifier, measured on 2026-10-18: a flood of tiny lines under the byte limit would otherwise hold the watcher for hours on an unread span, and the watcher is what raises the over-cap wake.
+It bounds only those unread spans; the whole-log readers are bounded by the filter described under Reading.
+The reserve is a judgement: enough for the `done:` or `blocked:` a worker must always be able to send.
+
+### Writing
+
+Every worker's instructions tell it to append with [`bin/fm-status-append.sh`](../bin/fm-status-append.sh) instead of a bare `>>`.
+A line that would pass the cap is refused loudly with exit status 75, and nothing is written.
+A line the loop repeats is written like any other until the cap refuses it, so a runaway loop through the helper stops at the cap with every earlier line intact.
+Only a decision or terminal line may use the reserve: one whose verb is `needs-decision`, `blocked`, `done` or `failed`, or the resolve, paused or captain-held verb (`resolved`, `paused` and `captain-held` unless configured), read as the status readers read a verb.
+Every other line stops at the cap, `working:`, `note:` and a line with no verb such as the incident's `text` included, so a loop through the helper cannot use up the reserve and a worker at the cap can still report `done:` or `blocked:`.
+A log already past the cap plus the reserve, such as the three incident logs left in place, refuses every line with exit status 75, terminal lines included, and each refusal names the file on stderr.
+The helper takes the log's lock without blocking and retries it for at most 10 s, about 7.8 times the 1.28 s that one call filling the whole cap with 100-byte lines held it on 2026-10-28.
+When the lock stays held longer, for example by a writer stopped while it held it, the call is refused with exit status 75, the refusal names the file on stderr, and nothing is written, so no sanctioned writer waits on the lock without end.
+A burst of distinct events is never dropped below the cap.
+A remote or secondmate clone must run the current Firstmate release before its workers use the guarded append: on an older clone the charter's status command fails with `No such file or directory` (exit 127) because `bin/fm-status-append.sh` is not there, and the worker's replies never reach the parent's status log.
+The writer never deletes, truncates or rewrites an event line.
+The writers inside Firstmate (spawn failures, model-fallback notes, pending-reply escalations, the parent channel, the secondmate report helper, the remote-reply mirror, and the guarded self-announced appends) use the same append.
+When the capped append refuses a mirrored remote status delta at the cap, `bin/fm-procevent-remote-reply.sh` stops that ingest before it commits anything: its cursor stays where it was, so the delta is read again whole, nothing is dropped, and one keyed `blocked [key=remote-reply-continuity-<id>-capped]` line names the log.
+When the append is refused because the log stayed locked past the lock wait, the ingest stops the same way with a retry message and no keyed line, since the log is not full, and the next ingest retries the delta.
+Two writers are left outside the capped append, both in generated extension code that runs inside the agent harness and writes with a plain file append: the `note: model-matrix fallback served` line of the omp extension, and the `note: warning: ... unmatched exclusion entries` line `bin/fm-spawn.sh` generates for the pi extension.
+Each is one event-driven line per fallback or per session, not a loop, and moving them behind the cap is a follow-up.
+A refused spawn failure report is not dropped silently: `bin/fm-spawn.sh` prints the file, the writer's refusal text and the exit status on its own stderr.
+
+### Foreign writers
+
+A process that opens the log itself is not bound by the helper, so the watcher checks for it.
+Each poll costs one stat over every `state/*.status` and the per-task cursor, ledger and presentation sidecars, and it runs before the fleet-ledger capture so a slow reader cannot delay it.
+When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it and the watcher raises a `check: status-log-over-cap` wake naming the file, its size, its growth rate and the writer process found by `lsof`.
+Every process `lsof` lists as holding the log open for writing is stopped with `SIGSTOP`, whatever its name: the incident's omp process, or a raw `>>` loop in a `bash`, `sh` or `zsh` child. `kill -CONT <pid>` undoes it.
+The guard first checks that the process is still the one `lsof` named, and never signals itself, one of its ancestors (the watcher that ran it) or the firstmate session named on line 1 of `state/.lock`.
+It never stops a running capped append either: the guard proves one from the process's own arguments (a `perl -e` program whose first line is the helper's marker), never from its name alone, and the cap already bounds it.
+A process that only reads the log is not listed, so it is never stopped, and a log with no writer found is named and nothing is stopped.
+When `lsof` is not installed, or does not finish inside its 10 s bound, the wake says `writer=unknown (lsof not available)` or `writer=unknown (lsof timed out)` instead of `none found`, and nothing is stopped: `none found` means `lsof` ran and listed no process.
+The writer of 2026-10-18 was one `printf` whose format has no conversion and that has an extra argument, which the harness shell re-applied without end: it opened the log once and held it for its whole run.
+A shell loop that opens and closes the log on every append wrote 0.3 to 1 KB/s on 2026-10-19, so it cannot have written the 0.7 GB/s measured on 2026-10-18, and `lsof` lists a held descriptor.
+A process that opens and closes the log on every append is listed by only a small fraction of looks, so for it the guard can end on `none found`: it names the log and stops nothing.
+A log with no writer found is looked at once more after one second, which also measures its growth.
+The guard never deletes or rewrites a file.
+[`bin/fm-control.sh`](../bin/fm-control.sh) is addressed by task id and drives an endpoint, and has no verb for one process, so the one-process stop lives in the guard.
+
+For a foreign writer the guarantee is detection plus a stop of that one pid within one watcher poll.
+The check runs at the top of each poll, after each poll-sized slice of the status-signal linger, after each poll-sized slice (at least one second) of each of these walks over a log's lines: the status-signal classification, the heartbeat scan, the stale-pane surface, the push-transition surface and the inbox-steer open-decisions fold.
+It runs once more just before any wake exits the watcher, except a process-event wake, which holds the wake-queue lock that the check appends under.
+Inside the over-cap wake it raised, while that wake flushes pending signals, the check still stops and queues a row for any file that is newly over the cap, and skips only a second wake: one check raises at most one wake, and a file already reported by that wake is not reported again until its next poll.
+The row for such a second file reaches firstmate in the queue with the first, not in the printed wake text.
+The declared-wait reads walk the last 200 lines, and widen only when those lines hold no opening event or a wait that opened before them; in the watcher the widened walk reads at most the last tail window (4 MiB), except the identity walk of an episode still open at that window's start, which reads back up to the read limit (cap plus reserve) from the log's end and is then cached so later polls classify only appended bytes; every one of those walks checks the cap on every line it walks, and outside the watcher a widened walk of the whole log walks only the lines the event-shape filter below keeps.
+The linger matters because a runaway writer's first append is itself a status signal, the linger is 30 s (`FM_SIGNAL_GRACE`), and the wake it ends in exits the watcher before the next poll: a check that ran only at the top of the poll would reach the writer only after a drain, an ack and a re-arm.
+The walks matter for the same reason: each takes the lines one at a time in the shell, 2.7 to 5 ms a line, so a span of up to 32,768 lines holds the watcher for 88 s or more, and the wake a walk ends in exits without another poll.
+The over-cap wake still delivers that pending status signal with it, but does not linger on it, so the stop is not reported a grace late.
+The report can lag the stop by up to one pending status-signal walk (measured 118 s at 30000 lines), while the writer stays stopped.
+It is not a bound on size: the cap bounds the sanctioned writer only.
+How far a log passes the cap before the stop is the writer's growth rate times the poll interval.
+The poll interval is 15 s in a primary home, 30 s in a secondmate home, and `FM_POLL` can raise it to 240 s.
+At the 0.7 GB/s measured on 2026-10-18 that is about 10 GB at 15 s and about 21 GB at 30 s, before `lsof` and the stop.
+The watcher must be alive for any of it.
+
+An existing log is never deleted, so a log that went over the cap stays over it.
+Detection therefore keys on growth.
+Each file has a marker `state/.status-cap-alerted.<name>` that holds the file's identity, its path and its size at the last alert.
+A file raises one wake when it first passes the cap and one more each time it has grown by more than one cap since its marker, so a writer resumed with `kill -CONT` or a relaunch that appends to the same file is caught and stopped again.
+A file that has not grown raises nothing.
+At most one wake per poll covers every file that is due.
+The marker clears when the file is replaced or falls under the cap.
+
+### Reading
+
+A reader takes a log in one of two ways.
+A reader that needs a log's history reads it exactly, up to the read limit, and refuses a log past it: one line on stderr names the file and the limit, and nothing is read.
+A reader that walks an unread span from a saved position line by line in the shell (the watcher's span classifier and the drain's unread spans) is refused the same way when the span has more lines than the line limit.
+Every whole-log history reader (`fm_status_cat`) and every open-decisions fold, with or without a checkpoint, takes the byte limit alone: it keeps no checkpoint or rereads from one, so a line limit would refuse a healthy log far below the cap on every call, and the harm a runaway does is its size in bytes.
+A reader that only filters with `grep` or `awk`, or that must return an exact position, asks for the byte limit alone too.
+A whole-log reader that loops in the shell walks only the lines one `grep` or `awk` pass keeps for it: the open-decisions folds (whole-log, checkpointed and incremental) and `key_opening_line` keep the lines that hold a decision verb, `status_open_activities` the lines that hold an activity verb, the pending-reply escalation scan the lines that hold `blocked`, `status_event_recorded` the lines that hold the wanted event's text from its first colon on, and the latest-event, declared-wait and open-loops review-lane scans the event-shaped lines, plus the log's last nonblank line.
+A line is event-shaped when it holds a colon and the text before its first colon or bracket is a status verb or holds a `corr` token; when, with its `[at=...]` stamps removed, its first colon (even one inside a bracket tag, as in `parked [reason: CI] waiting`) is followed by a space or ends the line, and the text before the first bracket or that colon is one word that starts with no capital, digit or punctuation, or the text before that colon holds `corr`; or when a captain token starts it.
+Every line the event scan counts as an event is event-shaped, so the pass drops no event.
+So the 2026-10-18 `text` lines, a counter such as `1793124970: text`, a label such as `Reason: retrying`, and a URL cost those loops nothing however many there are.
+A line those passes keep without being an event, such as one whose head is a word with a digit (`a1: x`) or a misused `corr` token, is still walked line by line.
+In the watcher the latest-event, declared-wait and identity walks call the cap tick on every line, and the stale loop ticks in the watcher's own shell at the top of each window, so a walk's tick acts only when that one read has run longer than a poll since the watcher's last tick.
+Then, because those reads run in a captured subshell that cannot wake, the tick stops a writer over the cap and writes the growth rate it measured before the stop, with the time it measured it, to `state/.status-cap-handoff.<watcher pid>`.
+That file holds at most one rate per file over the cap, the highest measured, since a later scan of a writer already stopped measures about zero, and it is replaced, never appended to.
+The watcher's own next tick reads and deletes it before anything else, drops the rate of any file no longer due an alert, and in the over-cap wake keeps its own scan's writer and action (so the wake names the pid it stopped and `kill -CONT <pid>`) and puts the held rate, marked `measured at <time>`, in place of its own lower one; the watcher's exit cleanup also deletes the file.
+The watcher makes the latest-event and declared-wait reads, and takes the declared-wait identity, for every window on every poll, so when it widens them past the last 200 lines it reads no further than the last tail window (4 MiB), except in the one case below; a healthy log fits in that window whole.
+One case reads further: when the declared wait's episode is still open at the start of that window, the episode opened before it, and the identity walk reads back one tail window at a time to the episode's real first line, so the identity does not slide with the window.
+That walk reads no more than the read limit back from the log's end, the bound a whole-log reader keeps, and an episode that opened further back than that gets no identity, which declared_wait_scope in `bin/fm-watch.sh` treats like any refused read.
+A run of identical restatements costs the walk one classified line; on 2026-10-28 on Mac-Studio.local, a log at the read limit holding one wait restated 33,788 times in identical 1 KiB records took 2.1 s, and one restated 356,689 times with a distinct stamp on every 100-byte line took 174 s, against 74 s for the bounded window alone before this walk.
+The watcher then caches a keyed wait's identity in `state/.<id>.wait-identity`, written only at an endpoint that ends a line: the log's identity, the endpoint, the episode's first line (offset, length and checksum), and the wait's verb and key, with a checksum of those fields. A later poll classifies only the bytes appended since the endpoint and re-reads only that first line to confirm it; a different file, a log that shrank, a cache that is unreadable or does not match its checksum, a changed wait, a changed first line, or an episode now older than the read limit discards the cache and takes the exact walk. On 2026-10-28 on Mac-Studio.local, a log of 356,732 distinct-stamp 100-byte restatements (34,602,932 bytes) took 289 s for the first poll (the exact walk, measured while other tests ran on the same host) and 0.24 s for the next poll after one more restatement.
+That window read starts one byte early and drops its first line, so a partial first line is dropped and a whole one is kept.
+The identity's position is the byte offset where the episode's first line starts, counted from the start of the log in both cases, so it is the same in the watcher and outside it and does not move as the window does.
+It never takes a clipped copy, so no position it returns (an endpoint, a line number, a saved cursor offset) is relative to a copy, and a span that cannot be read leaves the saved cursor where it was.
+A reader that runs on every poll discards that line, because its failure status is its signal; the watcher's over-cap wake names the file instead.
+A reader that needs only the latest events takes a bounded tail of the log: at most the last 4 MiB for the status-event library's last-event and declared-wait reads, at most the last 256 KiB for the session-start tail, and at most the last 64 KiB for the inbox, teardown and inactive-reconcile summaries.
+Each tail is cut to exactly that many bytes, so a log that is still growing cannot make a tail read chase its writer; the fleet ledger's capture is cut to exactly the bytes it counted for the same reason.
+A log under the read limit is read line by line by a history reader, as before the cap existed.
+
+A refusal is exit status 2 and no other failure uses it, so a caller can tell a log that cannot be read from a log with nothing in it.
+The pure readers (`status_open_decisions`, its dated variant, `status_own_open_decisions`, `status_current_line`, `status_open_activities`) print nothing, return 2 and say so on stderr; a fold that has a trusted checkpoint and only has its tail refused keeps the checkpoint on disk but does not answer with its open set: it prints nothing, names the refused suffix on stderr and returns 2, as the incremental fold does, so a caller never takes the old set for a complete one.
+Their callers read that as unknown, never as an empty set: `bin/fm-send.sh --resolve-key` refuses to send, and says the close could not be verified after a send, the captain-hold close and attestation commands refuse, the idle-reap classifier calls the lane ineligible, the pending-reply recovery and escalation leave the record alone, the watcher's retry ring leaves the mate alone, the AFK return brief names the lane and stays gated, `bin/fm-crew-state.sh` reports the lane `unknown`, and the fleet snapshot sets `hints.open_decisions_unreadable` on that task.
+The incremental fold that the wake drain uses for OPEN DECISIONS does the same with or without a trusted checkpoint: it prints nothing, returns 2, keeps the refusal line on stderr and leaves its cursor alone.
+`last_status_line` returns 2 with no event when its whole-log read is refused; with no known previous event, the ledger path of `bin/fm-inactive-reconcile.sh` claims no earlier fallback delivery, the open-loops `stalled_worker` row is still raised with no declared status, and a wait bound to a routed task prerequisite is refused because that prerequisite's status cannot be verified.
+The wake drain skips only the refused lane's unread span and open decisions: it names the log on stderr, keeps that lane's presentation cursor where it was, and still presents every other lane.
+A `signal:` row for a refused log prints no `wake annotation:` lines for it, for the same reason.
+The watcher's span classifier is not covered: it cannot classify a span of more than 32,768 unread lines, and reports the lane unreadable on every poll until the span is cleared; that is a follow-up.
+
+The history readers that still read a status log whole, up to the limit, are:
+the wake drain's unread-status and open-decisions spans and folds, the unread lines the drain prints as `wake annotation:` lines for a `signal:` row, the watcher's span classifier, the open-decisions fold and its dated variant, `status_open_activities`, `status_key_closing_verb`, `status_event_recorded`, `last_status_line` when it is asked for the previous event, the declared-wait identity snapshot, the latest-event endpoint read, the pending-reply escalation and correlation scans, the remote-reply mirror check, the open-loops review-lane scan, `key_opening_line` and the key-token scan behind `diverged` in `bin/fm-captain-hold.sh`, and the fleet snapshot copy.
+The key-token scan takes the byte limit alone, so a refused log yields no tokens and `diverged` reports nothing for it.
+The Pi branch dispatch (`.pi/extensions/lib/fm-branch-dispatch.ts`) reads a status log whole only to decide whether a stale or second-mate signal row is decision-owned, and treats a log past the same limit (its own copy of the cap plus the reserve, read from the same two variables) as an unsafe scope without reading it.
+The fleet snapshot refuses to copy a log past the limit, names it, and observes the task without a status log. A log within the limit is copied up to the size that was checked and no further, so a writer that appends after the check does not enlarge the copy; the Pi branch dispatch reads a status log the same way, up to the size of its open descriptor.
+The fleet ledger captures at most the last 4 MiB and 256 lines of what a log grew since its saved offset, and records a `task.status.skipped` event for the rest.
+The drain holds its unread-status and open-decisions spans in memory rather than in scratch files beside the cursor; its only scratch file is the latest-event endpoint read, at most 64 KiB, so a drain killed mid-read leaves no cursor copy and no file above 64 KiB.
+A fold checkpoint or home-appends ledger larger than one tail window is treated as absent and rebuilt from the log.
+A presentation manifest larger than one tail window, and the legacy open-decisions cursor that seeds it, fail closed instead: the readers (`status_presentation_cursor_offset`, `status_outcome_backstop_cursor_offset`, `status_open_decisions_cursor_offset`) return status 1, so the wake drain fails until the file is replaced, and the watcher's over-cap wake names it only once it passes the cap.
+`tests/fm-status-runaway-guard.test.sh` is the regression entry point.
+
 ## Test slots per key (FM_TEST_KEY_SLOTS)
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
@@ -1243,6 +1402,9 @@ That branch shares no history with code branches, so evidence never enters a pus
 The [`firstmate-coding-guidelines` skill](../.agents/skills/firstmate-coding-guidelines/SKILL.md#no-mistakes-test-configuration) owns why `commands.test` stays absent and targeted validation belongs to the evidence path.
 
 `commands.test` executes code, so no-mistakes honors it only from the default-branch copy of `.no-mistakes.yaml`; a pushed branch cannot change what the gate runs.
+
+It also sets `rebase: strategy: merge`, so the rebase step merges newer main instead of rewriting the submitted commits; no-mistakes honors that setting only from the default-branch copy, and [`tests/fm-nm-test-contract.test.sh`](../tests/fm-nm-test-contract.test.sh) pins it.
+[Event-driven supervision](architecture.md#event-driven-supervision) owns its effect on run binding and the CI conflict-repair path it does not cover.
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the firstmate-specific local test policy and entry points.
 
 Portable shard evidence and coverage rules are in [fm-test-portable-shards.md](fm-test-portable-shards.md); [herdr-backend.md](herdr-backend.md#destructive-lab-safety) owns the real-Herdr lane's isolation boundary, and [runtime-backends.md](verification/runtime-backends.md#herdr) owns active evidence.
@@ -1713,8 +1875,8 @@ The address selects the existing shared server; it does not authorize starting o
 ## Task Definition of Done (ship and scout briefs)
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
-Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
-The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
+The grading section says a session that did not build the work grades it; that each mandatory item is graded pass, fail, or unresolved; that a downstream-pending item is never a pass but does not by itself block proceeding, while any other unresolved item blocks; that supporting items never offset a failed mandatory one; and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
@@ -1727,6 +1889,14 @@ A fresh spawn of a brief with no such section at all is not refused: it prints o
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
 The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.
+`bin/fm-dod-lib.sh` also owns the one mandatory item shape: each item starts its own line with a unique id and carries every field nonempty, with Authority taken from a fixed set; `bash bin/fm-dod-lib.sh --shape` prints the id pattern, lead and trailing fields, allowed Authority values, one-line item form that a criteria refusal names, and the rule sentence that the scaffold and a verification-plan refusal print.
+It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
+A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
+A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head is the task's recorded forge `pr_head` or attributes to the copy's `HEAD` (equal to it, a descendant of it such as a pipeline fix commit, or carrying its tree), and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
+A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
+The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
+This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
 A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
@@ -2608,7 +2778,11 @@ Writes are allowed by default; the profile denies writes to these named protecte
 
 Task ids come from the `state/<id>.meta` records of this home and of every other local home.
 Each protected folder, each folder that holds protected entries, and every folder above them also refuses rename and deletion, so moving a parent cannot carry a protected asset away; creating new entries inside them stays allowed.
-Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch` and the installed `state/<task>.git-hooks`.
+In that shared Git directory the task keeps its own declared branch and the two recovery archives of the custody-return route in [`validation-supervision`](../.agents/skills/validation-supervision/SKILL.md), `archive/<task>-submitted-<8 lowercase hex>` and `archive/<task>-pipeline-<8 lowercase hex>`, each with its lock file and reflog.
+Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
+The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
+When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
+Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
 The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
@@ -2671,10 +2845,10 @@ Protected lists are read at launch, so a task, home, gate or session directory c
 Second, the delegated-write residual: an already-running unconfined helper, daemon, Docker service or remote API can still write anywhere for the worker.
 The profile does not restrict reads, network access or system calls unrelated to filesystem writes.
 In a confined Claude session the protected `sessions/` registry leaves the worker out of Claude's local session and peer list; that does not stop a tool.
-macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU from libproc.
+macOS refuses setuid programs, `ps` among them, inside any `sandbox-exec` sandbox, so the Firstmate tools named below read process facts through [`bin/fm-proc-info.py`](../bin/fm-proc-info.py) instead: process counts, parents, groups, states, commands and start times come from sysctl `KERN_PROC` and `KERN_PROCARGS2`, and process-tree CPU, resident memory and physical footprint from libproc.
 `bin/fm-proc-budget.sh`, the procevent runner and its Lavish adapter, the session-lock ancestry walks, the project-lock CPU sample and [`bin/fm-duration.py`](../bin/fm-duration.py)'s process table, Darwin process-group completion check and test-slot holder check, and the test orphan reaper [`bin/fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) use it whenever the sandbox refuses to execute `ps` (exit 126, or `PermissionError` in Python), and a failed read there fails closed; wherever `ps` runs, including outside confinement and under a test's stand-in `ps`, they run `ps` exactly as before.
 The refusal itself is the signal, so a test that clears `FM_WRITE_CONFINEMENT`, which selects only the task audit ledger, still reaches the helper.
-`bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`.
+`bin/fm-lint.sh` telemetry records its aggregate CPU sample as `unavailable` when `ps` cannot run, as inside the sandbox, instead of a false `0.00`, and its macOS resident-memory watch reads each root's process-group tree through a long-lived helper `mem-tree` reader started at the root's first tick, falling back to `ps` for a tick the reader does not answer in time, and for the rest of the root once the reader is given up.
 The shared process identity in `bin/fm-wake-lib.sh` follows the same refusal; for this user's processes the helper prints the same bytes as `LC_ALL=C ps`, with each argument escaped as `ps` escapes it, so such an identity recorded inside or outside a sandbox compares equal.
 Another user's argv cannot be read without setuid, so for that process the helper prints its short kernel name where `ps` prints the full command, and the two identities differ.
 The 53 test files identified in decision 023 that run `ps` themselves, rather than through these tools, still fail inside a confined worker; that count is historical, and converting them is follow-up work outside this boundary.
@@ -4199,7 +4373,7 @@ FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dis
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
-FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set
+FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set, and the omp primary extensions skip their home markers, home watch, and home digest while it is set (.omp/extensions/lib/fm-task-worker.ts)
 FM_TASK_INBOX=          # internal: absolute path of the task's steering inbox (state/<id>.inbox) that fm-spawn.sh exports into every ship, scout, and secondmate launch, never set by hand; the steering doorbell names "$FM_TASK_INBOX"
 HERDR_SESSION=default  # herdr-only: named session for normal backend ops; not enough for destructive cleanup (docs/herdr-backend.md)
 FM_BACKEND_HERDR_SUBMIT_POLLS=6  # herdr-only: agent-state samples spread across each Enter attempt's budget when confirming a submit (docs/herdr-backend.md "Current transport behavior")
@@ -4218,6 +4392,7 @@ FM_TASKS_AXI_COMPATIBLE=   # internal one-hop handoff of an already-computed tas
 FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppress drain, supervision repair, and checkout repair commands
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
 FM_POLL=15              # seconds between watcher poll cycles; unset means config/watch-poll, else 30 in a secondmate home and 15 elsewhere (docs/configuration.md "Watcher poll interval by home role")
+FM_STATUS_CAP_BYTES=33554432   # size a status log may reach through the sanctioned writer and the size at which the watcher raises its over-cap wake (docs/configuration.md "Status log size bounds"); FM_STATUS_CAP_RESERVE_BYTES is described there
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
@@ -4313,7 +4488,6 @@ FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto
 FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
-FM_CD_GUARD_MODE=warn   # warn (default) or deny for the primary checkout's persistent top-level cd guard; deny restores the block; docs/cd-guard.md owns the contract
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm observes a finished cycle for a verified successor (default 30 on Git Bash/MSYS); when set it also replaces the 900-second startup no-progress interval, and it never ends a startup that is making progress; the Claude Stop hook's handling-successor notice window is this value (default 30) plus 2 seconds
 FM_ARM_ATTACH_POLL=0.5  # seconds between checks while fm-watch-arm follows an attached watcher cycle (bin/fm-watch-arm.sh header)
 FM_OPENCODE_ARM_READY_TIMEOUT_MS=12000   # milliseconds an OpenCode wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
@@ -4321,7 +4495,7 @@ FM_PI_ARM_READY_TIMEOUT_MS=12000   # milliseconds a Pi wake waits for its succes
 FM_OMP_ARM_READY_TIMEOUT_MS=12000   # milliseconds an omp wake waits for its successor arm to report before it goes out with a still-starting line (30000 minimum for the supervision host); a notice window only, the successor is never stopped for it; default 35000 on Windows
 FM_PI_SUCCESSOR_GRACE_MS=15000   # milliseconds after a Pi replacement shutdown before recording missing-successor diagnostics and expiry; never activates the outgoing runtime, and never applies to terminal quit
 FM_OMP_SUCCESSOR_GRACE_MS=15000   # milliseconds after omp shutdown retirement before missing-successor recovery checks home-lock ownership; an explicit arm call can repair sooner (.omp/extensions/fm-primary-omp-watch.ts header)
-FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits
+FM_WATCH_ARM_RETIRE_TIMEOUT_MS=1000   # milliseconds Pi/omp/OpenCode wait for a successor arm that reported failure to exit before abandoning retries; Pi/omp also bound shutdown child-close waits, and omp bounds the output drain after an arm exits
 FM_WATCH_REARM_RETRY_BASE_MS=250   # Pi/omp/OpenCode adapter base delay for continuity restoration retries
 FM_WATCH_REARM_RETRY_MAX_MS=4000   # Pi/omp/OpenCode adapter cap for exponential continuity retry delay
 FM_WATCH_REARM_RETRY_LIMIT=5   # Pi/omp/OpenCode adapter launch-failure retries before surfacing restoration failure
@@ -4329,7 +4503,7 @@ FM_WATCH_CYCLE_LOG_MAX_BYTES=262144   # size cap for the arm-owned watcher lifec
 FM_WATCH_CYCLE_LOG_KEEP_LINES=1000   # newest complete lifecycle rows considered when the ledger is capped
 FM_WATCH_EXTENSION_LOG_KEEP_LINES=0   # opt-in Pi extension diagnostic log (state/.watch-extension.log); unset, empty, non-numeric, zero, or negative disables logging, a positive value keeps that many newest rows; logging never changes supervision behavior
 FM_WATCHER_STALE_GRACE=300   # defaults to FM_GUARD_GRACE if set, else the poll-derived grace (docs/turnend-guard.md "Guard grace and the poll cadence"); seconds after which a live holder's beacon is stale; a stale holder that does not prove the lock's recorded identity is refused, while an identity-matched one is attached to or reported running until fm_progress_check proves no CPU or beacon progress for FM_WATCHER_STALL_BOUND; the session-end auto-relaunch is bounded to this grace minus a fixed margin and does not run when that leaves no room (bin/fm-session-end-relaunch-lib.sh header)
-FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"
+FM_WATCHER_STALL_BOUND=       # no-progress interval a live, identity-matched holder must be proven to make no CPU or beacon progress for before re-arm evicts it or an attached arm fails; beacon age alone is not enough; default and arm/re-arm behavior: docs/turnend-guard.md "Guard grace and the poll cadence"; also the no-progress bound for the watcher's status reclassification read (docs/watcher-continuity.md "Grace, beacon, and stop signals")
 FM_SIGNAL_GRACE=30      # seconds to coalesce nearby status and turn-end signals into one wake
 FM_WATCHER_CLEANUP_LOCK_BOUND=   # optional watcher EXIT marker-lock wait; default and validation: docs/watcher-continuity.md
 FM_TURNEND_CHURN_ABSORB_SECS=900   # longest one endpoint's bare turn-ends may be deferred on pane-churn evidence alone; only consulted when config/turnend-churn-absorb is present
