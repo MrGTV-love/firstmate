@@ -1,0 +1,18 @@
+== HEAD 65df464b5
+normal run (rc=0)                  entries left: 
+error exit (rc=1)                  entries left: 
+bound fired (rc=124)               entries left: 
+interrupted by TERM                entries left: 
+interrupted by INT                 entries left: 
+interrupted by HUP                 entries left: 
+after KILLed owner left a file     entries left: ./fm-timeout-status.scratch ./fm-timeout-status.scratch/5992.KILLED 
+next normal run (rc=0)             entries left: 
+== BASE 541b9ff6c
+normal run (rc=0)                  entries left: 
+error exit (rc=1)                  entries left: 
+bound fired (rc=124)               entries left: 
+interrupted by TERM                entries left: 
+interrupted by INT                 entries left: 
+interrupted by HUP                 entries left: 
+after KILLed owner left a file     entries left: ./fm-timeout-status.KILLED 
+next normal run (rc=0)             entries left: ./fm-timeout-status.KILLED 

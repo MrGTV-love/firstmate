@@ -1,0 +1,22 @@
+== HEAD
+normal start rc=0 (167 lines)        entries left: 
+bound fired (1s) truncated=1         entries left: 
+S/drive-ss.sh: line 12: kill: (99594) - No such process
+ended by TERM                        entries left: 
+S/drive-ss.sh: line 12: kill: (53255) - No such process
+ended by KILL                        entries left: 
+next normal start                    entries left: 
+== BASE 541b9ff6c
+normal start rc=0 (124 lines)        entries left: 
+bound fired (1s) truncated=1         entries left: 
+ended by TERM                        entries left: ./fm-session-start-stage.mUyuLn 
+ended by KILL                        entries left: ./fm-session-start-stage.mUyuLn 
+next normal start                    entries left: ./fm-session-start-stage.mUyuLn 
+== HEAD (re-run with fixed wait)
+normal start rc=0 (170 lines)        entries left: 
+bound fired (1s) truncated=1         entries left: 
+  sent TERM while running
+ended by TERM                        entries left: 
+  sent KILL while running
+ended by KILL                        entries left: ./fm-session-start-stage.scratch ./fm-session-start-stage.scratch/23163.yO1p6U 
+next normal start                    entries left: 

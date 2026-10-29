@@ -1,0 +1,20 @@
+== HEAD, 0 unrelated fm-* entries
+/Users/charlesabrooker/tmp/nmval.Tb17nQ/drive-sweep.sh: line 16: 86232 Killed: 9               env TMPDIR="$T" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-dead); echo "$d" > "$2/dead-root"; kill -KILL $$' _ "$LIB" "$T" > /dev/null 2>&1
+/Users/charlesabrooker/tmp/nmval.Tb17nQ/drive-sweep.sh: line 19: 86531 Killed: 9               env TMPDIR="$RW" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-reap-child); echo "$d" > "$2/nested-root"; printf "exec sleep 600\n" > "$d/stub.sh"; (cd "$d" && nohup bash "$d/stub.sh" >/dev/null 2>&1 &) ; sleep 0.3; kill -KILL $$' _ "$LIB" "$T" > /dev/null 2>&1
+temp dir entries before: 8
+sweep seconds (5 runs): 1.074 0.860 0.999 1.036 0.953  median: 0.999
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     removed
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid none-found)
+temp dir unrelated entries after:   0
+== HEAD, 50000 unrelated fm-* entries
+/Users/charlesabrooker/tmp/nmval.Tb17nQ/drive-sweep.sh: line 16:  4146 Killed: 9               env TMPDIR="$T" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-dead); echo "$d" > "$2/dead-root"; kill -KILL $$' _ "$LIB" "$T" > /dev/null 2>&1
+/Users/charlesabrooker/tmp/nmval.Tb17nQ/drive-sweep.sh: line 19:  4926 Killed: 9               env TMPDIR="$RW" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-reap-child); echo "$d" > "$2/nested-root"; printf "exec sleep 600\n" > "$d/stub.sh"; (cd "$d" && nohup bash "$d/stub.sh" >/dev/null 2>&1 &) ; sleep 0.3; kill -KILL $$' _ "$LIB" "$T" > /dev/null 2>&1
+temp dir entries before: 50008
+sweep seconds (5 runs): 2.304 2.326 2.125 1.631 1.269  median: 2.125
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     removed
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid none-found)
+temp dir unrelated entries after:   50000

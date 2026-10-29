@@ -1,0 +1,14 @@
+== HEAD
+normal read rc=0 out=[1]           entries left: 
+forge error rc=1                   entries left: 
+ended by TERM                      entries left: 
+ended by INT                       entries left: 
+ended by KILL                      entries left: ./fm-gh-rest.scratch ./fm-gh-rest.scratch/26800.CJ53GG 
+next normal read rc=0              entries left: 
+== BASE 541b9ff6c
+normal read rc=0 out=[1]           entries left: 
+forge error rc=1                   entries left: 
+ended by TERM                      entries left: 
+ended by INT                       entries left: 
+ended by KILL                      entries left: ./fm-gh-rest.cKM1KI ./fm-gh-rest.cKM1KI/raw.292812299 ./fm-gh-rest.cKM1KI/raw.292812299.cache ./fm-gh-rest.cKM1KI/raw.292812299.err 
+next normal read rc=0              entries left: ./fm-gh-rest.cKM1KI ./fm-gh-rest.cKM1KI/raw.292812299 ./fm-gh-rest.cKM1KI/raw.292812299.cache ./fm-gh-rest.cKM1KI/raw.292812299.err 

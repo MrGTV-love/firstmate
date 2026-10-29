@@ -1,0 +1,17 @@
+== repeat HEAD 65df464b5, 50000 unrelated fm-* entries
+temp dir entries before: 50009
+sweep seconds (5 runs): 1.265 1.048 1.010 1.012 1.019  median: 1.019
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 78959)
+temp dir unrelated entries after:   50000
+== repeat HEAD 65df464b5, 0 unrelated fm-* entries
+temp dir entries before: 9
+sweep seconds (5 runs): 1.331 1.285 1.120 1.122 1.001  median: 1.122
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 96000)
+temp dir unrelated entries after:   0
+load:  4:31  up 18:31, 4 users, load averages: 18.75 18.90 18.10

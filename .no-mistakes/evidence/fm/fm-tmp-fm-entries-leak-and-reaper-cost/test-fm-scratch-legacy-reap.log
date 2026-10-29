@@ -1,0 +1,3 @@
+ok - the legacy reaper removes only old, unowned, unused entries of the known prefixes
+ok - the legacy reaper refuses a nonnumeric age floor
+ok - the legacy reaper refuses to run without an explicit --tmpdir, even with --apply

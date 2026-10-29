@@ -1,0 +1,4 @@
+ok - a KILLed shell leaves one marked record and the next sweep removes the record and its roots
+ok - tests/lib.sh refuses an owners directory it does not own and touches nothing behind it
+ok - the sweep keeps a live owner's roots and registries and every unmarked entry, narrow or wide
+ok - the sweep takes 0.066s with no unrelated entries and 0.138s with 12000

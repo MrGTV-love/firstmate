@@ -1,0 +1,33 @@
+== HEAD 65df464b5, 0 unrelated fm-* entries
+temp dir entries before: 9
+sweep seconds (5 runs): 2.211 1.125 0.958 1.258 1.394  median: 1.258
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 66407)
+temp dir unrelated entries after:   0
+== BASE 541b9ff6c, 0 unrelated fm-* entries
+temp dir entries before: 22
+sweep seconds (5 runs): 1.545 1.176 1.157 1.144 1.165  median: 1.165
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 86176)
+temp dir unrelated entries after:   0
+== HEAD 65df464b5, 50000 unrelated fm-* entries
+temp dir entries before: 50009
+sweep seconds (5 runs): 1.264 1.054 1.036 1.096 1.408  median: 1.096
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 5386)
+temp dir unrelated entries after:   50000
+== BASE 541b9ff6c, 50000 unrelated fm-* entries
+temp dir entries before: 50022
+sweep seconds (5 runs): 2.604 3.494 2.978 2.441 2.197  median: 2.604
+unmarked old fm-unmarked.keep:      kept
+live owner root fm-test-live.*:     kept
+dead owner root fm-test-dead.*:     removed
+stub under dead nested root:        stopped (pid 29869)
+temp dir unrelated entries after:   50000
+load:  4:31  up 18:31, 4 users, load averages: 23.27 19.63 18.32
