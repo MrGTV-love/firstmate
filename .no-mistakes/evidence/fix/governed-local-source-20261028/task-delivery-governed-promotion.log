@@ -1,0 +1,3 @@
+warning: re-init: ignored --initial-branch=main
+ok - governed promotion preserves scout metadata, instructions and checkout on actual refusal
+exit=0

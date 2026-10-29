@@ -1,0 +1,2 @@
+ok - fm-control relaunch: invalid --owned-path refuses before stopping a live worker
+exit=0

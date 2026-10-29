@@ -1,0 +1,3 @@
+ok - governed spawn refuses before admission and preserves prior branches, copy and foreign data
+ok - governed spawn requires explicit scope before refreshing or admitting a worker
+exit=0
