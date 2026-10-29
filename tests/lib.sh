@@ -1516,6 +1516,27 @@ PY
   printf '%s\n' "$dir"
 }
 
+# fm_test_export_owner_guard_counter: export a sleep that makes each process-event
+# owner guard (cmd_owner_watchdog in bin/fm-procevent.sh) started with
+# FM_TEST_GUARD_CHECKS=<file> add its completed lease checks, the guard's own unit
+# of work, to that file, so a wait for something the guard should end can be
+# bounded with fm_test_wait_until --cycles. Call it in the subshell that starts
+# the guard's ancestor; every other caller of sleep is unchanged.
+fm_test_export_owner_guard_counter() {
+  # shellcheck disable=SC2329 # Exported to the owner guards a child starts.
+  sleep() {
+    local checks
+    if [ "${FUNCNAME[1]:-}" = cmd_owner_watchdog ] && [ -n "${FM_TEST_GUARD_CHECKS:-}" ]; then
+      checks=$(cat "$FM_TEST_GUARD_CHECKS" 2>/dev/null) || checks=0
+      case "$checks" in ''|*[!0-9]*) checks=0 ;; esac
+      printf '%s\n' "$((checks + 1))" > "$FM_TEST_GUARD_CHECKS.tmp" \
+        && mv -f "$FM_TEST_GUARD_CHECKS.tmp" "$FM_TEST_GUARD_CHECKS"
+    fi
+    command sleep "$@"
+  }
+  export -f sleep
+}
+
 # fm_test_wait_until [--while-alive PID] [--progress-file PATH]...
 #                    [--cycles N COUNT_FILE] [--inactivity SECONDS]
 #                    -- COMMAND [ARGS...]

@@ -159,6 +159,48 @@ wait "$peer" 2>/dev/null || true
 assert_grep 'condition unmet (3,' "$TMP_ROOT/ended.err" "ended peer became an inactivity verdict"
 pass "peer death during a wait is detected"
 
+# A peer that exits leaves its recorded descendants to finish the work. Each peer
+# below exits only after the third probe, by which point the observer has sampled
+# its tree at least once, so the record names the child without any clock.
+note_probe() {  # <observed-marker> <result>
+  printf 'probe\n' >> "$1.probes"
+  [ "$(wc -l < "$1.probes")" -lt 3 ] || : > "$1"
+  test -s "$2"
+}
+observed="$TMP_ROOT/descendant-publish.observed"
+result="$TMP_ROOT/descendant.result"
+# shellcheck disable=SC2016 # The peer shell expands its positional arguments.
+bash -c '
+( while [ ! -e "$1" ]; do sleep 0.05; done; sleep 0.5; printf published > "$2" ) &
+while [ ! -e "$1" ]; do sleep 0.05; done
+' _ "$observed" "$result" &
+peer=$!
+fm_test_wait_until --while-alive "$peer" -- note_probe "$observed" "$result" \
+  || fail "a child publishing after its parent exited was rejected"
+wait "$peer" || fail "descendant publisher failed"
+[ "$(cat "$result")" = published ] || fail "the descendant result changed"
+pass "an outcome a live descendant publishes after the peer exits still wins"
+
+observed="$TMP_ROOT/descendant-silent.observed"
+child_pid="$TMP_ROOT/descendant-silent.child"
+# shellcheck disable=SC2016 # The peer shell expands its positional arguments.
+bash -c '
+( while [ ! -e "$1" ]; do sleep 0.05; done; exec sleep 1 ) &
+printf "%s\n" "$!" > "$2"
+while [ ! -e "$1" ]; do sleep 0.05; done
+' _ "$observed" "$child_pid" &
+peer=$!
+rc=0
+fm_test_wait_until --while-alive "$peer" -- note_probe "$observed" "$TMP_ROOT/never-published" \
+  2> "$TMP_ROOT/descendant-silent.err" || rc=$?
+wait "$peer" 2>/dev/null || true
+[ "$rc" -eq 1 ] || fail "a dead peer whose silent child ended without the outcome was accepted (rc=$rc)"
+assert_grep 'condition unmet (3,' "$TMP_ROOT/descendant-silent.err" "the dead peer became an inactivity verdict"
+if kill -0 "$(cat "$child_pid")" 2>/dev/null; then
+  fail "the dead-peer verdict came while its recorded child was still running"
+fi
+pass "a dead peer fails only once its recorded descendants are gone too"
+
 # A failed CPU read is unknown, not inactivity. Hide both process-table sources
 # while a real publisher stays alive, then prove its result is still accepted.
 fakebin=$(fm_fakebin "$TMP_ROOT/blind")

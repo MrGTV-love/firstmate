@@ -1423,18 +1423,7 @@ proc_shadow_owner=$(printf '%s\n' "$proc_shadow_registration" | sed -n 's/^owner
 # land within a few checks instead of only a quiet interval.
 proc_shadow_checks="$TMP_ROOT/proc-shadow.guard-checks"
 (
-  # shellcheck disable=SC2329 # Exported to the owner guard the reconcile starts.
-  sleep() {
-    local checks
-    if [ "${FUNCNAME[1]:-}" = cmd_owner_watchdog ] && [ -n "${FM_TEST_GUARD_CHECKS:-}" ]; then
-      checks=$(cat "$FM_TEST_GUARD_CHECKS" 2>/dev/null) || checks=0
-      case "$checks" in ''|*[!0-9]*) checks=0 ;; esac
-      printf '%s\n' "$((checks + 1))" > "$FM_TEST_GUARD_CHECKS.tmp" \
-        && mv -f "$FM_TEST_GUARD_CHECKS.tmp" "$FM_TEST_GUARD_CHECKS"
-    fi
-    command sleep "$@"
-  }
-  export -f sleep
+  fm_test_export_owner_guard_counter
   FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
     FM_TEST_GUARD_CHECKS="$proc_shadow_checks" "$PROCEVENT" reconcile | grep -q ' started=1 '
 ) || fail "the shadow extension runner did not launch"

@@ -1757,7 +1757,7 @@ if [ "\${3-}" = detach ] && [ "\${@: -2:1}" = _start ] && [ "\${@: -1}" = proc-g
   : > '$case_dir/cold-started'
   deadline=\$((SECONDS + \${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
   while [ ! -e '$case_dir/cold-release' ]; do
-    [ "\$SECONDS" -lt "\$deadline" ] || exit 124
+    [ "\$SECONDS" -lt "\$deadline" ] || { : > '$case_dir/cold-expired'; exit 124; }
     sleep 0.05
   done
 fi
@@ -1788,6 +1788,7 @@ SH
   bootstrap_pid=$!
   fm_test_wait_until --while-alive "$bootstrap_pid" --progress-file "$case_dir/cold.out" -- test -e "$case_dir/cold-started" || fail "bootstrap never launched the cold runner"
   fm_test_wait_until --while-alive "$bootstrap_pid" --progress-file "$case_dir/cold.out" -- test -e "$case_dir/cold.done" || fail "bootstrap waited for the cold runner to become ready"
+  [ ! -e "$case_dir/cold-expired" ] || fail "bootstrap waited for the cold runner until its stub gave up"
   wait "$bootstrap_pid" || fail "cold bootstrap fixture failed"
   expect_code 0 "$(cat "$case_dir/cold.done")" "a cold detector must not fail bootstrap"
   out=$(cat "$case_dir/cold.out")
@@ -1865,8 +1866,12 @@ deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
 while [ ! -e "$case_dir/release" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
 SH
   probe=$(fm_test_sampler_probe) || fail "could not write the sampler probe"
-  PYTHONPATH="$probe${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$case_dir/sampler-cycles" \
-    FM_TEST_SKIP_ORPHAN_REAP=1 bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH" &
+  (
+    fm_test_export_owner_guard_counter
+    PYTHONPATH="$probe${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$case_dir/sampler-cycles" \
+      FM_TEST_GUARD_CHECKS="$case_dir/guard-checks" FM_TEST_SKIP_ORPHAN_REAP=1 \
+      exec bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH"
+  ) &
   DETECTOR_CHILD_SUITE_PID=$!
   fm_test_wait_until --while-alive "$DETECTOR_CHILD_SUITE_PID" --progress-file "$case_dir/bootstrap.out" -- test -s "$case_dir/ready" || fail "the child suite's bootstrap never returned"
   expect_code 0 "$(cat "$case_dir/ready")" "the child suite's bootstrap failed: $(cat "$case_dir/bootstrap.out")"
@@ -1917,7 +1922,7 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
   fm_test_wait_until --while-alive "$runner" --cycles 5 "$case_dir/sampler-cycles" -- bash -c '! kill -0 "$1" 2>/dev/null && ! ps -axo pgid= | grep -qx " *$1"' _ "$runner" \
     || fail "the opted-in suite left its runner group running"
   detector_processes_are_gone() { [ "$(detector_process_count "$case_dir")" -eq 0 ]; }
-  fm_test_wait_until --progress-file "$case_dir/bootstrap.out" -- detector_processes_are_gone \
+  fm_test_wait_until --cycles 5 "$case_dir/guard-checks" --progress-file "$case_dir/bootstrap.out" -- detector_processes_are_gone \
     || fail "the opted-in suite left detector processes behind"
   pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
 }
