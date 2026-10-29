@@ -2216,11 +2216,71 @@ $rec
 EOF
   head=$(git -C "$slot" rev-parse HEAD)
   if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused slot'; fi
-  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion" 'moved task branch was not reported as preserved'
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: fm/$id moved from" 'moved task branch was not reported as preserved'
   moved=$(git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id") || fail 'refused promotion deleted a task branch that gained work'
   [ "$moved" != "$head" ] && [ "$(git -C "$slot" rev-parse "$moved^")" = "$head" ] || fail 'moved task branch lost its work'
   [ "$(git -C "$slot" rev-parse HEAD)" = "$head" ] || fail 'refused promotion did not restore the scout checkout'
   pass 'refused promotion preserves a pre-existing task branch and one that gained work'
+}
+
+# A legacy scout works at a detached HEAD. Its refused promotion removes only
+# the alias it created, so the scout's later detached work never blocks a retry.
+test_refused_detached_promotion_retries_after_scout_advances() {
+  local rec home proj id=promote-slot-detached slot out original advanced
+  rec=$(promotion_refusal_fixture promote-slot-detached "$id")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  git -C "$slot" checkout -q --detach
+  git -C "$slot" branch -D -q scout-retained
+  original=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'promotion admitted a refused detached slot'; fi
+  assert_contains "$out" 'manifest_live_owner' 'detached promotion lost the actual governed refusal'
+  assert_not_contains "$out" 'preserving task branch' 'detached rollback did not prove its own alias unused'
+  ! git -C "$slot" symbolic-ref -q HEAD >/dev/null || fail 'refused promotion left the detached scout on a branch'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$original" ] || fail 'refused promotion moved the detached scout'
+  ! git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused detached promotion left its own task branch behind'
+  printf 'detached scout work\n' > "$slot/scout-work.txt"
+  git -C "$slot" add scout-work.txt
+  git -C "$slot" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'detached scout advances after refusal'
+  advanced=$(git -C "$slot" rev-parse HEAD)
+  if out=$(run_promotion "$home" "$id"); then fail 'retried detached promotion admitted a refused slot'; fi
+  assert_not_contains "$out" "is not at the assigned copy's HEAD" 'detached retry was blocked by the earlier refused promotion'
+  assert_contains "$out" 'manifest_live_owner' 'detached retry did not reach the project owner'
+  [ "$(git -C "$slot" rev-parse HEAD)" = "$advanced" ] || fail 'detached retry lost the advanced scout work'
+  [ "$(git -C "$slot" rev-parse "$advanced^")" = "$original" ] || fail 'detached retry lost the original scout commit'
+  [ "$(cat "$slot/scout-work.txt")" = 'detached scout work' ] || fail 'detached retry lost the scout content'
+  pass 'refused detached promotion removes only its own alias, and a retry after the scout advances reaches the project owner'
+}
+
+# A project that declared the alias in a PASS manifest has used it, even when
+# Firstmate then rejects the returned identity: the alias and manifest stay.
+test_refused_promotion_preserves_project_declared_branch() {
+  local rec home proj id=promote-slot-declared slot out manifest
+  rec=$(promotion_refusal_fixture promote-slot-declared "$id" "$(cat <<'PY'
+import os
+arg = lambda flag: sys.argv[sys.argv.index(flag) + 1]
+record = dict(worktree_path=os.path.realpath(arg("--worktree-path")), owner_id=arg("--owner-id"), branch=arg("--branch"),
+              base_sha=arg("--base-sha"), owned_paths=[value.rstrip("/") for flag, value in zip(sys.argv, sys.argv[1:]) if flag == "--owned-path"],
+              lifecycle_state="worktree_active")
+open(os.environ["FM_TEST_SLOT_RECORD"], "w", encoding="utf-8").write(json.dumps(record))
+print(json.dumps(dict(state="PASS", manifest_path=os.environ["FM_TEST_SLOT_RECORD"], **record)))
+sys.exit(0)
+PY
+)")
+  IFS='|' read -r home proj slot <<EOF
+$rec
+EOF
+  manifest="$TMP_ROOT/promote-slot-declared/manifest.json"
+  printf 'kind=scout\nproject=%s\nworktree=%s\nwindow=fm-%s\nslot_owned_path=scripts/\n' "$proj" "$slot" "$id" > "$home/state/$id.meta"
+  if out=$(FM_TEST_SLOT_RECORD="$manifest" run_promotion "$home" "$id"); then fail 'promotion admitted a mismatched declaration'; fi
+  assert_contains "$out" 'provisioner identity mismatch: owned_paths' 'declared mismatch lost its attestation refusal'
+  assert_contains "$out" "preserving task branch fm/$id created by this refused promotion: the project report may declare it" \
+    'project-declared alias was not reported as preserved'
+  git -C "$slot" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null || fail 'refused promotion deleted a project-declared task branch'
+  assert_grep "\"branch\": \"fm/$id\"" "$manifest" 'refused promotion changed the project manifest'
+  [ "$(git -C "$slot" branch --show-current)" = scout-retained ] || fail 'refused promotion did not restore the scout checkout'
+  pass 'refused promotion preserves a task branch the project declared before attestation refused it'
 }
 
 # Recorded scope is Firstmate's own frozen contract: a caller's --owned-path is
@@ -2265,6 +2325,8 @@ PY
 
 test_governed_promotion_preserves_scout_on_refusal
 test_refused_promotion_preserves_other_task_branches
+test_refused_detached_promotion_retries_after_scout_advances
+test_refused_promotion_preserves_project_declared_branch
 test_promotion_refuses_recorded_scope_override
 
 echo "# all fm-task-delivery tests passed"

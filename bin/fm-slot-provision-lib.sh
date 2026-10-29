@@ -120,6 +120,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_BASE_SHA=
   FM_SLOT_BASE_REF=
   FM_SLOT_PREPARED_HEAD=
+  FM_SLOT_CREATED=0
   FM_SLOT_CREATED_FROM=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
@@ -158,6 +159,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
       git -C "$copy" checkout --quiet "$branch" -- || return 1
     else
       git -C "$copy" checkout --quiet -b "$branch" -- || return 1
+      FM_SLOT_CREATED=1
       FM_SLOT_CREATED_FROM=$old_branch
     fi
   fi
@@ -220,17 +222,24 @@ PY
 }
 
 # A refused promotion has no prepared record, so the task branch its own
-# provisioning call created from a named scout branch would otherwise block
-# every retry once the scout advances. Delete only that exact alias.
-fm_slot_drop_created_branch() { # <copy> <branch>
-  local copy=$1 branch=$2 from=$FM_SLOT_CREATED_FROM head=$FM_SLOT_PREPARED_HEAD reason='' worktrees
-  [ -n "$from" ] || return 0
-  if ! worktrees=$(git -C "$copy" worktree list --porcelain); then
+# provisioning call created would otherwise block every retry once the scout
+# advances. Delete only that exact alias, only while the restored checkout
+# still holds its commit and the project's report declares nothing.
+fm_slot_drop_created_branch() { # <copy> <branch> <report>
+  local copy=$1 branch=$2 report=$3 from=$FM_SLOT_CREATED_FROM head=$FM_SLOT_PREPARED_HEAD reason='' worktrees
+  [ "$FM_SLOT_CREATED" = 1 ] || return 0
+  if ! python3 -c 'import json, sys
+report = json.load(open(sys.argv[1], encoding="utf-8"))
+sys.exit(0 if isinstance(report, dict) and report.get("state") != "PASS" and "manifest_path" not in report else 1)' "$report" 2>/dev/null; then
+    reason='the project report may declare it'
+  elif ! worktrees=$(git -C "$copy" worktree list --porcelain); then
     reason='its worktrees cannot be listed'
-  elif [ "$(git -C "$copy" symbolic-ref -q HEAD)" != "refs/heads/$from" ]; then
-    reason="the copy is not back on $from"
-  elif [ "$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$from^{commit}")" != "$head" ]; then
-    reason="$from no longer retains $head"
+  elif [ -n "$from" ] && { [ "$(git -C "$copy" symbolic-ref -q HEAD)" != "refs/heads/$from" ] ||
+    [ "$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$from^{commit}")" != "$head" ]; }; then
+    reason="the copy is not back on $from at $head"
+  elif [ -z "$from" ] && { git -C "$copy" symbolic-ref -q HEAD >/dev/null ||
+    [ "$(git -C "$copy" rev-parse --verify --quiet HEAD)" != "$head" ]; }; then
+    reason="the copy is not back to a detached $head"
   elif git -C "$copy" symbolic-ref -q "refs/heads/$branch" >/dev/null; then
     reason="$branch is now a symbolic ref"
   elif printf '%s\n' "$worktrees" | grep -Fqx "branch refs/heads/$branch"; then
