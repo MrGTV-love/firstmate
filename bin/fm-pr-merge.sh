@@ -110,8 +110,8 @@
 # A caller-requested --auto that leaves the pull request neither merged nor
 # queued is refused the same way and says auto-merge was armed with nothing
 # landed or queued yet, or, when the merge command itself failed, that auto-merge
-# was only requested; both are read from the caller's own arguments rather than
-# from the forge's prose.
+# was requested with nothing proven merged or queued; both are read from the
+# caller's own arguments rather than from the forge's prose.
 # Every refusal that follows a merge command which returned success quotes that
 # command's own output, marked as the forge's text and kept apart from this
 # script's verdict, including the refusal for an outcome that cannot be read;
