@@ -1,0 +1,7 @@
+no_progress: "pid=98393 no CPU or watched-file progress for 1.4s"
+fm_test_wait_until: condition unmet (124, pid=98393)
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+not ok - the orphaned stub of an ended run survived the reaper
+tests/lib.sh: line 288: 99916 Killed: 9               bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release"
+rc=1 elapsed=39s

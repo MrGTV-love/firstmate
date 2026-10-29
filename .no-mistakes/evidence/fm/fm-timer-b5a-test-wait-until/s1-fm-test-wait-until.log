@@ -1,0 +1,26 @@
+FM_TEST_BEGIN 2026-10-29T15:16:41Z tests/fm-test-wait-until.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - 1x publisher reaches the awaited outcome
+ok - 5x publisher reaches the awaited outcome
+ok - file-only observation follows a detached publisher beyond the inactivity interval
+ok - CPU-only activity is not progress toward the outcome
+ok - 1x poller reaches the awaited outcome within its cycles
+ok - 1x live poller without the outcome fails after its stated cycles
+ok - 5x poller reaches the awaited outcome within its cycles
+ok - 5x live poller without the outcome fails after its stated cycles
+ok - 1x silent peer is detected without killing it
+ok - 5x silent peer is detected without killing it
+ok - missing detached publication is a file-progress stall, not waiter CPU progress
+ok - dead producers fail only when the requested outcome is absent
+ok - peer death during a wait is detected
+ok - an outcome a live descendant publishes after the peer exits still wins
+ok - a dead peer fails only once its recorded descendants are gone too
+ok - unavailable CPU telemetry is unknown and retried
+ok - waits require a producer observable and reject the old capped interface
+ok - unknown samples keep the window, genuine inactivity and reused peers are caught, corrupt evidence is retried
+FM_TEST_END 2026-10-29T15:17:23Z tests/fm-test-wait-until.test.sh exit=0 duration_ms=42159 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AXF7GAP3X95SW225C87QG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=42311
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=42159 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-test-wait-until.test.sh duration_ms=42159
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AXF7GAP3X95SW225C87QG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+bin/fm-proc-budget.sh --memory-kib 2097152 -- bin/fm-test-run.sh   6.15s user 8.62s system 34% cpu 42.801 total

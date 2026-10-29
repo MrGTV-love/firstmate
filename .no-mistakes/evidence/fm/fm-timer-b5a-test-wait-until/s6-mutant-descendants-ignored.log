@@ -1,0 +1,16 @@
+ok - 1x publisher reaches the awaited outcome
+ok - 5x publisher reaches the awaited outcome
+ok - file-only observation follows a detached publisher beyond the inactivity interval
+ok - CPU-only activity is not progress toward the outcome
+ok - 1x poller reaches the awaited outcome within its cycles
+ok - 1x live poller without the outcome fails after its stated cycles
+ok - 5x poller reaches the awaited outcome within its cycles
+ok - 5x live poller without the outcome fails after its stated cycles
+ok - 1x silent peer is detected without killing it
+ok - 5x silent peer is detected without killing it
+ok - missing detached publication is a file-progress stall, not waiter CPU progress
+ok - dead producers fail only when the requested outcome is absent
+ok - peer death during a wait is detected
+fm_test_wait_until: condition unmet (3, pid=56654)
+not ok - a child publishing after its parent exited was rejected
+rc=1 elapsed=33s
