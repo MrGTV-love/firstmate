@@ -397,7 +397,7 @@ The shape check is mechanical: the independent grader still decides whether each
 
 ## How You're Graded
 - A session that did not build this work grades it, against the items above and the evidence places they name.
-- Mandatory items are pass or fail and release-blocking. One failed mandatory item fails the task.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
 - Supporting items earn partial credit and never offset a failed mandatory item.
 - A crossed hard gate fails the task. Stop and report it.
 - Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
@@ -1663,7 +1663,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         '       bash bin/fm-dod-lib.sh --shape' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
-        'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
+        'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
         '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'
       ;;
     *) echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>, --shape (or --help)' >&2; exit 2 ;;

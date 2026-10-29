@@ -206,6 +206,7 @@ The 2026-10-23 caller-CWD landed-proof fix added `test_landed_proof_ignores_unre
 The DeepSeek harness change then added `test_teardown_retires_the_dsh_launch_state` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 337.
 The automatic PR-ready registration change then added `test_teardown_removes_pr_ready_refusal_marker` to `tests/fm-teardown.test.sh`, which makes the inventory 338.
 The graft-output scratch change then added `test_graft_output_alone_does_not_hold_a_foreign_copy` and `test_graft_output_is_not_preserved_from_a_released_own_nested_copy` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 340.
+The own-archive confinement change then added `test_task_archives_keep_links_to_other_refs` to `tests/fm-teardown.test.sh`, which makes the inventory 341.
 
 The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
 That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.
