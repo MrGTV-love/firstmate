@@ -1491,11 +1491,12 @@ class WaitVerifier:
         raise ValueError("unsupported waiting source; recollect before binding it")
 
     def live_task(self, task):
-        """A named prerequisite is live: assigned, its session alive, unmerged, and neither stalled nor failed.
+        """A named prerequisite is live: assigned, a live fm-crew-state.sh verdict, unmerged, not stalled or failed.
 
         It binds the prerequisite's launch generation and status stream, not its latest status line or whether it
         is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
-        standing while a replacement, a dead or missing session, a failure, a merge or trouble ends it.
+        standing; a finished or parked run's verdict can outlast its session. A replacement, a gone, dead or
+        unreadable endpoint with no run verdict, a failure, a merge or trouble ends it.
         """
         c = self.collector
         fields = c.read_fields(c.state / (task + ".meta"))

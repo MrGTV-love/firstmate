@@ -40,7 +40,8 @@
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
 # --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence is either its new
 # inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`, or the reason for the wait,
-# which stands while that task is live: same launch, session alive, unmerged, not stalled or failed
+# which stands while that task is live: same launch, a live fm-crew-state.sh verdict (working, parked, done,
+# paused or blocked, which for a finished or parked run can outlast its session), unmerged, not stalled or failed
 # (only an open_pr or red_check row may take this reason form).
 # docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
 # verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
