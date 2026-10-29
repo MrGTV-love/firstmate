@@ -2779,11 +2779,12 @@ Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and th
 These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
 
 - `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`, or `could not delete references` when they prune more than one ref;
-- `git branch -d` or `-D` of a packed branch, the task's own packed archive included, exits 1 with `could not delete reference <ref>`, and `git update-ref -d` of a packed ref exits 1;
+- `git branch -d` or `-D` of the task's own packed branch or archive exits 1 with `could not delete reference <ref>`, and `git update-ref -d` of one of them or of a packed ref outside `refs/heads` exits 1;
 - `git stash drop` or `git stash pop` of the last entry when `refs/stash` is packed exits 0 and prints `unable to create file <common>/packed-refs.new: Operation not permitted` and `Dropped refs/stash@{0} (...)`, and the pop applies the entry;
   `git stash list` is then empty, but the packed `refs/stash` still names that stash commit, so a bare `git stash pop` or `git stash apply` in any checkout of the repository applies it again until a later `git stash push` replaces it or an unconfined `git stash clear` removes it;
 - the pack-refs step of `git gc` reports `failed to run pack-refs`, and `git gc` still exits 0.
 
+Another task's packed branch is refused earlier, at its loose lock: `git branch -d`, `-D` or `git update-ref -d` of it prints `cannot lock ref '<ref>': Unable to create '<common>/refs/heads/<branch>.lock': Operation not permitted`, or `cannot lock ref '<ref>': unable to create directory for <common>/refs/heads/<branch>` when the branch's parent folder is missing, and never reaches `packed-refs`.
 The shared `info/grafts` and `shallow` files stay writable, so a worker can still change the history the primary checkout sees through them; the `refs/replace` deny does not close that route.
 A repository with reftable ref storage refuses the launch, because its refs are not in files this profile can name.
 Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.

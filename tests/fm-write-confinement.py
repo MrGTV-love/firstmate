@@ -560,8 +560,17 @@ def packed_refs_results(manifest, primary, worktree):
                "refused-packed-refs-write": unchanged(in_place),
                "refused-packed-refs-rename-over": unchanged(by_rename),
                "refused-packed-refs-new-file": unchanged(by_new_file),
+               # Refused at the loose refs/heads lock before Git reaches packed-refs.
                "refused-packed-branch-delete": unchanged(by_git("update-ref", "-d", "refs/heads/fm/packed")),
                "refused-pack-refs": unchanged(by_git("pack-refs", "--all"), restore=False)}
+    # A packed ref outside refs/heads has no loose lock deny, so deleting it
+    # reaches the packed-refs rewrite itself.
+    gone = "refs/remotes/no-mistakes/fm/gone"
+    deleted = git("-C", str(worktree), "update-ref", "-d", gone)
+    results["refused-packed-remote-ref-delete"] = (
+        deleted.returncode != 0 and f"unable to create file {packed}.new: Operation not permitted" in deleted.stderr
+        and packed.read_text() == original
+        and git("-C", primary, "rev-parse", "--verify", "-q", gone).stdout.strip() == manifest["forged_sha"])
     # A replace ref makes every Git command in the primary checkout show other
     # objects for a commit, so it changes what a branch holds.
     head = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()
