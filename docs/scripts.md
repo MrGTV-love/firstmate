@@ -181,6 +181,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
+| `fm-main-ci.sh`          | Read-only: judge a commit on a branch by the newest completed CI run that contains it, so a push coalesced into a later run reads as covered, never red or missing |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |
 | `fm-merge-authority-lib.sh` | Resolve merge authority at the gate, persist it against the accepted canonical PR, and identity-check its later poll consumption |
 | `fm-answered-by-lib.sh` | Derive who answered a decision (home role or recorded source) for the ledger and a captain hold's record |

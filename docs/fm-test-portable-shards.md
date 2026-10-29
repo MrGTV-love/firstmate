@@ -395,6 +395,11 @@ Rebasing the repair onto `8221de43a082aef5d0368cfdfb9512810b0d71e5` preserves bo
 The existing pipeline must restart validation from Review and refresh downstream checks and PR evidence for the integrated head; neither historical estimate is a new-head CI pass.
 The Jev shell-gate retirement added `tests/fm-retired-jev-shell-model-gate.test.sh`, `tests/fm-retired-jev-shell-outage-admissions.test.sh`, and `tests/fm-retired-jev-shell-outage-deny.test.sh` to the serial lane; their default weights packed serial shard 1 at 1204794 ms.
 Their hints (1853, 2347, and 2712 ms) are the successful `exit=0`, `gate_skip=false` records from the serial shards of [run 40122298914](https://github.com/MrGTV-love/firstmate/actions/runs/40122298914) on 2026-10-24.
+On 2026-10-29 seven hints were refreshed to the slowest successful sample across the serial timing artifacts of seven green runs (main runs 40759914461 and 40832695566; pull-request runs 40827497484, 40838643674, 40839568269, 40839791616, and 40845126476).
+`tests/fm-remote-secondmate-trace-context.test.sh` moved from 288623 to 969822 ms (observed 602140-969822 ms), and it had left serial shard 17 at 23.2-29.8 minutes against a 20-minute target.
+`tests/fm-status-runaway-guard.test.sh`, `tests/fm-control.test.sh`, `tests/fm-wake-drain-open-decisions-cursor.test.sh`, `tests/fm-guard-audit-closure.test.sh`, `tests/fm-guard-lint.test.sh`, and `tests/fm-test-reap-orphans.test.sh` were the other six hints more than fifteen percent below their observed maximum.
+Replaying each run's recorded script durations through the new shard membership puts the longest serial shard at 20.1-20.9 minutes in all seven runs, against 20.9-29.8 minutes observed, with an unchanged total of 432-451 serial-script minutes.
+This is a replay of recorded durations, not a measured CI run, and it moves no runner-minutes: the same scripts run.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
@@ -491,7 +496,9 @@ The longer-term performance objective remains a complete green run under fifteen
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
 The layout uses thirty long-lived Linux jobs (twenty-four serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
-The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
+The workflow retains per-PR supersession and coalesces main pushes into one group per branch, so a burst of merges queues one pending run for the newest commit and never cancels the running one.
+A commit whose run was replaced is read through `bin/fm-main-ci.sh`, which judges it by the newest completed run that contains it.
+The compliance workflow keeps its own event semantics.
 
 ## Local entry points
 
