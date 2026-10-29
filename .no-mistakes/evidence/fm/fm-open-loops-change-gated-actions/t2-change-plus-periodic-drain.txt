@@ -1,0 +1,152 @@
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "455b73154ecc1c883fb4ab8c","firstmate","lane-10:resume","answer or close this question, or record why it no longer applies",28,"needs-decision: may I rebase lane-10 now?",false
+STANDING (unchanged since its last action; no action needed):
+rows[48]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "99752bc2370af7dabe1ff496","captain","held-01:captain-hold","resolve the captain hold or record its next decision date",7797,"approve resume 1",false
+  "f11b292404e916a3c48f12ca","captain","held-02:captain-hold","resolve the captain hold or record its next decision date",7857,"approve resume 2",false
+  "6570784dbfb702b6e032ab5b","captain","held-03:captain-hold","resolve the captain hold or record its next decision date",7917,"approve resume 3",false
+  "8d95442f05a57534a981655a","captain","held-04:captain-hold","resolve the captain hold or record its next decision date",7977,"approve resume 4",false
+  "e6d9d1e1586c26f4339bf50c","captain","held-05:captain-hold","resolve the captain hold or record its next decision date",8037,"approve resume 5",false
+  "4905835115223adbe1b5143b","captain","held-06:captain-hold","resolve the captain hold or record its next decision date",8097,"approve resume 6",false
+  "1d4f475d4bf51804a06236f4","captain","held-07:captain-hold","resolve the captain hold or record its next decision date",8157,"approve resume 7",false
+  "3c2677980ac19bf2ce8994a0","firstmate","lane-01:resume","answer or close this question, or record why it no longer applies",8538,"needs-decision: may I resume after the fleet pause?",false
+  "ec1a1ed136c43e453b99fbf2","firstmate","lane-02:resume","answer or close this question, or record why it no longer applies",8539,"needs-decision: may I resume after the fleet pause?",false
+  "3c2a8a5eac1ebc27fff1d01a","firstmate","lane-03:resume","answer or close this question, or record why it no longer applies",8540,"needs-decision: may I resume after the fleet pause?",false
+  "ad05ffbda674eacf35b2856b","firstmate","lane-04:resume","answer or close this question, or record why it no longer applies",8541,"needs-decision: may I resume after the fleet pause?",false
+  "d4a86ffa521cd79df21b2d96","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",358,"needs-decision: rebased on main; may I push the new head?",false
+  "4c1cf7c4efd590ed766c5147","firstmate","lane-06:ci","answer or close this question, or record why it no longer applies",358,"needs-decision: CI is red on the rebased head; retry or diagnose?",false
+  "1e287a659c2a55e00a41a5af","firstmate","lane-06:resume","answer or close this question, or record why it no longer applies",8543,"needs-decision: may I resume after the fleet pause?",false
+  "e4f339ca338139b3ce9b3a86","firstmate","lane-07:resume","answer or close this question, or record why it no longer applies",8544,"needs-decision: may I resume after the fleet pause?",false
+  "be32d0b2495a8e041ef1fbab","firstmate","lane-08:resume","answer or close this question, or record why it no longer applies",8545,"needs-decision: may I resume after the fleet pause?",true
+  "a5f905448db0bf46dd717bbc","firstmate","lane-09:resume","answer or close this question, or record why it no longer applies",257,"needs-decision: may I drop the stale branch?",false
+  "65c1a41cdc5d0b8da864ee7c","firstmate","lane-11:resume","answer or close this question, or record why it no longer applies",8548,"needs-decision: may I resume after the fleet pause?",false
+  "ba212cb49a344600be1a2a2e","firstmate","lane-12:resume","answer or close this question, or record why it no longer applies",8549,"needs-decision: may I resume after the fleet pause?",false
+  "fd7acdd8cf7ba3165294e565","firstmate","lane-13:resume","answer or close this question, or record why it no longer applies",8550,"needs-decision: may I resume after the fleet pause?",false
+  "36a43465257ce910604037c2","firstmate","lane-14:resume","answer or close this question, or record why it no longer applies",8551,"needs-decision: may I resume after the fleet pause?",false
+  "44a3939114e134bccc232eae","firstmate","lane-15:resume","answer or close this question, or record why it no longer applies",8552,"needs-decision: may I resume after the fleet pause?",false
+  "8ac67a462d1614352b45de87","firstmate","lane-16:resume","answer or close this question, or record why it no longer applies",8553,"needs-decision: may I resume after the fleet pause?",false
+  "f1f20c6be12a14564acf8977","firstmate","lane-17:resume","answer or close this question, or record why it no longer applies",8554,"needs-decision: may I resume after the fleet pause?",false
+  "1f75a255f6b030b7e125def6","firstmate","lane-18:resume","answer or close this question, or record why it no longer applies",8555,"needs-decision: may I resume after the fleet pause?",false
+  "f472b6bb81797db9b4efe63b","firstmate","lane-19:resume","answer or close this question, or record why it no longer applies",8556,"needs-decision: may I resume after the fleet pause?",false
+  "3f8d5bdbff5359150f0ba51e","firstmate","lane-20:resume","answer or close this question, or record why it no longer applies",8557,"needs-decision: may I resume after the fleet pause?",false
+  "33c1ce4a78b08254ed0fb762","firstmate","lane-21:resume","answer or close this question, or record why it no longer applies",8558,"needs-decision: may I resume after the fleet pause?",false
+  "0c307b386a424a637c90dbf7","firstmate","lane-22:resume","answer or close this question, or record why it no longer applies",8559,"needs-decision: may I resume after the fleet pause?",false
+  "e42124bd92633e91e83e4dc3","firstmate","lane-23:resume","answer or close this question, or record why it no longer applies",8560,"needs-decision: may I resume after the fleet pause?",false
+  "88b6350042eee86981ff09af","firstmate","lane-24:resume","answer or close this question, or record why it no longer applies",8561,"needs-decision: may I resume after the fleet pause?",false
+  "3eefd56c3403e7596bd705ca","firstmate","lane-25:resume","answer or close this question, or record why it no longer applies",8562,"needs-decision: may I resume after the fleet pause?",false
+  "5c92231f1c2a0d9309b1a7d5","firstmate","lane-26:resume","answer or close this question, or record why it no longer applies",8563,"needs-decision: may I resume after the fleet pause?",false
+  "5fd6f7cf671a3584c94193a3","firstmate","lane-27:resume","answer or close this question, or record why it no longer applies",8564,"needs-decision: may I resume after the fleet pause?",false
+  "b1decb636535d6168e395a2f","firstmate","lane-28:resume","answer or close this question, or record why it no longer applies",8565,"needs-decision: may I resume after the fleet pause?",false
+  "41cabe252ed5fabc6daede76","firstmate","lane-29:resume","answer or close this question, or record why it no longer applies",8566,"needs-decision: may I resume after the fleet pause?",false
+  "4ff8a4aebbc996e3d863c700","firstmate","lane-30:resume","answer or close this question, or record why it no longer applies",8567,"needs-decision: may I resume after the fleet pause?",false
+  "8cca7b1a18a2957b2f458186","firstmate","lane-31:resume","answer or close this question, or record why it no longer applies",8568,"needs-decision: may I resume after the fleet pause?",false
+  "a65bebd02ab020cb0f77058a","firstmate","lane-32:resume","answer or close this question, or record why it no longer applies",8569,"needs-decision: may I resume after the fleet pause?",false
+  "97c33e18c31368e5aa95d895","firstmate","lane-33:resume","answer or close this question, or record why it no longer applies",8570,"needs-decision: may I resume after the fleet pause?",false
+  "0c4cee0e69471d37823577a4","firstmate","lane-34:resume","answer or close this question, or record why it no longer applies",8571,"needs-decision: may I resume after the fleet pause?",false
+  "8ca3125919ee75a80ff5ce4d","firstmate","lane-35:resume","answer or close this question, or record why it no longer applies",8572,"needs-decision: may I resume after the fleet pause?",false
+  "63f2722c71e68d1086e02b5b","firstmate","lane-36:resume","answer or close this question, or record why it no longer applies",8573,"needs-decision: may I resume after the fleet pause?",false
+  "8ee544bfd1ef75df7ed06a9b","firstmate","lane-37:resume","answer or close this question, or record why it no longer applies",8574,"needs-decision: may I resume after the fleet pause?",false
+  "1d52787d7750f9000e4740d2","firstmate","lane-38:resume","answer or close this question, or record why it no longer applies",8575,"needs-decision: may I resume after the fleet pause?",false
+  "e2ceed51008d5c57b6a7d036","firstmate","lane-39:resume","answer or close this question, or record why it no longer applies",8576,"needs-decision: may I resume after the fleet pause?",false
+  "604c9674b5d10ff7b8665355","firstmate","lane-40:resume","answer or close this question, or record why it no longer applies",8577,"needs-decision: may I resume after the fleet pause?",false
+  "fe66a4a166db3567d6ff1d22","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",8578,"needs-decision: may I resume after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793316059	50	signal	lane-10.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-10.status
+1793316061	51	check	open-loop-ledger	check: open-loop-ledger (49 overdue assigned obligations; read state/open-loops.json)
+1793316061	52	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (49 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[48]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "99752bc2370af7dabe1ff496","captain","held-01:captain-hold","resolve the captain hold or record its next decision date",7797,"approve resume 1","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "f11b292404e916a3c48f12ca","captain","held-02:captain-hold","resolve the captain hold or record its next decision date",7857,"approve resume 2","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "6570784dbfb702b6e032ab5b","captain","held-03:captain-hold","resolve the captain hold or record its next decision date",7917,"approve resume 3","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "8d95442f05a57534a981655a","captain","held-04:captain-hold","resolve the captain hold or record its next decision date",7977,"approve resume 4","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "e6d9d1e1586c26f4339bf50c","captain","held-05:captain-hold","resolve the captain hold or record its next decision date",8037,"approve resume 5","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "4905835115223adbe1b5143b","captain","held-06:captain-hold","resolve the captain hold or record its next decision date",8097,"approve resume 6","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "1d4f475d4bf51804a06236f4","captain","held-07:captain-hold","resolve the captain hold or record its next decision date",8157,"approve resume 7","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "3c2677980ac19bf2ce8994a0","firstmate","lane-01:resume","answer or close this question, or record why it no longer applies",8538,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "ec1a1ed136c43e453b99fbf2","firstmate","lane-02:resume","answer or close this question, or record why it no longer applies",8539,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "3c2a8a5eac1ebc27fff1d01a","firstmate","lane-03:resume","answer or close this question, or record why it no longer applies",8540,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "ad05ffbda674eacf35b2856b","firstmate","lane-04:resume","answer or close this question, or record why it no longer applies",8541,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "d4a86ffa521cd79df21b2d96","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",358,"needs-decision: rebased on main; may I push the new head?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain about the resumed lane", "at_epoch": 1793315788}
+  "4c1cf7c4efd590ed766c5147","firstmate","lane-06:ci","answer or close this question, or record why it no longer applies",358,"needs-decision: CI is red on the rebased head; retry or diagnose?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain about the resumed lane", "at_epoch": 1793315788}
+  "1e287a659c2a55e00a41a5af","firstmate","lane-06:resume","answer or close this question, or record why it no longer applies",8543,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "e4f339ca338139b3ce9b3a86","firstmate","lane-07:resume","answer or close this question, or record why it no longer applies",8544,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "be32d0b2495a8e041ef1fbab","firstmate","lane-08:resume","answer or close this question, or record why it no longer applies",8545,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain about lane-08 after a second deferral", "at_epoch": 1793315799}
+  "a5f905448db0bf46dd717bbc","firstmate","lane-09:resume","answer or close this question, or record why it no longer applies",257,"needs-decision: may I drop the stale branch?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain about the stale branch", "at_epoch": 1793315853}
+  "65c1a41cdc5d0b8da864ee7c","firstmate","lane-11:resume","answer or close this question, or record why it no longer applies",8548,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "ba212cb49a344600be1a2a2e","firstmate","lane-12:resume","answer or close this question, or record why it no longer applies",8549,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "fd7acdd8cf7ba3165294e565","firstmate","lane-13:resume","answer or close this question, or record why it no longer applies",8550,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "36a43465257ce910604037c2","firstmate","lane-14:resume","answer or close this question, or record why it no longer applies",8551,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "44a3939114e134bccc232eae","firstmate","lane-15:resume","answer or close this question, or record why it no longer applies",8552,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "8ac67a462d1614352b45de87","firstmate","lane-16:resume","answer or close this question, or record why it no longer applies",8553,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "f1f20c6be12a14564acf8977","firstmate","lane-17:resume","answer or close this question, or record why it no longer applies",8554,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "1f75a255f6b030b7e125def6","firstmate","lane-18:resume","answer or close this question, or record why it no longer applies",8555,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "f472b6bb81797db9b4efe63b","firstmate","lane-19:resume","answer or close this question, or record why it no longer applies",8556,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "3f8d5bdbff5359150f0ba51e","firstmate","lane-20:resume","answer or close this question, or record why it no longer applies",8557,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "33c1ce4a78b08254ed0fb762","firstmate","lane-21:resume","answer or close this question, or record why it no longer applies",8558,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "0c307b386a424a637c90dbf7","firstmate","lane-22:resume","answer or close this question, or record why it no longer applies",8559,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "e42124bd92633e91e83e4dc3","firstmate","lane-23:resume","answer or close this question, or record why it no longer applies",8560,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "88b6350042eee86981ff09af","firstmate","lane-24:resume","answer or close this question, or record why it no longer applies",8561,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "3eefd56c3403e7596bd705ca","firstmate","lane-25:resume","answer or close this question, or record why it no longer applies",8562,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "5c92231f1c2a0d9309b1a7d5","firstmate","lane-26:resume","answer or close this question, or record why it no longer applies",8563,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "5fd6f7cf671a3584c94193a3","firstmate","lane-27:resume","answer or close this question, or record why it no longer applies",8564,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "b1decb636535d6168e395a2f","firstmate","lane-28:resume","answer or close this question, or record why it no longer applies",8565,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "41cabe252ed5fabc6daede76","firstmate","lane-29:resume","answer or close this question, or record why it no longer applies",8566,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "4ff8a4aebbc996e3d863c700","firstmate","lane-30:resume","answer or close this question, or record why it no longer applies",8567,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "8cca7b1a18a2957b2f458186","firstmate","lane-31:resume","answer or close this question, or record why it no longer applies",8568,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "a65bebd02ab020cb0f77058a","firstmate","lane-32:resume","answer or close this question, or record why it no longer applies",8569,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "97c33e18c31368e5aa95d895","firstmate","lane-33:resume","answer or close this question, or record why it no longer applies",8570,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "0c4cee0e69471d37823577a4","firstmate","lane-34:resume","answer or close this question, or record why it no longer applies",8571,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "8ca3125919ee75a80ff5ce4d","firstmate","lane-35:resume","answer or close this question, or record why it no longer applies",8572,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "63f2722c71e68d1086e02b5b","firstmate","lane-36:resume","answer or close this question, or record why it no longer applies",8573,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "8ee544bfd1ef75df7ed06a9b","firstmate","lane-37:resume","answer or close this question, or record why it no longer applies",8574,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "1d52787d7750f9000e4740d2","firstmate","lane-38:resume","answer or close this question, or record why it no longer applies",8575,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "e2ceed51008d5c57b6a7d036","firstmate","lane-39:resume","answer or close this question, or record why it no longer applies",8576,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "604c9674b5d10ff7b8665355","firstmate","lane-40:resume","answer or close this question, or record why it no longer applies",8577,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793315616}
+  "fe66a4a166db3567d6ff1d22","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",8578,"needs-decision: may I resume after the fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain about the resumed lane", "at_epoch": 1793315788}
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-10.status: needs-decision [at=1793316042] [key=resume]: may I rebase lane-10 now?
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: rebased on main; may I push the new head?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=ci] needs-decision: CI is red on the rebased head; retry or diagnose?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I drop the stale branch?
+lane-10 [key=resume] needs-decision: may I rebase lane-10 now?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

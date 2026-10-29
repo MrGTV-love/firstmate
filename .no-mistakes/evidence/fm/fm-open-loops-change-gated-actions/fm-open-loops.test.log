@@ -1,5 +1,5 @@
 PASS: ordinary categories, PR proof, ages and configuration
-PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion
+PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion
 PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound
 PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh
 PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication
@@ -27,6 +27,8 @@ PASS: publication suppression reset success/failure/skip
 PASS: held-gate singleflight and child cleanup
 PASS: unset and empty address overrides share shell defaults before collection
 PASS: no-progress source failure owns resistant descendant cleanup
+PASS: live process-group EPERM still refuses and leaves the process running
+PASS: an all-zombie or vanished process group swallows the Darwin EPERM race
 PASS: no-progress expiry reports the configured interval and keeps captured output
 PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
 PASS: owned-work categories, owners, ages, degraded row, and atomic publication
@@ -37,7 +39,7 @@ PASS: unreadable tmux degrades coverage without fabricating missing worker
 PASS: current-state timeout retains independent observation failure
 PASS: real snapshot unreadable metadata/status inventory stays degraded
 PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
-PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage
+PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage
 PASS: a stamped escalation is never captain waiting; unchanged work stays listed and changed work gates
 PASS: each actor gates only the rows its own drain presented
 PASS: PR provenance steers use own inbox or handled records, reject foreign, old and reused evidence, and permit acknowledgement
@@ -63,4 +65,4 @@ PASS: a hold ending or becoming unreadable restores the same-turn action require
 PASS: a home without a ledger acknowledges without the receipt command
 PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
 ok - open-work reconciliation reports owned obligations from live records
-bash tests/$t.test.sh  413.85s user 605.06s system 38% cpu 44:17.92 total
+exit=0

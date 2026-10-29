@@ -1,0 +1,1248 @@
+
+### Fixture: 3 captain holds, 2 held-lane questions, 8 paused-lane questions without a hold, 1 deferral question
+## In flight
+
+## Queued
+- [ ] cap-rollout - Decide rollout (repo: firstmate) (kind: ship) (hold: approve rollout) (hold-kind: captain)
+  Captain hold set: 2026-10-20T00:00:00Z
+- [ ] paused-a - Paused lane A (repo: firstmate) (kind: ship) (hold: fleet pause) (hold-kind: captain)
+  Captain hold set: 2026-10-20T00:00:00Z
+- [ ] paused-b - Paused lane B (repo: firstmate) (kind: ship) (hold: fleet pause) (hold-kind: captain)
+  Captain hold set: 2026-10-20T00:00:00Z
+- [ ] lane-1 - Paused lane 1 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-2 - Paused lane 2 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-3 - Paused lane 3 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-4 - Paused lane 4 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-5 - Paused lane 5 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-6 - Paused lane 6 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-7 - Paused lane 7 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] lane-8 - Paused lane 8 (repo: firstmate) (kind: ship) (since 2026-10-20)
+- [ ] defer-q - Deferral check (repo: firstmate) (kind: ship) (since 2026-10-20)
+
+## Done
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313416
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859016,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859016,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-3 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7201,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:captain-hold","captain","resolve the captain hold or record its next decision date",859016,true,"fleet pause"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7276,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859016,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7276,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+generated_epoch: 1793313416
+complete: true
+OVERDUE:
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859018,"",false
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859018,"",false
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859018,"",false
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859018,"",false
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859018,"",false
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859018,"",false
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859018,"",false
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859018,"",false
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859018,"",false
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859018,"approve rollout",false
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7203,"needs-decision: pick the merge order",false
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-1 after the captain-ordered fleet pause?",false
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-2 after the captain-ordered fleet pause?",false
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-3 after the captain-ordered fleet pause?",false
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-4 after the captain-ordered fleet pause?",false
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-5 after the captain-ordered fleet pause?",false
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-6 after the captain-ordered fleet pause?",false
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-7 after the captain-ordered fleet pause?",false
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7203,"needs-decision: resume lane-8 after the captain-ordered fleet pause?",false
+  "cc4fc1938a3636cf404a2b81","captain","paused-a:captain-hold","resolve the captain hold or record its next decision date",859018,"fleet pause",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7278,"needs-decision: resume paused-a after the fleet pause?",false
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859018,"fleet pause",false
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7278,"needs-decision: resume paused-b after the fleet pause?",false
+
+### S-watch-change: real watcher queues one open-loop-ledger change wake for the new overdue set
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+[watcher exit 0]
+queue now:
+1	signal	paused-a.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+2	signal	paused-b.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+3	signal	defer-q.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+4	signal	lane-1.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+5	signal	lane-2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+6	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+7	signal	lane-4.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+8	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+9	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+10	signal	lane-7.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+11	signal	lane-8.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+1	signal	paused-a.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+2	signal	paused-b.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+3	signal	defer-q.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+4	signal	lane-1.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+5	signal	lane-2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+6	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+7	signal	lane-4.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+8	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+9	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+10	signal	lane-7.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+11	signal	lane-8.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+12	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+
+### S1a: first drain presents all 23 new overdue rows; ack with no actions is refused
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859049,"",false
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859049,"",false
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859049,"",false
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859049,"",false
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859049,"",false
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859049,"",false
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859049,"",false
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859049,"",false
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859049,"",false
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859049,"approve rollout",false
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7234,"needs-decision: pick the merge order",false
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-1 after the captain-ordered fleet pause?",false
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-2 after the captain-ordered fleet pause?",false
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-3 after the captain-ordered fleet pause?",false
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-4 after the captain-ordered fleet pause?",false
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-5 after the captain-ordered fleet pause?",false
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-6 after the captain-ordered fleet pause?",false
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-7 after the captain-ordered fleet pause?",false
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7234,"needs-decision: resume lane-8 after the captain-ordered fleet pause?",false
+  "cc4fc1938a3636cf404a2b81","captain","paused-a:captain-hold","resolve the captain hold or record its next decision date",859049,"fleet pause",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7309,"needs-decision: resume paused-a after the fleet pause?",false
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859049,"fleet pause",false
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7309,"needs-decision: resume paused-b after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313386	1	signal	paused-a.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+1793313386	2	signal	paused-b.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-a.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/paused-b.status
+1793313434	3	signal	defer-q.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313434	4	signal	lane-1.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313434	5	signal	lane-2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313435	6	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313435	7	signal	lane-4.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313435	8	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313435	9	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313436	10	signal	lane-7.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313436	11	signal	lane-8.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/defer-q.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-1.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-2.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-7.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-8.status
+1793313439	12	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+wake annotation: latest wake-EVENT observed at drain, not current state: paused-a.status: needs-decision [at=1793306140] [key=resume]: resume paused-a after the fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: paused-b.status: needs-decision [at=1793306140] [key=resume]: resume paused-b after the fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: defer-q.status: needs-decision [at=1793306215] [key=order]: pick the merge order
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-1.status: needs-decision [at=1793306215] [key=resume]: resume lane-1 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-2.status: needs-decision [at=1793306215] [key=resume]: resume lane-2 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-3.status: needs-decision [at=1793306215] [key=resume]: resume lane-3 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-4.status: needs-decision [at=1793306215] [key=resume]: resume lane-4 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-5.status: needs-decision [at=1793306215] [key=resume]: resume lane-5 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-6.status: needs-decision [at=1793306215] [key=resume]: resume lane-6 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-7.status: needs-decision [at=1793306215] [key=resume]: resume lane-7 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-8.status: needs-decision [at=1793306215] [key=resume]: resume lane-8 after the captain-ordered fleet pause?
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: resume lane-3 after the captain-ordered fleet pause?
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 33441.1793313439.l20wxn
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 33441.1793313439.l20wxn
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859055,"",false
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859055,"",false
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859055,"",false
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859055,"",false
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859055,"",false
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859055,"",false
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859055,"",false
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859055,"",false
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859055,"",false
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859055,"approve rollout",false
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7240,"needs-decision: pick the merge order",false
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-1 after the captain-ordered fleet pause?",false
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-2 after the captain-ordered fleet pause?",false
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-3 after the captain-ordered fleet pause?",false
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-4 after the captain-ordered fleet pause?",false
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-5 after the captain-ordered fleet pause?",false
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-6 after the captain-ordered fleet pause?",false
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-7 after the captain-ordered fleet pause?",false
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7240,"needs-decision: resume lane-8 after the captain-ordered fleet pause?",false
+  "cc4fc1938a3636cf404a2b81","captain","paused-a:captain-hold","resolve the captain hold or record its next decision date",859055,"fleet pause",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7315,"needs-decision: resume paused-a after the fleet pause?",false
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859055,"fleet pause",false
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7315,"needs-decision: resume paused-b after the fleet pause?",false
+[exit 1]
+
+### S5-adv: escalation naming a task that is NOT held for the captain is refused
+$ bin/fm-open-loops.sh action a55f6f88bf22f37154b5aa05 escalated --evidence told the captain --hold lane-1
+error: "--hold must name a task still held for the captain: captain prerequisite was answered, released, or is no longer actionable"
+[exit 1]
+
+### S5-adv: --hold with a non-escalated action is refused
+$ bin/fm-open-loops.sh action 6ebe795d5c2457fe4c43f4d2 deferred --evidence x --recheck 2026-10-30T00:37:51Z --hold paused-a
+error: "--hold is only valid for escalated actions"
+[exit 1]
+
+### S5: escalation bound to the captain-held task paused-a (verifiable proof)
+$ bin/fm-open-loops.sh action 6ebe795d5c2457fe4c43f4d2 escalated --evidence asked the captain to lift the pause --hold paused-a
+action: "6ebe795d5c2457fe4c43f4d2"
+kind: escalated
+standing: captain hold paused-a; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]
+
+### S5: escalation of paused-b:resume without --hold; the row's own captain-held task binds
+$ bin/fm-open-loops.sh action 22136b8e7348e5dcb0cc2268 escalated --evidence asked the captain to lift the pause
+action: "22136b8e7348e5dcb0cc2268"
+kind: escalated
+standing: captain hold paused-b; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]
+
+### S5/S1b: batch of 21 actions: identical free-text 'escalated' stamps on 11 rows, first deferrals on 10 rows
+      21
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/.no-mistakes/evidence/01M64W8Y7K4BPYQPXVVWJGH2T3/lab-batch-1.jsonl
+results[21]{line,id,kind,result,message}:
+  1,"0e194cd642350a76ce1dccdb","deferred","recorded",""
+  2,"8a3d975e9e4343df1756c060","deferred","recorded",""
+  3,"7c604dd621417c4683c73c4c","deferred","recorded",""
+  4,"d478f2307f6a297c6ba2b3dd","deferred","recorded",""
+  5,"2675f4d7d906bb4fca11d4de","deferred","recorded",""
+  6,"5377fbde26ec4df54cbd3812","deferred","recorded",""
+  7,"75a360b27e9ee3c1d14aab43","deferred","recorded",""
+  8,"b36ef105458ea94f860a5b84","deferred","recorded",""
+  9,"e5595263e43f5c720f8743d4","deferred","recorded",""
+  10,"603d99b002d01c8be50716ff","escalated","recorded",""
+  11,"5923361c39bd1c41a32d59e8","deferred","recorded",""
+  12,"a55f6f88bf22f37154b5aa05","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  13,"f3c8e5bfe478abd3597ae31b","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  14,"180ef3dfc9b6bad620ce6dee","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  15,"27c2d2e2ec27b3995685e96b","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  16,"d546e17301402764782dce38","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  17,"7cbf7e471ce5291b83d9fe8f","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  18,"833410718ded2d7bb4df5ed7","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  19,"b548f9a7085a1272dcd8287b","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)"
+  20,"cc4fc1938a3636cf404a2b81","escalated","recorded",""
+  21,"a44477a0495eaebf4aa36b75","escalated","recorded",""
+[exit 0]
+
+### S1b: ack now succeeds
+$ bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 33441.1793313439.l20wxn
+[exit 0]
+
+### S2: later heartbeat; rows unchanged, only ages grew
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313505
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859105,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859105,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-3 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7290,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:captain-hold","captain","resolve the captain hold or record its next decision date",859105,true,"fleet pause"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7365,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859105,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7365,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859107,"",false
+
+### S2: real watcher sees the unchanged overdue set and queues no wake (killed by its 20 s cap, exit 124)
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+[watcher exit 124]
+queue now:
+
+### S2: a drain with 23 unchanged overdue rows presents no OVERDUE block and ack needs zero new actions
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: resume lane-3 after the captain-ordered fleet pause?
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 42587.1793313527.1tRaV6
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 42587.1793313527.1tRaV6
+[exit 0]
+
+### S3: lane-3 resumes and re-raises its question with new text in a new status line
+
+### S3-probe: lane-4 posts a plain working status line (no question change)
+==> /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status <==
+needs-decision [at=1793306215] [key=resume]: resume lane-3 after the captain-ordered fleet pause?
+needs-decision [at=1793313551] [key=resume]: lane-3 resumed after the pause; confirm the rebase target
+
+==> /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status <==
+needs-decision [at=1793306215] [key=resume]: resume lane-4 after the captain-ordered fleet pause?
+working [at=1793313551]: lane-4 resumed, rebasing
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313552
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859152,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859152,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",1,false,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7337,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:captain-hold","captain","resolve the captain hold or record its next decision date",859152,true,"fleet pause"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7412,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859152,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7412,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+lane-3	ready_not_started	859152	
+lane-4	ready_not_started	859152	
+lane-3:resume	unanswered_question	1	needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4:resume	unanswered_question	7337	needs-decision: resume lane-4 after the captain-ordered fleet pause?
+
+### S3: watcher queues a change wake for the changed row set
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+[watcher exit 0]
+queue now:
+13	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (22 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+13	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+15	check	open-loop-ledger	check: open-loop-ledger (22 overdue assigned obligations; read state/open-loops.json)
+13	signal	lane-3.status
+14	signal	lane-4.status
+15	check	open-loop-ledger
+
+### S3: lane-3's re-raised question stamped 1900 s ago (over its 1800 s limit)
+needs-decision [at=1793306215] [key=resume]: resume lane-3 after the captain-ordered fleet pause?
+needs-decision [at=1793311677] [key=resume]: lane-3 resumed after the pause; confirm the rebase target
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313577
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859177,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859177,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",1900,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7362,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:captain-hold","captain","resolve the captain hold or record its next decision date",859177,true,"fleet pause"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7437,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859177,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7437,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+lane-3:resume	true	1900	needs-decision: lane-3 resumed after the pause; confirm the rebase target
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: rearm-resurface
+[watcher exit 0]
+queue now:
+13	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+15	check	open-loop-ledger	check: open-loop-ledger (22 overdue assigned obligations; read state/open-loops.json)
+16	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status
+[watcher exit 0]
+queue now:
+13	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+15	check	open-loop-ledger	check: open-loop-ledger (22 overdue assigned obligations; read state/open-loops.json)
+16	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+13	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+15	check	open-loop-ledger	check: open-loop-ledger (22 overdue assigned obligations; read state/open-loops.json)
+16	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status
+17	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+13	signal	lane-3.status
+14	signal	lane-4.status
+15	check	open-loop-ledger
+16	signal	lane-3.status
+17	check	open-loop-ledger
+
+### S3: the drain presents ONLY the changed row in OVERDUE; ack is refused until it gets a new action
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",1912,"needs-decision: lane-3 resumed after the pause; confirm the rebase target",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313582	16	signal	lane-3.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status
+1793313558	14	signal	lane-4.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-3.status /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-4.status
+1793313588	17	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+wake annotation: unread wake-EVENT since last drain, not current state: lane-3.status: needs-decision [at=1793306215] [key=resume]: resume lane-3 after the captain-ordered fleet pause?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-3.status: needs-decision [at=1793311677] [key=resume]: lane-3 resumed after the pause; confirm the rebase target
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-4.status: working [at=1793313551]: lane-4 resumed, rebasing
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 54061.1793313588.m88dy2
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",1912,"needs-decision: lane-3 resumed after the pause; confirm the rebase target",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+$ bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 54061.1793313588.m88dy2
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",1919,"needs-decision: lane-3 resumed after the pause; confirm the rebase target",false
+[exit 1]
+ack rc=1
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+
+### S3: one action on the changed row; ack then succeeds
+$ bin/fm-open-loops.sh action 180ef3dfc9b6bad620ce6dee deferred --evidence lane-3 rebase target needs the captain pause lifted --recheck 2026-10-30T01:40:05Z
+action: "180ef3dfc9b6bad620ce6dee"
+kind: deferred
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 54061.1793313588.m88dy2
+[exit 0]
+
+### S6 (M4): a second deferral on the unchanged defer-q:order row is refused and marks it captain-visible
+$ bin/fm-open-loops.sh action 5923361c39bd1c41a32d59e8 deferred --evidence still paused --recheck 2026-10-30T01:40:05Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7395,"needs-decision: pick the merge order",true
+[exit 1]
+$ bin/fm-open-loops.sh action 5923361c39bd1c41a32d59e8 escalated --evidence asked the captain to pick the merge order
+action: "5923361c39bd1c41a32d59e8"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+### S4: the periodic wake comes due (FM_OPEN_LOOPS_RESURFACE=1); rows are unchanged, so the watcher queues only open-loop-ledger-resurface
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313623
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859223,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859223,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",1946,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7408,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:captain-hold","captain","resolve the captain hold or record its next decision date",859223,true,"fleet pause"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7483,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859223,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7483,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=1 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger-resurface (23 overdue assigned obligations; periodic waiting list)
+[watcher exit 0]
+queue now:
+18	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (23 overdue assigned obligations; periodic waiting list)
+18	check	open-loop-ledger-resurface
+
+### S4: resurface drain prints STANDING and one WAITING OPEN WORK list with age, status and last action
+$ bin/fm-wake-drain.sh
+1793313633	18	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (23 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859240,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859240,"approve rollout","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7425,"needs-decision: pick the merge order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain to pick the merge order", "at_epoch": 1793313622}
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-1 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-2 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",1963,"needs-decision: lane-3 resumed after the pause; confirm the rebase target","deferred",{"kind": "deferred", "evidence": "lane-3 rebase target needs the captain pause lifted", "at_epoch": 1793313606}
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-4 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-5 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-6 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-7 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7425,"needs-decision: resume lane-8 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "cc4fc1938a3636cf404a2b81","captain","paused-a:captain-hold","resolve the captain hold or record its next decision date",859240,"fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7500,"needs-decision: resume paused-a after the fleet pause?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain to lift the pause", "at_epoch": 1793313472}
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859240,"fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7500,"needs-decision: resume paused-b after the fleet pause?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain to lift the pause", "at_epoch": 1793313474}
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 18 --recovery-generation 57100.1793313633.yaIQXw
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+### S4: ack of the resurface drain succeeds with no new action
+$ bin/fm-wake-drain.sh --ack-through 18 --recovery-generation 57100.1793313633.yaIQXw
+[exit 0]
+
+### S5c: the captain answers the paused-a hold (hold removed from the backlog); the bound escalation stops covering paused-a:resume
+- [ ] paused-a - Paused lane A (repo: firstmate) (kind: ship) (since 2026-10-20)
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7533,"needs-decision: resume paused-a after the fleet pause?",false
+[exit 1]
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313675
+rows[23]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859275,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859275,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",1998,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7460,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7535,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859275,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7535,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7537,"needs-decision: resume paused-a after the fleet pause?",false
+[exit 1]
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+19	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+19	check	open-loop-ledger
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859282,"",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7542,"needs-decision: resume paused-a after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313681	19	check	open-loop-ledger	check: open-loop-ledger (23 overdue assigned obligations; read state/open-loops.json)
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 72890.1793313681.lOvT2N
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859282,"",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7542,"needs-decision: resume paused-a after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisit
+
+### S7 (M4): firstmate's own ack is refused while paused-a rows need an action
+$ bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 72890.1793313681.lOvT2N
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859297,"",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7557,"needs-decision: resume paused-a after the fleet pause?",false
+[exit 1]
+rc=1
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+
+### S7: away mode on (state/.afk); the supervise daemon's ack (FM_WAKE_ACK_AWAY_DAEMON=1) consumes the wake it handled without the ledger gate
+$ env FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 72890.1793313681.lOvT2N
+[exit 0]
+queue after daemon ack: []
+
+### S7: the obligation stays in the ledger: firstmate's own gate still refuses
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859299,"",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7559,"needs-decision: resume paused-a after the fleet pause?",false
+[exit 1]
+
+### S7-adv: the daemon flag without state/.afk does not bypass the gate
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+[watcher exit 124]
+queue now:
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: rearm-resurface
+[watcher exit 0]
+queue now:
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313716
+rows[24]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859316,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859316,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2039,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2000,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-6 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7501,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7576,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859316,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7576,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status
+[watcher exit 0]
+queue now:
+20	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (24 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+20	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status
+21	check	open-loop-ledger	check: open-loop-ledger (24 overdue assigned obligations; read state/open-loops.json)
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859323,"",false
+  "e35386fd440f0de34d556e73","firstmate","lane-5:extra","answer or close this question, or record why it no longer applies",2007,"needs-decision: extra question to force a wake",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7583,"needs-decision: resume paused-a after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313720	20	signal	lane-5.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-5.status
+1793313721	21	check	open-loop-ledger	check: open-loop-ledger (24 overdue assigned obligations; read state/open-loops.json)
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-5.status: needs-decision [at=1793311716] [key=extra]: extra question to force a wake
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-5 [key=extra] needs-decision: extra question to force a wake
+lane-6 [key=resume] needs-decision: resume lane-6 after the captain-ordered fleet pause?
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 21 --recovery-generation 1473.1793313722.gILkCE
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ env FM_WAKE_ACK_AWAY_DAEMON=1 bin/fm-wake-drain.sh --ack-through 21 --recovery-generation 1473.1793313722.gILkCE
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859326,"",false
+  "e35386fd440f0de34d556e73","firstmate","lane-5:extra","answer or close this question, or record why it no longer applies",2010,"needs-decision: extra question to force a wake",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7586,"needs-decision: resume paused-a after the fleet pause?",false
+[exit 1]
+
+### G1: every overdue row is in the gate (--check-actions) or the waiting list (--digest), never neither and never both
+overdue=24 gated=3 waiting_list=21 neither=[] both=[]
+gated: ['lane-5:extra', 'paused-a', 'paused-a:resume']
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/.no-mistakes/evidence/01M64W8Y7K4BPYQPXVVWJGH2T3/lab-batch-2.jsonl
+results[3]{line,id,kind,result,message}:
+  1,"a99d7850ad592effcd1346d9","deferred","recorded",""
+  2,"e35386fd440f0de34d556e73","deferred","recorded",""
+  3,"6ebe795d5c2457fe4c43f4d2","deferred","recorded",""
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 21 --recovery-generation 1473.1793313722.gILkCE
+[exit 0]
+
+### M2: lane-6 re-raises its question AND the periodic interval elapsed in the same watcher cycle
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313761
+rows[24]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859361,true,""
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859361,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2084,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2045,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",1901,true,"needs-decision: lane-6 resumed; choose the base branch"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7546,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7621,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859361,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7621,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ FM_OPEN_LOOPS_RESURFACE=1 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status
+[watcher exit 0]
+queue now:
+22	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status
+$ FM_OPEN_LOOPS_RESURFACE=1 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger-resurface (24 overdue assigned obligations; periodic waiting list)
+[watcher exit 0]
+queue now:
+22	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status
+23	check	open-loop-ledger	check: open-loop-ledger (24 overdue assigned obligations; read state/open-loops.json)
+24	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (24 overdue assigned obligations; periodic waiting list)
+check: open-loop-ledger-resurface (24 overdue assigned obligations; periodic waiting list)
+[watcher exit 0]
+22	signal	lane-6.status
+23	check	open-loop-ledger
+24	check	open-loop-ledger-resurface
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",1913,"needs-decision: lane-6 resumed; choose the base branch",false
+STANDING (unchanged since its last action; no action needed):
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859373,"",false
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859373,"",false
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859373,"",false
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859373,"",false
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859373,"",false
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859373,"",false
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859373,"",false
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859373,"",false
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859373,"",false
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859373,"",false
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859373,"approve rollout",false
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7558,"needs-decision: pick the merge order",true
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-1 after the captain-ordered fleet pause?",false
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-2 after the captain-ordered fleet pause?",false
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",2096,"needs-decision: lane-3 resumed after the pause; confirm the rebase target",false
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-4 after the captain-ordered fleet pause?",false
+  "e35386fd440f0de34d556e73","firstmate","lane-5:extra","answer or close this question, or record why it no longer applies",2057,"needs-decision: extra question to force a wake",false
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-5 after the captain-ordered fleet pause?",false
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-7 after the captain-ordered fleet pause?",false
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-8 after the captain-ordered fleet pause?",false
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paused-a after the fleet pause?",false
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859373,"fleet pause",false
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paused-b after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313768	22	signal	lane-6.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/lane-6.status
+1793313771	23	check	open-loop-ledger	check: open-loop-ledger (24 overdue assigned obligations; read state/open-loops.json)
+1793313771	24	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (24 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "fleet paused by the captain", "at_epoch": 1793313484}
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859373,"","deferred",{"kind": "deferred", "evidence": "captain lifted the pause; scheduling", "at_epoch": 1793313759}
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859373,"approve rollout","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7558,"needs-decision: pick the merge order","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "asked the captain to pick the merge order", "at_epoch": 1793313622}
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-1 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-2 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",2096,"needs-decision: lane-3 resumed after the pause; confirm the rebase target","deferred",{"kind": "deferred", "evidence": "lane-3 rebase target needs the captain pause lifted", "at_epoch": 1793313606}
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-4 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "e35386fd440f0de34d556e73","firstmate","lane-5:extra","answer or close this question, or record why it no longer applies",2057,"needs-decision: extra question to force a wake","deferred",{"kind": "deferred", "evidence": "captain lifted the pause; scheduling", "at_epoch": 1793313759}
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-5 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-7 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-8 after the captain-ordered fleet pause?","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paused-a after the fleet pause?","deferred",{"kind": "deferred", "evidence": "captain lifted the pause; scheduling", "at_epoch": 1793313759}
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859373,"fleet pause","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated", "at_epoch": 1793313484}
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paused-b after the fleet pause?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "asked the captain to lift the pause", "at_epoch": 1793313474}
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-6.status: needs-decision [at=1793311860] [key=resume]: lane-6 resumed; choose the base branch
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-5 [key=extra] needs-decision: extra question to force a wake
+lane-6 [key=resume] needs-decision: lane-6 resumed; choose the base branch
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 24 --recovery-generation 41713.1793313771.ZOc72l
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+1:OVERDUE:
+4:STANDING (unchanged since its last action; no action needed):
+33:WAITING OPEN WORK (periodic list for the captain):
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",1913,"needs-decision: lane-6 resume
+STANDING (unchanged since its last action; no action needed):
+rows[23]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "0e194cd642350a76ce1dccdb","firstmate","defer-q","dispatch the dependency-cleared work",859373,"",false
+  "8a3d975e9e4343df1756c060","firstmate","lane-1","dispatch the dependency-cleared work",859373,"",false
+  "7c604dd621417c4683c73c4c","firstmate","lane-2","dispatch the dependency-cleared work",859373,"",false
+  "d478f2307f6a297c6ba2b3dd","firstmate","lane-3","dispatch the dependency-cleared work",859373,"",false
+  "2675f4d7d906bb4fca11d4de","firstmate","lane-4","dispatch the dependency-cleared work",859373,"",false
+  "5377fbde26ec4df54cbd3812","firstmate","lane-5","dispatch the dependency-cleared work",859373,"",false
+  "75a360b27e9ee3c1d14aab43","firstmate","lane-6","dispatch the dependency-cleared work",859373,"",false
+  "b36ef105458ea94f860a5b84","firstmate","lane-7","dispatch the dependency-cleared work",859373,"",false
+  "e5595263e43f5c720f8743d4","firstmate","lane-8","dispatch the dependency-cleared work",859373,"",false
+  "a99d7850ad592effcd1346d9","firstmate","paused-a","dispatch the dependency-cleared work",859373,"",false
+  "603d99b002d01c8be50716ff","captain","cap-rollout:captain-hold","resolve the captain hold or record its next decision date",859373,"approve rollout",false
+  "5923361c39bd1c41a32d59e8","firstmate","defer-q:order","answer or close this question, or record why it no longer applies",7558,"needs-decision: pick the merg
+  "a55f6f88bf22f37154b5aa05","firstmate","lane-1:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-1
+  "f3c8e5bfe478abd3597ae31b","firstmate","lane-2:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-2
+  "180ef3dfc9b6bad620ce6dee","firstmate","lane-3:resume","answer or close this question, or record why it no longer applies",2096,"needs-decision: lane-3 resume
+  "27c2d2e2ec27b3995685e96b","firstmate","lane-4:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-4
+  "e35386fd440f0de34d556e73","firstmate","lane-5:extra","answer or close this question, or record why it no longer applies",2057,"needs-decision: extra question
+  "d546e17301402764782dce38","firstmate","lane-5:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-5
+  "833410718ded2d7bb4df5ed7","firstmate","lane-7:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-7
+  "b548f9a7085a1272dcd8287b","firstmate","lane-8:resume","answer or close this question, or record why it no longer applies",7558,"needs-decision: resume lane-8
+  "6ebe795d5c2457fe4c43f4d2","firstmate","paused-a:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paus
+  "a44477a0495eaebf4aa36b75","captain","paused-b:captain-hold","resolve the captain hold or record its next decision date",859373,"fleet pause",false
+  "22136b8e7348e5dcb0cc2268","firstmate","paused-b:resume","answer or close this question, or record why it no longer applies",7633,"needs-decision: resume paus
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] 
+$ bin/fm-wake-drain.sh --ack-through 24 --recovery-generation 41713.1793313771.ZOc72l
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7cbf7e471ce5291b83d9fe8f","firstmate","lane-6:resume","answer or close this question, or record why it no longer applies",1916,"needs-decision: lane-6 resumed; choose the base branch",false
+[exit 1]
+ack rc=1
+changed lane-6:resume rows in WAITING list: 0
+$ bin/fm-open-loops.sh action 7cbf7e471ce5291b83d9fe8f deferred --evidence lane-6 base branch waits on rollout --recheck 2026-10-30T01:43:04Z
+action: "7cbf7e471ce5291b83d9fe8f"
+kind: deferred
+[exit 0]
+
+### M2: after one action on the changed row, ack of the change+periodic drain succeeds
+$ bin/fm-wake-drain.sh --ack-through 24 --recovery-generation 41713.1793313771.ZOc72l
+[exit 0]
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793313814
+rows[25]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859414,true,""
+  "silent_report","w1","firstmate","check in: progress, blockers, cross-workstream dependencies",1002,false,"last heard: status=1793312812; inbox acknowledgement=None; resolved reply=None; declared wait uses long cadence: fleet paused by the captain"
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859414,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2137,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2098,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",1954,true,"needs-decision: lane-6 resumed; choose the base branch"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7599,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7674,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859414,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7674,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+### S3b: live worker w1 (lab tmux window firstmate:fm-w1) last reported 1000 s ago -> overdue silent_report
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1793313835
+rows[26]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)"
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859435,true,""
+  "silent_report","w1","firstmate","check in: progress, blockers, cross-workstream dependencies",1001,true,"last heard: status=1793312834; inbox acknowledgement=None; resolved reply=None"
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859435,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2158,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2119,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",1975,true,"needs-decision: lane-6 resumed; choose the base branch"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7620,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7695,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859435,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7695,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+585e6d91156faaeeac77167f	silent_report	true	1001	last heard: status=1793312834; inbox acknowledgement=None; resolved reply=None
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+[watcher exit 0]
+queue now:
+25	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+25	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+26	check	open-loop-ledger	check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fb5d210f05f87485cab2ad11","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)",false
+  "585e6d91156faaeeac77167f","firstmate","w1","check in: progress, blockers, cross-workstream dependencies",1008,"last heard: status=1793312834; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313839	25	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+1793313841	26	check	open-loop-ledger	check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+wake annotation: latest wake-EVENT observed at drain, not current state: w1.status: working [at=1793312834]: holding for the captain fleet pause
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-5 [key=extra] needs-decision: extra question to force a wake
+lane-6 [key=resume] needs-decision: lane-6 resumed; choose the base branch
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 26 --recovery-generation 36766.1793313841.r59F4l
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fb5d210f05f87485cab2ad11","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree
+  "585e6d91156faaeeac77167f","firstmate","w1","check in: progress, blockers, cross-workstream dependencies",1008,"last heard: status=1793312834; inbox acknowledgement=None; resolved reply=None",false
+$ bin/fm-open-loops.sh action 585e6d91156faaeeac77167f escalated --evidence worker holds for the pause
+action: "585e6d91156faaeeac77167f"
+kind: escalated
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 26 --recovery-generation 36766.1793313841.r59F4l
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fb5d210f05f87485cab2ad11","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)",false
+[exit 1]
+
+### S3b: unchanged w1 row stays covered on the next scan
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1793313850
+rows[26]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)"
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859450,true,""
+  "silent_report","w1","firstmate","check in: progress, blockers, cross-workstream dependencies",1016,true,"last heard: status=1793312834; inbox acknowledgement=None; resolved reply=None"
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859450,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2173,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2134,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",1990,true,"needs-decision: lane-6 resumed; choose the base branch"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7635,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7710,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859450,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7710,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fb5d210f05f87485cab2ad11","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)",false
+[exit 1]
+$ bin/fm-open-loops.sh action fb5d210f05f87485cab2ad11 deferred --evidence lab worker has no worktree by design --recheck 2026-10-30T01:44:23Z
+action: "fb5d210f05f87485cab2ad11"
+kind: deferred
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 26 --recovery-generation 36766.1793313841.r59F4l
+[exit 0]
+
+### S3b: w1 (unpaused) posts a NEW status line; its clock restarts (stamped 950 s ago so it is still overdue)
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1793313868
+rows[26]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker liveness w1: worker liveness is inconclusive: ambiguous; worker current state w1: worktree gone (torn down?)"
+  "ready_not_started","defer-q","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-1","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-2","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-3","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-4","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-5","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-6","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-7","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","lane-8","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "ready_not_started","paused-a","firstmate","dispatch the dependency-cleared work",859468,true,""
+  "silent_report","w1","firstmate","check in: progress, blockers, cross-workstream dependencies",951,true,"last heard: status=1793312917; inbox acknowledgement=None; resolved reply=None"
+  "unanswered_question","cap-rollout:captain-hold","captain","resolve the captain hold or record its next decision date",859468,true,"approve rollout"
+  "unanswered_question","defer-q:order","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: pick the merge order"
+  "unanswered_question","lane-1:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-1 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-2:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-2 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-3:resume","firstmate","answer or close this question, or record why it no longer applies",2191,true,"needs-decision: lane-3 resumed after the pause; confirm the rebase target"
+  "unanswered_question","lane-4:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-4 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-5:extra","firstmate","answer or close this question, or record why it no longer applies",2152,true,"needs-decision: extra question to force a wake"
+  "unanswered_question","lane-5:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-5 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-6:resume","firstmate","answer or close this question, or record why it no longer applies",2008,true,"needs-decision: lane-6 resumed; choose the base branch"
+  "unanswered_question","lane-7:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-7 after the captain-ordered fleet pause?"
+  "unanswered_question","lane-8:resume","firstmate","answer or close this question, or record why it no longer applies",7653,true,"needs-decision: resume lane-8 after the captain-ordered fleet pause?"
+  "unanswered_question","paused-a:resume","firstmate","answer or close this question, or record why it no longer applies",7728,true,"needs-decision: resume paused-a after the fleet pause?"
+  "unanswered_question","paused-b:captain-hold","captain","resolve the captain hold or record its next decision date",859468,true,"fleet pause"
+  "unanswered_question","paused-b:resume","firstmate","answer or close this question, or record why it no longer applies",7728,true,"needs-decision: resume paused-b after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+585e6d91156faaeeac77167f	true	951	last heard: status=1793312917; inbox acknowledgement=None; resolved reply=None
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+[watcher exit 0]
+queue now:
+27	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+$ FM_OPEN_LOOPS_RESURFACE=3600 bin/fm-watch.sh (one cycle, 60s cap)
+check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+[watcher exit 0]
+queue now:
+27	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+28	check	open-loop-ledger	check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+27	signal	w1.status
+28	check	open-loop-ledger
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "585e6d91156faaeeac77167f","firstmate","w1","check in: progress, blockers, cross-workstream dependencies",959,"last heard: status=1793312917; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793313873	27	signal	w1.status	signal: /Users/charlesabrooker/tmp/fm-lab.g6rL6N/state/w1.status
+1793313875	28	check	open-loop-ledger	check: open-loop-ledger (26 overdue assigned obligations; read state/open-loops.json)
+wake annotation: latest wake-EVENT observed at drain, not current state: w1.status: working [at=1793312917]: lane resumed after the pause, rebasing onto main
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+defer-q [key=order] needs-decision: pick the merge order
+lane-1 [key=resume] needs-decision: resume lane-1 after the captain-ordered fleet pause?
+lane-2 [key=resume] needs-decision: resume lane-2 after the captain-ordered fleet pause?
+lane-3 [key=resume] needs-decision: lane-3 resumed after the pause; confirm the rebase target
+lane-4 [key=resume] needs-decision: resume lane-4 after the captain-ordered fleet pause?
+lane-5 [key=resume] needs-decision: resume lane-5 after the captain-ordered fleet pause?
+lane-5 [key=extra] needs-decision: extra question to force a wake
+lane-6 [key=resume] needs-decision: lane-6 resumed; choose the base branch
+lane-7 [key=resume] needs-decision: resume lane-7 after the captain-ordered fleet pause?
+lane-8 [key=resume] needs-decision: resume lane-8 after the captain-ordered fleet pause?
+paused-a [key=resume] needs-decision: resume paused-a after the fleet pause?
+paused-b [key=resume] needs-decision: resume paused-b after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 28 --recovery-generation 30819.1793313875.QVjqxf
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "585e6d91156faaeeac77167f","firstmate","w1","check in: progress, blockers, cross-workstream dependencies",959,"last heard: status=1793312917; inbox acknowledgement=None; resolved reply=None",false
+$ bin/fm-wake-drain.sh --ack-through 28 --recovery-generation 30819.1793313875.QVjqxf
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "585e6d91156faaeeac77167f","firstmate","w1","check in: progress, blockers, cross-workstream dependencies",961,"last heard: status=1793312917; inbox acknowledgement=None; resolved reply=None",false
+[exit 1]
+ack rc=1
+$ bin/fm-open-loops.sh action 585e6d91156faaeeac77167f escalated --evidence lane resumed; review its rebase
+action: "585e6d91156faaeeac77167f"
+kind: escalated
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 28 --recovery-generation 30819.1793313875.QVjqxf
+[exit 0]

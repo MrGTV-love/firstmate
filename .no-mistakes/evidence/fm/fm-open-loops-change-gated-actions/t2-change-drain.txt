@@ -1,0 +1,58 @@
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d4a86ffa521cd79df21b2d96","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",41,"needs-decision: rebased on main; may I push the new head?",false
+  "4c1cf7c4efd590ed766c5147","firstmate","lane-06:ci","answer or close this question, or record why it no longer applies",41,"needs-decision: CI is red on the rebased head; retry or diagnose?",false
+  "fe66a4a166db3567d6ff1d22","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",8261,"needs-decision: may I resume after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793315749	44	signal	lane-05.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-05.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-06.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-07.status
+1793315750	45	signal	lane-06.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-05.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-06.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-07.status
+1793315750	46	signal	lane-07.status	signal: /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-05.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-06.status /Users/charlesabrooker/tmp/fm-lab.jWcBJF/state/lane-07.status
+wake annotation: unread wake-EVENT since last drain, not current state: lane-05.status: working [at=1793315712]: resumed after the fleet pause
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-05.status: needs-decision [at=1793315712] [key=resume]: rebased on main; may I push the new head?
+wake annotation: unread wake-EVENT since last drain, not current state: lane-06.status: working [at=1793315712]: resumed after the fleet pause
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-06.status: needs-decision [at=1793315712] [key=ci]: CI is red on the rebased head; retry or diagnose?
+wake annotation: latest wake-EVENT observed at drain, not current state: lane-07.status: working [at=1793315712]: resumed after the fleet pause
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: rebased on main; may I push the new head?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=ci] needs-decision: CI is red on the rebased head; retry or diagnose?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-10 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

@@ -1,0 +1,506 @@
+
+### BASE code e27bbad9b: collector publishes the 41 paused-lane rows
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/tmp/fm-base-code.mDB0p8/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1793315917
+rows[41]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","lane-01:resume","firstmate","answer or close this question, or record why it no longer applies",8002,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-02:resume","firstmate","answer or close this question, or record why it no longer applies",8003,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-03:resume","firstmate","answer or close this question, or record why it no longer applies",8004,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-04:resume","firstmate","answer or close this question, or record why it no longer applies",8005,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-05:resume","firstmate","answer or close this question, or record why it no longer applies",8006,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-06:resume","firstmate","answer or close this question, or record why it no longer applies",8007,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-07:resume","firstmate","answer or close this question, or record why it no longer applies",8008,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-08:resume","firstmate","answer or close this question, or record why it no longer applies",8009,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-09:resume","firstmate","answer or close this question, or record why it no longer applies",8010,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-10:resume","firstmate","answer or close this question, or record why it no longer applies",8011,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-11:resume","firstmate","answer or close this question, or record why it no longer applies",8012,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-12:resume","firstmate","answer or close this question, or record why it no longer applies",8013,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-13:resume","firstmate","answer or close this question, or record why it no longer applies",8014,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-14:resume","firstmate","answer or close this question, or record why it no longer applies",8015,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-15:resume","firstmate","answer or close this question, or record why it no longer applies",8016,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-16:resume","firstmate","answer or close this question, or record why it no longer applies",8017,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-17:resume","firstmate","answer or close this question, or record why it no longer applies",8018,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-18:resume","firstmate","answer or close this question, or record why it no longer applies",8019,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-19:resume","firstmate","answer or close this question, or record why it no longer applies",8020,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-20:resume","firstmate","answer or close this question, or record why it no longer applies",8021,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-21:resume","firstmate","answer or close this question, or record why it no longer applies",8022,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-22:resume","firstmate","answer or close this question, or record why it no longer applies",8023,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-23:resume","firstmate","answer or close this question, or record why it no longer applies",8024,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-24:resume","firstmate","answer or close this question, or record why it no longer applies",8025,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-25:resume","firstmate","answer or close this question, or record why it no longer applies",8026,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-26:resume","firstmate","answer or close this question, or record why it no longer applies",8027,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-27:resume","firstmate","answer or close this question, or record why it no longer applies",8028,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-28:resume","firstmate","answer or close this question, or record why it no longer applies",8029,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-29:resume","firstmate","answer or close this question, or record why it no longer applies",8030,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-30:resume","firstmate","answer or close this question, or record why it no longer applies",8031,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-31:resume","firstmate","answer or close this question, or record why it no longer applies",8032,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-32:resume","firstmate","answer or close this question, or record why it no longer applies",8033,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-33:resume","firstmate","answer or close this question, or record why it no longer applies",8034,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-34:resume","firstmate","answer or close this question, or record why it no longer applies",8035,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-35:resume","firstmate","answer or close this question, or record why it no longer applies",8036,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-36:resume","firstmate","answer or close this question, or record why it no longer applies",8037,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-37:resume","firstmate","answer or close this question, or record why it no longer applies",8038,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-38:resume","firstmate","answer or close this question, or record why it no longer applies",8039,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-39:resume","firstmate","answer or close this question, or record why it no longer applies",8040,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-40:resume","firstmate","answer or close this question, or record why it no longer applies",8041,true,"needs-decision: may I resume after the fleet pause?"
+  "unanswered_question","lane-41:resume","firstmate","answer or close this question, or record why it no longer applies",8042,true,"needs-decision: may I resume after the fleet pause?"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+unanswered_question x41
+
+### BASE: turn 1 drain, stamp every row escalated, ack
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[41]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d7fdf97c19113e4fc53fec9","firstmate","lane-01:resume","answer or close this question, or record why it no longer applies",8005,"needs-decision: may I resume after the fleet pause?",false
+  "eb62d95ac867b0c77e36ca26","firstmate","lane-02:resume","answer or close this question, or record why it no longer applies",8006,"needs-decision: may I resume after the fleet pause?",false
+  "436e5fe03a88c426296d0d8a","firstmate","lane-03:resume","answer or close this question, or record why it no longer applies",8007,"needs-decision: may I resume after the fleet pause?",false
+  "979b43be58532f97be018111","firstmate","lane-04:resume","answer or close this question, or record why it no longer applies",8008,"needs-decision: may I resume after the fleet pause?",false
+  "c602961bcb55012cdac5a1c7","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",8009,"needs-decision: may I resume after the fleet pause?",false
+  "c699aea14b897d7f45864ef8","firstmate","lane-06:resume","answer or close this question, or record why it no longer applies",8010,"needs-decision: may I resume after the fleet pause?",false
+  "d3fcc72c36933176a27eb6a4","firstmate","lane-07:resume","answer or close this question, or record why it no longer applies",8011,"needs-decision: may I resume after the fleet pause?",false
+  "6b76d8620ccd03bb05250ede","firstmate","lane-08:resume","answer or close this question, or record why it no longer applies",8012,"needs-decision: may I resume after the fleet pause?",false
+  "f1d477c9fe96e4070abffc35","firstmate","lane-09:resume","answer or close this question, or record why it no longer applies",8013,"needs-decision: may I resume after the fleet pause?",false
+  "50c608560503dda441ccf74d","firstmate","lane-10:resume","answer or close this question, or record why it no longer applies",8014,"needs-decision: may I resume after the fleet pause?",false
+  "0e73c2a82189ce5a9b0bed9a","firstmate","lane-11:resume","answer or close this question, or record why it no longer applies",8015,"needs-decision: may I resume after the fleet pause?",false
+  "4bf124bfdef58331122759cb","firstmate","lane-12:resume","answer or close this question, or record why it no longer applies",8016,"needs-decision: may I resume after the fleet pause?",false
+  "9ef4f7ef008a7712f2c1e2df","firstmate","lane-13:resume","answer or close this question, or record why it no longer applies",8017,"needs-decision: may I resume after the fleet pause?",false
+  "ba9d48f8be158b5e42c185a2","firstmate","lane-14:resume","answer or close this question, or record why it no longer applies",8018,"needs-decision: may I resume after the fleet pause?",false
+  "3c325692f2cd5ad0db41daf5","firstmate","lane-15:resume","answer or close this question, or record why it no longer applies",8019,"needs-decision: may I resume after the fleet pause?",false
+  "43e8d891b929c90aaca0d987","firstmate","lane-16:resume","answer or close this question, or record why it no longer applies",8020,"needs-decision: may I resume after the fleet pause?",false
+  "155b9869ad214af5879a1bf4","firstmate","lane-17:resume","answer or close this question, or record why it no longer applies",8021,"needs-decision: may I resume after the fleet pause?",false
+  "a2d39bdcb017dcb9e68e925e","firstmate","lane-18:resume","answer or close this question, or record why it no longer applies",8022,"needs-decision: may I resume after the fleet pause?",false
+  "e2cdc26f3b2da11b5d4d86a5","firstmate","lane-19:resume","answer or close this question, or record why it no longer applies",8023,"needs-decision: may I resume after the fleet pause?",false
+  "90b918e696dceb4717e836e3","firstmate","lane-20:resume","answer or close this question, or record why it no longer applies",8024,"needs-decision: may I resume after the fleet pause?",false
+  "347dca49e477f1f1909809ca","firstmate","lane-21:resume","answer or close this question, or record why it no longer applies",8025,"needs-decision: may I resume after the fleet pause?",false
+  "ff226d5bb7a5b866df72d7c2","firstmate","lane-22:resume","answer or close this question, or record why it no longer applies",8026,"needs-decision: may I resume after the fleet pause?",false
+  "db345231f2ee8c81061ce7d1","firstmate","lane-23:resume","answer or close this question, or record why it no longer applies",8027,"needs-decision: may I resume after the fleet pause?",false
+  "8face814d21f15e6a27587f5","firstmate","lane-24:resume","answer or close this question, or record why it no longer applies",8028,"needs-decision: may I resume after the fleet pause?",false
+  "43fdbb0896e0adc9a6dd6892","firstmate","lane-25:resume","answer or close this question, or record why it no longer applies",8029,"needs-decision: may I resume after the fleet pause?",false
+  "7807579847cd467f6d071697","firstmate","lane-26:resume","answer or close this question, or record why it no longer applies",8030,"needs-decision: may I resume after the fleet pause?",false
+  "f3fbd23f76043fdc94b5a09e","firstmate","lane-27:resume","answer or close this question, or record why it no longer applies",8031,"needs-decision: may I resume after the fleet pause?",false
+  "070bbeac4deb6bdb1bdabfa9","firstmate","lane-28:resume","answer or close this question, or record why it no longer applies",8032,"needs-decision: may I resume after the fleet pause?",false
+  "0023a96d58eb17ed7b755590","firstmate","lane-29:resume","answer or close this question, or record why it no longer applies",8033,"needs-decision: may I resume after the fleet pause?",false
+  "31d6a7f1d4deba0678731466","firstmate","lane-30:resume","answer or close this question, or record why it no longer applies",8034,"needs-decision: may I resume after the fleet pause?",false
+  "57d789721813c4ed6aa78ce8","firstmate","lane-31:resume","answer or close this question, or record why it no longer applies",8035,"needs-decision: may I resume after the fleet pause?",false
+  "e11ae0f6b2e9c226e7376322","firstmate","lane-32:resume","answer or close this question, or record why it no longer applies",8036,"needs-decision: may I resume after the fleet pause?",false
+  "6c0d98405cc6b2712efcaf01","firstmate","lane-33:resume","answer or close this question, or record why it no longer applies",8037,"needs-decision: may I resume after the fleet pause?",false
+  "b6aa441bc1592a6ab39c322b","firstmate","lane-34:resume","answer or close this question, or record why it no longer applies",8038,"needs-decision: may I resume after the fleet pause?",false
+  "15f3eb841ab0666db7d08e25","firstmate","lane-35:resume","answer or close this question, or record why it no longer applies",8039,"needs-decision: may I resume after the fleet pause?",false
+  "446ce453f835bbd93348c5eb","firstmate","lane-36:resume","answer or close this question, or record why it no longer applies",8040,"needs-decision: may I resume after the fleet pause?",false
+  "8d66be5c7a9217706988fd0f","firstmate","lane-37:resume","answer or close this question, or record why it no longer applies",8041,"needs-decision: may I resume after the fleet pause?",false
+  "795b0f9a3957a089e9d49daf","firstmate","lane-38:resume","answer or close this question, or record why it no longer applies",8042,"needs-decision: may I resume after the fleet pause?",false
+  "c44eb43ecdd735ffacdd859c","firstmate","lane-39:resume","answer or close this question, or record why it no longer applies",8043,"needs-decision: may I resume after the fleet pause?",false
+  "ea2af48055728648f01daefb","firstmate","lane-40:resume","answer or close this question, or record why it no longer applies",8044,"needs-decision: may I resume after the fleet pause?",false
+  "0ecf77be2d4e7feed7cdec5e","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",8045,"needs-decision: may I resume after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] 
+1793315920	1	check	open-loop-ledger	check: open-loop-ledger
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-10 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 75614.1793315920.TlS5cb
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-base-code.mDB0p8/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn e
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.BatZwH/../b.jsonl
+results[41]{line,id,kind,result,message}:
+  1,"9d7fdf97c19113e4fc53fec9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  2,"eb62d95ac867b0c77e36ca26","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  3,"436e5fe03a88c426296d0d8a","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  4,"979b43be58532f97be018111","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  5,"c602961bcb55012cdac5a1c7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  6,"c699aea14b897d7f45864ef8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  7,"d3fcc72c36933176a27eb6a4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  8,"6b76d8620ccd03bb05250ede","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  9,"f1d477c9fe96e4070abffc35","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  10,"50c608560503dda441ccf74d","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  11,"0e73c2a82189ce5a9b0bed9a","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  12,"4bf124bfdef58331122759cb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  13,"9ef4f7ef008a7712f2c1e2df","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  14,"ba9d48f8be158b5e42c185a2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  15,"3c325692f2cd5ad0db41daf5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  16,"43e8d891b929c90aaca0d987","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  17,"155b9869ad214af5879a1bf4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  18,"a2d39bdcb017dcb9e68e925e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  19,"e2cdc26f3b2da11b5d4d86a5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  20,"90b918e696dceb4717e836e3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  21,"347dca49e477f1f1909809ca","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  22,"ff226d5bb7a5b866df72d7c2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  23,"db345231f2ee8c81061ce7d1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  24,"8face814d21f15e6a27587f5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  25,"43fdbb0896e0adc9a6dd6892","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  26,"7807579847cd467f6d071697","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  27,"f3fbd23f76043fdc94b5a09e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  28,"070bbeac4deb6bdb1bdabfa9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  29,"0023a96d58eb17ed7b755590","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  30,"31d6a7f1d4deba0678731466","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  31,"57d789721813c4ed6aa78ce8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  32,"e11ae0f6b2e9c226e7376322","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  33,"6c0d98405cc6b2712efcaf01","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  34,"b6aa441bc1592a6ab39c322b","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  35,"15f3eb841ab0666db7d08e25","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  36,"446ce453f835bbd93348c5eb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  37,"8d66be5c7a9217706988fd0f","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  38,"795b0f9a3957a089e9d49daf","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  39,"c44eb43ecdd735ffacdd859c","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  40,"ea2af48055728648f01daefb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  41,"0ecf77be2d4e7feed7cdec5e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 1 75614.1793315920.TlS5cb --recovery-generation
+wake drain: invalid acknowledgement sequence
+[exit 2]
+
+### BASE: turn 2, nothing changed; drain then ack
+$ bin/fm-wake-drain.sh
+1793315929	2	check	open-loop-ledger	check: open-loop-ledger
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-10 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 75614.1793315920.TlS5cb
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 2 75614.1793315920.TlS5cb --recovery-generation
+wake drain: invalid acknowledgement sequence
+[exit 2]
+wake drain: invalid acknowledgement sequence
+rows still demanding a fresh action: 0
+
+### BASE: (driver fix) turn-1 ack had a shell word-split bug; ack the turn-2 boundary now, after the turn-1 stamps and a second presentation with nothing changed
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 75614.1793315920.TlS5cb
+[exit 0]
+rows demanding a fresh action again: 0
+
+### BASE: next turn after the closed turn, nothing changed: new wake, drain, then ack
+$ bin/fm-wake-drain.sh
+1793315976	3	check	open-loop-ledger	check: open-loop-ledger
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-10 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 32245.1793315977.aXAhY4
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 32245.1793315977.aXAhY4
+[exit 0]
+rows demanding a fresh action again: 0
+
+### BASE: re-stamp all 41 unchanged rows with fresh actions, then ack
+$ bin/fm-open-loops.sh action --batch /Users/charlesabrooker/tmp/fm-lab.BatZwH/../b.jsonl
+results[41]{line,id,kind,result,message}:
+  1,"9d7fdf97c19113e4fc53fec9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  2,"eb62d95ac867b0c77e36ca26","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  3,"436e5fe03a88c426296d0d8a","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  4,"979b43be58532f97be018111","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  5,"c602961bcb55012cdac5a1c7","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  6,"c699aea14b897d7f45864ef8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  7,"d3fcc72c36933176a27eb6a4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  8,"6b76d8620ccd03bb05250ede","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  9,"f1d477c9fe96e4070abffc35","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  10,"50c608560503dda441ccf74d","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  11,"0e73c2a82189ce5a9b0bed9a","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  12,"4bf124bfdef58331122759cb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  13,"9ef4f7ef008a7712f2c1e2df","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  14,"ba9d48f8be158b5e42c185a2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  15,"3c325692f2cd5ad0db41daf5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  16,"43e8d891b929c90aaca0d987","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  17,"155b9869ad214af5879a1bf4","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  18,"a2d39bdcb017dcb9e68e925e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  19,"e2cdc26f3b2da11b5d4d86a5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  20,"90b918e696dceb4717e836e3","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  21,"347dca49e477f1f1909809ca","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  22,"ff226d5bb7a5b866df72d7c2","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  23,"db345231f2ee8c81061ce7d1","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  24,"8face814d21f15e6a27587f5","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  25,"43fdbb0896e0adc9a6dd6892","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  26,"7807579847cd467f6d071697","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  27,"f3fbd23f76043fdc94b5a09e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  28,"070bbeac4deb6bdb1bdabfa9","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  29,"0023a96d58eb17ed7b755590","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  30,"31d6a7f1d4deba0678731466","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  31,"57d789721813c4ed6aa78ce8","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  32,"e11ae0f6b2e9c226e7376322","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  33,"6c0d98405cc6b2712efcaf01","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  34,"b6aa441bc1592a6ab39c322b","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  35,"15f3eb841ab0666db7d08e25","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  36,"446ce453f835bbd93348c5eb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  37,"8d66be5c7a9217706988fd0f","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  38,"795b0f9a3957a089e9d49daf","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  39,"c44eb43ecdd735ffacdd859c","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  40,"ea2af48055728648f01daefb","escalated","recorded","unchanged row; re-present after 14400 seconds"
+  41,"0ecf77be2d4e7feed7cdec5e","escalated","recorded","unchanged row; re-present after 14400 seconds"
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 32245.1793315977.aXAhY4
+[exit 0]
+
+### BASE: clock 4h later (FM_OPEN_LOOPS_NOW=+14500 s), nothing changed: new wake, drain, then ack
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[41]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d7fdf97c19113e4fc53fec9","firstmate","lane-01:resume","answer or close this question, or record why it no longer applies",22593,"needs-decision: may I resume after the fleet pause?",false
+  "eb62d95ac867b0c77e36ca26","firstmate","lane-02:resume","answer or close this question, or record why it no longer applies",22594,"needs-decision: may I resume after the fleet pause?",false
+  "436e5fe03a88c426296d0d8a","firstmate","lane-03:resume","answer or close this question, or record why it no longer applies",22595,"needs-decision: may I resume after the fleet pause?",false
+  "979b43be58532f97be018111","firstmate","lane-04:resume","answer or close this question, or record why it no longer applies",22596,"needs-decision: may I resume after the fleet pause?",false
+  "c602961bcb55012cdac5a1c7","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",22597,"needs-decision: may I resume after the fleet pause?",false
+  "c699aea14b897d7f45864ef8","firstmate","lane-06:resume","answer or close this question, or record why it no longer applies",22598,"needs-decision: may I resume after the fleet pause?",false
+  "d3fcc72c36933176a27eb6a4","firstmate","lane-07:resume","answer or close this question, or record why it no longer applies",22599,"needs-decision: may I resume after the fleet pause?",false
+  "6b76d8620ccd03bb05250ede","firstmate","lane-08:resume","answer or close this question, or record why it no longer applies",22600,"needs-decision: may I resume after the fleet pause?",false
+  "f1d477c9fe96e4070abffc35","firstmate","lane-09:resume","answer or close this question, or record why it no longer applies",22601,"needs-decision: may I resume after the fleet pause?",false
+  "50c608560503dda441ccf74d","firstmate","lane-10:resume","answer or close this question, or record why it no longer applies",22602,"needs-decision: may I resume after the fleet pause?",false
+  "0e73c2a82189ce5a9b0bed9a","firstmate","lane-11:resume","answer or close this question, or record why it no longer applies",22603,"needs-decision: may I resume after the fleet pause?",false
+  "4bf124bfdef58331122759cb","firstmate","lane-12:resume","answer or close this question, or record why it no longer applies",22604,"needs-decision: may I resume after the fleet pause?",false
+  "9ef4f7ef008a7712f2c1e2df","firstmate","lane-13:resume","answer or close this question, or record why it no longer applies",22605,"needs-decision: may I resume after the fleet pause?",false
+  "ba9d48f8be158b5e42c185a2","firstmate","lane-14:resume","answer or close this question, or record why it no longer applies",22606,"needs-decision: may I resume after the fleet pause?",false
+  "3c325692f2cd5ad0db41daf5","firstmate","lane-15:resume","answer or close this question, or record why it no longer applies",22607,"needs-decision: may I resume after the fleet pause?",false
+  "43e8d891b929c90aaca0d987","firstmate","lane-16:resume","answer or close this question, or record why it no longer applies",22608,"needs-decision: may I resume after the fleet pause?",false
+  "155b9869ad214af5879a1bf4","firstmate","lane-17:resume","answer or close this question, or record why it no longer applies",22609,"needs-decision: may I resume after the fleet pause?",false
+  "a2d39bdcb017dcb9e68e925e","firstmate","lane-18:resume","answer or close this question, or record why it no longer applies",22610,"needs-decision: may I resume after the fleet pause?",false
+  "e2cdc26f3b2da11b5d4d86a5","firstmate","lane-19:resume","answer or close this question, or record why it no longer applies",22611,"needs-decision: may I resume after the fleet pause?",false
+  "90b918e696dceb4717e836e3","firstmate","lane-20:resume","answer or close this question, or record why it no longer applies",22612,"needs-decision: may I resume after the fleet pause?",false
+  "347dca49e477f1f1909809ca","firstmate","lane-21:resume","answer or close this question, or record why it no longer applies",22613,"needs-decision: may I resume after the fleet pause?",false
+  "ff226d5bb7a5b866df72d7c2","firstmate","lane-22:resume","answer or close this question, or record why it no longer applies",22614,"needs-decision: may I resume after the fleet pause?",false
+  "db345231f2ee8c81061ce7d1","firstmate","lane-23:resume","answer or close this question, or record why it no longer applies",22615,"needs-decision: may I resume after the fleet pause?",false
+  "8face814d21f15e6a27587f5","firstmate","lane-24:resume","answer or close this question, or record why it no longer applies",22616,"needs-decision: may I resume after the fleet pause?",false
+  "43fdbb0896e0adc9a6dd6892","firstmate","lane-25:resume","answer or close this question, or record why it no longer applies",22617,"needs-decision: may I resume after the fleet pause?",false
+  "7807579847cd467f6d071697","firstmate","lane-26:resume","answer or close this question, or record why it no longer applies",22618,"needs-decision: may I resume after the fleet pause?",false
+  "f3fbd23f76043fdc94b5a09e","firstmate","lane-27:resume","answer or close this question, or record why it no longer applies",22619,"needs-decision: may I resume after the fleet pause?",false
+  "070bbeac4deb6bdb1bdabfa9","firstmate","lane-28:resume","answer or close this question, or record why it no longer applies",22620,"needs-decision: may I resume after the fleet pause?",false
+  "0023a96d58eb17ed7b755590","firstmate","lane-29:resume","answer or close this question, or record why it no longer applies",22621,"needs-decision: may I resume after the fleet pause?",false
+  "31d6a7f1d4deba0678731466","firstmate","lane-30:resume","answer or close this question, or record why it no longer applies",22622,"needs-decision: may I resume after the fleet pause?",false
+  "57d789721813c4ed6aa78ce8","firstmate","lane-31:resume","answer or close this question, or record why it no longer applies",22623,"needs-decision: may I resume after the fleet pause?",false
+  "e11ae0f6b2e9c226e7376322","firstmate","lane-32:resume","answer or close this question, or record why it no longer applies",22624,"needs-decision: may I resume after the fleet pause?",false
+  "6c0d98405cc6b2712efcaf01","firstmate","lane-33:resume","answer or close this question, or record why it no longer applies",22625,"needs-decision: may I resume after the fleet pause?",false
+  "b6aa441bc1592a6ab39c322b","firstmate","lane-34:resume","answer or close this question, or record why it no longer applies",22626,"needs-decision: may I resume after the fleet pause?",false
+  "15f3eb841ab0666db7d08e25","firstmate","lane-35:resume","answer or close this question, or record why it no longer applies",22627,"needs-decision: may I resume after the fleet pause?",false
+  "446ce453f835bbd93348c5eb","firstmate","lane-36:resume","answer or close this question, or record why it no longer applies",22628,"needs-decision: may I resume after the fleet pause?",false
+  "8d66be5c7a9217706988fd0f","firstmate","lane-37:resume","answer or close this question, or record why it no longer applies",22629,"needs-decision: may I resume after the fleet pause?",false
+  "795b0f9a3957a089e9d49daf","firstmate","lane-38:resume","answer or close this question, or record why it no longer applies",22630,"needs-decision: may I resume after the fleet pause?",false
+  "c44eb43ecdd735ffacdd859c","firstmate","lane-39:resume","answer or close this question, or record why it no longer applies",22631,"needs-decision: may I resume after the fleet pause?",false
+  "ea2af48055728648f01daefb","firstmate","lane-40:resume","answer or close this question, or record why it no longer applies",22632,"needs-decision: may I resume after the fleet pause?",false
+  "0ecf77be2d4e7feed7cdec5e","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",22633,"needs-decision: may I resume after the fleet pause?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] 
+1793316008	4	check	open-loop-ledger	check: open-loop-ledger
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-01 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-02 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-03 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-04 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-05 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-06 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-07 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-08 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-09 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-10 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-11 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-12 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-13 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-14 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-15 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-16 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-17 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-18 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-19 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-20 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-21 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-22 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-23 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-24 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-25 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-26 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-27 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-28 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-29 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-30 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-31 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-32 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-33 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-34 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-35 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-36 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-37 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-38 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-39 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-40 [key=resume] needs-decision: may I resume after the fleet pause?
+lane-41 [key=resume] needs-decision: may I resume after the fleet pause?
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 20001.1793316008.e3sFwo
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 20001.1793316008.e3sFwo
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[41]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d7fdf97c19113e4fc53fec9","firstmate","lane-01:resume","answer or close this question, or record why it no longer applies",22593,"needs-decision: may I resume after the fleet pause?",false
+  "eb62d95ac867b0c77e36ca26","firstmate","lane-02:resume","answer or close this question, or record why it no longer applies",22594,"needs-decision: may I resume after the fleet pause?",false
+  "436e5fe03a88c426296d0d8a","firstmate","lane-03:resume","answer or close this question, or record why it no longer applies",22595,"needs-decision: may I resume after the fleet pause?",false
+  "979b43be58532f97be018111","firstmate","lane-04:resume","answer or close this question, or record why it no longer applies",22596,"needs-decision: may I resume after the fleet pause?",false
+  "c602961bcb55012cdac5a1c7","firstmate","lane-05:resume","answer or close this question, or record why it no longer applies",22597,"needs-decision: may I resume after the fleet pause?",false
+  "c699aea14b897d7f45864ef8","firstmate","lane-06:resume","answer or close this question, or record why it no longer applies",22598,"needs-decision: may I resume after the fleet pause?",false
+  "d3fcc72c36933176a27eb6a4","firstmate","lane-07:resume","answer or close this question, or record why it no longer applies",22599,"needs-decision: may I resume after the fleet pause?",false
+  "6b76d8620ccd03bb05250ede","firstmate","lane-08:resume","answer or close this question, or record why it no longer applies",22600,"needs-decision: may I resume after the fleet pause?",false
+  "f1d477c9fe96e4070abffc35","firstmate","lane-09:resume","answer or close this question, or record why it no longer applies",22601,"needs-decision: may I resume after the fleet pause?",false
+  "50c608560503dda441ccf74d","firstmate","lane-10:resume","answer or close this question, or record why it no longer applies",22602,"needs-decision: may I resume after the fleet pause?",false
+  "0e73c2a82189ce5a9b0bed9a","firstmate","lane-11:resume","answer or close this question, or record why it no longer applies",22603,"needs-decision: may I resume after the fleet pause?",false
+  "4bf124bfdef58331122759cb","firstmate","lane-12:resume","answer or close this question, or record why it no longer applies",22604,"needs-decision: may I resume after the fleet pause?",false
+  "9ef4f7ef008a7712f2c1e2df","firstmate","lane-13:resume","answer or close this question, or record why it no longer applies",22605,"needs-decision: may I resume after the fleet pause?",false
+  "ba9d48f8be158b5e42c185a2","firstmate","lane-14:resume","answer or close this question, or record why it no longer applies",22606,"needs-decision: may I resume after the fleet pause?",false
+  "3c325692f2cd5ad0db41daf5","firstmate","lane-15:resume","answer or close this question, or record why it no longer applies",22607,"needs-decision: may I resume after the fleet pause?",false
+  "43e8d891b929c90aaca0d987","firstmate","lane-16:resume","answer or close this question, or record why it no longer applies",22608,"needs-decision: may I resume after the fleet pause?",false
+  "155b9869ad214af5879a1bf4","firstmate","lane-17:resume","answer or close this question, or record why it no longer applies",22609,"needs-decision: may I resume after the fleet pause?",false
+  "a2d39bdcb017dcb9e68e925e","firstmate","lane-18:resume","answer or close this question, or record why it no longer applies",22610,"needs-decision: may I resume after the fleet pause?",false
+  "e2cdc26f3b2da11b5d4d86a5","firstmate","lane-19:resume","answer or close this question, or record why it no longer applies",22611,"needs-decision: may I resume after the fleet pause?",false
+  "90b918e696dceb4717e836e3","firstmate","lane-20:resume","answer or close this question, or record why it no longer applies",22612,"needs-decision: may I resume after the fleet pause?",false
+  "347dca49e477f1f1909809ca","firstmate","lane-21:resume","answer or close this question, or record why it no longer applies",22613,"needs-decision: may I resume after the fleet pause?",false
+  "ff226d5bb7a5b866df72d7c2","firstmate","lane-22:resume","answer or close this question, or record why it no longer applies",22614,"needs-decision: may I resume after the fleet pause?",false
+  "db345231f2ee8c81061ce7d1","firstmate","lane-23:resume","answer or close this question, or record why it no longer applies",22615,"needs-decision: may I resume after the fleet pause?",false
+  "8face814d21f15e6a27587f5","firstmate","lane-24:resume","answer or close this question, or record why it no longer applies",22616,"needs-decision: may I resume after the fleet pause?",false
+  "43fdbb0896e0adc9a6dd6892","firstmate","lane-25:resume","answer or close this question, or record why it no longer applies",22617,"needs-decision: may I resume after the fleet pause?",false
+  "7807579847cd467f6d071697","firstmate","lane-26:resume","answer or close this question, or record why it no longer applies",22618,"needs-decision: may I resume after the fleet pause?",false
+  "f3fbd23f76043fdc94b5a09e","firstmate","lane-27:resume","answer or close this question, or record why it no longer applies",22619,"needs-decision: may I resume after the fleet pause?",false
+  "070bbeac4deb6bdb1bdabfa9","firstmate","lane-28:resume","answer or close this question, or record why it no longer applies",22620,"needs-decision: may I resume after the fleet pause?",false
+  "0023a96d58eb17ed7b755590","firstmate","lane-29:resume","answer or close this question, or record why it no longer applies",22621,"needs-decision: may I resume after the fleet pause?",false
+  "31d6a7f1d4deba0678731466","firstmate","lane-30:resume","answer or close this question, or record why it no longer applies",22622,"needs-decision: may I resume after the fleet pause?",false
+  "57d789721813c4ed6aa78ce8","firstmate","lane-31:resume","answer or close this question, or record why it no longer applies",22623,"needs-decision: may I resume after the fleet pause?",false
+  "e11ae0f6b2e9c226e7376322","firstmate","lane-32:resume","answer or close this question, or record why it no longer applies",22624,"needs-decision: may I resume after the fleet pause?",false
+  "6c0d98405cc6b2712efcaf01","firstmate","lane-33:resume","answer or close this question, or record why it no longer applies",22625,"needs-decision: may I resume after the fleet pause?",false
+  "b6aa441bc1592a6ab39c322b","firstmate","lane-34:resume","answer or close this question, or record why it no longer applies",22626,"needs-decision: may I resume after the fleet pause?",false
+  "15f3eb841ab0666db7d08e25","firstmate","lane-35:resume","answer or close this question, or record why it no longer applies",22627,"needs-decision: may I resume after the fleet pause?",false
+  "446ce453f835bbd93348c5eb","firstmate","lane-36:resume","answer or close this question, or record why it no longer applies",22628,"needs-decision: may I resume after the fleet pause?",false
+  "8d66be5c7a9217706988fd0f","firstmate","lane-37:resume","answer or close this question, or record why it no longer applies",22629,"needs-decision: may I resume after the fleet pause?",false
+  "795b0f9a3957a089e9d49daf","firstmate","lane-38:resume","answer or close this question, or record why it no longer applies",22630,"needs-decision: may I resume after the fleet pause?",false
+  "c44eb43ecdd735ffacdd859c","firstmate","lane-39:resume","answer or close this question, or record why it no longer applies",22631,"needs-decision: may I resume after the fleet pause?",false
+  "ea2af48055728648f01daefb","firstmate","lane-40:resume","answer or close this question, or record why it no longer applies",22632,"needs-decision: may I resume after the fleet pause?",false
+  "0ecf77be2d4e7feed7cdec5e","firstmate","lane-41:resume","answer or close this question, or record why it no longer applies",22633,"needs-decision: may I resume after the fleet pause?",false
+[exit 1]
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+BASE rows demanding a fresh action again: 41

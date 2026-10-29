@@ -127,7 +127,7 @@ ok - a failing channel logs and falls back to the next channel, never crashing t
 ok - a hung notifier is bounded, logged, and falls through to the next channel
 ok - a backgrounded command notifier remains bounded until its process group is reaped
 ok - a hung notifier override is bounded, logged, and proceeds to the next channel
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AKW2M2FYTG5FKEZ8T6BB7/bin/fm-supervise-daemon.sh: line 979: 94291 Terminated: 15          sh -c 'sleep 30 & printf "%s" "$!" > "$1"; wait' sh "$child_file"
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-supervise-daemon.sh: line 979: 71506 Terminated: 15          sh -c 'sleep 30 & printf "%s" "$!" > "$1"; wait' sh "$child_file"
 ok - daemon shutdown stops and reaps the active notifier process group
 ok - inject_wedge_alarm writes the marker AND emits the active alert even with no tmux status-line (herdr backend)
 ok - in-process wedge throttle prevents alert spam when the marker cannot persist

@@ -1,225 +1,238 @@
 ok - an overdue ledger row wakes firstmate and leaves a durable queue row
 ok - unchanged evidence stays quiet; new rows and changed evidence wake immediately
-watcher fixture: owned child 30791 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-split/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-split/watch.out.err
+watcher fixture: owned child 72792 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-split/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-split/watch.out.err
 ok - row changes wake without the periodic list; the resurface wake carries it once per interval
-watcher fixture: owned child 52939 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-clean/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-clean/watch.out.err
+watcher fixture: owned child 92101 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-clean/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-clean/watch.out.err
 ok - a ledger with no overdue rows is silent
 ok - the watcher runs the reconciler detached and a partly blind ledger still wakes
-watcher fixture: owned child 82395 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-large-interval/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-large-interval/watch.out.err
+watcher fixture: owned child 54873 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-large-interval/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-large-interval/watch.out.err
 ok - a missing ledger collects with a large interval and its fresh publication stays throttled
 ok - a ledger the reconciler stopped publishing is its own wake
-watcher fixture: owned child 12212 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-queue/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-queue/state/.wake-queue: Is a directory
-watcher fixture: owned child 92791 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-queue/watch.out.err
-watcher fixture: owned child 10645 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-sequence/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-sequence/state/.wake-queue.seq: Is a directory
-watcher fixture: owned child 63668 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-sequence/watch.out.err
-watcher fixture: owned child 83191 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-recovery/watch.out.err
+watcher fixture: owned child 81706 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 36576 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-queue/watch.out.err
+watcher fixture: owned child 48626 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 97863 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-sequence/watch.out.err
+watcher fixture: owned child 13076 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-recovery/watch.out.err
 watcher: recovery state could not be persisted; retaining stale lock evidence
-watcher fixture: owned child 61663 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-overdue-recovery/watch.out.err
-watcher fixture: owned child 80594 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-queue/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-queue/state/.wake-queue: Is a directory
-watcher fixture: owned child 48248 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-queue/watch.out.err
-watcher fixture: owned child 74602 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-sequence/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-sequence/state/.wake-queue.seq: Is a directory
-watcher fixture: owned child 22870 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-sequence/watch.out.err
-watcher fixture: owned child 41017 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-recovery/watch.out.err
+watcher fixture: owned child 56323 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-overdue-recovery/watch.out.err
+watcher fixture: owned child 71603 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 12279 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-queue/watch.out.err
+watcher fixture: owned child 37125 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 74151 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-sequence/watch.out.err
+watcher fixture: owned child 91930 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-recovery/watch.out.err
 watcher: recovery state could not be persisted; retaining stale lock evidence
-watcher fixture: owned child 86817 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-stale-recovery/watch.out.err
-watcher fixture: owned child 6246 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-queue/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-queue/state/.wake-queue: Is a directory
-watcher fixture: owned child 52819 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-queue/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-queue/watch.out.err
-watcher fixture: owned child 72468 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-sequence/watch.out.err
-/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M622ZMY4NQCTH6N8BR9VJCAW/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-sequence/state/.wake-queue.seq: Is a directory
-watcher fixture: owned child 51136 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-sequence/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-sequence/watch.out.err
-watcher fixture: owned child 66273 wait returned status 1
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-recovery/watch.out.err
+watcher fixture: owned child 28988 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-stale-recovery/watch.out.err
+watcher fixture: owned child 36383 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-queue/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2794: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-queue/state/.wake-queue: Is a directory
+watcher fixture: owned child 55051 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-queue/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-queue/watch.out.err
+watcher fixture: owned child 62384 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-sequence/watch.out.err
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64W8Y7K4BPYQPXVVWJGH2T3/bin/fm-wake-lib.sh: line 2791: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-sequence/state/.wake-queue.seq: Is a directory
+watcher fixture: owned child 88911 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-sequence/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-sequence/watch.out.err
+watcher fixture: owned child 7740 wait returned status 1
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-recovery/watch.out.err
 watcher: recovery state could not be persisted; retaining stale lock evidence
-watcher fixture: owned child 82163 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-recovery/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-retry-missing-recovery/watch.out.err
+watcher fixture: owned child 31765 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-recovery/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-retry-missing-recovery/watch.out.err
 ok - queue, sequence, and recovery publication failures retry identical overdue and stale ledgers without losing cooldown
 ok - overdue and stale publication wait for their queue lock before committing cooldown
 ok - a retained collector survives watcher exit, rejects overlapping restart scans, and publishes without starvation
-tests/fm-watch-open-loops.test.sh: line 44: 67915 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 67915 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-0100/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-0100/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 92402 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 92402 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-0/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-0/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 11813 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 11813 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-00/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-00/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 29646 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 29646 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-000/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-000/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 44415 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 44415 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-invalid/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-interval-invalid/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 26120 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 26120 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-0100/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-0100/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 37238 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 37238 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 50329 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 50329 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 73928 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 73928 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 88879 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 88879 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-interval-invalid/watch.out.err
 ok - leading-zero intervals use decimal refresh/stale thresholds and all zero spellings fall back
-tests/fm-watch-open-loops.test.sh: line 44: 43487 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 43487 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-0/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-0/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 66198 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 66198 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-00/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-00/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44:  9265 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 9265 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-000/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-000/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 83857 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 83857 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-invalid/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-overdue-invalid/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 53428 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 53428 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-0/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-0/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 94336 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 94336 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-00/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-00/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44: 46795 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 46795 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-000/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-000/watch.out.err
-tests/fm-watch-open-loops.test.sh: line 44:  8538 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
-watcher fixture: owned child 8538 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-invalid/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-resurface-stale-invalid/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 69957 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 69957 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 91329 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 91329 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 18583 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 18583 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 49790 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 49790 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-overdue-invalid/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 99939 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 99939 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-0/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-0/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 33760 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 33760 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-00/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-00/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 61259 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 61259 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-000/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-000/watch.out.err
+tests/fm-watch-open-loops.test.sh: line 44: 86507 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 env "$@" "$WATCH" > "$out" 2> "$out.err"
+watcher fixture: owned child 86507 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-invalid/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-resurface-stale-invalid/watch.out.err
 ok - both stale and overdue cooldowns use decimal resurface seconds and all zero spellings fall back
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-aged/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224436
+generated_epoch: 1793313790
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846539636,true,""
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846628990,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-aged/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-aged/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224481
+generated_epoch: 1793313799
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846539681,true,""
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846628999,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-watcher fixture: owned child 50963 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-aged/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-aged/watch.out.err
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+watcher fixture: owned child 28477 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-aged/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-aged/watch.out.err
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-missing/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224493
+generated_epoch: 1793313805
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846539693,true,""
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846629005,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-missing/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-missing/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224511
+generated_epoch: 1793313818
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846539711,true,""
+  "missing_worker","recovery-obligation","firstmate","recover the assigned worker without discarding work",846629018,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-watcher fixture: owned child 91641 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-missing/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-recovery-missing/watch.out.err
+watcher fixture: owned child 74572 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-missing/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-recovery-missing/watch.out.err
 ok - real publication between stopped watchers rearms aged/missing stale incidents without resetting overdue cooldown
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224518
+generated_epoch: 1793313824
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846539718,true,""
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846629024,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-blocked-recovery-aged/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224566
+generated_epoch: 1793313833
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846539766,true,""
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846629033,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224581
+generated_epoch: 1793313843
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846539781,true,""
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846629043,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
-bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-blocked-recovery-missing/collector-bin/fm-open-loops.sh
 description: Reconcile assigned work against live delivery evidence
 complete: true
-generated_epoch: 1793224598
+generated_epoch: 1793313851
 rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
-  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846539798,true,""
+  "missing_worker","blocked-recovery-obligation","firstmate","recover the assigned worker without discarding work",846629051,true,""
 help: Run bin/fm-open-loops.sh --json for age limits and structured rows
 ok - fresh observation rearms aged/missing outages after real recovery races a blocked stale append
-watcher fixture: owned child 25139 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-1/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-1/watch.out.err
-watcher fixture: owned child 22306 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-2/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-2/watch.out.err
-watcher fixture: owned child 16290 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-3/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-3/watch.out.err
-watcher fixture: owned child 5237 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-4/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-4/watch.out.err
-watcher fixture: owned child 69612 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-5/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-5/watch.out.err
-watcher fixture: owned child 3058 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-6/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-6/watch.out.err
-watcher fixture: owned child 13833 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-7/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-7/watch.out.err
-watcher fixture: owned child 81562 wait returned status 143
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-8/watch.out
-watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.i3ToJj/ledger-corrupt-recovery-8/watch.out.err
-Terminated: 15
+watcher fixture: owned child 24799 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-1/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-1/watch.out.err
+watcher fixture: owned child 74476 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-2/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-2/watch.out.err
+watcher fixture: owned child 27371 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-3/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-3/watch.out.err
+watcher fixture: owned child 85337 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-4/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-4/watch.out.err
+watcher fixture: owned child 46010 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-5/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-5/watch.out.err
+watcher fixture: owned child 11580 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-6/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-6/watch.out.err
+watcher fixture: owned child 83383 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-7/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-7/watch.out.err
+watcher fixture: owned child 75001 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-8/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-8/watch.out.err
+watcher fixture: owned child 51406 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-9/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-9/watch.out.err
+watcher fixture: owned child 19651 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-10/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-10/watch.out.err
+watcher fixture: owned child 94832 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-11/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-11/watch.out.err
+watcher fixture: owned child 54863 wait returned status 143
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-12/watch.out
+watcher fixture output: /Users/charlesabrooker/tmp/fm-watch-open-loops-tests.ajuAKc/ledger-corrupt-recovery-12/watch.out.err
+ok - fresh corrupt ledgers preserve continuous-outage and overdue cooldowns while valid degraded reports rearm stale incidents
+exit=0
