@@ -1,0 +1,11 @@
+# mutant: bin/fm-test-reap-orphans.sh prints 'reaped' but never sends TERM/KILL
+# isolated TMPDIR=/tmp/fm-b5a-mut.Ln2c/tmp so no other suite's startup reaper can stop these stubs
+# stubs self-expire after FM_TEST_STUB_MAX_BLOCK_SECONDS=20
+# start 17:48:08 load averages: 41.28 46.37 44.69
+no_progress: "pid=79947 no CPU or watched-file progress for 1.3s"
+fm_test_wait_until: condition unmet (124, pid=79947)
+ok - disappearance checks distinguish a replaced identity from the still-live original
+ok - a stub is left alone while the run that made it is alive
+not ok - the orphaned stub of an ended run survived the reaper
+tests/lib.sh: line 393: 87033 Killed: 9               bash "$ROOT_DEAD/live-parent.sh" "$ROOT_DEAD/release"
+# exit=1 end 17:48:58

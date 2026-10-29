@@ -1,0 +1,7 @@
+# host: 17:43  up 1 day,  7:43, 4 users, load averages: 34.37 63.00 48.68
+# old helper = tests/lib.sh at base e27bbad9b; new helper = tests/lib.sh at 7dd5a9c5a
+# same publisher, same predicate; old helper given a 10s cap
+helper=old dilation=1x cap=10s wait_rc=0 elapsed=5s published=yes
+helper=new dilation=1x cap=10s wait_rc=0 elapsed=6s published=yes
+helper=old dilation=5x cap=10s wait_rc=1 elapsed=16s published=no-yet
+helper=new dilation=5x cap=10s wait_rc=0 elapsed=22s published=yes

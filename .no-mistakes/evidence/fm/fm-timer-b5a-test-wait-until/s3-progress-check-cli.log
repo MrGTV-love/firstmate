@@ -1,20 +1,38 @@
-$ progress-check rec 0 default   (PID 0, no files)
+## argument guards
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec 0 default
 error: "progress-check needs a positive PID, or PID 0 with watched files only"
 help: "python3 bin/fm-duration.py --help"
-exit=2
-$ progress-check rec 0 default --while-alive file
+-> exit=2
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec 0 default --while-alive journal
 error: "progress-check needs a positive PID, or PID 0 with watched files only"
 help: "python3 bin/fm-duration.py --help"
-exit=2
-$ progress-check rec -5 1
+-> exit=2
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec -5 default
 error: "progress-check needs a positive PID, or PID 0 with watched files only"
 help: "python3 bin/fm-duration.py --help"
-exit=2
-$ progress-check rec 36416 default --while-alive   (live sleep peer, twice)
-exit=0
-exit=0 (900s default window, not yet expired)
-record since==sampled? False since kept: True
-$ progress-check rec 36416 default --while-alive   (peer now dead)
-exit=3 (3 = dead peer)
-$ progress-check rec 36416 default   (dead peer, without --while-alive)
-exit=0 (0 = never authorizes a stop)
+-> exit=2
+## PID 0, file-only: first sample is never a stop; quiet file after interval -> 124; changed file resets
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec0 0 0.3 journal
+-> exit=0
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec0 0 0.3 journal
+no_progress: "pid=0 no CPU or watched-file progress for 0.9s"
+-> exit=124
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check rec0 0 0.3 journal
+-> exit=0
+## default inactivity = operational 15-minute policy (FM_DURATION_NO_PROGRESS_SECS overrides it)
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check recd 56099 default --while-alive
+-> exit=0
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check recd 56099 default --while-alive
+-> exit=0
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check recd 56099 default --while-alive
+-> exit=0
+## dead peer with --while-alive -> 3; same dead PID without --while-alive -> 0 (missing process never authorizes stop)
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check recd 56099 default --while-alive
+-> exit=3
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WFTACSYHPGJ8APCRTXJN9/bin/fm-duration.py progress-check recx 56099 default
+-> exit=0
+## (re-run) default inactivity honours the integer FM_DURATION_NO_PROGRESS_SECS override; a quiet live peer is 124 once that passes
+first sample (no override) -> exit=0
+2s later, default 900s policy -> exit=0
+no_progress: "pid=4086 no CPU or watched-file progress for 5.9s"
+2s later, override 1s -> exit=124
