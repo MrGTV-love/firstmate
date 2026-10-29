@@ -6209,7 +6209,7 @@ fi
 # A governed provisioner refusal retains this assigned copy and its endpoint:
 # ordinary acquisition-abort cleanup must not release its lease or remove it.
 spawn_slot_refused() {
-  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref= adopt_scope=0 record_prepared=0
+  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref='' adopt_scope=0 record_prepared=0
   [ "$BACKEND" != orca ] || window=$W
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0

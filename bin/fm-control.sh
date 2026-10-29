@@ -2734,9 +2734,10 @@ do_relaunch() {
       || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
     owned_copy=$WT
     [ "$RELOCATING" = 0 ] || owned_copy=$RELOCATE_DEST
-    [ "$KIND" != secondmate ] &&
-      { grep -q '^slot_manifest=' "$META" || fm_slot_required "$(fm_meta_get "$META" project)" "$owned_copy"; } \
-      || die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+    if [ "$KIND" = secondmate ] \
+      || ! { grep -q '^slot_manifest=' "$META" || fm_slot_required "$(fm_meta_get "$META" project)" "$owned_copy"; }; then
+      die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+    fi
   fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
