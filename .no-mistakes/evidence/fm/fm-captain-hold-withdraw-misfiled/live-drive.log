@@ -1,0 +1,214 @@
+parent lab home: /Users/charlesabrooker/tmp/fm-lab.bB6wWN
+mate lab home:   /Users/charlesabrooker/tmp/fm-lab.QMsPma
+remote mate lab: /Users/charlesabrooker/tmp/fm-lab.DjcoPm
+
+### SETUP: work items and legacy holds filed while the home had no owner rule (before this change)
+parent pending-reply record: corr=1d9461644618d8b3 at /Users/charlesabrooker/tmp/fm-lab.bB6wWN/state/pending-replies/1d9461644618d8b3
+-- pr290-ship
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+-- pr290-shape
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+-- d5-mechanism
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+-- d5-error-bound
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: captain
+
+### S1 ROOT CAUSE: a mate home cannot file a hold without saying whose call it is, and never holds Main's call
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh hold new-work --reason retry or fix one red CI check
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh hold new-work --reason retry or fix one red CI check --owner parent
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+  state: queued
+  held: no
+  hold_kind: "-"
+  kind: ship
+
+### S2 PR 290 path: merge gate refuses the misfiled captain hold (local merge entry point)
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-merge-local.sh pr290-ship
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: task pr290-ship is still held for the captain; release it before merging
+[exit 1]
+
+### S2 answer would forge the captain's words: show the honest paths instead
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify pr290-ship --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason the retry-or-fix question was Main's
+classified: pr290-ship as parent
+[exit 0]
+  state: queued
+  held: yes
+  hold_kind: external
+  kind: ship
+  body: "Captain hold set: 2026-01-01T00:00:00Z\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry-or-fix question was Main's\nClassification provenance: parent request corr=1d9461644618d8b3\nClassification evidence digest: ba612f1405f11ff5786bd60c4bfdb82250b60c3c5716d7bf2302ef89e749549b\nOriginal hold reason: retry or fix one red CI check; Main180/181 reserve ask-user decisions to Main, relayed corr=1d9461644618d8b3\n\nGated ship work.\n\nClassification evidence:\nMain decided: one unchanged-head retry.\nCI went green; DeepSeek PASS recorded."
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh open pr290-ship --distinguish-absent
+[exit 1]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh open pr290-ship --distinguish-absent --parent-owned
+[exit 0]
+
+### S2 merge gate now names the parent's decision, not the captain's
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-merge-local.sh pr290-ship
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task pr290-ship is still waiting on the parent firstmate's decision; record it with fm-captain-hold.sh decide before merging
+[exit 1]
+
+### S2 ADVERSARIAL: the captain's answer path refuses a parent decision
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh answer pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/fake-captain.txt --release
+fm-captain-hold: task pr290-ship is not held for the captain; hold it first or name the right task
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: external
+  kind: ship
+
+### S2 Main records its decision; work item stays open; merge proceeds
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh decide pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/parent-decision.txt
+decided: pr290-ship
+[exit 0]
+  state: queued
+  held: no
+  hold_kind: "-"
+  kind: ship
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 93254c9e89bb296eef2e4cdc9decd1340fdf1f454e31fc04c940b180b9cd6b92\nResolution mode: decided\nResolves hold set: 2026-01-01T00:00:00Z\nResolved at: 2026-10-29T09:12:21Z\nDecided by: parent firstmate\nNot a captain answer.\n\nParent decision:\nRetry the failing check once on the unchanged head. Done; 34/34 green.\n\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry-or-fix question was Main's\nClassification provenance: parent request corr=1d9461644618d8b3\nClassification evidence digest: ba612f1405f11ff5786bd60c4bfdb82250b60c3c5716d7bf2302ef89e749549b\nOriginal hold reason: retry or fix one red CI check; Main180/181 reserve ask-user decisions to Main, relayed corr=1d9461644618d8b3\n\nGated ship work.\n\nClassification evidence:\nMain decided: one unchanged-head retry.\nCI went green; DeepSeek PASS recorded."
+-- parent channel (/Users/charlesabrooker/tmp/fm-lab.bB6wWN/state/fm-mini-lab.status):
+needs-decision [key=captain-hold-pr290-ship-1]: parent decision pr290-ship: Parent classification as the parent's call, not the captain's words: the retry-or-fix question was Main's. Original hold reason: retry or fix one red CI check; Main180/181 reserve ask-user decisions to Main, relayed corr=1d9461644618d8b3
+resolved [key=captain-hold-pr290-ship-1]: parent decision pr290-ship: decided by the parent firstmate
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-merge-local.sh pr290-ship
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+merged fm/pr290-ship into local main (0339c70 -> a1c08ea) in /Users/charlesabrooker/tmp/fm-lab.QMsPma/projects/sample
+[exit 0]
+a1c08ea the fix
+0339c70 base
+
+### S3 ADVERSARIAL: the real PR 290 hold reason (no corr token) cannot be classified; it stays the captain's
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify pr290-shape --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason the question was Main's
+fm-captain-hold: task pr290-shape carries no parent provenance: its hold reason names no corr=<id> token of a request the parent firstmate relayed to this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh decide pr290-shape --decision-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/d.txt
+fm-captain-hold: task pr290-shape is not waiting on the parent firstmate (recorded owner: unrecorded); only the captain's own words release a captain call, so use answer for that
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh open pr290-shape --distinguish-absent
+[exit 0]
+
+### S3b ADVERSARIAL: a forged corr token with no parent record is refused
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify forged-work --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason the question was Main's
+fm-captain-hold: task forged-work carries no parent provenance: its hold reason names corr=deadbeefdeadbeef, but the parent home holds no pending-reply record of that request for this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+
+### S4 ADVERSARIAL: withdraw with no ruling, a non-captain ruling, or an unrelated ruling is refused
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/withdraw-evidence.txt
+fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a legacy hold classified as the parent's is released with decide, and nothing else releases a captain call without the captain's words
+[exit 1]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/withdraw-evidence.txt --ruling pr290-ship
+fm-captain-hold: pr290-ship is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw d5-mechanism
+[exit 1]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/withdraw-evidence.txt --ruling ruling-unrelated
+fm-captain-hold: ruling ruling-unrelated does not name d5-mechanism in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw d5-mechanism
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+
+### S5 vernant-d5: the captain's ruling A makes d5-mechanism and d5-error-bound moot; withdraw releases honestly
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh hold ruling-a --title Captain ruling A --reason Choose approach A or B for vernant-d5 --repo sample --owner captain
+ruling-a
+[exit 0]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/captain-ruling-a.txt
+answered: ruling-a
+[exit 0]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/withdraw-evidence.txt --ruling ruling-a
+withdrawn: d5-mechanism
+[exit 0]
+  state: queued
+  held: no
+  hold_kind: "-"
+  kind: ship
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 9bc025fe44bed67a07640ccfacafea9dd8515b7c08f51872b461b90ecb68ac65\nResolution mode: withdrawn\nResolves hold set: 2026-01-01T00:00:00Z\nResolved at: 2026-10-29T09:12:49Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: unrecorded\nRun from: secondmate home\nNot a captain answer.\n\nWithdrawal evidence:\nmoot under ruling A\n\nGated work."
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh withdraw d5-error-bound --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/withdraw-evidence.txt --ruling ruling-a
+withdrawn: d5-error-bound
+[exit 0]
+  state: done
+  held: no
+  hold_kind: captain
+  kind: captain
+-- tasks-axi ready (a withdrawn question must not be dispatchable work):
+$ tasks-axi ready
+count: 3
+ready[3]{id,state,kind,repo,title}:
+  pr290-ship,queued,ship,sample,Ship the successor watcher race fix
+  d5-mechanism,queued,ship,sample,vernant-d5 demand-map mechanism
+  new-work,queued,ship,sample,New gated work
+ready_public_followups: 0 delivery-ready obligations
+help[1]:
+  - Run `tasks-axi start <id> --file=data/backlog.md` to dispatch one of these
+[exit 0]
+
+### S6 a genuine captain call is not released by Main's decision and still blocks the merge
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh hold cap-work --reason captain: ship the risky migration now? --owner captain
+cap-work
+[exit 0]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh decide cap-work --decision-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/parent-decision.txt
+fm-captain-hold: task cap-work is not waiting on the parent firstmate (recorded owner: captain); only the captain's own words release a captain call, so use answer for that
+[exit 1]
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify cap-work --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason try to steal it
+fm-captain-hold: task cap-work records its owner (captain) from when it was filed or classified; a recorded owner is never reclassified
+[exit 1]
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+$ FM_HOME=<fm-lab.QMsPma> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-merge-local.sh cap-work
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: task cap-work is still held for the captain; release it before merging
+[exit 1]
+
+### S7 remote mate: classify matches the relayed request in this home's own steering inbox
+relayed request written to the remote inbox through bin/fm-task-inbox-lib.sh
+$ FM_HOME=<fm-lab.DjcoPm> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify unrelayed-work --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason the question was Main's
+fm-captain-hold: task unrelayed-work carries no parent provenance: its hold reason names corr=aabbccddeeff0011, but this home's parent-route steering inbox holds no relayed request with that correlation; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+$ FM_HOME=<fm-lab.DjcoPm> /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63A60AGEPSP74AYJ432XZDV/bin/fm-captain-hold.sh classify relayed-work --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.QMsPma/classify-evidence.txt --reason the question was Main's
+classified: relayed-work as parent
+[exit 0]
+  state: queued
+  held: yes
+  hold_kind: external
+  kind: ship
+  body: "Captain hold set: 2026-01-01T00:00:00Z\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the question was Main's\nClassification provenance: parent request corr=00112233445566ff\nClassification evidence digest: ba612f1405f11ff5786bd60c4bfdb82250b60c3c5716d7bf2302ef89e749549b\nOriginal hold reason: retry or fix one red CI check, relayed corr=00112233445566ff\n\nClassification evidence:\nMain decided: one unchanged-head retry.\nCI went green; DeepSeek PASS recorded."
+  state: queued
+  held: yes
+  hold_kind: captain
+  kind: ship
+
+### TEARDOWN
+lab homes removed on exit
