@@ -1528,14 +1528,14 @@ class WaitVerifier:
                     stream=[stat.st_dev, stat.st_ino])
 
     def task_pr(self, path, fields):
-        """A task's PR: its recorded pr=, or for a local ship the PR its done note names or its no-mistakes run records.
+        """A task's PR: its recorded pr=, or for a ship the PR its done note names or its no-mistakes run records.
 
         A done-note or run PR counts only when bin/fm-pr-lib.sh's fm_pr_url_parse accepts it, the shape the PR
         registrar (bin/fm-pr-ready-reconcile.sh) needs, so a PR no merge can be recorded for never keeps a task live.
         """
         if fields.get("pr"):
             return fields["pr"]
-        if fields.get("kind") != "ship" or fields.get("remote_host"):
+        if fields.get("kind") != "ship":
             return ""
         return self.collector.bash(
             '. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; . "$1/fm-pr-lib.sh"; . "$1/fm-nm-run-lib.sh"; '
