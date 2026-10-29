@@ -1,0 +1,3 @@
+$ bin/fm-proc-budget.sh -- bash tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone   (at af397f14018fe2d067085690f82bfaa342076ecd)
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=0

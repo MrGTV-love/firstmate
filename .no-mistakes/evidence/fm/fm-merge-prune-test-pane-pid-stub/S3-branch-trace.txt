@@ -1,0 +1,130 @@
+=== fixed stub, real lib  (pane pid argument: '45922')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s 45922
++ pane=45922
++ '[' -n 45922 ']'
++ fm_mp_read_pane_tree 45922
+++ ps -axo pid=,ppid=
++ table='45922 45915'
++ return 1
++ return 1
++ rc=1
++ set +x
+fm_mp_pane_agent_gone rc=1 (not proven gone)
+
+=== old stub (called with one arg), real lib  (pane pid argument: '45922')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s ''
++ pane=
++ '[' -n '' ']'
++ return 1
++ rc=1
++ set +x
+fm_mp_pane_agent_gone rc=1 (not proven gone)
+
+=== fixed stub, lib with ps status check removed  (pane pid argument: '45922')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s 45922
++ pane=45922
++ '[' -n 45922 ']'
++ fm_mp_read_pane_tree 45922
+++ ps -axo pid=,ppid=
++ table='45922 45915'
++ true
+++ printf '%s\n' '45922 45915'
+++ awk -v root=45922 '
++ tree='45922 45915'
++ read -r p n
++ '[' -z 45922 ']'
++ read -r p n
++ '[' 1 -gt 0 ']'
++ for p in '"${FM_MP_TREE_PIDS[@]}"'
+++ ps -o comm= -p 45922
++ comm=bash
+++ ps -o args= -p 45922
++ args='bash -c sleep 300 & wait'
+++ fm_agent_process_classify bash bash 'bash -c sleep 300 & wait' 45922
++++ fm_agent_process_classify_name bash bash
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_name=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n bash ']'
++++ fm_agent_process_classify_name bash bash
++++ base=bash
++++ base=bash
++++ case "$base" in
++++ printf shell
+++ by_argv0=shell
+++ '[' shell '!=' agent ']'
+++ '[' -n 45922 ']'
+++ fm_gemini_pid_is_gemini 45922
+++ '[' -r /proc/45922/cmdline ']'
+++ return 1
+++ '[' -n 'bash -c sleep 300 & wait' ']'
+++ fm_dsh_args_are_dsh 'bash -c sleep 300 & wait'
+++ args='bash -c sleep 300 & wait'
+++ executable=bash
+++ case "${executable##*/}" in
+++ return 1
+++ '[' -n 'bash -c sleep 300 & wait' ']'
+++ fm_gemini_args_are_gemini 'bash -c sleep 300 & wait'
+++ '[' -n 'bash -c sleep 300 & wait' ']'
+++ args='bash -c sleep 300 & wait'
+++ argv0=bash
+++ fm_gemini_path_is_gemini bash
+++ '[' -n bash ']'
+++ case "$path" in
+++ case "${path##*/}" in
+++ case "$path" in
+++ return 1
+++ case "${argv0##*/}" in
+++ return 1
+++ '[' shell = shell ']'
+++ '[' shell = shell ']'
+++ printf shell
++ '[' shell '!=' shell ']'
++ continue
++ rc=0
++ set +x
+fm_mp_pane_agent_gone rc=0 (AGENT GONE)
+
+=== old stub, lib with ps status check removed  (pane pid argument: '45922')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s ''
++ pane=
++ '[' -n '' ']'
++ return 1
++ rc=1
++ set +x
+fm_mp_pane_agent_gone rc=1 (not proven gone)
+
+=== ADVERSARIAL: fixed stub with an empty pane pid, real lib  (pane pid argument: '')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s ''
++ pane=
++ '[' -n '' ']'
++ return 1
++ rc=1
++ set +x
+fm_mp_pane_agent_gone rc=1 (not proven gone)
+
+=== ADVERSARIAL: fixed stub with an empty pane pid, lib with ps status check removed  (pane pid argument: '')
++ fm_mp_pane_agent_gone /nonexistent.meta
+++ fm_mp_pane_pid /nonexistent.meta
+++ printf %s ''
++ pane=
++ '[' -n '' ']'
++ return 1
++ rc=1
++ set +x
+fm_mp_pane_agent_gone rc=1 (not proven gone)
+
+bash: line 1: 45925 Terminated: 15          sleep 300

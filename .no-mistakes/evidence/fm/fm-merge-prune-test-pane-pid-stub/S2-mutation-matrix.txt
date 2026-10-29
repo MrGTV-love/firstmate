@@ -1,0 +1,52 @@
+# Disposable copies built by: git archive af397f14018fe2d067085690f82bfaa342076ecd | tar -x  (one per variant, under /tmp/fm-mp-pid-stub.Hfoprz)
+# stub=fixed: the PR's stub (test_pane_pid=$2; fm_mp_pane_pid() { printf %s "$test_pane_pid"; })
+# stub=old:   the pre-fix stub (fm_mp_pane_pid() { printf %s "$2"; })
+# lib=mut:    ps status check removed in fm_mp_read_pane_tree ('|| return 1' -> '|| true', and the empty-table check dropped)
+# iso-*:      the scenario keeps only its setup, 'go', and the supplemental direct assertion (orchestration checks and second half removed)
+
+=== variant fixed-real: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/fixed-real/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=
+
+=== variant fixed-mut: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/fixed-mut/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+not ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown: the live agent was stopped on a partial process table: t1 exit
+2026-10-29T07:46:20Z retained /Users/charlesabrooker/tmp/fm-merge-prune.valDJH/w1/th/pool1/1/repo: process(es) inside /Users/charlesabrooker/tmp/fm-merge-prune.valDJH/w1/th/pool1/1/repo: 43448
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793281576
+exit=
+
+=== variant old-real: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/old-real/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=
+
+=== variant old-mut: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/old-mut/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+not ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown: the live agent was stopped on a partial process table: t1 exit
+2026-10-29T07:46:31Z retained /Users/charlesabrooker/tmp/fm-merge-prune.0xv5gy/w1/th/pool1/1/repo: process(es) inside /Users/charlesabrooker/tmp/fm-merge-prune.0xv5gy/w1/th/pool1/1/repo: 55822
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793281587
+exit=
+
+=== variant iso-fixed-real: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/iso-fixed-real/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=
+
+=== variant iso-fixed-mut: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/iso-fixed-mut/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+not ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown: the reap admission took a partly read process table for an agent that is gone
+2026-10-29T07:46:42Z retained /Users/charlesabrooker/tmp/fm-merge-prune.w6UqSF/w1/th/pool1/1/repo: process(es) inside /Users/charlesabrooker/tmp/fm-merge-prune.w6UqSF/w1/th/pool1/1/repo: 69962
+pr=https://github.com/acme/widget/pull/7
+attempts=1
+next_at=1793281598
+exit=
+
+=== variant iso-old-real: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/iso-old-real/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=
+
+=== variant iso-old-mut: $ bin/fm-proc-budget.sh -- bash /tmp/fm-mp-pid-stub.Hfoprz/iso-old-mut/tests/fm-merge-prune.test.sh test_partial_process_table_proves_no_agent_gone
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+exit=
+
+
+# Note: the exit= lines are blank because the shell recorded no pipe status; the ok / not ok line is the verdict of each run.
