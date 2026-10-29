@@ -1536,7 +1536,9 @@ pass "publication on a large history reads only what was appended and retains de
 # refuses the mutex, or lets a live process take it first.
 # The code reaches the worker through a code-root/bin symlink, as in the teardown
 # fixtures, so every process of its tree names this home in its command line and
-# the checks are scoped to this home alone.
+# the checks are scoped to this home alone. Each worker counts its fence polls in
+# <home>.fence-polls, beside the home so a removed home keeps it, and a worker
+# that should end or publish is judged by those polls, not by a clock.
 FENCE_BIN="$TMP_ROOT/fence-bin"
 fm_test_refresh_fence_stub "$FENCE_BIN" || fail "could not write the fence stub"
 
@@ -1557,26 +1559,28 @@ start_fenced_refresh() {  # <name> <action>
   FENCE_HOME=$home
   mkdir -p "$home/code-root"
   ln -s "$ROOT/bin" "$home/code-root/bin"
-  env FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" \
-    PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
-    "$home/code-root/bin/fm-home-summary-refresh.sh" --detach \
-    || fail "could not start the detached refresh for $name"
+  (
+    fm_test_export_sleep_counter home_summary_fence
+    exec env FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" FM_TEST_SLEEP_COUNT="$home.fence-polls" \
+      PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
+      "$home/code-root/bin/fm-home-summary-refresh.sh" --detach
+  ) || fail "could not start the detached refresh for $name"
 }
 
 start_fenced_refresh gone-home remove
 GONE_HOME=$FENCE_HOME
-fm_test_wait_until 20 test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
-fm_test_wait_until 20 no_refresh_workers_of "$GONE_HOME" \
-  || fail "a refresh worker for a removed home was still running 20 seconds later: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
+fm_test_wait_until --progress-file "$GONE_HOME" -- test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
+fm_test_wait_until --cycles 10 "$GONE_HOME.fence-polls" -- no_refresh_workers_of "$GONE_HOME" \
+  || fail "a refresh worker for a removed home kept polling its fence: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
 pass "a refresh worker whose home is removed as it reaches its fence ends instead of polling forever"
 
 start_fenced_refresh uncreatable-fence-home refuse
 UNCREATABLE_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -e "$UNCREATABLE_HOME/state/.test-fence-refused" \
+fm_test_wait_until --progress-file "$UNCREATABLE_HOME/state/.test-fence-refused" -- test -e "$UNCREATABLE_HOME/state/.test-fence-refused" \
   || fail "the worker never reached the refused fence"
-fm_test_wait_until 20 no_refresh_workers_of "$UNCREATABLE_HOME" \
-  || fail "a refresh worker whose fence nothing holds was still running 20 seconds later: $(refresh_workers_of "$UNCREATABLE_HOME" | tr '\n' ' ')"
-fm_test_wait_until 5 grep -q 'no process holds it' "$UNCREATABLE_HOME/state/.home-summary-refresh.log" \
+fm_test_wait_until --cycles 10 "$UNCREATABLE_HOME.fence-polls" -- no_refresh_workers_of "$UNCREATABLE_HOME" \
+  || fail "a refresh worker whose fence nothing holds kept polling it: $(refresh_workers_of "$UNCREATABLE_HOME" | tr '\n' ' ')"
+fm_test_wait_until --progress-file "$UNCREATABLE_HOME/state/.home-summary-refresh.log" -- grep -q 'no process holds it' "$UNCREATABLE_HOME/state/.home-summary-refresh.log" \
   || fail "the unholdable fence was not logged: $(cat "$UNCREATABLE_HOME/state/.home-summary-refresh.log" 2>&1)"
 pass "a refresh worker whose fence cannot be created and is held by nothing fails at once and logs why"
 
@@ -1588,16 +1592,16 @@ ledger_published() {  # <home>
 # the worker finishes the refresh once the holder releases.
 start_fenced_refresh held-fence-home hold
 HELD_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -s "$HELD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+fm_test_wait_until --progress-file "$HELD_HOME/state/.test-fence-holder" -- test -s "$HELD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
 HELD_HOLDER=$(cat "$HELD_HOME/state/.test-fence-holder")
 sleep 3
 [ -n "$(refresh_workers_of "$HELD_HOME")" ] \
   || fail "the worker gave up on a fence a live process still held"
 kill -0 "$HELD_HOLDER" 2>/dev/null || fail "the fence holder ended before the worker could be judged"
 : > "$HELD_HOME/state/.test-fence-release"
-fm_test_wait_until 30 ledger_published "$HELD_HOME" \
+fm_test_wait_until --cycles 10 "$HELD_HOME.fence-polls" --progress-file "$HELD_HOME/state/home-summary.json" -- ledger_published "$HELD_HOME" \
   || fail "the worker never published once the live holder released the fence: $(cat "$HELD_HOME/state/.home-summary-refresh.log" 2>&1)"
-fm_test_wait_until 20 no_refresh_workers_of "$HELD_HOME" \
+fm_test_wait_until --cycles 10 "$HELD_HOME.fence-polls" -- no_refresh_workers_of "$HELD_HOME" \
   || fail "a refresh worker was left running after its fence holder released"
 pass "a refresh worker waits for a live fence holder and finishes once it releases"
 
@@ -1605,11 +1609,11 @@ pass "a refresh worker waits for a live fence holder and finishes once it releas
 # takes it over, so the worker neither waits forever nor fails.
 start_fenced_refresh dead-fence-home hold
 DEAD_HOME=$FENCE_HOME
-fm_test_wait_until 20 test -s "$DEAD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+fm_test_wait_until --progress-file "$DEAD_HOME/state/.test-fence-holder" -- test -s "$DEAD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
 DEAD_HOLDER=$(cat "$DEAD_HOME/state/.test-fence-holder")
 kill -KILL "$DEAD_HOLDER" 2>/dev/null || fail "could not stop the fence holder"
-fm_test_wait_until 30 ledger_published "$DEAD_HOME" \
+fm_test_wait_until --cycles 10 "$DEAD_HOME.fence-polls" --progress-file "$DEAD_HOME/state/home-summary.json" -- ledger_published "$DEAD_HOME" \
   || fail "the worker did not recover a fence whose holder died: $(cat "$DEAD_HOME/state/.home-summary-refresh.log" 2>&1)"
-fm_test_wait_until 20 no_refresh_workers_of "$DEAD_HOME" \
+fm_test_wait_until --cycles 10 "$DEAD_HOME.fence-polls" -- no_refresh_workers_of "$DEAD_HOME" \
   || fail "a refresh worker was left running after it recovered a dead holder's fence"
 pass "a refresh worker recovers a fence whose holder died"

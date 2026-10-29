@@ -32,11 +32,13 @@ test_local_only_force_overrides_unpushed() {
 # by anything that looks at the fixture: its command line names only the shared
 # code. The child runs a real teardown case with its refresh worker held at the
 # fence until the home is gone, then exits so its own fixture cleanup removes the
-# home under the waiting worker; no worker may remain.
+# home under the waiting worker; no worker may remain. The worker counts its
+# fence polls in polls, so one that keeps polling fails by its own polls.
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
-  local child out stub worker identity
+  local child out polls stub worker identity
   child="$TMP_ROOT/fixture-cleanup-child.sh"
   out="$TMP_ROOT/fixture-cleanup-worker"
+  polls="$TMP_ROOT/fixture-cleanup-fence-polls"
   stub="$TMP_ROOT/fixture-cleanup-stub"
   fm_test_refresh_fence_stub "$stub" || fail "could not write the fence stub"
   cat > "$child" <<'CHILD'
@@ -50,17 +52,20 @@ wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
 FM_TEARDOWN_TEST_PATH="$2:$PATH" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
   > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "the child teardown failed: $(cat "$case_dir/stderr")"
-fm_test_wait_until 30 test -s "$case_dir/state/.test-fence-waiting" \
+fm_test_wait_until --progress-file "$case_dir/state/.test-fence-waiting" -- test -s "$case_dir/state/.test-fence-waiting" \
   || fail "the refresh worker never reached the fence"
 worker=$(cat "$case_dir/state/.test-fence-waiting") || fail "the fence stub did not record the worker pid"
 printf '%s\t%s\n' "$worker" "$(fm_test_pid_identity "$worker")" > "$3"
 CHILD
-  bash "$child" "$ROOT" "$stub" "$out" || fail "the fixture child failed"
+  (
+    fm_test_export_sleep_counter home_summary_fence
+    FM_TEST_SLEEP_COUNT="$polls" exec bash "$child" "$ROOT" "$stub" "$out"
+  ) || fail "the fixture child failed"
   IFS=$'\t' read -r worker identity < "$out" || fail "the child recorded no worker"
   [ -n "$worker" ] && [ -n "$identity" ] || fail "the child recorded no worker identity"
   # shellcheck disable=SC2329 # Invoked through fm_test_wait_until.
   worker_gone() { [ "$(fm_test_pid_identity "$worker" 2>/dev/null || true)" != "$identity" ]; }
-  if ! fm_test_wait_until 20 worker_gone; then
+  if ! fm_test_wait_until --while-alive "$worker" --cycles 10 "$polls" -- worker_gone; then
     kill -KILL "$worker" 2>/dev/null || true
     fail "the home-summary refresh worker $worker outlived its fixture's cleanup"
   fi

@@ -1867,9 +1867,9 @@ while [ ! -e "$case_dir/release" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0
 SH
   probe=$(fm_test_sampler_probe) || fail "could not write the sampler probe"
   (
-    fm_test_export_owner_guard_counter
+    fm_test_export_sleep_counter cmd_owner_watchdog
     PYTHONPATH="$probe${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$case_dir/sampler-cycles" \
-      FM_TEST_GUARD_CHECKS="$case_dir/guard-checks" FM_TEST_SKIP_ORPHAN_REAP=1 \
+      FM_TEST_SLEEP_COUNT="$case_dir/guard-checks" FM_TEST_SKIP_ORPHAN_REAP=1 \
       exec bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH"
   ) &
   DETECTOR_CHILD_SUITE_PID=$!

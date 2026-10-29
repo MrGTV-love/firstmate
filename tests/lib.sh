@@ -1516,21 +1516,26 @@ PY
   printf '%s\n' "$dir"
 }
 
-# fm_test_export_owner_guard_counter: export a sleep that makes each process-event
-# owner guard (cmd_owner_watchdog in bin/fm-procevent.sh) started with
-# FM_TEST_GUARD_CHECKS=<file> add its completed lease checks, the guard's own unit
-# of work, to that file, so a wait for something the guard should end can be
-# bounded with fm_test_wait_until --cycles. Call it in the subshell that starts
-# the guard's ancestor; every other caller of sleep is unchanged.
-fm_test_export_owner_guard_counter() {
-  # shellcheck disable=SC2329 # Exported to the owner guards a child starts.
+# fm_test_export_sleep_counter <function>: export a sleep that makes each poll
+# loop whose wait is a sleep called directly from <function>, such as a
+# process-event owner guard (cmd_owner_watchdog in bin/fm-procevent.sh) or a
+# home-summary refresh worker's fence (home_summary_fence in
+# bin/fm-home-summary-refresh.sh), started with FM_TEST_SLEEP_COUNT=<file> add its
+# completed polls, the loop's own unit of work, to that file, so a wait for
+# something the loop should end or produce can be bounded with
+# fm_test_wait_until --cycles. Call it in the subshell that starts the loop's
+# ancestor; every other caller of sleep is unchanged.
+fm_test_export_sleep_counter() {
+  FM_TEST_SLEEP_CALLER=$1
+  export FM_TEST_SLEEP_CALLER
+  # shellcheck disable=SC2329 # Exported to the poll loops a child starts.
   sleep() {
-    local checks
-    if [ "${FUNCNAME[1]:-}" = cmd_owner_watchdog ] && [ -n "${FM_TEST_GUARD_CHECKS:-}" ]; then
-      checks=$(cat "$FM_TEST_GUARD_CHECKS" 2>/dev/null) || checks=0
-      case "$checks" in ''|*[!0-9]*) checks=0 ;; esac
-      printf '%s\n' "$((checks + 1))" > "$FM_TEST_GUARD_CHECKS.tmp" \
-        && mv -f "$FM_TEST_GUARD_CHECKS.tmp" "$FM_TEST_GUARD_CHECKS"
+    local polls
+    if [ "${FUNCNAME[1]:-}" = "${FM_TEST_SLEEP_CALLER:-}" ] && [ -n "${FM_TEST_SLEEP_COUNT:-}" ]; then
+      polls=$(cat "$FM_TEST_SLEEP_COUNT" 2>/dev/null) || polls=0
+      case "$polls" in ''|*[!0-9]*) polls=0 ;; esac
+      printf '%s\n' "$((polls + 1))" > "$FM_TEST_SLEEP_COUNT.tmp" \
+        && mv -f "$FM_TEST_SLEEP_COUNT.tmp" "$FM_TEST_SLEEP_COUNT"
     fi
     command sleep "$@"
   }
