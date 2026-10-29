@@ -824,6 +824,35 @@ test_own_procs_term_ends_the_tree() {
   pass "TERM to the wrapper ends the whole tree and returns 128 plus the signal"
 }
 
+# A TERM that lands right after the release, before the first sample, still
+# ends the started command through the tree cleanup.
+test_own_procs_term_at_release_ends_the_command() {
+  local rc finished="$TMP_ROOT/own-release-term.finished"
+  rm -f "$finished"
+  python3 - "$ROOT/bin/fm-proc-budget-tree.py" "$finished" <<'PY'
+import os
+import runpy
+import signal
+import sys
+
+tree = runpy.run_path(sys.argv[1], run_name="tree")
+real = os.write
+
+def write(fd, data):
+    written = real(fd, data)
+    if data == b"\n":
+        os.kill(os.getpid(), signal.SIGTERM)
+    return written
+
+os.write = write
+sys.exit(tree["run"](50, ["bash", "-c", 'sleep 30; : >"$1"', "_", sys.argv[2]]))
+PY
+  rc=$?
+  expect_code 143 "$rc" "a TERM caught as the command is released"
+  assert_absent "$finished" "the released command ran to its end instead of being ended"
+  pass "a TERM caught at the release ends the started command and returns 128 plus the signal"
+}
+
 # The dead-man link. The supervisor is killed mid-run: alone, and as a runner
 # such as bin/fm-duration.py ends the caller's group (TERM, then KILL at once).
 # The members ignore TERM, so only a KILL from the group's reader ends them.
@@ -923,7 +952,7 @@ PY
   python3 "$dir/spawn.py" "$1" "$dir/ready" "$dir/pids" <"$dir/hold" &
   NEIGHBOUR_PID=$!
   exec 8>"$dir/hold"
-  wait_for_file "$dir/ready" "$NEIGHBOUR_PID" || fail "the neighbours never started (fork limit reached?)"
+  wait_for_file "$dir/ready" "$NEIGHBOUR_PID" || { stop_neighbours; return 1; }
 }
 
 stop_neighbours() {
@@ -969,7 +998,11 @@ run_slow_tree() {
     2>"$dir/err" &
   wrapper=$!
   wait_for_file "$dir/ready" "$wrapper" || { wait "$wrapper"; echo $?; return; }
-  start_neighbours "$neighbours"
+  start_neighbours "$neighbours" || {
+    kill "$wrapper"
+    wait "$wrapper"
+    fail "the neighbours never started (fork limit reached?)"
+  }
   : >"$dir/go"
   wait "$wrapper"
   rc=$?
@@ -982,11 +1015,11 @@ test_own_procs_survives_neighbours_on_a_slow_host() {
   make_slow_tree
   # Control: the positional extra of 16 is spent by 300 neighbour processes, so
   # the rest of the user would have to free 284 processes to leave it unstarved.
-  rc=$(run_slow_tree 300 16)
+  rc=$(run_slow_tree 300 16) || exit 1
   [ "$rc" != 0 ] || fail "the control was not starved: the scenario would be vacuous"
   assert_absent "$dir/done" "the starved control must not have finished"
   assert_contains "$(cat "$dir/err")" "BlockingIOError" "the control lost its forks to the neighbours"
-  rc=$(run_slow_tree 300 --own-procs 128)
+  rc=$(run_slow_tree 300 --own-procs 128) || exit 1
   expect_code 0 "$rc" "a tree under its own limit while neighbours spend the shared count"
   assert_present "$dir/done" "the slowed tree finished its work"
   pass "neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower"
@@ -1032,6 +1065,7 @@ test_own_procs_passes_status_and_arguments_through
 test_own_procs_unreadable_samples_are_unknown
 test_own_procs_leftovers_end_with_the_command
 test_own_procs_term_ends_the_tree
+test_own_procs_term_at_release_ends_the_command
 test_own_procs_supervisor_death_ends_the_tree
 test_own_procs_stops_a_runaway_tree
 test_own_procs_nested_wrapper

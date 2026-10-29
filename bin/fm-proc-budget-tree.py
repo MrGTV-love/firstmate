@@ -246,10 +246,6 @@ def run(limit, command):
             child.wait()
         reason(f"cannot start the command under its dead-man guardian ({error}); command not started")
         return 125
-    if caught:
-        guardian.close()
-        child.wait()
-        return 128 + caught
     try:
         while True:
             if caught:
