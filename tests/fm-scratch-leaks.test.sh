@@ -262,8 +262,12 @@ test_session_start() {
       perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' bash "$ROOT/bin/fm-session-start.sh" >/dev/null 2>&1 &
     pid=$!
     started=0
-    while [ ! -d "$tmp/fm-session-start-stage.scratch" ] && [ "$started" -lt 200 ]; do started=$((started + 1)); sleep 0.05; done
-    [ -d "$tmp/fm-session-start-stage.scratch" ] || fail "the session start never made its stage file"
+    # The child writes its first stage only after the parent holds its trap.
+    while [ -z "$(find "$tmp/fm-session-start-stage.scratch" -type f -size +0 2>/dev/null)" ] && [ "$started" -lt 200 ]; do
+      started=$((started + 1))
+      sleep 0.05
+    done
+    [ -n "$(find "$tmp/fm-session-start-stage.scratch" -type f -size +0 2>/dev/null)" ] || fail "the session start never wrote its stage file"
     kill -"$sig" "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     [ ! -d "$tmp/fm-session-start-stage.scratch" ] || fail "a session start ended by $sig left its stage file: $(entries "$tmp/fm-session-start-stage.scratch")"
@@ -366,6 +370,56 @@ SH
   pass "the reaper leaves no working directory after a normal run, an error exit, TERM, INT or HUP"
 }
 
+# --- fm-scratch-lib: the container it trusts and the empty-container race ------
+scratch_new() {  # <tmpdir> <f|d> <prefix> [env...]
+  local tmp=$1 kind=$2 prefix=$3
+  shift 3
+  env TMPDIR="$tmp" "$@" bash -c '. "$1"; fm_scratch_new "$2" "$3"' _ "$ROOT/bin/fm-scratch-lib.sh" "$kind" "$prefix"
+}
+
+test_scratch_lib() {
+  local tmp outside dead path
+  # A container path that is a symlink is neither reaped through nor used.
+  tmp=$(new_tmp)
+  outside=$(new_tmp)
+  dead=$(dead_pid)
+  mkdir "$outside/$dead.PLANT1"
+  ln -s "$outside" "$tmp/fm-gh-rest.scratch"
+  path=$(scratch_new "$tmp" d fm-gh-rest) || fail "fm_scratch_new failed beside a symlinked container"
+  assert_present "$outside/$dead.PLANT1" "the scratch reaper removed an entry through a symlinked container"
+  case "$path" in "$tmp/fm-gh-rest."??????) ;; *) fail "fm_scratch_new used a symlinked container: $path" ;; esac
+  [ -d "$path" ] && [ ! -L "$path" ] || fail "fm_scratch_new beside a symlinked container made no directory: $path"
+  [ -z "$(find "$outside" -mindepth 1 -maxdepth 1 ! -name "$dead.PLANT1")" ] \
+    || fail "fm_scratch_new wrote into the target of a symlinked container"
+
+  # Another process's release removes the empty container between mkdir and
+  # mktemp, three times in a row; the request must still succeed.
+  tmp=$(new_tmp)
+  mkdir -p "$TMP_ROOT/race-bin"
+  cat > "$TMP_ROOT/race-bin/mktemp" <<'SH'
+#!/usr/bin/env bash
+n=$(cat "$RACE_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((n + 1))" > "$RACE_COUNT"
+if [ "$n" -lt 3 ]; then
+  for last; do :; done
+  rmdir "${last%/*}"
+  exit 1
+fi
+exec "$RACE_REAL_MKTEMP" "$@"
+SH
+  chmod +x "$TMP_ROOT/race-bin/mktemp"
+  rm -f "$TMP_ROOT/race-count"
+  path=$(scratch_new "$tmp" f fm-timeout-status PATH="$TMP_ROOT/race-bin:$PATH" \
+    RACE_COUNT="$TMP_ROOT/race-count" RACE_REAL_MKTEMP="$(command -v mktemp)") \
+    || fail "fm_scratch_new failed when a concurrent release removed its empty container"
+  assert_equals 4 "$(cat "$TMP_ROOT/race-count")" "the race fixture did not remove the container three times"
+  case "$path" in "$tmp/fm-timeout-status.scratch/"*) ;; *) fail "fm_scratch_new made its entry elsewhere: $path" ;; esac
+  assert_present "$path" "fm_scratch_new reported an entry it did not make"
+  env TMPDIR="$tmp" bash -c '. "$1"; fm_scratch_release "$2"' _ "$ROOT/bin/fm-scratch-lib.sh" "$path"
+  assert_clean "$tmp" "a released scratch entry"
+  pass "fm_scratch_new never enters a symlinked container and survives a container removed under it"
+}
+
 test_gh_rest
 test_timeout_status
 test_contributions
@@ -373,3 +427,4 @@ test_remote_reply_ingest
 test_session_start
 test_lavish_poll
 test_reaper
+test_scratch_lib

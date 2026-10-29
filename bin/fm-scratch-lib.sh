@@ -15,7 +15,10 @@
 #       user can signal. KILL cannot run any trap, so the next fm_scratch_new
 #       of the same prefix reaps what a killed owner left. A live owner is
 #       never touched: its pid answers kill -0. A reused pid only delays the
-#       removal. Only entries this user owns and that are not symlinks go.
+#       removal. Only entries this user owns and that are not symlinks go, and
+#       only from a container that is a directory this user owns, never a
+#       symlink. When another user holds the container path, fm_scratch_new
+#       makes <prefix>.XXXXXX directly in the temp dir instead.
 #
 # Sourced, never executed. The container name carries <prefix> verbatim, so a
 # command keeps its historic prefix (fm-gh-rest, fm-timeout-status, ...).
@@ -28,9 +31,14 @@ fm_scratch_container() {  # <prefix>
   printf '%s/%s.scratch\n' "${base%/}" "$1"
 }
 
+fm_scratch_owned() {  # <container>: a real directory of this user, not a symlink
+  [ -d "$1" ] && [ ! -L "$1" ] && [ -O "$1" ]
+}
+
 fm_scratch_reap() {  # <prefix>
   local container entry name pid
   container=$(fm_scratch_container "$1")
+  fm_scratch_owned "$container" || return 0
   for entry in "$container"/[0-9]*.??????; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     [ ! -L "$entry" ] && [ -O "$entry" ] || continue
@@ -44,23 +52,26 @@ fm_scratch_reap() {  # <prefix>
 }
 
 fm_scratch_new() {  # <f|d> <prefix>
-  local kind=$1 container path attempt=0
+  local kind=$1 container path dir='' base=${TMPDIR:-/tmp}
+  [ "$kind" != d ] || dir=1
   container=$(fm_scratch_container "$2")
-  [ ! -d "$container" ] || fm_scratch_reap "$2"
-  # A concurrent release may remove the empty container between mkdir and
-  # mktemp; the loop makes that race cost a retry rather than a failure.
-  while [ "$attempt" -lt 3 ]; do
-    attempt=$((attempt + 1))
-    (umask 077; mkdir -p -- "$container") 2>/dev/null || continue
-    if [ "$kind" = d ]; then
-      path=$(umask 077; mktemp -d "$container/$$.XXXXXX" 2>/dev/null) || continue
-    else
-      path=$(umask 077; mktemp "$container/$$.XXXXXX" 2>/dev/null) || continue
+  if [ -e "$container" ] || [ -L "$container" ]; then
+    if ! fm_scratch_owned "$container"; then
+      (umask 077; mktemp ${dir:+"-d"} "${base%/}/$2.XXXXXX")
+      return
     fi
-    printf '%s\n' "$path"
-    return 0
+    fm_scratch_reap "$2"
+  fi
+  # A concurrent release removes the container once it is empty, which can fall
+  # between mkdir and mktemp; only a container that vanished is worth a retry.
+  while :; do
+    (umask 077; mkdir -p -- "$container") 2>/dev/null || return 1
+    if path=$(umask 077; mktemp ${dir:+"-d"} "$container/$$.XXXXXX" 2>/dev/null); then
+      printf '%s\n' "$path"
+      return 0
+    fi
+    [ ! -d "$container" ] || return 1
   done
-  return 1
 }
 
 fm_scratch_release() {  # <path>

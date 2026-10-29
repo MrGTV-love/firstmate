@@ -51,8 +51,12 @@ test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it() {
   # the root and the owners container exist at the top.
   assert_equals 2 "$(find "$tmp" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" \
     "a killed shell left more than its fixture root and its record: $(find "$tmp" -mindepth 1 -maxdepth 1 | tr '\n' ' ')"
+  # The record was made when lib.sh was sourced, so it ages past the floor first.
+  touch -t 202001010000 "$tmp"/fm-test-owners/*/.fm-test-fixture
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
   assert_present "$root" "the sweep removed a fixture root younger than the age floor"
+  assert_equals 1 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" \
+    "the sweep removed an old record while a fixture root it names was still kept"
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0
   assert_absent "$root" "the sweep left the fixture root of a dead shell"
   assert_equals 0 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" \

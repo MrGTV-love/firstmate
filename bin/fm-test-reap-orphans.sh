@@ -72,10 +72,12 @@
 #                   `cleanup` file naming the fixture roots that shell made. Only
 #                   those records and roots are read, so the cost depends on how
 #                   many records exist and never on what else the shared temp dir
-#                   holds. The ownership proof is the default scan's: a root's
-#                   own marker must name a dead owner. A root the record does not
-#                   name is found only by the default scan or named with
-#                   --candidate.
+#                   holds, apart from the fmlab.* labs in the directory that
+#                   holds DIR, which are read as the default scan reads them; DIR
+#                   itself need not exist. The ownership proof is the default
+#                   scan's: a root's own marker must name a dead owner. A root the
+#                   record does not name is found only by the default scan or
+#                   named with --candidate.
 #   --candidate ROOT with --owners, one more root to examine as a container, as
 #                   the default scan does for an immediate fm-* entry (repeatable).
 #   --owner-pid PID with --root, the caller's own pid: reap what this owner left
@@ -301,10 +303,14 @@ scan_deep() {
 }
 
 # scan_owners <owners-dir>: the same markers, read only from the per-shell
-# records and the roots each names.
+# records, the roots each names, and the fmlab.* labs beside the owners dir.
 scan_owners() {
   local dir=$1 shell root
   local -a deep=()
+  printf '%s\0' "${dir%/*}"/fmlab.*/.fm-live-lab
+  for root in "${dir%/*}"/fmlab.*; do
+    scan_one_container "$root"
+  done
   for shell in "$dir"/*; do
     [ -d "$shell" ] && [ ! -L "$shell" ] || continue
     scan_one_container "$shell"
@@ -347,7 +353,9 @@ if [ -n "$OWNER_PID" ]; then
   done
 elif [ "${#OWNERS[@]}" -gt 0 ]; then
   for dir in "${OWNERS[@]}"; do
-    dir=$(physical_dir "$dir") || continue
+    dir=${dir%/}
+    root=$(physical_dir "${dir%/*}") || continue
+    dir=$root/${dir##*/}
     while IFS= read -r -d '' marker; do
       [ -f "$marker" ] || continue
       marker_owner_dead "$marker" || continue

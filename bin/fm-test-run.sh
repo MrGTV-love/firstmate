@@ -3036,7 +3036,8 @@ trap 'exit 143' TERM
 
 # One wide sweep per run: it also removes roots and registries an older layout
 # left behind. Each script's own sweep afterwards reads only the per-shell owner
-# records (tests/lib.sh), so the cost of a script does not track the temp dir.
+# records (tests/lib.sh) and the labs beside them, so the cost of a script does
+# not track the temp dir.
 FM_TEST_SWEEP_ALL=1 bash -c '. "$1/tests/lib.sh"' _ "$ROOT" >/dev/null 2>&1 || true
 
 RUN_ID="fm-test-run-${RUN_STARTED_MS}-$$"
@@ -3141,11 +3142,14 @@ record_script_result() {
 # Run the header's leftovers sweep before this worker moves to its next script.
 reap_script_leftovers() {  # <script>
   local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line base=${TMPDIR:-/tmp}
+  local -a owners=()
   [ -x "$reaper" ] || return 0
   [ ! -e "${base%/}/.git" ] || base=/tmp
+  owners=(--owners "${base%/}/fm-test-owners")
+  [ "${base%/}" = /tmp ] || owners+=(--owners /tmp/fm-test-owners)
   while IFS= read -r line; do
     [ -z "$line" ] || log "reaped after $1: $line"
-  done < <("$reaper" --owners "${base%/}/fm-test-owners" 2>/dev/null || true)
+  done < <("$reaper" "${owners[@]}" 2>/dev/null || true)
   return 0
 }
 

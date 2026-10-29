@@ -604,6 +604,15 @@ fm_test_reap_orphans() {
     mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
     [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     dir=$(dirname "$marker")
+    case "$dir" in
+      "$FM_TEST_OWNERS_DIR"/*)
+        if [ -f "$dir/cleanup" ]; then
+          while IFS= read -r root; do
+            [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] && continue 2
+          done < "$dir/cleanup"
+        fi
+        ;;
+    esac
     fm_test_remove_tree "$dir"
   done
 }
