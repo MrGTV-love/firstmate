@@ -37,6 +37,7 @@
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refused slot has an invalid prepared commit identity", "count": 2},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "refusing to reset or overwrite it"},
         {"file": "bin/fm-slot-provision-lib.sh", "match": "slot provisioner refused task"},
+        {"file": "bin/fm-slot-provision-lib.sh", "match": "created by this refused promotion"},
         {"file": "bin/fm-spawn.sh", "match": "could not record the refused slot checkpoint"},
         {"file": "bin/fm-spawn.sh", "match": "could not be confirmed stopped"},
         {"file": "bin/fm-control.sh", "match": "refused invalid --owned-path"},

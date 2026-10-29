@@ -120,6 +120,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
   FM_SLOT_BASE_SHA=
   FM_SLOT_BASE_REF=
   FM_SLOT_PREPARED_HEAD=
+  FM_SLOT_CREATED_FROM=
   fm_slot_require_scope "$@" || return 1
   fm_slot_check_copy "$project" "$copy" || return 1
   [ -f "$copy/scripts/git-stability/provision_existing_slot.py" ] || {
@@ -157,6 +158,7 @@ fm_slot_provision() { # <runner> <project> <copy> <task-id> <branch> <report> <l
       git -C "$copy" checkout --quiet "$branch" -- || return 1
     else
       git -C "$copy" checkout --quiet -b "$branch" -- || return 1
+      FM_SLOT_CREATED_FROM=$old_branch
     fi
   fi
   FM_SLOT_PREPARED_HEAD=$old_head
@@ -215,6 +217,31 @@ PY
   FM_SLOT_BASE_SHA=$base
   FM_SLOT_BASE_REF=$local_ref
   FM_SLOT_PROVISIONED=1
+}
+
+# A refused promotion has no prepared record, so the task branch its own
+# provisioning call created from a named scout branch would otherwise block
+# every retry once the scout advances. Delete only that exact alias.
+fm_slot_drop_created_branch() { # <copy> <branch>
+  local copy=$1 branch=$2 from=$FM_SLOT_CREATED_FROM head=$FM_SLOT_PREPARED_HEAD reason='' worktrees
+  [ -n "$from" ] || return 0
+  if ! worktrees=$(git -C "$copy" worktree list --porcelain); then
+    reason='its worktrees cannot be listed'
+  elif [ "$(git -C "$copy" symbolic-ref -q HEAD)" != "refs/heads/$from" ]; then
+    reason="the copy is not back on $from"
+  elif [ "$(git -C "$copy" rev-parse --verify --quiet "refs/heads/$from^{commit}")" != "$head" ]; then
+    reason="$from no longer retains $head"
+  elif git -C "$copy" symbolic-ref -q "refs/heads/$branch" >/dev/null; then
+    reason="$branch is now a symbolic ref"
+  elif printf '%s\n' "$worktrees" | grep -Fqx "branch refs/heads/$branch"; then
+    reason="$branch is checked out in a worktree"
+  elif ! git -C "$copy" update-ref --no-deref -d "refs/heads/$branch" "$head"; then
+    reason="$branch moved from $head"
+  fi
+  [ -z "$reason" ] || {
+    echo "warning: preserving task branch $branch created by this refused promotion: $reason" >&2
+    return 1
+  }
 }
 
 fm_slot_contract() { # <branch>
