@@ -2840,7 +2840,8 @@ make_held_case() {  # <name>
 # plain treehouse get records (leased=false), with a Treehouse stand-in that
 # models lease and return. Its lease command fails while <case-dir>/lease-fails
 # exists, and reports no lease command while <case-dir>/no-lease-command exists.
-# Its status lists <case-dir>/status.json while that exists, as for a project
+# While <case-dir>/lease-path exists its lease also takes --path <slot path>,
+# which leases the entry with that exact path. Its status lists <case-dir>/status.json while that exists, as for a project
 # whose current pool is another folder, else the case's own pool.
 # Lease calls land in lease.log and returns in treehouse.log.
 held_plain_get_slot() {
@@ -2852,6 +2853,7 @@ state="$case_dir/pool/treehouse-state.json"
 if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
   [ ! -e "$case_dir/no-lease-command" ] || { echo 'Error: unknown command "lease" for "treehouse"' >&2; exit 1; }
   printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  [ ! -e "$case_dir/lease-path" ] || printf '      --path string           Lease the worktree at this exact path\n'
   exit 0
 fi
 case "\${1:-}" in
@@ -2865,8 +2867,14 @@ case "\${1:-}" in
   lease)
     printf '%s\n' "\$*" >> "$case_dir/lease.log"
     [ ! -e "$case_dir/lease-fails" ] || { echo "Error: the lease could not be recorded" >&2; exit 1; }
-    jq --arg name "\$2" --arg holder "\$4" '(.worktrees[] | select(.name == \$name)) |= (.leased = true | .lease_holder = \$holder)' \\
-      "\$state" > "\$state.next" && mv "\$state.next" "\$state"
+    if [ "\$2" = --path ]; then
+      [ -e "$case_dir/lease-path" ] || { echo 'Error: unknown flag: --path' >&2; exit 1; }
+      jq --arg path "\$3" --arg holder "\$5" '(.worktrees[] | select(.path == \$path)) |= (.leased = true | .lease_holder = \$holder)' \\
+        "\${3%/*/*}/treehouse-state.json" > "\$state.next" && mv "\$state.next" "\${3%/*/*}/treehouse-state.json"
+    else
+      jq --arg name "\$2" --arg holder "\$4" '(.worktrees[] | select(.name == \$name)) |= (.leased = true | .lease_holder = \$holder)' \\
+        "\$state" > "\$state.next" && mv "\$state.next" "\$state"
+    fi
     ;;
   return) printf '%s\n' "\$*" >> "$case_dir/treehouse.log" ;;
 esac

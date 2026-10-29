@@ -5055,15 +5055,19 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
 }
 
 # A held close of a copy in a superseded pool folder: the project's current pool
-# is another folder, so treehouse get never hands this slot out and the close
-# goes ahead with the slot unleased. A lease an earlier teardown took by name on
-# a same-named slot of the current pool is released only once every refusal
-# check has passed, so a close that refuses changes no lease.
-held_superseded_case() {  # <name> <misdirected|plain>
+# is another folder that reuses its slot names, so the close leases the slot by
+# its exact path in the folder that holds it, never by name, and Treehouse then
+# never hands it out over the held copies, even once that folder is current
+# again. A lease an earlier teardown took by name on a same-named slot of the
+# current pool is released after the reservation and the held-copy record
+# checks, so a close those checks refuse changes no lease. Without lease --path
+# the close refuses and the copies stay held.
+held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
   local cur
   make_held_case "$1"
   held_foreign_unlanded "$FOREIGN_COPY"
   held_plain_get_slot "$FOREIGN_CASE"
+  [ "${3:-}" = no-lease-path ] || : > "$FOREIGN_CASE/lease-path"
   cur=$FOREIGN_CASE/current-pool/1/project
   mkdir -p "$cur"
   HELD_CURRENT_SLOT=$(cd "$cur" && pwd -P)
@@ -5075,16 +5079,18 @@ held_superseded_case() {  # <name> <misdirected|plain>
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
 }
 
-test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease() {
+test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path() {
   local rc shape
   for shape in plain misdirected; do
     held_superseded_case "held-superseded-$shape" "$shape"
     run_foreign_teardown rc
     expect_code 0 "$rc" "held-superseded-$shape: a landed task must close beside a held copy in a superseded pool folder: $(cat "$FOREIGN_CASE/stderr")"
     held_assert_closed "held-superseded-$shape"
-    assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-$shape: the close leased a slot by name"
-    cmp -s "$FOREIGN_CASE/lease-before" "$FOREIGN_CASE/pool/treehouse-state.json" \
-      || fail "held-superseded-$shape: the old folder's lease record changed"
+    assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+      "held-superseded-$shape: the slot was not leased once, by its exact path"
+    jq -e --arg slot "$FOREIGN_SLOT" '.worktrees[] | select(.path == $slot) | .leased == true and .lease_holder == "task-x1"' \
+      "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+      || fail "held-superseded-$shape: the old folder does not record the slot as leased: $(cat "$FOREIGN_CASE/pool/treehouse-state.json")"
     held_fingerprint "$FOREIGN_COPY" | cmp -s - "$FOREIGN_CASE/held-before.$(basename "$FOREIGN_COPY")" \
       || fail "held-superseded-$shape: the held copy changed"
     cmp -s "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" || fail "held-superseded-$shape: the slot's claim changed"
@@ -5094,51 +5100,25 @@ test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease() {
     else
       assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-$shape: a pool slot was returned"
     fi
-    assert_grep "is in a superseded Treehouse pool folder, which treehouse get does not hand out, so it stays unleased and claimed" \
-      "$FOREIGN_CASE/stdout" "held-superseded-$shape: the output did not say why the slot is not leased"
-    assert_grep "treehouse return $(printf '%q' "$FOREIGN_SLOT") </dev/null" "$FOREIGN_CASE/stdout" \
-      "held-superseded-$shape: the next step did not return the slot by its path"
+    assert_grep "is reserved under a durable lease and stays claimed" "$FOREIGN_CASE/stdout" \
+      "held-superseded-$shape: the output did not say the slot is reserved"
   done
-  pass "a held close in a superseded pool folder closes with the slot unleased and releases only this task's misdirected lease"
+  pass "a held close in a superseded pool folder leases the slot by its exact path and releases only this task's misdirected lease"
 }
 
-# The four steps a superseded held close must survive: the close leaves the
-# slot unleased in the old folder, the folder becomes current again, and a
-# start's allocation guard then refuses for that slot and names the held copy
-# from the held-copy inventory, never a lease. Once the held copy is landed the
-# slot no longer stops a start.
-held_allocation_check() {
-  FM_HOME="$FOREIGN_CASE/home" PATH="$FOREIGN_CASE/fakebin:$PATH" bash -c '
-    . "$1/bin/fm-wake-lib.sh"
-    . "$1/bin/fm-backend.sh"
-    . "$1/bin/fm-task-copy-lib.sh"
-    fm_task_copy_pool_slots_hold_no_current_copy "$2" "$3"
-  ' _ "$ROOT" "$FOREIGN_CASE/project" "$FOREIGN_CASE/state" 2>&1
-}
-
-test_a_held_copy_in_a_superseded_folder_is_protected_when_the_folder_returns() {
-  local rc out copy
-  held_superseded_case held-superseded-returns plain
-  copy=$(cd "$FOREIGN_COPY" && pwd -P)
+test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path() {
+  local rc
+  held_superseded_case held-superseded-no-path misdirected no-lease-path
   run_foreign_teardown rc
-  expect_code 0 "$rc" "held-superseded-returns: the held close must finish: $(cat "$FOREIGN_CASE/stderr")"
-  rc=0
-  out=$(held_allocation_check) || rc=$?
-  expect_code 0 "$rc" "held-superseded-returns: a slot of a superseded folder stopped a start: $out"
-  rm -f "$FOREIGN_CASE/status.json"
-  rc=0
-  out=$(held_allocation_check) || rc=$?
-  [ "$rc" -ne 0 ] || fail "held-superseded-returns: a start could take the slot over its held copy once the folder was current again"
-  assert_contains "$out" "holds copy $copy" "held-superseded-returns: the refusal did not name the held copy"
-  assert_contains "$out" "Land the work" "held-superseded-returns: the refusal did not name the supported routes"
-  assert_not_contains "$out" "treehouse lease" "held-superseded-returns: the refusal named a lease"
-  git -C "$FOREIGN_COPY" push -q origin HEAD:refs/heads/held-landed
-  git -C "$FOREIGN_CASE/project" fetch -q origin
-  rc=0
-  out=$(held_allocation_check) || rc=$?
-  expect_code 0 "$rc" "held-superseded-returns: a landed held copy still stopped a start: $out"
-  assert_present "$FOREIGN_COPY/unlanded.txt" "held-superseded-returns: the held copy's work is gone"
-  pass "a held copy a superseded close left stops a start once its folder is current again, and stops none once it is landed"
+  expect_code 1 "$rc" "held-superseded-no-path: a held close must refuse when the slot cannot be leased by its path: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "needs treehouse v3.1.7-fm or later (treehouse lease --path)" "$FOREIGN_CASE/stderr" \
+    "held-superseded-no-path: the refusal did not name the treehouse build it needs"
+  assert_grep "nothing was removed" "$FOREIGN_CASE/stderr" "held-superseded-no-path: the refusal did not say nothing was removed"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-no-path: the task record was removed"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-no-path: the refusal leased a slot"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-superseded-no-path: a refused close wrote a held-copy record"
+  held_assert_untouched "held-superseded-no-path" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "a held close in a superseded pool folder refuses with the treehouse build it needs when lease --path is missing, and changes nothing"
 }
 
 test_a_refused_held_close_releases_no_misdirected_lease() {
@@ -5149,7 +5129,8 @@ test_a_refused_held_close_releases_no_misdirected_lease() {
   expect_code 1 "$rc" "held-superseded-refused: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep "could not be written" "$FOREIGN_CASE/stderr" "held-superseded-refused: the refusal did not say why"
   assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-refused: the task record was removed"
-  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-refused: the refusal leased a slot"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-refused: the refusal leased anything but the exact slot it keeps held"
   assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
   held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
   pass "a held close that refuses releases no lease, not even a misdirected one"
@@ -6165,9 +6146,9 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
-test_a_held_close_in_a_superseded_pool_folder_closes_without_a_lease
+test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
+test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path
 test_a_refused_held_close_releases_no_misdirected_lease
-test_a_held_copy_in_a_superseded_folder_is_protected_when_the_folder_returns
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_leaves_one_record_line_and_a_rerun_adds_none
 test_a_held_copy_record_that_cannot_be_written_refuses_the_close

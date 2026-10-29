@@ -343,11 +343,11 @@ It does not return the slot, and it does not touch the slot's claim or any forei
 Before it removes anything, it reserves the slot under a durable lease in Treehouse state, exactly as an ordinary return does, because a slot taken with a plain `treehouse get` holds only a process lease that lapses when the worker exits and a later `treehouse get` could then reset it over the held copies.
 A slot that is already durably leased is not changed.
 When the slot cannot be proved durably leased, or the reservation fails, the whole close refuses before it removes anything, and the output says why.
-A slot in a superseded pool folder is not leased: Treehouse names a pool folder from the project's origin URL, so repointing origin leaves earlier copies in the old folder, and `treehouse lease` takes a slot name that it resolves in the current pool only.
-`treehouse get` does not hand out such a slot either, so that close goes ahead without a lease, as [Superseded pool folders](configuration.md#superseded-pool-folders) describes.
-The held-copy inventory still protects that slot: if the folder becomes current again, a start refuses while a held copy there is neither landed nor discarded, and names that copy.
-A lease that an earlier teardown took by name on a same-named slot of the current pool is released only after every refusal check has passed, so a close that refuses changes no lease.
-The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot stays claimed, reserved under a durable lease or, in a superseded pool folder, unleased.
+A slot in a superseded pool folder is leased by its exact path with `treehouse lease --path`: Treehouse names a pool folder from the project's origin URL and root, so repointing origin or moving the root leaves earlier copies in the old folder, and `treehouse lease <name>` resolves a slot name in the current pool only, as [Superseded pool folders](configuration.md#superseded-pool-folders) describes.
+That lease keeps Treehouse from handing out the slot even if the old folder becomes current again.
+When the installed treehouse has no `lease --path` (it needs treehouse v3.1.7-fm or later), the close refuses before it removes anything, with one line naming that build, and the copies stay held.
+A lease that an earlier teardown took by name on a same-named slot of the current pool is released after the reservation and the held-copy record checks, so a close those checks refuse changes no lease.
+The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot is reserved under a durable lease and stays claimed.
 Nothing returns the slot automatically, and teardown removes no held copy: a held copy goes on the owner's word naming it.
 The [nested task copy sweep](configuration.md#nested-task-copy-sweep-configcopy-budget), when its `--apply` job is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock through Vernant's closeout driver, after preserving its unique ignored files, when that copy passes the proofs the header of [`bin/fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) owns; it never removes an unlocked copy held for unique ignored files, whether or not its HEAD is landed, so that goes only on the owner's word naming it.
 For each held copy the output also prints the next step for that copy's owner, which depends on why the copy is held.
@@ -466,7 +466,6 @@ Treehouse leases only the first entry with the requested name, so a lease cannot
 No other refusal names a lease as its remedy.
 A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
 An unleased slot that `treehouse status` does not list, because the project's pool moved to a new folder, does not stop a start, because `treehouse get` allocates from the current pool only; this is judged again at each start, so a folder that becomes current again is protected again.
-A start also refuses for a slot of the current pool that holds a copy listed in the held-copy inventory `data/held-foreign-copies.log` until that copy is landed or discarded, and names that copy and those routes instead of a lease.
 A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
 A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.
 This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.

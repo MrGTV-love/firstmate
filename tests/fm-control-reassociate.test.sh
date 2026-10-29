@@ -820,8 +820,16 @@ SH
     chmod +x "$dir/code-root/bin/fm-fleet-sync.sh"
     cat > "$tb/treehouse" <<SH
 #!/usr/bin/env bash
+if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
+  [ ! -e "$dir/lease-path" ] || printf '      --lease-holder string   Optional label\n      --path string           Lease the worktree at this exact path\n'
+  exit 0
+fi
 printf '%s\n' "\$*" >> "$dir/treehouse.log"
 [ "\${1:-}" != status ] || [ ! -f "$dir/status.json" ] || cat "$dir/status.json"
+if [ "\${1:-} \${2:-}" = "lease --path" ] && [ -e "$dir/lease-path" ]; then
+  jq --arg path "\$3" --arg holder "\$5" '(.worktrees[] | select(.path == \$path)) |= (.leased = true | .lease_holder = \$holder)' \\
+    "$dir/pool/treehouse-state.json" > "$dir/pool/state.next" && mv "$dir/pool/state.next" "$dir/pool/treehouse-state.json"
+fi
 exit 0
 SH
     cat > "$tb/gh-axi" <<'SH'
@@ -1503,24 +1511,14 @@ test_unleased_shared_slot_gates_only_the_claimant() {
   pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
 }
 
-# shared_allocation_check <case-dir>: a start's allocation guard for the case
-# project, with the case's Treehouse stand-in.
-shared_allocation_check() {
-  FM_HOME="$1/home" PATH="$1/teardown-bin:$PATH" bash -c '
-    . "$1/bin/fm-wake-lib.sh"
-    . "$1/bin/fm-backend.sh"
-    . "$1/bin/fm-task-copy-lib.sh"
-    fm_task_copy_pool_slots_hold_no_current_copy "$2" "$3"
-  ' _ "$ROOT" "$1/proj" "$1/home/state" 2>&1
-}
-
-# treehouse get allocates from the project's current pool only, so a shared slot
-# in a superseded pool folder needs no lease before its claimant's record
-# retires; a shared slot the current pool lists still refuses with its lease
-# remedy.
+# A shared slot in a superseded pool folder keeps its remaining record's copy, so
+# its claimant's record retires once the slot is leased by its exact path for
+# that record, never by name; without lease --path it refuses, naming the
+# treehouse build it needs. A shared slot the current pool lists still refuses
+# with its lease remedy.
 test_superseded_shared_slot_retires_its_claimant() {
   local id=shared-superseded shape dir slot out rc
-  for shape in current superseded; do
+  for shape in current superseded superseded-no-path; do
     dir=$(new_case "shared-superseded-$shape" "$id")
     slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
     printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
@@ -1538,33 +1536,38 @@ test_superseded_shared_slot_retires_its_claimant() {
     cp "$dir/home/state/parked.meta" "$dir/parked-before"
     cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
     copy_fingerprint "$slot" > "$dir/slot-before"
+    [ "$shape" != superseded ] || : > "$dir/lease-path"
     rc=0
     out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
-    if [ "$shape" = superseded ]; then
-      expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
-      [ ! -e "$dir/home/state/$id.meta" ] || fail 'superseded shared-slot cleanup left the finished record'
-      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$slot" > "$dir/status.json"
-      rc=0
-      out=$(shared_allocation_check "$dir") || rc=$?
-      [ "$rc" -ne 0 ] || fail 'a start could take the shared slot once its folder was current again'
-      assert_contains "$out" "holds copy $slot" 'the refusal did not name the remaining copy'
-      assert_not_contains "$out" 'treehouse lease' 'the refusal named a lease'
-      rm "$dir/home/state/parked.meta"
-      rc=0
-      out=$(shared_allocation_check "$dir") || rc=$?
-      expect_code 0 "$rc" "a shared slot whose remaining record retired still stopped a start"$'\n'"$out"
-      fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
-    else
-      expect_code 1 "$rc" "an unleased shared slot of the current pool must refuse its claimant"$'\n'"$out"
-      assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the refusal must name the lease remedy'
-      cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
-    fi
+    case "$shape" in
+      superseded)
+        expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
+        [ ! -e "$dir/home/state/$id.meta" ] || fail 'superseded shared-slot cleanup left the finished record'
+        assert_equals "lease --path $slot --lease-holder parked" "$(grep -E '^lease ' "$dir/treehouse.log")" \
+          'the slot was not leased once, by its exact path, for the remaining record'
+        jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "parked"' "$dir/pool/treehouse-state.json" >/dev/null \
+          || fail "the old folder does not record the shared slot as leased: $(cat "$dir/pool/treehouse-state.json")"
+        ;;
+      superseded-no-path)
+        expect_code 1 "$rc" "a superseded shared slot must refuse without lease --path"$'\n'"$out"
+        assert_contains "$out" 'needs treehouse v3.1.7-fm or later (treehouse lease --path)' 'the refusal did not name the treehouse build it needs'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+      *)
+        expect_code 1 "$rc" "an unleased shared slot of the current pool must refuse its claimant"$'\n'"$out"
+        assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the refusal must name the lease remedy'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+    esac
     cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$shape: cleanup changed the parked record"
     copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
-    cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: cleanup changed Treehouse's lease state"
-    ! grep -Eq '^(lease|return)' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup leased or returned a slot: $(cat "$dir/treehouse.log")"
+    ! grep -Eq '^return' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup returned a slot: $(cat "$dir/treehouse.log")"
+    if [ "$shape" != superseded ]; then
+      cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: cleanup changed Treehouse's lease state"
+      ! grep -Eq '^lease' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup leased a slot: $(cat "$dir/treehouse.log")"
+    fi
   done
-  pass 'a shared slot in a superseded pool folder retires its claimant without a lease, and a current-pool one still refuses'
+  pass 'a superseded shared slot is leased by its exact path before its claimant retires, refuses without lease --path, and a current-pool one still refuses'
 }
 
 # The lease remedy names the remaining record that stays in the slot, never
