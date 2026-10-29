@@ -310,8 +310,10 @@ A retried `decide` or `withdraw` whose record is already written for the current
 ### Withdrawing a call that a captain ruling made moot
 
 `withdraw` is the honest release for a captain-kind hold on an open work item whose question a recorded captain ruling has already settled.
-It never writes the captain's words and never completes the work item.
-It lifts the hold and writes a `Resolution mode: withdrawn` record that names the ruling, the owner the hold was filed with, and the home role it ran from (derived, never typed).
+It never writes the captain's words and never completes a work item.
+It lifts the hold so a ship or scout work item resumes queued and unheld.
+Like `decide`, it closes a question-shaped row (a `captain`-kind row that no worker owns), so a moot question never returns as dispatchable work.
+It writes a `Resolution mode: withdrawn` record that names the ruling, the owner the hold was filed with, and the home role it ran from (derived, never typed).
 It also records the evidence file and the line `Not a captain answer.`, and it publishes a `resolved` line saying the call was withdrawn.
 The record carries a `Withdrawal evidence:` label instead of `Captain decision:`, so every reader that recognizes a captain answer skips it.
 Bearings and the divergence guard read only open captain-kind holds, so a withdrawn call leaves both.
@@ -330,7 +332,7 @@ The basis works on any captain hold, including one recorded as the captain's or 
 
 There is no weaker basis for `withdraw`.
 A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
-A legacy hold that was the parent's call is classified with `classify --owner parent` and resolved with `decide`.
+A legacy hold that was the parent's call and carries parent provenance is classified with `classify --owner parent` and resolved with `decide`; one without provenance stays the captain's.
 
 ### Classifying a hold filed before owners were recorded
 
@@ -339,13 +341,14 @@ Leaving every such hold captain-only turned each misfiled one into a fake captai
 `classify` is the one honest correction: the parent records, once, that the hold was its own call.
 It takes only `--owner parent`, and needs a one-line `--reason` and an evidence file whose text is stored in the task body.
 A legacy hold that is the captain's needs no classification: `hold <id> --owner captain --reason <reason>` records that owner, and `classify` refuses any other owner with a message naming that command.
-It asks for no caller identity, because it could not check one (see the reassessment below).
+It never widens who may release a captain call (see the provenance rule below).
 
 - Only a hold with no owner on record can be classified, and only in a secondmate home.
   A hold whose owner was recorded at filing, or by an earlier classification, is refused, so a call recorded as the captain's is never reclassified.
   A main home is refused, because its holds are the captain's by construction.
 - The legacy set is closed and cannot grow: a secondmate home refuses every new hold that names no owner, through `bin/fm-captain-hold.sh hold` and the `bin/fm-decision-hold.sh` shim alike.
-- The record names the owner, says it is `a parent classification`, and names the home role the command ran from (derived, never typed), the reason, the evidence digest, and the original hold reason, and says `Not a captain answer.`.
+- Only a hold with parent provenance can be classified (below); any other legacy hold stays the captain's.
+- The record names the owner, says it is `a parent classification`, and names the home role the command ran from (derived, never typed), the reason, the provenance correlation, the evidence digest, and the original hold reason, and says `Not a captain answer.`.
   It is never written under `Captain decision:` or `Answered by:`.
 - It re-files the hold as an `external` parent decision, so the existing `decide` releases it with the work item left open, and the merge gate refuses it until then.
 - It rewrites the hold reason to read `Parent classification as the parent's call, not the captain's words: <reason>. Original hold reason: ...`, and publishes that on the parent channel.
@@ -354,18 +357,15 @@ It asks for no caller identity, because it could not check one (see the reassess
 - The captain reverses a parent classification by re-holding with `--owner captain`.
   That clears the classification from the record and restores an open captain call, which `decide` then refuses.
 
-#### Harm-model reassessment for `classify`
+#### Parent provenance for `classify`
 
 The harm this guard judges is a non-captain actor releasing a genuine captain call without the captain's words.
-`classify --owner parent` widens what the guard permits: before it, an ownerless mate-home hold could be released only by the captain's words.
-An identity check cannot bound that widening, because processes of the same OS user cannot be told apart inside one home.
-A typed `--by main` flag recorded nothing a caller could not type, so it was removed rather than presented as a check.
-The guard instead bounds the release to a closed legacy set and makes every use visible, cited and reversible:
-
-- Closed set: only a captain hold with no owner recorded at filing, in a secondmate home, once per hold; new ownerless holds are refused there, so the set cannot grow.
-- Cited: `--reason` and an evidence file are required, and the evidence text is stored in the task body.
-- Visible: the record and the hold reason say it is a parent classification and `Not a captain answer.`; the parent channel carries it; Bearings, the return brief, and the divergence check show it so.
-- Reversible: the captain re-holds with `--owner captain`, and the merge gate still refuses until `decide`.
+`classify` therefore needs a fact recorded at filing, never an assertion made at classify time.
+A hold has parent provenance when its hold reason, written when the hold was filed, carries the `corr=<id>` token of a request the parent firstmate relayed to this home.
+The parent's own pending-reply record for that correlation (`state/pending-replies/<id>` in the parent home) must exist and name this home.
+A hold reason with no such token, or a token the parent never recorded, is refused, and the hold stays held.
+A remote mate cannot read its parent home, so its legacy holds have no provenance here.
+A legacy hold without provenance stays the captain's: it is released only by the captain's recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`), and `decide` refuses it.
 
 ## Reconcile: re-check reality, never a blind close
 
@@ -759,10 +759,12 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
 - The captain's `answer` path cannot release a parent-owned call, and `decide` records a non-captain block, releases a gated work item with the work left open, closes a question-shaped row, closes the channel key, and replays once.
 - A captain-owned call is not closed by `decide`, in a secondmate home or a main home, and the merge gate still refuses it.
 - `withdraw` releases a call that is moot under a recorded captain ruling, leaves the work open, writes no captain words, and drops the call from Bearings.
+  A withdrawn question-shaped row is closed and is absent from `tasks-axi ready`, while a withdrawn work item stays queued and unheld.
   It refuses a missing basis, a missing ruling, a self ruling, an open task as ruling, an evidence-only close as ruling, a ruling that does not name the hold, a ruling that names the task only by its origin, a ruling reused after the task was re-held, and a missing evidence file.
 - `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
-- `classify` moves a legacy hold to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.
+- `classify` moves a legacy hold with parent provenance to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.
+  It refuses a legacy hold without parent provenance, or whose correlation the parent never recorded, and leaves it held for the captain, so `decide` still refuses it.
   It refuses a missing record piece, any owner other than the parent, a recorded captain or parent owner, a task that is not a captain hold, a second classification, and a main home.
   A legacy hold that is the captain's is marked so by `hold --owner captain`, which keeps it an open captain call and leaves nothing for `classify` to change.
   The classified hold reads as Main's classification in the held listing, leaves Bearings and the divergence check, and the captain's re-hold with `--owner captain` takes it back and makes `decide` refuse it.

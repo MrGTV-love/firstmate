@@ -25,6 +25,18 @@ make_mate_home() {  # <name>; prints the mate home, the parent is "<mate>-parent
   printf '%s\n' "$mate"
 }
 
+# A request the parent firstmate relayed to the mate, recorded in the parent
+# home as bin/fm-pending-reply-lib.sh records it; prints a hold reason that
+# carries the request's correlation, as a hold filed for that request does.
+parent_relayed_reason() {  # <mate-home> <reason>
+  local mate=$1 parent corr=0123456789abcdef
+  parent=$(sed -n 's/^parent_home=//p' "$mate/.fm-secondmate-parent")
+  mkdir -p "$parent/state/pending-replies"
+  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\nphase=resolved\n' "$corr" "$(cat "$mate/.fm-secondmate-home")" \
+    > "$parent/state/pending-replies/$corr"
+  printf '%s, relayed by the parent firstmate corr=%s' "$2" "$corr"
+}
+
 # The mate's parent channel, as the hold publishers resolve it.
 mate_channel() {  # <mate-home>
   local mate=$1 parent
@@ -129,7 +141,7 @@ test_a_parent_owned_call_closes_on_the_parents_decision() {
   mate=$(make_mate_home parent-owned)
   channel=$(mate_channel "$mate")
   decision="$mate/parent-decision.txt"
-  make_legacy_mate_hold "$mate" gated-work "retry the red check once or fix it"
+  make_legacy_mate_hold "$mate" gated-work "$(parent_relayed_reason "$mate" "retry the red check once or fix it")"
   classify_as_parent "$mate" gated-work
 
   show=$(tasks_in "$mate" show gated-work --full)
@@ -172,7 +184,7 @@ test_a_parent_owned_call_closes_on_the_parents_decision() {
     || fail "a replay duplicated the resolution: $(cat "$channel")"
 
   # A question-shaped row has no work item to resume, so the decision closes it.
-  make_legacy_mate_question "$mate" retry-q "retry or fix one red check"
+  make_legacy_mate_question "$mate" retry-q "$(parent_relayed_reason "$mate" "retry or fix one red check")"
   classify_as_parent "$mate" retry-q
   out=$(run_captain "$mate" decide retry-q --decision-file "$decision") || fail "the parent decision on a question row was refused"
   assert_equals "decided: retry-q" "$out" "decide did not report the decision on the question row"
@@ -227,7 +239,7 @@ test_the_merge_gate_reads_each_owner_without_confusing_them() {
   mate=$(make_mate_home merge-gate)
   decision="$mate/parent-decision.txt"
   printf 'Retry once.\n' > "$decision"
-  make_legacy_mate_hold "$mate" parent-work "parent call"
+  make_legacy_mate_hold "$mate" parent-work "$(parent_relayed_reason "$mate" "parent call")"
   classify_as_parent "$mate" parent-work
   tasks_in "$mate" add captain-work "Captain work" --kind ship --repo sample >/dev/null
   run_captain "$mate" hold captain-work --owner captain --reason "captain call" >/dev/null
@@ -247,7 +259,9 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   evidence="$home/evidence.txt"
   tasks_in "$home" add moot-work "Moot work" --kind ship --repo sample --body 'Gated work plan.' >/dev/null
   FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$home" hold moot-work --reason "moot-premise-choice pending" >/dev/null || fail "hold failed"
-  printf 'Ruling A: use the demand map; moot-work is moot.\n' > "$decision"
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$home" hold moot-q --title "Which error bound" --reason "pick the bound" --repo sample >/dev/null \
+    || fail "could not file the question-shaped call"
+  printf 'Ruling A: use the demand map; moot-work and moot-q are moot.\n' > "$decision"
   run_captain "$home" hold ruling-a --title "Ruling A" --reason "choose the approach" --repo sample >/dev/null
   run_captain "$home" answer ruling-a --decision-file "$decision" >/dev/null || fail "could not record the ruling"
   printf 'Main decided after ruling A: the mechanism call is moot.\n' > "$evidence"
@@ -299,6 +313,21 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   assert_not_contains "$show" "Answered by:" "the withdrawal was labelled as an answer"
   assert_not_contains "$show" "Captain decision: Main decided" "the evidence was written as the captain's words"
   [ "$(open_status "$home" moot-work)" = 1 ] || fail "the withdrawn call still reads as an open captain call"
+  assert_contains "$(tasks_in "$home" ready)" "moot-work" "the withdrawn work item is not queued and dispatchable"
+
+  # A question-shaped row has no work item to resume, so the withdrawal closes it.
+  run_captain "$home" withdraw moot-q --evidence-file "$evidence" --ruling ruling-a >/dev/null \
+    || fail "a withdrawal of a question-shaped call failed"
+  show=$(tasks_in "$home" show moot-q --full)
+  assert_contains "$show" "state: done" "the withdrawal left a question-shaped row open"
+  assert_contains "$show" "Resolution mode: withdrawn" "the closed question row lost its withdrawal record"
+  assert_not_contains "$show" "Answered by:" "the closed question row was labelled as an answer"
+  assert_not_contains "$(tasks_in "$home" ready)" "moot-q" "the withdrawn question became dispatchable work"
+  [ "$(open_status "$home" moot-q)" = 1 ] || fail "the withdrawn question still reads as an open captain call"
+  assert_equals "withdrawn: moot-q" "$(run_captain "$home" withdraw moot-q --evidence-file "$evidence" --ruling ruling-a)" \
+    "an exact replay on the closed question row failed"
+  [ "$(tasks_in "$home" show moot-q --full | grep -o 'Resolution mode: withdrawn' | wc -l | tr -d ' ')" = 1 ] \
+    || fail "the replay on the closed question row wrote a second record"
 
   bearings=$(run_bearings "$home") || fail "bearings failed"
   assert_not_contains "$bearings" "moot-premise-choice pending" "Bearings still shows the withdrawn call as the captain's"
@@ -315,7 +344,7 @@ test_withdraw_releases_a_moot_call_on_a_recorded_captain_ruling() {
   printf 'Go.\n' > "$decision"
   run_captain "$home" answer moot-work --decision-file "$decision" --release >/dev/null \
     || fail "the captain's answer on a re-held withdrawn task failed"
-  pass "withdraw releases a moot call on a recorded captain ruling and keeps the work open"
+  pass "withdraw releases a moot call on a recorded captain ruling, keeps a work item open, and closes a question row"
 }
 
 test_withdraw_never_releases_a_genuine_captain_call() {
@@ -477,7 +506,29 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   decision="$mate/decision.txt"
   printf 'Main decided one unchanged-head retry; CI 34 of 34 green; independent PASS at the head.\n' > "$evidence"
   printf 'Retry once, unchanged head.\n' > "$decision"
-  make_legacy_mate_hold "$mate" legacy-work "retry or fix one red CI check"
+  # A legacy hold with no parent provenance, or naming a correlation the parent
+  # never recorded, stays the captain's: classify refuses it and decide cannot release it.
+  make_legacy_mate_hold "$mate" unproven-work "retry or fix one red CI check"
+  make_legacy_mate_hold "$mate" forged-work "retry or fix one red CI check, relayed corr=fedcba9876543210"
+  for id in unproven-work forged-work; do
+    if run_captain "$mate" classify "$id" --owner parent --evidence-file "$evidence" \
+      --reason "the question was Main's" 2>"$mate/refusal.err" >/dev/null; then
+      fail "classify accepted $id without parent provenance"
+    fi
+    assert_contains "$(cat "$mate/refusal.err")" "carries no parent provenance" "the refusal for $id did not name the missing provenance"
+    show=$(tasks_in "$mate" show "$id" --full)
+    assert_contains "$show" "held: yes" "the refused classification released $id"
+    assert_contains "$show" "hold_kind: captain" "the refused classification changed the kind of $id"
+    assert_not_contains "$show" "Decision owner:" "the refused classification recorded an owner on $id"
+    [ "$(open_status "$mate" "$id")" = 0 ] || fail "$id stopped reading as an open captain call"
+    if run_captain "$mate" decide "$id" --decision-file "$decision" >/dev/null 2>&1; then
+      fail "decide released the captain's legacy hold $id without a captain ruling"
+    fi
+    assert_contains "$(tasks_in "$mate" show "$id" --full)" "held: yes" "the refused decision released $id"
+  done
+  ! grep -qs 'parent decision unproven-work' "$channel" || fail "a refused classification reached the parent channel"
+
+  make_legacy_mate_hold "$mate" legacy-work "$(parent_relayed_reason "$mate" "retry or fix one red CI check")"
   [ "$(open_status "$mate" legacy-work)" = 0 ] || fail "the legacy hold is not an open captain call"
 
   # A missing piece of the record, or the retired --by flag, is refused and changes nothing.
@@ -501,6 +552,7 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   assert_contains "$show" "Owner classified: parent, a parent classification, run from secondmate home. Not a captain answer." \
     "the parent classification and the not-captain marker were not recorded"
   assert_contains "$show" "Classification reason: the question was Main's" "the reason was not recorded"
+  assert_contains "$show" "Classification provenance: parent request corr=0123456789abcdef" "the provenance was not recorded"
   assert_contains "$show" "Original hold reason: retry or fix one red CI check" "the original reason was lost"
   assert_contains "$show" "Classification evidence:" "the evidence block was not recorded"
   assert_contains "$show" "independent PASS at the head" "the evidence text was not recorded"
@@ -526,7 +578,7 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   assert_not_contains "$show" "Captain decision:" "the decision was written as the captain's words"
   assert_contains "$(plain_channel "$mate")" "resolved [key=captain-hold-legacy-work-1]: parent decision legacy-work: decided by the parent firstmate" \
     "the decision did not close the parent channel key"
-  pass "Main classifies a legacy hold once, with evidence, and the parent decision releases it with the work still open"
+  pass "Main classifies a legacy hold with parent provenance once, with evidence, and the parent decision releases it with the work still open; a hold without provenance stays the captain's"
 }
 
 test_a_recorded_captain_owner_is_never_reclassified() {
@@ -545,7 +597,7 @@ test_a_recorded_captain_owner_is_never_reclassified() {
   [ "$(open_status "$mate" recorded-work)" = 0 ] || fail "the recorded captain call stopped reading as open"
 
   # A parent-owned hold, a closed task, and a task that is not a captain hold are not classifiable.
-  make_legacy_mate_hold "$mate" parent-work "parent call"
+  make_legacy_mate_hold "$mate" parent-work "$(parent_relayed_reason "$mate" "parent call")"
   classify_as_parent "$mate" parent-work
   if run_captain "$mate" classify parent-work --owner parent --evidence-file "$evidence" --reason "again" >/dev/null 2>&1; then
     fail "classify reclassified a hold already recorded as the parent's"
@@ -576,7 +628,7 @@ test_a_classified_hold_shows_as_mains_classification_and_the_captain_can_reverse
   decision="$mate/captain-answer.txt"
   printf 'Main decided; this was a retry of one check.\n' > "$evidence"
   printf 'Go.\n' > "$decision"
-  make_legacy_mate_hold "$mate" classified-work "classify-readers-reason pending"
+  make_legacy_mate_hold "$mate" classified-work "$(parent_relayed_reason "$mate" "classify-readers-reason pending")"
   run_captain "$mate" classify classified-work --owner parent --evidence-file "$evidence" \
     --reason "never a captain call" >/dev/null || fail "classify failed"
 
@@ -639,7 +691,7 @@ test_lifecycle_readers_and_the_gate_know_parent_and_withdrawn_records() {
   printf 'Retry once.\n' > "$decision"
   tasks_in "$mate" add scout-a "Scout A" --kind scout --repo sample --start >/dev/null
   write_origin_meta "$mate" scout-a
-  make_legacy_mate_hold "$mate" legacy-p "retry or fix one red check"
+  make_legacy_mate_hold "$mate" legacy-p "$(parent_relayed_reason "$mate" "retry or fix one red check")"
   classify_as_parent "$mate" legacy-p
   [ "$(open_status "$mate" legacy-p --any-owner)" = 0 ] || fail "the any-owner predicate missed an open parent decision"
   [ "$(open_status "$mate" legacy-p)" = 1 ] || fail "the captain predicate counted the parent's decision"
@@ -686,7 +738,7 @@ test_a_retried_decide_or_withdraw_finishes_without_a_second_record() {
   channel=$(mate_channel "$mate")
   decision="$mate/decision.txt"
   printf 'Retry once.\n' > "$decision"
-  make_legacy_mate_hold "$mate" retry-work "retry or fix one red check"
+  make_legacy_mate_hold "$mate" retry-work "$(parent_relayed_reason "$mate" "retry or fix one red check")"
   classify_as_parent "$mate" retry-work
   fail_tasks_axi_once "$mate" unhold
   if run_captain "$mate" decide retry-work --decision-file "$decision" >/dev/null 2>&1; then
@@ -735,7 +787,7 @@ test_the_gate_accepts_an_archived_parent_decision() {
   printf 'Retry once.\n' > "$decision"
   tasks_in "$mate" add scout-b "Scout B" --kind scout --repo sample --start >/dev/null
   write_origin_meta "$mate" scout-b
-  make_legacy_mate_question "$mate" q-arch "retry or fix one red check"
+  make_legacy_mate_question "$mate" q-arch "$(parent_relayed_reason "$mate" "retry or fix one red check")"
   classify_as_parent "$mate" q-arch
   run_captain "$mate" complete scout-b q-arch >/dev/null || fail "the gate refused an open parent decision"
   run_captain "$mate" decide q-arch --decision-file "$decision" >/dev/null || fail "decide failed"
@@ -758,7 +810,7 @@ test_an_expired_dated_hold_still_releases_and_a_parent_hold_blocks_completion() 
   mate=$(make_mate_home expired-dated)
   tasks_in "$mate" add dated-p "Dated parent" --kind ship --repo sample --body 'Gated work plan.' >/dev/null
   FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET in_premate_home "$mate" run_captain "$mate" hold dated-p \
-    --reason "retry or fix one red check" --until 2020-01-01 >/dev/null || fail "could not file the dated legacy hold"
+    --reason "$(parent_relayed_reason "$mate" "retry or fix one red check")" --until 2020-01-01 >/dev/null || fail "could not file the dated legacy hold"
   assert_contains "$(tasks_in "$mate" show dated-p --full)" "held: no" "the fixture hold did not expire"
   classify_as_parent "$mate" dated-p
   [ "$(open_status "$mate" dated-p --parent-owned)" = 0 ] || fail "an expired classified hold stopped reading as open"
