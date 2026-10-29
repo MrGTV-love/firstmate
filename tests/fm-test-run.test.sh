@@ -807,10 +807,8 @@ test_changed_dependency_selection_and_unmapped_failure() {
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm timeout-lib-change
 
   printf '\n' >>"$repo/src/unmapped.ts"
-  set +e
-  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "unmapped changed source must fail with exit 2, got $rc"
   grep -Fq 'no changed-test mapping for source path: src/unmapped.ts' "$tmp/err" \
     || fail "unmapped changed source failure is not actionable: $(cat "$tmp/err")"
@@ -1054,12 +1052,10 @@ SH
   git -C "$timeout_repo" add .
   git -C "$timeout_repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$timeout_repo/$timeout_script"
-  set +e
+  rc=0
   (cd "$timeout_repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/timeout-durations.jsonl" \
     bin/fm-test-run.sh --changed --base HEAD) \
-    >"$tmp/timeout.out" 2>"$tmp/timeout.err"
-  rc=$?
-  set -e
+    >"$tmp/timeout.out" 2>"$tmp/timeout.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "a script that stops making progress must fail the run, got $rc: $(cat "$tmp/timeout.out" "$tmp/timeout.err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
     || fail "single unproven changed script did not receive the automatic progress guard: $(cat "$tmp/timeout.out")"
@@ -1091,11 +1087,9 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "a delayed gate skip must still pass the run, got $rc: $(cat "$tmp/out" "$tmp/err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 .*gate_skip=true' "$tmp/out" \
     || fail "a gate skip printed after the guard's own lines was counted as a plain pass: $(cat "$tmp/out")"
@@ -1142,11 +1136,9 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/out" | head -n 2 | awk '{print $1}' | paste -sd, -)
   [ "$shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
     || fail "the fixture did not take the concurrent path: $shape"
@@ -1182,22 +1174,18 @@ fi
 exec "$REAL_STAT" "$@"
 SH
   chmod +x "$fakebin/uname" "$fakebin/stat"
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
-  rc=$?
-  set -e
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1) || rc=$?
   expect_code 0 "$rc" "native-Windows POSIX-mode emulation"
   assert_contains "$out" "FM_TEST_SUMMARY total=2 failed=0" \
     "Windows mode emulation did not complete both parallel scripts"
 
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" REAL_STAT="$real_stat" FAKE_UNAME=CYGWIN_NT-10.0 \
     bin/fm-test-run.sh --jobs 2 \
-      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1)
-  rc=$?
-  set -e
+      tests/fm-arm-pretool-check.test.sh tests/fm-ask-user-authority.test.sh 2>&1) || rc=$?
   expect_code 1 "$rc" "Cygwin POSIX-mode enforcement"
   assert_contains "$out" "isolation failure: worker root mode is 755, expected 0700" \
     "Cygwin mode enforcement did not reject a non-0700 worker root"
@@ -1242,12 +1230,10 @@ PY
   printf '\n' >>"$repo/bin/shared-probe-lib.sh"
 
   : >"$tmp/run.log"
-  set +e
+  rc=0
   out=$(cd "$repo" && PATH="$fakebin:$PATH" FM_DURATION_FILE="$tmp/durations.jsonl" \
     FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
-    bin/fm-test-run.sh --changed --base HEAD 2>&1)
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD 2>&1) || rc=$?
   expect_code 0 "$rc" "plain --changed on an emulated native Windows bash: $out"
   for script in fm-daemon.test.sh fm-pi-watch-extension.test.sh; do
     [ -e "$tmp/ran.$script" ] || fail "$script was not run on the emulated Windows host: $out"
@@ -1260,12 +1246,10 @@ PY
 
   rm -f "$tmp"/ran.*
   : >"$tmp/run.log"
-  set +e
+  rc=0
   out=$(cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
     FM_TEST_REAL_DURATION="$ROOT/bin/fm-duration.py" FM_TEST_RUN_LOG="$tmp/run.log" \
-    bin/fm-test-run.sh --changed --base HEAD 2>&1)
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD 2>&1) || rc=$?
   expect_code 1 "$rc" "plain --changed on a POSIX host keeps the progress runner: $out"
   assert_contains "$(cat "$tmp/run.log")" "run test.tests/fm-daemon.test.sh" \
     "a POSIX host did not send the changed script through the progress runner"
@@ -1434,29 +1418,23 @@ fi
 exec "$REAL_GIT" "$@"
 SH
   chmod +x "$fake_bin/git"
-  set +e
+  rc=0
   (cd "$repo" && PATH="$fake_bin:$PATH" REAL_GIT="$real_git" SLOW_GIT_MARKER="$tmp/slow-git" \
     bin/fm-test-run.sh --changed --base HEAD --max-wall-ms 100) \
-    >"$tmp/slow-selection.out" 2>"$tmp/slow-selection.err"
-  rc=$?
-  set -e
+    >"$tmp/slow-selection.out" 2>"$tmp/slow-selection.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "an empty run past its budget must fail normally, got $rc"
   grep -Eq '^FM_TEST_SUMMARY total=0 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its summary"
   grep -Eq '^FM_TEST_BUDGET max_wall_ms=100 duration_ms=[0-9]+$' "$tmp/slow-selection.out" \
     || fail "over-budget empty selection omitted its budget result"
   [ -e "$tmp/slow-git" ] || fail "the slow selection fixture did not run"
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --max-wall-ms nope) \
-    >"$tmp/bad-budget.out" 2>"$tmp/bad-budget.err"
-  rc=$?
-  set -e
+    >"$tmp/bad-budget.out" 2>"$tmp/bad-budget.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "malformed budget on an empty selection must be refused, got $rc"
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD --per-script-timeout-secs nope) \
-    >"$tmp/bad-timeout.out" 2>"$tmp/bad-timeout.err"
-  rc=$?
-  set -e
+    >"$tmp/bad-timeout.out" 2>"$tmp/bad-timeout.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "malformed timeout on an empty selection must be refused, got $rc"
   rm -rf "$tmp"
   pass "empty changed selection emits deterministic text and JSON summaries"
@@ -1528,18 +1506,14 @@ echo "not ok - fail"
 exit 1
 SH
   chmod +x "$pass_f" "$fail_f"
-  set +e
-  "$RUNNER" "$pass_f" "$fail_f" >"$tmp/out.txt" 2>"$tmp/err.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" "$pass_f" "$fail_f" >"$tmp/out.txt" 2>"$tmp/err.txt" || rc=$?
   [ "$rc" -ne 0 ] || fail "aggregate exit must be non-zero when any script fails"
   grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out.txt" \
     || fail "summary should report total=2 failed=1: $(grep FM_TEST_SUMMARY "$tmp/out.txt")"
   # All-green stays 0.
-  set +e
-  "$RUNNER" "$pass_f" >"$tmp/out2.txt" 2>"$tmp/err2.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" "$pass_f" >"$tmp/out2.txt" 2>"$tmp/err2.txt" || rc=$?
   [ "$rc" -eq 0 ] || { rm -rf "$tmp"; fail "aggregate exit must be 0 when every script passes"; }
   rm -rf "$tmp"
   pass "aggregate exit reflects any script failure"
@@ -1775,10 +1749,8 @@ echo "skip: ${TEST_GATE_SKIP_TOKEN:-herdr not found}"
 exit 0
 SH
   chmod +x "$skip_f"
-  set +e
-  "$RUNNER" --fail-on-gate-skip 'herdr not found' "$skip_f" >"$out" 2>"$tmp/err.txt"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --fail-on-gate-skip 'herdr not found' "$skip_f" >"$out" 2>"$tmp/err.txt" || rc=$?
   [ "$rc" -ne 0 ] || fail "fail-on-gate-skip must make herdr-not-found a hard failure"
   grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
     || fail "summary must report failed=1 under fail-on-gate-skip: $(grep FM_TEST_SUMMARY "$out")"
@@ -1797,11 +1769,9 @@ SH
         ;;
     esac
     for token in 'herdr not found' 'tasks-axi not found'; do
-      set +e
+      rc=0
       TEST_GATE_SKIP_TOKEN="$token" "$RUNNER" "${flags[@]}" --json "$tmp/timing.json" \
-        "$skip_f" >"$out" 2>"$tmp/err.txt"
-      rc=$?
-      set -e
+        "$skip_f" >"$out" 2>"$tmp/err.txt" || rc=$?
       [ "$rc" -ne 0 ] || fail "$form repeated flags must make $token a hard failure"
       grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$out" \
         || fail "$form repeated flags must report failed=1 for $token"
@@ -2270,10 +2240,8 @@ test_serial_shard_guard_holds_at_every_lane_size() {
   # 20 proves the result does not depend on one particular size.
   for count in 5 6 20; do
     shard_fixture_grow "$dir" "$count"
-    set +e
-    out=$(shard_fixture_guard "$dir")
-    rc=$?
-    set -e
+    rc=0
+    out=$(shard_fixture_guard "$dir") || rc=$?
     assert_not_contains "$out" "serial shards share scripts" \
       "$count extra scripts: the guard put one script in two serial shards"
     assert_not_contains "$out" "serial shards must equal" \
@@ -2310,13 +2278,11 @@ done
 exec "$REAL_SORT" "$@"
 SH
   chmod +x "$tmp/fakebin/sort"
-  set +e
+  rc=0
   env -i PATH="$tmp/fakebin:$PATH" REAL_SORT="$real_sort" \
     HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
     "$dir/bin/fm-test-run.sh" --list --lane "$shard_lane" \
-    >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -ne 0 ] || fail "failed shard generation returned successful partial coverage"
   [ ! -s "$tmp/out" ] || fail "failed shard generation published a partial script list"
   rm -rf "$tmp"
@@ -2332,9 +2298,7 @@ test_coverage_guard_passes_with_extra_scripts() {
   # Drop the scripts that have no measured duration hint so the five new ones
   # stay inside the guard's unmeasured-share bound; the guard then has nothing
   # left to refuse except a shard conflict.
-  set +e
-  out=$(shard_fixture_guard "$dir")
-  set -e
+  out=$(shard_fixture_guard "$dir") || true
   unmeasured=$(printf '%s\n' "$out" | grep '^tests/.*\.test\.sh$' | grep -v 'zz-shard-dummy' || true)
   for script in $unmeasured; do
     rm -f "$dir/$script"
@@ -2361,10 +2325,8 @@ test_coverage_guard_still_refuses_a_true_duplicate() {
   ' "$dir/bin/fm-test-run.sh" >"$dir/bin/fm-test-run.sh.new"
   mv "$dir/bin/fm-test-run.sh.new" "$dir/bin/fm-test-run.sh"
   chmod +x "$dir/bin/fm-test-run.sh"
-  set +e
-  out=$(shard_fixture_guard "$dir")
-  rc=$?
-  set -e
+  rc=0
+  out=$(shard_fixture_guard "$dir") || rc=$?
   [ "$rc" -ne 0 ] || fail "coverage guard accepted a script that sits in two shards: $out"
   assert_contains "$out" "shards share scripts" "duplicate refusal names the shared scripts"
   assert_contains "$out" "$dup" "duplicate refusal names the duplicated script"
@@ -2380,27 +2342,21 @@ test_portable_serial_shard_lane_refusals() {
 
   # A lane built for a different shard count must refuse rather than run a
   # partial suite: this is what keeps a CI matrix from silently dropping tests.
-  set +e
-  "$RUNNER" --list --lane "portable-serial-1of${other}" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane "portable-serial-1of${other}" >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "mismatched shard count must refuse (exit 2), got $rc"
   [ ! -s "$tmp/out" ] || fail "mismatched shard count must not list tests"
   grep -Fq "configured for $count" "$tmp/err" \
     || fail "mismatch refusal must name the configured count: $(cat "$tmp/err")"
 
-  set +e
-  "$RUNNER" --list --lane "portable-serial-$((count + 1))of${count}" >"$tmp/out2" 2>"$tmp/err2"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane "portable-serial-$((count + 1))of${count}" >"$tmp/out2" 2>"$tmp/err2" || rc=$?
   [ "$rc" -eq 2 ] || fail "out-of-range shard index must refuse (exit 2), got $rc"
   grep -Fq "outside 1..$count" "$tmp/err2" \
     || fail "range refusal message missing: $(cat "$tmp/err2")"
 
-  set +e
-  "$RUNNER" --list --lane portable-serial-1 >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --list --lane portable-serial-1 >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "shard lane without a count must refuse (exit 2), got $rc"
   rm -rf "$tmp"
   pass "portable serial shard lanes refuse mismatched, out-of-range, and countless names"
@@ -2409,24 +2365,18 @@ test_portable_serial_shard_lane_refusals() {
 test_jobs_requires_proven_isolated() {
   local tmp rc shard_lane
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-jobs.XXXXXX")
-  set +e
-  "$RUNNER" --jobs 2 --lane portable-serial >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 --lane portable-serial >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs with portable-serial must refuse (exit 2), got $rc"
   grep -Fq 'portable serial lanes stay serial' "$tmp/err" \
     || fail "--jobs refusal message missing: $(cat "$tmp/err")"
-  set +e
-  "$RUNNER" --jobs 2 tests/fm-afk-inject-e2e.test.sh >"$tmp/out2" 2>"$tmp/err2"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 tests/fm-afk-inject-e2e.test.sh >"$tmp/out2" 2>"$tmp/err2" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs on a family with no recorded proof must refuse, got $rc"
   # Sharding across runners never relaxes the serial rule inside one shard.
   shard_lane=$("$RUNNER" --list-lanes | grep -m1 '^portable-serial-[0-9]*of[0-9]*$')
-  set +e
-  "$RUNNER" --jobs 2 --lane "$shard_lane" >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$RUNNER" --jobs 2 --lane "$shard_lane" >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "--jobs with a portable serial shard must refuse, got $rc"
   grep -Fq 'portable serial lanes stay serial' "$tmp/err3" \
     || fail "shard --jobs refusal message missing: $(cat "$tmp/err3")"
@@ -2455,12 +2405,10 @@ printf '%s\n' "${0##*/}" >> "$ADMISSION_RESULTS"
 SH
     chmod +x "$repo/tests/$script"
   done
-  set +e
+  rc=0
   ADMISSION_RESULTS="$tmp/executed" bash "$repo/bin/fm-test-run.sh" --jobs 2 \
     tests/fm-supervision-events.test.sh tests/fm-session-lock-ancestry.test.sh \
-    >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "--jobs on a proven family must be admitted, got $rc: $(cat "$tmp/err") $(cat "$tmp/out")"
   grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/out" \
     || fail "the admitted concurrent run did not report both scripts green: $(cat "$tmp/out")"
@@ -2468,20 +2416,16 @@ SH
   [ "$executed" = $'fm-session-lock-ancestry.test.sh\nfm-supervision-events.test.sh' ] \
     || fail "admission must execute each selected script exactly once: $executed"
 
-  set +e
+  rc=0
   bash "$repo/bin/fm-test-run.sh" --jobs 5 tests/fm-session-lock-ancestry.test.sh \
-    >"$tmp/over-cap.out" 2>"$tmp/over-cap.err"
-  rc=$?
-  set -e
+    >"$tmp/over-cap.out" 2>"$tmp/over-cap.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "a family run above its proven four-worker cap must be refused, got $rc"
 
   external="$tmp/fm-session-lock-ancestry.test.sh"
   printf '#!/usr/bin/env bash\necho "ok - colliding external fixture"\n' >"$external"
   chmod +x "$external"
-  set +e
-  bash "$repo/bin/fm-test-run.sh" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err"
-  rc=$?
-  set -e
+  rc=0
+  bash "$repo/bin/fm-test-run.sh" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err" || rc=$?
   [ "$rc" -eq 2 ] \
     || fail "an external script colliding with a proven family member must be refused, got $rc"
   rm -rf "$tmp"
@@ -2507,34 +2451,28 @@ test_unmapped_new_test_never_inherits_family_concurrency() {
     chmod +x "$repo/tests/$script"
   done
 
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --jobs 2 \
     tests/fm-procevent.test.sh tests/fm-quota-choose.test.sh) \
-    >"$tmp/family.out" 2>"$tmp/family.err"
-  rc=$?
-  set -e
+    >"$tmp/family.out" 2>"$tmp/family.err" || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "two members of the proven residual family must be admitted, got $rc: $(cat "$tmp/family.err")"
   grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/family.out" \
     || fail "the admitted residual-family run did not report both scripts green: $(cat "$tmp/family.out")"
 
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh --jobs 2 \
     tests/fm-procevent.test.sh tests/fm-zz-unmapped-fixture.test.sh) \
-    >"$tmp/unmapped.out" 2>"$tmp/unmapped.err"
-  rc=$?
-  set -e
+    >"$tmp/unmapped.out" 2>"$tmp/unmapped.err" || rc=$?
   [ "$rc" -eq 2 ] \
     || fail "an unclassified new test must not be admitted under --jobs, got $rc: $(cat "$tmp/unmapped.out")"
   grep -Fq 'fm-zz-unmapped-fixture.test.sh' "$tmp/unmapped.err" \
     || fail "the refusal did not name the unclassified script: $(cat "$tmp/unmapped.err")"
 
   # It is only concurrency that is refused: the same script still runs serially.
-  set +e
+  rc=0
   (cd "$repo" && bin/fm-test-run.sh tests/fm-zz-unmapped-fixture.test.sh) \
-    >"$tmp/serial.out" 2>"$tmp/serial.err"
-  rc=$?
-  set -e
+    >"$tmp/serial.out" 2>"$tmp/serial.err" || rc=$?
   [ "$rc" -eq 0 ] \
     || fail "an unclassified test must still run serially, got $rc: $(cat "$tmp/serial.err")"
   grep -Eq '^FM_TEST_BEGIN .+ family=unclassified expected_gate_skip=none$' "$tmp/serial.out" \
@@ -2563,10 +2501,8 @@ test_changed_shared_fixture_selects_its_readers() {
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixture-change
 
   printf '\n' >>"$repo/tests/unread-thing.sh"
-  set +e
-  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+  rc=0
+  (cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 2 ] || fail "an unread tests/ path must still fail with exit 2, got $rc"
   grep -Fq 'no changed-test mapping for source path: tests/unread-thing.sh' "$tmp/err" \
     || fail "the refusal did not name the unread tests/ path: $(cat "$tmp/err")"
@@ -2628,16 +2564,12 @@ test_changed_omp_composer_captures_select_their_consumers() {
 test_concurrent_runs_are_ordered_longest_first() {
   local tmp listed first
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-order.XXXXXX")
-  set +e
-  "$RUNNER" --jobs 2 --family watcher-wake-lock --list >"$tmp/serial" 2>&1
-  set -e
+  "$RUNNER" --jobs 2 --family watcher-wake-lock --list >"$tmp/serial" 2>&1 || true
   # The scheduler reorders the real run, so assert on the begin-marker order of
   # a real concurrent run over scripts whose hints differ by a wide margin.
-  set +e
   "$RUNNER" --jobs 2 \
     tests/fm-session-lock-ancestry.test.sh tests/fm-task-inbox.test.sh \
-    >"$tmp/out" 2>"$tmp/err"
-  set -e
+    >"$tmp/out" 2>"$tmp/err" || true
   first=$(grep -m1 '^FM_TEST_BEGIN' "$tmp/out" | awk '{print $3}')
   [ "$first" = tests/fm-task-inbox.test.sh ] \
     || fail "concurrent run did not start the longest script first, started: $first"
@@ -2669,11 +2601,9 @@ SH
   chmod +x "$runner" "$repo/$hang"
 
   began=$(date +%s)
-  set +e
+  rc=0
   GRANDCHILD_PID="$grandchild_pid" FM_TEST_KEY_SLOTS=1 FM_TEST_SLOT_DIR="$tmp/slots" \
-    "$runner" --per-script-timeout-secs 3 --json "$tmp/timing.json" "$hang" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    "$runner" --per-script-timeout-secs 3 --json "$tmp/timing.json" "$hang" >"$tmp/out" 2>"$tmp/err" || rc=$?
   ended=$(date +%s)
 
   [ "$rc" -ne 0 ] || fail "a terminated script must fail the run: $(cat "$tmp/out")"
@@ -2705,10 +2635,8 @@ assert "cpu_ms" in script and script["cpu_ms"] is None, script
   fi
 
   # 0 keeps the historical unbounded behavior, so no existing caller changes.
-  set +e
-  "$runner" --per-script-timeout-secs nope "$hang" >"$tmp/o2" 2>"$tmp/e2"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --per-script-timeout-secs nope "$hang" >"$tmp/o2" 2>"$tmp/e2" || rc=$?
   [ "$rc" -eq 2 ] || fail "--per-script-timeout-secs with a non-number must be refused, got $rc"
 
   rm -rf "$tmp"
@@ -2756,11 +2684,9 @@ kill -KILL "$$"
 SH
   chmod +x "$runner" "$repo/$leak"
 
-  set +e
+  rc=0
   (cd "$repo" && FM_TEST_SKIP_ORPHAN_REAP=1 FM_LEAK_PIDFILE="$stub_pid_file" \
-    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err")
-  rc=$?
-  set -e
+    TMPDIR="$tmp" "$runner" "$leak" >"$tmp/out" 2>"$tmp/err") || rc=$?
   [ "$rc" -ne 0 ] || fail "a script killed outright must fail the run: $(cat "$tmp/out")"
   [ -s "$stub_pid_file" ] || fail "the killed script never started its stub: $(cat "$tmp/out" "$tmp/err")"
   IFS=$'\t' read -r stub _ < "$stub_pid_file"
@@ -2866,11 +2792,9 @@ SH
   git -C "$repo" add .
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$repo/$script"
-  set +e
+  rc=0
   (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=5 FM_DURATION_FILE="$tmp/durations.jsonl" \
-    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || fail "healthy progressing changed script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-watch-triage\.test\.sh exit=0 ' "$tmp/out" \
     || fail "the slow changed watcher script did not finish green: $(cat "$tmp/out")"
@@ -2895,19 +2819,15 @@ SH
   chmod +x "$runner" "$repo/$fast"
 
   # Comfortably inside budget: the run passes and states the budget it met.
-  set +e
-  "$runner" --max-wall-ms 60000 "$fast" >"$tmp/under" 2>"$tmp/under.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 60000 "$fast" >"$tmp/under" 2>"$tmp/under.err" || rc=$?
   [ "$rc" -eq 0 ] || fail "a run inside its budget must pass, got $rc: $(cat "$tmp/under.err")"
   grep -Eq '^FM_TEST_BUDGET max_wall_ms=60000 duration_ms=[0-9]+$' "$tmp/under" \
     || fail "an inside-budget run did not report the budget: $(cat "$tmp/under")"
 
   # Same green script, budget it cannot meet: the run must FAIL.
-  set +e
-  "$runner" --max-wall-ms 500 "$fast" >"$tmp/over" 2>"$tmp/over.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 500 "$fast" >"$tmp/over" 2>"$tmp/over.err" || rc=$?
   [ "$rc" -eq 1 ] || fail "an over-budget run must fail through the result path, got $rc"
   grep -Eq '^FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=[0-9]+$' "$tmp/over" \
     || fail "an over-budget run omitted its summary: $(cat "$tmp/over")"
@@ -2923,15 +2843,11 @@ SH
     || fail "budget verdict used a different duration than the summary: $(cat "$tmp/over")"
 
   # A malformed budget is refused rather than silently ignored.
-  set +e
-  "$runner" --max-wall-ms 0 "$fast" >"$tmp/bad" 2>"$tmp/bad.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms 0 "$fast" >"$tmp/bad" 2>"$tmp/bad.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--max-wall-ms 0 must be refused (exit 2), got $rc"
-  set +e
-  "$runner" --max-wall-ms nope "$fast" >"$tmp/bad2" 2>"$tmp/bad2.err"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --max-wall-ms nope "$fast" >"$tmp/bad2" 2>"$tmp/bad2.err" || rc=$?
   [ "$rc" -eq 2 ] || fail "--max-wall-ms with a non-number must be refused (exit 2), got $rc"
 
   rm -rf "$tmp"
@@ -2999,12 +2915,10 @@ touch "$SCHED_EVIDENCE/replacement-started"
 echo "ok - replacement fixture started before slow fixture finished"
 SH
   chmod +x "$runner" "$repo/$a" "$repo/$b" "$repo/$c" "$fake_bin/stat"
-  set +e
+  rc=0
   PATH="$fake_bin:$PATH" SCHED_EVIDENCE="$evidence" SCHED_WAIT_FOR_REPLACEMENT=1 \
     "$runner" --jobs 2 --json "$tmp/timing.json" \
-    "$a" "$b" "$c" >"$tmp/out" 2>"$tmp/err"
-  rc=$?
-  set -e
+    "$a" "$b" "$c" >"$tmp/out" 2>"$tmp/err" || rc=$?
   [ "$rc" -eq 0 ] || { cat "$tmp/out" "$tmp/err"; rm -rf "$tmp"; fail "jobs=2 must refill the first completed slot"; }
   begin_n=$(grep -c '^FM_TEST_BEGIN ' "$tmp/out" || true)
   end_n=$(grep -c '^FM_TEST_END ' "$tmp/out" || true)
@@ -3027,10 +2941,8 @@ echo "not ok - deliberate fail"
 exit 1
 SH
   chmod +x "$tmp/fail.test.sh"
-  set +e
-  "$runner" --jobs 2 "$a" "$tmp/fail.test.sh" >"$tmp/out3" 2>"$tmp/err3"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --jobs 2 "$a" "$tmp/fail.test.sh" >"$tmp/out3" 2>"$tmp/err3" || rc=$?
   [ "$rc" -eq 2 ] || fail "jobs with non-proven fail fixture must refuse before run, got $rc"
 
   # Parallel failure propagation stays inside the private runner fixture.
@@ -3040,10 +2952,8 @@ echo "not ok - deliberate proven-set fail"
 exit 1
 SH
   chmod +x "$repo/$b"
-  set +e
-  SCHED_EVIDENCE="$evidence" "$runner" --jobs 2 "$a" "$b" >"$tmp/out4" 2>"$tmp/err4"
-  rc=$?
-  set -e
+  rc=0
+  SCHED_EVIDENCE="$evidence" "$runner" --jobs 2 "$a" "$b" >"$tmp/out4" 2>"$tmp/err4" || rc=$?
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "jobs aggregate must be non-zero when a proven worker fails"; }
   grep -q 'FM_TEST_SUMMARY total=2 failed=1' "$tmp/out4" \
     || { rm -rf "$tmp"; fail "jobs failure summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out4")"; }
@@ -3054,10 +2964,8 @@ echo "skip: herdr not found" >&2
 exit 0
 SH
   chmod +x "$repo/$d"
-  set +e
-  "$runner" --jobs 2 --fail-on-gate-skip 'herdr not found' "$d" >"$tmp/out5" 2>"$tmp/err5"
-  rc=$?
-  set -e
+  rc=0
+  "$runner" --jobs 2 --fail-on-gate-skip 'herdr not found' "$d" >"$tmp/out5" 2>"$tmp/err5" || rc=$?
   [ "$rc" -ne 0 ] || { rm -rf "$tmp"; fail "parallel stderr gate skip must hard-fail"; }
   grep -q 'FM_TEST_SUMMARY total=1 failed=1' "$tmp/out5" \
     || { rm -rf "$tmp"; fail "parallel stderr hard-fail summary wrong: $(grep FM_TEST_SUMMARY "$tmp/out5")"; }

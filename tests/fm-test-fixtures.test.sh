@@ -463,6 +463,7 @@ test_beta() { printf 'ran-beta\n'; }
 test_returns_seven() { printf 'ran-returns-seven\n'; return 7; }
 test_calls_fail() { fail 'the case failed'; }
 test_unregistered() { printf 'ran-unregistered\n'; }
+test_leaks_errexit() { set +e; false; set -e; printf 'ran-leaks-errexit\n'; }
 helper_not_a_case() { printf 'ran-helper\n'; }
 SH
     # shellcheck disable=SC2016 # The generated file expands these when it runs.
@@ -538,7 +539,14 @@ test_single_case_selection() (
   run_file FM_FIXTURE_CASES='test_alpha test_returns_seven test_beta' -- "$dir/registered.test.sh"
   [ "$rc" -eq 7 ] && [ "$out" = $'before-test_alpha\nran-alpha\nbefore-test_returns_seven\nran-returns-seven' ] \
     || fail "a registered case returning 7 did not end the full run: rc=$rc out=$out"
+  run_file FM_FIXTURE_CASES='test_leaks_errexit test_alpha' -- "$dir/registered.test.sh"
+  [ "$rc" -eq 1 ] && [ "$out" = $'before-test_leaks_errexit\nran-leaks-errexit' ] \
+    || fail "a case that turned errexit on did not end the full run before the next case: rc=$rc out=$out"
+  case "$err" in *'test_leaks_errexit changed errexit'*) ;; *) fail "the errexit refusal did not name the case: $err" ;; esac
+  run_file FM_TEST_ONLY=test_leaks_errexit -- "$dir/env.test.sh"
+  [ "$rc" -eq 1 ] || fail "a case run alone that turned errexit on exited $rc, expected 1: $out $err"
   pass "a registry limits the cases, keeps registration order, runs the before hook for every registered case, and stops at the first failing case"
+  pass "a case that changes errexit fails the file in a full run and when run alone"
 )
 
 # fm_test_only in tests/lib.sh is the only reader of FM_TEST_ONLY: a file that

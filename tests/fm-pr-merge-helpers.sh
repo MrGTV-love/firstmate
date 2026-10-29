@@ -927,11 +927,9 @@ away_change_script() {  # <case-dir> <name>; script body on stdin
 run_required_case() {
   local case_dir=$1 number=$2
   shift 2
-  set +e
+  RC=0
   run_pr_merge "$case_dir" task-x1 "https://github.com/example/repo/pull/$number" "$@" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  RC=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || RC=$?
 }
 
 write_rollup_response() {  # <case-dir> <output>

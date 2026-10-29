@@ -1826,11 +1826,9 @@ test_first_register_succeeds_with_empty_lock_list_under_bash32() {
     || fail "could not retain the private request context"
 
   err=$(mktemp "$home/register-err.XXXXXX")
-  set +e
+  rc=0
   run_pf_sysbash "$home" register pf-empty-locks --relation rel-code \
-    --work-home main --work-id work-empty-locks --generation 1 >"$home/register.out" 2>"$err"
-  rc=$?
-  set -e
+    --work-home main --work-id work-empty-locks --generation 1 >"$home/register.out" 2>"$err" || rc=$?
   [ "$rc" -eq 0 ] || fail "first register under /bin/bash with an empty lock list failed (exit $rc): $(cat "$err" "$home/register.out")"
   grep -q 'unbound variable' "$err" \
     && fail "first register hit an unbound-variable crash under /bin/bash: $(cat "$err")"

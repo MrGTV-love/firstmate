@@ -174,7 +174,9 @@ pass() {
 #   be one of them and the requested cases run in registration order, or every
 #   registered case runs when none is requested. Without them, a requested name
 #   must be a defined test_ function and runs in the order given. The first case
-#   to return nonzero ends the file with that status. A file that must prepare
+#   to return nonzero ends the file with that status, and a case that turns
+#   errexit (set -e) on or off fails the file, so a case sees the same errexit
+#   state in a full run as when it runs alone. A file that must prepare
 #   state at a particular point in its registry defines fm_test_before_case,
 #   which receives each registered case name in order, selected or not, so a
 #   selected case runs in the same shell state as in the full run.
@@ -204,10 +206,11 @@ fm_test_case_known() {
 }
 
 fm_test_run_one() {
-  local rc
+  local rc errexit=${-//[!e]/}
   "$1"
   rc=$?
   [ "$rc" -eq 0 ] || exit "$rc"
+  [ "${-//[!e]/}" = "$errexit" ] || fail "$1 changed errexit (set -e); a case must leave it as it found it"
 }
 
 fm_test_run_cases() {
