@@ -274,14 +274,25 @@ esac
 exit 0
 SH
 chmod +x "$FAKEBIN/no-mistakes"
+# A no-mistakes task's green reading also needs the run's verification-plan
+# snapshot (fm_nm_evidence_problem), which a real run renders from its start.
+mkdir -p "$CASE/home/data/ready"
+printf 'ready fixture verification plan\n' > "$CASE/home/data/ready/verification-plan.md"
+plan_sha=$(shasum -a 256 "$CASE/home/data/ready/verification-plan.md" | awk '{print $1}')
 cat > "$CASE/nm-status" <<EOF
 run:
   id: "01RUN"
   branch: main
   status: running
   head: "$HEAD"
+  head_sha: $HEAD
   pr: "https://github.com/example/project/pull/192"
   findings: none
+  verification_plan:
+    path: $CASE/home/data/ready/verification-plan.md
+    sha256: $plan_sha
+    source_path: $CASE/home/data/ready/verification-plan.md
+    captured_at: $(date +%s)
   steps[4]{step,status,findings,duration_ms}:
     intent,completed,0,0
     review,completed,0,0
