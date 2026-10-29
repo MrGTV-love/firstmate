@@ -362,10 +362,16 @@ It never widens who may release a captain call (see the provenance rule below).
 The harm this guard judges is a non-captain actor releasing a genuine captain call without the captain's words.
 `classify` therefore needs a fact recorded at filing, never an assertion made at classify time.
 A hold has parent provenance when its hold reason, written when the hold was filed, carries the `corr=<id>` token of a request the parent firstmate relayed to this home.
-The parent's own pending-reply record for that correlation (`state/pending-replies/<id>` in the parent home) must exist and name this home.
-A hold reason with no such token, or a token the parent never recorded, is refused, and the hold stays held.
-A remote mate cannot read its parent home, so its legacy holds have no provenance here.
+A record of that request must match the token, read through the record's owner and never from free text:
+
+- In a local mate, the parent's own pending-reply record for that correlation (`state/pending-replies/<id>` in the parent home) must exist and name this home.
+- In a remote mate, which cannot read its parent home, the request must be in this home's own parent-route steering inbox (`state/parent-route/<mate-id>.inbox/`, pending or `handled/`).
+  That is the durable record the parent's remote send leg writes (`bin/fm-send.sh`), read through `bin/fm-task-inbox-lib.sh`, and its body must open with the from-firstmate marker and that `corr=<id>` token.
+
+A hold reason with no such token, or a token that no record matches, is refused, and the hold stays held.
+The refusal names which fact is missing: no `corr=<id>` token, or a token with no matching record.
 A legacy hold without provenance stays the captain's: it is released only by the captain's recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`), and `decide` refuses it.
+A hold filed before this rule carries a `corr=<id>` token only if its filer copied one into the reason, so `classify` may not free such a hold: the 2026-10-28 PR 290 hold, whose reason carries no token, still needs the captain's words or a captain ruling.
 
 ## Reconcile: re-check reality, never a blind close
 

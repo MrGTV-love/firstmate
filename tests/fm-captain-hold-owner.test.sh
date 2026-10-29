@@ -578,6 +578,41 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   assert_not_contains "$show" "Captain decision:" "the decision was written as the captain's words"
   assert_contains "$(plain_channel "$mate")" "resolved [key=captain-hold-legacy-work-1]: parent decision legacy-work: decided by the parent firstmate" \
     "the decision did not close the parent channel key"
+
+  # A remote mate cannot read its parent home: its provenance is the relayed
+  # request in its own parent-route steering inbox, written through the inbox owner.
+  local remote
+  remote=$(make_mate_home classify-remote)
+  printf 'schema=fm-secondmate-parent.v1\nroute=remote\n' > "$remote/.fm-secondmate-parent"
+  (
+    export FM_HOME=$remote
+    . "$ROOT/bin/fm-task-inbox-lib.sh"
+    . "$ROOT/bin/fm-operational-input.sh"
+    fm_task_inbox_write "$remote/state/parent-route" "$(cat "$remote/.fm-secondmate-home")" \
+      "${FM_FROMFIRST_MARK}corr=00112233445566ff retry the red check once or fix it" >/dev/null
+  ) || fail "could not record the relayed request in the remote inbox"
+  make_legacy_mate_hold "$remote" relayed-work "retry or fix one red CI check, relayed corr=00112233445566ff"
+  make_legacy_mate_hold "$remote" unrelayed-work "retry or fix one red CI check, relayed corr=aabbccddeeff0011"
+  make_legacy_mate_hold "$remote" tokenless-work "retry or fix one red CI check"
+  if run_captain "$remote" classify unrelayed-work --owner parent --evidence-file "$evidence" \
+    --reason "the question was Main's" 2>"$remote/refusal.err" >/dev/null; then
+    fail "classify accepted a remote hold whose correlation no relayed request matches"
+  fi
+  assert_contains "$(cat "$remote/refusal.err")" "names corr=aabbccddeeff0011, but this home's parent-route steering inbox holds no relayed request with that correlation" \
+    "the remote refusal did not say the correlation has no matching record"
+  assert_contains "$(tasks_in "$remote" show unrelayed-work --full)" "hold_kind: captain" "the refused remote classification changed the hold"
+  if run_captain "$remote" classify tokenless-work --owner parent --evidence-file "$evidence" \
+    --reason "the question was Main's" 2>"$remote/refusal.err" >/dev/null; then
+    fail "classify accepted a remote hold whose reason names no correlation"
+  fi
+  assert_contains "$(cat "$remote/refusal.err")" "its hold reason names no corr=<id> token" \
+    "the remote refusal did not say the reason names no correlation"
+  run_captain "$remote" classify relayed-work --owner parent --evidence-file "$evidence" \
+    --reason "the question was Main's" >/dev/null || fail "classify refused a remote hold matched by its relayed inbox request"
+  show=$(shown "$remote" relayed-work)
+  assert_contains "$show" "Decision owner: parent" "the remote classification did not record the parent as owner"
+  assert_contains "$show" "Classification provenance: parent request corr=00112233445566ff" "the remote provenance was not recorded"
+  [ "$(open_status "$remote" relayed-work --parent-owned)" = 0 ] || fail "the remote classified hold does not read as the parent's open call"
   pass "Main classifies a legacy hold with parent provenance once, with evidence, and the parent decision releases it with the work still open; a hold without provenance stays the captain's"
 }
 
