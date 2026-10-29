@@ -1,0 +1,61 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a queue lock freed during the alarm check lands the pending append before after-output work
+[test_alarm_after_queue_frees_appends_before_after_output] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - the drain presents a pending append ahead of the alarm that interrupted its wait
+[test_alarm_freed_queue_keeps_producer_order] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a failed lock observation inside a queue wait keeps waiting and lands the pending append
+[test_alarm_observation_failure_keeps_waiting_append] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row
+[test_alarm_runs_during_watcher_down_waits] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an alarm exit spills a consumed source's pending wake and the next watcher queues it first
+[test_alarm_spills_consumed_append_for_next_watcher] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death
+[test_dead_owner_alarm_names_its_trigger] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner alarms only after two consecutive blocked checks, revalidated before publication
+[test_dead_owner_alarm_needs_two_checks] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms
+[test_dead_owner_alarm_requires_blocked_waiter] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - exit cleanup's bounded recovery-marker wait never delivers a second wake
+[test_exit_cleanup_wait_never_delivers_second_wake] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture
+[test_lock_alarm_crosses_threshold_during_capture] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - local observation covers foreign-indexed state locks and never-owned external locks without touching the foreign index
+[test_lock_alarm_discovers_foreign_owners] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter
+[test_lock_alarm_project_and_control_limits] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock
+[test_lock_alarm_while_queue_append_waits] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a timed-out waiter is pruned without alarming on or changing the fresh live owner
+[test_lock_monitor_prunes_finished_waiters] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+[test_lock_receipts_retire_with_release] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue
+[test_long_held_lock_alarm] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock
+[test_startup_queue_wait_alarm_releases_with_downtime] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - spilled rows wait for a held queue lock, then replay in order ahead of newer rows
+[test_wake_spill_replay_waits_for_held_queue] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a watcher past the alarm limit stays silent about its own and the daemon's singleton locks
+[test_watcher_skips_own_singleton_locks] rc=0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent
+[test_zombie_owner_is_reclaimed] rc=0
+fails=0 secs=142

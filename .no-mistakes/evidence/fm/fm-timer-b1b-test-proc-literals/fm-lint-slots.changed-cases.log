@@ -1,0 +1,9 @@
+ok - a resident-watch shim that resolves to itself is refused at once
+ok - the resident-memory watch samples only its command's own tree
+ok - a root whose footprint crosses the bound while its resident size does not is ended and retried narrower
+ok - a reader that misses one deadline is replaced and footprint ends the root on the next tick
+ok - a reader whose first reply is 1 s late keeps footprint in use
+ok - a later reply 1 s late is sampled by ps for that tick only
+ok - a replacement reader that exits before replying is retried and footprint still ends the root
+ok - three failed replacement readers in a row give the reader up as restarts-failed
+rc=0 secs=52

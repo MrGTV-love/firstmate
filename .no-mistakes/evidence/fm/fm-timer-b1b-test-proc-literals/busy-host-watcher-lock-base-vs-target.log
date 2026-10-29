@@ -1,0 +1,19 @@
+== BASE ca1fdbf7e (fm-proc-budget.sh 128, counts the whole user)  dir=/Users/charlesabrooker/tmp/fm-b1b-base.dlkbqi
+user procs before: 985
+tree's lock holder seen after ~380 ms; starting 300 neighbours
+user procs with neighbours: 1285
+case exit: 1
+ok - disposable watcher refuses inherited state outside its marked lab
+/Users/charlesabrooker/tmp/fm-b1b-base.dlkbqi/bin/fm-wake-lib.sh: fork: Resource temporarily unavailable
+/Users/charlesabrooker/tmp/fm-b1b-base.dlkbqi/bin/fm-wake-lib.sh: fork: Resource temporarily unavailable
+/Users/charlesabrooker/tmp/fm-b1b-base.dlkbqi/bin/fm-wake-lib.sh: fork: Resource temporarily unavailable
+AssertionError: replay gave up behind a live holder
+not ok - spill replay under a held queue lock lost or reordered rows
+
+== TARGET 1e352181d (fm_test_tree_leash = --own-procs 128)  dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63XKMPWXCY7PQ7PRXA08165
+user procs before: 981
+tree's lock holder seen after ~380 ms; starting 300 neighbours
+user procs with neighbours: 1271
+case exit: 0
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - spilled rows wait for a held queue lock, then replay in order ahead of newer rows

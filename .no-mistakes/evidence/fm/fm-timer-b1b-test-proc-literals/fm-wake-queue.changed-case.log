@@ -1,0 +1,2 @@
+ok - lock-wait diagnostics never recreate a vanished state directory
+rc=0 secs=11
