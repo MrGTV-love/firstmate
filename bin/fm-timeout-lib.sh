@@ -92,6 +92,9 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
+# shellcheck source=bin/fm-scratch-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-scratch-lib.sh"
+
 # fm_run_progress <no-progress-seconds> <command...>: keep slow work running
 # while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
 # bounds below it has no wall-clock cutoff. fm-duration.py owns the Python
@@ -335,26 +338,28 @@ fm_timeout_free_fd() {
 # fm_timeout_open_status <prefix>: make a status file, open a write and a read
 # descriptor on it, and unlink it at once. The numbers go to FM_TIMEOUT_WFD and
 # FM_TIMEOUT_RFD. Nothing named stays on disk, so a caller that dies by TERM,
-# INT, HUP or KILL while waiting leaves no file behind. The one remaining gap is
-# a KILL between mktemp and the unlink.
+# INT or HUP while waiting leaves no file behind. A KILL between the file's
+# creation and its unlink leaves an empty file in the prefix's scratch
+# container (fm-scratch-lib.sh), which the next call with the same prefix
+# removes once it sees the dead owner.
 fm_timeout_open_status() {
   local status_file wfd rfd
   FM_TIMEOUT_WFD=
   FM_TIMEOUT_RFD=
-  status_file=$(mktemp "${TMPDIR:-/tmp}/$1.XXXXXX" 2>/dev/null) || return 1
+  status_file=$(fm_scratch_new f "$1" 2>/dev/null) || return 1
   wfd=$(fm_timeout_free_fd 20) || wfd=
   rfd=
   [ -z "$wfd" ] || rfd=$(fm_timeout_free_fd $((wfd + 1))) || rfd=
   if [ -z "$wfd" ] || [ -z "$rfd" ]; then
-    rm -f "$status_file" 2>/dev/null || true
+    fm_scratch_release "$status_file"
     return 1
   fi
   if ! { eval "exec $wfd>\"\$status_file\" $rfd<\"\$status_file\""; } 2>/dev/null; then
     eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
-    rm -f "$status_file" 2>/dev/null || true
+    fm_scratch_release "$status_file"
     return 1
   fi
-  rm -f "$status_file" 2>/dev/null || true
+  fm_scratch_release "$status_file"
   FM_TIMEOUT_WFD=$wfd
   FM_TIMEOUT_RFD=$rfd
 }

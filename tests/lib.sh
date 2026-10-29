@@ -211,8 +211,20 @@ fm_test_tmpdir() {
 
 FM_TEST_TMPDIR=$(fm_test_tmpdir) || return 1
 
+# One record directory per sourcing shell holds everything the shell owns that
+# a hard kill could strand: its cleanup, process-event, watcher and process
+# registries, the shared fixture words file, the slot gate and the claim root.
+# The record carries the .fm-test-fixture marker written below, so a shell that
+# is killed leaves exactly one marked entry, kept where the sweep reads it
+# without enumerating the rest of the shared temp dir (fm_test_reap_orphans).
+FM_TEST_OWNERS_DIR="$FM_TEST_TMPDIR/fm-test-owners"
+(umask 077; mkdir -p "$FM_TEST_OWNERS_DIR") || return 1
+FM_TEST_SHELL_DIR=$(umask 077; mktemp -d "$FM_TEST_OWNERS_DIR/$$.XXXXXX") || return 1
+FM_TEST_SHELL_DIR=$(cd -P -- "$FM_TEST_SHELL_DIR" && pwd -P) || return 1
+
 FM_TEST_CLEANUP_DIRS=()
-FM_TEST_CLEANUP_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-cleanup.$$.XXXXXX") || return 1
+FM_TEST_CLEANUP_REGISTRY="$FM_TEST_SHELL_DIR/cleanup"
+: > "$FM_TEST_CLEANUP_REGISTRY" || return 1
 
 fm_test_pid_identity() {
   local pid=$1
@@ -221,7 +233,11 @@ fm_test_pid_identity() {
 }
 
 FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
-  rm -f "$FM_TEST_CLEANUP_REGISTRY"
+  rm -rf "$FM_TEST_SHELL_DIR"
+  return 1
+}
+printf '%s\n%s\n' "$$" "$FM_TEST_OWNER_IDENTITY" > "$FM_TEST_SHELL_DIR/.fm-test-fixture" || {
+  rm -rf "$FM_TEST_SHELL_DIR"
   return 1
 }
 
@@ -239,7 +255,8 @@ FM_TEST_OWNER_IDENTITY=$(fm_test_pid_identity "$$") || {
 # private one). It never matches on a script or process name, which would reach
 # into another home's live runners.
 
-FM_TEST_PROCEVENT_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-procevent.$$.XXXXXX") || return 1
+FM_TEST_PROCEVENT_REGISTRY="$FM_TEST_SHELL_DIR/procevent"
+: > "$FM_TEST_PROCEVENT_REGISTRY" || return 1
 
 fm_test_track_procevent_home() {  # <home> [claim-root]
   [ -n "${1:-}" ] || return 1
@@ -278,7 +295,8 @@ fm_test_reap_procevent_homes() {
 # deleted has no lock and is skipped; that watcher exits on its own home-gone
 # check within one poll.
 
-FM_TEST_WATCHER_REGISTRY=$(mktemp "$FM_TEST_TMPDIR/.fm-test-watcher.$$.XXXXXX") || return 1
+FM_TEST_WATCHER_REGISTRY="$FM_TEST_SHELL_DIR/watcher"
+: > "$FM_TEST_WATCHER_REGISTRY" || return 1
 
 fm_test_track_watcher_state() {  # <state-dir>
   [ -n "${1:-}" ] || return 1
@@ -325,7 +343,8 @@ fm_test_reap_watchers() {
 # Reaping requires that birth identity and the registered command needle to
 # match, so a reused PID cannot authorize killing an unrelated process.
 
-FM_TEST_PROCESS_REGISTRY=$(mktemp "${TMPDIR:-/tmp}/.fm-test-process.$$.XXXXXX") || return 1
+FM_TEST_PROCESS_REGISTRY="$FM_TEST_SHELL_DIR/process"
+: > "$FM_TEST_PROCESS_REGISTRY" || return 1
 
 fm_test_track_process() {  # <pidfile> <command-needle>
   [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
@@ -422,6 +441,7 @@ fm_test_reap_fixture_processes() {
   local d
   local -a args=()
   [ -f "$FM_TEST_CLEANUP_REGISTRY" ] || return 0
+  [ ! -d "$FM_TEST_SHELL_DIR" ] || args+=(--root "$FM_TEST_SHELL_DIR")
   while IFS= read -r d; do
     [ -n "$d" ] && [ -d "$d" ] && args+=(--root "$d")
   done < "$FM_TEST_CLEANUP_REGISTRY"
@@ -447,6 +467,7 @@ fm_test_cleanup() {
     done < "$FM_TEST_CLEANUP_REGISTRY"
     rm -f "$FM_TEST_CLEANUP_REGISTRY"
   fi
+  fm_test_remove_tree "$FM_TEST_SHELL_DIR"
 }
 
 fm_test_tmproot() {
@@ -467,7 +488,8 @@ fm_test_tmproot() {
 # case; it is created here, in the sourcing shell, so command substitutions reuse it.
 fm_test_drop_file() {
   if [ ! -f "${FM_TEST_DROP_WORDS:-}" ]; then
-    FM_TEST_DROP_WORDS=$(fm_test_tmproot fm-drop-words)/captain-words.txt
+    mkdir -p "$FM_TEST_SHELL_DIR/drop-words" || return 1
+    FM_TEST_DROP_WORDS="$FM_TEST_SHELL_DIR/drop-words/captain-words.txt"
     printf 'Fixture: the captain approved discarding this work.\n' > "$FM_TEST_DROP_WORDS"
     export FM_TEST_DROP_WORDS
   fi
@@ -478,7 +500,8 @@ fm_test_drop_file >/dev/null
 # The per-key test slot gate (bin/fm-duration.py) is host-wide by default, so a
 # fixture that runs a test.* key must never take or wait on a real slot.
 if [ -z "${FM_TEST_SLOT_DIR:-}" ]; then
-  FM_TEST_SLOT_DIR=$(fm_test_tmproot fm-test-slots)
+  FM_TEST_SLOT_DIR="$FM_TEST_SHELL_DIR/slots"
+  mkdir -p "$FM_TEST_SLOT_DIR" || return 1
   export FM_TEST_SLOT_DIR
 fi
 
@@ -489,7 +512,7 @@ export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 # The private root starts with the standing pile-up detector's claim held by this
 # suite's shell, so a test bootstrap sees a live owner and launches no detector
 # runner. A suite that tests the detector exports an empty claim root instead.
-FM_PROCEVENT_CLAIM_ROOT=$(fm_test_tmproot fm-procevent-claims)/claims || return 1
+FM_PROCEVENT_CLAIM_ROOT="$FM_TEST_SHELL_DIR/procevent-claims/claims"
 export FM_PROCEVENT_CLAIM_ROOT
 (umask 077; mkdir -p "$FM_PROCEVENT_CLAIM_ROOT" \
   && printf '%s\n%s\n%s\n%s\n' "${FM_PROCEVENT_CLAIM_ROOT%/claims}/no-detector-home" "$$" \
@@ -508,14 +531,62 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # from real (non-test) firstmate commands. The marker identifies the owning
 # shell across PID reuse, so the same live owner always wins over the age
 # fallback for dead or unowned roots.
+#
+# The sweep reads only what a test run owns: the per-shell records under
+# fm-test-owners (each names its shell's fixture roots) and marked fm-test-*
+# roots at the top of the temp dir. Its cost therefore does not grow with the
+# other fm-* entries that tools leave in a shared temp dir, which the shared
+# per-prefix scratch containers (bin/fm-scratch-lib.sh) keep out of the way as
+# well. FM_TEST_SWEEP_ALL=1 widens it to every top-level fm-* directory and to
+# dead shells' legacy registries; bin/fm-test-run.sh does that once per run.
 FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 fm_test_reap_orphans() {
-  local marker dir mtime now owner_pid owner_identity current_identity
+  local marker dir mtime now owner_pid owner_identity current_identity shell root entry
+  local pattern='fm-test-*'
+  local -a markers=() reaper_args=()
+  [ "${FM_TEST_SWEEP_ALL:-0}" != 1 ] || pattern='fm-*'
+  for shell in "$FM_TEST_OWNERS_DIR"/*; do
+    [ -d "$shell" ] && [ ! -L "$shell" ] || continue
+    # A shell's fixture roots go before its record, which is removed last.
+    if [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ]; then
+      while IFS= read -r root; do
+        [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] && markers+=("$root/.fm-test-fixture")
+      done < "$shell/cleanup"
+    fi
+    [ -f "$shell/.fm-test-fixture" ] && markers+=("$shell/.fm-test-fixture")
+  done
+  for marker in "$FM_TEST_TMPDIR"/$pattern/.fm-test-fixture; do
+    [ -e "$marker" ] && markers+=("$marker")
+  done
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    # Registries from before the per-shell records lived beside the fixture roots.
+    for entry in "$FM_TEST_TMPDIR"/.fm-test-cleanup.* "$FM_TEST_TMPDIR"/.fm-test-procevent.* \
+      "$FM_TEST_TMPDIR"/.fm-test-watcher.* "$FM_TEST_TMPDIR"/.fm-test-process.*; do
+      [ -f "$entry" ] && [ ! -L "$entry" ] && [ -O "$entry" ] || continue
+      owner_pid=${entry##*/}
+      owner_pid=${owner_pid#.fm-test-*.}
+      owner_pid=${owner_pid%%.*}
+      case "$owner_pid" in '' | *[!0-9]*) continue ;; esac
+      ! kill -0 "$owner_pid" 2>/dev/null || continue
+      mtime=$(stat -c %Y "$entry" 2>/dev/null || stat -f %m "$entry" 2>/dev/null) || continue
+      [ $(( $(date +%s) - mtime )) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
+      rm -f "$entry"
+    done
+  fi
+  [ "${#markers[@]}" -gt 0 ] || return 0
   # Stop what a dead owner left running before any root (and so its proof) goes.
-  "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$FM_TEST_TMPDIR" >/dev/null 2>&1 || true
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    reaper_args=(--tmpdir "$FM_TEST_TMPDIR")
+  else
+    reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
+    for marker in "${markers[@]}"; do
+      case "$marker" in "$FM_TEST_OWNERS_DIR"/*) ;; *) reaper_args+=(--candidate "${marker%/.fm-test-fixture}") ;; esac
+    done
+  fi
+  "$ROOT/bin/fm-test-reap-orphans.sh" "${reaper_args[@]}" >/dev/null 2>&1 || true
   now=$(date +%s)
-  for marker in "$FM_TEST_TMPDIR"/fm-*/.fm-test-fixture; do
+  for marker in "${markers[@]}"; do
     [ -e "$marker" ] || continue
     owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || owner_pid=
     owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || owner_identity=

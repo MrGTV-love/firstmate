@@ -55,6 +55,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-herdr-ci-cleanup.sh` | Snapshot and tear down only job-owned `fm-lab-*` sessions in the Herdr CI lane       |
 | `fm-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `FM_TASK_ID` marks a task worker |
 | [`fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) | Reap processes provably owned by an ended lab or test run; its header owns the safety contract |
+| [`fm-scratch-legacy-reap.sh`](../bin/fm-scratch-legacy-reap.sh) | One-time removal of old unowned scratch entries from before `fm-scratch-lib.sh`; dry run unless `--apply` |
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
@@ -137,6 +138,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pipeline-spend.sh`   | Attribute a task's no-mistakes pipeline spend to the task and keep it in the private spend ledger |
 | `fm-tangle-lib.sh`       | Shared default-branch resolution and primary-checkout tangle classification          |
 | `fm-timeout-lib.sh`      | Single owner of hard-bounded command execution and its fallback watchdog |
+| `fm-scratch-lib.sh`      | Single owner of per-command scratch entries in the shared temp dir: owner-named, released by the command, reaped after a KILL |
 | `fm-task-docker-lib.sh`  | Single owner of which Docker containers, networks, and volumes belong to a task, and of their removal at teardown |
 | `fm-timing-lib.sh`       | Single owner of the deferred network stage's per-step elapsed-time records, inert unless a run asks for them |
 | `fm-supervision-lib.sh`  | Shared supervision-need and watcher-beacon freshness predicates |

@@ -3,6 +3,7 @@
 #
 # Usage:
 #   fm-test-reap-orphans.sh [--tmpdir DIR]...
+#   fm-test-reap-orphans.sh --owners DIR [--candidate ROOT]...
 #   fm-test-reap-orphans.sh --owner-pid PID --root DIR...
 #   fm-test-reap-orphans.sh --help
 #
@@ -65,10 +66,25 @@
 #                   marker directly inside it. Unmarked roots are not scanned
 #                   below depth one.
 #                   An unmarked container or sibling is not ownership evidence.
+#   --owners DIR    directory of per-shell owner records, as tests/lib.sh keeps
+#                   them (repeatable; excludes --tmpdir). Each immediate
+#                   subdirectory carries a .fm-test-fixture marker and a
+#                   `cleanup` file naming the fixture roots that shell made. Only
+#                   those records and roots are read, so the cost depends on how
+#                   many records exist and never on what else the shared temp dir
+#                   holds. The ownership proof is the default scan's: a root's
+#                   own marker must name a dead owner. A root the record does not
+#                   name is found only by the default scan or named with
+#                   --candidate.
+#   --candidate ROOT with --owners, one more root to examine as a container, as
+#                   the default scan does for an immediate fm-* entry (repeatable).
 #   --owner-pid PID with --root, the caller's own pid: reap what this owner left
 #                   under its own roots. Refused unless PID is this process or
 #                   one of its ancestors.
 #   --root DIR      a fixture root the owner made (repeatable, needs --owner-pid).
+#
+# The default scan walks a whole temp dir, so run it once per runner start. A
+# per-script or per-shell sweep uses --owners.
 #
 # Prints one `reaped` line per process and nothing otherwise.
 # Exits 2 on misuse and 1 if scratch allocation or reading the process list fails;
@@ -89,10 +105,14 @@ usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//';
 
 OWNER_PID=
 TMPDIRS=()
+OWNERS=()
+CANDIDATES=()
 ROOTS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --tmpdir) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; TMPDIRS+=("$2"); shift ;;
+    --owners) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; OWNERS+=("$2"); shift ;;
+    --candidate) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; CANDIDATES+=("$2"); shift ;;
     --owner-pid) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; OWNER_PID=$2; shift ;;
     --root) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; ROOTS+=("$2"); shift ;;
     -h|--help) usage; exit 0 ;;
@@ -106,7 +126,14 @@ if [ -n "$OWNER_PID" ] || [ "${#ROOTS[@]}" -gt 0 ]; then
     || { echo "fm-test-reap-orphans: --owner-pid and --root go together and exclude --tmpdir" >&2; exit 2; }
 fi
 
-if [ "${#TMPDIRS[@]}" -eq 0 ]; then
+if [ "${#OWNERS[@]}" -gt 0 ]; then
+  [ "${#TMPDIRS[@]}" -eq 0 ] && [ -z "$OWNER_PID" ] \
+    || { echo "fm-test-reap-orphans: --owners excludes --tmpdir, --owner-pid and --root" >&2; exit 2; }
+  TMPDIRS=("${OWNERS[0]}")
+elif [ "${#CANDIDATES[@]}" -gt 0 ]; then
+  echo "fm-test-reap-orphans: --candidate needs --owners" >&2
+  exit 2
+elif [ "${#TMPDIRS[@]}" -eq 0 ]; then
   [ -z "${TMPDIR:-}" ] || TMPDIRS+=("$TMPDIR")
   TMPDIRS+=(/tmp)
 fi
@@ -146,8 +173,12 @@ if [ -n "$OWNER_PID" ] && ! owner_is_ancestor; then
   echo "fm-test-reap-orphans: --owner-pid $OWNER_PID is not this process or an ancestor" >&2
   exit 2
 fi
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-reap.XXXXXX" 2>/dev/null) || WORK=$(mktemp -d /tmp/fm-test-reap.XXXXXX) || exit 1
-trap 'rm -rf "$WORK"' EXIT
+# shellcheck source=bin/fm-scratch-lib.sh
+. "$SCRIPT_DIR/fm-scratch-lib.sh"
+# The scratch directory exists only once a root needs a process scan, so a sweep
+# that finds nothing makes no entry in the shared temp dir at all.
+WORK=
+trap '[ -z "$WORK" ] || fm_scratch_release "$WORK"' EXIT
 
 marker_owner() {
   local marker=$1 token
@@ -241,32 +272,63 @@ physical_dir() { CDPATH='' cd -P -- "$1" 2>/dev/null && pwd -P; }
 # is read by glob with no fork, and `find` runs, in one batch, only inside a
 # directory that is itself a marked root, a runner container, or a live lab.
 scan_containers() {
-  local dir=$1 container marker nested
+  local dir=$1 container
   local -a deep=()
   for container in "$dir"/fm-* "$dir"/fmlab.*; do
-    [ -d "$container" ] && [ ! -L "$container" ] || continue
-    nested=0
-    case "${container##*/}" in fm-test-run.* | fmlab.*) nested=1 ;; esac
-    for marker in "$container/.fm-lab-home" "$container/.fm-test-fixture"; do
-      [ -f "$marker" ] || continue
-      printf '%s\0' "$marker"
-      nested=1
-    done
-    [ "$nested" -eq 0 ] || deep+=("$container")
+    scan_one_container "$container"
   done
+  scan_deep
+}
+
+# scan_one_container <container>: print its depth-one markers and queue it for
+# the batched `find` when it is itself a marked root, a runner container, or a
+# live lab. scan_deep runs that `find` over everything queued.
+scan_one_container() {
+  local container=$1 marker nested=0
+  [ -d "$container" ] && [ ! -L "$container" ] || return 0
+  case "${container##*/}" in fm-test-run.* | fmlab.*) nested=1 ;; esac
+  for marker in "$container/.fm-lab-home" "$container/.fm-test-fixture"; do
+    [ -f "$marker" ] || continue
+    printf '%s\0' "$marker"
+    nested=1
+  done
+  [ "$nested" -eq 0 ] || deep+=("$container")
+}
+
+scan_deep() {
   [ "${#deep[@]}" -gt 0 ] || return 0
   find "${deep[@]}" -mindepth 2 -type f \( -name .fm-lab-home -o -name .fm-test-fixture \) -print0 2>/dev/null
 }
 
+# scan_owners <owners-dir>: the same markers, read only from the per-shell
+# records and the roots each names.
+scan_owners() {
+  local dir=$1 shell root
+  local -a deep=()
+  for shell in "$dir"/*; do
+    [ -d "$shell" ] && [ ! -L "$shell" ] || continue
+    scan_one_container "$shell"
+    [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ] && [ -O "$shell/cleanup" ] || continue
+    while IFS= read -r root; do
+      [ -n "$root" ] || continue
+      scan_one_container "$root"
+    done < "$shell/cleanup"
+  done
+  [ "${#CANDIDATES[@]}" -eq 0 ] || for root in "${CANDIDATES[@]}"; do
+    scan_one_container "$root"
+  done
+  scan_deep
+}
+
 # Roots proven by their markers. One `variant<TAB>root` line each, because the
 # same directory is spelled /tmp/... or /private/tmp/... by different callers.
-: > "$WORK/roots"
+ROOT_LINES=()
 add_root() {  # <physical-root>
   local root=$1
-  printf '%s\t%s\n' "$root" "$root" >> "$WORK/roots"
+  ROOT_LINES+=("$root"$'\t'"$root")
   case "$root" in
-    /private/tmp/*|/private/var/*) printf '%s\t%s\n' "${root#/private}" "$root" >> "$WORK/roots" ;;
-    /tmp/*|/var/*) printf '%s\t%s\n' "/private$root" "$root" >> "$WORK/roots" ;;
+    /private/tmp/*|/private/var/*) ROOT_LINES+=("${root#/private}"$'\t'"$root") ;;
+    /tmp/*|/var/*) ROOT_LINES+=("/private$root"$'\t'"$root") ;;
   esac
 }
 
@@ -283,6 +345,17 @@ if [ -n "$OWNER_PID" ]; then
       break
     done
   done
+elif [ "${#OWNERS[@]}" -gt 0 ]; then
+  for dir in "${OWNERS[@]}"; do
+    dir=$(physical_dir "$dir") || continue
+    while IFS= read -r -d '' marker; do
+      [ -f "$marker" ] || continue
+      marker_owner_dead "$marker" || continue
+      root=$(dirname "$marker")
+      case "$marker" in */.fm-test-fixture) ;; *) lab_inactive "$root" || continue ;; esac
+      add_root "$root"
+    done < <(scan_owners "$dir")
+  done
 else
   for dir in "${TMPDIRS[@]}"; do
     dir=$(physical_dir "$dir") || continue
@@ -298,7 +371,9 @@ else
     )
   done
 fi
-[ -s "$WORK/roots" ] || exit 0
+[ "${#ROOT_LINES[@]}" -gt 0 ] || exit 0
+WORK=$(fm_scratch_new d fm-test-reap) || WORK=$(mktemp -d /tmp/fm-test-reap.XXXXXX) || exit 1
+printf '%s\n' "${ROOT_LINES[@]}" > "$WORK/roots"
 
 COLUMNS=10000 LC_ALL=C ps -U "$(id -u)" -ww -o pid= -o ppid= -o lstart= -o command= > "$WORK/ps" 2>/dev/null
 status=$?
