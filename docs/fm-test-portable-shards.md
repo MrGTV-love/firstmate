@@ -155,11 +155,11 @@ The six captain-hold group hints of that table were not slowest-run samples beca
 
 The former combined `tests/fm-captain-hold-lifecycle.test.sh` measured between 773304 ms and 1259266 ms in those eight runs against a 343658 ms hint.
 No lane packing could place a single 21-minute member beside the other shard-2 members inside a 30-minute job.
-Its 116 cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
+Its cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
 
 | File | Area |
 |---|---|
-| `tests/fm-captain-hold-lifecycle.test.sh` | holds, origins, inventories, the completion gate, recorded answers, deferral, and the secondmate parent channel |
+| `tests/fm-captain-hold-lifecycle.test.sh` | holds, origins, inventories, the completion gate, recorded answers, deferral, project freezes, and the secondmate parent channel |
 | `tests/fm-captain-hold-sweep.test.sh` | the finished-board sweep and bound captain keys at the sweep |
 | `tests/fm-captain-hold-keyed-answers.test.sh` | the keyed-answer intake, default and done releases, and replay after interruption |
 | `tests/fm-captain-hold-reconcile.test.sh` | reconcile requests, verified closes, operational-key closes, legacy identities, and record divergence |
