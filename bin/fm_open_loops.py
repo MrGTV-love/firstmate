@@ -1695,7 +1695,7 @@ def ledger_action(args, state, now, batch=()):
                    and not ((row.get("category") == "review_pass_not_merged"
                              or actions.get(ident, {}).get("unverified")) and presentation_answered(ident))]
         if missing:
-            print("error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused")
+            print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
             return 1
         return 0
