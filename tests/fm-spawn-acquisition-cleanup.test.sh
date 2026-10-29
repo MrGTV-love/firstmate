@@ -672,7 +672,7 @@ PY
     gate="$wcase/provisioner.pid"
     if [ "$shape" = busy ]; then
       get_mode=busy
-      gate="$wcase/get-pid"
+      gate="$wcase/arrived"
     fi
     : > "$wcase/ticks"
     printf 'MODE=%s\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
