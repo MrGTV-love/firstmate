@@ -49,6 +49,10 @@
 # provisioner owns repeat/reuse compatibility; dirty scratch, branch/scope changes,
 # foreign active manifests, and create-only refusals stop promotion without a
 # manifest-force path. Governed scouts keep their already-provisioned task branch.
+# A refused promotion deletes a task branch only it created, so a retry is not
+# blocked once the scout advances; it warns and keeps the branch when the
+# project report may declare it or the branch moved, is checked out or the copy
+# is not restored (fm_slot_drop_created_branch in bin/fm-slot-provision-lib.sh).
 # Usage: fm-promote.sh <task-id> --mode <no-mistakes|direct-PR|local-only> --yolo <on|off> [--branch-prefix <prefix>] [--owned-path <tracked-path>]... [--upstream-consent <host>/<owner>/<repo>]
 # --upstream-consent records the captain's one-off approval for this task to
 # publish to firstmate's own upstream repository; promotion applies the same
