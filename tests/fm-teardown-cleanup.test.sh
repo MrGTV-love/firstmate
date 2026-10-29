@@ -33,7 +33,8 @@ test_local_only_force_overrides_unpushed() {
 # and, once the fixture that owned the home is cleaned up, can never be stopped
 # by anything that looks at the fixture: its command line names only the shared
 # code. The child runs a real teardown case with its refresh worker held at the
-# fence, then exits so its own fixture cleanup runs; no worker may remain.
+# fence until the home is gone, then exits so its own fixture cleanup removes the
+# home under the waiting worker; no worker may remain.
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
   local child out stub worker identity
   child="$TMP_ROOT/fixture-cleanup-child.sh"
@@ -48,12 +49,12 @@ set -u
 case_dir=$(make_case leak-child)
 write_meta "$case_dir" local-only ship
 wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
-export FM_TEST_FENCE_ACTION=refuse FM_TEST_FENCE_HOME="$case_dir"
+export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
 FM_TEARDOWN_TEST_PATH="$2:$PATH" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
   > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "the child teardown failed: $(cat "$case_dir/stderr")"
-fm_test_wait_until 30 test -e "$case_dir/state/.test-fence-refused" \
-  || fail "the refresh worker never reached the refused fence"
-worker=$(cat "$case_dir/state/.home-summary-refresh.lock/pid") || fail "the worker did not record its lock pid"
+fm_test_wait_until 30 test -s "$case_dir/state/.test-fence-waiting" \
+  || fail "the refresh worker never reached the fence"
+worker=$(cat "$case_dir/state/.test-fence-waiting") || fail "the fence stub did not record the worker pid"
 printf '%s\t%s\n' "$worker" "$(fm_test_pid_identity "$worker")" > "$3"
 CHILD
   bash "$child" "$ROOT" "$stub" "$out" || fail "the fixture child failed"

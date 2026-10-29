@@ -1329,9 +1329,13 @@ fm_test_base_path_sans() {
 # for its fence (the lock's steal mutex). FM_TEST_FENCE_ACTION picks what happens
 # there: remove deletes FM_TEST_FENCE_HOME; refuse writes
 # FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
-# holds it; hold starts a live process that takes the mutex first, records its pid
-# in FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
-# FM_TEST_FENCE_HOME/state/.test-fence-release exists (or it is killed). Any other
+# holds it; await-removal records the worker's pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
+# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# that takes the mutex first, records its pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
+# FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
+# gone (or it is killed). Any other
 # case, or any other target, runs the real ln. A refresh waiting on a fence is
 # reproduced this way without timing luck.
 fm_test_refresh_fence_stub() {
@@ -1347,13 +1351,18 @@ case "${*: -1}" in
     case "${FM_TEST_FENCE_ACTION:-}" in
       remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
       refuse) : > "$state/.test-fence-refused"; exit 1 ;;
+      await-removal)
+        printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        exit 1
+        ;;
       hold)
         if [ ! -e "$state/.test-fence-holder" ]; then
           env -u FM_TEST_FENCE_ACTION nohup bash -c '
             . "$1"
             fm_lock_acquire_wait "$2"
             printf "%s\n" "$$" > "$3"
-            while [ ! -e "$4" ]; do sleep 0.1; done
+            while [ ! -e "$4" ] && [ -d "${4%/*}" ]; do sleep 0.1; done
             fm_lock_release "$2"
           ' _ "$FM_TEST_FENCE_LIB" "${*: -1}" "$state/.test-fence-holder" "$state/.test-fence-release" \
             >/dev/null 2>&1 </dev/null &
