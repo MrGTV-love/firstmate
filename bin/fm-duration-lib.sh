@@ -12,7 +12,7 @@
 # Missing Python, a fixture copy without the helper, or a helper that cannot
 # read its table preserves the existing bound with an explicit diagnostic.
 # FM_DURATION_FILE=off disables recording.
-FM_DURATION_HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-duration.py"
+FM_DURATION_HELPER="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
 
 fm_duration_load() {
   if [ -r /proc/loadavg ]; then

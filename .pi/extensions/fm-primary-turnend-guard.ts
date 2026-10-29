@@ -54,8 +54,33 @@ function lockOwnership(): LockOwnership {
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
+// A Pi command started from inside the live session, such as the `pi --help`
+// capability probe in bin/fm-spawn.sh, auto-loads this extension too and passes
+// lockOwnership() through the same ancestor walk. Its pid dies at once, so the
+// marker must keep naming the live session above it (#5202). Pid equality with
+// the lock is not required because a wrapper such as pi-signed may hold the lock
+// while the extension host runs as its child.
+function markerNamesLiveAncestor(): boolean {
+  let markerPid = "";
+  try {
+    markerPid = readFileSync(marker, "utf8").split(/\r?\n/)[1] ?? "";
+  } catch {
+    return false;
+  }
+  if (!/^[0-9]+$/.test(markerPid) || markerPid === String(process.pid) || !pidAlive(markerPid)) {
+    return false;
+  }
+  let pid = String(process.pid);
+  for (let i = 0; i < 8; i += 1) {
+    pid = parentPid(pid);
+    if (!pid || pid === "1") return false;
+    if (pid === markerPid) return true;
+  }
+  return false;
+}
+
 function markLoaded(): void {
-  if (!existsSync(state) || lockOwnership() === "other") return;
+  if (!existsSync(state) || lockOwnership() === "other" || markerNamesLiveAncestor()) return;
   writeFileSync(marker, `${extensionVersion}\n${process.pid}\n`);
 }
 
@@ -469,13 +494,8 @@ function runGuard(): Promise<{ code: number; stderr: string }> {
   });
 }
 
-// PreToolUse seatbelts (bin/fm-arm-pretool-check.sh, docs/arm-pretool-check.md;
-// bin/fm-cd-pretool-check.sh, docs/cd-guard.md). Both piggyback on this same
-// extension file rather than separate ones so no extra Pi -e flag is needed at
-// launch - the primary already loads this file for the turn-end guard, and
-// pi.on("tool_call", ...) can block (verified 2026-07-09 against pi 0.80.5:
-// returning {block: true} prevents the bash command from running). Each owner
-// script owns its own decision and is inert outside the real primary checkout.
+// Watcher-arm PreToolUse seatbelt (bin/fm-arm-pretool-check.sh,
+// docs/arm-pretool-check.md), sharing the turn-end extension entry point.
 function runChecker(script: string, command: string): Promise<{ code: number; stderr: string }> {
   return new Promise((resolveResult) => {
     const invocation = firstmateShellInvocation(
@@ -502,10 +522,6 @@ function runChecker(script: string, command: string): Promise<{ code: number; st
 
 function runPretoolCheck(command: string): Promise<{ code: number; stderr: string }> {
   return runChecker("fm-arm-pretool-check.sh", command);
-}
-
-function runCdCheck(command: string): Promise<{ code: number; stderr: string }> {
-  return runChecker("fm-cd-pretool-check.sh", command);
 }
 
 export default function (pi: ExtensionAPI) {
@@ -591,10 +607,6 @@ export default function (pi: ExtensionAPI) {
     if (event.type !== "tool_call" || event.toolName !== "bash") return {};
     const command = String((event.input as { command?: unknown })?.command ?? "");
     if (!command) return {};
-    const cdResult = await runCdCheck(command);
-    if (cdResult.code === 2) {
-      return { block: true, reason: cdResult.stderr.trim() || "denied by the cd-guard PreToolUse seatbelt" };
-    }
     const result = await runPretoolCheck(command);
     if (result.code !== 2) return {};
     return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };

@@ -285,7 +285,7 @@ watcher_live() {  # <home>
 }
 host_exited() { [ -s "$1/host.rc" ]; }
 # The recovery marker's episode kind (downtime or handling), read through its
-# owner's parser; the Claude re-arm owner delivers a close only on downtime.
+# owner's parser; watcher-continuity.md owns the Claude host delivery boundary.
 marker_kind() {  # <home>
   FM_HOME="$1" bash -c '
     . "$1"

@@ -12,15 +12,15 @@ import { encodeFirstmateOperationalInput } from "./lib/fm-operational-input.js";
 // wake line, and the delivered message carries every such line in order while
 // wake lines keep an eight-line cap. The host prints the first cycle's status
 // line as soon as it is verified, so readiness and the handling handoff work
-// as they do for the arm, with a longer readiness budget for the host's own
-// startup. On a home that does not run the host nothing below changes.
+// as they do for the arm, with a longer readiness notice window for the host's
+// own startup. On a home that does not run the host nothing below changes.
 const COORDINATOR_KEY = "__firstmateOpenCodeWatchArm";
-// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
-// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
-// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
-const ARM_READY_TIMEOUT_DEFAULT_MS = process.platform === "win32" ? 35000 : 12000;
-const ARM_READY_TIMEOUT_MS = positiveInteger("FM_OPENCODE_ARM_READY_TIMEOUT_MS", ARM_READY_TIMEOUT_DEFAULT_MS);
-const HOST_READY_TIMEOUT_MS = Math.max(ARM_READY_TIMEOUT_MS, 30000);
+// How long a wake waits for its successor to report before it goes out with a
+// still-starting line. A notice window only: the successor is never stopped for
+// it, since the arm owns startup no-progress detection.
+const ARM_READY_NOTICE_DEFAULT_MS = process.platform === "win32" ? 35000 : 12000;
+const ARM_READY_NOTICE_MS = positiveInteger("FM_OPENCODE_ARM_READY_TIMEOUT_MS", ARM_READY_NOTICE_DEFAULT_MS);
+const HOST_READY_NOTICE_MS = Math.max(ARM_READY_NOTICE_MS, 30000);
 const WAKE_LINE = /^(signal:|stale:|check:|heartbeat($|:))/;
 const HOST_LINE = /^supervision-host:/;
 const ARM_RETIRE_TIMEOUT_MS = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
@@ -38,6 +38,7 @@ let armClose = new WeakMap();
 let armReadiness = new WeakMap();
 let armRecovery = new WeakMap();
 let armHostMode = new WeakMap();
+let armLeftStarting = new WeakSet();
 
 function positiveInteger(name, fallback) {
   const value = Number(process.env[name]);
@@ -52,9 +53,9 @@ function setArmStatus(status) {
 function waitForArmReady(armChild) {
   const readiness = armReadiness.get(armChild);
   if (!readiness) return Promise.resolve("failed");
-  const timeout = armHostMode.get(armChild) ? HOST_READY_TIMEOUT_MS : ARM_READY_TIMEOUT_MS;
+  const notice = armHostMode.get(armChild) ? HOST_READY_NOTICE_MS : ARM_READY_NOTICE_MS;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve("timeout"), timeout);
+    const timer = setTimeout(() => resolve("starting"), notice);
     timer.unref();
     void readiness.then((status) => {
       clearTimeout(timer);
@@ -375,6 +376,11 @@ async function restoreAfterActionableClose(paths, sessionID, client, predecessor
     // An actionable line belongs to this arm's close handler.
     // Do not retire it before that handler can start the successor cycle.
     if (status === "wake") return { failure: "", recovery: armRecovery.get(armChild) };
+    // A successor still starting is left running and reports its own result.
+    if (status === "starting") {
+      armLeftStarting.add(armChild);
+      return { failure: "", notice: `watcher: successor pid=${armChild?.pid ?? "unknown"} still starting; it keeps running and reports its own result` };
+    }
     failure = restorationFailure(status);
     if (!(await retireArm(armChild))) {
       setArmStatus("failed");
@@ -442,9 +448,11 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
     resolveReadiness = resolve;
   });
   armReadiness.set(armChild, readiness);
+  let confirmed = false;
   const settleReadiness = (status) => {
     if (readinessSettled) return;
     readinessSettled = true;
+    confirmed = status === "armed" || status === "external";
     resolveReadiness(status);
   };
   const closed = new Promise((resolveClosedChild) => {
@@ -484,7 +492,8 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
       restorationInFlight = restoration;
       void restoration.then(async (result) => {
         try {
-          const message = result.failure ? `${classification.message}\n\n${result.failure}` : classification.message;
+          const note = result.failure || result.notice;
+          const message = note ? `${classification.message}\n\n${note}` : classification.message;
           await deliverActionableWake(paths, client, sessionID, message, result.recovery);
         } finally {
           if (restorationInFlight === restoration) restorationInFlight = null;
@@ -500,6 +509,9 @@ function spawnArm(paths, sessionID, client, predecessorArmPid = "") {
       });
       return;
     }
+    // A successor left still starting when its wake went out reports its own
+    // later startup failure here, where this close is observed.
+    if (armLeftStarting.has(armChild) && !confirmed) surfaceFailure(paths, client, sessionID, classification.message);
     if (restorationInFlight) {
       setArmStatus("failed");
       return;

@@ -151,7 +151,8 @@ fm_quota_single_provider_table() {
     'kimi kimi' \
     'cursor cursor' \
     'agy agy' \
-    'muse meta'
+    'muse meta' \
+    'dsh deepseek'
 }
 
 # Reads the whole table before answering: leaving the loop early closes the

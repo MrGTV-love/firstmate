@@ -360,6 +360,189 @@ SH
   pass "a quiet scan of 12 status logs enters $count subshells (bound 40)"
 }
 
+# Twelve quiet status logs under <dir>/state, plus the helpers the marker
+# budgets share. marker-setup.sh pins the constant identity held in
+# <dir>/identity (strong by default), so a result does not depend on the host
+# file system recording birth times, and offers mark_all, grow_logs and
+# quiet_scan.
+write_marker_fixture() {  # <dir>
+  local dir=$1 i=0
+  mkdir -p "$dir/state" "$dir/home"
+  while [ "$i" -lt 12 ]; do
+    i=$((i + 1))
+    printf 'working [at=%s]: step\n' "$i" > "$dir/state/task-$i.status"
+  done
+  printf 'strong:16777232:123:2026-10-09 12:34:56' > "$dir/identity"
+  cat > "$dir/identity-reader" <<SH
+#!/bin/sh
+cat "$dir/identity"
+SH
+  chmod +x "$dir/identity-reader"
+  cat > "$TMP_ROOT/marker-setup.sh" <<'SH'
+root=$1 dir=$2
+export FM_STATE_OVERRIDE="$dir/state" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/home"
+export FM_STATUS_IDENTITY_READER="$dir/identity-reader"
+. "$root/bin/fm-watch.sh"
+STATE="$dir/state"
+mark_all() {  # also commit each heartbeat marker when asked
+  local f task hb size ident
+  for f in "$STATE"/*.status; do
+    fm_wake_status_mark_current "$STATE" "$f" || echo "mark failed: $f"
+    [ "${1-}" = heartbeat ] || continue
+    task=${f##*/}; task=${task%.status}
+    status_heartbeat_seen_marker_path_to hb "$STATE" "$task"
+    _fm_status_file_size "$f" size
+    _fm_open_decisions_file_ident "$f" ident
+    status_presentation_marker_commit "$hb" "$f" "$size" "$ident" || echo "heartbeat mark failed: $f"
+  done
+}
+grow_logs() {  # every log gains a line; only the seen marker follows it
+  local f
+  for f in "$STATE"/*.status; do printf 'working [at=9]: more\n' >> "$f"; done
+  mark_all
+}
+quiet_scan() {
+  local out
+  out=$(scan_signals)
+  [ -z "$out" ] || echo "the scan was not quiet: $out"
+}
+SH
+}
+
+# The heartbeat marker lags its log between heartbeats (it is rewritten only
+# then), so a quiet scan meets a lagging marker on nearly every log. A lagging
+# marker that no device migration can apply to must cost a handful of commands,
+# not the per-byte signature decode: on an unchanged strong device, on a host
+# without birth times (a weak identity), and after a device shift has already
+# migrated the classified position of a marker whose reported size is stale.
+# Prints "<current-marker commands> <lagging-marker commands>" for one scan.
+lagging_scan_commands() {  # <dir> strong|weak|shifted
+  local dir=$1 mode=$2 script="$TMP_ROOT/lagging-$2.sh" log="$TMP_ROOT/lagging-$2.log" out
+  write_marker_fixture "$dir"
+  [ "$mode" != weak ] || printf 'weak:16777232:123' > "$dir/identity"
+  cat > "$script" <<'SH'
+mode=$3
+. "${0%/*}/marker-setup.sh"
+mark_all heartbeat
+quiet_scan
+_FMB_COMMANDS=0
+set -T
+trap '_FMB_COMMANDS=$((_FMB_COMMANDS + 1))' DEBUG
+scan_signals > /dev/null
+trap - DEBUG
+quiet=$_FMB_COMMANDS
+grow_logs
+if [ "$mode" = shifted ]; then
+  printf 'strong:16777233:123:2026-10-09 12:34:56' > "$dir/identity"
+  quiet_scan
+  case "$(cat "$STATE/.hb-surfaced-task-1")" in
+    *@strong:16777233:*) ;;
+    *) echo "the scan did not migrate the classified heartbeat position to the new device" ;;
+  esac
+fi
+quiet_scan
+hb_before=$(cat "$STATE/.hb-surfaced-task-1")
+_FMB_COMMANDS=0
+trap '_FMB_COMMANDS=$((_FMB_COMMANDS + 1))' DEBUG
+scan_signals > /dev/null
+trap - DEBUG
+[ "$(cat "$STATE/.hb-surfaced-task-1")" = "$hb_before" ] || echo "the scan rewrote a lagging $mode heartbeat marker it could not migrate"
+printf '%s %s' "$quiet" "$_FMB_COMMANDS" > "$FMB_LOG"
+SH
+  : > "$log"
+  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" "$mode" 2>&1) || fail "measured $mode script failed: $out"
+  [ -z "$out" ] || fail "measured $mode script printed: $out"
+  cat "$log"
+}
+
+test_lagging_marker_scan_costs_no_signature_decode() {
+  local dir="$TMP_ROOT/lagging" script="$TMP_ROOT/lagging.sh" mode measured quiet lagging count added=''
+  # 12 logs: a bound of 150 commands per log over the current-marker scan. The
+  # per-byte decode this guards against added about 1100 per log.
+  for mode in strong weak shifted; do
+    measured=$(lagging_scan_commands "$dir-$mode" "$mode")
+    read -r quiet lagging <<< "$measured"
+    [ "$((lagging - quiet))" -le $((12 * 150)) ] \
+      || fail "lagging $mode heartbeat markers added $((lagging - quiet)) commands to a quiet scan of 12 logs; the bound is $((12 * 150))"
+    added="$added $mode=$((lagging - quiet))"
+  done
+  write_marker_fixture "$dir"
+  cat > "$script" <<'SH'
+. "${0%/*}/marker-setup.sh"
+unset FM_STATUS_IDENTITY_READER
+mark_all heartbeat
+grow_logs
+quiet_scan
+. "$COUNTER"
+scan_signals > /dev/null
+trap - DEBUG
+SH
+  count=$(subshells_of "$script" "$dir")
+  [ "$count" -le 40 ] \
+    || fail "a quiet scan of 12 logs with lagging heartbeat markers entered $count subshells; the bound is 40"
+  pass "lagging heartbeat markers add commands$added (bound $((12 * 150)) each) and keep the scan at $count subshells (bound 40)"
+}
+
+# The heartbeat backstop walks every status log, so a log with nothing past its
+# classified offset must be answered without the owned capture a real read
+# gets: each capture creates its output file with mktemp and costs about 200 ms,
+# so 38 quiet logs would block the poll shell for seconds every heartbeat. A
+# mktemp on PATH records those starts; a log with unread bytes is the control
+# that proves the capture still runs, and still finds nothing to wake for.
+test_quiet_heartbeat_scan_starts_no_owned_capture() {
+  local dir="$TMP_ROOT/hb-quiet" script="$TMP_ROOT/hb-quiet.sh" log="$TMP_ROOT/hb-quiet.log" out quiet unread
+  write_marker_fixture "$dir"
+  mkdir -p "$dir/shim"
+  cat > "$dir/shim/mktemp" <<SH
+#!/bin/sh
+printf x >> "\$FMB_MKTEMP_LOG"
+exec $(command -v mktemp) "\$@"
+SH
+  chmod +x "$dir/shim/mktemp"
+  cat > "$script" <<'SH'
+. "${0%/*}/marker-setup.sh"
+unset FM_STATUS_IDENTITY_READER
+mark_all heartbeat
+PATH="$dir/shim:$PATH"
+export FMB_MKTEMP_LOG="$dir/mktemp.log"
+captures() { wc -c < "$FMB_MKTEMP_LOG" | tr -d ' '; }
+: > "$FMB_MKTEMP_LOG"
+heartbeat_scan_finds_actionable
+rc=$?
+[ "$rc" -eq 1 ] || echo "a quiet heartbeat scan found work (rc=$rc): $FM_HEARTBEAT_SURFACE_ENDPOINTS"
+quiet=$(captures)
+printf 'working [at=9]: more\n' >> "$STATE/task-1.status"
+: > "$FMB_MKTEMP_LOG"
+heartbeat_scan_finds_actionable
+rc=$?
+[ "$rc" -eq 1 ] || echo "a heartbeat scan of one routine append found work (rc=$rc): $FM_HEARTBEAT_SURFACE_ENDPOINTS"
+printf '%s %s' "$quiet" "$(captures)" > "$FMB_LOG"
+SH
+  out=$(FMB_LOG="$log" "${BASH:-bash}" "$script" "$ROOT" "$dir" 2>&1) || fail "measured script failed: $out"
+  [ -z "$out" ] || fail "measured script printed: $out"
+  read -r quiet unread < "$log"
+  [ "$quiet" = 0 ] || fail "a quiet heartbeat scan of 12 status logs started $quiet owned captures; it needs none"
+  [ "$unread" = 1 ] || fail "a heartbeat scan with one unread log started $unread owned captures; it needs exactly one"
+  pass "a quiet heartbeat scan of 12 status logs starts no owned capture; one unread log starts one"
+}
+
+test_heartbeat_marker_path_matches_the_tr_pipeline() {
+  local script="$TMP_ROOT/hb-path.sh"
+  cat > "$script" <<'SH'
+root=$1
+. "$root/bin/fm-classify-lib.sh"
+for task in task a.b x:y/z.w 'with space' trailing. .lead 'back\slash' '*' '[x]' 'café.id' $'tab\there' ''; do
+  want=$(printf '%s/.hb-surfaced-%s' /state "$(printf '%s' "$task" | tr ':/.' '___')")
+  got=$(status_heartbeat_seen_marker_path /state "$task")
+  [ "$want" = "$got" ] || printf 'marker path of %q: reference %q, helper %q\n' "$task" "$want" "$got"
+  status_heartbeat_seen_marker_path_to direct /state "$task"
+  [ "$want" = "$direct" ] || printf 'marker path _to of %q: reference %q, helper %q\n' "$task" "$want" "$direct"
+done
+SH
+  run_everywhere "heartbeat marker path" "$script"
+  pass "the heartbeat marker path is byte-identical to the tr pipeline for every task id shape"
+}
+
 test_recorded_windows_reads_each_task_without_a_subshell() {
   local dir="$TMP_ROOT/windows" script="$TMP_ROOT/windows.sh" i count
   mkdir -p "$dir/state" "$dir/home"
@@ -474,6 +657,9 @@ else
   test_toon_readers_match_the_pipelines_they_replace
   test_status_signature_matches_the_od_pipeline
   test_quiet_signal_scan_costs_one_stat_per_log
+  test_lagging_marker_scan_costs_no_signature_decode
+  test_quiet_heartbeat_scan_starts_no_owned_capture
+  test_heartbeat_marker_path_matches_the_tr_pipeline
   test_recorded_windows_reads_each_task_without_a_subshell
   test_owner_watchdog_tick_subshell_budget
   test_state_root_checks_do_not_depend_on_ifs

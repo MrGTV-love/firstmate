@@ -624,8 +624,8 @@ git -C "$UPSRC" -c user.name=t -c user.email=t@example.invalid commit -qm source
 # not hold up the Claude primary; the generated brief must ask it to end its
 # turn on the gate instead of running a foreground polling command.
 # The stand-in brief script is the real scaffold and the stand-in spawn runs the
-# real task Definition of Done check on it, so the lab must fill every
-# placeholder a real spawn refuses.
+# real dispatch verdict on it, so the lab must fill every placeholder and
+# answer the exclusion list a real spawn refuses.
 WORKSRC="$TMP_ROOT/worker-source"
 cp -R "$UPSRC" "$WORKSRC"
 cat > "$WORKSRC/bin/fm-brief.sh" <<SH
@@ -640,8 +640,8 @@ cat > "$WORKSRC/bin/fm-spawn.sh" <<SH
 #!/usr/bin/env bash
 id=\$1
 . "$ROOT/bin/fm-dod-lib.sh"
-if problem=\$(fm_brief_task_dod_problem "\$FM_HOME/data/\$id/brief.md"); then
-  echo "error: unfinished task Definition of Done: \$problem" >&2
+if problems=\$(fm_brief_dispatch_problems "\$FM_HOME/data/\$id/brief.md"); then
+  echo "error: brief cannot be dispatched: \$problems" >&2
   exit 1
 fi
 SH

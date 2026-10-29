@@ -2054,11 +2054,23 @@ async function claimInheritedLifecycleLock(home) {
   return mode;
 }
 
+// The shell acquirer's diagnostic receipt, retired as fm_lock_clean_known_files
+// (bin/fm-wake-lib.sh) does, so the owner directory and state tree are left clean.
+async function retireLockMonitorRecord(ownerPath) {
+  const recordPath = path.join(ownerPath, "monitor-record");
+  const receipt = (await readFile(recordPath, "utf8").catch(() => "")).split("\n")[0];
+  if (path.isAbsolute(receipt) && path.basename(receipt).startsWith(".lock-monitor.hold.")) {
+    for (const file of [receipt, `${receipt}.alerted`, `${receipt}.pending`]) await rm(file, { force: true });
+  }
+  await rm(recordPath, { force: true });
+}
+
 async function releaseLifecycleLock() {
   await assertLifecycleLockOwned();
   const { lockPath, ownerPath } = activeLifecycleLock;
   await unlink(lockPath);
   await unlink(path.join(ownerPath, "pid"));
+  await retireLockMonitorRecord(ownerPath);
   await rmdir(ownerPath);
   activeLifecycleLock = null;
 }

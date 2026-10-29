@@ -1152,6 +1152,70 @@ EOF
   pass "home-summary excludes kind=secondmate from unowned_current and terminal_in_flight"
 }
 
+test_current_status_pr() {
+  local home fakebin out id start base elapsed utf8
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to read a status log under"
+  home=$(make_home current-status-pr)
+  fakebin=$(make_fakebin "$home")
+  for id in replacement replacement-decision replacement-same-line single fallback absent explicit invalid-bytes nul-byte; do
+    fm_write_meta "$home/state/$id.meta" "kind=ship" "remote_host=example.invalid"
+  done
+  printf 'done: PR https://github.com/example/repo/pull/1 checks green\nworking: PR 1 withdrawn, replacement https://github.com/example/repo/pull/2\n' > "$home/state/replacement.status"
+  printf 'done: https://github.com/example/repo/pull/1\nneeds-decision: replacement https://github.com/example/repo/pull/2 open, which?\n' > "$home/state/replacement-decision.status"
+  printf 'done: PR https://github.com/example/repo/pull/2 replaces withdrawn https://github.com/example/repo/pull/1\n' > "$home/state/replacement-same-line.status"
+  printf 'done: https://github.com/example/repo/pull/4\n' > "$home/state/single.status"
+  printf 'working: https://github.com/example/repo/pull/5\nnote: compare https://github.com/example/repo/pull/6 and https://github.com/example/repo/pull/7' > "$home/state/fallback.status"
+  printf 'working: no pull request yet\n' > "$home/state/absent.status"
+  printf 'pr=https://github.com/example/repo/pull/8\n' >> "$home/state/explicit.meta"
+  printf 'done: https://github.com/example/repo/pull/9\n' > "$home/state/explicit.status"
+  printf 'working: https://github.com/example/repo/pull/10\nworking: \377\376 replacement https://github.com/example/repo/pull/11\n' > "$home/state/invalid-bytes.status"
+  printf 'working: https://github.com/example/repo/pull/12\nworking: nul\0byte replacement https://github.com/example/repo/pull/13\n' > "$home/state/nul-byte.status"
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" LC_ALL="$utf8" "$SNAPSHOT" --json)
+  printf '%s' "$out" | jq -e '
+    [.tasks[] | {key:.id,value:{url:.pr.url,source:.pr.source}}] | from_entries
+    | .replacement == {url:"https://github.com/example/repo/pull/2",source:"status_event"}
+      and .single == {url:"https://github.com/example/repo/pull/4",source:"status_event"}
+      and .["replacement-decision"] == {url:"https://github.com/example/repo/pull/2",source:"status_event"}
+      and .["replacement-same-line"] == {url:"https://github.com/example/repo/pull/2",source:"status_event"}
+      and .fallback == {url:"https://github.com/example/repo/pull/6",source:"status_event"}
+      and .absent == {url:null,source:"absent"}
+      and .explicit == {url:"https://github.com/example/repo/pull/8",source:"meta"}
+      and .["invalid-bytes"] == {url:"https://github.com/example/repo/pull/11",source:"status_event"}
+      and .["nul-byte"] == {url:"https://github.com/example/repo/pull/13",source:"status_event"}
+  ' >/dev/null || fail "current PR selection or explicit metadata precedence wrong"
+  pass "snapshot selects first URL on newest URL-bearing line, all three replacement logs, absent URL, explicit metadata precedence, and invalid-byte and NUL logs"
+
+  for id in replacement replacement-decision replacement-same-line single fallback absent explicit invalid-bytes nul-byte; do
+    rm "$home/state/$id.meta" "$home/state/$id.status"
+  done
+  fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
+  # Keep the long-log fixture independent of shell expansion and external tools.
+  local i
+  for ((i=0; i<200000; i++)); do printf 'working: routine progress\n'; done > "$home/state/large.status"
+  printf 'done: https://github.com/example/repo/pull/15\n' >> "$home/state/large.status"
+  # Production drains checkpoint the independent open-decision fold. Seed it
+  # through its public reader so this measures PR discovery, not a cold fold.
+  bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
+    _ "$ROOT/bin/fm-classify-lib.sh" "$home/state/large.status" || fail "could not checkpoint large fixture"
+  # The last-event reader scans the whole log whatever the record says, and its
+  # cost is not this change's. An explicit pr= skips PR discovery, so the same
+  # snapshot with it is the baseline that discovery is measured against.
+  printf 'pr=https://github.com/example/repo/pull/16\n' >> "$home/state/large.meta"
+  start=$SECONDS
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  base=$((SECONDS - start))
+  printf '%s' "$out" | jq -e '.tasks[] | select(.id == "large") | .pr.url == "https://github.com/example/repo/pull/16" and .pr.source == "meta"' >/dev/null || fail "explicit pr= lost to the long status log"
+  fm_write_meta "$home/state/large.meta" "kind=ship" "remote_host=example.invalid"
+  start=$SECONDS
+  out=$(PATH="$fakebin:$PATH" FM_HOME="$home" "$SNAPSHOT" --json)
+  elapsed=$((SECONDS - start))
+  printf '%s' "$out" | jq -e '.tasks[] | select(.id == "large") | .pr.url == "https://github.com/example/repo/pull/15" and .pr.source == "status_event"' >/dev/null || fail "long status log lost newest PR"
+  [ $((elapsed - base)) -lt 5 ] || fail "PR discovery added $((elapsed - base))s to a 200,000-line snapshot (${base}s baseline, ${elapsed}s with discovery; must add under 5s)"
+  pass "PR discovery adds under 5s to a 200,000-line status snapshot (${base}s baseline, ${elapsed}s with discovery)"
+}
+
+test_current_status_pr
 test_empty_fleet_json
 test_fixture_snapshot_json
 test_home_summary_excludes_secondmate_from_child_inventory

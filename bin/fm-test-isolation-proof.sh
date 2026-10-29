@@ -112,7 +112,7 @@ exclusion_reason() {
     fm-pr-check-security.test.sh)
       printf '%s\n' 'watcher lock / migration / poll security surface; intentional shared-lock class'
       ;;
-    fm-teardown.test.sh)
+    fm-teardown.test.sh|fm-teardown-pool.test.sh|fm-teardown-cleanup.test.sh)
       printf '%s\n' 'landed-work + lock-race teardown matrix; keep serial with forge/git stress peers'
       ;;
     fm-herdr-session-cleanup.test.sh)
@@ -121,7 +121,9 @@ exclusion_reason() {
     fm-daemon.test.sh|fm-guard-stale-banner.test.sh|fm-pi-watch-extension.test.sh|\
     fm-supervision-events.test.sh|fm-turnend-guard.test.sh|fm-wake-daemon-lifecycle-e2e.test.sh|\
     fm-wake-queue.test.sh|fm-watch-checkpoint.test.sh|fm-watch-triage.test.sh|\
-    fm-watch-triage-waits.test.sh|fm-watcher-lock.test.sh)
+    fm-watch-triage-waits.test.sh|fm-watch-triage-waits-declared.test.sh|\
+    fm-watch-triage-waits-pauses.test.sh|fm-watch-triage-waits-away.test.sh|\
+    fm-watcher-lock.test.sh)
       printf '%s\n' 'watcher/wake/lock family; intentional process locks and daemon races'
       ;;
     fm-afk-inject-e2e.test.sh|fm-afk-return.test.sh|fm-afk-inject-herdr-e2e.test.sh|\
@@ -170,13 +172,15 @@ tests/fm-captain-hold-keyed-answers.test.sh
 tests/fm-captain-hold-lifecycle.test.sh
 tests/fm-captain-hold-reconcile.test.sh
 tests/fm-captain-hold-sweep.test.sh
-tests/fm-cd-pretool-check.test.sh
 tests/fm-composer-ghost.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-crew-state.test.sh
 tests/fm-ensure-agents-md.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-herdr-lab.test.sh
+tests/fm-lint-policy.test.sh
+tests/fm-lint-report.test.sh
+tests/fm-lint-slots.test.sh
 tests/fm-lint.test.sh
 tests/fm-pi-primary-types.test.sh
 tests/fm-pr-merge.test.sh
@@ -210,8 +214,13 @@ fm-spawn-worktree-settle.test.sh
 fm-trace-context-spawn.test.sh
 fm-pr-check-security.test.sh
 fm-teardown.test.sh
+fm-teardown-pool.test.sh
+fm-teardown-cleanup.test.sh
 fm-watcher-lock.test.sh
 fm-watch-triage-waits.test.sh
+fm-watch-triage-waits-declared.test.sh
+fm-watch-triage-waits-pauses.test.sh
+fm-watch-triage-waits-away.test.sh
 fm-wake-queue.test.sh
 fm-afk-inject-e2e.test.sh
 fm-backend-herdr-smoke.test.sh

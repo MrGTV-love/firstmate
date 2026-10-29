@@ -308,3 +308,7 @@ The exclusion binds the pass as a writer: proposing an offload and letting the m
 Every Firstmate-home skill that migration produces is user-owned and local under the destinations hard rule, while an approved project-level destination is produced and shipped through that project's registered delivery path, never by stow.
 Changing firstmate's tracked `.agents/skills/` or public `skills/` remains a deliberately scoped Firstmate repository task through its pipeline, gated by this home's firstmate-repository publication authority, never a stow product.
 Outside a captain-approved offload, generalizable knowledge still routes to shared tracked material through its pipeline where that authority exists and to `data/` otherwise, and fleet-local knowledge to `data/` always.
+
+## Session scope
+
+When the captain invokes `/stow`, load the `stow` skill for its memory curation, knowledge routing, and persistence of the open work records this session is holding; it files and corrects only the open work that session is holding, and never reconciles the backlog against repository or PR reality.

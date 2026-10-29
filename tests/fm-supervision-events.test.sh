@@ -95,6 +95,35 @@ fi
 grep -q 'absorbed push' "$STATE_DIR/.watch-triage.log" 2>/dev/null || fail "the captain-held absorb should be logged to the triage log"
 pass "handle_push_transition: a captain-held crew is absorbed (no fast wake), left to the poll loop's long cadence"
 
+# --- handle_push_transition: a device-shifted heartbeat marker keeps its offset -
+
+reset_state
+fm_write_meta "$STATE_DIR/tk3.meta" "window=default:wG:pQ" "backend=herdr" "kind=ship"
+cat > "$TMP/identity-reader" <<'SH'
+#!/usr/bin/env bash
+IFS= read -r identity < "${1%.status}.identity" || exit 1
+printf '%s' "$identity"
+SH
+cat > "$TMP/span-reader" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$2" >> "$FM_STATE_OVERRIDE/.test-span-starts"
+exec perl -e 'open my $f, "<", $ARGV[0] or exit 1; seek $f, $ARGV[1], 0 or exit 1; read($f, my $b, $ARGV[2]) == $ARGV[2] or exit 1; print $b or exit 1' "$@"
+SH
+chmod +x "$TMP/identity-reader" "$TMP/span-reader"
+(
+  export FM_STATUS_IDENTITY_READER="$TMP/identity-reader" FM_STATUS_SPAN_READER="$TMP/span-reader"
+  printf 'done: old result\n' > "$STATE_DIR/tk3.status"
+  printf 'strong:16777232:123:2026-10-09 12:34:56\n' > "$STATE_DIR/tk3.identity"
+  status_presentation_marker_commit "$STATE_DIR/.hb-surfaced-tk3" "$STATE_DIR/tk3.status" 17 \
+    'strong:16777232:123:2026-10-09 12:34:56' || exit 1
+  printf 'strong:16777233:123:2026-10-09 12:34:56\n' > "$STATE_DIR/tk3.identity"
+  printf 'done: new result\n' >> "$STATE_DIR/tk3.status"
+  handle_push_transition herdr default "$(mkrec wG:pQ blocked)"
+) >/dev/null 2>&1 || fail "the device-shifted push transition did not complete"
+[ "$(sort -u "$STATE_DIR/.test-span-starts")" = 17 ] \
+  || fail "a push transition reclassified a device-shifted marker from before its offset: $(sort -u "$STATE_DIR/.test-span-starts" | tr '\n' ' ')"
+pass "handle_push_transition: a device-shifted heartbeat marker keeps its classified offset"
+
 # --- event_wait_or_sleep: secondmate windows are excluded from the pane list --
 
 reset_state
@@ -178,7 +207,9 @@ case "$1 ${2:-}" in
     case "${FM_RECOVERY_SERVER_STATE:?}" in
       running) printf '%s\n' '{"server":{"running":true}}' ;;
       unknown) printf '%s\n' '{"server":{}}' ;;
-      stopped) printf '%s\n' '{"server":{"running":false}}' ;;
+      # An absent socket beside the log completes the stopped server's absence proof.
+      stopped) jq -cn --arg socket "${FM_RECOVERY_INSPECTION_LOG%/*}/absent.sock" \
+        '{server:{running:false,socket:$socket}}' ;;
     esac
     ;;
   *) exit 98 ;;
@@ -245,11 +276,14 @@ SH
         assert_contains "$(cat "$RECOVERY_INSPECTION_LOG")" \
           "status --json --session $RECOVERY_INSPECTION_SESSION" \
           "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must consult the recorded server's state"
-        awk -v expected="${#RECOVERY_EXPECTED_IDS[@]}" '
+        # A stopped server is read twice: once to classify it, once by its absence proof.
+        RECOVERY_STATUS_READS=1
+        [ "$RECOVERY_SERVER_STATE" != stopped ] || RECOVERY_STATUS_READS=2
+        awk -v expected="${#RECOVERY_EXPECTED_IDS[@]}" -v reads="$RECOVERY_STATUS_READS" '
           $1 == "pane" && $2 == "get" { panes++; next }
           $1 == "status" && $2 == "--json" { servers++; next }
           { bad = 1 }
-          END { exit bad || panes != expected || servers != expected }
+          END { exit bad || panes != expected || servers != expected * reads }
         ' "$RECOVERY_INSPECTION_LOG" \
           || fail "$RECOVERY_SERVER_STATE/$RECOVERY_MODE must inspect exactly the selected records using read-only calls"
       done

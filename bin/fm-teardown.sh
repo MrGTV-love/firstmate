@@ -237,6 +237,11 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return. A lock in any
 # other format, a driver refusal, or a copy still registered afterwards refuses.
+# A driver refusal saves its complete combined output unchanged in a private
+# data/<task>/vernant-closeout.XXXXXX file, names that file (or the data/<task>
+# directory it could not save into), and prints the last 20 lines with control
+# characters sanitized. Successful closeouts print no driver output and create
+# no durable output file.
 # The task's own nested copy that Vernant's creation lock holds takes the same
 # driver route instead of a forced removal, before the final project-lock wait
 # like a foreign copy, after the clean and landed proof and the same ignored-file,
@@ -565,8 +570,8 @@
 #     daemon. Missing launchctl, a service that stays loaded, an unreadable load
 #     state, or a failed archive refuses even with --force, preserving the
 #     unarchived plist and any remaining copy.
-#     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
-#     launch-agent cases exercise this boundary with a fake launchctl.
+#     tests/fm-teardown-cleanup.test.sh's private, foreign, nested, and
+#     absent-copy launch-agent cases exercise this boundary with a fake launchctl.
 #   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
 #     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
 #     whose header owns object attribution, removal, and retry metadata.
@@ -596,7 +601,8 @@
 #     supabase/config.toml project_id. Reading a present config requires python3's
 #     standard-library tomllib parser; unreadable or invalid configuration refuses
 #     cleanup before Docker removal.
-#     tests/fm-teardown.test.sh covers failure/retry and forced-descendant cleanup.
+#     tests/fm-teardown-cleanup.test.sh covers failure/retry and forced-descendant
+#     cleanup.
 #     Residual: teardown leaves autonomous pipelines live, and forced-descendant
 #     cleanup does not reap a child's processes; a still-live producer can create
 #     a stack after the final listing. Snapshot cleanup cannot stop a live producer.
@@ -648,6 +654,8 @@ for _teardown_source in \
   fm-status-event-lib.sh \
   fm-status-wake-lib.sh \
   fm-status-io-lib.sh \
+  fm-file-identity-lib.sh \
+  fm-status-cap-lib.sh \
   fm-utc-lib.sh \
   fm-gate-refuse-lib.sh \
   fm-pr-lib.sh \
@@ -1608,7 +1616,7 @@ remote_secondmate_teardown() {
     "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
     "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
     "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-    "$STATE/.session-launch-refused-$ID"
+    "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
   printf 'teardown %s complete (remote %s:%s)\n' "$ID" "$remote_host" "$remote_home"
   return "$rc"
 }
@@ -2020,7 +2028,8 @@ remove_pr_poll_artifacts() {
   fm_pr_poll_merge_notified_remove "$state_dir" "$id" || return 1
   rm -f "$state_dir/$id.check.sh" "$state_dir/$id.pr-poll" \
     "$state_dir/$id.pr-poll-registration" "$state_dir/$id.pr-poll-retirement" \
-    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" || return 1
+    "$state_dir/$id.merge-authority" "$state_dir/$id.check-trust" \
+    "$state_dir/.pr-ready-reconcile/$id.refused" || return 1
 }
 
 # Resolve the PR number for a worktree branch via gh-axi. Echoes the number on a
@@ -2067,10 +2076,16 @@ ensure_commit_object() {
   git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
+# A git command that reads only stdin still resolves a working tree from the
+# caller's CWD. A caller sitting in a task copy whose git directory this
+# environment cannot resolve (for example a linked worktree mounted without the
+# repository that owns it) then made patch-id fail, so every landed patch looked
+# unproven and teardown falsely refused the copy. Anchor the whole pipeline at
+# the directory the diff is read from, so the proof depends only on that copy.
 patch_id_for_commit() {
-  local commit=$1
-  git -C "${TEARDOWN_LANDED_DIR:-$WT}" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
-    | git patch-id --stable 2>/dev/null \
+  local commit=$1 dir=${TEARDOWN_LANDED_DIR:-$WT}
+  git -C "$dir" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
+    | git -C "$dir" patch-id --stable 2>/dev/null \
     | awk 'NR == 1 { print $1 }'
 }
 
@@ -2880,7 +2895,7 @@ teardown_refuse_removed_nested_copy() {
 # script header for why `git clean -fd` is not enough and why a dirty return
 # is not reported as clean. The registered-copy custody proof runs before the
 # clean, so a refused return never deletes a registered nested worktree
-# (tests/fm-teardown.test.sh test_non_pool_returns_recheck_registered_copies).
+# (tests/fm-teardown-pool.test.sh test_non_pool_returns_recheck_registered_copies).
 teardown_scrub_scratch_copy() {  # <wt> <owner-task>
   local wt=$1 owner=$2
   # A non-git path has no nested repository this clean can remove.
@@ -2971,6 +2986,7 @@ validate_worktree_teardown_safety() {
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
     echo "REFUSED: cannot inspect worktree $WT for uncommitted changes." >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
@@ -2982,6 +2998,7 @@ validate_worktree_teardown_safety() {
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
     echo "REFUSED: cannot inspect worktree $WT for commits not on a remote." >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
@@ -2989,6 +3006,7 @@ validate_worktree_teardown_safety() {
 
   if [ -n "$dirty" ]; then
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
     report_worktree_dirt "$dirty"
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
     return 1
@@ -3000,6 +3018,7 @@ validate_worktree_teardown_safety() {
     fi
     if ! work_is_landed "$branch"; then
       echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
+    "$SCRIPT_DIR/fm-guard-event.sh" teardown-unlanded deny --source-ok true 2>/dev/null || true
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
       [ -z "$TEARDOWN_PIPELINE_INPUT_REASON" ] || printf 'this copy is not proven to be the input of the pipeline run that produced the merged PR head:\n%s\n' "$TEARDOWN_PIPELINE_INPUT_REASON" >&2
@@ -4012,7 +4031,7 @@ require_shared_task_worktree_slot() {
           echo "Several other root records name this slot; select the live one whose work stays in it as <remaining-task>. Each candidate's last recorded status:" >&2
           for ((i=0; i < ${#sharers[@]}; i++)); do
             last=
-            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -1 "${sharer_metas[$i]%.meta}.status" 2>/dev/null)
+            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -c 65536 "${sharer_metas[$i]%.meta}.status" 2>/dev/null | head -c 65536 | tail -1)
             echo "  ${sharers[$i]}: ${last:-(no status recorded)}" >&2
           done
         fi
@@ -4144,7 +4163,7 @@ teardown_held_copies_report() {
     entry=${TEARDOWN_FOREIGN_HELD[$i]}
     copy=${entry%%$'\t'*}
     copy_q=$(printf '%q' "$copy")
-    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and never a copy locked by Vernant's creation lock or held for ignored files"
+    [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" != commits ] || sweep="; the nested task copy sweep, when it is armed, also removes an unlocked copy held for commits once its HEAD is landed, and may release a copy locked by Vernant's creation lock only through Vernant's closeout driver, only when its launcher is gone and every proof passes, including every commit on a remote; it never removes an unlocked copy held for unique ignored files"
     echo "notice: held foreign copy $(fm_refuse_text "$copy") stays in pool slot $(fm_refuse_text "$slot"): $(fm_refuse_text "${entry#*$'\t'}")."
     if [ "${TEARDOWN_FOREIGN_HELD_KIND[$i]}" = ignored ]; then
       echo "notice: next step for the owner of $(fm_refuse_text "$copy"): review its ignored files with git -C $copy_q status --ignored and save the ones you need, with any commits only it holds (git -C $copy_q log --oneline HEAD --not --remotes), before the copy is removed in any way, and when no copy is left in the slot return it with $return_cmd."
@@ -5568,11 +5587,12 @@ cleanup_firstmate_home_children() {
       "$sub_state/$child_id.pi-ext.ts" "$sub_state/$child_id.omp-ext.ts" "$sub_state/$child_id.omp-fallback.yml" \
       "$sub_state/$child_id.live-model" \
       "$sub_state/$child_id.omp-session.json" "$sub_state/$child_id.reboot-notice" \
+      "$sub_state/$child_id.write-confinement.sb" \
       "$sub_state/$child_id.grok-turnend-token" "$sub_state/$child_id.kimi-turnend-token" \
       "$sub_state/$child_id.muse-session" "$sub_state/$child_id.muse-session-current" \
       "$sub_state/$child_id.cursor-session" "$sub_state/$child_id.reconcile-nudged" \
       "$sub_state/$child_id.claude-settings.json" "$sub_state/$child_id.devin-config.json" \
-      "$sub_state/.$child_id.branch-outcome-index"
+      "$sub_state/.$child_id.branch-outcome-index" "$sub_state/.$child_id.wait-identity"
     chmod u+w "$sub_state/$child_id.git-hooks" 2>/dev/null || true
     rm -rf "$sub_state/$child_id.git-hooks"
   done
@@ -6119,24 +6139,24 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
   "$(fm_wake_signal_seen_path "$STATE" "$STATE/$ID.turn-ended")" \
   "$STATE/$ID.pi-ext.ts" "$STATE/$ID.omp-ext.ts" "$STATE/$ID.omp-fallback.yml" "$STATE/$ID.live-model" \
   "$STATE/$ID.grok-turnend-token" \
-  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" \
+  "$STATE/$ID.omp-session.json" "$STATE/$ID.reboot-notice" "$STATE/$ID.write-confinement.sb" \
   "$STATE/$ID.kimi-turnend-token" "$STATE/$ID.muse-session" \
   "$STATE/$ID.muse-session-current" "$STATE/$ID.cursor-session" \
   "$STATE/$ID.control-relaunch" "$STATE/$ID.control-relaunch.meta-prior" \
   "$STATE/$ID.control-relaunch.brief-prior" "$STATE/$ID.control-relaunch.note" \
   "$STATE/$ID.reconcile-nudged" "$STATE/$ID.gemini-settings.json" \
-  "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" \
+  "$STATE/$ID.claude-settings.json" "$STATE/$ID.devin-config.json" "$STATE/$ID.dsh-session" \
   "$STATE/.$ID.branch-outcome-index" \
   "$STATE/.secondmate-relaunch-$ID" "$STATE/.secondmate-relaunch-bound-$ID" \
   "$STATE/$ID.control-exit" "$STATE/.session-end-relaunch-$ID" "$STATE/.session-end-handled-$ID" \
-  "$STATE/.session-launch-refused-$ID"
+  "$STATE/.session-launch-refused-$ID" "$STATE/.$ID.wait-identity"
 # The steering inbox (bin/fm-task-inbox-lib.sh) is runtime state for the
 # retired endpoint; teardown only runs after landing is confirmed, so any
 # leftover unhandled steer here is moot rather than unlanded work.
 # state/<id>.git-hooks is the spawn-owned commit-msg strip directory, left
 # read-only by its installer.
 chmod u+w "$STATE/$ID.git-hooks" 2>/dev/null || true
-rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID"
+rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID" "$STATE/$ID.dsh"
 # A presentation journal the close path left behind is orphaned once the
 # recorded pane is proven gone (the Herdr gate above) unless it still names a
 # live projected workspace - a version 2 binding of some other pane, or a

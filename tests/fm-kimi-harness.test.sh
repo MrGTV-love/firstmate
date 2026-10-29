@@ -530,6 +530,10 @@ test_kimi_hook_fails_closed_on_missing_malformed_or_partial_config() {
   out=$(HOME="$partial" "$KIMI_HOOK" install 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "partial Firstmate marker was accepted"
   assert_contains "$out" "partial, duplicated, or altered" "partial marker refusal lacked its concrete reason"
+  assert_contains "$out" "$partial/.kimi-code/config.toml" \
+    "partial marker refusal must name the config path to repair"
+  assert_contains "$out" "bin/fm-kimi-turnend-hook.sh install" \
+    "partial marker refusal must name the command that succeeds once the file is whole"
   cmp -s "$partial/before" "$partial/.kimi-code/config.toml" \
     || fail "partial marker refusal changed config bytes"
   pass "Kimi hook install refuses missing, malformed, and surprising config without writing"

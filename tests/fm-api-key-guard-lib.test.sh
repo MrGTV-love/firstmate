@@ -40,9 +40,14 @@ test_padded_api_selectors_are_refused() {
     [ "$rc" -eq 1 ] || fail "an API route with native whitespace normalization was admitted"
     assert_contains "$out" 'openai-codex/<gpt-model>' "a refusal must give the subscription remedy"
   done
-  for selector in 'openai-codex/gpt-6.1-sol' ' openai-codex / gpt-6.1-sol ' 'deepseek/model' ''; do
+  for selector in 'openai-codex/gpt-6.1-sol' ' openai-codex / gpt-6.1-sol ' 'ollama/model' ''; do
     out=$(fm_omp_api_billing_route_check "$selector" 2>&1); rc=$?
     [ "$rc" -eq 0 ] && [ -z "$out" ] || fail "a non-API selector was refused: $out"
+  done
+  for selector in 'deepseek/model' ' DeepSeek / model '; do
+    out=$(fm_omp_api_billing_route_check "$selector" 2>&1); rc=$?
+    [ "$rc" -eq 1 ] || fail "DeepSeek must not launch through omp"
+    assert_contains "$out" 'select --harness dsh' "DeepSeek refusal must name dsh-tui"
   done
   pass "padded API selectors are refused while subscription selectors remain admitted"
 }

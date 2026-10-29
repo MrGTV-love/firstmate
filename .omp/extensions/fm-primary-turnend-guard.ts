@@ -1,4 +1,4 @@
-// Firstmate turn-end guard, pre-tool seatbelts, and native session-start
+// Firstmate turn-end guard, watcher-arm pre-tool seatbelt, and native session-start
 // delivery for the omp (Oh My Pi) primary.
 //
 // A port of .pi/extensions/fm-primary-turnend-guard.ts with the turn-end
@@ -38,6 +38,7 @@ import {
   encodeFirstmateOperationalInput,
 } from "../../.pi/extensions/lib/fm-operational-input.ts";
 import { installLiveModelPublisher } from "../../bin/fm-omp-live-model.ts";
+import { taskWorkerSession } from "./lib/fm-task-worker.ts";
 
 // The omp extension API surface this file uses, declared locally: omp ships no
 // separately installable type package and is a Pi fork whose event names match
@@ -92,7 +93,7 @@ function lockOwnership(): LockOwnership {
 // next restart. Writes only on a change, and only for the lock owner or while
 // no live session holds the lock.
 function markLoaded(): void {
-  if (!existsSync(state) || lockOwnership() === "other") return;
+  if (taskWorkerSession() || !existsSync(state) || lockOwnership() === "other") return;
   const record = `${extensionVersion}\n${process.pid}\n`;
   try {
     if (readFileSync(marker, "utf8") === record) return;
@@ -484,13 +485,8 @@ function runGuard(stopHookActive: boolean): Promise<{ code: number; stderr: stri
   });
 }
 
-// PreToolUse seatbelts (bin/fm-arm-pretool-check.sh, docs/arm-pretool-check.md;
-// bin/fm-cd-pretool-check.sh, docs/cd-guard.md). Both piggyback on this same
-// extension file so no extra -e flag is needed: omp auto-discovers this file
-// for the turn-end guard, and pi.on("tool_call", ...) can block (verified on
-// omp 18.1.2: returning {block: true, reason} refused the bash command and
-// surfaced the reason verbatim to the model). Each owner script owns its own
-// decision and is inert outside the real primary checkout.
+// Watcher-arm PreToolUse seatbelt (bin/fm-arm-pretool-check.sh,
+// docs/arm-pretool-check.md), sharing the turn-end extension entry point.
 function runChecker(script: string, command: string): Promise<{ code: number; stderr: string }> {
   return new Promise((resolveResult) => {
     const child = spawn(`${root}/bin/${script}`, ["--command", command], {
@@ -509,11 +505,42 @@ function runPretoolCheck(command: string): Promise<{ code: number; stderr: strin
   return runChecker("fm-arm-pretool-check.sh", command);
 }
 
-function runCdCheck(command: string): Promise<{ code: number; stderr: string }> {
-  return runChecker("fm-cd-pretool-check.sh", command);
-}
-
 export default function (pi: ExtensionAPI) {
+  pi.on?.("tool_call", async (event) => {
+    if (!event || event.type !== "tool_call" || event.toolName !== "bash") return {};
+    const command = String((event.input as { command?: unknown })?.command ?? "");
+    if (!command) return {};
+    const result = await runPretoolCheck(command);
+    if (result.code !== 2) return {};
+    return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };
+  });
+
+  // The blocking turn boundary. Returning undefined lets the session settle;
+  // returning { continue: true, additionalContext } compels one more agent
+  // loop with the guard text attached (verified on omp 18.1.2 and 18.1.11).
+  pi.on?.("session_stop", async (event) => {
+    markLoaded();
+    const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
+    const result = await runGuard(stopHookActive);
+    if (result.code !== 2) return undefined;
+    let content: string;
+    try {
+      content = encodeFirstmateOperationalInput(
+        "turn-end-guard",
+        "TURN WOULD END BLIND - supervision is off. " +
+          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
+          result.stderr,
+      );
+    } catch {
+      content = "TURN WOULD END BLIND - supervision is off. " +
+        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
+        result.stderr;
+    }
+    return { continue: true, additionalContext: content };
+  });
+
+  // A task worker is not a home: it publishes no home state and gets no home digest.
+  if (taskWorkerSession()) return;
   let sessionstartGeneration: SessionstartGeneration | null = null;
   let sessionstartExitListenerRegistered = false;
   let sessionStarts = 0;
@@ -601,43 +628,6 @@ export default function (pi: ExtensionAPI) {
       if (sessionstartGeneration === generation) sessionstartGeneration = null;
       removeSessionstartExitListener();
     }
-  });
-
-  pi.on?.("tool_call", async (event) => {
-    if (!event || event.type !== "tool_call" || event.toolName !== "bash") return {};
-    const command = String((event.input as { command?: unknown })?.command ?? "");
-    if (!command) return {};
-    const cdResult = await runCdCheck(command);
-    if (cdResult.code === 2) {
-      return { block: true, reason: cdResult.stderr.trim() || "denied by the cd-guard PreToolUse seatbelt" };
-    }
-    const result = await runPretoolCheck(command);
-    if (result.code !== 2) return {};
-    return { block: true, reason: result.stderr.trim() || "denied by the watcher-arm PreToolUse seatbelt" };
-  });
-
-  // The blocking turn boundary. Returning undefined lets the session settle;
-  // returning { continue: true, additionalContext } compels one more agent
-  // loop with the guard text attached (verified on omp 18.1.2 and 18.1.11).
-  pi.on?.("session_stop", async (event) => {
-    markLoaded();
-    const stopHookActive = Boolean(event && (event as { stop_hook_active?: unknown }).stop_hook_active === true);
-    const result = await runGuard(stopHookActive);
-    if (result.code !== 2) return undefined;
-    let content: string;
-    try {
-      content = encodeFirstmateOperationalInput(
-        "turn-end-guard",
-        "TURN WOULD END BLIND - supervision is off. " +
-          "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-          result.stderr,
-      );
-    } catch {
-      content = "TURN WOULD END BLIND - supervision is off. " +
-        "The watcher cycle is missing, failed, or unhealthy. Follow the harness recovery instruction below before ending the turn.\n\n" +
-        result.stderr;
-    }
-    return { continue: true, additionalContext: content };
   });
 
   markLoaded();

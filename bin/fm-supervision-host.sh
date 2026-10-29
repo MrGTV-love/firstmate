@@ -13,12 +13,14 @@
 # (bin/fm-claude-stop-autoarm.sh), the Cursor stop-hook park
 # (bin/fm-turnend-guard-cursor.sh), the OpenCode TUI plugin
 # (.opencode/plugins/fm-primary-watch-arm.js), the omp watch extension
-# (.omp/extensions/fm-primary-omp-watch.ts), Grok's model-owned background arm
+# (.omp/extensions/fm-primary-omp-watch.ts), the DSH native primary plugin
+# (.dsh/fm-primary.mjs), Grok's model-owned background arm
 # (docs/supervision-protocols/grok.md), and Codex's foreground checkpoint
 # (bin/fm-watch-checkpoint.sh). To that owner it IS an arm: it prints the
 # arm's own lines and exits only when main is needed, and stays parked across
-# every close it handled itself. Each owner passes its harness as
-# FM_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin.
+# every close it handled itself. An owner passes its harness as
+# FM_SUPERVISION_HOST_PRIMARY, which the engine carries as the primary pin, or
+# leaves it to detection (docs/supervision-host.md "Arm owners" names which).
 #
 # OUTPUT, the contract every owner reads. The first cycle's status line
 # ("watcher: started ..." or "watcher: attached ...") is printed as soon as the
@@ -52,11 +54,12 @@
 #     that is unsafe or holds nothing for the branch) stay main's. That
 #     pass-through starts the successor watcher cycle and leaves it running
 #     before the close is printed, so supervision continues when the session
-#     drops the handoff. It confirms no handling handoff, so the recovery
-#     marker still reads downtime and the re-arm owner delivers the close to
-#     main. The host records that successor's arm before relinquishing it
-#     (detach_successor owns the persistence check and failure path). The
-#     session's next park without --restart requests a take-over of its cycle
+#     drops the handoff. It confirms no engine handling handoff, so the host
+#     leaves the recovery marker as the closed watcher and any drain left it;
+#     docs/watcher-continuity.md owns the re-arm owner's delivery eligibility
+#     in either phase. The host records that successor's arm before
+#     relinquishing it (detach_successor owns the persistence check and
+#     failure path). The session's next park without --restart requests a take-over of its cycle
 #     rather than an ordinary attach; bin/fm-watch-arm.sh's --take-over header owns the
 #     conditions under which that restores a single owner and the fallback;
 #   - away (an away record exists): every close goes to the engine.
@@ -162,8 +165,10 @@
 # registration lets turns run past the boundary up to it, any other value is
 # the boundary), FM_SUPERVISION_HOST_TURN_TIMEOUT (1200), FM_SUPERVISION_HOST_ROTATE_TURNS (20:
 # a new engine conversation after this many turns; every main session start
-# also opens a new one), FM_SUPERVISION_HOST_READY_TIMEOUT (25: how long a
-# successor cycle may take to verify), FM_SUPERVISION_HOST_POLL (1).
+# also opens a new one), FM_SUPERVISION_HOST_READY_TIMEOUT (25: how long a close
+# waits for its successor cycle to verify before it goes on with a still-starting
+# line; a notice window only, the successor is never stopped for it, since the
+# arm owns startup no-progress detection), FM_SUPERVISION_HOST_POLL (1).
 # Park duration uses Bash's process-relative SECONDS counter (including Bash
 # 3.2), while durable timestamps still use epoch time. This is not a portable
 # monotonic-clock guarantee. Arm exit probes use ordinary 0.5-second child
@@ -404,7 +409,7 @@ stop_engine_turn() {
   fi
   limit=$(( (ENGINE_GRACE + 10) * 10 ))
   i=0
-  while [ -n "$ENGINE_SUBSHELL" ] && fm_pid_alive "$ENGINE_SUBSHELL" && [ "$i" -lt "$limit" ]; do
+  while [ -n "$ENGINE_SUBSHELL" ] && kill -0 "$ENGINE_SUBSHELL" 2>/dev/null && [ "$i" -lt "$limit" ]; do
     sleep 0.1
     i=$((i + 1))
   done
@@ -469,9 +474,11 @@ start_arm() {  # <predecessor-arm-pid or empty> [--restart]; sets the started pi
   # (the shape start_handling_successor in bin/fm-claude-stop-autoarm.sh uses).
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set -m 2>/dev/null || true
   if [ -n "$predecessor" ]; then
-    FM_WATCH_PREDECESSOR_ARM_PID=$predecessor FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    FM_WATCH_LATE_FAILURE_MARK="$out.unattended" FM_WATCH_PREDECESSOR_ARM_PID=$predecessor FM_GUARD_GRACE="$GRACE" \
+      "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   else
-    FM_GUARD_GRACE="$GRACE" "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
+    FM_WATCH_LATE_FAILURE_MARK="$out.unattended" FM_GUARD_GRACE="$GRACE" \
+      "$SCRIPT_DIR/fm-watch-arm.sh" "$@" >"$out" 2>&1 </dev/null &
   fi
   pid=$!
   [ "${ARM_OWN_GROUP:-0}" -ne 1 ] || set +m 2>/dev/null || true
@@ -533,14 +540,14 @@ stream_ready_line() {
 # or 1 when the park boundary arrives first.
 await_close() {
   local i
-  while fm_pid_alive "$ARM_PID"; do
+  while kill -0 "$ARM_PID" 2>/dev/null; do
     refresh_process "$ARM_PID"
     [ "$READY_PENDING" -eq 0 ] || stream_ready_line
     boundary_reached && return 1
     # Probe the arm's exit twice a second between POLL-cadence checks, without
     # changing the outer identity refresh, readiness, or boundary cadence.
     i=$((POLL * 2))
-    while [ "$i" -gt 0 ] && fm_pid_alive "$ARM_PID"; do
+    while [ "$i" -gt 0 ] && kill -0 "$ARM_PID" 2>/dev/null; do
       sleep 0.5
       i=$((i - 1))
     done
@@ -650,8 +657,13 @@ stand_down() {  # <why>
   exit 0
 }
 
-# Start the successor cycle and wait until it proves a live watcher. Sets
+# Start the successor cycle and wait until it proves a live watcher or reports
+# its own failure, for at most READY_TIMEOUT. Returns 0 when verified, 1 when it
+# failed, and 2 when it is still starting; that successor is left running and a
+# later startup failure reaches the durable wake queue through the arm's
+# FM_WATCH_LATE_FAILURE_MARK (bin/fm-watch-arm.sh header). Sets
 # SUCCESSOR_WATCHER and SUCCESSOR_GENERATION (empty when the arm attached).
+SUCCESSOR_STARTING_LINE="supervision-host: the successor watcher cycle is still starting; it keeps running and reports its own result"
 start_successor() {  # <predecessor-arm-pid>
   local deadline line
   SUCCESSOR_WATCHER=
@@ -671,7 +683,17 @@ start_successor() {  # <predecessor-arm-pid>
       return 0
     fi
     fm_pid_alive "$SUCCESSOR_PID" || return 1
-    [ "$(date +%s)" -lt "$deadline" ] || return 1
+    ! grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 1
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      : > "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+      if ! grep -Eq '^watcher: (started|attached) pid=[0-9]+' "$SUCCESSOR_OUT" 2>/dev/null; then
+        grep -q '^watcher: FAILED' "$SUCCESSOR_OUT" 2>/dev/null || return 2
+        rm -f "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+        return 1
+      fi
+      rm -f "$SUCCESSOR_OUT.unattended" 2>/dev/null || true
+      continue
+    fi
     sleep 0.2
   done
 }
@@ -703,15 +725,20 @@ detach_successor() {
 }
 
 # Start the same successor a handled wake starts and leave it running. It
-# confirms no handling handoff: main, not the engine, handles this close, and
-# the re-arm owner delivers it only while the recovery marker still reads
-# downtime (autoarm_commit in bin/fm-claude-stop-autoarm.sh). A failed start
-# returns 1; the caller still prints the close unchanged.
+# confirms no handling handoff: main, not the engine, handles this close.
+# docs/watcher-continuity.md owns delivery eligibility if another drain changes
+# the shared recovery phase. A failed start returns 1; the caller still prints
+# the close unchanged. A successor still starting is left running too, and
+# SUCCESSOR_NOTE carries the line saying so.
+SUCCESSOR_NOTE=
 leave_successor_for_main() {
-  if ! ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID"; then
+  local rc=0
+  ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || rc=$?
+  if [ "$rc" -eq 1 ]; then
     log_line "pass-through	successor-unverified	$(printf '%s\n' "$REASON" | head -n 1)"
     return 1
   fi
+  [ "$rc" -eq 0 ] || SUCCESSOR_NOTE=$SUCCESSOR_STARTING_LINE
   detach_successor
 }
 
@@ -1097,7 +1124,7 @@ while :; do
       if [ "$ATTENDED_WHY" = main-only ]; then
         leave_successor_for_main || true
       fi
-      emit
+      emit "$SUCCESSOR_NOTE"
       exit 0
     fi
     host_still_owner || stand_down "this session no longer owns supervision"
@@ -1121,7 +1148,13 @@ while :; do
 
   # A turn that could outlive the boundary would outlive the hook registration.
   turn_crosses_boundary && boundary_exit
-  if ! ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID"; then
+  SUCCESSOR_RC=0
+  ARM_OWN_GROUP=1 start_successor "$CLOSED_ARM_PID" || SUCCESSOR_RC=$?
+  if [ "$SUCCESSOR_RC" -eq 2 ]; then
+    detach_successor || true
+    exit_to_main "the successor watcher cycle is still starting; it keeps running and reports its own result, and this wake is yours"
+  fi
+  if [ "$SUCCESSOR_RC" -ne 0 ]; then
     exit_to_main "the successor watcher cycle could not be verified before handling; this wake is yours"
   fi
   if [ -n "$SUCCESSOR_GENERATION" ]; then
@@ -1139,9 +1172,8 @@ while :; do
     # The successor this turn already started and confirmed stays up. Retiring
     # it is what left no watcher after a close that became main-only.
     detach_successor
-    # Main handles this close after all, so hand back the downtime the handoff
-    # above consumed: the re-arm owner delivers the close only while the
-    # recovery marker reads downtime (leave_successor_for_main).
+    # Main handles this close after all, so hand back the downtime the engine
+    # handoff above consumed (leave_successor_for_main).
     if [ -n "$SUCCESSOR_GENERATION" ] \
       && ! fm_recovery_marker_publish "$STATE/.watcher-down" downtime >/dev/null 2>&1; then
       log_line "pass-through	downtime-unrestored	$(printf '%s\n' "$REASON" | head -n 1)"

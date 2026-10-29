@@ -119,6 +119,18 @@ A worker stops itself once its configured code root stops being a Firstmate chec
 `bin/fm-remote-job-reap-orphans.sh` clears any worker already left behind that way.
 It never touches a worker whose checkout still exists.
 
+### Known limitation: mkdir-based locks
+
+Ubuntu 26.04's uutils coreutils `mkdir` can report success for a directory that a concurrent caller created.
+The sequence-number reservation in [`bin/fm-remote-job-lib.sh`](../bin/fm-remote-job-lib.sh) no longer trusts that status, because an exclusive owner marker decides the winner.
+The worker singleton lock in `worker_acquire_lock` and a job's `.claim` in `worker_claim` no longer trust it either: `fm_remote_job_mkdir_exclusive` takes a per-path mutex around the `mkdir`, so a later creator finds the directory and fails.
+The remaining locks still treat a successful `mkdir` as exclusive ownership:
+
+- `bin/fm-afk-launch.sh:180`, the AFK launch lock in `fm_afk_launch_lock_acquire`.
+- `bin/fm-busy-event.sh:124` and `:136`, the busy-state writer lock in `lock_acquire`.
+
+The agreed remedy is for these sites to use the same exclusive-create helper.
+
 ### What the remote account must provide
 
 - The remote account must provide the required toolchain, the selected worker runtime, the selected session backend, and credentials that work on that host.
@@ -411,6 +423,16 @@ The primary then takes these steps:
 4. It asks the remote host to launch on Herdr in `fm-remote`.
 
 All remote secondmates on one host share `fm-remote` and retain separate `2ndmate-<id>` workspaces inside it.
+A live agent is retained, not restarted, even when its running profile differs from the requested profile.
+The parent reconciles its record to the host's confirmed harness and endpoint, retaining requested model and effort only for a confirmed fresh launch and leaving unreported reused-agent profile fields unknown.
+The [`fm-spawn.sh` header](../bin/fm-spawn.sh) owns the launch-outcome labels, including the conservative report for a host whose launch disposition is missing or unrecognized.
+
+### Release a background-task exit picker
+
+Use the ordinary [`stay` lifecycle command](agent-control.md#exit-and-the-background-task-picker) for a remote Claude second mate parked on that picker.
+The parent delegates to the owning host's local control plane, so the same picker, launch-ownership, and agent-alive proofs run beside the actual endpoint.
+This preserves the agent, its background work, the route, and unread steering; it does not perform a relaunch.
+Other parent-side lifecycle verbs retain their remote-placement refusal.
 
 ### Refused and unsupported launches
 
@@ -501,6 +523,7 @@ The remote charter appends replies to `state/parent-replies.status` in the remot
 The remote home's own outcome publishers append there too, through the channel contract in `bin/fm-parent-channel-lib.sh` ([secondmate-parent-channel.md](secondmate-parent-channel.md)).
 The remote charter also names its steering inbox as `state/parent-route/<id>.inbox` in the remote home.
 That inbox is the record surface the routed transport writes to, so a steer never lands on a parent-home path the remote host cannot reach.
+The seed also rewrites every helper path under the parent's code root to the same script under `<remote-root>/bin`, so the status command in the charter runs the remote clone's `bin/fm-status-append.sh`, which is the size-capped writer, and never a path that exists only on the parent machine.
 
 ### How remote lines are mirrored
 
@@ -682,7 +705,7 @@ The portable tests use these pieces:
 - A stateful host-local Herdr CLI fixture.
 - A controlled account fixture for the readiness gate.
 
-[`fm-remote-job-launchagent.test.sh`](../tests/fm-remote-job-launchagent.test.sh) exercises the real worker with stubbed asynchronous `launchctl`, covering slow claim sweeps, missing readiness recovery during a sweep, stale readiness without reload, concurrent repair, untracked owners, interrupted repairs, and asynchronous service removal before bootstrap.
+[`fm-remote-job-launchagent.test.sh`](../tests/fm-remote-job-launchagent.test.sh) exercises the real worker with stubbed asynchronous `launchctl`, covering slow claim sweeps, missing readiness recovery during a sweep, stale readiness without reload, concurrent repair, subshell repair-lock ownership and dead-holder reclamation without `BASHPID`, untracked owners, interrupted repairs, and asynchronous service removal before bootstrap.
 The lifecycle test covers seeding a registered project that this machine has never cloned.
 It asserts that the local project tree is unchanged afterwards.
 It carries Bitbucket, self-hosted, and scp-like origins through to the remote clone.

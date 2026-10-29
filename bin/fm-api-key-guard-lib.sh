@@ -10,12 +10,18 @@
 # It reads the invoking environment and, on tmux, the effective session/global
 # environment. Existing panes can hold older values; the launch command sheds
 # both credential variables when billing has not been opted into.
+# An ambient refusal prints the exact `env -u` relaunch that clears it plus the
+# `--allow-api-key` opt-in; a tmux refusal prints the tmux unset command,
+# because `env -u` cannot clear a value the new window inherits from the server.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
 
 # fm_omp_api_billing_route_check <model>
 # Explicit openai/* and openrouter/* routes bill APIs, regardless of catalog
 # availability or model-index membership. Never resolve or call those models.
+# DeepSeek has moved to dsh-tui; bin/fm-dsh.py owns that match and refuses it
+# here too so raw omp model arguments and fallback capability checks cannot
+# retain the former adapter.
 fm_omp_api_billing_route_check() {
   local provider=${1%%/*}
   [ "${1#*/}" != "$1" ] || return 0
@@ -29,7 +35,11 @@ fm_omp_api_billing_route_check() {
       return 1
       ;;
   esac
-  return 0
+  command -v python3 >/dev/null 2>&1 || {
+    echo "error: cannot check omp model '$1' against the DeepSeek route: python3 is not on PATH" >&2
+    return 1
+  }
+  python3 "$(dirname "${BASH_SOURCE[0]}")/fm-dsh.py" check omp "$1"
 }
 
 # fm_omp_api_billing_config_diagnostics
@@ -180,7 +190,8 @@ fm_api_key_guard() {
       esac
     fi
     if [ "$would_reach" -eq 1 ] && [ -n "${!check_var:-}" ]; then
-      echo "error: $check_var is set and would reach the claude worker$route_text; unset it or pass --allow-api-key to deliberately bill the API" >&2
+      echo "error: $check_var is set and would reach the claude worker$route_text; repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>, or pass --allow-api-key to deliberately bill the API" >&2
+      "${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/fm-guard-event.sh" claude-api-billing deny --source-ok true 2>/dev/null || true
       return 1
     fi
   done

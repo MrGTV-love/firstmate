@@ -5,7 +5,7 @@
 # the whole watcher to obtain handle_push_transition. Its source list is limited
 # to the four production boundaries the transition handler actually calls.
 
-FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FM_PUSH_TRANSITION_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 
 # shellcheck source=bin/fm-wake-lib.sh
 . "$FM_PUSH_TRANSITION_LIB_DIR/fm-wake-lib.sh"
@@ -21,6 +21,9 @@ TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
 FM_WAKE_POST_OUTPUT_ACTION=
 FM_WAKE_BEFORE_OUTPUT_ACTION=
 FM_WAKE_AFTER_OUTPUT_ACTION=
+# The command the status-span walk below calls once per line; the watcher sets it to
+# its size-cap check (status_cap_span_tick in bin/fm-watch.sh).
+FM_STATUS_SPAN_TICK=
 # Set only after this watcher has printed a durable actionable reason. The
 # watcher's EXIT cleanup uses it to distinguish an ordinary delivered close from
 # an interruption that leaves a recovery gap before the next arm.
@@ -165,8 +168,10 @@ handle_push_transition() {  # <backend> <session> <record>
     fm_backend_commit_transition "$backend" "$STATE" "$session" "$record" || exit 1
     return
   fi
-  span_record=$(status_span_first_actionable_record "$STATE/$task.status" \
-    "$(hb_surfaced_offset "$task")")
+  status_presentation_marker_adopt_device "$(_hb_surfaced_path "$task")" "$STATE/$task.status" || true
+  span_record=''
+  status_span_first_actionable_record "$STATE/$task.status" \
+    "$(hb_surfaced_offset "$task")" span_record '' "$FM_STATUS_SPAN_TICK"
   case $? in
     0|1) surface_end=${span_record%%$'\t'*}; rest=${span_record#*$'\t'}; surface_ident=${rest%%$'\t'*} ;;
   esac

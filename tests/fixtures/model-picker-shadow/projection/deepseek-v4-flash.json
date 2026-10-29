@@ -1,0 +1,140 @@
+{
+ "as_of": "2026-10-16T02:59:02Z",
+ "creator": "DeepSeek",
+ "metrics": {
+  "aa-briefcase-analytical-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "Analytical Quality & Presentation Elo",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1343.52
+  },
+  "aa-briefcase-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Briefcase v1.1",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1258.64
+  },
+  "aa-lcr": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-LCR v1.1",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.796666666666667
+  },
+  "automationbench-aa": {
+   "derived": false,
+   "estimated": false,
+   "label": "AutomationBench-AA",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.5396771855133674
+  },
+  "costpertask": {
+   "derived": false,
+   "estimated": false,
+   "label": "Cost per Task",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": null,
+   "value": 0.22
+  },
+  "gdpval-aa-elo": {
+   "derived": false,
+   "estimated": false,
+   "label": "GDPval-AA v2.1",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "elo",
+   "value": 1433.74
+  },
+  "inputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Input Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 0.44
+  },
+  "omniscience-accuracy": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Accuracy",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.4038333333333333
+  },
+  "omniscience-non-hallucination-rate": {
+   "derived": false,
+   "estimated": false,
+   "label": "AA-Omniscience Non-Hallucination Rate",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.0830304724629578
+  },
+  "outputpriceper1mtokens": {
+   "derived": false,
+   "estimated": false,
+   "label": "Output Price per 1M Tokens",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "raw",
+   "source": "embedded",
+   "unit": "usd",
+   "value": 1.32
+  },
+  "scicode": {
+   "derived": false,
+   "estimated": false,
+   "label": "SciCode",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.503472222222222
+  },
+  "terminal-bench-4-0": {
+   "derived": false,
+   "estimated": false,
+   "label": "Terminal-Bench 4.0",
+   "observed_at": "2026-10-16T02:59:02Z",
+   "partial": false,
+   "scale": "fraction",
+   "source": "embedded",
+   "unit": "fraction",
+   "value": 0.121212121212121
+  }
+ },
+ "name": "DeepSeek V4 Flash 0731 (Max)",
+ "slug": "deepseek-v4-flash"
+}

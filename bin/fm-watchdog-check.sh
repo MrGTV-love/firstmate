@@ -34,9 +34,11 @@
 # rewake during a legitimate handling turn.
 #
 # Recovery, only for a verdict other than healthy or idle, under this home's watchdog lock:
-#   1. When the watcher lock names a live pid, stop that watcher with
-#      `bin/fm-watch-arm.sh --stop`, the home-scoped stop that publishes
-#      downtime exactly as any watcher close does. Never pkill.
+#   1. Stop a live watcher only after identity-bound repeated observations
+#      prove no process-tree CPU or beacon progress for STALE_SECS. First or
+#      uncertain samples and advancing work are preserved regardless of beacon
+#      age. `bin/fm-watch-arm.sh --stop` rechecks that exact identity and progress
+#      proof before signalling; never pkill. The reason is logged.
 #   2. Run config/watchdog-resume, the one command that resumes the main
 #      session (relaunch it when gone, wake it when idle). The repository has
 #      no supported relaunch route for a main session, so the captain's own
@@ -44,17 +46,21 @@
 #      command gets FM_HOME, FM_ROOT, and FM_WATCHDOG_REASON (the verdict).
 #      An absent file makes this step a recorded no-op.
 #   3. Re-read the verdict for up to FM_WATCHDOG_VERIFY_SECS (default 90).
-# A recovery that restores neither healthy nor idle is a failed attempt. At
-# most one attempt runs per FM_WATCHDOG_RETRY_SECS (default 240). After
-# FM_WATCHDOG_ALARM_AFTER (default 2) consecutive failed attempts the check
-# raises the existing wedge alarm channels (docs/wedge-alarm.md), at most once
-# per FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
+# An attempt that ran an action without restoring healthy or idle is a failed
+# recovery; one with no watcher to stop and no usable resume command is a
+# no-op. Only the current attempt is classified. At most one attempt runs per
+# FM_WATCHDOG_RETRY_SECS (default 240). After FM_WATCHDOG_ALARM_AFTER (default
+# 2) consecutive attempts of either kind, the check raises the existing wedge
+# alarm channels (docs/wedge-alarm.md) titled with the verdict, counting the
+# recovery checks and naming the latest attempt's kind, at most once per
+# FM_WATCHDOG_ALARM_INTERVAL_SECS (default 3600). A healthy or idle verdict
 # clears the episode.
 #
 # Exit 0: healthy, idle, recovered, or waiting out the retry interval.
-# Exit 1: the latest recovery attempt failed. Exit 2: usage.
+# Exit 1: still unhealthy after an attempt, including a no-op. Exit 2: usage.
 # State: state/.watchdog-episode (attempt count and times), state/.watchdog.log
-# (bounded), state/.watchdog.lock. Nothing outside this home is touched.
+# (bounded), state/.watchdog.lock, and state/.watchdog-progress (identity-bound
+# CPU/beacon samples). Nothing outside this home is touched.
 #
 # Test seams, honored only when FM_TEST_SEAM=1: FM_WATCHDOG_ARM replaces
 # bin/fm-watch-arm.sh and FM_WATCHDOG_NOW replaces the clock.
@@ -64,7 +70,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
-usage() { sed -n '2,64p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,63p' "$0" | sed 's/^# \{0,1\}//'; }
 
 case "${1:-}" in
   '') ;;
@@ -145,9 +151,13 @@ if [ -z "${FM_SUPERVISION_MODEL:-}" ]; then
 fi
 
 WATCHDOG_VERDICT=
+WATCHDOG_STUCK_PID=
+WATCHDOG_STUCK_IDENTITY=
 watchdog_verdict() {
-  local lock_pid age
+  local lock_pid age watcher_pid progress_rc=0
   WATCHDOG_VERDICT=healthy
+  WATCHDOG_STUCK_PID=
+  WATCHDOG_STUCK_IDENTITY=
   fm_supervision_status "$STATE" "$STALE_SECS"
   if [ "$FM_SUP_NEEDED" != true ]; then
     WATCHDOG_VERDICT=idle
@@ -157,6 +167,20 @@ watchdog_verdict() {
   if [ -z "$lock_pid" ] || ! fm_harness_pid_alive "$lock_pid"; then
     WATCHDOG_VERDICT="session-missing"
     return 0
+  fi
+  watcher_pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
+  if fm_pid_alive "$watcher_pid" \
+    && fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$watcher_pid" "$FM_HOME"; then
+    # An old beacon is not proof of a hang. Consecutive identity-bound samples
+    # must show neither tree CPU nor beacon progress for the inactivity bound.
+    # A first, failed or uncertain sample preserves the running watcher.
+    fm_progress_check "$STATE/.watchdog-progress" \
+      "$watcher_pid" "$STALE_SECS" "$STATE/.last-watcher-beat" >> "$LOG" 2>&1 || progress_rc=$?
+    if [ "$progress_rc" -ne 124 ]; then
+      return 0
+    fi
+    WATCHDOG_STUCK_PID=$watcher_pid
+    WATCHDOG_STUCK_IDENTITY=$FM_WATCHER_MATCHED_IDENTITY
   fi
   fm_watcher_supervision_verdict "$STATE" "$WATCH" "$STALE_SECS" "$FM_HOME" "$FM_ROOT"
   if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
@@ -208,8 +232,8 @@ episode_write() {
 # the notifier seam to "discard" so tests cannot post. Production must fire the
 # real channels, so the default the source just set is withdrawn unless the
 # caller wired a seam itself.
-raise_alarm() {  # <summary>
-  local summary=$1 seam_set=0 seam_value=
+raise_alarm() {  # <summary> <verdict>
+  local summary=$1 verdict=$2 seam_set=0 seam_value=
   if [ -n "${FM_WEDGE_ALARM_EXEC:-}" ]; then
     seam_set=1
     seam_value=$FM_WEDGE_ALARM_EXEC
@@ -221,29 +245,54 @@ raise_alarm() {  # <summary>
   else
     unset FM_WEDGE_ALARM_EXEC
   fi
-  wedge_alarm_notify "$summary" "$LOG"
+  wedge_alarm_notify "$summary" "$LOG" "firstmate supervision is down ($verdict)"
 }
 
+RECOVERY_ACTION_RAN=0
+WATCHER_PRESERVED=
+RESUME_UNAVAILABLE=
 stop_stale_watcher() {
   local pid
   pid=$(cat "$STATE/.watch.lock/pid" 2>/dev/null || true)
   fm_pid_alive "$pid" || return 0
-  log "stopping the stale watcher pid=$pid through $(basename "$ARM") --stop"
-  fm_run_timed "$STEP_BOUND" "$ARM" --stop >> "$LOG" 2>&1 \
+  # A live pid that is not this home's watcher (a reused pid) holds only a stale
+  # lock: the arm's --stop clears that lock and its downtime without signalling.
+  if ! fm_watcher_lock_matches_pid "$STATE" "$WATCH" "$pid" "$FM_HOME"; then
+    log "clearing stale watcher lock: live pid=$pid is not this home's watcher; through $(basename "$ARM") --stop, never signalled"
+    RECOVERY_ACTION_RAN=1
+    fm_run_timed "$STEP_BOUND" env FM_WATCH_STOP_PID="$pid" FM_WATCH_STOP_IDENTITY= \
+      FM_WATCH_STOP_IDLE_SECS="$STALE_SECS" "$ARM" --stop >> "$LOG" 2>&1 \
+      || log "stale watcher lock clear reported a failure"
+    return 0
+  fi
+  if [ "$pid" != "$WATCHDOG_STUCK_PID" ] \
+    || [ "$FM_WATCHER_MATCHED_IDENTITY" != "$WATCHDOG_STUCK_IDENTITY" ]; then
+    log "preserving watcher pid=$pid: no identity-matched no-progress proof"
+    WATCHER_PRESERVED=$pid
+    return 0
+  fi
+  log "stopping watcher pid=$pid: no CPU or beacon progress for ${STALE_SECS}s, identity reverified; through $(basename "$ARM") --stop"
+  RECOVERY_ACTION_RAN=1
+  fm_run_timed "$STEP_BOUND" env FM_WATCH_STOP_PID="$pid" \
+    FM_WATCH_STOP_IDENTITY="$WATCHDOG_STUCK_IDENTITY" FM_WATCH_STOP_IDLE_SECS="$STALE_SECS" \
+    "$ARM" --stop >> "$LOG" 2>&1 \
     || log "watcher stop reported a failure"
 }
 
 run_resume() {  # <reason>
   local file="$CONFIG/watchdog-resume" cmd
   if [ ! -f "$file" ] || [ ! -r "$file" ]; then
-    log "no config/watchdog-resume; the session cannot be resumed from here"
+    RESUME_UNAVAILABLE="no config/watchdog-resume"
+    log "$RESUME_UNAVAILABLE; the session cannot be resumed from here"
     return 0
   fi
   cmd=$(grep -v '^[[:space:]]*#' "$file" | sed '/^[[:space:]]*$/d' | head -n 1)
   if [ -z "$cmd" ]; then
-    log "config/watchdog-resume holds no command"
+    RESUME_UNAVAILABLE="config/watchdog-resume holds no command"
+    log "$RESUME_UNAVAILABLE"
     return 0
   fi
+  RECOVERY_ACTION_RAN=1
   log "running config/watchdog-resume for $1"
   FM_WATCHDOG_REASON=$1 fm_run_timed "$STEP_BOUND" sh -c "$cmd" >> "$LOG" 2>&1 \
     || log "config/watchdog-resume exited non-zero"
@@ -260,7 +309,7 @@ wait_healthy() {
 }
 
 watchdog_main() {
-  local first now_epoch
+  local first now_epoch detail='' latest checks=checks
   watchdog_verdict
   first=$WATCHDOG_VERDICT
   case "$first" in
@@ -278,7 +327,7 @@ watchdog_main() {
     echo "watchdog: $first - waiting out the retry interval"
     return 0
   fi
-  log "verdict $first; recovery attempt $((EP_ATTEMPTS + 1))"
+  log "verdict $first; recovery check attempt $((EP_ATTEMPTS + 1))"
   stop_stale_watcher
   run_resume "$first"
   EP_LAST_ATTEMPT=$now_epoch
@@ -289,14 +338,26 @@ watchdog_main() {
     return 0
   fi
   EP_ATTEMPTS=$((EP_ATTEMPTS + 1))
-  log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
+  if [ "$RECOVERY_ACTION_RAN" -eq 1 ]; then
+    latest="recovery failed"
+    log "recovery attempt $EP_ATTEMPTS failed; verdict now $WATCHDOG_VERDICT"
+  else
+    latest="no-op"
+    if [ -n "$WATCHER_PRESERVED" ]; then
+      detail=" - live watcher pid=$WATCHER_PRESERVED preserved without a no-progress proof and $RESUME_UNAVAILABLE"
+    else
+      detail=" - no live watcher to stop and $RESUME_UNAVAILABLE"
+    fi
+    log "attempt $EP_ATTEMPTS was a no-op; verdict now $WATCHDOG_VERDICT"
+  fi
+  [ "$EP_ATTEMPTS" -eq 1 ] && checks=check
   if [ "$EP_ATTEMPTS" -ge "$ALARM_AFTER" ] \
     && { [ "$EP_LAST_ALARM" -eq 0 ] || [ $((now_epoch - EP_LAST_ALARM)) -ge "$ALARM_INTERVAL" ]; }; then
     EP_LAST_ALARM=$now_epoch
-    raise_alarm "firstmate supervision is down ($first) and $EP_ATTEMPTS automatic recoveries failed - see $LOG"
+    raise_alarm "firstmate supervision is down ($first): $EP_ATTEMPTS recovery $checks did not restore supervision; latest attempt: $latest$detail - see $LOG" "$first"
   fi
   episode_write
-  echo "watchdog: $first - recovery failed (attempt $EP_ATTEMPTS)"
+  echo "watchdog: $first - $latest (attempt $EP_ATTEMPTS)$detail"
   return 1
 }
 

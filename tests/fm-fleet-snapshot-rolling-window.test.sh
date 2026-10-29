@@ -10,7 +10,7 @@ TMP_ROOT=$(fm_test_tmproot fm-snapshot-window)
 HOME_DIR=$TMP_ROOT/home
 FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 REAL_JQ=$(command -v jq)
-REAL_CP=$(command -v cp)
+REAL_HEAD=$(command -v head)
 mkdir -p "$HOME_DIR/state" "$HOME_DIR/data" "$HOME_DIR/config" "$HOME_DIR/projects" "$HOME_DIR/wt"
 
 cat > "$TMP_ROOT/read-hooks.sh" <<'SH'
@@ -49,7 +49,9 @@ task_read_end() {
   return 0
 }
 SH
-cat > "$FAKEBIN/cp" <<'SH'
+# The snapshot copies a status log with head -c up to the size it checked, so the pacing
+# hook sits on head and passes every other head call straight through.
+cat > "$FAKEBIN/head" <<'SH'
 #!/usr/bin/env bash
 . "$FM_TEST_READ_HOOKS"
 id=''
@@ -61,13 +63,13 @@ for arg in "$@"; do
       ;;
   esac
 done
-[ -n "$id" ] || exec "$FM_TEST_REAL_CP" "$@"
+[ -n "$id" ] || exec "$FM_TEST_REAL_HEAD" "$@"
 task_read_start observations "$id" || exit $?
 rc=0
 if [ "${FM_TEST_FAIL_PHASE:-}" = observations ] && [ "$id" = task-02 ]; then
   rc=7
 else
-  "$FM_TEST_REAL_CP" "$@" || rc=$?
+  "$FM_TEST_REAL_HEAD" "$@" || rc=$?
 fi
 task_read_end observations "$id"
 exit "$rc"
@@ -109,7 +111,7 @@ case "${1:-}" in
 esac
 exit 0
 SH
-chmod +x "$FAKEBIN/cp" "$FAKEBIN/jq" "$FAKEBIN/no-mistakes" "$FAKEBIN/tmux"
+chmod +x "$FAKEBIN/head" "$FAKEBIN/jq" "$FAKEBIN/no-mistakes" "$FAKEBIN/tmux"
 
 for n in 01 02 03 04 05 06 07 08 09; do
   fm_write_meta "$HOME_DIR/state/task-$n.meta" \
@@ -122,7 +124,7 @@ run_snapshot() {
   PATH="$FAKEBIN:$PATH" FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" \
     FM_SNAPSHOT_NOW=2026-10-08T12:00:00Z FM_SNAPSHOT_NOW_EPOCH=1791460800 \
     FM_TEST_READ_HOOKS="$TMP_ROOT/read-hooks.sh" \
-    FM_TEST_REAL_CP="$REAL_CP" FM_TEST_REAL_JQ="$REAL_JQ" \
+    FM_TEST_REAL_HEAD="$REAL_HEAD" FM_TEST_REAL_JQ="$REAL_JQ" \
     "$ROOT/bin/fm-fleet-snapshot.sh" --home-input
 }
 

@@ -1,0 +1,451 @@
+#!/usr/bin/env bash
+# fm-guard-lint.sh - the single owner of the guard-registry lint.
+#
+# Validates docs/guards/registry.json against the nine rules in docs/guard-spec.md
+# and enforces the ratchet: a violation that is not allowlisted fails, and an
+# allowlisted violation that no longer occurs also fails, so
+# docs/guards/lint-allowlist.json can only shrink.
+#
+# Usage:
+#   fm-guard-lint.sh [--mode report|enforce|new-or-touched] [--base <git-ref>]
+#                    [--root <dir>] [--registry <path>] [--allowlist <path>]
+#                    [--retired <path>] [--json] [--counts] [-h|--help]
+#
+# --root points the lint at another checkout or at a fixture tree; every path in
+# the registry is resolved against it. The default is this script's repository.
+#
+# Modes:
+#   report          print every violation and exit 0 (the ratchet's first step)
+#   enforce         exit 1 on any violation not allowlisted, and on any stale
+#                   allowlisted entry whose violation is gone (the default)
+#   new-or-touched  enforce only for guards added or edited since --base and for
+#                   refusal-site violations the allowlist does not hold, so new
+#                   work cannot add debt while the legacy population burns down
+#
+# Rules, each owned by docs/guard-spec.md:
+#   R1 unique id, unique normalized invariant, unique owner+invariant pair
+#   R2 no block without an executable remedy whose repository paths exist
+#   R3 a proxy source carries proxy_reason
+#   R4 the fail direction is declared closed or open
+#   R5 the block budget is declared, 1 to 3, or carries budget_reason
+#   R6 a post-write guard carries precheck_gap
+#   R7 every owner file and test file resolves (wiring itself is owned by
+#      bin/fm-guard-refcheck.sh)
+#   R8 every instrumented guard names its telemetry target and calls the writer
+#   R9 every exemption carries a derivation and a demotion candidate
+# plus three rules over the refusal sites bin/fm-guard-sites.py discovers in the
+# runtime code (docs/guard-spec.md "Refusal sites"):
+#   S1 every refusal site maps to a registry entry through its sites markers
+#   S2 a sites marker matches exactly the sites it declares, and no site is
+#      mapped by two entries
+#   S4 a typed unregistered_ids list in the registry has the computed length
+# In new-or-touched mode a site on a changed line must map even when it is
+# allowlisted, and the allowlist may not grow against --base (S5).
+#
+# Output:
+#   VIOLATION <rule> <id>: <message>          one line per violation
+#   INFO <id>: <message>                      non-failing observations
+#   LINT_SUMMARY mode=<m> guards=<n> violations=<v> allowlisted=<a> stale=<s> shown=<k> sites=<r>
+# With --json, one JSON object is written to stdout instead, carrying the same
+# fields except sites, plus the complete violation and stale-entry lists.
+#
+# Exit: 0 clean or report mode; 1 violations, stale entries, or a malformed
+# registry; 2 usage or environment error. A missing registry is a violation, not a skip,
+# because a guard population with no registry is exactly the state this lint
+# exists to make visible.
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+MODE=enforce
+BASE_REF=origin/main
+ROOT_OVERRIDE=''
+REGISTRY=''
+ALLOWLIST=''
+RETIRED=
+JSON=0
+COUNTS=0
+
+usage() { sed -n '3,55p' "$0" | sed 's/^# \{0,1\}//'; }
+
+die_usage() { echo "error: $*" >&2; echo "run with --help" >&2; exit 2; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --mode) [ $# -ge 2 ] || die_usage "--mode needs a value"; MODE=$2; shift 2 ;;
+    --root) [ $# -ge 2 ] || die_usage "--root needs a value"; ROOT_OVERRIDE=$2; shift 2 ;;
+    --base) [ $# -ge 2 ] || die_usage "--base needs a value"; BASE_REF=$2; shift 2 ;;
+    --registry) [ $# -ge 2 ] || die_usage "--registry needs a value"; REGISTRY=$2; shift 2 ;;
+    --allowlist) [ $# -ge 2 ] || die_usage "--allowlist needs a value"; ALLOWLIST=$2; shift 2 ;;
+    --retired) [ $# -ge 2 ] || die_usage "--retired needs a value"; RETIRED=$2; shift 2 ;;
+    --json) JSON=1; shift ;;
+    --counts) COUNTS=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) die_usage "unknown argument '$1'" ;;
+  esac
+done
+
+case "$MODE" in report|enforce|new-or-touched) ;; *) die_usage "unknown mode '$MODE'" ;; esac
+
+if [ -n "$ROOT_OVERRIDE" ]; then
+  [ -d "$ROOT_OVERRIDE" ] || die_usage "root is not a directory: $ROOT_OVERRIDE"
+  ROOT=$(cd "$ROOT_OVERRIDE" && pwd -P)
+fi
+: "${REGISTRY:=$ROOT/docs/guards/registry.json}"
+: "${ALLOWLIST:=$ROOT/docs/guards/lint-allowlist.json}"
+: "${RETIRED:=$ROOT/docs/guards/retired.json}"
+
+command -v jq >/dev/null 2>&1 || { echo "error: jq is required" >&2; exit 2; }
+
+VIOLATIONS=$(mktemp "${TMPDIR:-/tmp}/fm-guard-lint.XXXXXX") || exit 2
+trap 'rm -f "$VIOLATIONS"' EXIT
+
+violation() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >>"$VIOLATIONS"; }
+info() { [ "$JSON" -eq 1 ] || printf 'INFO %s: %s\n' "$1" "$2"; }
+
+# Every repository path token in a remedy must exist. Tokens are the prefixes the
+# spec names: bin/, tests/, docs/, config/, state/, plus a bare script name.
+check_remedy_paths() {  # <id> <remedy>
+  local id=$1 remedy=$2 tok
+  for tok in $(printf '%s' "$remedy" | tr ' ()`",;' '[\n*]' | grep -E '^(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.pi|\.grok|\.omp|\.cursor|\.opencode|\.tac)/' || true); do
+    tok=${tok%"${tok##*[!.,;:]}"}
+    case "$tok" in
+      config/*|state/*|projects/*) continue ;;
+    esac
+    [ -e "$ROOT/$tok" ] || violation R2 "$id" "remedy names '$tok', which does not exist"
+  done
+}
+
+has_executable_token() {  # <remedy>
+  local r=$1
+  printf '%s' "$r" | grep -Eq '(^|[[:space:]"(])(bin|scripts|tests|docs|config|state|\.claude|\.codex|\.github|\.tac)/' && return 0
+  # shellcheck disable=SC2016 # Match literal Markdown backticks, not command substitution.
+  printf '%s' "$r" | grep -Eq '`[^`]+`' && return 0
+  printf '%s' "$r" | grep -Eq '(^|[[:space:](])env -u ' && return 0
+  printf '%s' "$r" | grep -Eq '(^|[[:space:](])git [a-z]' && return 0
+  printf '%s' "$r" | grep -Eq 'FM_[A-Z_]+=' && return 0
+  return 1
+}
+
+[ -f "$REGISTRY" ] || { echo "error: registry not found: $REGISTRY" >&2; exit 1; }
+jq -e '.guards | type == "array"' "$REGISTRY" >/dev/null 2>&1 \
+  || { echo "error: registry is not valid JSON with a guards array: $REGISTRY" >&2; exit 1; }
+
+# ------------------------------------------------------------ refusal sites
+# The discovery and the mapping live in bin/fm-guard-sites.py; the verdicts and
+# the ratchet stay here, so the lint cannot validate only the entries it was given.
+SITES_HELPER="$SCRIPT_DIR/fm-guard-sites.py"
+command -v python3 >/dev/null 2>&1 || { echo "error: python3 is required" >&2; exit 2; }
+SITES_JSON=$(mktemp "${TMPDIR:-/tmp}/fm-guard-sites.XXXXXX") || exit 2
+trap 'rm -f "$VIOLATIONS" "$SITES_JSON"' EXIT
+if [ "$MODE" = new-or-touched ]; then
+  python3 "$SITES_HELPER" --root "$ROOT" --registry "$REGISTRY" --touched-since "$BASE_REF" >"$SITES_JSON"
+else
+  python3 "$SITES_HELPER" --root "$ROOT" --registry "$REGISTRY" >"$SITES_JSON"
+fi
+case $? in
+  0) ;;
+  *) echo "error: refusal site discovery failed (base ref '$BASE_REF' in new-or-touched mode)" >&2; exit 2 ;;
+esac
+jq -r '.sites[] | select(.entry == null)
+  | ["S1", .key, "\(.file):\(.line) [\(.sig)] \(.text[0:110]) maps to no registry entry: add a sites marker to the guard that owns it"] | @tsv' "$SITES_JSON" \
+  | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
+jq -r '.errors[] | [.rule, .id, .message] | @tsv' "$SITES_JSON" \
+  | while IFS=$'\t' read -r rule id msg; do violation "$rule" "$id" "$msg"; done
+SITES_N=$(jq -r '.sites | length' "$SITES_JSON")
+UNREGISTERED_N=$(jq -r '[.sites[] | select(.entry == null)] | length' "$SITES_JSON")
+typed_unregistered=$(jq -r 'if (.unregistered_ids | type) == "array" then (.unregistered_ids | length) else "" end' "$REGISTRY")
+if [ -n "$typed_unregistered" ] && [ "$typed_unregistered" != "$UNREGISTERED_N" ]; then
+  violation S4 inventory "the registry types unregistered_ids ($typed_unregistered) but the scan computes $UNREGISTERED_N; remove the typed list"
+fi
+
+# ---------------------------------------------------------------- R1 uniqueness
+dup_ids=$(jq -r '.guards[].id' "$REGISTRY" | sort | uniq -d)
+if [ -n "$dup_ids" ]; then
+  while IFS= read -r id; do
+    [ -n "$id" ] && violation R1 "$id" "duplicate guard id"
+  done <<EOF
+$dup_ids
+EOF
+fi
+
+# A shared invariant is one rule owned twice. Normalization strips case and
+# punctuation so two spellings of one behavior still collide.
+jq -r '.guards
+  | group_by(.invariant | ascii_downcase | gsub("[^a-z0-9]+"; " ") | gsub("^ +| +$"; ""))
+  | map(select(length > 1))
+  | .[]
+  | (map(.id) | sort) as $ids
+  | [$ids[0], ($ids[1:] | join(","))] | @tsv' "$REGISTRY" 2>/dev/null \
+  | while IFS=$'\t' read -r first rest; do
+      [ -n "$first" ] || continue
+      violation R1 "$first" "invariant shared with: $rest"
+    done
+
+# ------------------------------------------------------------- per-guard rules
+jq -c '.guards[]' "$REGISTRY" >"${VIOLATIONS}.guards" 2>/dev/null || true
+while IFS= read -r entry; do
+  id=$(printf '%s' "$entry" | jq -r '.id // ""')
+  [ -n "$id" ] || continue
+  layer=$(printf '%s' "$entry" | jq -r '.layer // ""')
+  owner=$(printf '%s' "$entry" | jq -r '.owner // ""')
+  invariant=$(printf '%s' "$entry" | jq -r '.invariant // ""')
+  source=$(printf '%s' "$entry" | jq -r '.source // ""')
+  trigger=$(printf '%s' "$entry" | jq -r '.trigger // ""')
+  remedy=$(printf '%s' "$entry" | jq -r '.remedy // ""')
+  fail=$(printf '%s' "$entry" | jq -r '.fail_direction // ""')
+  budget=$(printf '%s' "$entry" | jq -r '.budget | if type == "number" then tostring else . end')
+  budget_reason=$(printf '%s' "$entry" | jq -r '.budget_reason // ""')
+  telemetry=$(printf '%s' "$entry" | jq -r '.telemetry // ""')
+  test=$(printf '%s' "$entry" | jq -r '.test // ""')
+  decision=$(printf '%s' "$entry" | jq -r '.decision // ""')
+  precheck_gap=$(printf '%s' "$entry" | jq -r '.precheck_gap // ""')
+  proxy=$(printf '%s' "$entry" | jq -r '.proxy // false')
+  proxy_reason=$(printf '%s' "$entry" | jq -r '.proxy_reason // ""')
+  instrumented=$(printf '%s' "$entry" | jq -r '.instrumented // false')
+  exempt_count=$(printf '%s' "$entry" | jq -r '(.exemptions // []) | length')
+
+  case "$layer" in
+    impossible-by-construction|machine-check|runtime-block|runtime-warn|runtime-warn-after-write|prose) ;;
+    *) violation R4 "$id" "unknown layer '$layer'" ;;
+  esac
+  [ -n "$invariant" ] || violation R1 "$id" "invariant is empty"
+  [ -n "$source" ] || violation R3 "$id" "source is empty"
+  [ -n "$trigger" ] || violation R3 "$id" "trigger is empty"
+  case "$decision" in deny|warn|allow) ;; *) violation R4 "$id" "decision '$decision' is not deny, warn, or allow" ;; esac
+
+  if [ -z "$remedy" ]; then
+    violation R2 "$id" "remedy is empty"
+  else
+    has_executable_token "$remedy" \
+      || violation R2 "$id" "remedy has no executable token: $remedy"
+    check_remedy_paths "$id" "$remedy"
+  fi
+
+  [ "$proxy" = true ] && [ -z "$proxy_reason" ] \
+    && violation R3 "$id" "proxy source with no proxy_reason"
+
+  case "$fail" in
+    closed|open) ;;
+    "") violation R4 "$id" "fail_direction is not declared" ;;
+    *) violation R4 "$id" "fail_direction '$fail' is not closed or open" ;;
+  esac
+
+  case "$budget" in
+    ''|null) violation R5 "$id" "budget is not declared" ;;
+    *[!0-9]*) violation R5 "$id" "budget '$budget' is not a number" ;;
+    *)
+      if [ "$budget" -gt 3 ] && [ -z "$budget_reason" ]; then
+        violation R5 "$id" "budget $budget exceeds 3 with no budget_reason"
+      fi
+      [ "$budget" -ge 1 ] || violation R5 "$id" "budget must be at least 1"
+      ;;
+  esac
+
+  if [ "$layer" = runtime-warn-after-write ] && [ -z "$precheck_gap" ]; then
+    violation R6 "$id" "post-write guard with no precheck_gap"
+  fi
+
+  if [ -z "$owner" ]; then
+    violation R7 "$id" "owner is empty"
+  else
+    printf '%s\n' "$owner" | tr ',' '\n' | tr '+' '\n' | while IFS= read -r f; do
+      f=$(printf '%s' "$f" | tr -d ' \t')
+      [ -n "$f" ] || continue
+      [ -e "$ROOT/$f" ] || printf 'R7\t%s\tnonexistent owner file %s\n' "$id" "$f" >>"$VIOLATIONS"
+    done
+  fi
+  if [ -z "$test" ]; then
+    violation R7 "$id" "test is empty"
+  else
+    [ -e "$ROOT/$test" ] || violation R7 "$id" "nonexistent test file $test"
+  fi
+
+  if [ -z "$telemetry" ]; then
+    violation R8 "$id" "telemetry is empty"
+  fi
+  if [ "$instrumented" = true ]; then
+    if [ -z "$owner" ]; then
+      violation R8 "$id" "instrumented guard has no owner"
+    else
+      # The writer call must live in the guard's owner, or in a host file the
+      # registry names under emitters when the invariant is decided in a caller.
+      emitters=$(printf '%s\n' "$entry" | jq -r '(.emitters // [])[]?' 2>/dev/null)
+      found=0
+      for candidate in "$owner" $emitters; do
+        if grep -qsE 'fm_guard_event|fm-guard-event\.sh' "$ROOT/$candidate"; then
+          found=1
+          break
+        fi
+      done
+      if [ "$found" -eq 0 ]; then
+        violation R8 "$id" "instrumented guard never calls the guard event writer in $owner${emitters:+ or its emitters}"
+      fi
+    fi
+  fi
+
+  if [ "$exempt_count" -gt 0 ]; then
+    while IFS=$'\t' read -r case_text derivation demotion; do
+      [ -n "$derivation" ] || violation R9 "$id" "exemption '$case_text' has no derivation"
+      [ -n "$demotion" ] || violation R9 "$id" "exemption '$case_text' has no demotion candidate"
+    done <<EOF
+$(printf '%s' "$entry" | jq -r '.exemptions[]? | [(.case // ""), (.derivation // ""), (.demotion // "")] | @tsv')
+EOF
+    info "$id" "exemptions=$exempt_count"
+  fi
+done <"${VIOLATIONS}.guards"
+rm -f "${VIOLATIONS}.guards"
+
+# ------------------------------------------------- retired and inventory shape
+if [ -f "$RETIRED" ]; then
+  jq -r '.[].id // empty' "$RETIRED" 2>/dev/null | while IFS= read -r rid; do
+    [ -n "$rid" ] || continue
+    reason=$(jq -r --arg id "$rid" '.[] | select(.id == $id) | (.why // .reason // "")' "$RETIRED")
+    rtest=$(jq -r --arg id "$rid" '.[] | select(.id == $id) | (.retirement_test // "")' "$RETIRED")
+    [ -n "$reason" ] || violation R1 "$rid" "retired entry has no reason"
+    [ -n "$rtest" ] || violation R1 "$rid" "retired entry has no retirement test"
+    [ -e "$ROOT/$rtest" ] || violation R7 "$rid" "retirement test $rtest does not exist"
+    jq -e --arg id "$rid" '.guards[]? | select(.id == $id)' "$REGISTRY" >/dev/null 2>&1 \
+      && violation R1 "$rid" "retired guard is still registered"
+  done
+fi
+
+if [ "$COUNTS" -eq 1 ]; then
+  audited=$(jq -r '.audited // 0' "$REGISTRY")
+  active=$(jq -r '.guards | length' "$REGISTRY")
+  retired_n=$(jq -r 'length' "$RETIRED" 2>/dev/null || echo 0)
+  excluded_n=$(jq -r '(.excluded // []) | length' "$REGISTRY")
+  # An active guard added after the audit is named in beyond_audit_active, and
+  # a retirement beyond the audit is listed in beyond_audit_retired; both stay
+  # outside the audited population.
+  beyond_n=$(jq -r '(.beyond_audit_retired // []) | length' "$REGISTRY")
+  beyond_active_n=$(jq -r '(.beyond_audit_active // []) | length' "$REGISTRY")
+  jq -r '(.guards | map(.id)) as $ids | (.beyond_audit_active // [])[] | select(. as $b | $ids | index($b) | not)' "$REGISTRY" \
+    | while IFS= read -r bid; do
+        [ -n "$bid" ] && violation R1 "$bid" "beyond_audit_active names no registered guard"
+      done
+  # unregistered is computed from the scan of the runtime code: the refusal sites
+  # that map to no registry entry. It is not part of the audited guard arithmetic.
+  total=$((active - beyond_active_n + retired_n - beyond_n + excluded_n))
+  [ "$total" -eq "$audited" ] \
+    || violation R1 "inventory" "active($active, $beyond_active_n beyond the audit) + retired($retired_n, $beyond_n beyond the audit) + excluded($excluded_n) = $total, audited=$audited"
+  info inventory "active=$active retired=$retired_n beyond_audit=$beyond_n excluded=$excluded_n unregistered=$UNREGISTERED_N audited=$audited beyond_audit_active=$beyond_active_n sites=$SITES_N mapped=$((SITES_N - UNREGISTERED_N))"
+fi
+
+# --------------------------------------------------------------- ratchet gate
+ALLOWED_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-guard-allow.XXXXXX") || exit 2
+SC=$(mktemp "${TMPDIR:-/tmp}/fm-guard-shown.XXXXXX") || exit 2
+trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC"' EXIT
+if [ -f "$ALLOWLIST" ]; then
+  jq -r '(.allowed // [])[] | [.id, .rule] | @tsv' "$ALLOWLIST" >"$ALLOWED_FILE" 2>/dev/null || : >"$ALLOWED_FILE"
+else
+  : >"$ALLOWED_FILE"
+fi
+
+is_allowed() {  # <id> <rule>
+  awk -F'\t' -v id="$1" -v rule="$2" '$1 == id && $2 == rule {found = 1} END {exit !found}' "$ALLOWED_FILE"
+}
+
+# One awk pass per join: a refusal site population is hundreds of rows, and a
+# process per row would make the lint the slowest step of the portable lane.
+counts=$(awk -F'\t' -v af="$ALLOWED_FILE" -v sc="$SC" '
+  FILENAME == af {allowed[$1 "\t" $2] = 1; next}
+  ($2 "\t" $1) in allowed {en++; next}
+  {shown++; print > sc}
+  END {print en + 0, shown + 0}' "$ALLOWED_FILE" "$VIOLATIONS")
+en=${counts% *}
+shown=${counts#* }
+[ "$JSON" -eq 1 ] || awk -F'\t' '{printf "VIOLATION %s %s: %s\n", $1, $2, $3}' "$SC"
+
+stale=0
+stale_lines=$(awk -F'\t' -v vf="$VIOLATIONS" '
+  FILENAME == vf {seen[$1 "\t" $2] = 1; next}
+  $1 != "" && !(($2 "\t" $1) in seen) {print $2 "\t" $1}' "$VIOLATIONS" "$ALLOWED_FILE")
+if [ -n "$stale_lines" ]; then
+  stale=$(printf '%s\n' "$stale_lines" | wc -l | tr -d ' ')
+  [ "$JSON" -eq 1 ] || printf '%s\n' "$stale_lines" \
+    | awk -F'\t' '{printf "STALE %s %s: allowlisted violation no longer occurs; remove the entry\n", $1, $2}'
+fi
+
+guards_n=$(jq -r '.guards | length' "$REGISTRY")
+if [ "$JSON" -eq 1 ]; then
+  jq -n --arg mode "$MODE" --argjson guards "$guards_n" --argjson violations "$shown" \
+    --argjson allowlisted "$en" --argjson stale "$stale" --argjson total "$(wc -l <"$VIOLATIONS" | tr -d ' ')" \
+    --rawfile lines "$SC" \
+    '{mode:$mode, guards:$guards, violations:$total, unallowlisted:$violations, allowlisted:$allowlisted, stale:$stale,
+      findings: ($lines | split("\n") | map(select(length > 0) | split("\t") | {rule: .[0], id: .[1], message: .[2]}))}'
+else
+  printf 'LINT_SUMMARY mode=%s guards=%s violations=%s allowlisted=%s stale=%s shown=%s sites=%s\n' \
+    "$MODE" "$guards_n" "$(wc -l <"$VIOLATIONS" | tr -d ' ')" "$en" "$stale" "$shown" "$SITES_N"
+fi
+
+case "$MODE" in
+  report) exit 0 ;;
+  enforce) [ "$stale" -eq 0 ] && [ "$shown" -eq 0 ] && exit 0; exit 1 ;;
+  new-or-touched)
+    # Only guards added or edited since the base are in scope. A changed guard is
+    # one whose canonical JSON differs between the base registry and this one.
+    base_json=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base.XXXXXX") || exit 2
+    base_allow=$(mktemp "${TMPDIR:-/tmp}/fm-guard-base-allow.XXXXXX") || exit 2
+    trap 'rm -f "$VIOLATIONS" "$SITES_JSON" "$ALLOWED_FILE" "$SC" "$base_json" "$base_allow"' EXIT
+    if git -C "$ROOT" rev-parse --verify "$BASE_REF" >/dev/null 2>&1 \
+      && git -C "$ROOT" show "$BASE_REF:docs/guards/registry.json" >"$base_json" 2>/dev/null; then
+      touched=$(jq -r --slurpfile base "$base_json" '
+        (.guards | map({key: .id, value: .}) | from_entries) as $now
+        | ($base[0].guards | map({key: .id, value: .}) | from_entries) as $was
+        | $now | keys[] | select(($was[.] == null) or ($was[.] != $now[.]))' "$REGISTRY")
+      out=0
+      while IFS= read -r gid; do
+        [ -n "$gid" ] || continue
+        awk -F'\t' -v id="$gid" '$2 == id {print}' "$SC" | while IFS=$'\t' read -r r i m; do
+          [ -n "$r" ] || continue
+          printf 'VIOLATION %s %s: %s\n' "$r" "$i" "$m"
+        done
+        awk -F'\t' -v id="$gid" '$2 == id {found = 1} END {exit !found}' "$SC" && out=1
+      done <<TOUCHED_GUARDS
+$touched
+TOUCHED_GUARDS
+      # The allowlist holds every legacy refusal-site violation, so one it does not
+      # hold is new, whichever guard or site it names.
+      awk -F'\t' '$1 ~ /^S[0-9]+$/ {found = 1} END {exit !found}' "$SC" && out=1
+      # A refusal site on a changed line must map to a guard now: the allowlist is
+      # the burn-down list for sites nobody touched, so it never excuses a touched one.
+      touched_sites=$(jq -r '.sites[] | select(.entry == null and .touched)
+        | [.key, .file, (.line | tostring), .sig, .text[0:110]] | @tsv' "$SITES_JSON")
+      while IFS=$'\t' read -r sid sfile sline ssig stext; do
+        [ -n "$sid" ] || continue
+        out=1
+        # An unallowlisted site was already printed with the other violations.
+        if is_allowed "$sid" S1; then
+          printf 'VIOLATION S1 %s: %s:%s [%s] %s is on a changed line and maps to no registry entry; the allowlist does not excuse a touched site\n' \
+            "$sid" "$sfile" "$sline" "$ssig" "$stext"
+        fi
+      done <<TOUCHED_SITES
+$touched_sites
+TOUCHED_SITES
+      # Once the base allowlist carries the site burn-down list (schema 2), it may
+      # only shrink: an entry the base does not hold is excused new debt.
+      if git -C "$ROOT" show "$BASE_REF:docs/guards/lint-allowlist.json" >"$base_allow" 2>/dev/null \
+        && [ "$(jq -r '.schema_version // 1' "$base_allow" 2>/dev/null)" -ge 2 ] 2>/dev/null; then
+        if [ "$(jq -r '.schema_version // 1' "$ALLOWLIST" 2>/dev/null)" -lt 2 ] 2>/dev/null; then
+          echo "VIOLATION S5 allowlist: schema_version dropped below 2, which would unseal the burn-down list"
+          out=1
+        fi
+        grown=$(jq -r --slurpfile base "$base_allow" '(.allowed // [])[]
+          | select(([.id, .rule] as $k | ($base[0].allowed // []) | any(.id == $k[0] and .rule == $k[1])) | not)
+          | [.id, .rule] | @tsv' "$ALLOWLIST" 2>/dev/null)
+        while IFS=$'\t' read -r gid grule; do
+          [ -n "$gid" ] || continue
+          printf 'VIOLATION S5 %s: allowlist entry %s is not in %s; the allowlist may only shrink\n' "$gid" "$grule" "$BASE_REF"
+          out=1
+        done <<GROWN
+$grown
+GROWN
+      fi
+      exit "$out"
+    fi
+    echo "error: cannot resolve base ref '$BASE_REF' for new-or-touched mode" >&2
+    exit 2
+    ;;
+esac

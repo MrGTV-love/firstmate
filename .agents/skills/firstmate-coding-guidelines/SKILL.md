@@ -15,6 +15,9 @@ Load this before changing firstmate's shared, tracked material, as defined by `A
 It exists because `AGENTS.md` grew from 585 to 958 lines between its last two restructures, entirely from conditional detail added inline instead of routed to its right home.
 Applying the rules below on every change is what keeps that from happening again.
 
+Firstmate's shared instruction surface reaches running homes only after it lands on the default branch and those homes fast-forward.
+Only `AGENTS.md`, `bin/`, and `.agents/skills/` are loaded by a running firstmate; public `skills/` is an installer-facing surface.
+
 ## Knowledge-placement decision tree
 
 Before writing a new fact anywhere in this repo, ask where it belongs, in this order.

@@ -59,7 +59,8 @@ async function testMonotonicDeadline(root) {
 const [kind, root, scenario] = process.argv.slice(2);
 if (!scenario) {
   await testMonotonicDeadline(root);
-  for (const name of ["shutdown", "unready", ...(kind === "omp" ? ["host-unready"] : [])]) {
+  // omp readiness is progress-owned by the arm, not a second expiry here.
+  for (const name of (kind === "omp" ? ["shutdown"] : ["shutdown", "unready"])) {
     const result = spawnSync(process.execPath, [process.argv[1], kind, root, name], { encoding: "utf8" });
     assert.equal(result.status, 0, `${kind}/${name}: ${result.stderr}${result.stdout}`);
   }
@@ -70,8 +71,6 @@ const state = `${home}/state`;
 const config = `${home}/config`;
 mkdirSync(state, { recursive: true });
 mkdirSync(config, { recursive: true });
-const host = scenario === "host-unready";
-if (host) writeFileSync(`${config}/supervision-host`, "");
 const fakebin = `${root}/expiry-fakebin`;
 mkdirSync(fakebin, { recursive: true });
 writeFileSync(`${fakebin}/bash`, '#!/bin/bash\nif [ "${1:-}" = -lc ]; then exec /bin/bash -c "$2"; fi\nexec /bin/bash "$@"\n', { mode: 0o755 });
@@ -84,8 +83,6 @@ Object.assign(process.env, {
   FM_ARM_LOG: `${home}/arms.log`,
   FM_EXPIRY_SCENARIO: scenario,
   FM_WATCH_ARM_RETIRE_TIMEOUT_MS: "60",
-  FM_PI_ARM_READY_TIMEOUT_MS: "2000",
-  FM_OMP_ARM_READY_TIMEOUT_MS: "2000",
   FM_PI_SUCCESSOR_GRACE_MS: "400",
   FM_OMP_SUCCESSOR_GRACE_MS: "400",
 });
@@ -108,6 +105,9 @@ if [ "$first" = 1 ]; then
     printf 'signal: expiry regression wake\\n'
     exit 0
   fi
+else
+  # The arm reports its own startup failure; only then is it retired.
+  printf 'watcher: FAILED - expiry regression startup failure\\n'
 fi
 while :; do sleep 1; done
 `);
@@ -122,7 +122,7 @@ process.once("exit", () => {
 });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const waitFor = async (predicate) => {
-  for (let i = 0; i < (host ? 1800 : 500) && !predicate(); i++) await sleep(20);
+  for (let i = 0; i < 500 && !predicate(); i++) await sleep(20);
   assert.ok(predicate(), `${kind}/${scenario} did not reach its expected state`);
 };
 const handlers = new Map();
@@ -155,7 +155,8 @@ if (scenario === "shutdown") {
 }
 const log = readFileSync(`${state}/extensions/${kind}-primary-watch/lifecycle.log`, "utf8");
 const records = log.trim().split("\n").map((line) => Object.fromEntries(line.split(" ").slice(1).map((field) => field.split("="))));
-const expected = scenario === "shutdown" ? [["shutdown-arm-close", 60]] : [[host ? "supervision-host-readiness" : "arm-readiness", host ? 30000 : 2000], ["unready-arm-close", 60]];
+const expected = scenario === "shutdown" ? [["shutdown-arm-close", 60]] : [["unready-arm-close", 60]];
+assert.ok(!records.some((record) => record["waited-on"]?.endsWith("readiness")), `no readiness deadline may expire: ${log}`);
 for (const [waitedOn, bound] of expected) {
   const matches = records.filter((record) => record.event === "bound-expired" && record["waited-on"] === waitedOn);
   assert.equal(matches.length, 1, `one expiry record is required for ${waitedOn}: ${log}`);

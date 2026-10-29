@@ -8,6 +8,11 @@
 # This wrapper only acquires the harness payload, discovers the active roots,
 # invokes that policy, and renders the established harness-specific responses.
 # It never executes, sources, evaluates, or expands the submitted command.
+# The policy's deny reason carries the foreground alternative: a checkpoint via
+# bin/fm-watch-checkpoint.sh --seconds <n>, or the harness-native repair line
+# bin/fm-supervision-instructions.sh --repair-line prints for the active harness.
+# Rendering that reason verbatim keeps one owner for the classification and
+# avoids a second, per-harness copy of the remedy in this transport.
 # See docs/arm-pretool-check.md for the complete contract and validation record.
 #
 # Usage:

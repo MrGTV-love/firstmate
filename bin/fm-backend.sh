@@ -48,7 +48,7 @@
 # on their own for on-demand reads (fm-peek.sh, fm-crew-state.sh).
 
 FM_BACKEND_SCRIPT=${BASH_SOURCE[0]:-$0}
-FM_BACKEND_LIB_DIR="$(cd "$(dirname "$FM_BACKEND_SCRIPT")" && pwd)"
+FM_BACKEND_LIB_DIR="$(d=${FM_BACKEND_SCRIPT%/*}; [ "$d" != "$FM_BACKEND_SCRIPT" ] || d=.; cd "${d:-/}" && pwd)"
 unset FM_BACKEND_SCRIPT
 FM_BACKEND_DEFAULT_ROOT="$(cd "$FM_BACKEND_LIB_DIR/.." && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-${FM_ROOT:-$FM_BACKEND_DEFAULT_ROOT}}"
@@ -1024,8 +1024,10 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # reuses its strict husk classifier -
 # which consults `pane process-info` and the real process table even when
 # registration is absent, so a registration Herdr kept over a shell-only pane reads
-# `dead` here (issue #4115) - then maps a positively stopped session server to
-# `missing` only in this recovery-grade view. Zellij remains unverified because
+# `dead` here (issue #4115). A Herdr session whose stopped status is backed by
+# proven process and socket absence reads `missing`; a failed probe or an
+# unproven stop is `unreadable`. This read never starts a server. Zellij remains
+# unverified because
 # its secondmate ghost-tab and agent-process recovery path has not been
 # empirically validated. Orca and cmux do not support secondmate spawns.
 fm_backend_agent_state() {  # <backend> <target>

@@ -96,6 +96,8 @@ case "$LOCK_ATTEMPTS" in ''|*[!0-9]*|0) LOCK_ATTEMPTS=50 ;; esac
 . "$SCRIPT_DIR/fm-supervision-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-supervision-liveness-lib.sh
+. "$SCRIPT_DIR/fm-supervision-liveness-lib.sh"
 # shellcheck source=bin/fm-session-lock-lib.sh
 . "$SCRIPT_DIR/fm-session-lock-lib.sh"
 # shellcheck source=bin/fm-supervision-engine-lib.sh
@@ -283,14 +285,14 @@ claim_park || exit 0
 # session is told once, loudly, instead of supervision going quiet unannounced.
 if [ "$LOOP_COUNT" -ge "$LOOP_CEILING" ]; then
   [ "$LOOP_COUNT" -eq "$LOOP_CEILING" ] || exit 0
-  fm_supervision_needed "$STATE" "$GRACE" || exit 0
+  fm_supervision_in_flight "$STATE" "$GRACE" || exit 0
   emit_followup turn-end-guard "FIRSTMATE SUPERVISION FOLLOW-UP CEILING REACHED - this session has taken $LOOP_COUNT consecutive hook-driven turns without a captain message, so automatic wake delivery stops here to bound the loop. Queued wakes stay durable: run bin/fm-wake-drain.sh, handle them, and run its exact WAKE_ACK_REQUIRED command. Supervision resumes automatically at the next turn end after the captain's next message."
 fi
 
 # Away mode owns the watcher and its own triage; never park and never wake.
 [ -e "$STATE/.afk" ] && exit 0
 
-if ! fm_supervision_needed "$STATE" "$GRACE"; then
+if ! fm_supervision_in_flight "$STATE" "$GRACE"; then
   budget_reset_if_ours
   exit 0
 fi
@@ -379,8 +381,10 @@ while [ "$attempt" -lt "$ARM_ATTEMPTS" ]; do
   fi
 
   # A non-actionable close is benign when another verified watcher already owns
-  # this home and is still beating inside the shared grace window.
-  if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
+  # this home and is still beating inside the shared grace window. The shared
+  # lock-owner predicate owns that check (bin/fm-supervision-liveness-lib.sh);
+  # the park's own ownership and loop bounds stay here.
+  if fm_supervision_watcher_live "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     HEALTHY=1
     break
   fi
@@ -391,7 +395,7 @@ done
 
 # The need may have vanished while parked - the fleet was torn down, or Relay
 # was opted out. Nothing left to supervise, so end the turn quietly.
-if ! fm_supervision_needed "$STATE" "$GRACE"; then
+if ! fm_supervision_in_flight "$STATE" "$GRACE"; then
   budget_reset_if_ours
   exit 0
 fi

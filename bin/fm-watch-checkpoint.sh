@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run one bounded foreground watcher checkpoint for harnesses that should not
 # rely on background-task completion to wake the model.
+# Prefers a Perl-owned process-group bound so inherited ignored signals cannot
+# bypass interruption or the watcher's cleanup grace on a different coreutils.
 #
 # SUPERVISION HOST. A home opted in with config/supervision-host
 # (docs/configuration.md "Supervision host" owns the gate;
@@ -75,67 +77,96 @@ ERR=$(mktemp "${TMPDIR:-/tmp}/fm-watch-checkpoint.err.XXXXXX") || {
 }
 trap 'rm -f "$OUT" "$ERR"' EXIT
 
+# The bound runs in a process group apart from both its caller and the command,
+# so a group-kill of the caller cannot also kill the deadline and orphan a
+# watcher that holds the watcher lock. An INT, TERM, or HUP sent to the bound,
+# unless it inherited that signal as ignored, is forwarded to the command group,
+# and losing the calling shell sends the deadline's own signal; either starts
+# the deadline's kill-after escalation. Both the bound and the command call
+# setpgrp for the command's group, so it exists before any signal can target it;
+# bin/fm-timeout-lib.sh owns the same rule. The timeout/gtimeout fallback bounds
+# only by deadline and kill-after; it does not track the calling shell.
 run_with_perl_timeout() {  # <seconds> <signal> <kill-after-seconds> <command...>
   perl -e '
     use POSIX qw(:sys_wait_h);
+    my $owner = shift;
     my $seconds = shift;
     my $signal = shift;
     my $kill_after = shift;
-    my $pid = fork;
-    die "fork failed\n" unless defined $pid;
-    if (!$pid) {
-      setpgrp(0, 0);
-      exec @ARGV;
-      die "exec failed: $!\n";
+    my ($pid, $pending, $stopping, $timed_out) = (0, "", 0, 0);
+    sub finish {
+      exit($timed_out ? 124 : (($? & 127) ? 128 + ($? & 127) : $? >> 8));
     }
-    my $timed_out = 0;
-    local $SIG{ALRM} = sub {
-      if ($timed_out) {
+    sub stop {
+      my $sig = shift;
+      return $pending ||= $sig unless $pid;
+      kill $sig, -$pid;
+      alarm $kill_after unless $stopping++;
+    }
+    for my $sig (qw(INT TERM HUP)) {
+      $SIG{$sig} = sub { stop($sig) } unless ($SIG{$sig} // "") eq "IGNORE";
+    }
+    $SIG{ALRM} = sub {
+      if ($stopping) {
         kill "KILL", -$pid;
         waitpid $pid, 0;
-        exit 124;
+        finish();
       }
       $timed_out = 1;
-      kill $signal, -$pid;
-      alarm($kill_after) if $kill_after;
+      stop($signal);
     };
-    alarm $seconds;
+    setpgrp(0, 0);
+    my $child = fork;
+    die "fork failed\n" unless defined $child;
+    if (!$child) {
+      $SIG{$_} = "DEFAULT" for qw(INT TERM);
+      setpgrp(0, 0);
+      # The indirect-object form keeps a one-item command out of the shell: a
+      # plain exec of a single element is parsed as a command line, so a home
+      # path with spaces would split the watcher path into words.
+      exec { $ARGV[0] } @ARGV;
+      die "exec failed: $!\n";
+    }
+    setpgrp($child, $child);
+    $pid = $child;
+    stop($pending) if $pending;
+    alarm $seconds unless $stopping;
     while (1) {
       my $waited = waitpid $pid, WNOHANG;
       if ($waited == $pid) {
         alarm 0;
-        exit($timed_out ? 124 : ($? >> 8));
+        finish();
       }
+      stop($signal) if !$stopping && getppid() != $owner;
       select undef, undef, undef, 0.05;
     }
-  ' "$@"
+  ' "${BASHPID:-$$}" "$@"
 }
 
 run_bounded() {  # <seconds> <signal> <kill-after-seconds> <command...>
   local seconds=$1 signal=$2 kill_after=$3 cleanup_lock_bound
   shift 3
-  if [ "$kill_after" -gt 0 ]; then
-    cleanup_lock_bound=${FM_WATCHER_CLEANUP_LOCK_BOUND:-2}
-    case "$cleanup_lock_bound" in
-      ''|*[!0-9]*) cleanup_lock_bound=2 ;;
-      *) cleanup_lock_bound=$((10#$cleanup_lock_bound)) ;;
-    esac
-    [ "$cleanup_lock_bound" -gt 0 ] || cleanup_lock_bound=2
-    [ "$cleanup_lock_bound" -gt "$kill_after" ] || cleanup_lock_bound=$kill_after
-    kill_after=$cleanup_lock_bound
-  fi
-  if command -v timeout >/dev/null 2>&1; then
-    if [ "$kill_after" -gt 0 ]; then
-      timeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
-    else
-      timeout --signal="$signal" "$seconds" "$@"
-    fi
+  cleanup_lock_bound=${FM_WATCHER_CLEANUP_LOCK_BOUND:-2}
+  case "$cleanup_lock_bound" in
+    ''|*[!0-9]*) cleanup_lock_bound=2 ;;
+    *) cleanup_lock_bound=$((10#$cleanup_lock_bound)) ;;
+  esac
+  [ "$cleanup_lock_bound" -gt 0 ] || cleanup_lock_bound=2
+  [ "$cleanup_lock_bound" -gt "$kill_after" ] || cleanup_lock_bound=$kill_after
+  kill_after=$cleanup_lock_bound
+  # The checkpoint relies on INT reaching Bash and allowing EXIT cleanup before
+  # KILL. The Perl bound owns those dispositions and reports 124 when it had to
+  # escalate, which the platform timeout does not: GNU timeout reports 137 when
+  # it KILLs a child that could not take INT, and that is a normal quiet
+  # checkpoint here. Perl therefore leads, the plain timeout tools remain the
+  # fallback when Perl cannot load its required POSIX module, and the last
+  # branch preserves the Perl diagnostic if neither timeout tool is available.
+  if perl -MPOSIX=:sys_wait_h -e 'exit 0' >/dev/null 2>&1; then
+    run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
+  elif command -v timeout >/dev/null 2>&1; then
+    timeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
   elif command -v gtimeout >/dev/null 2>&1; then
-    if [ "$kill_after" -gt 0 ]; then
-      gtimeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
-    else
-      gtimeout --signal="$signal" "$seconds" "$@"
-    fi
+    gtimeout --signal="$signal" --kill-after="${kill_after}s" "$seconds" "$@"
   else
     run_with_perl_timeout "$seconds" "$signal" "$kill_after" "$@"
   fi
@@ -156,12 +187,18 @@ if fm_supervision_host_enabled "$CONFIG" codex; then
   fi
   # The host's park boundary stays below the 28800-second registration.
   [ "$BOUND" -lt 27000 ] 2>/dev/null || BOUND=27000
-  LIMIT=$(( BOUND + $(positive_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200) + $(positive_or "${FM_SUPERVISION_ENGINE_GRACE:-}" 30) ))
+  ENGINE_GRACE=$(positive_or "${FM_SUPERVISION_ENGINE_GRACE:-}" 30)
+  LIMIT=$(( BOUND + $(positive_or "${FM_SUPERVISION_HOST_TURN_TIMEOUT:-}" 1200) + ENGINE_GRACE ))
+  # The host's TERM is a cleanup request, not a kill: it stops its engine turn
+  # within ENGINE_GRACE plus ten seconds and each of its two arms within ten
+  # more before it releases its wake grant and branch leases, so the KILL grace
+  # covers ENGINE_GRACE plus thirty seconds rather than cutting that cleanup
+  # short and stranding the records it was releasing.
   set +e
   # The host ends its own park; the outer bound only catches a host that
   # outlived every one of its own bounds.
   FM_SUPERVISION_HOST_PRIMARY=codex FM_SUPERVISION_HOST_PARK_SECONDS=$BOUND FM_SUPERVISION_HOST_PARK_LIMIT=$LIMIT \
-    run_bounded $((LIMIT + 120)) TERM 0 "$SCRIPT_DIR/fm-supervision-host.sh" park >"$OUT" 2>"$ERR"
+    run_bounded $((LIMIT + 120)) TERM $((ENGINE_GRACE + 30)) "$SCRIPT_DIR/fm-supervision-host.sh" park >"$OUT" 2>"$ERR"
   RC=$?
   set -e
   if grep -E '^(signal:|stale:|check:|heartbeat($|:)|supervision-host:)' "$OUT" 2>/dev/null \

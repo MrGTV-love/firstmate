@@ -34,8 +34,8 @@
 //     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
-//     longer readiness budget for the host's own startup. On a home that does
-//     not run the host nothing below changes.
+//     longer readiness notice window for the host's own startup. On a home
+//     that does not run the host nothing below changes.
 //
 // Session-generation ownership (stated once here):
 // Current task-session proof handles switch events separately in
@@ -59,11 +59,32 @@
 // Recovery remains pending until activation hands off to a tracked arm or
 // scheduled retry. Timed activation failures surface through the failure-wake
 // path and leave recovery available to a later arm call or successor.
-// Single instance: the latest factory bind in this process owns the home
-// (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry). An earlier
+// Single instance: the latest factory bind in this process owns the home unless
+// it waits for primary proof (below; .pi/extensions/lib/fm-watch-lifecycle.ts
+// owns the registry). An earlier
 // instance retires its generation and its event handlers become no-ops, and
 // its arm tool and command forward to the current instance, so a session that
 // loaded this file twice still has exactly one live generation and one arm.
+// Ownership is judged by positive evidence, never by a record that an owner once existed:
+//   - The primary session owns the home and its wakes. omp's agent registry
+//     names every session in this process with its kind: "main" is the
+//     primary, and a task or subagent helper session has another kind. A
+//     factory bind made while the primary session already runs (a helper
+//     session loading this file, or a rebind for the primary) does not take
+//     the home: it waits, and claims the home only when a session_start, turn
+//     start, or arm call whose context is the primary session reaches it. So a
+//     helper never retires the primary's generation, never holds the home, and
+//     never receives a forwarded arm or a wake, whether or not it is still
+//     live; its own arm call reaches the primary's instance without the
+//     helper's context. With no registry the latest bind owns the home.
+//   - An arm child counts as owned only while its process is alive and its
+//     readiness has not failed; a child whose process ended is replaced, and
+//     the repair call reports started, not unchanged.
+//   - A child that printed "watcher: FAILED" is not verified, so it does not own the watch.
+//   - An arm ends at its process exit. "close" also waits for every descendant
+//     that still holds an output pipe, so after the exit the remaining output
+//     is drained for at most FM_WATCH_ARM_RETIRE_TIMEOUT_MS, and then the
+//     retry, wake delivery, and ownership paths see the end as a close.
 // .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
 // at state/extensions/omp-primary-watch/lifecycle.log.
 //
@@ -90,6 +111,7 @@ import { Type } from "typebox";
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
 import { installTaskSessionProof, resolveLocalSecondmateTask } from "./lib/fm-task-session.ts";
 import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
+import { taskWorkerSession } from "./lib/fm-task-worker.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
@@ -186,14 +208,14 @@ const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(exte
 const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
 const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
 const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
-// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
-// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
-// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
-const armReadyTimeoutMs = positiveInteger(
+// How long a wake waits for its successor to report before it goes out with a
+// still-starting line. A notice window only: the successor is never stopped for
+// it, since the arm owns startup no-progress detection.
+const armReadyNoticeMs = positiveInteger(
   "FM_OMP_ARM_READY_TIMEOUT_MS",
   process.platform === "win32" ? 35000 : 12000,
 );
-const hostReadyTimeoutMs = Math.max(armReadyTimeoutMs, 30000);
+const hostReadyNoticeMs = Math.max(armReadyNoticeMs, 30000);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
@@ -238,9 +260,12 @@ const armClose = new WeakMap<ChildProcess, Promise<void>>();
 // Children the extension itself asked to exit; their close is not a failure
 // of the successor and never earns a deferred retry.
 const armRetired = new WeakSet<ChildProcess>();
+const armLeftStarting = new WeakSet<ChildProcess>();
+// Children whose readiness settled as failed before their close was observed.
+const armUnverified = new WeakSet<ChildProcess>();
+const armHostMode = new WeakMap<ChildProcess, boolean>();
 const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
 const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
-const armHostMode = new WeakMap<ChildProcess, boolean>();
 
 function positiveInteger(name: string, fallback: number): number {
   const value = Number(process.env[name]);
@@ -255,6 +280,45 @@ function pidAlive(pid: string): boolean {
   } catch {
     return false;
   }
+}
+
+// An arm child owns the watch only while its process runs and its readiness has
+// not failed. The handle's exit state is authoritative: it is set when the
+// process ends, before "close" fires, and "close" waits for every descendant
+// that still holds an output pipe.
+function armChildExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
+function armChildOwnsWatch(child: ChildProcess): boolean {
+  if (armChildExited(child)) return false;
+  if (child.pid === undefined || !pidAlive(String(child.pid))) return false;
+  return !armUnverified.has(child);
+}
+
+type AgentSessionRef = { kind?: unknown; session?: { sessionManager?: unknown } | null };
+
+// omp's process-global agent registry (see the header); null when this omp
+// exposes none.
+function agentSessions(pi: ExtensionAPI): AgentSessionRef[] | null {
+  try {
+    const refs = (pi.pi as { AgentRegistry?: { global?: () => { list?: () => unknown } } } | undefined)
+      ?.AgentRegistry?.global?.()?.list?.();
+    return Array.isArray(refs) ? refs : null;
+  } catch {
+    return null;
+  }
+}
+
+function primarySessionRunning(pi: ExtensionAPI): boolean {
+  return agentSessions(pi)?.some((ref) => ref.kind === "main" && ref.session) ?? false;
+}
+
+// Positive proof that ctx comes from the primary session, by its identity.
+function fromPrimarySession(pi: ExtensionAPI, ctx: unknown): boolean {
+  const manager = (ctx as { sessionManager?: unknown } | null | undefined)?.sessionManager;
+  if (!manager) return false;
+  return agentSessions(pi)?.some((ref) => ref.kind === "main" && ref.session?.sessionManager === manager) ?? false;
 }
 
 // The lock records the omp process that runs the extensions, and omp loads them
@@ -735,19 +799,29 @@ type OmpWatchInstanceApi = {
 };
 
 export default function (pi: ExtensionAPI) {
-  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state);
+  // A task worker is not a home: it arms no watcher and writes no home state.
+  if (taskWorkerSession()) return;
+  // A bind while the primary session already runs waits for proof; see the header.
+  let awaitingPrimaryProof = primarySessionRunning(pi);
+  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state, { claim: !awaitingPrimaryProof });
   const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
   let generation = createGeneration();
   lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
-  activateGeneration(generation);
-  lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  if (!awaitingPrimaryProof) {
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  }
   // The stop of the latest generation, so a self-heal never races the child
   // retirement that stop is still waiting on.
   let generationStopped: Promise<void> = Promise.resolve();
   let healTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
   let recoveryPending = false;
   let latestContext: any = null;
-  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  lifecycle("factory-bind", {
+    generation: generation.id,
+    superseded: instance.previous?.id,
+    waiting: awaitingPrimaryProof ? "primary-session" : undefined,
+  });
   if (instance.previous?.api) {
     const predecessor = instance.previous.api.retire();
     generationStopped = predecessor.stopped;
@@ -810,14 +884,33 @@ export default function (pi: ExtensionAPI) {
     healTimer = timer;
   }
 
-  // The arm tool and command. A superseded instance forwards to the current
-  // one; a stopped generation is healed first, because the call itself proves
-  // the session is live.
+  // A waiting instance takes the home only with proof that ctx is the primary
+  // session (see the header). The holder is retired as a factory bind retires
+  // its predecessor, and the caller binds and activates this instance.
+  function claimHomeForPrimary(cause: string, ctx: unknown): boolean {
+    if (!awaitingPrimaryProof || !fromPrimarySession(pi, ctx)) return false;
+    awaitingPrimaryProof = false;
+    const displaced = instance.claim();
+    lifecycle("home-claimed", { cause, from: displaced?.id });
+    rememberContext(ctx);
+    if (displaced?.api) {
+      const retired = displaced.api.retire();
+      generationStopped = retired.stopped;
+      void generationStopped.catch(() => {});
+    }
+    recoveryPending = true;
+    return true;
+  }
+
+  // The arm tool and command. A superseded or waiting instance forwards to the
+  // current one; a stopped generation is healed first, because the call itself
+  // proves the session is live.
   async function armFromSession(ctx?: unknown): Promise<ArmResult> {
-    if (!instance.isCurrent()) {
+    if (!instance.isCurrent() && !claimHomeForPrimary("arm-call", ctx)) {
       const current = instance.current();
       lifecycle("arm-forwarded", { to: current?.id });
-      if (current?.api) return await current.api.activate(ctx);
+      // A waiting instance's context is not the primary session's.
+      if (current?.api) return await current.api.activate(awaitingPrimaryProof ? undefined : ctx);
       return { ok: false, message: shuttingDownMessage };
     }
     rememberContext(ctx);
@@ -1424,8 +1517,9 @@ export default function (pi: ExtensionAPI) {
             releaseClaim();
             return;
           }
-          if (restoration.failure && !operationalHandback(pending.message)) surfaceFailure(owner, restoration.failure);
-          const message = restoration.failure ? `${pending.message}\n\n${restoration.failure}` : pending.message;
+          const note = restoration.failure || restoration.notice;
+          if (note && !operationalHandback(pending.message)) surfaceFailure(owner, note);
+          const message = note ? `${pending.message}\n\n${note}` : pending.message;
           const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
           if (!delivered) {
             settleClaim("failed");
@@ -1512,24 +1606,16 @@ export default function (pi: ExtensionAPI) {
     });
   }
 
-  function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
+  function waitForReadiness(armChild: ChildProcess): Promise<"ready" | "failed" | "starting"> {
     const readiness = armReadiness.get(armChild);
-    if (!readiness) return Promise.resolve(false);
-    const timeout = armHostMode.get(armChild) ? hostReadyTimeoutMs : armReadyTimeoutMs;
+    if (!readiness) return Promise.resolve("failed");
+    const notice = armHostMode.get(armChild) ? hostReadyNoticeMs : armReadyNoticeMs;
     return new Promise((resolveReady) => {
-      const timer = setLifecycleDeadline(() => {
-        lifecycle("bound-expired", {
-          waiter: "omp-watch-extension",
-          "waited-on": armHostMode.get(armChild) ? "supervision-host-readiness" : "arm-readiness",
-          bound: `${timeout}ms`,
-          actual: `${timer.elapsedMs()}ms`,
-        });
-        resolveReady(false);
-      }, timeout);
+      const timer = setLifecycleDeadline(() => resolveReady("starting"), notice);
       timer.unref();
       void readiness.then((ready) => {
         timer.cancel();
-        resolveReady(ready);
+        resolveReady(ready ? "ready" : "failed");
       });
     });
   }
@@ -1548,7 +1634,7 @@ export default function (pi: ExtensionAPI) {
           bound: `${armRetireTimeoutMs}ms`,
           actual: `${timer.elapsedMs()}ms`,
         });
-        resolveRetired(false);
+        resolveRetired(armChildExited(armChild));
       }, armRetireTimeoutMs);
       timer.unref();
       void closed.then(() => {
@@ -1560,6 +1646,7 @@ export default function (pi: ExtensionAPI) {
 
   async function restoreAfterActionableClose(owner: SessionGeneration, predecessorArmPid: string): Promise<{
     failure: string;
+    notice?: string;
     recovery?: { generation: string; watcherPid: string };
   }> {
     let failure = "";
@@ -1567,8 +1654,13 @@ export default function (pi: ExtensionAPI) {
       if (!generationIsLive(owner)) return { failure: "" };
       const replacement = startArm(owner, predecessorArmPid);
       const successorChild = owner.child;
-      if (replacement.ok && successorChild && await waitForReadiness(successorChild)) {
+      const readiness = replacement.ok && successorChild ? await waitForReadiness(successorChild) : "failed";
+      if (successorChild && readiness === "ready") {
         return { failure: "", recovery: armRecovery.get(successorChild) };
+      }
+      if (successorChild && readiness === "starting") {
+        armLeftStarting.add(successorChild);
+        return { failure: "", notice: `watcher: successor pid=${successorChild.pid ?? "unknown"} still starting; it keeps running and reports its own result` };
       }
       if (replacement.ok) {
         failure = "watcher: FAILED - omp extension could not verify a ready successor watcher";
@@ -1625,10 +1717,25 @@ export default function (pi: ExtensionAPI) {
     }
     markLoaded();
     if (owner.child) {
-      return {
-        ok: true,
-        message: `watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; ${repairOnlyHint}`,
-      };
+      if (armChildOwnsWatch(owner.child)) {
+        return {
+          ok: true,
+          message: `watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; ${repairOnlyHint}`,
+        };
+      }
+      // The recorded child is gone or failed: its process ended, or its close
+      // is held open by a descendant. A flag naming it is not ownership.
+      const stale = owner.child;
+      const staleAlive = stale.pid !== undefined && pidAlive(String(stale.pid));
+      lifecycle("arm-owner-stale", {
+        pid: stale.pid,
+        exit: stale.exitCode ?? stale.signalCode ?? (staleAlive ? "alive-unverified" : "ended-unreaped"),
+      });
+      owner.child = null;
+      if (!armChildExited(stale) && staleAlive) {
+        armRetired.add(stale);
+        stale.kill("SIGTERM");
+      }
     }
     if (owner.retryTimer) {
       return {
@@ -1674,6 +1781,7 @@ export default function (pi: ExtensionAPI) {
       if (readinessSettled) return;
       readinessSettled = true;
       verified = ready;
+      if (!ready) armUnverified.add(armChild);
       resolveReadiness(ready);
     };
     const observeEstablishedArm = (): void => {
@@ -1682,6 +1790,8 @@ export default function (pi: ExtensionAPI) {
       if (recovery) armRecovery.set(armChild, { watcherPid: recovery[1], generation: recovery[2] });
       if (/^watcher: (?:started|attached)\b/m.test(combined)) {
         settleReadiness(true);
+      } else if (/^watcher: FAILED\b/m.test(combined)) {
+        settleReadiness(false);
       }
       if (hostMode) return;
       const reason = completedActionableLine(stdout) || completedActionableLine(stderr);
@@ -1704,7 +1814,7 @@ export default function (pi: ExtensionAPI) {
       stderr += chunk;
       observeEstablishedArm();
     });
-    armChild.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+    const endArm = (code: number | null, signal: NodeJS.Signals | null): void => {
       if (settled) return;
       settled = true;
       resolveClosed();
@@ -1722,18 +1832,41 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       if (!generationIsLive(owner)) return;
+      // A successor left still starting when its wake went out reports its own
+      // later startup failure here, where this close is observed.
+      if (armLeftStarting.has(armChild) && !verified && !armRetired.has(armChild)) {
+        surfaceFailure(owner, classification.message);
+      }
       if (owner.restoring) {
         // The pipeline is still delivering the wake this successor was
-        // started for. A verified successor that failed on its own keeps its
-        // bounded retry for the end of that delivery; an unready child closing
+        // started for. A verified or still-starting successor that failed on
+        // its own keeps its bounded retry for the end of that delivery; an unready child closing
         // here was retired by the restoration itself.
-        if (verified && !armRetired.has(armChild)) {
+        if ((verified || armLeftStarting.has(armChild)) && !armRetired.has(armChild)) {
           owner.deferredClose = { message: classification.message, predecessorArmPid: predecessor };
         }
         return;
       }
       scheduleRetry(owner, classification.message, predecessor);
+    };
+    // The arm ends at its process exit; see the header.
+    armChild.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      const drain = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "omp-watch-extension",
+          "waited-on": "arm-output-drain",
+          bound: `${armRetireTimeoutMs}ms`,
+          actual: `${drain.elapsedMs()}ms`,
+        });
+        armChild.stdout.destroy();
+        armChild.stderr.destroy();
+        endArm(code, signal);
+      }, armRetireTimeoutMs);
+      drain.unref();
+      armChild.once("close", () => drain.cancel());
     });
+    armChild.on("close", endArm);
     armChild.on("error", (error: Error) => {
       if (settled) return;
       settled = true;
@@ -1783,8 +1916,32 @@ export default function (pi: ExtensionAPI) {
     return result;
   }
 
+  // Bind and activate this instance's generation for a session event.
+  // A failure is recorded and surfaced, and leaves the bounded self-heal to retry.
+  async function bindForSession(cause: string, ctx: unknown): Promise<void> {
+    rememberContext(ctx);
+    try {
+      await generationStopped;
+      if (!instance.isCurrent()) return;
+      bindLiveGeneration(cause);
+      markLoaded();
+      if (lockOwnership() !== "owned") return;
+      activateOwnedWatch(generation);
+    } catch (error) {
+      if (!instance.isCurrent()) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      lifecycle("session-bind-failed", { cause, generation: generation.id, error: detail });
+      surfaceFailure(generation, `watcher: FAILED - omp extension could not bind the session generation\n${detail}`);
+      recoveryPending = true;
+      scheduleSelfHeal(generation);
+    }
+  }
+
   pi.on?.("before_agent_start", (_event, ctx) => {
-    if (!instance.isCurrent()) return;
+    if (!instance.isCurrent()) {
+      if (!claimHomeForPrimary("turn-start", ctx)) return;
+      void bindForSession("turn-start", ctx);
+    }
     sessionActivity += 1;
     rememberContext(ctx);
     markLoaded();
@@ -1814,24 +1971,18 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on?.("session_start", async (_event, ctx) => {
-    if (!instance.isCurrent()) {
-      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+    if (!instance.isCurrent() && !claimHomeForPrimary("session_start", ctx)) {
+      lifecycle("session_start-ignored", { reason: awaitingPrimaryProof ? "not-primary-session" : "superseded-instance" });
       return;
     }
-    rememberContext(ctx);
     lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
-    await generationStopped;
-    if (!instance.isCurrent()) return;
-    bindLiveGeneration("session_start");
-    markLoaded();
-    if (lockOwnership() !== "owned") return;
-    activateOwnedWatch(generation);
+    await bindForSession("session_start", ctx);
   });
   pi.on?.("session_shutdown", async (_event, ctx) => {
     // omp carries no shutdown reason, so pending work is always persisted;
     // watcher delivery re-reads the queue on the next owning activation.
     if (!instance.isCurrent()) {
-      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      lifecycle("session_shutdown-ignored", { reason: awaitingPrimaryProof ? "not-primary-session" : "superseded-instance" });
       return;
     }
     lifecycle("session_shutdown", { generation: generation.id });

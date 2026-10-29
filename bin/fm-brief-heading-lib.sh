@@ -6,6 +6,17 @@
 # validation, dispatch resolution, and worker skill selection.
 # Every consumer shares parsing semantics; never-send privacy preprocessing
 # is owned by docs/configuration.md "Never-send list".
+# CRLF lines are read as LF; brief and criteria admission rejects NUL bytes
+# through fm_brief_file_problem before capturing their text in shell variables.
+
+fm_brief_file_problem() {  # <file>
+  [ -f "$1" ] && [ -r "$1" ] || return 1
+  if IFS= read -r -d '' _ < "$1"; then
+    printf 'malformed input %s: NUL bytes are not supported; replace them with text or line endings\n' "$1"
+    return 0
+  fi
+  return 1
+}
 
 # Parse an exact ATX heading outside fenced blocks. Body mode prints through
 # the next unfenced heading at the same or a higher level, or through the next
@@ -25,6 +36,7 @@ fm_brief_heading_parse() {  # <file|-> <heading> <body|unfenced-body|present> [<
       while (substr(heading, target_level + 1, 1) == "#") target_level++
     }
     {
+      sub(/\r$/, "", $0)
       line = $0
       scan = line
       spaces = 0

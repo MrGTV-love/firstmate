@@ -659,7 +659,7 @@ test_herdr_lab_omission_is_loud_for_ship_and_scout() {
   pass "fm-brief.sh: ship and scout scaffolds make omitted Herdr intent fail-visible"
 }
 
-# Regression (issue #2575): AGENTS.md section 11 and this script's own help tell
+# Regression (issue #2575): the crew-brief-authoring skill and this script's own help tell
 # firstmate to fill `{TASK}` and `{FIRSTMATE_SPEC}`. The unguarded Herdr gate used
 # to quote `{TASK}` in its own prose, so that documented global replace spliced
 # the whole task body into the middle of the gate's sentence - silently
@@ -828,7 +828,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_HOME changed charter bytes compared with the same absolute home"
-  assert_grep ">> '$home/state/relative-home.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$home/state/relative-home.status'" "$brief" \
     "relative FM_HOME did not render an absolute secondmate status path"
 
   brief="$home/data/relative-state/brief.md"
@@ -844,7 +844,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_STATE_OVERRIDE changed charter bytes compared with the same absolute state directory"
-  assert_grep ">> '$state_override/relative-state.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$state_override/relative-state.status'" "$brief" \
     "relative FM_STATE_OVERRIDE did not render an absolute secondmate status path"
 
   brief="$data_override/relative-data/brief.md"
@@ -860,7 +860,7 @@ test_secondmate_directory_paths_are_absolute_and_output_is_stable() {
   )
   cmp -s "$baseline" "$brief" \
     || fail "relative FM_DATA_OVERRIDE changed charter bytes compared with the same absolute data directory"
-  assert_grep ">> '$home/state/relative-data.status'" "$brief" \
+  assert_grep "fm-status-append.sh' '$home/state/relative-data.status'" "$brief" \
     "relative FM_DATA_OVERRIDE changed the absolute default status path"
 
   err="$root/unresolved.err"
@@ -937,7 +937,7 @@ test_pause_verb_override_renders_all_brief_scaffolds() {
     # may not carry an unevaluated substitution that a file-write tool would
     # copy through verbatim.
     # shellcheck disable=SC2016 # Match literal backticks in the generated interface.
-    append=$(sed -n '/`echo "{state}/s/.*`\(echo .*\)`.*/\1/p' "$brief")
+    append=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$brief")
     now=$(date +%s)
     append=${append//\{state\}/done}
     append=${append//\{one short line\}/test event}
@@ -1131,8 +1131,6 @@ test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
     for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
       assert_grep "$token" "$brief" "$id: brief missing the $token placeholder"
     done
-    assert_grep "Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader)" "$brief" \
-      "$id: brief missing the mandatory item shape"
     assert_grep "A session that did not build this work grades it" "$brief" "$id: brief does not name who grades"
     assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
     assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
@@ -1806,8 +1804,190 @@ test_ship_brief_does_not_instruct_a_nested_worktree() {
   pass "fm-brief.sh: a ship brief forbids the nested worktree and gives the lane a blocked route"
 }
 
+# The dispatch refusal is one refusal, not one per round trip: a brief with two
+# leftover Task bodies and three leftover Definition of Done tokens names all
+# five in a single pass, omits the two tokens that are filled, and ends with the
+# runnable repair naming the brief, the tokens, the DoD-file alternative, and
+# the scaffold command.
+test_spawn_lists_every_dispatch_placeholder_in_one_refusal() {
+  local home proj fakebin id brief out status count
+  home="$TMP_ROOT/dispatch-refusal/home"
+  proj="$TMP_ROOT/dispatch-refusal/project"
+  fakebin="$TMP_ROOT/dispatch-refusal/bin"
+  id="dispatch-refusal-wp1"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config" "$home/projects" "$fakebin"
+  fm_git_init_commit "$proj"
+  printf '#!/bin/sh\nexit 1\n' > "$fakebin/tmux"
+  chmod +x "$fakebin/tmux"
+  brief="$home/data/$id/brief.md"
+  cat > "$brief" <<'EOF'
+You are a crewmate.
+
+# Task
+## Captain's intent
+{TASK}
+
+## Firstmate spec
+{FIRSTMATE_SPEC}
+
+## Definition Of Done (task)
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+Ship the listed behavior.
+
+### Hard gates
+Keep the existing safety guard.
+
+### Honesty rule
+{DOD_HONESTY_RULE}
+
+## How You're Graded
+- A session that did not build this work grades it.
+EOF
+  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_PROJECTS_OVERRIDE="$home/projects" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux \
+    PATH="$fakebin:$PATH" "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude \
+    --mode no-mistakes --yolo off 2>&1)
+  status=$?
+  expect_code 1 "$status" "a half-filled brief must still refuse to spawn: $out"
+  [ "$(printf '%s\n' "$out" | grep -c 'every unfinished item is listed once')" -eq 1 ] \
+    || fail "a half-filled brief produced more than one refusal: $out"
+  count=$(printf '%s\n' "$out" | grep -oE '\{(TASK|FIRSTMATE_SPEC|DOD_[A-Z_]+)\}' | sort -u | wc -l | tr -d ' ')
+  [ "$count" -eq 5 ] || fail "the refusal did not name all five leftover tokens ($count): $out"
+  for token in '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}'; do
+    if printf '%s\n' "$out" | grep -qF -- "$token"; then
+      fail "the refusal reported the filled token $token: $out"
+    fi
+  done
+  assert_contains "$out" "  ## Captain's intent still holds {TASK}" "the refusal omitted the intent problem"
+  assert_contains "$out" "  ## Firstmate spec still holds {FIRSTMATE_SPEC}" "the refusal omitted the spec problem"
+  assert_contains "$out" "  ## Definition Of Done (task) still holds {DOD_CAPABILITY}" "the refusal omitted the capability token"
+  assert_contains "$out" "  ### Mandatory items still holds {DOD_MANDATORY_ITEMS}" "the refusal omitted the mandatory item token"
+  assert_contains "$out" "  ### Honesty rule still holds {DOD_HONESTY_RULE}" "the refusal omitted the honesty token"
+  assert_contains "$out" "error: repair: edit $brief and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief" \
+    "the refusal did not end with the complete repair"
+  pass "fm-spawn: a half-filled brief produces one refusal naming all five tokens and the repair"
+}
+
+# The worktree-isolation refusal keeps its resolved paths and now carries the
+# relaunch command and the reassociation alternative. The function runs against
+# a stubbed isolation predicate so the exact refusal text is what is judged.
+test_worktree_isolation_refusal_carries_the_repair() {
+  # shellcheck disable=SC2034 # SCRIPT_DIR is consumed by the eval'd validate_spawn_worktree body.
+  local source out status SCRIPT_DIR="$ROOT/bin"
+  source=$(sed -n '/^validate_spawn_worktree() {/,/^}/p' "$ROOT/bin/fm-spawn.sh")
+  [ -n "$source" ] || fail "could not read validate_spawn_worktree from bin/fm-spawn.sh"
+  out=$(
+    exec 2>&1
+    # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
+    WT="$TMP_ROOT/primary-checkout"
+    # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
+    PROJ_ABS="$TMP_ROOT/project-clone"
+    # shellcheck disable=SC2034 # consumed by the eval'd validate_spawn_worktree body.
+    FM_TASK_COPY_TOP="$TMP_ROOT/project-clone"
+    # shellcheck disable=SC2329 # The eval'd validate_spawn_worktree calls this fixture predicate.
+    fm_task_copy_isolated() { return 1; }
+    eval "$source"
+    validate_spawn_worktree "treehouse get" "tmux pane"
+  )
+  status=$?
+  expect_code 1 "$status" "the worktree isolation guard must still refuse"
+  assert_contains "$out" "treehouse get did not yield an isolated worktree" "the refusal lost its resolved source"
+  assert_contains "$out" "resolved '$TMP_ROOT/primary-checkout'" "the refusal lost the resolved path"
+  assert_contains "$out" "spawning project '$TMP_ROOT/project-clone'" "the refusal lost the spawning project"
+  assert_contains "$out" "refusing to launch to avoid tangling the primary checkout" "the refusal lost its decision"
+  assert_contains "$out" "error: repair: relaunch with the registered project clone and its exact flags: bin/fm-spawn.sh <task> <project-clone> --mode <mode> --yolo <on|off>; for an existing task, re-point its record at the replacement copy instead: bin/fm-control.sh <task> reassociate --worktree <replacement-copy>" \
+    "the isolation refusal did not print the runnable repair"
+  pass "fm-spawn: the worktree-isolation refusal prints the relaunch and reassociation repair"
+}
+
+# The backend-capability refusal names the spawn-capable backends the code
+# accepts and the invocation that selects one.
+test_spawn_backend_refusal_names_spawn_capable_backends_and_invocation() {
+  local home proj fakebin id out status
+  home="$TMP_ROOT/backend-refusal/home"
+  proj="$TMP_ROOT/backend-refusal/project"
+  fakebin="$TMP_ROOT/backend-refusal/bin"
+  id="backend-refusal-wp1"
+  mkdir -p "$home/data/$id" "$home/state" "$home/config" "$home/projects" "$fakebin"
+  fm_git_init_commit "$proj"
+  printf '#!/bin/sh\nexit 1\n' > "$fakebin/tmux"
+  chmod +x "$fakebin/tmux"
+  out=$(FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_PROJECTS_OVERRIDE="$home/projects" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux \
+    PATH="$fakebin:$PATH" "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude \
+    --mode no-mistakes --yolo off --backend bogus 2>&1)
+  status=$?
+  expect_code 1 "$status" "an unknown backend must still refuse: $out"
+  assert_contains "$out" "unknown backend 'bogus' (known: tmux herdr zellij orca cmux)" \
+    "the refusal did not name the known backends"
+  assert_contains "$out" "spawn-capable: tmux herdr zellij orca cmux" \
+    "the refusal did not name the spawn-capable backends"
+  assert_contains "$out" "error: repair: relaunch on a spawn-capable backend" \
+    "the refusal did not print the repair"
+  assert_contains "$out" "bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off> --backend <name>" \
+    "the refusal did not print the working invocation"
+  pass "fm-spawn: the backend refusal names the spawn-capable backends and the invocation"
+}
+
+# The ambient API-billing refusal prints the exact env-u relaunch and the
+# deliberate --allow-api-key alternative.
+test_api_key_refusal_carries_the_billing_repair() {
+  local out status
+  out=$(
+    exec 2>&1
+    # shellcheck source=bin/fm-api-key-guard-lib.sh
+    . "$ROOT/bin/fm-api-key-guard-lib.sh"
+    ANTHROPIC_API_KEY=sk-ant-test-key fm_api_key_guard claude 0 '' 0 '' ''
+  )
+  status=$?
+  expect_code 1 "$status" "the API-key guard must still refuse an ambient key"
+  assert_contains "$out" "ANTHROPIC_API_KEY is set and would reach the claude worker through ambient environment inheritance" \
+    "the refusal lost its fault and route"
+  assert_contains "$out" "repair: env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN bin/fm-spawn.sh <task> <project> --mode <mode> --yolo <on|off>" \
+    "the refusal did not print the env-u relaunch"
+  assert_contains "$out" "or pass --allow-api-key to deliberately bill the API" \
+    "the refusal did not print the deliberate alternative"
+  pass "the API-key guard refusal prints the env-u relaunch and the deliberate opt-in"
+}
+
+# Run the generated command against a filled brief. This proves the worker can
+# produce the actual separate file input rather than only seeing a flag name.
+test_generated_verification_plan_command() {
+  local home="$TMP_ROOT/plan-command-home" id=plan-command brief content command plan token
+  mkdir -p "$home/data"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" project --mode no-mistakes >/dev/null \
+    || fail 'plan-command scaffold failed'
+  brief="$home/data/$id/brief.md"
+  content=$(cat "$brief")
+  content=${content//'{TASK}'/'Fix the badge refresh.'}
+  content=${content//'{FIRSTMATE_SPEC}'/'Keep the renderer. Out of scope is recorded below.'}
+  content=${content//'### Out of scope'/$'### Out of scope\n- Do not redesign the dashboard.'}
+  for token in '{DOD_CAPABILITY}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+    content=${content//"$token"/'The badge updates after refresh.'}
+  done
+  content=${content//'{DOD_MANDATORY_ITEMS}'/"$(fm_test_dod_item M1)"}
+  printf '%s\n' "$content" > "$brief"
+  command=$(awk '/^`bash .* --verification-plan / { sub(/^`/, ""); sub(/`$/, ""); print; exit }' "$brief")
+  [ -n "$command" ] || fail 'no generated plan-build command'
+  bash -c "$command" || fail 'generated plan-build command failed'
+  plan="$home/data/$id/verification-plan.md"
+  assert_grep 'The badge updates after refresh.' "$plan" 'generated plan omitted task DoD'
+  assert_grep 'Do not redesign the dashboard.' "$plan" 'generated plan omitted exclusions'
+  assert_no_grep 'Keep the renderer.' "$plan" 'generated plan leaked unrelated Firstmate build constraints'
+  assert_grep "--verification-plan $plan" "$brief" 'worker cannot pass the generated file to no-mistakes'
+  pass 'fm-brief: generated verification-plan command creates the separate input with criteria and exclusions'
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
+test_generated_verification_plan_command
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
 test_forge_selection_renders_correct_cli
@@ -1836,6 +2016,10 @@ test_ship_and_scout_teach_validation_round_pause
 test_scout_and_secondmate_load_decision_hold_policy
 test_scout_and_secondmate_scaffold
 test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections
+test_spawn_lists_every_dispatch_placeholder_in_one_refusal
+test_worktree_isolation_refusal_carries_the_repair
+test_spawn_backend_refusal_names_spawn_capable_backends_and_invocation
+test_api_key_refusal_carries_the_billing_repair
 test_scout_lavish_line_follows_presentation_floor
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief

@@ -12,10 +12,13 @@
 //
 // Single instance: one process may evaluate a watcher extension more than
 // once for the same home (for example when it is both auto-discovered and named
-// with -e, or rebound by a reload). Each factory bind claims the home's slot in
-// a process-global registry, so the latest bind is the current instance and
-// every earlier one learns it was superseded. Each extension decides what a
-// superseded instance does; the registry only answers who is current.
+// with -e, when a helper session loads it, or when a reload rebinds it). A
+// factory bind claims the home's slot in a process-global registry unless it
+// waits (claim: false) for the extension's proof that it should own the home,
+// and then takes the slot later through claim. So the latest bind that claimed
+// is the current instance, and every earlier one learns it was superseded. The
+// registry only answers who is current; each extension decides what a
+// superseded or waiting instance does.
 // A binding's previous slot is only for transferring predecessor state. Callers
 // release it after handoff; publish also clears it before storing an API that
 // may capture the binding, so the current slot cannot retain retired factories
@@ -85,23 +88,33 @@ export type WatchInstanceBinding<T> = {
   isCurrent: () => boolean;
   current: () => WatchInstanceSlot<T> | null;
   publish: (api: T) => void;
+  // Take the home's slot from whichever instance holds it and return that
+  // displaced slot (null when this instance already held it).
+  claim: () => WatchInstanceSlot<T> | null;
 };
 
-// Claim <home>'s slot in the process-global registry named <registryKey>.
-export function bindWatchInstance<T>(registryKey: string, home: string): WatchInstanceBinding<T> {
+// Claim <home>'s slot in the process-global registry named <registryKey>, or
+// with claim false only register this instance, leaving the slot to claim().
+export function bindWatchInstance<T>(registryKey: string, home: string, options: { claim?: boolean } = {}): WatchInstanceBinding<T> {
   const holder = globalThis as typeof globalThis & Record<string, WatchInstanceRegistry | undefined>;
   const registry = holder[registryKey] ??= { nextId: 0, slots: new Map() };
   const slot: WatchInstanceSlot<T> = { id: ++registry.nextId, api: null };
+  const claimNow = options.claim !== false;
   const binding: WatchInstanceBinding<T> = {
     id: slot.id,
-    previous: (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
+    previous: claimNow ? (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null : null,
     isCurrent: () => registry.slots.get(home) === slot,
     current: () => (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null,
     publish: (api: T) => {
       binding.previous = null;
       slot.api = api;
     },
+    claim: () => {
+      const displaced = (registry.slots.get(home) as WatchInstanceSlot<T> | undefined) ?? null;
+      registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
+      return displaced === slot ? null : displaced;
+    },
   };
-  registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
+  if (claimNow) registry.slots.set(home, slot as WatchInstanceSlot<unknown>);
   return binding;
 }

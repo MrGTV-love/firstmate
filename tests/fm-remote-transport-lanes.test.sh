@@ -56,7 +56,7 @@ cp "$ROOT/bin/fm-remote-job-lib.sh" "$ROOT/bin/fm-remote-job-worker.sh" \
   "$ROOT/bin/fm-composer-lib.sh" "$ROOT/bin/fm-cursor-lib.sh" \
   "$ROOT/bin/fm-classify-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$ROOT/bin/fm-timeout-lib.sh" \
   "$ROOT/bin/fm-status-decision-lib.sh" "$ROOT/bin/fm-status-event-lib.sh" \
-  "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
+  "$ROOT/bin/fm-status-wake-lib.sh" "$ROOT/bin/fm-status-io-lib.sh" "$ROOT/bin/fm-file-identity-lib.sh" "$ROOT/bin/fm-status-cap-lib.sh" "$ROOT/bin/fm-utc-lib.sh" \
   "$ROOT/bin/fm-ff-lib.sh" "$ROOT/bin/fm-secondmate-registry-lib.sh" \
   "$ROOT/bin/fm-session-launch-policy-lib.sh" "$ROOT/bin/fm-config-inherit-lib.sh" \
   "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$ROOT/bin/fm-role-lib.sh" \
@@ -138,6 +138,38 @@ SEQ_EXPECTED=$(seq 1 20)
   || fail "concurrent sequence claims were not unique and monotonic: $SEQ_RESULTS"
 [ "$(find "$STATE_ROOT/.seq-claims" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" = 20 ] \
   || fail "concurrent sequence allocations did not retain every durable claim"
+
+# Ubuntu 26.04 ships uutils coreutils, whose mkdir can report success for a
+# directory a concurrent caller created. Ownership must come from the claim's
+# exclusive owner marker, never from mkdir's exit status, or two callers take
+# one sequence number. This shim reproduces that platform behavior exactly.
+mkdir() {
+  local target=${!#} rc
+  command mkdir "$@" 2>/dev/null
+  rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  case "$target" in
+    */.seq-claims/[0-9]*) [ -d "$target" ] && return 0 ;;
+  esac
+  return "$rc"
+}
+rm -rf -- "$STATE_ROOT/.seq-claims"
+fm_remote_job_prepare_state "$ACCOUNT_HOME" || fail "$FM_REMOTE_JOB_ERROR"
+rm -f -- "$STATE_ROOT/seq" "$TMP_ROOT"/seq-*
+SEQ_PIDS=()
+for i in $(seq 1 20); do
+  fm_remote_job_next_seq > "$TMP_ROOT/seq-$i" &
+  SEQ_PIDS+=("$!")
+done
+for pid in "${SEQ_PIDS[@]}"; do
+  wait "$pid" \
+    || fail "a concurrent allocator failed under a platform mkdir that reports success for an existing claim"
+done
+unset -f mkdir
+SEQ_RESULTS=$(cat "$TMP_ROOT"/seq-* | sort -n)
+[ "$SEQ_RESULTS" = "$SEQ_EXPECTED" ] \
+  || fail "a platform mkdir that reports success for an existing claim duplicated a sequence: $SEQ_RESULTS"
+
 mkdir "$STATE_ROOT/.seq-claims/999998" "$STATE_ROOT/.seq-claims/999999"
 touch -t 200001010000 "$STATE_ROOT/.seq-claims/999998"
 fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "sequence claim reaping failed"
@@ -152,6 +184,45 @@ fm_remote_job_reap_stale "$ACCOUNT_HOME" || fail "expired sequence claim reaping
 assert_absent "$STATE_ROOT/.seq-claims/999997" "an expired sequence claim survived the next hourly scan"
 rmdir "$STATE_ROOT/.seq-claims/999999"
 pass "atomic sequence claims remain unique and reap only after expiry"
+
+# The worker singleton lock and each job's claim take fm_remote_job_mkdir_exclusive.
+# The same packaged mkdir can report success to every concurrent creator of one
+# absent path. This shim does that: a caller that saw the path absent always
+# succeeds, and a caller that finds it present fails as mkdir does. Only the
+# helper's own mutex can then leave a single owner.
+EXCLUSIVE_DIR="$TMP_ROOT/exclusive-mkdir"
+command mkdir "$EXCLUSIVE_DIR"
+mkdir() {
+  local target=${!#}
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    command mkdir "$@"
+  else
+    sleep 0.2
+    command mkdir -p "$@"
+  fi
+}
+EXCLUSIVE_PIDS=()
+for i in $(seq 1 20); do
+  fm_remote_job_mkdir_exclusive "$EXCLUSIVE_DIR/claim" 2>/dev/null &
+  EXCLUSIVE_PIDS+=("$!")
+done
+EXCLUSIVE_WINNERS=0
+for pid in "${EXCLUSIVE_PIDS[@]}"; do
+  if wait "$pid"; then
+    EXCLUSIVE_WINNERS=$((EXCLUSIVE_WINNERS + 1))
+  fi
+done
+unset -f mkdir
+[ "$EXCLUSIVE_WINNERS" -eq 1 ] \
+  || fail "$EXCLUSIVE_WINNERS of 20 concurrent callers each took the exclusive directory; exactly one may"
+[ -d "$EXCLUSIVE_DIR/claim" ] && [ ! -L "$EXCLUSIVE_DIR/claim" ] \
+  || fail "the exclusive directory its owner created is missing"
+[ -n "$(find "$EXCLUSIVE_DIR/claim" -maxdepth 0 -perm 700)" ] \
+  || fail "the exclusive directory was not created owner-only"
+EXCLUSIVE_LITTER=$(find "$EXCLUSIVE_DIR" -mindepth 1 -maxdepth 1 ! -name claim)
+[ -z "$EXCLUSIVE_LITTER" ] \
+  || fail "concurrent exclusive creators left mutex litter: $EXCLUSIVE_LITTER"
+pass "exclusive directory creation leaves exactly one owner when mkdir reports success to every concurrent creator"
 
 fm_on() {
   FM_HOME="$LOCAL_HOME" \

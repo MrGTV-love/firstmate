@@ -36,7 +36,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
 | [`fm-brief.sh`](../bin/fm-brief.sh) | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout; emitted ship/scout briefs own the private-service cleanup rule |
-| [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the [task Definition of Done](configuration.md#task-definition-of-done-ship-and-scout-briefs) scaffold and its fresh-spawn placeholder check, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
+| [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the [task Definition of Done](configuration.md#task-definition-of-done-ship-and-scout-briefs) scaffold and its fresh-spawn placeholder check, the named-head reachability gate on ship `done:` acceptance, the no-mistakes `--intent` contract, and the separate no-mistakes verification plan (`--verification-plan <brief>`) |
 | [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section and legacy captain-provenance reader |
 | [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
@@ -58,7 +58,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
-| [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth; its header owns the budget contract |
+| [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth and, with `--memory-kib`, its memory; its header owns the budget contract |
 | [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget or a nested copy sits inside a live task's copy ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |
 | `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
@@ -66,9 +66,16 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-proc-guard.py`       | The engine behind `fm-proc-guard.sh`                                                 |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
+| `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules, require every refusal site to map to a guard, and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
+| `fm-guard-sites.py`      | Enumerate every refusal site in the runtime code and map each to a registry entry for `fm-guard-lint.sh` ([signatures](guard-spec.md#refusal-sites)) |
+| `fm-guard-refcheck.sh`   | Prove every wired hook path resolves, every registry path exists, and no retired guard is referenced live |
+| `fm-guard-event.sh`      | Append one guard decision event per call, never influencing the decision it records |
+| `fm-guard-metrics.sh`    | Compute per-guard opportunities, fires, override rate, clear cost, and the retirement verdict |
+| `fm-supervision-liveness-lib.sh` | Shared supervision-liveness predicate and reason vocabulary for the turn-end guards and the fleet guard |
 | `fm-primary-scope-lib.sh` | Shared marker-or-plain-checkout primary-home predicate for tracked hooks             |
 | `fm-session-lock-lib.sh` | Shared session-lock ownership from harness ancestry or a trusted Claude session id for fm-lock.sh and the Claude Stop auto-arm, plus the read-only lock inspection behind `fm-lock.sh status` and `fm-inbox.sh ready` |
 | `fm-claude-stop-autoarm.sh` | Claude Stop `asyncRewake` hook owning tokenless watcher continuity with single-flight exit-2 rewake (docs/watcher-continuity.md) |
+| `fm-claude-hold-release.sh` | Claude `UserPromptSubmit` and `StopFailure` hook releasing main's presentation hold when a turn ends without Stop (docs/watcher-continuity.md) |
 | `fm-turnend-guard.sh`    | Shared primary turn-end guard predicate so no turn ends blind (docs/turnend-guard.md) |
 | `fm-turnend-guard-grok.sh` | Grok Stop-hook adapter for the primary turn-end guard                              |
 | `fm-kimi-turnend-hook.sh` | Surgically install or remove Kimi's guarded global crew turn-end hook                |
@@ -80,7 +87,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-remote-readiness-lib.sh` | Shared remote second-mate readiness gate: check and, when needed, repair then re-check through `fm-remote-doctor.sh` |
 | [`fm-project-origin-lib.sh`](../bin/fm-project-origin-lib.sh) | Accepted origin-form owner shared by both remote provisioning boundaries |
 | `fm-spawn.sh`            | Spawn crewmates, scouts, `id=repo` batches, and secondmates on the resolved harness and runtime backend |
-| `fm-git-strip-ai-trailers.sh` | Strip known AI commit trailers at commit-msg time and install that hook for a fleet launch |
+| `fm-git-strip-ai-trailers.sh` | Strip known AI commit trailers at commit-msg time and install a fleet launch's task Git hooks, including the credential checks |
 | `fm-backend.sh`          | Runtime-backend selection, meta helpers, selector resolution, and operation dispatch |
 | `fm-backend-hometag-lib.sh` | Shared per-installation home-tag derivation for zellij tab and cmux workspace titles |
 | `fm-composer-lib.sh`     | Single fleet-wide owner of composer shapes, capability-aware screen classification, and verdicts |
@@ -99,6 +106,9 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-task-inbox-lib.sh`   | Single owner of durable steering-inbox records, acknowledgement, doorbells, and the delivery-attempt ladder |
 | `fm-pending-reply-lib.sh` | Parent-owned secondmate pending-reply expectations, recovery, and keyed escalation lifecycle |
 | `fm-secondmate-report.sh` | Optional helper that resolves the parent channel itself and appends a correlated status or document-pointer report |
+| `fm-status-append.sh`    | Sanctioned worker append to a task status log: size-capped, refusing loudly with exit 75 at the cap or when the log stays locked past its 10 s lock wait |
+| `fm-status-cap-lib.sh`   | Single owner of the status-log size cap, the read limits and tail window, the capped append, and over-cap detection |
+| `fm-status-cap-guard.sh` | Investigate a status log or sidecar over the cap once: name its writer and growth, and stop each process holding it open for writing with SIGSTOP |
 | `fm-extension.mjs`       | Bind, inspect, verify, and strictly invoke trusted external process-event adapter packages |
 | `fm-extension-launch-barrier.mjs` | Publish one exact static core-owned invocation group before package code runs |
 | `fm-extension.sh`        | Expose extension binding commands through the tracked shell and remote-home command boundary |
@@ -114,6 +124,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-inactive-reconcile.sh` | Reconcile long-inactive direct crewmate terminal outcomes without forge access |
 | `fm-idle-session-reap.sh` | Report parked sessions with their reasons and ask `fm-teardown.sh` to clean up idle finished tasks whose work landed |
 | `fm-idle-reap-lib.sh` | Shared automatic-reap eligibility for scan and locked teardown admission |
+| `fm-merge-prune.sh` | Prune a merged task's pool copy right after its PR merges: run teardown unforced, remove the copy teardown returns, retry transient refusals, and keep or remove a refused copy only on live proof |
+| `fm-merge-prune-lib.sh` | Provable-scratch proofs for the merge prune's fallback (clean, pushed, scratch-only, unused, nested copies) |
 | `fm-afk-contract.sh`     | Own the away-or-quiet record's posture, schema, entry, read-back, archive, and cross-subsystem authority lock |
 | `fm-afk-start.sh`        | Run the common sourceable away-mode daemon entry in the foreground                      |
 | `fm-afk-launch.sh`       | Own away/quiet entry (same-turn record write, then read-back), exit, rollback, and any backend terminal lifecycle |
@@ -164,7 +176,9 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pr-poll.sh`          | Provide the byte-static watcher program for validated pull-request, merge-request, and Gerrit-change poll sidecars |
 | `fm-contributions.sh`    | Observe owned publications, retain exact-head judgments, measure required actors, and wake on maintainer signals |
 | `fm-pr-check.sh`         | Record validated task `pr=` and `pr_head=` values, then atomically arm a static merge poll; refuses GitHub drafts and persistent secondmate records (see [architecture.md](architecture.md)) |
-| `fm-pr-merge.sh`         | Record PR metadata, merge a task's canonical full GitHub, GitLab, or Forgejo URL, refuse a Gerrit change because firstmate never submits one, then refuse an outcome it cannot prove landed or queued |
+| `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a ten-second full ci log reading skipped for that pass when slower, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
+| `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions for GitHub, GitLab, or Forgejo, refuse Gerrit submission, then refuse an outcome it cannot prove landed or queued |
+| `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |
 | `fm-pr-reviewers.sh`     | Read-only: suggest reviewers from GitHub's own author mapping of recent commits on a pull request's changed files, never requesting one |
 | `fm-merge-outcome-lib.sh` | Publish a confirmed merge's durable, role-routed supervision outcome                 |
@@ -189,6 +203,13 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-mail.sh`             | General-purpose mail plane: read unseen IMAP mail, send one SMTP message, or surface new mail as a `check` wake via `poll` (configuration in the home's gitignored `.env`) |
 | `fm-mail.py`             | The IMAP/SMTP engine behind `fm-mail.sh` |
 | `fm-mail-check.sh`       | Standing received-mail poll: `arm` registers a watcher check that runs `fm-mail.sh poll` on the watcher cadence (new mail still wakes via the poll; the check's own line also wakes unless the poll is a proven no-op), `disarm` removes it |
+| `fm-slack-lib.sh`        | Slack environment resolution and the Python entry point used by the Slack commands |
+| `fm_slack.py`            | Slack Web API client with bounded waits, classified errors, and token redaction |
+| `fm_slack_replay.py`     | Deterministic replay of the Slack methods the plane uses; opens no socket |
+| `fm_slack_watch.py`      | Mirror open captain calls into DM threads, deliver authorized replies to the keyed-answer intake, and journal pending publication |
+| `fm-slack-mirror.sh`     | Mirror open captain calls into one owner-DM thread per call |
+| `fm-slack-poll.sh`       | Poll tracked DM threads and deliver authorized typed or reaction answers through `fm-captain-hold.sh answers` |
+| `fm-slack-check.sh`      | Standing Slack poll: ordered `arm` after the `slack-dm` binding, `check` on the watcher cadence, and `disarm` as the hard off switch |
 | `fm-voice-relay.py`      | Hold the spoken conversation on this host, answer from the records, and hand real work to `fm-inbox.sh` ([voice-relay.md](voice-relay.md)) |
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
 | `fm_voice_frame.py`      | The wire format both machines share, copied to the laptop beside the client          |
@@ -200,4 +221,4 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 [`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-descendant cleanup, reassigned-slot handling, prerequisites, failure/retry behavior, and the live-producer residual.
 The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
 
-[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).
+[`tests/fm-teardown-cleanup.test.sh`](../tests/fm-teardown-cleanup.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).

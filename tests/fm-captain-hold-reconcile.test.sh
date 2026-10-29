@@ -999,6 +999,25 @@ test_operational_key_closes_with_durable_evidence_and_replay() {
   pass "status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety"
 }
 
+test_key_opening_binding_is_a_position_in_the_whole_log() {
+  local home binding
+  home=$(make_home key-opening-large-log)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  # 4500 padded lines, the keyed call as line 4501, then 200 more: about 5.3 MB, past the
+  # 4 MiB tail window. The staged evidence is bound to the opening's line number, which
+  # the log's append-only order keeps stable for its whole life, so it must be 4501
+  # however large the log is.
+  perl -e 'my $pad = "p" x 1100; print "working [at=$_]: step $_ $pad\n" for 1 .. 4500; print "needs-decision [key=big-call]: captain must choose\n"; print "working [at=$_]: later step $_ $pad\n" for 1 .. 200;' \
+    > "$home/state/lane.status"
+  printf 'Verified source captured.txt: the answer was recorded elsewhere.\n' > "$home/evidence.txt"
+  run_captain "$home" reconcile close-key lane --key big-call --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "the close of a key opened in a 5 MB log failed"
+  binding=$(find "$home/state/reconcile-evidence/lane" -name 'big-call-*.opening' -type f)
+  [ -f "$binding" ] || fail "the close staged no opening binding"
+  [ "$(cat "$binding")" = 4501 ] || fail "the opening binding is $(cat "$binding"), not the opening's line number 4501"
+  pass "a key close binds its staged evidence to the opening's true line number in a log past the tail window"
+}
+
 test_operational_key_close_refusals_and_interrupted_append() {
   local home key before open evidence
   home=$(make_home operational-key-refusals)
@@ -1522,6 +1541,50 @@ EOF
   pass "a status resolution over a still-open captain-held task is signalled, not closed"
 }
 
+# `diverged` runs on every wake drain, over every lane's status log. It must never hand a
+# whole log to grep, so a runaway log cannot be read again by every drain: a log past the
+# read limit (bin/fm-status-cap-lib.sh) yields no key tokens and no report, and a log
+# inside it is reported exactly as before. A grep stand-in on PATH records any status log
+# it is handed as a file operand; the limit is set small so the fixture stays tiny.
+test_diverged_never_hands_a_status_log_to_grep_and_skips_one_past_the_limit() {
+  local home id out real_grep err
+  home=$(make_home divergence-bounded)
+  id=sample-route-review
+  tasks_in "$home" add "$id" "Investigate sample routing" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the investigation fixture"
+  write_origin_meta "$home" "$id"
+  run_captain "$home" hold sample-route-call \
+    --title "Choose route: north or south" --reason "captain route choice pending" \
+    --repo sample --origin "$id" >/dev/null \
+    || fail "could not register the captain call"
+  printf 'needs-decision [key=sample-route-call]: north or south\nresolved [key=sample-route-call]: answered: north\n' \
+    > "$home/state/$id.status"
+  real_grep=$(command -v grep)
+  err="$home/grep-operands.log"
+  : > "$err"
+  # shellcheck disable=SC2016 # The stand-in's own source is written literally.
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'for a in "$@"; do case "$a" in *.status) printf "%%s\\n" "$a" >> %q ;; esac; done\n' "$err"
+    printf 'exec %q "$@"\n' "$real_grep"
+  } > "$home/fakebin/grep"
+  chmod +x "$home/fakebin/grep"
+
+  out=$(FM_STATUS_CAP_BYTES=2048 FM_STATUS_CAP_RESERVE_BYTES=1024 run_captain "$home" diverged) \
+    || fail "diverged failed on a log inside the read limit"
+  printf '%s\n' "$out" | grep -F "sample-route-call	$id	sample-route-call" >/dev/null \
+    || fail "a log inside the read limit was no longer reported: $out"
+  [ ! -s "$err" ] || fail "diverged handed a status log to grep as a file operand: $(cat "$err")"
+
+  perl -e 'print "working: padding line to push the log past the limit\n" x 80' >> "$home/state/$id.status"
+  [ "$(wc -c < "$home/state/$id.status" | tr -d ' ')" -gt 3072 ] || fail "the fixture log is not past the read limit"
+  out=$(FM_STATUS_CAP_BYTES=2048 FM_STATUS_CAP_RESERVE_BYTES=1024 run_captain "$home" diverged) \
+    || fail "diverged failed on a log past the read limit"
+  [ -z "$out" ] || fail "a log past the read limit still produced a report: $out"
+  [ ! -s "$err" ] || fail "diverged handed a status log past the limit to grep: $(cat "$err")"
+  pass "diverged reports a log inside the read limit, skips one past it, and never hands a status log to grep"
+}
+
 # The false-signal boundary, driven by the shapes that are genuinely fine. A
 # captain call whose deliverable IS the decision has no routed work item at all,
 # and that is legitimate: routed work must never be part of the test. Nor may a
@@ -1597,6 +1660,7 @@ test_verified_close_retry_matrix
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_close_key_leaves_a_migrated_captain_hold_to_its_owner
 test_operational_key_closes_with_durable_evidence_and_replay
+test_key_opening_binding_is_a_position_in_the_whole_log
 test_operational_key_close_refusals_and_interrupted_append
 test_standalone_closes_follow_the_supervision_role_partition
 test_unbound_source_closes_no_hold
@@ -1605,6 +1669,7 @@ test_board_answer_reaches_the_keyed_answer_intake
 test_chat_channel_feeds_the_same_keyed_answer_intake
 test_origin_slug_validation_precedes_path_construction
 test_status_resolution_over_an_open_hold_is_signalled
+test_diverged_never_hands_a_status_log_to_grep_and_skips_one_past_the_limit
 test_legitimate_holds_produce_no_divergence_signal
 )
 captain_hold_run_tests "$@"

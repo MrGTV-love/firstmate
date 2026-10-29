@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { runCommandAsync } from "./fm-async-exec.ts";
 
@@ -51,7 +51,7 @@ export function afkPostureRecordPresent(state: string): boolean {
 // refers back to.
 export const AWAY_POSTURE_TAIL =
   "POSTURE: AWAY. The away-posture record state/.afk-contract exists, so the captain is not present and MAIN is parked: you take every row, including check rows and decision rows, and no outcome reaches the captain until the return brief. " +
-  "The record below is the captain's away words, verbatim, and the whole mandate: act on them by your own judgment where this event is the moment they name, only through the guarded scripts under MAIN's standing authority - never more - which enforce it: bin/fm-pr-merge.sh merges any pull request that is green at its live head, synchronously, and refuses a red one or --allow-red; bin/fm-spawn.sh dispatches queued work (already queued, or filed by you from the words) within the spend cap; bin/fm-send.sh --resolve-key answers a decision the words pre-answer, or one the ask-user-authority policy in your prompt lets firstmate decide; bin/fm-merge-local.sh still refuses you. " +
+  "The record below is the captain's away words, verbatim, and the whole mandate: act on them by your own judgment where this event is the moment they name, only through the guarded scripts under MAIN's standing authority - never more - which enforce it: bin/fm-pr-merge.sh merges a pull request that is green at its live head and also passes bin/fm-review-record.py verify (whose header owns the recorded-review rule, including its away refusal and later-FAIL rule), synchronously, and refuses a red one or --allow-red; bin/fm-spawn.sh dispatches queued work (already queued, or filed by you from the words) within the spend cap; bin/fm-send.sh --resolve-key answers a decision the words pre-answer, or one the ask-user-authority policy in your prompt lets firstmate decide; bin/fm-merge-local.sh still refuses you. " +
   "Never by analogy, and hold on doubt: a sentence you cannot act on with confidence is reported with verdict captain, naming it, and left for the return. " +
   "Credential entry, legal or financial acceptance, an attended prompt, any discard the captain did not name, and any destructive, irreversible, or security-sensitive action are refused for every actor in every posture, whatever the words say. " +
   "Log every action taken under the words in its outcome summary, opening with \"per your away instructions:\". " +
@@ -282,6 +282,40 @@ function statusFileVersion(path: string): string | null {
   }
 }
 
+// bin/fm-status-cap-lib.sh's fm_status_read_limit_bytes: the cap plus the reserve, with the
+// same positive-integer fallback for FM_STATUS_CAP_BYTES and FM_STATUS_CAP_RESERVE_BYTES. A
+// status log past it is never read whole.
+function statusBound(value: string | undefined, fallback: number): number {
+  return /^[0-9]+$/.test(value ?? "") && Number(value) > 0 ? Number(value) : fallback;
+}
+
+function statusReadLimitBytes(): number {
+  return statusBound(process.env.FM_STATUS_CAP_BYTES, 33554432) + statusBound(process.env.FM_STATUS_CAP_RESERVE_BYTES, 1048576);
+}
+
+// Read a status log whole only when it is within the read limit, and never more than the
+// size that was checked: the size comes from the open descriptor and the read stops at it,
+// so a writer that appends afterwards cannot make this allocate or read past the bound.
+// Returns the bytes up to that endpoint; throws, as the callers' catch expects, when the
+// log is past the limit.
+function readStatusBounded(path: string): Buffer {
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const size = fstatSync(fd).size;
+    if (size > statusReadLimitBytes()) throw new Error("status log is past the read limit");
+    const buffer = Buffer.alloc(size);
+    let filled = 0;
+    while (filled < size) {
+      const read = readSync(fd, buffer, filled, size - filled, filled);
+      if (read === 0) break;
+      filled += read;
+    }
+    return buffer.subarray(0, filled);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function openDecisions(
   lines: readonly string[],
   resolveVerb: string,
@@ -502,7 +536,7 @@ export function scopeForUnreadWake(state: string, heartbeat: boolean, afk = fals
             let contents: Buffer;
             let spanOffset = 0;
             try {
-              contents = readFileSync(statusPath);
+              contents = readStatusBounded(statusPath);
               if (cursor && cursor.offset <= contents.length) {
                 try {
                   if (cursor.ident === statusFileIdentity(statusPath)) spanOffset = cursor.offset;

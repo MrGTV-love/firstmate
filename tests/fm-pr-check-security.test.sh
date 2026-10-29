@@ -17,6 +17,9 @@ WATCH="$ROOT/bin/fm-watch.sh"
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 REGISTER="$ROOT/bin/fm-check-register.sh"
 TMP_ROOT=$(fm_test_tmproot fm-pr-check-security)
+NM_HOME="$TMP_ROOT/no-mistakes"
+fm_test_empty_pipeline_db "$NM_HOME"
+export NM_HOME
 fm_git_identity fmtest fmtest@example.invalid
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 REAL_CP=$(command -v cp)
@@ -131,6 +134,7 @@ make_case() {
   git -C "$dir/wt" init -q
   git -C "$dir/wt" commit -q --allow-empty -m init
   git -C "$dir/wt" update-ref refs/remotes/origin/main "$(git -C "$dir/wt" rev-parse HEAD)"
+  fm_fake_ship_review_history "$fakebin"
   cat > "$fake_root/bin/fm-guard.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'guard\n' >> "$FM_TEST_GUARD_LOG"
@@ -157,7 +161,7 @@ case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
       *mergeStateStatus*)
-        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\"}"
+        printf '%s\n' "{\"state\":\"OPEN\",\"isDraft\":false,\"mergeable\":\"MERGEABLE\",\"mergeStateStatus\":\"CLEAN\",\"headRefOid\":\"${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}\",\"baseRefName\":\"main\",\"baseRefOid\":\"0000000000000000000000000000000000000000\"}"
         exit 0
         ;;
       *" --json isDraft "*)
@@ -265,8 +269,14 @@ SH
 [ "${FM_TEST_NM_FAIL:-0}" = 0 ] || exit 1
 head=$(git rev-parse HEAD 2>/dev/null) || exit 1
 pipeline=${FM_TEST_NM_PIPELINE_HEAD:-$head}
-printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\noutcome: %s\n' \
-  "$pipeline" "${FM_TEST_NM_OUTCOME-passed}"
+task=${FM_TEST_NM_TASK_ID:-task-a}
+plan_dir="${FM_HOME:-$(dirname "$(pwd)")/home}/data/$task"
+mkdir -p "$plan_dir" || exit 1
+plan="$plan_dir/verification-plan.md"
+[ -f "$plan" ] || printf 'fixture verification plan\n' > "$plan"
+plan_sha=$(shasum -a 256 "$plan" | awk '{print $1}')
+printf 'run:\n  id: "RUNFIXTURE"\n  branch: fm/task\n  status: completed\n  head_sha: %s\n  verification_plan:\n    path: %s\n    sha256: %s\n    source_path: %s\n    captured_at: %s\noutcome: %s\n' \
+  "$pipeline" "$plan" "$plan_sha" "$plan" "$(date +%s)" "${FM_TEST_NM_OUTCOME-passed}"
 printf 'branch_sync:\n  state: %s\n  local:\n    head: %s\n  pipeline:\n    current_head: %s\n' \
   "${FM_TEST_NM_SYNC_STATE:-synchronized}" "$head" "$pipeline"
 if [ -n "${FM_TEST_NM_NEXT_ACTION:-}" ]; then
@@ -291,6 +301,7 @@ write_task_meta() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     "kind=ship" \
+    "model=gpt-5.1-codex" \
     "mode=no-mistakes"
 }
 
@@ -303,15 +314,17 @@ write_poll_meta() {
   fm_write_meta "$state/$id.meta" \
     "window=fm-$id" \
     "worktree=$case_dir/wt" \
+    "model=gpt-5.1-codex" \
     "$@" \
     "pr=$url"
 }
 
 
 run_check_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -319,10 +332,26 @@ run_check_entry() {
     "$PR_CHECK" "$@"
 }
 
+seed_merge_review() {
+  local dir=$1 url=$2
+  printf 'VERDICT: PASS head=%s\n' "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" > "$dir/review.md"
+  FM_HOME="$dir/home" "$ROOT/bin/fm-review-record.py" review --pr "$url" \
+    --head "${FM_TEST_GH_HEAD:-0123456789abcdef0123456789abcdef01234567}" \
+    --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
+    --loosens-deny-allow-list yes --widens-guard yes --customer-data-billing-spend yes \
+    --report "$dir/review.md"
+}
+
 run_merge_entry() {
-  local dir=$1
+  local dir=$1 task_id=${2:-task-a}
   shift
+  # Valid merge fixtures satisfy the separate independent-review prerequisite;
+  # malformed-input fixtures still reach the merge entrypoint's own parser.
+  if [ "$#" -ge 2 ] && (fm_pr_task_id_valid "$1" && fm_pr_url_parse "$2"); then
+    seed_merge_review "$dir" "$2" >/dev/null || fail "valid merge fixture could not record its review"
+  fi
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" \
+    FM_TEST_NM_TASK_ID="$task_id" \
     FM_TEST_GUARD_LOG="$dir/guard.log" FM_TEST_GH_LOG="$dir/gh.log" \
     FM_TEST_GH_AXI_LOG="$dir/gh-axi.log" FM_TEST_GLAB_LOG="$dir/glab.log" \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" \
@@ -754,7 +783,7 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   dir=$(make_case direct-pr-unpushed)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
   git -C "$dir/wt" commit -q --allow-empty -m 'fix only in the copy'
   later=$(git -C "$dir/wt" rev-parse HEAD)
@@ -775,7 +804,7 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   dir=$(make_case multi-pr-registration)
   fm_write_meta "$dir/home/state/task-a.meta" \
     "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
-    "project=$dir/project" "kind=ship" "mode=direct-PR"
+    "project=$dir/project" "kind=ship" "model=gpt-5.1-codex" "mode=direct-PR"
   printf 'done [at=1]: PR %s checks green\ndone [at=2]: PR %s checks green\n' \
     https://github.com/o/r/pull/3 https://github.com/o/r/pull/4 > "$dir/home/state/task-a.status"
   pushed=$(git -C "$dir/wt" rev-parse HEAD)
@@ -985,6 +1014,7 @@ SH
       "worktree=$dir/wt" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     cat > "$dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
@@ -1159,6 +1189,31 @@ test_static_poll_contract() {
   [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll"
   [ "$(grep -c '^check: .*: merged$' "$dir/watch.out")" -eq 1 ] || fail "watcher did not convert merged output into exactly one wake"
   pass "static poll is silent except for one merged line and remains watcher-bounded"
+}
+
+# A merge that happens elsewhere reaches the watcher through the merge poll. The
+# poll's outcome arms the pool-copy prune (bin/fm-merge-prune.sh); the watcher
+# does not run it inside the lock it holds. The tick is off here so nothing
+# attempts a teardown against the fixture.
+test_watcher_merged_poll_arms_the_pool_copy_prune() {
+  local dir rc
+  dir=$(make_case merge-prune-poll-arms)
+  write_task_meta "$dir"
+  write_poll_meta "$dir/home/state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$dir/home/state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare authenticated watcher poll"
+  fm_pr_poll_publish_prepared || fail "could not publish authenticated watcher poll"
+  rm -f "$dir/home/state/.last-check"
+  set +e
+  FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=0 FM_TEST_GH_STATE=MERGED \
+    run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll: $(cat "$dir/watch.err")"
+  [ -f "$dir/home/state/task-a.merge-prune" ] || fail "the merged poll did not arm the pool-copy prune"
+  grep -qx 'pr=https://github.com/o/r/pull/1' "$dir/home/state/task-a.merge-prune" \
+    || fail "the armed record does not name the merged PR: $(cat "$dir/home/state/task-a.merge-prune")"
+  pass "a merge seen by the poll arms the pool-copy prune without running it under the poll's lock"
 }
 
 test_atomic_interruption_leaves_no_partial_artifact() {
@@ -1615,6 +1670,7 @@ test_teardown_removes_poll_artifacts() {
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only'
   printf 'check\n' > "$dir/home/state/task-a.check.sh"
   printf 'data\n' > "$dir/home/state/task-a.pr-poll"
@@ -1643,6 +1699,7 @@ SH
     "worktree=$dir/missing-worktree" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'pr=https://github.com/o/r/pull/18'
   seed_canonical_poll "$dir" task-a https://github.com/o/r/pull/18
@@ -1672,6 +1729,7 @@ SH
       "worktree=$dir/missing-worktree" \
       "project=$dir/project" \
       'kind=ship' \
+      'model=gpt-5.1-codex' \
       'mode=local-only'
     if [ "$artifact" = check.sh ]; then
       counterpart=pr-poll
@@ -1968,6 +2026,7 @@ test_gerrit_ready_gate_reads_the_published_tree() {
   : > "$dir/gerrit-axi.log"
   set +e
   out=$(FM_TEST_GERRIT_REVISION=0123456789abcdef0123456789abcdef01234567 \
+    FM_TEST_NM_TASK_ID=task-published \
     FM_TEST_GERRIT_AXI_LOG="$dir/gerrit-axi.log" PATH="$dir/fakebin:$BASE_PATH" \
     bash -c '. "$1/bin/fm-timeout-lib.sh"; . "$1/bin/fm-dod-lib.sh"
       fm_dod_accept_ship_done ship no-mistakes "$2" "$3" "$4" "$5" task-published "$6"' \
@@ -3303,6 +3362,7 @@ test_teardown_cannot_race_authority_consumption() {
     "worktree=$dir/wt" \
     "project=$dir/project" \
     'kind=ship' \
+    'model=gpt-5.1-codex' \
     'mode=local-only' \
     'yolo=on'
   write_away_record "$dir"
@@ -3352,6 +3412,7 @@ test_authority_retirement_preserves_replacement() {
   run_check_entry "$dir" task-a "$url_a" >/dev/null 2> "$dir/seed.err" \
     || fail "replacement: could not arm the original poll"
   queue_merge "$dir" "$url_a"
+  seed_merge_review "$dir" "$url_b" >/dev/null || fail "replacement review could not be recorded"
   # The replacement runs inside the watcher, whose environment names the real
   # firstmate root, so restore the fixture root every other arming here uses.
   cat > "$dir/replace-authority.sh" <<SH
@@ -3772,6 +3833,7 @@ test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
+test_watcher_merged_poll_arms_the_pool_copy_prune
 test_atomic_interruption_leaves_no_partial_artifact
 test_concurrent_watcher_sees_only_complete_publication
 test_poll_publication_refuses_unsafe_destinations

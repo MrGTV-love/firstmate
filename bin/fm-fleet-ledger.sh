@@ -10,7 +10,8 @@
 #
 # Producers:
 #   bin/fm-brief.sh              appended (in every worker's status command,
-#                                right after its unchanged plain append)
+#                                right after its capped append,
+#                                bin/fm-status-append.sh)
 #   bin/fm-spawn.sh              dispatched (fresh spawns only, never relaunch)
 #   bin/fm-watch.sh              capture, once per poll cycle
 #   bin/fm-pr-check.sh           pr_ready (a PR registered for review, not the
@@ -36,16 +37,20 @@
 #   fm-fleet-ledger.sh closed <task> <evidence> <pr>
 #   fm-fleet-ledger.sh answered <task> send <key>
 #   fm-fleet-ledger.sh answered <task> hold <key> <source>
-#   fm-fleet-ledger.sh capture
+#   fm-fleet-ledger.sh capture [--try-lock]
 #   fm-fleet-ledger.sh appended <config> <state>/<task>.status
 #
 # capture appends one task.status record for every complete (newline-ended)
 # line added to a state/<task>.status log since that task's byte offset in
 # state/.<task>.fleet-ledger-offset. An absent offset reads from byte 0, and a
 # log shorter than its offset is re-read from byte 0. A partial last line waits
-# for a later capture. Records are appended before the offset is saved, so an
-# interrupted capture repeats records rather than losing them. Without any
-# grown log, capture returns after one size listing and sources nothing.
+# for a later capture. A log that grew by more than one tail window or more than
+# CAPTURE_MAX_LINES lines since the offset is captured from its last whole lines,
+# and a task.status.skipped record counts the bytes left out (docs/fleet-ledger.md;
+# docs/configuration.md "Status log size bounds" owns the bounds). Records are
+# appended before the offset is saved, so an interrupted capture repeats records
+# rather than losing them. Without any grown log, capture returns after one size
+# listing and sources nothing.
 # appended captures only that task, so a worker's status line is recorded as
 # soon as the worker writes it; the byte offset keeps the per-poll capture from
 # recording it again. Its arguments name the home, because a worker has no
@@ -65,17 +70,24 @@
 # already holds a task.closed with the same evidence and pr, so a close that more
 # than one path reaches is recorded once and a reopened task records its next close.
 # Every write holds state/.fleet-ledger.lock.
+# capture --try-lock is the watcher's periodic, nonblocking attempt: it returns
+# 75 on contention without changing any status offset or ledger record, so the
+# next poll retries the pending growth while lock alarms remain runnable.
+# Explicit lifecycle writers and plain capture retain their blocking contract.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
 # home exactly as the other bin/ scripts do.
 #
-# Exit status: 0 on success or when off, 2 on a usage error, 1 when a record
-# could not be written. Producers ignore a failure so it never changes theirs.
+# Exit status: 0 on success or when off, 2 on a usage error, 75 when --try-lock
+# sees contention, 1 when a record could not be written. Producers ignore a
+# failure so it never changes theirs.
 set -u
 # Byte semantics for offsets and lengths; jq still reads the text as UTF-8.
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
@@ -85,7 +97,7 @@ LOCK="$STATE/.fleet-ledger.lock"
 TEXT_MAX_CHARS=2000
 
 usage() {
-  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture | appended <config> <state>/<task>.status" >&2
+  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture [--try-lock] | appended <config> <state>/<task>.status" >&2
   exit 2
 }
 
@@ -94,6 +106,7 @@ task_ok() {
 }
 
 cmd=${1:-}
+TRY_CAPTURE=0
 case "$cmd" in
   dispatched) { [ "$#" -eq 6 ] && task_ok "$2"; } || usage ;;
   pr_ready) { [ "$#" -eq 3 ] && task_ok "$2" && [ -n "$3" ]; } || usage ;;
@@ -109,7 +122,13 @@ case "$cmd" in
     case "$#:${3:-}" in 4:send) ;; 5:hold) ;; *) usage ;; esac
     [ -n "$4" ] || usage
     ;;
-  capture) [ "$#" -eq 1 ] || usage ;;
+  capture)
+    case "$#" in
+      1) ;;
+      2) [ "$2" = --try-lock ] || usage; TRY_CAPTURE=1 ;;
+      *) usage ;;
+    esac
+    ;;
   appended)
     [ "$#" -eq 3 ] && [ -n "$2" ] || usage
     case "$3" in /*/*.status) ;; *) usage ;; esac
@@ -213,8 +232,15 @@ append_status() { # <task> <status-line>
     --arg state "$verb" --arg key "$key" --arg text "$text"
 }
 
+# The most status lines one capture turns into ledger events. Each line costs a jq run,
+# 27 ms measured on 2026-10-18, so a burst of tens of thousands would hold the
+# watcher's poll loop for minutes; 256 lines is about seven seconds. A log that grew
+# by more than this since the last capture is captured from its last lines and the
+# ledger records how much it skipped.
+CAPTURE_MAX_LINES=256
+
 capture_task() { # <task>; caller holds the lock
-  local task=$1 log offset data complete tail line saved
+  local task=$1 log offset data size complete tail line saved window window_lines skipped clamped=0 head lines drop start
   log="$STATE/$task.status"
   saved=$(offset_path "$task")
   [ -f "$log" ] && [ ! -L "$log" ] || return 0
@@ -223,12 +249,50 @@ capture_task() { # <task>; caller holds the lock
   data=${data//[[:space:]]/}
   [ "$data" -ge "$offset" ] || offset=0
   [ "$data" -gt "$offset" ] || return 0
-  # The trailing x keeps a final newline that command substitution would strip.
-  data=$(tail -c "+$((offset + 1))" "$log"; printf x) || return 1
+  size=$data
+  # Bounded: a log that grew by more than one tail window (bin/fm-status-cap-lib.sh)
+  # or more than CAPTURE_MAX_LINES lines since the saved offset is captured from its
+  # last whole lines, and the ledger records a task.status.skipped event saying how
+  # much it skipped, so a runaway writer cannot make this read the whole log into
+  # memory or start thousands of jq processes. The saved offset advances to the end
+  # of what was read.
+  fm_status_window_bytes window
+  window_lines=$CAPTURE_MAX_LINES
+  skipped=0
+  if [ $((data - offset)) -gt "$window" ]; then
+    skipped=$((data - window - offset))
+    offset=$((data - window))
+    clamped=1
+  fi
+  # Exactly the counted bytes, so a log that is still growing cannot make the read chase
+  # its writer. The trailing x keeps a final newline that command substitution would strip.
+  # A clamped read starts one byte before the window, already counted as skipped.
+  start=$((offset - clamped))
+  data=$(tail -c "+$((start + 1))" "$log" | head -c "$((size - start))"; printf x) || return 1
   data=${data%x}
+  if [ "$clamped" = 1 ]; then
+    # The window starts mid-line unless the byte before it ended one: drop the partial line,
+    # which is empty when that byte is a newline.
+    case "$data" in
+      *$'\n'*) head=${data%%$'\n'*}; data=${data#*$'\n'}; skipped=$((skipped + ${#head})); offset=$((offset + ${#head})) ;;
+      *) skipped=$((skipped + ${#data} - 1)); offset=$((offset + ${#data} - 1)); data='' ;;
+    esac
+  fi
   tail=${data##*$'\n'}
   complete=${data%"$tail"}
   [ -n "$complete" ] || return 0
+  lines=$(printf '%s' "$complete" | grep -c '')
+  if [ "$lines" -gt "$window_lines" ]; then
+    head=$(printf '%s' "$complete" | head -n $((lines - window_lines)))
+    drop=$(( ${#head} + 1 ))
+    complete=${complete:$drop}
+    skipped=$((skipped + drop))
+    offset=$((offset + drop))
+  fi
+  if [ "$skipped" -gt 0 ]; then
+    # shellcheck disable=SC2016 # $bytes is a jq variable, not a shell one.
+    append task.status.skipped "$task" '{bytes: ($bytes | tonumber)}' --arg bytes "$skipped" || return 1
+  fi
   while IFS= read -r line; do
     [ -n "${line//[[:space:]]/}" ] || continue
     append_status "$task" "$line" || return 1
@@ -243,7 +307,14 @@ if [ "$cmd" = capture ]; then
 fi
 
 load_libs || exit 1
-fm_lock_acquire_wait "$LOCK" || exit 1
+if [ "$TRY_CAPTURE" -eq 1 ]; then
+  if ! fm_lock_try_acquire "$LOCK"; then
+    [ "${FM_LOCK_BUSY:-0}" -ne 1 ] || exit 75
+    exit 1
+  fi
+else
+  fm_lock_acquire_wait "$LOCK" || exit 1
+fi
 trap 'fm_lock_release "$LOCK"' EXIT
 rc=0
 # shellcheck disable=SC2016 # $names below are jq variables, not shell ones.

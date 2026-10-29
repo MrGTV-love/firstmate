@@ -124,29 +124,65 @@ SH
       pass "$subject: $evidence"
     done
   done
+  [ "$backend" != omp ] || fm_jev_native_omp_url_reads "$subject" "$lab" "$base"
   [ "$backend" != omp ] || fm_jev_native_omp_pretool "$subject" "$lab" "$base"
 }
 
-# omp's tool_call handler is refused by the host after 30 seconds unless the worker overlay raises its deadline,
-# so a judgment that answers after 31 seconds must still decide the shell call under that real overlay.
+# The worker overlay disables omp URL reads, so an ungranted worker's read or grep of a URL fails
+# with omp's own settings error while an ordinary file read still returns the file.
+fm_jev_native_omp_url_reads() {  # <subject> <lab> <provider-base>
+  local subject=$1 lab=$2 base=$3 case_name status request
+  for case_name in read-url grep-url read-file; do
+    rm -rf -- "${lab:?}/home" "${lab:?}/worktree"
+    mkdir -p "$lab/home/config" "$lab/home/state" "$lab/home/data" "$lab/worktree"
+    printf 'TYPESAFE_API_KEY=synthetic-local-only\n' > "$lab/home/.env"
+    printf 'fm-url-read-file-canary\n' > "$lab/worktree/local.txt"
+    case "$case_name" in
+      read-url) jq -n '{phase:"normal",tool:"read",benign:true,args:{path:"https://example.invalid/fm-url-read",i:"Read one URL"}}' ;;
+      grep-url) jq -n '{phase:"normal",tool:"grep",benign:true,args:{pattern:"canary",path:"https://example.invalid/fm-url-read",i:"Search one URL"}}' ;;
+      read-file) jq -n '{phase:"normal",tool:"read",benign:true,args:{path:"local.txt",i:"Read one file"}}' ;;
+    esac > "$lab/scenario.json"
+    : > "$lab/jev.jsonl"
+    : > "$lab/model.jsonl"
+    curl --max-time 10 -fsS -X POST -d '{}' "$base/reset" > /dev/null || fail "$subject: provider reset failed"
+    (cd "$lab/worktree" && HOME="$lab/os-home" PI_CODING_AGENT_DIR="$lab/agent" OMP_SKIP_SETUP=1 \
+      fm_run_timed 90 omp -p "Use the one tool call, then stop." --model native/gpt-6.1-sol --thinking off --no-session \
+      --no-extensions -e "$lab/extension.ts" --config "$ROOT/.omp/fm-worker-overlay.yml" --no-skills --no-rules --no-title --no-lsp --tools read,grep \
+      < /dev/null > "$lab/native.out" 2>&1)
+    status=$?
+    [ "$status" -eq 0 ] || fail "$subject: $case_name native run exited $status: $(cat "$lab/native.out")"
+    request=$(tail -n 1 "$lab/model.jsonl")
+    if [ "$case_name" = read-file ]; then
+      printf '%s' "$request" | grep -qF 'fm-url-read-file-canary' \
+        || fail "$subject: an ordinary file read did not return the file: $(cat "$lab/native.out")"
+    else
+      printf '%s' "$request" | grep -qF 'URL reads are disabled by settings.' \
+        || fail "$subject: $case_name was not refused by the worker overlay: $request"
+    fi
+  done
+  pass "$subject: worker overlay refuses ungranted URL read and grep paths and keeps ordinary file reads"
+}
+
+# Write admission is deterministic: under the real worker overlay the write call runs with no Jev request.
 fm_jev_native_omp_pretool() {  # <subject> <lab> <provider-base>
-  local subject=$1 lab=$2 base=$3 marker="$2/pretool-ran" status
+  local subject=$1 lab=$2 base=$3 marker="$2/worktree/pretool-ran" status
   rm -rf -- "${lab:?}/home" "${lab:?}/worktree"
   mkdir -p "$lab/home/config" "$lab/home/state" "$lab/home/data" "$lab/worktree"
   printf 'TYPESAFE_API_KEY=synthetic-local-only\n' > "$lab/home/.env"
-  jq -n --arg command "echo ran > $marker" '{phase:"normal",tool:"bash",args:{command:$command,i:"Run one shell command"},benign:true,judge_delay:31}' > "$lab/scenario.json"
+  jq -n --arg path "$marker" '{phase:"normal",tool:"write",args:{path:$path,content:"ran",i:"Write one fixture file"}}' > "$lab/scenario.json"
   : > "$lab/jev.jsonl"
   : > "$lab/model.jsonl"
   curl --max-time 10 -fsS -X POST -d '{}' "$base/reset" > /dev/null || fail "$subject: provider reset failed"
   (cd "$lab/worktree" && HOME="$lab/os-home" PI_CODING_AGENT_DIR="$lab/agent" OMP_SKIP_SETUP=1 \
-    fm_run_timed 120 omp -p "Run the one shell command, then stop." --model native/gpt-6.1-sol --thinking off --no-session \
-    --no-extensions -e "$lab/extension.ts" --config "$ROOT/.omp/fm-worker-overlay.yml" --no-skills --no-rules --no-title --no-lsp --tools bash \
+    fm_run_timed 120 omp -p "Write the one fixture file, then stop." --model native/gpt-6.1-sol --thinking off --no-session \
+    --no-extensions -e "$lab/extension.ts" --config "$ROOT/.omp/fm-worker-overlay.yml" --no-skills --no-rules --no-title --no-lsp --tools write \
     < /dev/null > "$lab/native.out" 2>&1)
   status=$?
   [ "$status" -eq 0 ] || fail "$subject: pre-tool native run exited $status: $(cat "$lab/native.out")"
-  [ -e "$marker" ] || fail "$subject: the shell call was refused although the judgment answered: $(cat "$lab/native.out")"
-  jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].decision == "allow" and .[0].error_type == null and .[0].request_started == true and .[0].ms >= 31000' \
-    "$lab/home/state/jev-guard.jsonl" > /dev/null || fail "$subject: the 31-second answer was not the pre-tool decision: $(cat "$lab/home/state/jev-guard.jsonl")"
+  [ "$(cat "$marker" 2>/dev/null)" = ran ] || fail "$subject: the write call did not write its file: $(cat "$lab/native.out")"
+  jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].tool == "write" and .[0].decision == "allow" and .[0].enforcement == "pretool_allow" and .[0].branch == "deterministic" and .[0].error_type == null and .[0].request_started == false' \
+    <(node "$FM_GUARD_AUDIT_READER" "$lab/home/state") > /dev/null || fail "$subject: the write call was not admitted deterministically: $(node "$FM_GUARD_AUDIT_READER" "$lab/home/state")"
+  [ ! -s "$lab/jev.jsonl" ] || fail "$subject: write admission sent a Jev request: $(cat "$lab/jev.jsonl")"
   ! grep -q 'timed out after' "$lab/native.out" || fail "$subject: the host timed out the pre-tool handler: $(cat "$lab/native.out")"
-  pass "$subject: pre-tool shell judgment answered after 31 seconds decides the call under the worker overlay"
+  pass "$subject: write call admitted deterministically under the worker overlay with no Jev request"
 }

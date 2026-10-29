@@ -132,7 +132,7 @@
 #                                   and docs/configuration.md.
 #          FM_WEDGE_ALARM_EXEC      notifier seam: when set, every notifier
 #                                   channel routes through this command as
-#                                   `<cmd> <channel> <summary>` instead of
+#                                   `<cmd> <channel> <summary> <title>` instead of
 #                                   invoking its real notifier; "discard" fires
 #                                   nothing. Unset in production. When SOURCED the
 #                                   daemon defaults this to "discard" so no test
@@ -220,6 +220,7 @@ HOUSEKEEPING_TICK_DEFAULT=15
 # alarm. The escape hatch makes a guard false-positive visible instead of silent.
 MAX_DEFER_SECS_DEFAULT=300
 WEDGE_ALARM_TIMEOUT_SECS_DEFAULT=10
+WEDGE_ALARM_TITLE_DEFAULT='firstmate: away-mode escalations WEDGED'
 WEDGE_ALARM_LAST_EPOCH=0
 WEDGE_ALARM_NOTIFIER_PID=
 # Why the latest delivery attempt did not land; the wedge alarm reports it.
@@ -355,7 +356,7 @@ _collapse_newlines() {  # <text>
 # them exactly as before; the away launcher reuses the identical resolution to
 # pass the captain pane in as FM_SUPERVISOR_TARGET.
 
-# --- classification helpers (PURE: no side effects, testable) ---------------
+# --- classification helpers (device-marker adoption is explicit) -----------
 # last_status_line, status_is_captain_relevant, window_to_task, and the
 # status-span reader come from bin/fm-classify-lib.sh (sourced above),
 # the single classifier shared with bin/fm-watch.sh. The decision-string wrappers
@@ -372,6 +373,7 @@ classify_signal() {  # <reason-after-colon> <state>
     case "$f" in *.status) ;; *) continue ;; esac
     [ -e "$f" ] || [ -L "$f" ] || continue
     task=$(basename "$f"); task="${task%.status}"
+    status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
     record=$(status_span_first_actionable_record "$f" \
       "$(status_seen_offset "$state" "$task")")
     rc=$?
@@ -986,20 +988,20 @@ wedge_alarm_stop_active_notifier() {
 
 # The single execution seam for every configured notifier channel.
 # FM_WEDGE_ALARM_EXEC, when set, REPLACES the real notifier: the resolved channel
-# name and summary are handed to that command instead of ever invoking osascript
+# name, summary, and title are handed to that command instead of ever invoking osascript
 # or herdr or a captain-supplied command. This is the one injection point the test harness forces to a recorder
 # so no test can post a real desktop notification - the library-mode guard at the
 # foot of this file defaults it to "discard" whenever the daemon is SOURCED
 # rather than executed, which is the only way a test reaches these functions. The
 # special value "discard" fires nothing; unset means production (the executed
 # daemon), so the real channels fire.
-wedge_alarm_os_notifier_override() {  # <channel> <summary>
+wedge_alarm_os_notifier_override() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 rc exec_override=${FM_WEDGE_ALARM_EXEC:-}
   case "$exec_override" in
     '') return 2 ;;
     discard) return 0 ;;
     *)
-      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" >/dev/null 2>&1
+      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1
       rc=$?
       [ "$rc" -eq 0 ] && return 0
       log "wedge alarm: notifier override exited $rc for channel '$channel'"
@@ -1022,8 +1024,8 @@ wedge_alarm_via_osascript() {  # <summary>
   command -v osascript >/dev/null 2>&1 || {
     log "wedge alarm: osascript not found; cannot post a macOS notification"; return 1; }
   wedge_alarm_run_bounded osascript osascript -e 'on run argv' \
-    -e 'display notification (item 1 of argv) with title "firstmate: away-mode escalations WEDGED" sound name "Basso"' \
-    -e 'end run' "$summary" >/dev/null 2>&1 && return 0
+    -e 'display notification (item 1 of argv) with title (item 2 of argv) sound name "Basso"' \
+    -e 'end run' "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1 && return 0
   log "wedge alarm: osascript notification failed"
   return 1
 }
@@ -1040,7 +1042,7 @@ wedge_alarm_via_herdr() {  # <summary>
   esac
   command -v herdr >/dev/null 2>&1 || {
     log "wedge alarm: herdr not found; cannot post a herdr notification"; return 1; }
-  wedge_alarm_run_bounded herdr herdr notification show "firstmate: away-mode escalations WEDGED" \
+  wedge_alarm_run_bounded herdr herdr notification show "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" \
     --body "$summary" --sound request >/dev/null 2>&1 && return 0
   log "wedge alarm: herdr notification failed"
   return 1
@@ -1064,13 +1066,13 @@ wedge_alarm_via_command() {  # <cmd> <summary>
   return 1
 }
 
-wedge_alarm_emit() {  # <channel> <summary>
+wedge_alarm_emit() {  # <channel> <summary>; title: WEDGE_ALARM_TITLE
   local channel=$1 summary=$2 cmd=${3:-} rc exec_override=${FM_WEDGE_ALARM_EXEC:-} WEDGE_ALARM_EMIT_ACTIVE=1
   case "$exec_override" in
     '') ;;
     discard) return 0 ;;
     *)
-      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" >/dev/null 2>&1
+      wedge_alarm_run_bounded "$channel" "$exec_override" "$channel" "$summary" "${WEDGE_ALARM_TITLE:-$WEDGE_ALARM_TITLE_DEFAULT}" >/dev/null 2>&1
       rc=$?
       [ "$rc" -eq 0 ] && return 0
       log "wedge alarm: notifier override exited $rc for channel '$channel'"
@@ -1088,8 +1090,9 @@ wedge_alarm_emit() {  # <channel> <summary>
 # `off` directive disables the alert, regardless of position; an unresolvable
 # `auto` (no OS channel on this platform) logs that the durable marker is the
 # only signal. Every notifier routes through the test-forced recorder seam.
-wedge_alarm_notify() {  # <summary> <marker>
+wedge_alarm_notify() {  # <summary> <marker> [title]
   local summary=$1 marker=$2 ch
+  local WEDGE_ALARM_TITLE=${3:-$WEDGE_ALARM_TITLE_DEFAULT}
   local -a channels=()
   while IFS= read -r ch; do
     [ -n "$ch" ] || continue
@@ -1350,6 +1353,7 @@ housekeeping() {  # <state>
       [ -e "$f" ] || [ -L "$f" ] || continue
       [ "$f" = "$exclude" ] && continue
       task=$(basename "$f"); task="${task%.status}"
+      status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$f" || true
       record=$(status_span_first_actionable_record "$f" \
         "$(status_seen_offset "$state" "$task")")
       rc=$?
@@ -1568,6 +1572,7 @@ handle_wake() {  # <reason> <state>
               case "$arg" in *" ("*) stale_detail="${arg#*" ("}"; arg="${arg%% \(*}" ;; esac
               task=$(window_to_task "$arg" "$state")
               if [ -n "$task" ]; then
+                status_presentation_marker_adopt_device "$(_seen_status_path "$state" "$task")" "$state/$task.status" || true
                 span_record=$(status_span_first_actionable_record "$state/$task.status" \
                   "$(status_seen_offset "$state" "$task")")
                 span_rc=$?

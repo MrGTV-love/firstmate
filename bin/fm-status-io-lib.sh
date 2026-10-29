@@ -2,6 +2,9 @@
 
 _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
 
+# shellcheck source=bin/fm-file-identity-lib.sh
+. "$_FM_CLASSIFY_LIB_DIR/fm-file-identity-lib.sh"
+
 # Read the kernel name once at source time, not per status metadata lookup.
 # This also serves stdout helpers called through $(), where a lazy cache would
 # not persist. Reuse fm-wake-lib.sh's _FM_UNAME when already loaded; either value
@@ -21,6 +24,13 @@ case $- in *u*) _fm_classify_nounset=on ;; *) _fm_classify_nounset=off ;; esac
 . "$_FM_CLASSIFY_LIB_DIR/fm-timeout-lib.sh"
 [ "$_fm_classify_nounset" = on ] || set +u
 unset _fm_classify_nounset
+
+# The read limit and the tail window (bin/fm-status-cap-lib.sh owns both bounds and
+# their reasons) are applied once, here, so every caller that takes bytes from a
+# status log inherits them.
+# shellcheck source=bin/fm-status-cap-lib.sh
+# shellcheck disable=SC1091
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-cap-lib.sh"
 
 # Parameter expansion rather than dirname and basename: every presentation scan
 # asks for the cursor path of every task, and two child processes per call were
@@ -166,9 +176,13 @@ _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
 # unchanged. Consumers distinguish a missing manifest from a failed read of an
 # existing receipt, which must never become an empty or partial successful read.
 _fm_read_file_into() {  # <file> <out-var>
-  local __fm_rf_data='' __fm_rf_size LC_ALL=C
+  local __fm_rf_data='' __fm_rf_size __fm_rf_window LC_ALL=C
   _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
   case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
+  # The presentation manifest is one small row per task; one past the tail
+  # window is abnormal and is refused, not read.
+  fm_status_window_bytes __fm_rf_window
+  [ "$__fm_rf_size" -le "$__fm_rf_window" ] || return 1
   { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
   [ "${#__fm_rf_data}" -eq "$__fm_rf_size" ] || return 1
   printf -v "$2" '%s' "$__fm_rf_data"
@@ -190,25 +204,77 @@ _fm_status_span_scratch() {  # <status-file>
   printf '%s.span.%s' "$__fm_ss_cursor" "$$"
 }
 
-_fm_status_read_span() {  # <status-file> <start-offset> <byte-length>
-  local f=$1 start=$2 length=$3
+# Take exactly <byte-length> bytes of a status log from <start-offset>
+# (fm_status_read_exact, bin/fm-status-cap-lib.sh), or refuse: a span past the read
+# limit is refused, one line on stderr names the file, nothing is printed, and the
+# status is 2. The reader never prints a clipped copy, so a caller that turns the bytes
+# into a position (an endpoint, a line number, a cursor) always measures it against the
+# span it asked for, and a caller that fails on a read error leaves its saved position
+# where it was. The optional fourth argument is the line limit: the default refuses a
+# span with more lines than a shell loop should walk, and 0 asks for the byte limit
+# alone, for a caller that filters without a shell loop or needs an exact position.
+_fm_status_read_span() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
   if [ -n "${FM_STATUS_SPAN_READER:-}" ]; then
-    "$FM_STATUS_SPAN_READER" "$f" "$start" "$length"
+    "$FM_STATUS_SPAN_READER" "$1" "$2" "$3"
     return
   fi
-  perl -MFcntl=:DEFAULT -e '
-    my ($path, $start, $length) = @ARGV;
-    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
-    sysseek($file, $start, 0) == $start or exit 1;
-    while ($length > 0) {
-      my $want = $length > 65536 ? 65536 : $length;
-      my $read = sysread($file, my $chunk, $want);
-      defined($read) && $read > 0 or exit 1;
-      print $chunk or exit 1;
-      $length -= $read;
-    }
-  ' "$f" "$start" "$length"
+  fm_status_read_exact "$1" "$2" "$3" "${4-}"
 }
+
+# Whole-file readers use this instead of redirecting a status log: it prints the log
+# exactly when it is within the byte limit and refuses it, loudly, when it is not. It
+# takes the byte limit alone, never the line limit, because a history reader keeps no
+# checkpoint and rereads from byte 0: a line limit would refuse a healthy log far below
+# the cap on every call, and the harm a runaway does is its size in bytes.
+fm_status_cat() {  # <status-file>
+  local f=$1 __fm_wc_size
+  _fm_status_file_size "$f" __fm_wc_size || return 1
+  __fm_wc_size=${__fm_wc_size//[[:space:]]/}
+  case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$__fm_wc_size" -gt 0 ] || return 0
+  fm_status_read_exact "$f" 0 "$__fm_wc_size" 0
+}
+
+# The status lines on stdin that hold any of <word>s anywhere, in order. A fold runs this
+# one grep pass before its shell loop, so the loop walks only the lines whose verb can be
+# one of those words: a log of other lines, however many, costs the loop nothing.
+_fm_status_lines_with() {  # <word>...
+  local __fm_lw_word
+  local -a __fm_lw_args=()
+  for __fm_lw_word in "$@"; do __fm_lw_args+=(-e "$__fm_lw_word"); done
+  LC_ALL=C grep -aF "${__fm_lw_args[@]}" || [ "$?" -eq 1 ]
+}
+
+# 0 when a status sidecar (a fold cursor, the home-appends ledger) is small enough
+# to read whole: no larger than one tail window. A sidecar past that is abnormal, and
+# the readers answer it in two ways. The fold checkpoint parse
+# (_fm_open_decisions_checkpoint_parse) and the home-appends ranges read treat it as
+# absent and rebuild it from the log. status_open_decisions_cursor_offset fails closed
+# (status 1), as does _fm_read_file_into for a presentation manifest past the same
+# window, so the drain's presentation cursor reads fail until the sidecar is replaced.
+# The watcher guard (bin/fm-status-cap-guard.sh) raises the alarm for a sidecar once it
+# passes the cap.
+_fm_status_sidecar_fits() {  # <file>
+  local __fm_sf_size __fm_sf_window
+  _fm_status_file_size "$1" __fm_sf_size 2>/dev/null || return 1
+  __fm_sf_size=${__fm_sf_size//[[:space:]]/}
+  case "$__fm_sf_size" in ''|*[!0-9]*) return 1 ;; esac
+  fm_status_window_bytes __fm_sf_window
+  [ "$__fm_sf_size" -le "$__fm_sf_window" ]
+}
+
+# The last <lines> lines of a status log, read from at most its last tail window of
+# bytes: tail -n alone scans backwards for newlines, so a log that holds one
+# newline-free run of gigabytes would still be read whole. This is a tail read for a
+# caller that needs only the latest events; it never stands for the log's history.
+# A partial first line of a clamped read is the caller's tolerance, exactly as with
+# tail -n.
+fm_status_tail_lines() {  # <status-file> <lines>
+  local window
+  fm_status_window_bytes window
+  tail -c "$window" "$1" 2>/dev/null | head -c "$window" | tail -n "$2"
+}
+
 FM_STATUS_SNAPSHOT_EVENT_LINE=
 FM_STATUS_SNAPSHOT_EVENT_MTIME=
 FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=
@@ -243,7 +309,7 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   fi
   length=$((endpoint - start))
   scratch="$(_fm_status_span_scratch "$f").latest"
-  _fm_status_read_span "$f" "$start" "$length" > "$scratch" 2>/dev/null \
+  _fm_status_read_span "$f" "$start" "$length" 0 > "$scratch" 2>/dev/null \
     || { rm -f "$scratch"; return 1; }
   if record=$(LC_ALL=C perl -e '
     my ($path, $start, $skip_first) = @ARGV;
@@ -321,6 +387,136 @@ status_presentation_marker_parse() {
   STATUS_PRESENTATION_REPORTED=$reported
   STATUS_PRESENTATION_CLASSIFIED=$classified
 }
+# Split an r1 signature on NUL bytes, not on the substring "00" (a hex
+# substring can cross a byte boundary). Decode only identity; the other five
+# fields stay byte-exact hex, so path/access/type changes cannot be adopted.
+_status_reported_identity_into() {  # <signature> <identity-out> <other-fields-out>
+  local __fm_ri_hex=${1#r1:} __fm_ri_pair __fm_ri_field=0 __fm_ri_esc='' __fm_ri_other=''
+  case "$1" in r1:*) ;; *) return 1 ;; esac
+  case "$__fm_ri_hex" in ''|*[!0-9a-f]*) return 1 ;; esac
+  [ "$((${#__fm_ri_hex} % 2))" -eq 0 ] || return 1
+  while [ -n "$__fm_ri_hex" ]; do
+    __fm_ri_pair=${__fm_ri_hex:0:2}; __fm_ri_hex=${__fm_ri_hex:2}
+    if [ "$__fm_ri_pair" = 00 ]; then
+      __fm_ri_field=$((__fm_ri_field + 1))
+      __fm_ri_other="${__fm_ri_other}00"
+    elif [ "$__fm_ri_field" -eq 1 ]; then
+      __fm_ri_esc="${__fm_ri_esc}\\x${__fm_ri_pair}"
+    else
+      __fm_ri_other="${__fm_ri_other}${__fm_ri_pair}"
+    fi
+  done
+  [ "$__fm_ri_field" -eq 5 ] || return 1
+  printf -v "$2" '%b' "$__fm_ri_esc"
+  printf -v "$3" '%s' "$__fm_ri_other"
+}
+
+# The device number of a strong identity in an r1 signature, read by parameter
+# expansion alone: _status_reported_identity_into decodes every byte, which a
+# marker that merely lags its log cannot afford on every scan. The size field is
+# digit pairs or "size-error", which cannot hold the hex of "strong:" at any
+# nibble offset, so its first occurrence opens the identity; device digits are
+# "3<digit>" pairs, so the first 3a after it is the colon that ends the device.
+# <remainder-out> receives the signature without those device digits, so two
+# signatures differ only in their device exactly when their remainders match.
+# Any other shape fails: the signature holds no strong numeric device.
+_status_signature_device_into() {  # <signature> <device-out> <remainder-out>
+  local __fm_sd_hex=${1#r1:} __fm_sd_head __fm_sd_tail __fm_sd_dev='' __fm_sd_i
+  case "$1" in r1:*7374726f6e673a*) ;; *) return 1 ;; esac
+  __fm_sd_head=${__fm_sd_hex%%7374726f6e673a*}
+  __fm_sd_hex=${__fm_sd_hex#*7374726f6e673a}
+  case "$__fm_sd_hex" in *3a*) ;; *) return 1 ;; esac
+  __fm_sd_tail=${__fm_sd_hex#*3a}
+  __fm_sd_hex=${__fm_sd_hex%%3a*}
+  [ -n "$__fm_sd_hex" ] && [ -z "${__fm_sd_hex//3[0-9]/}" ] || return 1
+  for ((__fm_sd_i = 1; __fm_sd_i < ${#__fm_sd_hex}; __fm_sd_i += 2)); do
+    __fm_sd_dev="$__fm_sd_dev${__fm_sd_hex:__fm_sd_i:1}"
+  done
+  printf -v "$2" '%s' "$__fm_sd_dev"
+  printf -v "$3" '%s:%s' "$__fm_sd_head" "$__fm_sd_tail"
+}
+
+# A strong identity (device:inode:birth) that differs from another only in its
+# device number. A weak identity, which lacks a birth time, never qualifies.
+_fm_status_ident_device_shifted() {  # <recorded-identity> <current-identity>
+  case "$1" in strong:*:*:?*) ;; *) return 1 ;; esac
+  case "$2" in strong:*:*:?*) ;; *) return 1 ;; esac
+  fm_file_identity_device_shifted "${1#strong:}" "${2#strong:}"
+}
+
+# Explicit migration, separate from the pure marker readers below. The marker's
+# classified position migrates whenever its strong inode+birth are unchanged and
+# its offset is within the file: the offset is kept, so a log that grew past it
+# reads only the new bytes. The reported signature migrates only when every
+# other observed field is also unchanged; a grown or otherwise changed log keeps
+# its old signature and signals once. Never advance a classified offset or turn
+# a reported-but-unclassified state into a classified one. Revalidate the file
+# and marker immediately before atomic publication; failure leaves detection
+# conservative. The per-byte signature decode runs only when one of those
+# migrations is possible: the current signature holds a strong numeric device,
+# and either the reported signature differs from it in that device alone or the
+# classified identity is strong on another device. Every scan that reads a
+# marker calls this first.
+status_presentation_marker_adopt_device() {  # <marker> <status-file> [current-signature]
+  local marker=$1 file=$2 current=${3-} raw reported classified old_ident new_ident old_other new_other
+  local new_reported new_classified offset fresh fresh_ident='' fresh_size='' tmp new_dev old_dev new_rest old_rest classified_dev migratable=0
+  [ -f "$marker" ] && [ -r "$marker" ] && [ ! -L "$marker" ] || return 1
+  { IFS= read -r -d '' raw || :; } 2>/dev/null < "$marker" || return 1
+  while [ "${raw%$'\n'}" != "$raw" ]; do raw=${raw%$'\n'}; done
+  status_presentation_marker_parse "$raw" || return 1
+  reported=$STATUS_PRESENTATION_REPORTED
+  classified=$STATUS_PRESENTATION_CLASSIFIED
+  [ -n "$current" ] || current=$(status_observed_signature "$file") || return 1
+  [ "$reported" != "$current" ] || return 0
+  _status_signature_device_into "$current" new_dev new_rest || return 0
+  if _status_signature_device_into "$reported" old_dev old_rest \
+    && [ "$old_dev" != "$new_dev" ] && [ "$old_rest" = "$new_rest" ]; then
+    migratable=1
+  fi
+  if [ "$classified" != - ]; then
+    classified_dev=${classified#*@}
+    case "$classified_dev" in
+      strong:*)
+        classified_dev=${classified_dev#strong:}; classified_dev=${classified_dev%%:*}
+        [ "$classified_dev" = "$new_dev" ] || migratable=1
+        ;;
+    esac
+  fi
+  [ "$migratable" -eq 1 ] || return 0
+  _status_reported_identity_into "$current" new_ident new_other || return 1
+  new_reported=$reported
+  new_classified=$classified
+  if _status_reported_identity_into "$reported" old_ident old_other \
+    && [ "$old_other" = "$new_other" ] \
+    && _fm_status_ident_device_shifted "$old_ident" "$new_ident"; then
+    new_reported=$current
+  fi
+  if [ "$classified" != - ]; then
+    offset=${classified%%@*}
+    if _fm_status_ident_device_shifted "${classified#*@}" "$new_ident"; then
+      new_classified="${offset}@${new_ident}"
+    fi
+  fi
+  [ "$new_reported" != "$reported" ] || [ "$new_classified" != "$classified" ] || return 0
+  if [ "$new_reported" != "$reported" ]; then
+    fresh=$(status_observed_signature "$file") && [ "$fresh" = "$current" ] || new_reported=$reported
+  fi
+  if [ "$new_classified" != "$classified" ]; then
+    _fm_open_decisions_file_ident "$file" fresh_ident fresh_size || fresh_ident=
+    fresh_size=${fresh_size//[[:space:]]/}
+    case "$fresh_size" in ''|*[!0-9]*) fresh_size=-1 ;; esac
+    { [ "$fresh_ident" = "$new_ident" ] && [ "$offset" -le "$fresh_size" ]; } || new_classified=$classified
+  fi
+  [ "$new_reported" != "$reported" ] || [ "$new_classified" != "$classified" ] || return 1
+  [ "$(cat "$marker" 2>/dev/null)" = "$raw" ] || return 1
+  tmp=$(mktemp "$marker.device.XXXXXX") || return 1
+  if ! printf 'v2\t%s\t%s' "$new_reported" "$new_classified" > "$tmp" \
+    || ! mv -f "$tmp" "$marker"; then
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
 status_presentation_marker_reported_matches() {
   local raw
   # Read the marker with the shell's own read, not a cat process: this runs for

@@ -1,0 +1,7 @@
+schema=fm-remote-secondmate-control.v1
+backend=herdr
+target=fm-remote:w3:p2
+herdr_session=fm-remote
+harness=omp
+model=openai-codex/gpt-6.1-sol
+effort=high

@@ -1,0 +1,36 @@
+{
+  "schema": "fm-slack-replay.v1",
+  "team": "T0123456789",
+  "channel": "D0123456789",
+  "bot_user": "UBOT0123456",
+  "bot_id": "BBOT0123456",
+  "next_ts": 899,
+  "scopes": [
+    "chat:write",
+    "im:write",
+    "im:history",
+    "reactions:read",
+    "reactions:write",
+    "users:read"
+  ],
+  "users": {
+    "U0TESTOWNER": {
+      "is_bot": false
+    },
+    "U0123456789": {
+      "is_bot": false
+    },
+    "U0DISPLAYNAME": {
+      "is_bot": false
+    }
+  },
+  "messages": [
+    {
+      "ts": "900.000002",
+      "thread_ts": "900.000001",
+      "user": "U0TESTOWNER",
+      "text": "9"
+    }
+  ],
+  "reactions": {}
+}

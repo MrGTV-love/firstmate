@@ -76,9 +76,9 @@
 # succeeds; there is no separate allowlist version negotiation.
 #
 # shellcheck source=bin/fm-startup-memory-budget-lib.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-startup-memory-budget-lib.sh"
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-startup-memory-budget-lib.sh"
 # shellcheck source=bin/fm-role-lib.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-role-lib.sh"
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-role-lib.sh"
 
 # The one shared data file in this inheritance contract. There is deliberately
 # no shared learnings file.

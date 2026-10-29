@@ -28,6 +28,7 @@ APPLICABLE_VETO="$LAB/applicable-veto.json"
 MUSE_EXHAUSTED="$LAB/muse-exhausted.json"
 MUSE_POSITIVE="$LAB/muse-positive.json"
 AGY_POSITIVE="$LAB/agy-positive.json"
+DSH_POSITIVE="$LAB/dsh-positive.json"
 TOON="$LAB/quota.toon"
 RENDERER_TOON="$LAB/renderer-quota.toon"
 EMPTY_TOON="$LAB/empty-quota.toon"
@@ -574,6 +575,14 @@ if err=$(call_choose --snapshot "$AGY_POSITIVE" --candidate agy:default 2>&1); t
 fi
 printf '%s\n' "$err" | grep -F 'unknown harness: agy' >/dev/null || fail "legacy Agy rejection changed: $err"
 ok "Agy remains resolver-only"
+
+jq '.providers += [{"provider":"deepseek","windows":[],"quotaSemantics":{"status":"known","effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":25,"runway":{"status":"through_reset"}}]}}]' \
+  "$LAB/captured.json" > "$DSH_POSITIVE"
+if err=$(call_choose --snapshot "$DSH_POSITIVE" --candidate dsh:deepseek/deepseek-v4-flash 2>&1); then
+  fail "legacy quota chooser unexpectedly accepted dsh"
+fi
+[ "$err" = "error: unknown harness: dsh" ] || fail "legacy dsh rejection changed: $err"
+ok "dsh remains resolver-only"
 
 jq '.providers += [.providers[] | select(.provider == "claude")]' "$LAB/captured.json" > "$DUPLICATE"
 if err=$(call_choose --snapshot "$DUPLICATE" --candidate claude:default 2>&1); then

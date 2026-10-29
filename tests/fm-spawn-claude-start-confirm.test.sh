@@ -105,6 +105,28 @@ test_a_worker_parked_on_a_startup_dialog_is_reported() {
   pass "a claude worker parked on any of its startup dialogs is reported loudly and stays recorded"
 }
 
+test_a_refused_startup_report_is_surfaced_and_not_dropped() {
+  local id=parked-refused-z1 out size
+  make_case parked-refused "$id"
+  printf '%s\n' "$TRUST_SCREEN" > "$CASE_DIR/screen"
+  # A status log already past cap plus reserve refuses every line, the blocked: report
+  # included. The spawn still reports the parked worker, and it must say that the
+  # report did not land: the file, the writer's refusal and the exit status.
+  head -c 6000 /dev/zero | tr '\0' 'x' > "$HOME_DIR/state/$id.status"
+  printf '\n' >> "$HOME_DIR/state/$id.status"
+  size=$(wc -c < "$HOME_DIR/state/$id.status" | tr -d ' ')
+  FM_STATUS_CAP_BYTES=4096 FM_STATUS_CAP_RESERVE_BYTES=512 spawn_ship "$id"
+  expect_code 0 "$SPAWN_RC" "a parked launch is reported, not failed: $SPAWN_OUT"
+  assert_contains "$SPAWN_OUT" "warning: claude worker $id is stopped on its startup dialog" \
+    "the spawn stayed silent about the dialog"
+  assert_contains "$SPAWN_OUT" "fm-status-append: refused:" "the writer's refusal was dropped: $SPAWN_OUT"
+  assert_contains "$SPAWN_OUT" "$HOME_DIR/state/$id.status" "the refusal does not name the status file: $SPAWN_OUT"
+  assert_contains "$SPAWN_OUT" "(exit 75)" "the refusal does not carry the exit status: $SPAWN_OUT"
+  out=$(wc -c < "$HOME_DIR/state/$id.status" | tr -d ' ')
+  [ "$out" = "$size" ] || fail "a refused report changed the status log ($size -> $out)"
+  pass "a startup report the capped writer refuses is surfaced on the spawn's stderr with the file, the refusal and the exit status"
+}
+
 test_a_worker_with_proof_of_a_started_turn_is_not_reported() {
   local id out pair name screen state event
   for pair in "imports|$IMPORTS_SCREEN" "trust|$TRUST_SCREEN" \
@@ -175,6 +197,7 @@ test_an_unreadable_pane_does_not_stall_the_spawn() {
 }
 
 test_a_worker_parked_on_a_startup_dialog_is_reported
+test_a_refused_startup_report_is_surfaced_and_not_dropped
 test_a_worker_with_proof_of_a_started_turn_is_not_reported
 test_a_pane_with_no_dialog_and_no_proof_is_not_reported
 test_a_dialog_answered_during_the_window_is_not_reported

@@ -6,7 +6,9 @@
 # process as the session-socket owner, and real holder processes whose
 # environment and ancestry carry the birth markers the guard reads. It pins
 # the decision table: no server -> start; an Aqua-born owner -> leave it; an
-# SSH-born or unprovable owner -> stop it, wait for the socket, start. Nothing
+# SSH-born or unprovable owner -> stop it, wait for the socket, start; a failed
+# status, an unproven stop, or an unreleased socket -> keep waiting with no
+# deadline, never a second server. Nothing
 # here touches the runner's own herdr servers, launch agents, or login
 # session, and no live harness guard applies: the verdict comes from process
 # environment and ancestry, which are kernel facts rather than vendor output.
@@ -36,7 +38,8 @@ trap cleanup_holders EXIT
 GUARD="$ROOT/bin/fm-remote-herdr-guard.sh"
 JQ=$(command -v jq)
 PYTHON=$(command -v python3)
-SESSION=fm-remote
+# A per-run name keeps the real absence proof clear of a host's own fm-remote server.
+SESSION=fm-remote-t$$
 
 # The guard must see only the fixture and the system tools it really needs,
 # so a case can also present a host with NO lsof.
@@ -77,6 +80,25 @@ printf '%s\n' "$*" >> "$FM_FAKE_HERDR_LOG"
 running=$(cat "$FM_FAKE_HERDR_RUNNING" 2>/dev/null || printf 'false')
 case "$*" in
   "status --json --session "*)
+    if [ -f "$FM_FAKE_STATE/status-fail-count" ]; then
+      left=$(cat "$FM_FAKE_STATE/status-fail-count")
+      [ "$left" = always ] && exit 1
+      if [ "$left" -gt 0 ]; then
+        printf '%s\n' "$((left - 1))" > "$FM_FAKE_STATE/status-fail-count"
+        exit 1
+      fi
+    fi
+    if [ -f "$FM_FAKE_STATE/comes-back-after" ]; then
+      left=$(cat "$FM_FAKE_STATE/comes-back-after")
+      if [ "$left" -gt 0 ]; then
+        printf '%s\n' "$((left - 1))" > "$FM_FAKE_STATE/comes-back-after"
+      else
+        rm -f "$FM_FAKE_STATE/comes-back-after"
+        printf 'true\n' > "$FM_FAKE_HERDR_RUNNING"
+        cp "$FM_FAKE_STATE/comes-back-owner" "$FM_FAKE_SOCKET_OWNER"
+        running=true
+      fi
+    fi
     if [ -f "$FM_FAKE_STATE/release-after" ]; then
       left=$(cat "$FM_FAKE_STATE/release-after")
       if [ "$left" -gt 0 ]; then
@@ -91,7 +113,20 @@ case "$*" in
       "$running" "$FM_FAKE_HERDR_SOCKET"
     ;;
   "server stop --session "*)
-    if [ -f "$FM_FAKE_STATE/stop-ignored" ]; then
+    if [ -f "$FM_FAKE_STATE/stop-comes-back-once" ]; then
+      cp "$FM_FAKE_STATE/stop-comes-back-once" "$FM_FAKE_STATE/comes-back-after"
+      rm "$FM_FAKE_STATE/stop-comes-back-once"
+      printf 'false\n' > "$FM_FAKE_HERDR_RUNNING"
+    elif [ -f "$FM_FAKE_STATE/stop-replaced-by" ]; then
+      cp "$FM_FAKE_STATE/stop-replaced-by" "$FM_FAKE_SOCKET_OWNER"
+      rm "$FM_FAKE_STATE/stop-replaced-by"
+    elif [ -f "$FM_FAKE_STATE/stop-fails" ]; then
+      cp "$FM_FAKE_STATE/stop-fails" "$FM_FAKE_STATE/status-fail-count"
+      exit 1
+    elif [ -f "$FM_FAKE_STATE/stop-fails-stopped" ]; then
+      printf 'false\n' > "$FM_FAKE_HERDR_RUNNING"
+      exit 1
+    elif [ -f "$FM_FAKE_STATE/stop-ignored" ]; then
       exit 0
     elif [ -f "$FM_FAKE_STATE/stop-releases-after" ]; then
       cp "$FM_FAKE_STATE/stop-releases-after" "$FM_FAKE_STATE/release-after"
@@ -223,6 +258,58 @@ guard() { # [extra env assignments...]
   set -e
 }
 
+guard_bg() { # starts the guard in the background -> GUARD_PID, output in $CASE_STATE/guard.out
+  env -i PATH="$CASE_PATH" HOME="$TMP_ROOT" \
+    FM_FAKE_STATE="$CASE_STATE" FM_FAKE_HERDR_LOG="$CASE_LOG" FM_FAKE_HERDR_RUNNING="$CASE_RUNNING" \
+    FM_FAKE_SOCKET_OWNER="$CASE_OWNER" FM_FAKE_HERDR_SOCKET="$CASE_SOCKET" \
+    FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS=8 \
+    "$GUARD" "$FAKE/herdr" "$SESSION" > "$CASE_STATE/guard.out" 2>&1 &
+  GUARD_PID=$!
+}
+
+wait_for_output() { # <text>
+  local n=0
+  while ! grep -F -- "$1" "$CASE_STATE/guard.out" >/dev/null 2>&1; do
+    n=$((n + 1))
+    [ "$n" -le $((FM_TEST_STUB_MAX_BLOCK_SECONDS * 10)) ] || fail "the guard never printed: $1"$'\n'"$(cat "$CASE_STATE/guard.out")"
+    sleep 0.1
+  done
+}
+
+# live_twin -> TWIN_PID: a real process whose argv is `<dir>/herdr server
+# --session <session>`, the old server a failed status must not be replaced over.
+live_twin() {
+  mkdir -p "$TMP_ROOT/twin"
+  printf '#!%s\nimport time; time.sleep(%s)\n' "$("$PYTHON" -c 'import sys; print(sys.executable)')" \
+    "$FM_TEST_STUB_MAX_BLOCK_SECONDS" > "$TMP_ROOT/twin/herdr"
+  chmod +x "$TMP_ROOT/twin/herdr"
+  "$TMP_ROOT/twin/herdr" server --session "$SESSION" &
+  TWIN_PID=$!
+  HOLDER_PIDS+=("$TWIN_PID")
+  local n=0
+  until ps -p "$TWIN_PID" -o command= 2>/dev/null | grep -F -- "twin/herdr server --session $SESSION" >/dev/null; do
+    n=$((n + 1))
+    [ "$n" -le $((FM_TEST_STUB_MAX_BLOCK_SECONDS * 10)) ] || fail "the live twin process never appeared"
+    sleep 0.1
+  done
+}
+
+# assert_still_waiting <notice> <msg>: the backgrounded guard printed <notice>
+# and is still alive, waiting, with no server started.
+assert_still_waiting() {
+  wait_for_output "$1"
+  /bin/sleep 0.5
+  kill -0 "$GUARD_PID" 2>/dev/null || fail "$2: the guard exited instead of waiting"$'\n'"$(cat "$CASE_STATE/guard.out")"
+  assert_not_started "$2: a second server started"
+}
+
+stop_guard() {
+  kill "$GUARD_PID" 2>/dev/null || true
+  wait "$GUARD_PID" 2>/dev/null || true
+}
+
+UNRELEASED_NOTICE='has not released its socket after 8 tenths of a second; still waiting'
+
 herdr_calls() { cat "$CASE_LOG"; }
 assert_started() { # <msg>
   [ -f "$CASE_STATE/started" ] || fail "$1"
@@ -280,6 +367,7 @@ expect_code 0 "$GUARD_RC" "the guard failed when no server owned the session"
 assert_started "the guard did not start the server when none owned the session"
 assert_not_contains "$(herdr_calls)" 'server stop' "the guard stopped something when no server owned the session"
 assert_contains "$GUARD_OUT" "no server owns session $SESSION" "the guard did not report the empty session"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "a proven-absent session must start exactly one server"
 pass "an empty session is started inside the launch agent"
 
 # --- an Aqua-born owner is left alone ----------------------------------------
@@ -459,17 +547,74 @@ assert_contains "$GUARD_OUT" 'lsof does not resolve' "the guard did not report t
 assert_stop_before_start
 pass "a host without lsof cannot prove an Aqua birth, so the session is taken over"
 
-# --- a foreign owner that keeps the socket makes the guard fail for a retry --
+# --- a foreign owner that keeps the socket leaves the guard waiting -----------
 
 new_case running
 printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
 touch "$CASE_STATE/stop-ignored"
-guard
-expect_code 1 "$GUARD_RC" "the guard did not exit 1 when the foreign server kept its socket"
-assert_not_started "the guard started a server while the foreign one still held the socket"
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a foreign server kept its socket"
+/bin/sleep 10
+kill -0 "$GUARD_PID" 2>/dev/null || fail "the guard stopped waiting on a foreign server that kept its socket"
+stop_guard
+polls=$(grep -c "^status --json --session $SESSION$" "$CASE_LOG")
+[ "$polls" -le 12 ] || fail "the takeover re-check did not back off: $polls status reads in about 11 seconds"
 assert_contains "$(herdr_calls)" "server stop --session $SESSION" "the guard never asked the foreign server to stop"
-assert_contains "$GUARD_OUT" 'did not release its socket within 8 tenths' "the guard did not report the bounded wait"
-pass "a foreign server that never releases the socket yields exit 1 so launchd retries"
+[ "$(grep -c "$UNRELEASED_NOTICE" "$CASE_STATE/guard.out")" = 1 ] || fail "the long-wait notice was not logged exactly once"
+pass "a foreign server that never releases the socket leaves the guard waiting, with one notice"
+
+# --- a different server during a takeover re-runs the ownership decision -----
+
+# The released session passes the guard's own absence read, then a server comes
+# up before the start-lock holder re-reads status: another starter won the lock.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+load_job gui dev.firstmate.herdr.fm-remote "$LAUNCHD_PID"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$LAUNCHD_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not settle on an Aqua server that came up under the start lock"
+assert_not_started "the guard started a second server beside one that came up under the start lock"
+assert_contains "$GUARD_OUT" "came up under the start lock" "the guard did not report the server that won the start lock"
+assert_contains "$GUARD_OUT" "pid $LAUNCHD_PID born in the Aqua login session (launchd); nothing to do" \
+  "the guard did not re-run the ownership decision for the server that won the start lock"
+
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$SSH_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not take over a foreign server that came up under the start lock"
+assert_contains "$GUARD_OUT" "pid $SSH_PID born outside the Aqua login session (ssh)" \
+  "the guard did not re-run the ownership decision for the foreign server that won the start lock"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the new foreign server over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after the second takeover"
+# The same pid keeps the socket, so only the start-lock verdict shows that the
+# server running now is not the one this takeover stopped.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '1\n' > "$CASE_STATE/stop-comes-back-once"
+printf '%s\n' "$UNMARKED_PID" > "$CASE_STATE/comes-back-owner"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not re-judge a server that came up under the start lock with the same socket owner"
+assert_contains "$GUARD_OUT" "came up under the start lock" "the guard did not report the server that won the start lock"
+assert_contains "$GUARD_OUT" "did not stop; re-running the ownership decision" \
+  "the start-lock verdict alone did not send the guard back to the ownership decision"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the start-lock winner over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after re-judging"
+pass "a server that wins the start lock during a takeover gets a fresh ownership decision"
+
+# A reconnecting SSH attach replaces the stopped server before the re-check.
+new_case running
+printf '%s\n' "$UNMARKED_PID" > "$CASE_OWNER"
+printf '%s\n' "$SSH_PID" > "$CASE_STATE/stop-replaced-by"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not take over the server that replaced the stopped one"
+assert_contains "$GUARD_OUT" "did not stop; re-running the ownership decision" "the guard did not notice the replaced socket owner"
+assert_contains "$GUARD_OUT" "pid $SSH_PID born outside the Aqua login session (ssh)" "the guard did not judge the replacing server"
+[ "$(grep -c "^server stop --session $SESSION$" "$CASE_LOG")" = 2 ] || fail "the guard did not take the replacing server over"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard did not start exactly one server after taking the replacement over"
+pass "a foreign server that replaces the stopped one between stop and re-check is taken over"
 
 # --- the release wait is polled, not assumed ---------------------------------
 
@@ -483,6 +628,61 @@ assert_contains "$GUARD_OUT" 'released its socket after' "the guard did not repo
 [ "$(grep -c "^status --json --session $SESSION$" "$CASE_LOG")" -ge 4 ] \
   || fail "the guard did not keep polling the session status until the socket was released"
 pass "the guard starts as soon as the foreign server releases the socket"
+
+# --- a failed status or an unproven stop never starts a second server --------
+
+new_case running
+printf '%s\n' "$LAUNCHD_PID" > "$CASE_OWNER"
+load_job gui dev.firstmate.herdr.fm-remote "$LAUNCHD_PID"
+printf '2\n' > "$CASE_STATE/status-fail-count"
+guard
+expect_code 0 "$GUARD_RC" "the guard did not settle on the live owner once status answered"
+assert_not_started "a failed status started a second server beside the live one"
+assert_contains "$GUARD_OUT" "herdr status failed; waiting and re-checking" "the guard did not say why it waited"
+[ "$(grep -c 'herdr status failed' <<<"$GUARD_OUT")" = 1 ] || fail "the guard repeated an unchanged wait reason"
+pass "a failed status while the old server is alive waits and starts nothing"
+
+live_twin
+new_case stopped
+guard_bg
+wait_for_output "server process and socket absence is unproven; waiting"
+assert_not_started "a stopped status started a second server beside a live server process"
+kill "$TWIN_PID" 2>/dev/null || true
+wait "$TWIN_PID" 2>/dev/null || true
+set +e
+wait "$GUARD_PID"
+rc=$?
+set -e
+expect_code 0 "$rc" "the guard failed after the old server process exited"
+assert_started "the guard did not start once the old server process was gone"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the guard started more than one server"
+pass "a stopped status starts only after the old server process is proven gone"
+
+new_case running
+printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
+printf 'always\n' > "$CASE_STATE/stop-fails"
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a failed server stop with failing status"
+stop_guard
+assert_contains "$(cat "$CASE_STATE/guard.out")" "herdr status failed; waiting and re-checking" "the takeover did not say why it waited"
+pass "a failed takeover stop with failing status keeps waiting and starts no second server"
+
+live_twin
+new_case running
+printf '%s\n' "$SSH_PID" > "$CASE_OWNER"
+touch "$CASE_STATE/stop-fails-stopped"
+guard_bg
+assert_still_waiting "$UNRELEASED_NOTICE" "a failed takeover stop beside the live server process"
+assert_contains "$(cat "$CASE_STATE/guard.out")" "server process and socket absence is unproven" "the takeover did not report the unproven stop"
+kill "$TWIN_PID" 2>/dev/null || true
+wait "$TWIN_PID" 2>/dev/null || true
+set +e
+wait "$GUARD_PID"
+rc=$?
+set -e
+expect_code 0 "$rc" "the guard failed after the old server process exited"
+[ "$(grep -c "^server --session $SESSION$" "$CASE_LOG")" = 1 ] || fail "the takeover did not start exactly one server once the old process was gone"
+pass "a failed takeover stop whose status says stopped waits for the old process, then starts one server"
 
 # --- usage errors never touch a server ---------------------------------------
 

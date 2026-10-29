@@ -532,7 +532,7 @@ scan_landed_awaiting_cleanup() {  # -> <task>\t<url> rows
 
 render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-ok>
   local evidence=$1 blockers=$2 since=$3 drain_ok=$4 now record superseded superseded_at archive_dir stamp
-  local tag task key summary count routine routine_visible captain visible_outcomes live held_err last verb rows status url drained=0 pointer
+  local tag task key summary count routine routine_visible captain visible_outcomes live held_err last verb rows status url drained=0 pointer open
   now=$(date +%s)
   # Where main processes outcomes through the drain's BRANCH OUTCOMES section
   # (the supervision host off Pi, docs/supervision-host.md "Captain outcomes"),
@@ -606,12 +606,17 @@ render_return_brief() {  # <evidence-file> <blockers-file> <since-epoch> <drain-
     task=$(basename "$meta"); task=${task%.meta}
     status="$STATE/$task.status"
     status_path_readable "$status" || continue
+    if ! open=$(status_open_decisions "$status"); then
+      count=$((count + 1))
+      printf '  - %s: its open decisions are unknown, the status log %s cannot be read; catch-up stays gated\n' "$task" "$status"
+      continue
+    fi
     while IFS="$(printf '\t')" read -r key verb summary; do
       [ "$verb" = needs-decision ] || continue
       count=$((count + 1))
       printf '  - %s [key=%s] needs your decision: %s\n' "$task" "$key" "$(printf '%s' "$summary" | clean_field)"
     done <<EOF
-$(status_open_decisions "$status")
+$open
 EOF
   done
   rows=$(printf '%s\n' "$STORE_ROWS" | awk -F '\t' '$3 == "captain" && $6 != "true" { printf "  - %s: %s\n", $2, $5 }')

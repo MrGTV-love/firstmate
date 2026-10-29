@@ -397,7 +397,7 @@ fm_supervision_engine_turn() {
     # of a second: the turn closes promptly when the engine dies while the
     # process-table scans keep their one-second cadence.
     i=0
-    while [ "$i" -lt 10 ] && fm_pid_alive "$watched"; do
+    while [ "$i" -lt 10 ] && kill -0 "$watched" 2>/dev/null; do
       sleep 0.1
       i=$((i + 1))
     done

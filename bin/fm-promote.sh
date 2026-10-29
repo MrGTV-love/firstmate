@@ -11,7 +11,11 @@
 # bin/fm-dod-lib.sh, the single owner an ordinary ship brief also uses - the
 # mode-specific Definition of done, so a promoted worker receives exactly the same
 # delivery contract as a briefed one, including the no-mistakes mode's ask-user
-# escalation rule and --yes ban. The instructions also carry `# Task` with
+# escalation rule, --yes ban and separate verification-plan instructions.
+# The plan is built from the durable brief: it labels the original task DoD and
+# exclusions as scout-time context, says the promoted ship intent governs on
+# conflict, and never treats promotion's build steps as captain intent.
+# The instructions also carry `# Task` with
 # `## Captain's intent` preserved from the scout brief and promotion's ship-time
 # instructions under `## Firstmate spec`; the scout-time spec remains context but
 # is not relabeled as the ship spec. Promotion refuses leftover `{TASK}` /
@@ -23,7 +27,7 @@
 # A scout records no delivery posture, so promotion is where this task's delivery
 # contract is decided: --mode, --yolo, and the ship branch resolved from
 # --branch-prefix are written into the meta alongside the kind= flip. Firstmate resolves all three at promotion time, having just
-# read the scout's report (AGENTS.md section 7); data/projects.md holds the
+# read the scout's report (AGENTS.md section 7 and the crew-brief-authoring skill); data/projects.md holds the
 # captain's standing posture as context, and this script never looks that posture
 # up. The registry IS read for one thing only: the project's forge binding, which
 # is a project fact rather than a per-task decision, so promotion takes it from
@@ -248,8 +252,19 @@ PROMOTE_CONSENT_WORDS=
 [ -z "$UPSTREAM_CONSENT" ] || PROMOTE_CONSENT_WORDS=" upstream-consent=$UPSTREAM_CONSENT"
 
 SCOUT_BRIEF="$DATA/$ID/brief.md"
-if fm_brief_task_placeholders_present "$SCOUT_BRIEF"; then
-  echo "error: $SCOUT_BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" >&2
+# Promotion re-checks only the two Task bodies, the scope it has always
+# enforced: the Definition of Done was accepted at the scout's fresh spawn and
+# promotion does not re-litigate it. The helper still lists both leftover
+# bodies in one pass instead of stopping at the first.
+if DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$SCOUT_BRIEF" task-only); then
+  echo "error: $SCOUT_BRIEF cannot be promoted; every unfinished Task body or malformed input is listed once:" >&2
+  while IFS= read -r line; do
+    printf '  %s\n' "$line" >&2
+  done <<EOF
+$DISPATCH_PROBLEMS
+EOF
+  echo "error: preserve the original ask in ## Captain's intent and fill the scout-time ## Firstmate spec; promotion generates a separate ship-time spec" >&2
+  printf "error: repair: edit %s and replace {TASK} in ## Captain's intent and {FIRSTMATE_SPEC} in ## Firstmate spec before promotion\n" "$SCOUT_BRIEF" >&2
   exit 1
 fi
 if ! fm_brief_task_content_valid "$SCOUT_BRIEF"; then
@@ -312,7 +327,7 @@ EOF
     printf '%s\n' "$PROMOTION_ASK_USER_BLOCK"
   fi
   printf '\n'
-  fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT"
+  fm_dod_block "$MODE" "$ID" "$BRANCH" "$FORGE" "$BASE_BRANCH" "$UPSTREAM_CONSENT" "$SCOUT_BRIEF"
 }
 mkdir -p "$DATA/$ID"
 [ ! -d "$INSTRUCTIONS" ] || { echo "error: ship instructions path is a directory: $INSTRUCTIONS" >&2; exit 1; }

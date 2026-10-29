@@ -56,7 +56,7 @@
 
 set -u
 
-FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+FM_SM_LIVE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd -- "${d:-/}" && pwd -P)"
 
 # shellcheck source=bin/fm-backend.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-backend.sh"

@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Full remote secondmate lifecycle over the deterministic generic SSH boundary.
+# On the Ubuntu 26.04 runner this suite grew about 1.6x (564382 to 898093 ms),
+# and the cause of that growth is unproven.
+# The blocked-write waits below are 120-second wall-clock hang tripwires, not
+# slack for that growth, and they must not be raised further.
+# docs/fm-test-portable-shards.md records the CI run that passed this suite on
+# that image.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -288,6 +294,9 @@ publish_healthy_watcher_identity() { # <state> <home> <watch-script>
 }
 
 remote_env() {
+  # Keep this lifecycle fixture's inputs explicit: unrelated production defaults
+  # must not add remote jobs before its bounded inheritance/launch barriers.
+  FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json crew-harness backend' \
   FM_HOME="$PARENT" \
   FM_ROOT_OVERRIDE="$REMOTE_ROOT" \
   FM_PROCEVENT_CLAIM_ROOT="$CLAIMS" \
@@ -596,6 +605,40 @@ assert_no_grep '- seed-fail ' "$TMP_ROOT/seed-parent/data/secondmates.md" "faile
 assert_grep '- seed-keep ' "$TMP_ROOT/seed-parent/data/secondmates.md" "failed seed rollback removed a competing successful route"
 assert_present "$TMP_ROOT/seed-keep-home/.fm-secondmate-home" "serialized seed lost its published remote home"
 pass "remote seed rollback preserves serialized competing routes"
+
+# The parent's code root and the remote host's code clone are different directories on
+# different machines. The charter's status command runs a helper from the code root, so
+# the seeded copy must run it from <remote-root>, and that command must work there: run
+# from the remote home as the remote worker would run it, it appends one line to the
+# remote relay log through the capped writer.
+SEED_PARENT_ROOT="$TMP_ROOT/seed-parent-code"
+mkdir -p "$SEED_PARENT_ROOT"
+(cd "$ROOT" && tar --exclude=.git --exclude=.no-mistakes --exclude=data --exclude=state --exclude=config -cf - .) | (cd "$SEED_PARENT_ROOT" && tar -xf -)
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" init -q -b main
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" add .
+"$REAL_GIT" -C "$SEED_PARENT_ROOT" -c user.email=test@example.com -c user.name=Test commit -qm 'parent fixture root'
+[ "$SEED_PARENT_ROOT" != "$REMOTE_ROOT" ] || fail "the fixture's parent and remote code roots must differ"
+FM_SECONDMATE_CHARTER='Two roots charter.' FM_SECONDMATE_SCOPE='two roots' \
+  seed_env env FM_ROOT_OVERRIDE="$SEED_PARENT_ROOT" "$SEED_PARENT_ROOT/bin/fm-remote-home-seed.sh" \
+  seed-roots remote-mac "$REMOTE_ROOT" "$TMP_ROOT/seed-roots-home" --no-projects \
+  > "$TMP_ROOT/seed-roots.out" 2>&1 \
+  || fail "seeding with a parent code root that differs from the remote root failed: $(cat "$TMP_ROOT/seed-roots.out")"
+SEED_ROOTS_CHARTER="$TMP_ROOT/seed-roots-home/data/charter.md"
+assert_present "$SEED_ROOTS_CHARTER" "the two-root seed published no charter"
+assert_no_grep "$SEED_PARENT_ROOT/bin/" "$SEED_ROOTS_CHARTER" "the remote charter still names a helper in the parent machine's code root"
+assert_grep "$REMOTE_ROOT/bin/fm-status-append.sh" "$SEED_ROOTS_CHARTER" "the remote charter does not run the status helper from the remote code root"
+# shellcheck disable=SC2016 # The sed program matches literal backticks in the charter.
+seed_roots_cmd=$(sed -n '/`[^`]*fm-status-append\.sh[^`]*{state}/s/.*`\([^`]*fm-status-append\.sh[^`]*\)`.*/\1/p' "$SEED_ROOTS_CHARTER" | head -1)
+[ -n "$seed_roots_cmd" ] || fail "the remote charter carries no status command"
+seed_roots_cmd=${seed_roots_cmd//\{state\}/working}
+seed_roots_cmd=${seed_roots_cmd//\{one short line\}/from the remote worker}
+seed_roots_cmd=${seed_roots_cmd//<epoch>/1790000000}
+mkdir -p "$TMP_ROOT/seed-roots-home/state"
+(cd "$TMP_ROOT/seed-roots-home" && bash -c "$seed_roots_cmd") >/dev/null 2>"$TMP_ROOT/seed-roots-cmd.err" \
+  || fail "the remote charter's status command failed on the remote host: $(cat "$TMP_ROOT/seed-roots-cmd.err")"
+assert_grep 'working [at=1790000000]: from the remote worker' "$TMP_ROOT/seed-roots-home/state/parent-replies.status" \
+  "the remote charter's status command did not append to the remote relay log"
+pass "a remote charter runs its status helper from the remote code root, and the command works there"
 
 : > "$DOCTOR_LOG"
 if FM_SECONDMATE_CHARTER='Unknown readiness charter.' FM_SECONDMATE_SCOPE='unknown readiness' \
@@ -972,6 +1015,35 @@ assert_contains "$out" "schema=fm-remote-secondmate-control.v1" "ordinary host-l
 cmp -s "$TMP_ROOT/remote-before-policy.meta" "$REMOTE_HOME/state/parent-route/ios.meta" || fail "ordinary alive reuse changed endpoint metadata"
 pass "host-local launch refuses policy before dead-endpoint removal and keeps ordinary alive reuse"
 
+# The host's stay runs the ordinary local control plane against this endpoint's
+# private state. The fixture's synthetic agent cannot prove live launch
+# ownership, so it must stop at that gate without sending any pane input, and
+# only the exact one-argument form is accepted.
+cp "$REMOTE_HOME/state/parent-route/ios.meta" "$TMP_ROOT/remote-before-stay.meta"
+herdr_input_count() { grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true; }
+stay_inputs=$(herdr_input_count)
+stay_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios 2>&1)
+stay_rc=$?
+[ "$stay_rc" -ne 0 ] || fail "host-local stay accepted an agent it cannot attribute to the task"
+assert_contains "$stay_out" 'cannot positively attribute its live Herdr agent to this task; refusing lifecycle input' \
+  "host-local stay did not reach the ordinary control plane's ownership gate"
+[ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a refused host-local stay sent pane or tab input"
+for stay_extra in '' 'extra'; do
+  if [ -z "$stay_extra" ]; then
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay 2>&1)
+  else
+    stay_arity_out=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios "$stay_extra" 2>&1)
+  fi
+  stay_arity_rc=$?
+  [ "$stay_arity_rc" -ne 0 ] || fail "host-local stay accepted the wrong number of arguments (extra='$stay_extra')"
+  assert_contains "$stay_arity_out" 'fm-remote-secondmate-control.sh stay <id>' \
+    "host-local stay arity refusal did not print usage (extra='$stay_extra')"
+  [ "$(herdr_input_count)" = "$stay_inputs" ] || fail "a wrong-arity host-local stay sent pane or tab input (extra='$stay_extra')"
+done
+cmp -s "$TMP_ROOT/remote-before-stay.meta" "$REMOTE_HOME/state/parent-route/ios.meta" \
+  || fail "a refused host-local stay rewrote endpoint metadata"
+pass "host-local stay reaches the ordinary control plane's ownership gate, accepts exactly one id, and sends nothing"
+
 remote_route_meta="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$remote_route_meta" "$TMP_ROOT/remote-ios-before-default-session.meta"
 legacy_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
@@ -986,6 +1058,7 @@ cp "$HERDR_LOG" "$TMP_ROOT/herdr-before-default-session.log"
 if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh route ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh send ios probe >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh key ios Enter >/dev/null 2>&1 \
+  || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh stay ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh capture ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh observe ios >/dev/null 2>&1 \
   || remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh retire ios --force >/dev/null 2>&1 \
@@ -1074,16 +1147,18 @@ EOF
 FM_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-concurrent.out" 2>&1 &
 spawn_concurrent=$!
-spawn_inherit_wait=0
-# Earlier inherited files traverse the worker before captain-shared.md, so give
-# a loaded portable runner 30 seconds to reach this deliberately blocked write.
+# Earlier inherited files traverse the worker before captain-shared.md. The
+# bound here measures how fast a loaded runner can walk them, not a property
+# under test, so it is wall clock and not an iteration count: 1500 turns of a
+# 0.02s sleep gave a loaded 26.04 runner roughly 35 seconds and it had not
+# arrived, while the same code reaches the write quickly on a quieter host.
+spawn_inherit_deadline=$((SECONDS + 120))
 while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
   kill -0 "$spawn_concurrent" 2>/dev/null \
     || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn exited before its blocked inheritance write"; }
-  spawn_inherit_wait=$((spawn_inherit_wait + 1))
-  [ "$spawn_inherit_wait" -le 1500 ] \
+  [ "$SECONDS" -lt "$spawn_inherit_deadline" ] \
     || { cat "$TMP_ROOT/spawn-concurrent.out"; fail "remote spawn never reached its blocked inheritance write"; }
-  sleep 0.02
+  sleep 0.05
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
@@ -1188,14 +1263,13 @@ EOF
 FM_FAKE_SSH_MODE=inherit-block remote_env "$ROOT/bin/fm-config-push.sh" \
   > "$TMP_ROOT/config-concurrent-first.out" 2>&1 &
 config_first=$!
-inherit_wait=0
+inherit_deadline=$((SECONDS + 120))
 while [ ! -f "$TMP_ROOT/inherit.entered" ]; do
   kill -0 "$config_first" 2>/dev/null || fail "first inheritance transaction exited before its blocked write"
-  inherit_wait=$((inherit_wait + 1))
-  # Match the earlier spawn/inheritance wait: a loaded portable runner can
-  # spend several seconds in the remote entrypoint before reaching this write.
-  [ "$inherit_wait" -le 1500 ] || fail "first inheritance transaction never reached its blocked write"
-  sleep 0.02
+  # Wall clock for the same reason as the earlier wait: this bounds host speed,
+  # not a property, and 1500 turns of a 0.02s sleep was not enough under load.
+  [ "$SECONDS" -lt "$inherit_deadline" ] || fail "first inheritance transaction never reached its blocked write"
+  sleep 0.05
 done
 cat > "$PARENT/data/captain-shared.md" <<'EOF'
 # Shared captain preferences
@@ -1688,14 +1762,13 @@ rm -f "$TMUX_STATE" "$TMP_ROOT/launch.entered" "$TMP_ROOT/launch.release"
 FM_FAKE_SSH_MODE=launch-block remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate \
   > "$TMP_ROOT/spawn-retirement.out" 2>&1 &
 spawn_retirement_pid=$!
-launch_wait=0
-# The respawn performs readiness and inheritance jobs before launch, so allow
-# the same 30-second loaded-runner bound as the earlier blocked worker path.
+launch_deadline=$((SECONDS + 120))
+# The respawn performs readiness and inheritance jobs before launch; bound the
+# wait in wall clock for the same reason as the other blocked writes above.
 while [ ! -f "$TMP_ROOT/launch.entered" ]; do
   kill -0 "$spawn_retirement_pid" 2>/dev/null || fail "remote respawn exited before its blocked launch"
-  launch_wait=$((launch_wait + 1))
-  [ "$launch_wait" -le 1500 ] || fail "remote respawn never reached its blocked launch"
-  sleep 0.02
+  [ "$SECONDS" -lt "$launch_deadline" ] || fail "remote respawn never reached its blocked launch"
+  sleep 0.05
 done
 cp "$PARENT/state/ios.meta" "$TMP_ROOT/respawn-blocked.meta"
 cp "$PARENT/data/secondmates.md" "$TMP_ROOT/respawn-blocked.registry"

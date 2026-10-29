@@ -121,6 +121,38 @@
       "audience": "agent-runtime"
     },
     {
+      "path": ".agents/skills/backlog-maintenance/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/captain-facing-wording/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/check-result-handling/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/crew-brief-authoring/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/dispatch-profile-intake/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/knowledge-routing/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/task-delivery/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/worker-steering/SKILL.md",
+      "audience": "agent-runtime"
+    },
+    {
       "path": ".agents/skills/bearings/SKILL.md",
       "audience": "agent-runtime"
     },
@@ -198,6 +230,10 @@
     },
     {
       "path": ".agents/skills/harness-adapters/references/harness/devin.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": ".agents/skills/harness-adapters/references/harness/dsh.md",
       "audience": "agent-runtime"
     },
     {
@@ -401,10 +437,6 @@
       "audience": "operator-current"
     },
     {
-      "path": "docs/cd-guard.md",
-      "audience": "maintainer-architecture"
-    },
-    {
       "path": "docs/cmux-backend.md",
       "audience": "operator-current"
     },
@@ -419,6 +451,10 @@
     {
       "path": "docs/configuration.md",
       "audience": "operator-current"
+    },
+    {
+      "path": "docs/review-rubric.md",
+      "audience": "agent-runtime"
     },
     {
       "path": "docs/captain-hold-lifecycle.md",
@@ -493,6 +529,10 @@
       "audience": "operator-current"
     },
     {
+      "path": "docs/guard-spec.md",
+      "audience": "maintainer-architecture"
+    },
+    {
       "path": "docs/host-guards.md",
       "audience": "maintainer-architecture"
     },
@@ -534,6 +574,10 @@
     },
     {
       "path": "docs/supervision-protocols/cursor.md",
+      "audience": "agent-runtime"
+    },
+    {
+      "path": "docs/supervision-protocols/dsh.md",
       "audience": "agent-runtime"
     },
     {
@@ -614,6 +658,10 @@
     },
     {
       "path": "docs/verification/secondmate-parent-channel.md",
+      "audience": "maintainer-verification"
+    },
+    {
+      "path": "docs/verification/slack-watch.md",
       "audience": "maintainer-verification"
     },
     {

@@ -4,6 +4,14 @@
 #        fm-open-loops.sh --present-overdue | --check-actions | --report
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
 #        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID]
+#        fm-open-loops.sh action --batch JSONL_FILE   # - reads stdin
+# Batch input has one JSON object per line: row_id, kind, evidence, and optional
+# recheck, hold, prerequisite or prerequisite_task (same validation as the single-row form).
+# Example: {"row_id":"ROW_ID","kind":"escalated","evidence":"decision requested"}
+# A batch shares one cached fleet snapshot, including failed reads, across all actions.
+# The whole input is read before the ledger lock is taken, so a slow producer never blocks a drain.
+# Each input line produces one result row (line,id,kind,result,message); valid actions
+# persist even when siblings refuse. Any refusal exits 1; malformed CLI arguments exit 2.
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
@@ -16,8 +24,11 @@
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
-# requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+# requirements; rows under a standing receipt or already answered this turn are listed after them and print
+# nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
+# --complete-actions closes this actor's handling turn; fm-wake-drain.sh runs it after a successful
+# acknowledgement (internal integration, not for direct use).
 # --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
