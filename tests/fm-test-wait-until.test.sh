@@ -160,8 +160,10 @@ assert_grep 'condition unmet (3,' "$TMP_ROOT/ended.err" "ended peer became an in
 pass "peer death during a wait is detected"
 
 # A peer that exits leaves its recorded descendants to finish the work. Each peer
-# below exits only after the third probe, by which point the observer has sampled
-# its tree at least once, so the record names the child without any clock.
+# publishes its child's PID after the fork and the main wait starts only once it
+# exists; the peer exits only after the third probe, by which point the observer
+# has sampled that tree at least once, so the record names the child without any
+# clock.
 note_probe() {  # <observed-marker> <result>
   printf 'probe\n' >> "$1.probes"
   [ "$(wc -l < "$1.probes")" -lt 3 ] || : > "$1"
@@ -169,12 +171,15 @@ note_probe() {  # <observed-marker> <result>
 }
 observed="$TMP_ROOT/descendant-publish.observed"
 result="$TMP_ROOT/descendant.result"
+child_pid="$TMP_ROOT/descendant-publish.child"
 # shellcheck disable=SC2016 # The peer shell expands its positional arguments.
 bash -c '
 ( while [ ! -e "$1" ]; do sleep 0.05; done; sleep 0.5; printf published > "$2" ) &
+printf "%s\n" "$!" > "$3"
 while [ ! -e "$1" ]; do sleep 0.05; done
-' _ "$observed" "$result" &
+' _ "$observed" "$result" "$child_pid" &
 peer=$!
+fm_test_wait_until --while-alive "$peer" -- test -s "$child_pid" || fail "the publishing peer never forked its child"
 fm_test_wait_until --while-alive "$peer" -- note_probe "$observed" "$result" \
   || fail "a child publishing after its parent exited was rejected"
 wait "$peer" || fail "descendant publisher failed"
@@ -190,6 +195,7 @@ printf "%s\n" "$!" > "$2"
 while [ ! -e "$1" ]; do sleep 0.05; done
 ' _ "$observed" "$child_pid" &
 peer=$!
+fm_test_wait_until --while-alive "$peer" -- test -s "$child_pid" || fail "the silent peer never forked its child"
 rc=0
 fm_test_wait_until --while-alive "$peer" -- note_probe "$observed" "$TMP_ROOT/never-published" \
   2> "$TMP_ROOT/descendant-silent.err" || rc=$?
