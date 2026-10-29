@@ -369,7 +369,7 @@ test_check_absolute_limit_stops_endless_progress_as_unknown() {
         || fail "registration of $i failed"
     done
     # FM_DURATION_ABSOLUTE_SECS is fm-duration.py's own test seam for its 6 hour extreme.
-    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_ABSOLUTE_SECS=2 \
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_ABSOLUTE_SECS=8 \
       FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=30 \
       "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
     pid=$!

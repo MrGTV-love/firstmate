@@ -3,3 +3,5 @@
 bin/fm-model-catalog-lib.sh	30	bound=$(fm_duration_limit "model-catalog.$h" 30) || return $?
 bin/fm-crew-state.sh	5	record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
 bin/fm-crew-state.sh	5	record=$(fm_run_timed "$(fm_duration_limit crew-state.forge-read 5 2>/dev/null)" bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+bin/fm-contributions.sh	5	fm_duration_progress "contributions.read.${read%.err}" 5 env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1  "$@" 2> "$forge_err" || rc=$?
+bin/fm-mail-check.sh	15	out=$(fm_duration_progress mail-check.poll 15 "$MAIL_BIN" poll 2>&1) || rc=$?

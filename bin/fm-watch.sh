@@ -381,15 +381,15 @@ case "$CHECK_TIMEOUT" in
      if [ "$CHECK_TIMEOUT" -gt 0 ]; then FM_CHECK_TIMEOUT=$CHECK_TIMEOUT; else unset FM_CHECK_TIMEOUT; fi ;;
 esac
 CHECK_TIMEOUT=$(fm_duration_limit check.inactivity "${FM_CHECK_TIMEOUT:-30}")
-# Harm: checks run inline in this loop, so a check that keeps progressing
-# forever (a CPU spin, or a retry loop writing stderr) starves every later
-# watcher duty. Progressing work stops only at fm-duration.py's absolute
-# extreme (6 hours wall clock, FM_DURATION_ABSOLUTE_SECS), read from its one
-# definition. Expiry means unknown, retry next pass, never a check result.
-CHECK_ABSOLUTE=$(python3 -c 'import runpy, sys
+# Harm: checks and status reads run inline in this loop, so one that keeps
+# progressing forever (a CPU spin, or a retry loop writing stderr) starves every
+# later watcher duty. Progress-supervised work stops only at fm-duration.py's
+# absolute extreme (6 hours wall clock, FM_DURATION_ABSOLUTE_SECS), read from
+# its one definition. Expiry means unknown, retry next pass, never a result.
+CAPTURE_ABSOLUTE=$(python3 -c 'import runpy, sys
 d = runpy.run_path(sys.argv[1])
 print(d["positive_override"]("FM_DURATION_ABSOLUTE_SECS", d["ABSOLUTE_LIMIT"]))' \
-  "$SCRIPT_DIR/fm-duration.py" 2>/dev/null) || CHECK_ABSOLUTE=
+  "$SCRIPT_DIR/fm-duration.py" 2>/dev/null) || CAPTURE_ABSOLUTE=
 # Harm: a check that keeps writing stderr grows its private progress file
 # without bound. Past the cap only the newest tail is kept.
 CHECK_STDERR_CAP_BYTES=1048576
@@ -2404,8 +2404,7 @@ run_check_capture() {  # <name> <check> [args...]
   local name=$1 started
   shift
   started=$SECONDS
-  FM_CAPTURE_BACKSTOP=$CHECK_ABSOLUTE FM_CAPTURE_PROGRESS=1 \
-    run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
+  FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
   if [ -n "$FM_CHECK_STOPPED" ]; then
     triage_log "check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
     FM_CHECK_RESULT=
@@ -2426,8 +2425,8 @@ fm_check_stderr_cap() {  # <file>
 # wall-clock one: from the second liveness tick, fm_progress_check samples the
 # capture's process tree and private output streams. Only a tree with no CPU
 # or output progress is stopped as stalled (124). Without a POSIX python3
-# nothing is proven stalled. FM_CAPTURE_BACKSTOP also stops progressing work
-# after that many seconds. FM_CHECK_STOPPED names why a capture was stopped.
+# nothing is proven stalled. Progressing work still stops at CAPTURE_ABSOLUTE.
+# FM_CHECK_STOPPED names why a capture was stopped.
 run_owned_capture() {
   local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
   local progress_rc stop_reason progress_sampled=
@@ -2490,8 +2489,8 @@ run_owned_capture() {
           "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.stderr" \
         || progress_rc=$?
       progress_sampled=1
-      if [ "$progress_rc" != 124 ] && [ -n "${FM_CAPTURE_BACKSTOP:-}" ] \
-        && [ "$((SECONDS - check_started))" -gt "$FM_CAPTURE_BACKSTOP" ]; then
+      if [ "$progress_rc" != 124 ] && [ -n "$CAPTURE_ABSOLUTE" ] \
+        && [ "$((SECONDS - check_started))" -gt "$CAPTURE_ABSOLUTE" ]; then
         progress_rc=124
         stop_reason='absolute limit'
       fi

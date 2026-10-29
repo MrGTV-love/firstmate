@@ -31,14 +31,15 @@
 # state/.mail-woken. Same-line silence is only for a proven no-op: successful
 # poll with no new mail, or a repeated pre-wake failure (missing env,
 # connection refused before wake_for, missing python3, missing fm-mail.sh,
-# heal could not record a uid) that cannot have queued mail. Fail-closed
-# after a queued wake always doorbells.
+# heal could not record a uid) that cannot have queued mail. Every pass prints
+# while a mail: row is still waiting in the wake queue, judged from the queue,
+# so mail queued by a poll that was later stopped still doorbells.
 #
-# The poll has no budget or stop of its own. FM_MAIL_TIMEOUT bounds each
-# IMAP/SMTP socket read, and the whole check runs under the watcher's check
-# progress rule. A check the watcher stops is unknown and retried next pass,
-# never a clean inbox or mail failure; mail it already queued is still
-# drained, because the next pass sees the queued mail: check keys.
+# The poll runs through fm_duration_progress under the mail-check.poll key:
+# its sample is recorded, and only output and process-tree CPU silence past
+# that key's measured bound (15-second cold start) stops it. FM_MAIL_TIMEOUT
+# still bounds each IMAP/SMTP socket read. A stopped poll is unknown, retry
+# next pass, never a clean inbox or mail failure.
 set -u
 export LC_ALL=C
 
@@ -82,6 +83,9 @@ die_usage() {
   usage >&2
   exit 2
 }
+
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
 
 record_epoch_now() {
   case "${FM_MAIL_CHECK_NOW:-}" in
@@ -140,6 +144,10 @@ record_write() {
   return 0
 }
 
+mail_rows_undrained() {
+  [ -s "$STATE/.wake-queue" ] && grep -q $'\tcheck\tmail:' "$STATE/.wake-queue"
+}
+
 # True when this poll has publication evidence, so a repeated diagnostic is
 # not a proven no-op. Stdout is a side channel; the durable ledger (queued
 # mail: check keys, or growth of .mail-woken) is the same record the poll
@@ -152,9 +160,7 @@ poll_has_publication_evidence() {
   then
     return 0
   fi
-  if [ -s "$STATE/.wake-queue" ] && grep -q $'\tcheck\tmail:' "$STATE/.wake-queue"; then
-    return 0
-  fi
+  mail_rows_undrained && return 0
   if [ -f "$STATE/.mail-woken" ]; then
     if [ -z "$woken_before" ] || [ ! -f "$woken_before" ] \
       || ! cmp -s "$woken_before" "$STATE/.mail-woken"; then
@@ -178,8 +184,10 @@ action_check() {
   if [ ! -x "$MAIL_BIN" ]; then
     line="fm-mail.sh is missing next to this check ($MAIL_BIN)"
   else
-    out=$("$MAIL_BIN" poll 2>&1) || rc=$?
-    if [ "${rc:-0}" -ne 0 ]; then
+    out=$(fm_duration_progress mail-check.poll 15 "$MAIL_BIN" poll 2>&1) || rc=$?
+    if [ "${rc:-0}" -eq 124 ]; then
+      line="poll stopped making progress; result unknown, retry next pass"
+    elif [ "${rc:-0}" -ne 0 ]; then
       line=$(poll_summary "$rc" "$out")
     elif printf '%s\n' "$out" | grep '^fm-mail: woke for ' >/dev/null; then
       # A successful poll can still surface new mail: the poll itself already
@@ -202,6 +210,9 @@ action_check() {
     queued=1
   fi
   [ -n "$woken_before" ] && rm -f -- "$woken_before"
+  if [ -z "$line" ] && mail_rows_undrained; then
+    line="queued mail is waiting to be drained"
+  fi
   if [ -n "$line" ] && { [ "$line" != "$RECORD_REPORTED" ] || [ "$queued" -eq 1 ]; }; then
     fm_cap_line_var "mail: $line" "$MAX_LINE"
     printf '%s\n' "$FM_LINE_CAP_LINE"
