@@ -1,0 +1,57 @@
++(eval):1> bin/fm-proc-budget.sh --memory-kib 4194304 -- bash tests/fm-spawn-worktree-settle.test.sh
+ok - raw Claude shell data byte fidelity: reviewer
+ok - raw Claude shell data byte fidelity: literal
+ok - raw Claude shell data byte fidelity: double-quoted
+ok - raw Claude shell data byte fidelity: tab-stripped
+ok - raw Claude shell data byte fidelity: multiple
+ok - raw Claude shell data byte fidelity: quoted
+ok - raw Claude shell data byte fidelity: quoted-placeholder
+ok - raw Claude shell data byte fidelity: quoted-substitution-data
+ok - raw Claude shell data byte fidelity: comment
+ok - raw Claude shell data byte fidelity: option-terminator
+ok - raw Claude shell data byte fidelity: quoted-expansion-data
+ok - raw Claude shell data byte fidelity: value-session-id
+ok - raw Claude accepts a test bracket command: [ -d src ] && claude --print hi
+ok - raw Claude accepts a test bracket command: [[ -f x ]] && claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -u FM_UNSET_PROBE claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -- FOO=1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: command claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: exec claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: exec -a worker claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nohup claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: time claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: time -p claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nice claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: nice -n 5 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: true && nohup env -u X nice -n 1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -i FOO=1 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: command -p claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout 3600 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout -k 5 -s TERM 10 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate -i claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: caffeinate -t 60 -di claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -arm64 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -x86_64 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: arch -arch arm64 -e A=b claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: stdbuf -o0 -e L claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: stdbuf -i 0 claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: timeout "$T" claude --print hi
+ok - raw Claude renders a claude behind a named wrapper: env -u "$V" A="$X" claude --print hi
+ok - raw Claude renders a claude in shell -c text: bash -c 'claude --print hi'
+ok - raw Claude renders a claude in shell -c text: sh -e -c 'true && claude --print hi' name
+ok - raw Claude renders a claude in shell -c text: bash -lc "nohup claude --print hi"
+Traceback (most recent call last):
+  File "<stdin>", line 82, in <module>
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+not ok - raw Claude shell-data or refusal regression failed: expected exit 0, got 1
+exit=1

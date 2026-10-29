@@ -1,0 +1,5 @@
++(eval):1> bin/fm-proc-budget.sh --memory-kib 4194304 -- env 'FM_TEST_ONLY=test_claude_staged_native_hook_suppression' bash tests/fm-spawn-herdr-launch-shell.test.sh
+ok - staged normal Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged raw Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged secondmate Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+exit=0

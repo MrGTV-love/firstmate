@@ -1,0 +1,16 @@
+# Counterfactual: fm-spawn.sh Claude HERDR_ENV boundary disabled (if false), test re-run
+diff --git a/bin/fm-spawn.sh b/bin/fm-spawn.sh
+index a3be6984..59b686bc 100755
+--- a/bin/fm-spawn.sh
++++ b/bin/fm-spawn.sh
+@@ -7298,7 +7298,7 @@ fi
+ # Unset HERDR_ENV only in this child, intended to stop that registration (not
+ # yet proven on installed Herdr); keep the pane identity and
+ # Firstmate's own busy hooks, and do not alter other panes or session settings.
+-if [ "$HARNESS" = claude ]; then
++if false; then
+   if [ "$BACKEND" = herdr ]; then
+     LAUNCH="env -u HERDR_ENV FM_HERDR_RUNTIME=1 $LAUNCH"
+   else
+not ok - normal: native marker reached Claude
+exit=1

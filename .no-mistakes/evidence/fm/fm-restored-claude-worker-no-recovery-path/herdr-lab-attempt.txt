@@ -1,0 +1,9 @@
+Live installed-Herdr lab attempt (2026-10-28, Mac mini, herdr 0.9.1)
+$ bin/fm-herdr-lab.sh name herdrenv            -> fm-lab-herdrenv-28486-19129
+$ bin/fm-herdr-lab.sh prepare fm-lab-herdrenv-28486-19129
+fm-herdr-lab: fleet-state tripwire requires exactly one running default session
+$ herdr session list --json  (read-only)
+{"name":"default","default":true,"running":false}
+Result: the guarded lab helper refuses to claim a lab while the default Herdr session is stopped.
+Starting the default session would touch the live default session, which the runbook forbids.
+No lab was claimed, so no teardown was needed; no session was created.

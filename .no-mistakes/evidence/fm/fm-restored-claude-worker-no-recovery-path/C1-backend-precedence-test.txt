@@ -1,0 +1,3 @@
++(eval):1> bin/fm-proc-budget.sh --memory-kib 4194304 -- env 'FM_TEST_ONLY=test_backend_detect_precedence' bash tests/fm-backend.test.sh
+ok - fm_backend_detect: no markers -> undetected, HERDR_ENV=1 -> herdr, $TMUX -> tmux, CMUX_WORKSPACE_ID -> cmux, nested combinations resolve innermost-first
+exit=0
