@@ -1483,6 +1483,39 @@ SH
   chmod +x "$1/ln"
 }
 
+# fm_test_sampler_probe: print a PYTHONPATH directory whose sitecustomize makes
+# every pile-up sampler (bin/fm-proc-guard.py watch) started with
+# FM_TEST_SAMPLER_CYCLES=<file> add its completed samples, the sampler's own unit
+# of work, to that file, so a wait for something a procevent runner should
+# produce can be bounded with fm_test_wait_until --cycles.
+fm_test_sampler_probe() {
+  local dir
+  dir=$(fm_test_tmproot fm-sampler-probe) || return 1
+  cat > "$dir/sitecustomize.py" <<'PY'
+import os
+import sys
+import time
+
+samples = os.environ.get('FM_TEST_SAMPLER_CYCLES')
+if samples and sys.argv and sys.argv[0].endswith('fm-proc-guard.py'):
+    real_sleep = time.sleep
+
+    def counted_sleep(seconds):
+        try:
+            with open(samples) as handle:
+                done = int(handle.read())
+        except (OSError, ValueError):
+            done = 0
+        with open(samples + '.tmp', 'w') as handle:
+            handle.write('%d\n' % (done + 1))
+        os.replace(samples + '.tmp', samples)
+        real_sleep(seconds)
+
+    time.sleep = counted_sleep
+PY
+  printf '%s\n' "$dir"
+}
+
 # fm_test_wait_until [--while-alive PID] [--progress-file PATH]...
 #                    [--cycles N COUNT_FILE] [--inactivity SECONDS]
 #                    -- COMMAND [ARGS...]
@@ -1504,9 +1537,13 @@ SH
 # final predicate probe, so completion at peer exit wins. Invalid
 # arguments/observer errors return 2. No peer is killed; its owner retains
 # cleanup. Predicates must be quick, nonblocking probes and may be shell
-# functions; each probe runs in a subshell with output suppressed.
+# functions; each probe runs in a subshell with output suppressed. The probe and
+# count run every 0.1s; the observer runs at the repo's progress cadence,
+# min(1, inactivity / 4) seconds (communicate_progress in bin/fm-duration.py),
+# and at once when kill -0 first shows the peer gone.
 fm_test_wait_until() (
   local pid=0 inactivity=default record rc cycles=0 tally='' base='' count reached
+  local cadence=10 tick=0 exited=0
   local paths=() observer=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -1548,6 +1585,9 @@ fm_test_wait_until() (
   observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$record" "$pid" "$inactivity")
   [ "${#paths[@]}" -eq 0 ] || observer+=("${paths[@]}")
   [ "$pid" -eq 0 ] || observer+=(--while-alive)
+  [ "$inactivity" = default ] \
+    || cadence=$(awk -v seconds="$inactivity" 'BEGIN { ticks = int(seconds * 2.5); print (ticks < 1 ? 1 : (ticks > 10 ? 10 : ticks)) }') \
+    || return 2
   while :; do
     reached=0
     if [ -n "$tally" ] && read_count; then
@@ -1563,7 +1603,14 @@ fm_test_wait_until() (
       return 1
     fi
     rc=0
-    "${observer[@]}" || rc=$?
+    if [ "$pid" -gt 0 ] && [ "$exited" -eq 0 ] && ! kill -0 "$pid" 2>/dev/null; then
+      exited=1 tick=0
+    fi
+    if [ "$tick" -eq 0 ]; then
+      "${observer[@]}" || rc=$?
+      tick=$cadence
+    fi
+    tick=$((tick - 1))
     case "$rc" in
       0) ;;
       3|124)

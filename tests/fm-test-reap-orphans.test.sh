@@ -21,6 +21,9 @@ TMP_ROOT=$(cd "$TMP_ROOT" && pwd -P)
 REAPER="$ROOT/bin/fm-test-reap-orphans.sh"
 SCAN="$TMP_ROOT/scan"
 mkdir -p "$SCAN"
+# A self-bounded fixture that ends on its own bound instead of being stopped
+# records its pid here, so wait_gone never reads that end as reaping.
+export FM_TEST_STUB_EXPIRY_LOG="$TMP_ROOT/stub-expired"
 
 TRACKED_PIDS=()
 TRACKED_IDENTITIES=()
@@ -73,7 +76,8 @@ alive() {
 gone() { ! alive "$@"; }
 
 wait_gone() { # <pid> [identity]
-  fm_test_wait_until --while-alive "$1" -- gone "$1" "${2:-}"
+  fm_test_wait_until --while-alive "$1" -- gone "$1" "${2:-}" || return 1
+  ! grep -qx "$1" "$FM_TEST_STUB_EXPIRY_LOG" 2>/dev/null
 }
 
 wait_file() { # <file>
@@ -89,6 +93,7 @@ while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 2
   sleep 0.05
   n=$((n + 1))
 done
+[ -e "$1" ] || printf '%s\n' "$$" >> "${FM_TEST_STUB_EXPIRY_LOG:-/dev/null}"
 SH
   chmod +x "$1"
 }
@@ -229,12 +234,18 @@ cat > "$TMP_ROOT/go-cwd_test.go" <<'GO'
 package fixture
 
 import (
+	"fmt"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestWait(t *testing.T) {
 	time.Sleep(120 * time.Second)
+	if log, err := os.OpenFile(os.Getenv("FM_TEST_STUB_EXPIRY_LOG"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+		fmt.Fprintf(log, "%d\n", os.Getpid())
+		log.Close()
+	}
 }
 GO
 env GOENV=off GOTOOLCHAIN=local GOWORK=off go test -c \
@@ -339,24 +350,26 @@ pass "active and indeterminate private lab servers prevent reaping until stopped
 # child that stub forked.
 OWNED=$(fm_test_tmproot fm-test-reap-owned)
 OWNED=$(cd "$OWNED" && pwd -P)
+write_stub "$TMP_ROOT/owned-child.sh"
 cat > "$OWNED/forking.sh" <<'SH'
 #!/usr/bin/env bash
-sleep 120 &
+bash "$3" "$3.never" &
 echo $! > "$2"
 n=0
 while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 20 )) ]; do
   sleep 0.05
   n=$((n + 1))
 done
+[ -e "$1" ] || printf '%s\n' "$$" >> "${FM_TEST_STUB_EXPIRY_LOG:-/dev/null}"
 SH
 chmod +x "$OWNED/forking.sh"
-( bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid" >/dev/null 2>&1 & echo $! > "$OWNED/stub.pid" )
+( bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid" "$TMP_ROOT/owned-child.sh" >/dev/null 2>&1 & echo $! > "$OWNED/stub.pid" )
 wait_file "$OWNED/stub.pid" || fail "the owned stub did not start"
 wait_file "$OWNED/child.pid" || fail "the owned stub's child did not start"
 OWNED_STUB=$(cat "$OWNED/stub.pid")
 OWNED_CHILD=$(cat "$OWNED/child.pid")
-track "$OWNED_STUB" "$(initialized_identity "$OWNED_STUB" bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid")"
-track "$OWNED_CHILD" "$(initialized_identity "$OWNED_CHILD" sleep 120)"
+track "$OWNED_STUB" "$(initialized_identity "$OWNED_STUB" bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid" "$TMP_ROOT/owned-child.sh")"
+track "$OWNED_CHILD" "$(initialized_identity "$OWNED_CHILD" bash "$TMP_ROOT/owned-child.sh" "$TMP_ROOT/owned-child.sh.never")"
 # A job the caller still holds, below the owner rather than under init, goes too.
 write_stub "$OWNED/job.sh"
 bash "$OWNED/job.sh" "$OWNED/release" &
@@ -404,6 +417,7 @@ while [ ! -e "$1" ] && [ "$n" -lt $(( ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120} * 2
   sleep 0.05
   n=$((n + 1))
 done
+[ -e "$1" ] || printf '%s\n' "$$" >> "${FM_TEST_STUB_EXPIRY_LOG:-/dev/null}"
 STUB
 chmod +x "$root/stub.sh"
 ( bash "$root/stub.sh" "$root/release" >/dev/null 2>&1 &

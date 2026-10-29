@@ -39,8 +39,8 @@ progress for the inactivity interval. First, failed, corrupt or reused-PID
 observations never authorize a stop. Missing telemetry does not prove a stall.
 PID 0 selects file-only observation and requires at least one watched path; the
 observer's own CPU never becomes publisher progress. --while-alive on a positive
-PID additionally returns 3 for a dead/zombie peer or an observed PID reuse; it
-never signals anything. In that mode the PID is a liveness fence only: activity
+PID additionally returns 3 for a dead/zombie peer or an observed PID reuse once
+no descendant it was last observed with remains; it never signals anything. In that mode the PID is a liveness fence only: activity
 (CPU, runnable work, forks) is not progress toward an outcome, so only watched
 files reset inactivity. Tests use it to distinguish a missing outcome after
 peer exit from a productive publisher that is merely slow. An inactivity of
@@ -745,6 +745,19 @@ def communicate_progress(child, inactivity):
                 raise
 
 
+def descendants_alive(pid, old):
+    """Whether a process recorded beside PID, other than PID, still runs."""
+    members = [(child, start) for child, start in old if child != pid]
+    if not members:
+        return False
+    table = proc_table(os.getpid())
+    if table is None:
+        table = ps_table()
+    if table is None:
+        return True  # An unreadable table is unknown, not a death verdict.
+    return any(child in table and table[child][2] == start for child, start in members)
+
+
 def progress_check(path, pid, inactivity, paths, while_alive=False):
     """124 only after repeated valid samples prove no CPU or file progress.
 
@@ -752,19 +765,29 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     corrupt record, missing process, or clock reset never authorizes a signal.
     Callers own their lock and must recheck its identity before acting.
     PID 0 observes files only. The opt-in while_alive mode returns 3 for a
-    proven dead/zombie/reused peer, independently of the inactivity verdict,
-    and counts only watched-file changes as progress.
+    proven dead/zombie/reused peer once the descendants recorded with it are
+    gone too, independently of the inactivity verdict, and counts only
+    watched-file changes as progress.
     """
     observed = {}
     identity = ()
     runnable = False
+    previous, old = None, {}
+    with contextlib.suppress(OSError, ValueError, KeyError, TypeError):
+        candidate = json.loads(path.read_text())
+        if (candidate['pid'] == pid and 0 <= candidate['since'] <= candidate['sampled']
+                and isinstance(candidate['identity'], list) and isinstance(candidate['files'], list)):
+            old = {(child, tuple(start)): value for child, start, value in candidate['cpu']}
+            previous = candidate
+    gone = False
     if while_alive:
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
-            return 3
+            gone = True
         except PermissionError:
             pass  # An unreadable peer is unknown, not dead.
+    if while_alive and not gone:
         # kill(0) alone accepts zombies. Prefer the native stat where available;
         # confined Darwin workers use the existing process-info fallback.
         try:
@@ -778,9 +801,8 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
                      if len(line.split()) == 2 and line.split()[0] == str(pid)), '')
             except OSError:
                 state = ''  # Unavailable state is unknown, not a death verdict.
-        if state.startswith(('Z', 'X')):
-            return 3
-    if pid:
+        gone = state.startswith(('Z', 'X'))
+    if pid and not gone:
         cpu, runnable = tree_cpu(pid, observed)
         if cpu is None:
             warn_blind_telemetry()
@@ -788,6 +810,12 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
         if not any(child == pid for child, _ in observed):
             return 0
         identity = next(identity for (child, identity) in observed if child == pid)
+        gone = (while_alive and previous is not None and previous['identity'] != list(identity)
+                and (pid, tuple(previous['identity'])) in old)  # A reused PID is not the peer's successor.
+    if gone:
+        if previous is None or not descendants_alive(pid, old):
+            return 3
+        identity, observed = tuple(previous['identity']), dict(old)
     files = []
     for name in paths:
         try:
@@ -801,21 +829,11 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     record = dict(pid=pid, identity=list(identity), files=files,
                   cpu=[[child, list(start), value] for (child, start), value in observed.items()],
                   since=now, sampled=now)
-    try:
-        previous = json.loads(path.read_text())
-        if (previous['pid'] == pid
-                and 0 <= previous['since'] <= previous['sampled'] <= now):
-            old = {(child, tuple(start)): value for child, start, value in previous['cpu']}
-            if (while_alive and previous['identity'] != list(identity)
-                    and (pid, tuple(previous['identity'])) in old):
-                return 3  # A reused PID is not the awaited peer's successor.
-            if previous['identity'] == list(identity):
-                advancing = files != previous['files'] or not while_alive and (
-                    runnable or any(value > old.get(key, -1) for key, value in observed.items()))
-                if not advancing:
-                    record['since'] = previous['since']
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
+    if previous is not None and previous['sampled'] <= now and previous['identity'] == list(identity):
+        advancing = files != previous['files'] or not while_alive and (
+            runnable or any(value > old.get(key, -1) for key, value in observed.items()))
+        if not advancing:
+            record['since'] = previous['since']
     temporary = path.with_name(path.name + '.' + str(os.getpid()))
     try:
         temporary.write_text(json.dumps(record))

@@ -1844,7 +1844,7 @@ SH
 # private copy of bin/ so every process it starts carries that copy's path, then
 # holds until released. With opt-in 1 it exports an empty claim root first.
 start_detector_child_suite() {  # <case-dir> <opt-in:0|1>
-  local case_dir=$1 fakebin
+  local case_dir=$1 fakebin probe
   mkdir -p "$case_dir/home/config" "$case_dir/home/state"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
   cp -R "$ROOT/bin" "$case_dir/bin"
@@ -1864,7 +1864,9 @@ printf '%s\n' "$?" > "$case_dir/ready"
 deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
 while [ ! -e "$case_dir/release" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
 SH
-  FM_TEST_SKIP_ORPHAN_REAP=1 bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH" &
+  probe=$(fm_test_sampler_probe) || fail "could not write the sampler probe"
+  PYTHONPATH="$probe${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$case_dir/sampler-cycles" \
+    FM_TEST_SKIP_ORPHAN_REAP=1 bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH" &
   DETECTOR_CHILD_SUITE_PID=$!
   fm_test_wait_until --while-alive "$DETECTOR_CHILD_SUITE_PID" --progress-file "$case_dir/bootstrap.out" -- test -s "$case_dir/ready" || fail "the child suite's bootstrap never returned"
   expect_code 0 "$(cat "$case_dir/ready")" "the child suite's bootstrap failed: $(cat "$case_dir/bootstrap.out")"
@@ -1907,12 +1909,12 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
   fm_test_wait_until --while-alive "$DETECTOR_CHILD_SUITE_PID" --progress-file "$case_dir/claims/proc-guard.claim" -- test -s "$case_dir/claims/proc-guard.claim" || fail "the opted-in suite's runner never claimed the detector"
   runner=$(sed -n '2p' "$case_dir/claims/proc-guard.claim")
   detector_runner_is_the_only_leader() { [ "$(detector_runner_leaders "$case_dir")" = "$runner" ]; }
-  fm_test_wait_until --while-alive "$runner" -- detector_runner_is_the_only_leader \
+  fm_test_wait_until --while-alive "$runner" --cycles 10 "$case_dir/sampler-cycles" -- detector_runner_is_the_only_leader \
     || fail "expected exactly the one claimed runner $runner, found: $(detector_runner_leaders "$case_dir")"
   : > "$case_dir/release"
   wait "$DETECTOR_CHILD_SUITE_PID" || fail "the opted-in child suite failed"
   # shellcheck disable=SC2016 # The child shell owns these expansions.
-  fm_test_wait_until --while-alive "$runner" -- bash -c '! kill -0 "$1" 2>/dev/null && ! ps -axo pgid= | grep -qx " *$1"' _ "$runner" \
+  fm_test_wait_until --while-alive "$runner" --cycles 5 "$case_dir/sampler-cycles" -- bash -c '! kill -0 "$1" 2>/dev/null && ! ps -axo pgid= | grep -qx " *$1"' _ "$runner" \
     || fail "the opted-in suite left its runner group running"
   detector_processes_are_gone() { [ "$(detector_process_count "$case_dir")" -eq 0 ]; }
   fm_test_wait_until --progress-file "$case_dir/bootstrap.out" -- detector_processes_are_gone \

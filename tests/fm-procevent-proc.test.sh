@@ -12,6 +12,7 @@ PROCEVENT="$ROOT/bin/fm-procevent.sh"
 TMP_ROOT=$(fm_test_tmproot fm-procevent-proc)
 export FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 export FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
+SAMPLER_PROBE=$(fm_test_sampler_probe) || fail "could not write the sampler probe"
 
 new_home() {  # <name>: print a tracked lab home
   local home="$TMP_ROOT/$1"
@@ -65,10 +66,18 @@ fm_test_wait_until --progress-file "$HOME_A/state/procevent-inbox/proc-guard.1.r
 changed_result="$HOME_A/state/procevent-inbox/proc-guard.1.result"
 grep -qx 'limit: 1' "$changed_result" || fail "the replacement sampler retained the old limit"
 kill -0 "$prior_runner" 2>/dev/null && fail "changed rearm left the obsolete listener alive"
-in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
+changed_runner=$(cat "$HOME_A/state/procevent/proc-guard.runner")
+A_SAMPLES="$HOME_A/state/.test-sampler-cycles"
+PYTHONPATH="$SAMPLER_PROBE${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$A_SAMPLES" \
+  in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
   || fail "restoring the quiet sampler failed"
+runner_replaced() { local current; current=$(cat "$1" 2>/dev/null) && [ -n "$current" ] && [ "$current" != "$2" ]; }
+fm_test_wait_until --progress-file "$HOME_A/state/procevent/proc-guard.runner" -- \
+  runner_replaced "$HOME_A/state/procevent/proc-guard.runner" "$changed_runner" \
+  || fail "the quiet replacement never published its listener"
 # shellcheck disable=SC2016 # $1 expands in the child shell.
-fm_test_wait_until --while-alive "$(cat "$HOME_A/state/procevent/proc-guard.runner")" -- bash -c 'test ! -e "$1/proc-guard.episode"' _ "$FM_PROCEVENT_CLAIM_ROOT" \
+fm_test_wait_until --while-alive "$(cat "$HOME_A/state/procevent/proc-guard.runner")" --cycles 20 "$A_SAMPLES" \
+  -- bash -c 'test ! -e "$1/proc-guard.episode"' _ "$FM_PROCEVENT_CLAIM_ROOT" \
   || fail "the quiet replacement never cleared the episode"
 in_home "$HOME_A" "$ADAPTER" retire >/dev/null || fail "quiet retire failed"
 pass "arm starts an idempotent standing listener without a watcher or fresh owner lease"
@@ -108,35 +117,6 @@ if "$ADAPTER" classify "$RESULT_DIR/missing" >/dev/null 2>&1; then fail "classif
 pass "classify and terminal: a pile-up keeps listening, an error ends the source"
 
 # --- the runner, end to end --------------------------------------------------
-
-# A cycle-count probe for the pile-up sampler (bin/fm-proc-guard.py watch), whose
-# unit of work is one sample: every sampler this home's runner starts adds its
-# completed samples to SAMPLES, so a wait for something the sampler should
-# produce fails after a few samples without it instead of hanging the suite.
-SAMPLER_PROBE="$TMP_ROOT/sampler-probe"
-mkdir -p "$SAMPLER_PROBE"
-cat > "$SAMPLER_PROBE/sitecustomize.py" <<'PY'
-import os
-import sys
-import time
-
-samples = os.environ.get('FM_TEST_SAMPLER_CYCLES')
-if samples and sys.argv and sys.argv[0].endswith('fm-proc-guard.py'):
-    real_sleep = time.sleep
-
-    def counted_sleep(seconds):
-        try:
-            with open(samples) as handle:
-                done = int(handle.read())
-        except (OSError, ValueError):
-            done = 0
-        with open(samples + '.tmp', 'w') as handle:
-            handle.write('%d\n' % (done + 1))
-        os.replace(samples + '.tmp', samples)
-        real_sleep(seconds)
-
-    time.sleep = counted_sleep
-PY
 
 HOME_E=$(new_home e2e)
 STATE_E="$HOME_E/state"

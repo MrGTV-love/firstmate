@@ -524,13 +524,16 @@ PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
 init_pid=$(cat "$INIT_ENTERED")
 fm_test_wait_until --while-alive "$init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
   || fail "the refresh left its stalled initializer alive"
+[ ! -e "$INIT_DONE" ] || fail "the refresh left its stalled initializer alive until it finished on its own"
 cmp -s "$TMP_ROOT/before-state-init-ledger.json" "$HOME_DIR/state/home-summary.json" \
   || fail "interrupted initialization changed the prior published ledger"
 pass "best-effort refresh bounds state initialization"
 
 DETACH_INIT_MARKER="$TMP_ROOT/detach-init-entered"
+DETACH_INIT_DONE="$TMP_ROOT/detach-init-done"
 PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
   FM_TEST_STALLED_STATE="$HOME_DIR/state" FM_TEST_MKDIR_MARKER="$DETACH_INIT_MARKER" \
+  FM_TEST_MKDIR_DONE_MARKER="$DETACH_INIT_DONE" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$HOME_DIR" FM_HOME_SUMMARY_TIMEOUT=1 \
   WRITER="$WRITER" python3 - <<'PY' \
   || fail "detached state initialization blocked its foreground caller"
@@ -563,6 +566,7 @@ fm_test_wait_until --progress-file "$DETACH_INIT_MARKER" -- test -e "$DETACH_INI
 detach_init_pid=$(cat "$DETACH_INIT_MARKER")
 fm_test_wait_until --while-alive "$detach_init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
   || fail "the detached worker left its stalled initialization running past the bound"
+[ ! -e "$DETACH_INIT_DONE" ] || fail "the detached worker left its stalled initialization running until it finished on its own"
 pass "detached foreground returns before stalled bounded state initialization"
 
 SIGNALBIN="$TMP_ROOT/signalbin"
