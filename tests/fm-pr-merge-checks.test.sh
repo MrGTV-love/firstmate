@@ -1845,13 +1845,14 @@ test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried() {
 
 # A merge queue builds its merge group on its own tip and runs the required
 # checks on that combined tree before anything lands, so an attended --auto
-# merge into a base with one recognised merge_queue rule skips only the tip
-# containment. The green-check reads still apply on that path.
+# merge into a base with one recognised merge_queue rule and a required check
+# skips only the tip containment. The green-check reads still apply on that path.
 test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment() {
   local case_dir rc head built_on tip=b34192a213f406add8809a34224315cdc9073798
   head=1616161616161616161616161616161616161616
   case_dir=$(make_case github-queue-enters)
   add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
   built_on=$(cat "$case_dir/github-base")
   write_github_compare "$case_dir" "$tip" "$built_on" 3
   printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
@@ -1875,6 +1876,7 @@ test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment() {
 
   case_dir=$(make_case github-queue-enters-red)
   add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
   write_github_red_json "$case_dir" "$head" lint
   write_github_compare "$case_dir" "$tip" "$built_on" 3
   printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
@@ -1894,12 +1896,12 @@ test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment() {
   pass "fm-pr-merge skips only the tip containment for an --auto merge into the base's merge queue"
 }
 
-# Each case below lacks proof that the merge enters a merge queue, so the head
-# still has to contain the live tip.
+# Each case below lacks proof that the merge enters a merge queue that checks
+# the combined tree, so the head still has to contain the live tip.
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
   local case_dir rc head built_on scenario tip=b34192a213f406add8809a34224315cdc9073798
   head=1717171717171717171717171717171717171717
-  for scenario in direct-merge-into-queue auto-without-queue auto-unreadable-queue; do
+  for scenario in direct-merge-into-queue auto-without-queue auto-unreadable-queue auto-queue-without-required; do
     case_dir=$(make_case "github-lacks-tip-$scenario")
     add_gh_mocks "$case_dir" "$head"
     built_on=$(cat "$case_dir/github-base")
@@ -1916,6 +1918,10 @@ test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
         : > "$case_dir/github-rules-fail"
         set -- --attended-override -- --auto --squash
         ;;
+      auto-queue-without-required)
+        printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+        set -- --attended-override -- --auto --squash
+        ;;
     esac
 
     set +e
@@ -1930,7 +1936,7 @@ test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
     assert_no_grep 'pr merge' "$case_dir/gh.log" \
       "$scenario: gh pr merge ran on a tree no check ran on"
   done
-  pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, or an unreadable queue"
+  pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, an unreadable queue, or a queue with no required check"
 }
 
 # Off a proven merge queue, --auto merges at once only in a state where gh
@@ -2115,6 +2121,7 @@ test_queue_auto_is_neither_held_to_merge_at_once_states_nor_disarmed() {
   head=2020202020202020202020202020202020202020
   case_dir=$(make_case github-queue-auto-blocked)
   add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
   "$JQ_BIN" -c '.mergeStateStatus = "BLOCKED"' "$case_dir/github-view.json" > "$case_dir/view.tmp"
   mv "$case_dir/view.tmp" "$case_dir/github-view.json"
   printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"

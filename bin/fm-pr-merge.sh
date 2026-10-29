@@ -41,8 +41,9 @@
 # head binding below does not extend to the base; a tip that lands in the
 # seconds between that last read and GitHub applying the merge is a residual
 # this script cannot close. Only a merge that enters the base's merge queue,
-# proven live at both reads, skips that containment rule and never the check
-# reads, because the queue checks the combined tree itself;
+# proven live at both reads together with a complete, non-empty required set,
+# skips that containment rule and never the check reads, because the queue
+# runs those required checks on the combined tree itself;
 # github_merge_enters_queue below owns that proof. Off a proven queue, an
 # attended --auto merge also needs a live mergeStateStatus at that last read
 # where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
@@ -1495,18 +1496,21 @@ github_branch_rules_unavailable_on_plan() {
 
 # Whether this merge enters the given base branch's merge queue, read live:
 # the caller asked for --auto, the only path this script sends into a queue,
-# and the base's rules name exactly one recognised merge_queue rule. A queue
-# builds its merge group on its own tip and runs the required checks on that
-# combined tree before anything lands, so a landed tree no check ran on cannot
-# happen there and the head need not contain the tip. A direct merge, no queue
-# rule, an unreadable, conflicting or unrecognised rule, or a plan without branch
-# rules all return 1, so the containment rule applies unchanged. Sets
-# FM_PR_GITHUB_BASE to the base it read.
+# the base's rules name exactly one recognised merge_queue rule, and the base's
+# required set reads completely and names at least one check. A queue builds
+# its merge group on its own tip and runs the required checks on that combined
+# tree before anything lands, so a landed tree no check ran on cannot happen
+# there and the head need not contain the tip. A direct merge, no queue rule, an
+# unreadable, conflicting or unrecognised rule, a plan without branch rules, or
+# a required set that is unreadable or empty, where the queue would land its
+# group with no check run on it, all return 1, so the containment rule applies
+# unchanged. Sets FM_PR_GITHUB_BASE to the base it read.
 github_merge_enters_queue() {
   [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] || return 1
   FM_PR_GITHUB_BASE=$1
   github_read_queue_method
-  [ "$FM_PR_GITHUB_QUEUE_STATUS" = single ]
+  [ "$FM_PR_GITHUB_QUEUE_STATUS" = single ] || return 1
+  github_read_required_contexts "$1" && [ "$FM_PR_GITHUB_REQUIRED" != '[]' ]
 }
 
 # Read the effective merge-queue method for the observed base branch. The four
@@ -2068,6 +2072,7 @@ case "$PROVIDER" in
     fi
     ;;
   gitlab)
+    # Known gap: no base-tip containment here yet; backlog task fm-pr-merge-tip-containment-gitlab-forgejo owns it.
     gitlab_verify_mergeable || exit 1
     # --sha binds the merge to the head this run verified, so a push that lands
     # in between is refused by GitLab instead of merged unverified. --yes only
@@ -2102,6 +2107,7 @@ case "$PROVIDER" in
     [ "$gitlab_confirm_rc" -eq 0 ] || exit 0
     ;;
   forgejo)
+    # Known gap: no base-tip containment here yet; backlog task fm-pr-merge-tip-containment-gitlab-forgejo owns it.
     forgejo_reject_unsupported_args "$@" || exit 1
     forgejo_method=$(caller_merge_method "$@")
     [ -n "$forgejo_method" ] || forgejo_method=$(forgejo_default_merge_style) || exit 1
