@@ -199,7 +199,9 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
-    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
+    # Folders no task operation writes: a replace ref or a hook runs inside the
+    # primary checkout's own Git commands, outside this profile.
+    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace", "hooks")]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):

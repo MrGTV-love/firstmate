@@ -642,6 +642,7 @@ def fixture(repo, base, harness, user_home, other):
         "shared-legacy-audit": state / "jev-guard.jsonl",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
+        "primary-hooks": project / ".git/hooks/fm-probe",
         "data-secondmates": data / "secondmates.md", "data-captain": data / "captain.md", "data-backlog": data / "backlog.md",
     }
     # A task created after the profile was built: its records are written
@@ -651,7 +652,7 @@ def fixture(repo, base, harness, user_home, other):
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
                "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees",
-               "git-packed-refs": project / ".git/packed-refs"}
+               "git-packed-refs": project / ".git/packed-refs", "git-hooks": project / ".git/hooks"}
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(worktree))
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
