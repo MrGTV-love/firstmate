@@ -1,0 +1,4 @@
+#!/bin/bash
+# Stand-in for a saturated runner: the shell starts late, then becomes the real sh (same pid).
+/bin/sleep "${FM_SLOW_SH_DELAY:-0}"
+exec /bin/sh "$@"

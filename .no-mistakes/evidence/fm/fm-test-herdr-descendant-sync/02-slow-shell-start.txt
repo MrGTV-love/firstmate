@@ -1,0 +1,15 @@
+=== old, shell starts 1s late (saturated-runner stand-in)
+not ok - a registered agent with a live agent-named descendant must stay live/alive, got 'stale-agent dead refused'
+  (test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive took 2s)
+/bin/sh: line 1: 15795 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.vH1mKO/stale-reg-spaced-bin/Application Support/Some Dir/pi' 300
+not ok - an agent-named descendant under a spaced install path must stay live/alive, got 'stale-agent dead refused'
+  (test_agent_descendant_under_a_spaced_install_path_stays_alive took 1s)
+exit=
+=== new, shell starts 1s late (saturated-runner stand-in)
+/bin/sh: line 1: 11545 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.82aA1d/stale-reg-descendant-bin/pi' 300
+ok - herdr stale registration: an agent process outside the foreground group still counts as alive
+  (test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive took 3s)
+/bin/sh: line 1: 24660 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.82aA1d/stale-reg-spaced-bin/Application Support/Some Dir/pi' 300
+ok - herdr stale registration: the descendant walk reads a spaced executable path whole
+  (test_agent_descendant_under_a_spaced_install_path_stays_alive took 5s)
+exit=

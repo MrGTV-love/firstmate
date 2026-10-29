@@ -1,0 +1,6 @@
+sh: /Users/charlesabrooker/tmp/fm-backend-herdr-tests.QtzcGB/stale-reg-descendant-bin/pi: No such file or directory
+not ok - the shell died before its agent-named child appeared
+  (test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive exit=1 after 0s)
+sh: /Users/charlesabrooker/tmp/fm-backend-herdr-tests.QtzcGB/stale-reg-spaced-bin/Application Support/Some Dir/pi: No such file or directory
+not ok - the shell died before its agent-named child appeared
+  (test_agent_descendant_under_a_spaced_install_path_stays_alive exit=1 after 0s)

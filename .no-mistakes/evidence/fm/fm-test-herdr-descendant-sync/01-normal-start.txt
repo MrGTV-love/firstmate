@@ -1,0 +1,25 @@
+=== new, normal start
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 17.727s
+
+OK
+sh: line 1: 13138 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.TwRqyJ/stale-reg-descendant-bin/pi' 300
+ok - herdr stale registration: an agent process outside the foreground group still counts as alive
+  (test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive took 2s)
+sh: line 1: 16172 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.TwRqyJ/stale-reg-spaced-bin/Application Support/Some Dir/pi' 300
+ok - herdr stale registration: the descendant walk reads a spaced executable path whole
+  (test_agent_descendant_under_a_spaced_install_path_stays_alive took 1s)
+exit=0
+=== old, normal start
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 17.655s
+
+OK
+sh: line 1: 74529 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.ugJkd9/stale-reg-descendant-bin/pi' 300
+ok - herdr stale registration: an agent process outside the foreground group still counts as alive
+  (test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_alive took 2s)
+ok - herdr stale registration: the descendant walk reads a spaced executable path whole
+  (test_agent_descendant_under_a_spaced_install_path_stays_alive took 2s)
+exit=0

@@ -1,0 +1,3 @@
+CPU load: 54 busy loops on 18 cores
+old: case passes=10 case fails=0 (5 rounds x 2 cases)
+new: run stopped by the tester before it finished; the shared host was busy with other fleet work and the old version also passed under this load, so this run does not separate old from new.
