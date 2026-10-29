@@ -6,8 +6,9 @@
 # newer branch outcome, OPEN DECISIONS, captain-call record divergence, and on
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
-# Overdue open-work rows (OVERDUE, STANDING) are presented first, and
-# acknowledgement refuses while a presented row lacks a valid action receipt;
+# Overdue open-work rows that need an action (OVERDUE) are presented first; only an
+# open-loop-ledger-resurface drain adds covered rows (STANDING) and the WAITING OPEN WORK
+# list. Acknowledgement refuses while a row this actor presented still needs an action;
 # docs/configuration.md "Open-work ledger" owns that gate, receipt standing, and invalidation.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
