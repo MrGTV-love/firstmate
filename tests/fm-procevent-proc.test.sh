@@ -109,19 +109,50 @@ pass "classify and terminal: a pile-up keeps listening, an error ends the source
 
 # --- the runner, end to end --------------------------------------------------
 
+# A cycle-count probe for the pile-up sampler (bin/fm-proc-guard.py watch), whose
+# unit of work is one sample: every sampler this home's runner starts adds its
+# completed samples to SAMPLES, so a wait for something the sampler should
+# produce fails after a few samples without it instead of hanging the suite.
+SAMPLER_PROBE="$TMP_ROOT/sampler-probe"
+mkdir -p "$SAMPLER_PROBE"
+cat > "$SAMPLER_PROBE/sitecustomize.py" <<'PY'
+import os
+import sys
+import time
+
+samples = os.environ.get('FM_TEST_SAMPLER_CYCLES')
+if samples and sys.argv and sys.argv[0].endswith('fm-proc-guard.py'):
+    real_sleep = time.sleep
+
+    def counted_sleep(seconds):
+        try:
+            with open(samples) as handle:
+                done = int(handle.read())
+        except (OSError, ValueError):
+            done = 0
+        with open(samples + '.tmp', 'w') as handle:
+            handle.write('%d\n' % (done + 1))
+        os.replace(samples + '.tmp', samples)
+        real_sleep(seconds)
+
+    time.sleep = counted_sleep
+PY
+
 HOME_E=$(new_home e2e)
 STATE_E="$HOME_E/state"
-in_home "$HOME_E" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "e2e arm failed"
+SAMPLES="$STATE_E/.test-sampler-cycles"
+PYTHONPATH="$SAMPLER_PROBE${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$SAMPLES" \
+  in_home "$HOME_E" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "e2e arm failed"
 fm_test_wait_until --progress-file "$STATE_E/procevent/proc-guard.runner" -- test -s "$STATE_E/procevent/proc-guard.runner" || fail "arm never established a listener"
 RUNNER=$(cat "$STATE_E/procevent/proc-guard.runner")
-fm_test_wait_until --while-alive "$RUNNER" --progress-file "$STATE_E/procevent-inbox/proc-guard.1.result" -- test -e "$STATE_E/procevent-inbox/proc-guard.1.result" || fail "the runner never captured a pile-up"
+fm_test_wait_until --while-alive "$RUNNER" --cycles 20 "$SAMPLES" --progress-file "$STATE_E/procevent-inbox/proc-guard.1.result" -- test -e "$STATE_E/procevent-inbox/proc-guard.1.result" || fail "the runner never captured a pile-up"
 
 result="$STATE_E/procevent-inbox/proc-guard.1.result"
 [ "$("$ADAPTER" classify "$result")" = pileup ] || fail "captured result is not a pile-up: $(cat "$result")"
 census=$(sed -n 's/^census: //p' "$result")
 [ -f "$census" ] || fail "the captured result names a missing census: $census"
 # shellcheck disable=SC2016 # $3 and $4 are awk field references.
-fm_test_wait_until --while-alive "$RUNNER" --progress-file "$STATE_E/.wake-queue" -- awk -F '\t' '$3 == "check" && $4 == "procevent:proc-guard:1" { found = 1 } END { exit !found }' "$STATE_E/.wake-queue" \
+fm_test_wait_until --while-alive "$RUNNER" --cycles 20 "$SAMPLES" --progress-file "$STATE_E/.wake-queue" -- awk -F '\t' '$3 == "check" && $4 == "procevent:proc-guard:1" { found = 1 } END { exit !found }' "$STATE_E/.wake-queue" \
   || fail "no durable wake was queued for the pile-up: $(cat "$STATE_E/.wake-queue" 2>/dev/null)"
 [ "$(awk -F '\t' '$3 == "check"' "$STATE_E/.wake-queue" | grep -c .)" = 1 ] || fail "more than one wake for one pile-up"
 [ -f "$STATE_E/procevent/proc-guard.source" ] || fail "a pile-up retired the standing detector"
@@ -137,7 +168,7 @@ in_home "$HOME_F" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null ||
 [ "$(census_n "$HOME_F/state")" = 0 ] || fail "a competing home captured the same pile-up"
 kill -0 "$RUNNER" 2>/dev/null || fail "the restarted poll did not keep waiting"
 in_home "$HOME_E" "$ADAPTER" retire >/dev/null || fail "retire failed"
-fm_test_wait_until --while-alive "$RUNNER" -- bash -c "! kill -0 $RUNNER 2>/dev/null" || fail "retire left the poll running"
+fm_test_wait_until --while-alive "$RUNNER" --cycles 20 "$SAMPLES" -- bash -c "! kill -0 $RUNNER 2>/dev/null" || fail "retire left the poll running"
 pass "the same canonical runner keeps listening after capture and retire stops it"
 
 in_home "$HOME_F" "$ADAPTER" arm --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "handoff arm failed"

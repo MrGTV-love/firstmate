@@ -12,6 +12,7 @@ set -u
 
 WATCH="$ROOT/bin/fm-watch.sh"
 TMP_ROOT=$(fm_test_tmproot fm-watch-typesafe-health-tests)
+count_watch_polls
 
 # Start a watcher with every other cadence switched off, so only the probe can fire.
 start_watcher() {  # <state> <fakebin> <out> [extra env...]
@@ -53,8 +54,8 @@ test_probe_runs_detached_on_its_interval_with_the_home() {
   install_probe "$fakebin" 'exit 0'
   start_watcher "$state" "$fakebin" "$out" FM_TYPESAFE_HEALTH_INTERVAL=1 FM_TYPESAFE_HEALTH_BIN="$fakebin/fake-probe" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- probe_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the probe"; }
-  fm_test_wait_until --while-alive "$pid" -- probe_repeated "$state" || { stop_owned_watcher "$pid"; fail "the probe did not repeat on its interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- probe_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the probe"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- probe_repeated "$state" || { stop_owned_watcher "$pid"; fail "the probe did not repeat on its interval"; }
   case "$(head -n 1 "$state/.probe-calls")" in
     "probe|$dir|$state|"*) ;;
     *) stop_owned_watcher "$pid"; fail "the probe is started as 'probe' with this home: $(head -n 1 "$state/.probe-calls")" ;;
@@ -77,7 +78,7 @@ test_first_probe_waits_a_full_interval() {
     stop_owned_watcher "$pid"
     fail "a fresh watcher must not start a probe before one interval has passed"
   fi
-  fm_test_wait_until --while-alive "$pid" -- test -e "$state/.typesafe-health-next" \
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- test -e "$state/.typesafe-health-next" \
     || { stop_owned_watcher "$pid"; fail "the first deadline is recorded so a restart keeps it"; }
   stop_owned_watcher "$pid"
   pass "a fresh watcher leaves session start alone: the first probe waits one full interval"
@@ -105,7 +106,7 @@ test_failing_probe_never_stops_the_poll() {
   install_probe "$fakebin" 'echo "boom" >&2; exit 1'
   start_watcher "$state" "$fakebin" "$out" FM_TYPESAFE_HEALTH_INTERVAL=1 FM_TYPESAFE_HEALTH_BIN="$fakebin/fake-probe" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- probe_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing probe must be retried on the next interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- probe_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing probe must be retried on the next interval"; }
   is_live_non_zombie "$pid" || fail "a failing probe must not stop the watcher"
   [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a failing probe must not wake firstmate by itself"; }
   stop_owned_watcher "$pid"
@@ -118,7 +119,7 @@ test_hung_probe_is_never_doubled() {
   install_probe "$fakebin" 'exec sleep 30'
   start_watcher "$state" "$fakebin" "$out" FM_TYPESAFE_HEALTH_INTERVAL=1 FM_TYPESAFE_HEALTH_BIN="$fakebin/fake-probe" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- probe_called "$state" || { stop_owned_watcher "$pid"; fail "the hung-probe case never started a probe"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- probe_called "$state" || { stop_owned_watcher "$pid"; fail "the hung-probe case never started a probe"; }
   sleep 4
   hung=$(head -n 1 "$state/.probe-calls" | cut -d'|' -f4)
   if [ "$(probe_calls "$state")" != 1 ]; then

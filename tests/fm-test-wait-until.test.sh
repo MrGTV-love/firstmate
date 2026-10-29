@@ -46,24 +46,69 @@ wait "$publisher" || fail "detached publisher failed"
 [ "$(cat "$result")" = detached ] || fail "detached result changed"
 pass "file-only observation follows a detached publisher beyond the inactivity interval"
 
-# No files change during this CPU-only workload. CPU/runnable progress must
-# preserve the wait until the child publishes its final result.
-result="$TMP_ROOT/cpu.result"
+# Activity alone is not progress toward an outcome. A live peer that burns CPU
+# but changes no outcome-specific observable is silent, not productive.
 python3 -c '
-import pathlib, sys, time
-start = time.process_time()
-while time.process_time() - start < 2:
+import time
+while True:
     sum(range(1000))
-pathlib.Path(sys.argv[1]).write_text("computed")
-' "$result" &
-publisher=$!
-fm_test_wait_until --while-alive "$publisher" --inactivity 0.3 -- test -s "$result" \
-  || fail "productive CPU-only work was rejected"
-wait "$publisher" || fail "CPU publisher failed"
-[ "$(cat "$result")" = computed ] || fail "CPU result changed"
-pass "CPU-only work is not a silent stall"
+' &
+busy=$!
+rc=0
+fm_test_wait_until --while-alive "$busy" --inactivity 0.3 -- false 2> "$TMP_ROOT/busy.err" || rc=$?
+kill "$busy"
+wait "$busy" 2>/dev/null || true
+[ "$rc" -eq 1 ] || fail "CPU activity without an observable outcome kept the wait alive (rc=$rc)"
+assert_grep 'no_progress:' "$TMP_ROOT/busy.err" "CPU-only activity was not judged silent"
+pass "CPU-only activity is not progress toward the outcome"
 
-# Real harm: a live peer with neither CPU nor file progress is stuck. The
+# A live poller completes cycles on its own counter. Slowed five times, a poller
+# that publishes on its third cycle still passes; one that keeps polling without
+# the outcome fails after the caller's N cycles, not after a quiet interval.
+poller() {  # <count-file> <result-file> <dilation> <publish-cycle>
+  python3 -c '
+import os, pathlib, sys, time
+count, result = map(pathlib.Path, sys.argv[1:3])
+dilation, publish = int(sys.argv[3]), int(sys.argv[4])
+cycle = 0
+while True:
+    time.sleep(0.1 * dilation)
+    cycle += 1
+    if cycle == publish:
+        result.write_text("published")
+    count.with_suffix(".tmp").write_text(str(cycle))
+    os.replace(count.with_suffix(".tmp"), count)
+' "$@" &
+}
+for dilation in 1 5; do
+  count="$TMP_ROOT/poll-$dilation.count"
+  result="$TMP_ROOT/poll-$dilation.result"
+  poller "$count" "$result" "$dilation" 3
+  peer=$!
+  rc=0
+  fm_test_wait_until --while-alive "$peer" --cycles 5 "$count" -- test -s "$result" || rc=$?
+  kill "$peer"
+  wait "$peer" 2>/dev/null || true
+  [ "$rc" -eq 0 ] || fail "${dilation}x poller that published was rejected (rc=$rc)"
+  pass "${dilation}x poller reaches the awaited outcome within its cycles"
+
+  count="$TMP_ROOT/idle-$dilation.count"
+  poller "$count" "$TMP_ROOT/idle-$dilation.result" "$dilation" 0
+  peer=$!
+  rc=0
+  fm_test_wait_until --while-alive "$peer" --cycles 3 "$count" -- test -s "$TMP_ROOT/idle-$dilation.result" \
+    2> "$TMP_ROOT/idle-$dilation.err" || rc=$?
+  kill -0 "$peer" || fail "the cycle bound killed its peer instead of leaving cleanup to its owner"
+  kill "$peer"
+  wait "$peer" 2>/dev/null || true
+  [ "$rc" -eq 1 ] || fail "${dilation}x live poller without the outcome was not rejected (rc=$rc)"
+  assert_grep 'condition unmet after 3 peer cycles' "$TMP_ROOT/idle-$dilation.err" \
+    "the live poller was not judged by its own cycles"
+  [ "$(cat "$count")" -ge 3 ] || fail "the wait failed before the poller completed 3 cycles"
+  pass "${dilation}x live poller without the outcome fails after its stated cycles"
+done
+
+# Real harm: a live peer with no outcome-specific progress is stuck. The
 # helper returns failure, but cleanup remains the test owner's responsibility.
 for dilation in 1 5; do
   sleep "$((30 * dilation))" &
@@ -132,9 +177,10 @@ pass "unavailable CPU telemetry is unknown and retried"
 
 # An invalid or absent observable must not fall back to a capped compatibility
 # path, which would silently restore the bug in unmigrated callers.
-for shape in no-observable old-api waiter-pid; do
+for shape in no-observable old-api waiter-pid zero-cycles; do
   rc=0
   case "$shape" in
+    zero-cycles) fm_test_wait_until --cycles 0 "$TMP_ROOT/count" -- false 2>/dev/null || rc=$? ;;
     old-api) fm_test_wait_until 1 false 2>/dev/null || rc=$? ;;
     waiter-pid) fm_test_wait_until --while-alive "$$" -- false 2>/dev/null || rc=$? ;;
     no-observable) fm_test_wait_until -- false 2>/dev/null || rc=$? ;;

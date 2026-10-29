@@ -10,7 +10,7 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
        fm-duration.py keep-going INACTIVITY_SECONDS -- COMMAND [ARGS...]
-       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS [PATH...] [--while-alive]
+       fm-duration.py progress-check RECORD PID INACTIVITY_SECONDS|default [PATH...] [--while-alive]
        fm-duration.py check-literals [--base REF | --report]
 
 keep-going is the record-free operational command runner: its only automatic
@@ -40,8 +40,11 @@ observations never authorize a stop. Missing telemetry does not prove a stall.
 PID 0 selects file-only observation and requires at least one watched path; the
 observer's own CPU never becomes publisher progress. --while-alive on a positive
 PID additionally returns 3 for a dead/zombie peer or an observed PID reuse; it
-never signals anything. Tests use it to distinguish a missing outcome after
-peer exit from a productive publisher that is merely slow.
+never signals anything. In that mode the PID is a liveness fence only: activity
+(CPU, runnable work, forks) is not progress toward an outcome, so only watched
+files reset inactivity. Tests use it to distinguish a missing outcome after
+peer exit from a productive publisher that is merely slow. An inactivity of
+"default" selects the operational no-progress policy below.
 These inactivity bounds exist to recover genuinely hung work, not to cap the
 duration of productive work. The default operational policy is 15 quiet minutes;
 callers' historical timeout overrides now select inactivity intervals instead.
@@ -749,7 +752,8 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     corrupt record, missing process, or clock reset never authorizes a signal.
     Callers own their lock and must recheck its identity before acting.
     PID 0 observes files only. The opt-in while_alive mode returns 3 for a
-    proven dead/zombie/reused peer, independently of the inactivity verdict.
+    proven dead/zombie/reused peer, independently of the inactivity verdict,
+    and counts only watched-file changes as progress.
     """
     def unknown():
         # An unreadable interval cannot be evidence of continuous inactivity.
@@ -812,7 +816,8 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
                     and (pid, tuple(previous['identity'])) in old):
                 return 3  # A reused PID is not the awaited peer's successor.
             if previous['identity'] == list(identity):
-                advancing = runnable or files != previous['files'] or any(value > old.get(key, -1) for key, value in observed.items())
+                advancing = files != previous['files'] or not while_alive and (
+                    runnable or any(value > old.get(key, -1) for key, value in observed.items()))
                 if not advancing:
                     record['since'] = previous['since']
     except (OSError, ValueError, KeyError, TypeError):
@@ -1415,7 +1420,8 @@ def main():
     observer = commands.add_parser('progress-check')
     observer.add_argument('record', type=Path)
     observer.add_argument('pid', type=int)
-    observer.add_argument('inactivity', type=float)
+    observer.add_argument('inactivity', type=lambda value: float(
+        positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT) if value == 'default' else value))
     observer.add_argument('paths', nargs='*')
     observer.add_argument('--while-alive', action='store_true')
     gater = commands.add_parser('gate')

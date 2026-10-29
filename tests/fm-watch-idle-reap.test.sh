@@ -14,6 +14,7 @@ set -u
 
 WATCH="$ROOT/bin/fm-watch.sh"
 TMP_ROOT=$(fm_test_tmproot fm-watch-idle-reap-tests)
+count_watch_polls
 
 # Start a watcher with every other cadence switched off, so only the sweep can fire.
 start_watcher() {  # <state> <fakebin> <out> [extra env...]
@@ -49,6 +50,7 @@ install_run_once() {  # <fakebin> <real-sweep>
   cat > "$1/reap-once" <<SH
 #!/usr/bin/env bash
 mkdir "$1/reap-once.started" 2>/dev/null || exit 0
+printf '%s\n' "\$\$" > "$1/reap-once.started/pid"
 exec "$2" "\$@"
 SH
   chmod +x "$1/reap-once"
@@ -129,7 +131,7 @@ wait_clocked_polls() {
   local state=$1 pid=$2 count
   count=$(cat "$state/.test-poll-completed-$pid" 2>/dev/null || true)
   case "$count" in ''|*[!0-9]*) count=0 ;; esac
-  fm_test_wait_until --while-alive "$pid" -- polls_completed "$state" "$pid" "$((count + 2))" \
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- polls_completed "$state" "$pid" "$((count + 2))" \
     || { stop_owned_watcher "$pid"; fail "the clocked watcher did not complete two polls"; }
 }
 
@@ -171,9 +173,9 @@ test_successive_watchers_preserve_the_cleanup_deadline() {
     pid=$!
     wait_clocked_polls "$state" "$pid"
     if [ "$expected" -gt 0 ]; then
-      fm_test_wait_until --while-alive "$pid" -- sweep_count_is "$state" "$expected" \
+      fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_count_is "$state" "$expected" \
         || { stop_owned_watcher "$pid"; fail "$step watcher did not retain the original sweep deadline"; }
-      fm_test_wait_until --while-alive "$pid" -- sweep_finished "$state" \
+      fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_finished "$state" \
         || { stop_owned_watcher "$pid"; fail "$step sweep did not finish"; }
     fi
     sweep_count_is "$state" "$expected" \
@@ -192,8 +194,8 @@ test_sweep_runs_detached_on_its_interval_with_the_home() {
   install_sweep "$fakebin" 'exit 0'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=1 FM_IDLE_REAP_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the sweep"; }
-  fm_test_wait_until --while-alive "$pid" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "the sweep did not repeat on its interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the sweep"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "the sweep did not repeat on its interval"; }
   case "$(head -n 1 "$state/.sweep-calls")" in
     "reap|$dir|$state|"*) ;;
     *) stop_owned_watcher "$pid"; fail "the sweep is started as 'reap' with this home: $(head -n 1 "$state/.sweep-calls")" ;;
@@ -246,7 +248,9 @@ test_stock_lab_watcher_reaps_through_real_teardown() (
     FM_IDLE_REAP_BIN="$fakebin/reap-once" \
     FM_IDLE_REAP_TEARDOWN_BIN="$dir/code-root/bin/fm-teardown.sh" FM_TEARDOWN_GUARD_DONE=1
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- grep -q $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- test -s "$fakebin/reap-once.started/pid" \
+    || { stop_owned_watcher "$pid"; fail "the lab watcher never started the sweep: $(cat "$out.err")"; }
+  fm_test_wait_until --while-alive "$(cat "$fakebin/reap-once.started/pid")" -- grep -q $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
     || { stop_owned_watcher "$pid"; fail "the lab watcher did not report the reaped task: $(cat "$state/idle-sessions.report" 2>/dev/null) $(cat "$out.err")"; }
   stop_owned_watcher "$pid"
   assert_grep $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
@@ -295,7 +299,7 @@ test_failing_sweep_never_stops_the_poll() {
   install_sweep "$fakebin" 'echo "boom" >&2; exit 1'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=1 FM_IDLE_REAP_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing sweep must be retried on the next interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing sweep must be retried on the next interval"; }
   is_live_non_zombie "$pid" || fail "a failing sweep must not stop the watcher"
   [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a failing sweep must not wake firstmate"; }
   stop_owned_watcher "$pid"
@@ -308,7 +312,7 @@ test_hung_sweep_is_never_doubled() {
   install_sweep "$fakebin" 'exec sleep 30'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=1 FM_IDLE_REAP_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung-sweep case never started a sweep"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung-sweep case never started a sweep"; }
   sleep 4
   hung=$(head -n 1 "$state/.sweep-calls" | cut -d'|' -f4)
   if [ "$(sweep_calls "$state")" != 1 ]; then
@@ -329,8 +333,8 @@ test_lavish_sweep_runs_detached_on_its_interval_in_auto_mode() {
   install_sweep "$fakebin" 'exit 0'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the Lavish sweep"; }
-  fm_test_wait_until --while-alive "$pid" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "the Lavish sweep did not repeat on its interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the Lavish sweep"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "the Lavish sweep did not repeat on its interval"; }
   case "$(head -n 1 "$state/.sweep-calls")" in
     "sweep --auto|$dir|$state|"*) ;;
     *) stop_owned_watcher "$pid"; fail "the Lavish sweep is started as 'sweep --auto' with this home: $(head -n 1 "$state/.sweep-calls")" ;;
@@ -353,7 +357,7 @@ test_lavish_sweep_first_run_waits_and_zero_turns_it_off() {
     stop_owned_watcher "$pid"
     fail "a fresh watcher must not run the Lavish sweep before one interval has passed"
   fi
-  fm_test_wait_until --while-alive "$pid" -- test -e "$state/.lavish-auto-retire-next" \
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- test -e "$state/.lavish-auto-retire-next" \
     || { stop_owned_watcher "$pid"; fail "the first Lavish sweep deadline is recorded so a restart keeps it"; }
   stop_owned_watcher "$pid"
   dir=$(make_case lavish-auto-off); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
@@ -376,7 +380,7 @@ test_lavish_sweep_failing_or_hung_never_stops_the_poll() {
   install_sweep "$fakebin" 'echo "boom" >&2; exit 1'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing Lavish sweep must be retried on the next interval"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing Lavish sweep must be retried on the next interval"; }
   is_live_non_zombie "$pid" || fail "a failing Lavish sweep must not stop the watcher"
   [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a failing Lavish sweep must not wake firstmate by itself"; }
   stop_owned_watcher "$pid"
@@ -384,7 +388,7 @@ test_lavish_sweep_failing_or_hung_never_stops_the_poll() {
   install_sweep "$fakebin" 'exec sleep 30'
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung Lavish sweep case never started a sweep"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung Lavish sweep case never started a sweep"; }
   sleep 4
   hung=$(head -n 1 "$state/.sweep-calls" | cut -d'|' -f4)
   if [ "$(sweep_calls "$state")" != 1 ]; then
@@ -419,7 +423,7 @@ test_merge_prune_sweep_starts_for_an_armed_record_and_waits_for_one() {
     fail "the prune sweep must not start while no merge-prune record exists"
   fi
   arm_merge_prune_record "$state" t1
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the prune sweep for an armed record"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the prune sweep for an armed record"; }
   case "$(head -n 1 "$state/.sweep-calls")" in
     "sweep|$dir|$state|"*) ;;
     *) stop_owned_watcher "$pid"; fail "the prune sweep is started as 'sweep' with this home: $(head -n 1 "$state/.sweep-calls")" ;;
@@ -459,7 +463,7 @@ exit 0'
   arm_merge_prune_record "$state" t1
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=1 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- test ! -e "$state/t1.merge-prune" || { stop_owned_watcher "$pid"; fail "the prune sweep was not retried while the record stayed: $(sweep_calls "$state") call(s)"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 10 "$(watch_polls_file "$state" "$pid")" -- test ! -e "$state/t1.merge-prune" || { stop_owned_watcher "$pid"; fail "the prune sweep was not retried while the record stayed: $(sweep_calls "$state") call(s)"; }
   sleep 4
   sweep_count_is "$state" 3 || { stop_owned_watcher "$pid"; fail "want 3 attempts (two that leave the record, one that retires it), got $(sweep_calls "$state")"; }
   is_live_non_zombie "$pid" || fail "a retried prune sweep must not stop the watcher"
@@ -475,7 +479,7 @@ test_merge_prune_sweep_still_running_is_never_doubled() {
   arm_merge_prune_record "$state" t1
   start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_MERGE_PRUNE_INTERVAL=1 FM_MERGE_PRUNE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung prune sweep case never started a sweep"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 5 "$(watch_polls_file "$state" "$pid")" -- sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung prune sweep case never started a sweep"; }
   sleep 4
   hung=$(head -n 1 "$state/.sweep-calls" | cut -d'|' -f4)
   if [ "$(sweep_calls "$state")" != 1 ]; then
@@ -584,14 +588,14 @@ test_poll_watcher_uses_the_resolved_interval() {
   poll_install_recording_sleep "$fakebin" "$log"
   poll_start_watcher "$dir" "$state" "$fakebin" "$out"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- poll_logged "$log" 30 || { stop_owned_watcher "$pid"; fail "a secondmate-home watcher must sleep 30 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- poll_logged "$log" 30 || { stop_owned_watcher "$pid"; fail "a secondmate-home watcher must sleep 30 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
   stop_owned_watcher "$pid"
   poll_logged "$log" 15 && fail "a secondmate-home watcher must not use the 15-second interval"
   dir=$(make_case poll-watcher-primary); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
   poll_install_recording_sleep "$fakebin" "$log"
   poll_start_watcher "$dir" "$state" "$fakebin" "$out"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- poll_logged "$log" 15 || { stop_owned_watcher "$pid"; fail "a primary-home watcher must sleep 15 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- poll_logged "$log" 15 || { stop_owned_watcher "$pid"; fail "a primary-home watcher must sleep 15 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
   stop_owned_watcher "$pid"
   poll_logged "$log" 30 && fail "a primary-home watcher must not use the 30-second interval"
   dir=$(make_case poll-watcher-config); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
@@ -599,14 +603,14 @@ test_poll_watcher_uses_the_resolved_interval() {
   poll_install_recording_sleep "$fakebin" "$log"
   poll_start_watcher "$dir" "$state" "$fakebin" "$out"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- poll_logged "$log" 41 || { stop_owned_watcher "$pid"; fail "config/watch-poll must set the watcher interval: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- poll_logged "$log" 41 || { stop_owned_watcher "$pid"; fail "config/watch-poll must set the watcher interval: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
   stop_owned_watcher "$pid"
   dir=$(make_case poll-watcher-env); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
   poll_mark_secondmate "$dir"; mkdir -p "$dir/config"; printf '41\n' > "$dir/config/watch-poll"
   poll_install_recording_sleep "$fakebin" "$log"
   poll_start_watcher "$dir" "$state" "$fakebin" "$out" FM_POLL=7
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- poll_logged "$log" 7 || { stop_owned_watcher "$pid"; fail "FM_POLL must beat config/watch-poll: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- poll_logged "$log" 7 || { stop_owned_watcher "$pid"; fail "FM_POLL must beat config/watch-poll: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
   stop_owned_watcher "$pid"
   poll_logged "$log" 41 && fail "config/watch-poll must not be used while FM_POLL is set"
   pass "a running watcher sleeps the resolved interval: role default, config override, FM_POLL first"
@@ -625,7 +629,7 @@ test_poll_status_change_noticed_within_one_longer_interval() {
   poll_install_recording_sleep "$fakebin" "$log"
   poll_start_watcher "$dir" "$state" "$fakebin" "$out"
   pid=$!
-  fm_test_wait_until --while-alive "$pid" -- poll_logged "$log" 4 || { stop_owned_watcher "$pid"; fail "the watcher never reached its first interval wait"; }
+  fm_test_wait_until --while-alive "$pid" --cycles 3 "$(watch_polls_file "$state" "$pid")" -- poll_logged "$log" 4 || { stop_owned_watcher "$pid"; fail "the watcher never reached its first interval wait"; }
   printf 'blocked: needs a decision\n' > "$status_file"
   written=$(date +%s)
   waited=0
