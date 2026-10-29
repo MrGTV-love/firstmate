@@ -1,0 +1,25 @@
+===== 3ea6d935c: literal case totals in tests/
+$ git grep -nE '"\$total" = [0-9]+|[0-9]+-case (inventory|cover)|wc -l.*= *[0-9]{2,}' 3ea6d935c -- tests/
+3ea6d935c:tests/fm-backend-herdr.test.sh:5885:  [ "$total" = 1 ] || fail "expected no orphaned workspaces after 3 cycles, got $total total: $(jq -c '.workspaces' "$state")"
+3ea6d935c:tests/fm-pr-merge-helpers.sh:608:  if [ "$total" = 0 ]; then
+3ea6d935c:tests/fm-test-run.test.sh:501:  [ "$total" = 341 ] \
+3ea6d935c:tests/fm-test-run.test.sh:502:    || fail "the teardown groups register $total cases, not the 341-case inventory they partition"
+3ea6d935c:tests/fm-test-run.test.sh:503:  pass "the teardown groups are a duplicate-free 341-case cover, each case registered by the file that defines it"
+3ea6d935c:tests/fm-test-run.test.sh:3261:  [ "$total" = 160 ] \
+3ea6d935c:tests/fm-test-run.test.sh:3262:    || fail "the control-relaunch groups register $total cases, not the 160-case inventory they partition"
+3ea6d935c:tests/fm-test-run.test.sh:3263:  pass "the control-relaunch groups are a duplicate-free 160-case cover, each case registered by the file that defines it"
+3ea6d935c:tests/fm-test-run.test.sh:3290:  [ "$total" = 67 ] \
+3ea6d935c:tests/fm-test-run.test.sh:3291:    || fail "the watch-triage-waits groups call $total cases, not the 67-case inventory they partition"
+3ea6d935c:tests/fm-test-run.test.sh:3292:  pass "the watch-triage-waits groups are a duplicate-free 67-case cover, each case defined in the shared helper"
+3ea6d935c:tests/fm-test-run.test.sh:3354:  [ "$total" = 158 ] \
+3ea6d935c:tests/fm-test-run.test.sh:3355:    || fail "the fm-pr-merge groups register $total cases, not the 158-case inventory they partition"
+3ea6d935c:tests/fm-test-run.test.sh:3356:  pass "the fm-pr-merge groups are a duplicate-free 158-case cover, each case registered by the file that defines it"
+3ea6d935c:tests/fm-test-run.test.sh:3394:  [ "$total" = 86 ] \
+3ea6d935c:tests/fm-test-run.test.sh:3395:    || fail "the fm-lint groups register $total cases, not the 86-case inventory they partition"
+3ea6d935c:tests/fm-test-run.test.sh:3396:  pass "the fm-lint groups are a duplicate-free 86-case cover, each case registered by the file that defines it"
+===== HEAD: literal case totals in tests/
+$ git grep -nE '"\$total" = [0-9]+|[0-9]+-case (inventory|cover)|wc -l.*= *[0-9]{2,}' HEAD -- tests/
+HEAD:tests/fm-backend-herdr.test.sh:5885:  [ "$total" = 1 ] || fail "expected no orphaned workspaces after 3 cycles, got $total total: $(jq -c '.workspaces' "$state")"
+HEAD:tests/fm-pr-merge-helpers.sh:608:  if [ "$total" = 0 ]; then
+===== HEAD: every assignment/compare of a count variable near a registry in tests/
+HEAD:tests/fm-test-run.test.sh:2221:  union_count=$(printf '%s\n' "$s1" "$s2" "$serial" "$herdr" | LC_ALL=C sort -u | wc -l | tr -d ' ')

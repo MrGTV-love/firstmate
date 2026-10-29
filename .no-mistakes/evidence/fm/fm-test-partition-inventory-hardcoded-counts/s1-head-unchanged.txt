@@ -1,0 +1,8 @@
+$ bin/fm-proc-budget.sh -- partition-driver.sh <head copy> tests/fm-test-run.test.sh <6 partition cases>
+ok - the partition checks catch an unregistered, ghost, duplicated, or unlisted case and accept an added test
+ok - the teardown groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the control-relaunch groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the watch-triage scripts call each helper-defined case exactly once
+ok - the fm-pr-merge groups are a duplicate-free cover, each case registered by the file that defines it
+ok - the fm-lint groups are a duplicate-free cover, each case registered by the file that defines it
+exit=0

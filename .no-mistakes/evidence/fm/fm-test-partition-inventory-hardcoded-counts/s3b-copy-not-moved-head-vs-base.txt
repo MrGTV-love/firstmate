@@ -1,0 +1,12 @@
+===== HEAD c44521709
+### head + copy-not-moved -> test_pr_merge_groups_partition_one_inventory
+    edit: +test_derived_author_coverage() { :; }
+    edit: +test_derived_author_coverage
+not ok - the fm-pr-merge groups do not partition their suite: registered in more than one group: test_derived_author_coverage ;defined in more than one group: test_derived_author_coverage 
+exit=1
+===== BASE 3ea6d935c
+### base + copy-not-moved -> test_pr_merge_groups_partition_one_inventory
+    edit: +test_derived_author_coverage() { :; }
+    edit: +test_derived_author_coverage
+not ok - an fm-pr-merge case is registered in more than one group: test_derived_author_coverage
+exit=1
