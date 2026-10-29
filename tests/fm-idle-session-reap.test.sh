@@ -33,6 +33,7 @@ case "$mode" in
   ok) rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
+  nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
   hang) exec sleep 30 ;;
   slow) for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo "teardown step $i"; sleep 1; done; rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   real) exec "$ROOT/bin/fm-teardown.sh" "$@" ;;
@@ -405,6 +406,25 @@ test_lease_refusal_is_transient() {
   out=$(run_reap "$home" reap) || fail "second reap failed: $out"
   [ "$(calls)" = 2 ] || fail "a leased task is offered again on the next pass (calls=$(calls))"
   pass "a lease refusal is skipped without a memo and retried next pass"
+}
+
+# Teardown whose no-mistakes read went silent knows nothing yet and exits 75. That
+# is a retry, never a refusal: no memo, so the task is not parked for the retry
+# interval, and the next sweep offers it again.
+test_unknown_no_mistakes_read_is_retried_not_parked() {
+  local home out
+  home=$(make_home nmunknown)
+  : > "$STUB_LOG"
+  printf 'nm-unknown\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-nm scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-nm
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-nm lock-skipped "an unknown no-mistakes read is a retry"
+  assert_absent "$home/state/.idle-reap/scout-nm.refused" "an unknown no-mistakes read records no refusal memo"
+  assert_present "$home/state/scout-nm.meta" "an unknown no-mistakes read preserves the task record"
+  out=$(run_reap "$home" reap) || fail "second reap failed: $out"
+  [ "$(calls)" = 2 ] || fail "a task whose no-mistakes read was unknown is offered again on the next pass (calls=$(calls))"
+  pass "an unknown no-mistakes read is retried on the next pass, with no memo and no park"
 }
 
 
@@ -1051,6 +1071,7 @@ test_budget_bounds_teardowns_per_pass
 test_refusal_is_remembered_and_retried_on_change
 test_real_teardown_refusal_preserves_the_task
 test_lease_refusal_is_transient
+test_unknown_no_mistakes_read_is_retried_not_parked
 test_project_lock_contention_is_skipped_and_retried
 test_project_lock_fresh_publication_is_skipped_not_refused
 test_project_lock_acquisition_error_is_not_skipped

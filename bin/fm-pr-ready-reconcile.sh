@@ -12,8 +12,11 @@
 # registered when fm-crew-state.sh reads its run as `checks green: PR ready for
 # review` naming the run's PR; otherwise a missing declaration is a no-op. That
 # read searches the run's full ci log for its newest checks marker, so a green
-# PR stays green however often main advances, under its own ten-second limit; a
-# read past it is printed and skipped for this pass so later records still run.
+# PR stays green however often main advances. That read, and the completion
+# gate's run-status read inside it and inside fm-pr-check.sh, are stopped only when
+# they go silent for this pass's stall interval; a silent read is printed as
+# unknown and skipped for this pass so later records still run, and a registration
+# whose run did not answer (fm-pr-check.sh exit 75) is unknown, never a refusal.
 # A refusal is printed with fm-pr-check.sh's error lines as its reason, queued as
 # one check wake per distinct reason, and
 # retained per task for ten minutes, during which the task is skipped before any
@@ -76,7 +79,7 @@ crew_state_ready_url() {  # <id>
   local line component rc=0
   line=$(fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_STALL_SECS" \
-    "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
+    FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
   ! fm_timed_out "$rc" || return 124
   [ "$rc" -eq 0 ] || return 1
   case "$line" in "state: done · "*" · $READY_DETAIL"*': '*) ;; *) return 1 ;; esac
@@ -139,13 +142,14 @@ reconcile_one() {  # <meta> <id>
   fm_pr_url_parse "$url" || return 0
   url=$FM_PR_URL
   [ ! -f "$refusal" ] || [ -L "$refusal" ] || previous=$(cat -- "$refusal" 2>/dev/null) || previous=
-  rm -f -- "$refusal"
-  if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+  if output=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" \
     "$SCRIPT_DIR/fm-pr-check.sh" "$id" "$url" 2>&1); then
+    rm -f -- "$refusal"
     printf 'pr-ready: %s: registered %s\n' "$id" "$url"
   elif [ "$?" -eq 75 ]; then
-    # The run did not answer, so nothing was refused: no refusal memo and no wake,
-    # and the next pass reads it again.
+    # The run did not answer, so nothing was refused: no new wake, and the last
+    # refusal memo stays as it is, so a repeat of that refusal is not woken twice;
+    # its age is already past the back-off, so the next pass reads it again.
     printf 'pr-ready: %s: the run did not answer, so registration of %s is unknown; read again next pass\n' "$id" "$url"
   else
     # Only the registrar's own error lines are the reason: the fm-guard.sh

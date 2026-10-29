@@ -388,6 +388,34 @@ done
 assert_unregistered ready
 pass 'a registrar that reports an unanswered run is unknown: no refusal memo, no wake, asked again next pass'
 
+# An unanswered run between two identical refusals keeps the first refusal's memo,
+# so the repeat is recognised and queues no second wake for the same reason.
+make_case registrar-unknown-between-refusals
+write_ship ready
+cp -R "$ROOT/bin" "$CASE/bin"
+cat > "$CASE/bin/fm-pr-check.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "$(cat "$FM_READY_CASE/pr-check.mode")" = unknown ]; then exit 75; fi
+echo 'error: PR is still a draft' >&2
+exit 1
+SH
+chmod +x "$CASE/bin/fm-pr-check.sh"
+memo="$CASE/home/state/.pr-ready-reconcile/ready.refused"
+for mode in refuse unknown refuse; do
+  printf '%s\n' "$mode" > "$CASE/pr-check.mode"
+  [ ! -e "$memo" ] || fm_touch_epoch "$(($(date +%s) - 3600))" "$memo"
+  FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" FM_HOME="$CASE/home" \
+    FM_STATE_OVERRIDE="$CASE/home/state" FM_CONFIG_OVERRIDE="$CASE/home/config" \
+    FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" PATH="$FAKEBIN:$PATH" \
+    bash "$CASE/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1
+  if [ "$mode" = unknown ]; then
+    grep -qx 'error: PR is still a draft' "$memo" 2>/dev/null \
+      || fail "an unanswered run dropped the earlier refusal memo: $(cat "$CASE/pass.out")"
+  fi
+done
+[ "$(refusal_wakes ready)" -eq 1 ] || fail "a refusal repeated after an unanswered run queued $(refusal_wakes ready) wakes, want 1"
+pass 'an unanswered run between two identical refusals keeps the memo, so the repeat queues no second wake'
+
 make_case registration
 write_ship ready
 before=$(occupancy)

@@ -1424,12 +1424,62 @@ test_slow_working_daemon_still_finds_the_parked_run() {
   FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
   FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
   FM_FAKE_NM_STATUS_BURN_SECS=13 FM_FAKE_NM_BURN_MARK="$case_dir/nm-burned" FM_TEARDOWN_NM_STALL_SECS=2 \
+  FM_DURATION_NO_PROGRESS_SECS=20 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "parked-run-daemon-slow: a slow, working daemon should not block teardown"
   assert_grep "abort --run" "$case_dir/nm-abort.log" \
     "parked-run-daemon-slow: the parked run was not found and aborted"
-  pass "a slow, working daemon still lets teardown find and abort the parked run"
+  assert_grep "task-x1 is still waiting on a no-mistakes read" "$case_dir/stderr" \
+    "parked-run-daemon-slow: teardown printed no progress while it waited, so a sweep could call it silent"
+  pass "a slow, working daemon still lets teardown find and abort the parked run, with progress while it waits"
+}
+
+# The captain's --force discard is not held hostage by a quiet daemon: once the
+# parked-run lookup is unknown, teardown goes on, and says and records that the
+# run state is unknown.
+test_forced_teardown_goes_on_past_a_silent_daemon() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-silent-forced: --force should go on past an unknown run state"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "force goes on with the no-mistakes run state unknown" "$case_dir/stderr" \
+    "parked-run-daemon-silent-forced: teardown did not say the run state is unknown"
+  assert_grep "run state unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-daemon-silent-forced: teardown did not record the unknown run state"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-daemon-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent daemon and records the run state as unknown"
+}
+
+test_forced_teardown_goes_on_past_a_silent_confirmation() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-confirmation-silent-forced: --force should go on past an unknown abort"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-confirmation-silent-forced: the parked run was not aborted first"
+  assert_grep "stopped after the abort is unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-confirmation-silent-forced: teardown did not record the unknown abort outcome"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-confirmation-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent abort confirmation and records it as unknown"
 }
 
 # After the abort is sent, only the confirming read goes quiet. That is not "still
@@ -6196,6 +6246,8 @@ test_parked_own_run_refuses_when_abort_is_unconfirmed
 test_silent_daemon_leaves_the_parked_run_unknown
 test_slow_working_daemon_still_finds_the_parked_run
 test_silent_confirmation_after_abort_is_unknown
+test_forced_teardown_goes_on_past_a_silent_daemon
+test_forced_teardown_goes_on_past_a_silent_confirmation
 test_mismatched_run_after_abort_refuses_unconfirmed
 test_empty_status_after_abort_refuses_unconfirmed
 test_not_found_status_after_abort_confirms_completion

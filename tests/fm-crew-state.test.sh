@@ -1799,7 +1799,7 @@ test_terminal_passed_with_merged_gitlab_mr_reports_merged() {
 
 # A forge read cannot show progress, so its bound is this host's measured one, and
 # running out of it says nothing about the PR. A host where the same read has taken
-# three seconds gets nine: a read that takes eight is slow, not hung, and must name
+# five seconds gets fifteen: a read that takes eight is slow, not hung, and must name
 # the PR's state. One that never answers is stopped and the state is unknown, said as
 # "timed out; try again" so it is not mistaken for a read that failed.
 test_forge_read_bound_follows_the_measured_ledger() {
@@ -1812,7 +1812,7 @@ test_forge_read_bound_follows_the_measured_ledger() {
     "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/14"
   ledger="$d/durations.jsonl"
   for i in 1 2 3 4 5; do
-    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 3000 0 >/dev/null 2>&1 \
+    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record crew-state.forge-read 5000 0 >/dev/null 2>&1 \
       || fail "could not seed the duration ledger"
   done
   FM_FAKE_GLAB_STATE=opened
