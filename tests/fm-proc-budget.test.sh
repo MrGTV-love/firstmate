@@ -1005,7 +1005,7 @@ run_slow_tree() {
   wrapper=$!
   wait_for_file "$dir/ready" "$wrapper" || { wait "$wrapper"; echo $?; return; }
   start_neighbours "$neighbours" || {
-    kill "$wrapper"
+    : >"$dir/go"
     wait "$wrapper"
     fail "the neighbours never started (fork limit reached?)"
   }
