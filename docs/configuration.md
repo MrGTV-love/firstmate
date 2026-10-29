@@ -2774,7 +2774,7 @@ When a project branch named `archive` fills either folder name with a file, Git 
 The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so a ref Git has packed cannot be repointed or removed by a file write, by a rename onto `packed-refs` or by a Git command.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
 Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.
-`fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` and `git pull` exit 0 and keep the remote-tracking ref of a branch the remote deleted: a confined worker's fetch never prunes.
+`fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` exits 0 under that setting and keeps the remote-tracking ref of a branch the remote deleted; a `remote.<name>.prune=true` setting or an explicit `--prune` still prunes and fails as listed below.
 These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
 
 - `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`, or `could not delete references` when they prune more than one ref;
