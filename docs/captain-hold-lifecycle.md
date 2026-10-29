@@ -371,7 +371,7 @@ A record of that request must match the token, read through the record's owner a
 A hold reason with no such token, or a token that no record matches, is refused, and the hold stays held.
 The refusal names which fact is missing: no `corr=<id>` token, or a token with no matching record.
 A legacy hold without provenance stays the captain's: it is released only by the captain's recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`), and `decide` refuses it.
-A hold filed before this rule carries a `corr=<id>` token only if its filer copied one into the reason, so `classify` may not free such a hold: the 2026-10-28 PR 290 hold, whose reason carries no token, still needs the captain's words or a captain ruling.
+A hold filed before this rule carries a `corr=<id>` token only if its filer copied one into the reason, so `classify` may not free such a hold, and one without a token still needs the captain's words or a captain ruling.
 
 ## Reconcile: re-check reality, never a blind close
 
@@ -771,6 +771,7 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
 - `classify` moves a legacy hold with parent provenance to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.
   It refuses a legacy hold without parent provenance, or whose correlation the parent never recorded, and leaves it held for the captain, so `decide` still refuses it.
+  In a remote mate it accepts a hold whose correlation matches a relayed request in the home's parent-route steering inbox, and its refusal names whether the token or the matching record is missing.
   It refuses a missing record piece, any owner other than the parent, a recorded captain or parent owner, a task that is not a captain hold, a second classification, and a main home.
   A legacy hold that is the captain's is marked so by `hold --owner captain`, which keeps it an open captain call and leaves nothing for `classify` to change.
   The classified hold reads as Main's classification in the held listing, leaves Bearings and the divergence check, and the captain's re-hold with `--owner captain` takes it back and makes `decide` refuse it.
