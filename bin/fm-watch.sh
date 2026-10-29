@@ -2262,7 +2262,7 @@ procevent_surface_queued() {
 run_check_process() {
   local c=$1
   shift
-  exec bash "$c" "$@"
+  exec python3 "$SCRIPT_DIR/fm-check-run.py" "$FM_CHECK_OWNER_FD" -- bash "$c" "$@"
 }
 
 run_check() {
@@ -2280,8 +2280,18 @@ FM_CHECK_SIGNAL_PENDING=
 FM_CHECK_WAIT_FD=
 FM_CHECK_WAIT_WRITER=
 FM_CHECK_WAIT_FIFO=
+FM_CHECK_OWNER_FD=
+FM_CHECK_OWNER_WRITER=
 
 fm_check_output_cleanup() {
+  if [ -n "$FM_CHECK_OWNER_WRITER" ]; then
+    eval "exec $FM_CHECK_OWNER_WRITER>&-"
+    FM_CHECK_OWNER_WRITER=
+  fi
+  if [ -n "$FM_CHECK_OWNER_FD" ]; then
+    eval "exec $FM_CHECK_OWNER_FD<&-"
+    FM_CHECK_OWNER_FD=
+  fi
   if [ -n "$FM_CHECK_WAIT_FD" ]; then
     eval "exec $FM_CHECK_WAIT_FD<&-"
     FM_CHECK_WAIT_FD=
@@ -2309,6 +2319,15 @@ fm_check_wait_open() {
   eval "exec $FM_CHECK_WAIT_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_WAIT_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
   rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
   FM_CHECK_WAIT_FIFO=
+  if [ "${FM_CAPTURE_PROGRESS:-}" = 1 ]; then
+    FM_CHECK_OWNER_WRITER=$(fm_timeout_free_fd $((FM_CHECK_WAIT_FD + 1))) || return 1
+    FM_CHECK_OWNER_FD=$(fm_timeout_free_fd $((FM_CHECK_OWNER_WRITER + 1))) || return 1
+    FM_CHECK_WAIT_FIFO="$FM_CHECK_OUTPUT.owner"
+    mkfifo -m 600 "$FM_CHECK_WAIT_FIFO" || return 1
+    eval "exec $FM_CHECK_OWNER_WRITER<>\"\$FM_CHECK_WAIT_FIFO\" $FM_CHECK_OWNER_FD<\"\$FM_CHECK_WAIT_FIFO\"" || return 1
+    rm -f -- "$FM_CHECK_WAIT_FIFO" || return 1
+    FM_CHECK_WAIT_FIFO=
+  fi
 }
 
 # Keep the existing hundredth-second stop bounds, but spend one process for the
@@ -2363,6 +2382,8 @@ watcher_stop_signals() {
 
 # Capture a check without blocking bash inside a command substitution, so the
 # poll shell keeps publishing its beacon while observing check progress.
+# fm-check-run.py connects a watcher-only pipe to the process-budget guardian:
+# owner EOF or launcher death cleans the tree even when SIGKILL bypasses EXIT.
 run_check_capture() {
   FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
 }
@@ -2394,6 +2415,9 @@ run_owned_capture() {
   check_started=$SECONDS
   (
     eval "exec $FM_CHECK_WAIT_FD<&-"
+    # Only the watcher retains this writer. SIGKILL therefore gives the shared
+    # guardian an independent owner-loss signal even when EXIT cannot run.
+    [ -z "$FM_CHECK_OWNER_WRITER" ] || eval "exec $FM_CHECK_OWNER_WRITER>&-"
     if [ "$capture_stderr" = discard ]; then
       "$@" 2> "$FM_CHECK_OUTPUT.stderr"
     else

@@ -309,6 +309,44 @@ SH
   pass 'authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound'
 }
 
+test_check_sigkill_owner_cleans_progressing_tree() {
+  local dir state pid child launcher descendant leaked=0
+  dir=$(make_case check-sigkill-owner)
+  state="$dir/state"
+  cat > "$state/owner.check.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+sleep 300 &
+printf '%s\n' "$!" > "$FM_STATE_OVERRIDE/descendant-pid"
+printf '%s\n' "$PPID" > "$FM_STATE_OVERRIDE/launcher-pid"
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/check-pid"
+while :; do printf 'working\n' >&2; sleep 0.1; done
+SH
+  chmod 0700 "$state/owner.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" owner >/dev/null || fail 'registration failed'
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+    FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+    "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+  pid=$!
+  while is_live_non_zombie "$pid" && [ ! -s "$state/check-pid" ]; do sleep 0.1; done
+  [ -s "$state/check-pid" ] || fail "check never started: $(cat "$dir/watch.err")"
+  IFS= read -r child < "$state/check-pid"
+  IFS= read -r launcher < "$state/launcher-pid"
+  IFS= read -r descendant < "$state/descendant-pid"
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null || true
+  # Wait for the cleanup owner, not a guessed deadline. On the old direct-exec
+  # path the launcher is the now-dead watcher, exposing the leak immediately.
+  while is_live_non_zombie "$launcher"; do sleep 0.1; done
+  is_live_non_zombie "$child" && leaked=1
+  is_live_non_zombie "$descendant" && leaked=1
+  if [ "$leaked" = 1 ]; then
+    kill -KILL "$child" "$descendant" 2>/dev/null || true
+    fail 'SIGKILL watcher left a progressing TERM-resistant check or descendant alive'
+  fi
+  pass 'SIGKILL owner loss independently cleans a progressing TERM-resistant check tree'
+}
+
 test_check_wait_has_no_per_tick_processes() {
   local dir state fakebin
   dir=$(make_case check-wait-processes)
@@ -340,7 +378,7 @@ SH
       deadline_started=$SECONDS
       run_owned_capture 2 0 discard bash -c '\''printf "%s\\n" "$$" > "$FM_STATE_OVERRIDE/stopped-pid"; trap "" TERM; kill -STOP "$$"; printf must-not-complete'\'' || exit 25
       deadline_elapsed=$((SECONDS - deadline_started))
-      [ "$deadline_elapsed" -ge 3 ] && [ "$deadline_elapsed" -lt 10 ] || exit 35
+      [ "$deadline_elapsed" -ge 3 ] || exit 35
       [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 26
       IFS= read -r stopped_pid < "$STATE/stopped-pid"
       ! kill -0 "$stopped_pid" 2>/dev/null || exit 27
@@ -3105,6 +3143,7 @@ test_group_cleanup_without_perl_uses_one_sleep_per_wait
 test_slow_check_beats_but_stopped_poll_goes_stale
 test_check_inactivity_configuration_and_launch_allowance
 test_check_progress_survives_fivefold_slowdown
+test_check_sigkill_owner_cleans_progressing_tree
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

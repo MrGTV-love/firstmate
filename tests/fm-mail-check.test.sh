@@ -65,6 +65,7 @@ enter_mailbox() {
   [ -e "$home/bin/fm-path-lib.sh" ] || ln -s "$ROOT/bin/fm-path-lib.sh" "$home/bin/fm-path-lib.sh"
   {
     printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016 # Positional parameters belong to the generated shim.
     printf 'case "$1" in -c|*/fm-duration.py) exec %q "$@" ;; esac\n' "$REAL_PYTHON"
     printf '%s\n' "$generator"
   } > "$FAKEBIN/python3"
@@ -225,6 +226,7 @@ test_silent_poll_is_unknown_and_retried() {
   local home out attempt
   home=$(make_home silent)
   write_env "$home"
+  # shellcheck disable=SC2016 # PID and home are resolved by the generated poll process.
   enter_mailbox "$home" 'printf "%s\n" "$$" > "$FM_HOME/poll-pid"; sleep 30'
   for attempt in 1 2; do
     out="$home/out-$attempt.txt"
