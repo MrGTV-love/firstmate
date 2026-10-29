@@ -339,7 +339,7 @@
 # read the landing proof needed prints "unknown: the no-mistakes run record did not
 # answer; retry teardown", fires no unlanded-work guard event and exits
 # FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
-# prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed,
+# prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing more closed,
 # except under --force, where the captain's authorized discard goes on and prints
 # and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
 # from then on every daemon read of that teardown and its children (FM_NM_READ_STALLED)
@@ -3165,7 +3165,7 @@ teardown_nm_run_status_merged() {  # <worktree> <stall-secs> <args...>
 teardown_nm_run_unknown() {  # <what is unknown>
   local why="the no-mistakes daemon went silent (no output or CPU progress for ${NM_TEARDOWN_STALL_SECS}s), so $1"
   if [ "$FORCE" != "--force" ]; then
-    echo "UNKNOWN: $why; nothing was closed, retry teardown." >&2
+    echo "UNKNOWN: $why; nothing more was closed, retry teardown." >&2
     exit "$FM_PROJECT_LOCK_BUSY_EXIT"
   fi
   echo "warning: $why; --force goes on with the no-mistakes run state unknown." >&2
