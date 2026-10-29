@@ -354,7 +354,7 @@ command_findings() {
     out=$(probe_output "$hit" $args_joined)
     status=$?
     if [ "$status" -eq 124 ]; then
-      emit "$name check unknown: $hit stopped making progress; retry next pass"
+      emit "$name check unknown: $hit stopped making progress; retry at the next tool-update interval"
       return 0
     fi
     version=$(parse_version "$out")
@@ -386,7 +386,7 @@ EOF
       announce_out=$(probe_output "$resolved_path" $announce_args)
       status=$?
       if [ "$status" -eq 124 ]; then
-        emit "$name check unknown: $resolved_path did not answer when asked for its update announcement; retry next pass"
+        emit "$name check unknown: $resolved_path did not answer when asked for its update announcement; retry at the next tool-update interval"
         announce_out=
       fi
     fi
@@ -442,7 +442,7 @@ git_probe_answered() {
   local status=$1 name=$2 subject=$3 question=$4
   case "$status" in
     124)
-      emit "$name check unknown: $subject did not answer $question; retry next pass"
+      emit "$name check unknown: $subject did not answer $question; retry at the next tool-update interval"
       return 1
       ;;
   esac
