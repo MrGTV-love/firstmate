@@ -47,18 +47,13 @@
 #
 # Probing costs real time, so `check` runs its probes at most once per
 # FM_TOOL_UPDATE_INTERVAL (default 900, 0 disables the gate, otherwise 60..86400)
-# and stays silent in between. Each probe is bounded by
-# FM_TOOL_UPDATE_PROBE_SECS (default 5, valid 1..30) and a whole sweep by
-# FM_TOOL_UPDATE_BUDGET_SECS (default 20, valid 1..120).
-#
-# The sweep has to finish inside the watcher's own per check bound, because a run
-# the watcher kills prints nothing and writes no record, so it would repeat that
-# silence on every poll. That coupling is enforced rather than assumed: a budget
-# larger than FM_CHECK_TIMEOUT (default 30, read from this check's own
-# environment because the watcher runs it as a direct child) allows is cut down
-# to what fits, and the cut is reported in the report line so the operator sees
-# it. A budget that cannot be read as a whole number from 1 to 120 is still
-# refused outright.
+# and stays silent in between. Each probe runs through fm_run_progress;
+# FM_TOOL_UPDATE_PROBE_SECS is a positive whole-second inactivity minimum for
+# the tool-update.probe ledger interval (five-second cold-start fallback).
+# Output or process-tree CPU progress keeps the probe alive. There is no sweep
+# deadline. A stopped probe is unknown, never current or an update. Independent
+# probes continue; an incomplete sweep preserves the last report and cadence
+# stamp so the next pass retries it rather than suppressing the uncertainty.
 #
 # The report record state/.tool-updates is written only when a sweep runs to its
 # end, and it carries the whole finding set the last report was made from,
@@ -126,65 +121,22 @@ if [ "$INTERVAL" -ne 0 ] && { [ "$INTERVAL" -lt 60 ] || [ "$INTERVAL" -gt 86400 
   exit 2
 fi
 
-PROBE_SECS=${FM_TOOL_UPDATE_PROBE_SECS:-5}
+# Harm: a silent, CPU-idle probe can hold a sweep indefinitely. Progress,
+# rather than elapsed sweep time, decides when its answer becomes unknown.
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
+PROBE_SECS=$(fm_duration_limit tool-update.probe "${FM_TOOL_UPDATE_PROBE_SECS:-5}")
 case "$PROBE_SECS" in
-  ''|*[!0-9]*|0)
-    printf 'fm-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
+  ''|*[!0-9]*|0*)
+    printf 'fm-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a positive whole number\n' >&2
     exit 2
     ;;
 esac
-if [ "$PROBE_SECS" -gt 30 ]; then
-  printf 'fm-tool-update-check: FM_TOOL_UPDATE_PROBE_SECS must be a whole number from 1 to 30\n' >&2
-  exit 2
-fi
 
-BUDGET_SECS=${FM_TOOL_UPDATE_BUDGET_SECS:-20}
-case "$BUDGET_SECS" in
-  ''|*[!0-9]*|0)
-    printf 'fm-tool-update-check: FM_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
-    exit 2
-    ;;
-esac
-if [ "$BUDGET_SECS" -gt 120 ]; then
-  printf 'fm-tool-update-check: FM_TOOL_UPDATE_BUDGET_SECS must be a whole number from 1 to 120\n' >&2
-  exit 2
-fi
-
-# The smallest bound a probe can be given, because fm_run_timed treats a
-# non-positive bound as no bound.
-PROBE_MIN_SECS=1
-# Both clocks here count whole seconds, so a probe can start when the arithmetic
-# says a second is left while almost none of it really is, and it still gets a
-# full bound.
-CLOCK_ROUNDING_SECS=1
-# fm_run_timed asks its runner for -k 1, so a probe that does not stop on TERM is
-# only killed a second after its bound.
-KILL_GRACE_SECS=1
-
-# The watcher's per check bound, read from this check's own environment. The
-# watcher runs the check as a direct child, so an operator who raised it is seen
-# here too, and when it is unset both sides resolve the same default.
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
-case "$CHECK_TIMEOUT" in
-  ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;;
-esac
-# The last probe of a sweep can end this far past the deadline, so that is what
-# the budget has to leave the watcher's own bound.
-BUDGET_MAX=$((CHECK_TIMEOUT - PROBE_MIN_SECS - CLOCK_ROUNDING_SECS - KILL_GRACE_SECS))
-[ "$BUDGET_MAX" -ge 1 ] || BUDGET_MAX=1
-# Cut rather than refuse. A refusal is reported once and then suppressed by the
-# no-nag gate, which leaves the detector dead and quiet, and a check that goes
-# silent is worse than a check that reports something awkward.
-BUDGET_CUT_FROM=
-if [ "$BUDGET_SECS" -gt "$BUDGET_MAX" ]; then
-  BUDGET_CUT_FROM=$BUDGET_SECS
-  BUDGET_SECS=$BUDGET_MAX
-fi
 
 # --- small helpers ----------------------------------------------------------
 
-# The record epoch is overridable so a test can drive the cadence gate; the
-# sweep budget always uses real time so a frozen epoch cannot disable it.
+# The record epoch is overridable so a test can drive the cadence gate.
 record_epoch_now() {
   case "${FM_TOOL_UPDATE_NOW:-}" in
     ''|*[!0-9]*) date +%s ;;
@@ -192,11 +144,8 @@ record_epoch_now() {
   esac
 }
 
-real_epoch() { date +%s; }
-
 FINDINGS=
-DEADLINE=0
-INCOMPLETE_REPORTED=0
+PROBE_UNKNOWN=0
 
 # Each finding is flattened to a single line here, because the whole report must
 # stay one line for the wake record.
@@ -207,38 +156,6 @@ emit() {
     FINDINGS=$text
   else
     FINDINGS="$FINDINGS; $text"
-  fi
-}
-
-budget_exhausted() {
-  [ "$(real_epoch)" -ge "$DEADLINE" ]
-}
-
-# True while the sweep budget still has room for another probe. When it does not,
-# it records once which tool the sweep did not finish, so a sweep that cannot
-# finish says so rather than being killed by the watcher with nothing printed.
-budget_allows() {
-  local name=$1
-  budget_exhausted || return 0
-  if [ "$INCOMPLETE_REPORTED" -eq 0 ]; then
-    INCOMPLETE_REPORTED=1
-    emit "check incomplete: the time budget ran out before $name"
-  fi
-  return 1
-}
-
-# The bound for one probe: the probe bound, cut down to whatever the sweep
-# budget has left, so no probe can run past the end of the sweep. Never below
-# PROBE_MIN_SECS, because fm_run_timed treats a non-positive bound as no bound.
-probe_bound() {
-  local left
-  left=$((DEADLINE - $(real_epoch)))
-  if [ "$left" -lt "$PROBE_MIN_SECS" ]; then
-    printf '%s\n' "$PROBE_MIN_SECS"
-  elif [ "$left" -lt "$PROBE_SECS" ]; then
-    printf '%s\n' "$left"
-  else
-    printf '%s\n' "$PROBE_SECS"
   fi
 }
 
@@ -408,7 +325,7 @@ path_hits() {
 probe_output() {
   local path=$1
   shift
-  fm_run_timed "$(probe_bound)" "$path" "$@" 2>&1
+  fm_run_progress "$PROBE_SECS" "$path" "$@" 2>&1
 }
 
 command_findings() {
@@ -432,12 +349,14 @@ command_findings() {
 
   while IFS= read -r hit; do
     [ -n "$hit" ] || continue
-    if budget_exhausted; then
-      emit "$name check failed: the time budget ran out before every copy answered"
-      break
-    fi
     # shellcheck disable=SC2086  # deliberate split on validated space-free tokens
     out=$(probe_output "$hit" $args_joined)
+    status=$?
+    if [ "$status" -eq 124 ]; then
+      PROBE_UNKNOWN=1
+      emit "$name check unknown: $hit stopped making progress; retry next pass"
+      return 0
+    fi
     version=$(parse_version "$out")
     if [ -z "$resolved_path" ]; then
       resolved_path=$hit
@@ -463,21 +382,13 @@ EOF
     # and it is asked of the copy PATH actually resolves.
     announce_out=$resolved_out
     if [ "$announce_args" != "$args_joined" ]; then
-      if budget_exhausted; then
-        # The version probe's output cannot carry the announcement, so searching
-        # it would present a source that was never asked as a clean result.
-        emit "$name check failed: the time budget ran out before the update announcement was checked"
+      # shellcheck disable=SC2086  # deliberate split on validated space-free tokens
+      announce_out=$(probe_output "$resolved_path" $announce_args)
+      status=$?
+      if [ "$status" -eq 124 ]; then
+        PROBE_UNKNOWN=1
+        emit "$name check unknown: $resolved_path did not answer when asked for its update announcement; retry next pass"
         announce_out=
-      else
-        # shellcheck disable=SC2086  # deliberate split on validated space-free tokens
-        announce_out=$(probe_output "$resolved_path" $announce_args)
-        status=$?
-        if [ "$status" -eq 124 ]; then
-          # A source that was asked and never answered is not a source that had
-          # nothing to say. The one that answers with nothing stays silent below.
-          emit "$name check failed: $resolved_path did not answer when asked for its update announcement"
-          announce_out=
-        fi
       fi
     fi
     if [ -n "$announce_out" ]; then
@@ -501,8 +412,7 @@ EOF
   fi
 
   if [ -z "$resolved_version" ]; then
-    # No copy was probed at all when the path is empty, and the budget report
-    # already covers that, so do not blame a copy that was never asked.
+    # Report only a copy that answered without a readable version.
     [ -z "$resolved_path" ] || emit "$name check failed: $resolved_path did not report a version"
     return 0
   fi
@@ -520,20 +430,11 @@ EOF
 
 # --- git probes -------------------------------------------------------------
 
-# A probe the sweep budget can no longer afford is never issued, and says so with
-# a status of its own rather than a git status, so no caller can read it as an
-# answer. Neither git nor the bounded runner uses this value.
-GIT_PROBE_NOT_ISSUED=3
-
-# One bounded read-only git probe. The budget check lives here rather than in the
-# callers, so no probe can be issued past the sweep deadline whatever a caller
-# does, and the budget only has to leave room for the one probe that was already
-# running when the deadline passed.
+# One progress-supervised read-only git probe, independent of sweep age.
 git_probe() {
   local repo=$1
   shift
-  budget_exhausted && return "$GIT_PROBE_NOT_ISSUED"
-  fm_run_timed "$(probe_bound)" git -C "$repo" "$@"
+  fm_run_progress "$PROBE_SECS" git -C "$repo" "$@"
 }
 
 # The single place that reads a probe status as no answer at all, so every probe
@@ -541,12 +442,9 @@ git_probe() {
 git_probe_answered() {
   local status=$1 name=$2 subject=$3 question=$4
   case "$status" in
-    "$GIT_PROBE_NOT_ISSUED")
-      emit "$name check failed: the time budget ran out before $subject was asked $question"
-      return 1
-      ;;
     124)
-      emit "$name check failed: $subject did not answer $question"
+      PROBE_UNKNOWN=1
+      emit "$name check unknown: $subject did not answer $question; retry next pass"
       return 1
       ;;
   esac
@@ -555,8 +453,7 @@ git_probe_answered() {
 
 # Read-only throughout: nothing here writes to the watched repository. This is the
 # one tool kind that issues several probes in a row, two of them over the network,
-# and each of them goes through git_probe, which owns both the bound and the
-# budget check, so the sweep cannot outrun its deadline here.
+# and each goes through git_probe, which owns its inactivity supervision.
 git_findings() {
   local name=$1 repo=$2 remote=$3 branch=$4
   local status remote_sha local_sha local_label count short symref
@@ -569,7 +466,6 @@ git_findings() {
     emit "$name check failed: $repo is not a directory"
     return 0
   fi
-  budget_allows "$name" || return 0
   git_probe "$repo" rev-parse --git-dir >/dev/null 2>&1
   status=$?
   git_probe_answered "$status" "$name" "$repo" "whether it is a git repository" || return 0
@@ -717,18 +613,11 @@ action_check() {
     return 0
   fi
 
-  DEADLINE=$(($(real_epoch) + BUDGET_SECS))
-
-  if [ -n "$BUDGET_CUT_FROM" ]; then
-    emit "sweep budget ${BUDGET_CUT_FROM}s cut to ${BUDGET_SECS}s to stay inside the watcher check timeout of ${CHECK_TIMEOUT}s"
-  fi
-
   if ! config_validate; then
     emit "watched tool registry: $CONFIG_PROBLEM"
   else
     while IFS=$FIELD_SEP read -r name command_name args_joined announce announce_args repo remote branch; do
       [ -n "$name" ] || continue
-      budget_allows "$name" || break
       [ -z "$command_name" ] || command_findings "$name" "$command_name" "$args_joined" "$announce" "$announce_args"
       [ -z "$repo" ] || git_findings "$name" "$repo" "$remote" "$branch"
     done < <(config_records)
@@ -749,10 +638,12 @@ action_check() {
   #
   # Report before recording, so a record that cannot be written costs a repeated
   # report rather than a lost one.
-  if [ -n "$line" ] && [ "$FINDINGS" != "$RECORD_REPORTED" ]; then
+  if [ -n "$line" ] && { [ "$PROBE_UNKNOWN" -ne 0 ] || [ "$FINDINGS" != "$RECORD_REPORTED" ]; }; then
     printf '%s\n' "$line"
   fi
-  record_write "$FINDINGS" || true
+  # Unknown reads do not stamp the cadence or erase the last complete report.
+  # Retry next pass, including when an older finding would otherwise suppress it.
+  [ "$PROBE_UNKNOWN" -ne 0 ] || record_write "$FINDINGS" || true
   return 0
 }
 

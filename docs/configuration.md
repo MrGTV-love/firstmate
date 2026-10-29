@@ -3345,7 +3345,7 @@ This section is the single owner of the canonical schema.
 - A `git` entry reports how many commits the local clone is behind its remote branch, and stays silent when the clone is current or ahead.
 - An omitted `branch` uses the remote's default branch, taken from the clone's own record of it and otherwise asked of the remote directly, so a `--single-branch` clone still resolves.
 
-Both probe kinds are read-only and bounded, and a probe that cannot answer is reported as a check failure rather than assumed current.
+Both probe kinds are read-only and progress-supervised; an inactive probe is unknown and retried, never assumed current.
 See [`docs/examples/watched-tools.json`](examples/watched-tools.json) for a starting point to copy into local `config/watched-tools.json`.
 
 **Arm, edit, and disarm**
@@ -3368,13 +3368,11 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `FM_TOOL_UPDATE_INTERVAL` | 900 seconds | Time between probes; `0` probes on every run. |
-| `FM_TOOL_UPDATE_PROBE_SECS` | 5 | Bounds one probe. |
-| `FM_TOOL_UPDATE_BUDGET_SECS` | 20 | Bounds a whole sweep. |
+| `FM_TOOL_UPDATE_PROBE_SECS` | Ledger-derived, cold-start 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
 
-- A sweep that runs out of budget says which tool it did not reach rather than reporting the rest as current.
-- The sweep must finish inside `FM_CHECK_TIMEOUT` (default 30), because a run the watcher kills prints nothing and records nothing and would then repeat that silence on every poll.
-- So a budget larger than that timeout allows is cut down to what fits instead of being refused, and the cut is reported in the report line.
-- A budget that is not a whole number from 1 to 120 is still refused outright.
+A sweep has no wall-clock budget.
+An inactive probe reports uncertainty, preserves the last completed report and cadence stamp, and is retried on the next pass.
+The script header owns the progress and ledger mechanics.
 
 ## Mail plane (.env)
 
@@ -3420,7 +3418,7 @@ Arming writes `state/mail.check.sh` and registers it with the watcher's slow-che
 Same-line silence is only for a proven no-op: a successful poll with no new mail, or a repeated identical pre-wake failure that cannot have queued mail.
 A fail-closed poll that already queued a wake, and a timeout, always print so the watcher wakes to drain it.
 
-`FM_MAIL_CHECK_BUDGET` (default 15, valid 5..25) bounds one standing poll and is cut down to fit `FM_CHECK_TIMEOUT`.
+`bin/fm-mail-check.sh` owns progress-based poll supervision and its `FM_MAIL_CHECK_INACTIVITY` minimum; a stopped poll is unknown and retried, not evidence of an empty inbox.
 `bin/fm-mail-check.sh disarm` removes the standing check.
 
 ## Slack decision plane (.env)
@@ -4470,14 +4468,14 @@ FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
 FM_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before a stuck-busy stale wake; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/fm-task-inbox-lib.sh
-FM_CHECK_TIMEOUT=30     # decimal whole seconds allowed after each slow check launches, excluding output setup; leading zeros do not change the duration
-FM_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5..25, cut to fit FM_CHECK_TIMEOUT
+FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; ledger check.inactivity, cold-start 30s; output or process-tree CPU progress keeps checks alive
+FM_CONTRIBUTIONS_INACTIVITY=   # optional positive whole-second read inactivity minimum; ledger contributions.read, cold-start 5s
+FM_MAIL_CHECK_INACTIVITY=   # optional positive whole-second poll inactivity minimum; ledger mail-check.poll, cold-start 15s
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400
-FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
-FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
-FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
+FM_TOOL_UPDATE_PROBE_SECS=   # optional positive whole-second probe inactivity minimum; ledger tool-update.probe, cold-start 5s
+FM_TOOL_UPDATE_NOW=     # test override for the watched-tool cadence clock
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_COPY_SWEEP_PLAN_TIMEOUT=120   # seconds the nested-copy sweep waits for Vernant's closeout plan of a locked copy before it holds the copy; a non-positive or non-numeric value becomes 120 (see "Nested task copy sweep")
 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5   # maximum locked release slots per apply run; see the script header ("Nested task copy sweep")

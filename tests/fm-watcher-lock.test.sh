@@ -199,11 +199,11 @@ test_live_stale_watch_lock_is_actionable() {
   pass "live watcher lock with stale heartbeat is actionable"
 }
 
-watcher_check_timeout_case() {
-  local fallback=$1 timeout=$2 runtime=$3 setup=$4 expected=$5
+watcher_check_inactivity_case() {
+  local timeout=$1 runtime=$2 setup=$3 expected=$4
   local dir state fakebin pid i real_mktemp
   real_mktemp=$(command -v mktemp)
-  dir=$(make_case "check-timeout-$fallback-$timeout-$setup-$expected")
+  dir=$(make_case "check-inactivity-$timeout-$setup-$expected")
   state="$dir/state"
   fakebin="$dir/fakebin"
   cat > "$state/timeout.check.sh" <<'SH'
@@ -232,7 +232,7 @@ SH
   fi
   PATH="$fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
     FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    FM_CHECK_TIMEOUT="$timeout" FM_CHECK_FORCE_FALLBACK="$fallback" \
+    FM_CHECK_TIMEOUT="$timeout" \
     FM_TEST_CHECK_RUNTIME="$runtime" FM_TEST_CHECK_SETUP="$setup" \
     FM_TEST_REAL_MKTEMP="$real_mktemp" \
     "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
@@ -248,16 +248,16 @@ SH
     sleep 0.1
   done
   stop_seed_watcher "$pid" "$dir/watch.err"
-  [ -e "$state/check-started" ] || fail "timeout $timeout never launched (fallback $fallback): $(cat "$dir/watch.err")"
-  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep (fallback $fallback): $(cat "$dir/watch.err")"
+  [ -e "$state/check-started" ] || fail "timeout $timeout never launched: $(cat "$dir/watch.err")"
+  [ -e "$state/.last-check" ] || fail "timeout $timeout did not finish its sweep: $(cat "$dir/watch.err")"
   if [ "$setup" -gt 0 ]; then
     [ -e "$state/output-setup-started" ] && [ -e "$state/output-setup-finished" ] \
       || fail "slow check-output setup was not exercised"
   fi
   if [ "$expected" = complete ]; then
-    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (fallback $fallback, setup $setup)"
+    [ -e "$state/check-finished" ] || fail "timeout $timeout deducted launch allowance (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$dir/watch.out" >/dev/null \
-      || fail "timeout $timeout lost actual watcher output (fallback $fallback, setup $setup)"
+      || fail "timeout $timeout lost actual watcher output (setup $setup)"
     grep -F "check: $state/timeout.check.sh: check-completed" "$state/.wake-queue" >/dev/null \
       || fail "timeout $timeout did not queue check output"
   else
@@ -267,15 +267,46 @@ SH
   fi
 }
 
-test_check_timeout_configuration_and_launch_allowance() {
-  local fallback
-  for fallback in 0 1; do
-    watcher_check_timeout_case "$fallback" 08 0.5 0 complete
-    watcher_check_timeout_case "$fallback" 010 9.2 0 complete
-    watcher_check_timeout_case "$fallback" 2 1 4 complete
-    watcher_check_timeout_case "$fallback" 2 4 0 expired
+test_check_inactivity_configuration_and_launch_allowance() {
+  watcher_check_inactivity_case 08 0.5 0 complete
+  watcher_check_inactivity_case 010 9.2 0 complete
+  watcher_check_inactivity_case 2 1 4 complete
+  watcher_check_inactivity_case 2 30 0 expired
+  pass 'decimal inactivity intervals preserve launch allowance and stop a silent check'
+}
+
+test_check_progress_survives_fivefold_slowdown() {
+  local dir state factor pid
+  for factor in 1 5; do
+    dir=$(make_case "progress-$factor")
+    state="$dir/state"
+    cat > "$state/progress.check.sh" <<'SH'
+#!/usr/bin/env bash
+for ((step=0; step<10; step++)); do
+  printf 'working %s\n' "$step" >&2
+  sleep "$FM_TEST_DELAY"
+done
+touch "$FM_STATE_OVERRIDE/check-finished"
+printf 'check-completed\n'
+SH
+    chmod 0700 "$state/progress.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" progress >/dev/null || fail 'registration failed'
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=2 \
+      FM_TEST_DELAY="0.$factor" "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    while is_live_non_zombie "$pid"; do
+      grep -F 'check-completed' "$dir/watch.out" >/dev/null && break
+      [ ! -e "$state/.last-check" ] || [ -e "$state/check-finished" ] || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -e "$state/check-finished" ] || fail "${factor}x progressing check was killed"
+    grep -F 'check-completed' "$dir/watch.out" >/dev/null || fail 'check output was lost'
+    grep -F 'check-completed' "$state/.wake-queue" >/dev/null || fail 'check wake was lost'
+    ! grep -F 'working ' "$dir/watch.out" >/dev/null || fail 'stderr telemetry became check news'
   done
-  pass "decimal check timeouts preserve post-setup launch allowance and still expire checks through native and Perl controllers"
+  pass 'authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound'
 }
 
 test_check_wait_has_no_per_tick_processes() {
@@ -318,13 +349,11 @@ SH
       IFS= read -r descendant_pid < "$STATE/descendant-pid"
       ! kill -0 "$descendant_pid" 2>/dev/null || exit 30
       [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 31
-      CHECK_TIMEOUT=120
-      for FM_CHECK_FORCE_FALLBACK in 0 1; do
-        FM_CHECK_OWNED_GROUP=1 run_owned_capture 2 0 discard run_check_process "$STATE/controller-check.sh" || exit 32
-        [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
-        IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
-        ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
-      done
+      CHECK_TIMEOUT=2
+      run_check_capture "$STATE/controller-check.sh" || exit 32
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
+      IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
+      ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
     ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
     || fail "bounded check lost output/status or launched poll sleeps: $(cat "$dir/capture.err" "$dir/poll-launches" 2>/dev/null)"
   pass "bounded check returns output and failure status without launching per-tick sleep processes"
@@ -3074,7 +3103,8 @@ test_live_stale_watch_lock_is_actionable
 test_check_wait_has_no_per_tick_processes
 test_group_cleanup_without_perl_uses_one_sleep_per_wait
 test_slow_check_beats_but_stopped_poll_goes_stale
-test_check_timeout_configuration_and_launch_allowance
+test_check_inactivity_configuration_and_launch_allowance
+test_check_progress_survives_fivefold_slowdown
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

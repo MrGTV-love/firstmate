@@ -35,13 +35,11 @@
 # have queued mail. Fail-closed after a queued wake and timeout always
 # doorbell.
 #
-# The poll must finish inside the watcher's per-check bound
-# (FM_CHECK_TIMEOUT, default 30, read from this check's own environment
-# because the watcher runs it as a direct child). The internal budget
-# FM_MAIL_CHECK_BUDGET (default 15, valid 5..25) is cut down to whatever fits
-# inside that bound before the poll starts. A poll that does not finish is a
-# real condition, so the budget is enforced rather than assumed: a timed-out
-# poll reports one line naming the budget instead of leaving the check silent.
+# The poll has no wall-clock budget. fm_run_progress observes output and
+# process-tree CPU; FM_MAIL_CHECK_INACTIVITY sets a minimum for the mail-check.poll
+# ledger interval (15-second cold-start fallback). Only proven inactivity
+# stops a poll. That means unknown, retry next pass, never a clean inbox or
+# mail failure; it still doorbells because mail might already be queued.
 set -u
 export LC_ALL=C
 
@@ -93,30 +91,15 @@ record_epoch_now() {
   esac
 }
 
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
-case "$CHECK_TIMEOUT" in
-  ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;;
+# Harm: a poll with no output or CPU progress can hold mail collection forever.
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
+POLL_INACTIVITY=$(fm_duration_limit mail-check.poll "${FM_MAIL_CHECK_INACTIVITY:-15}")
+case "$POLL_INACTIVITY" in
+  ''|*[!0-9]*|0*)
+    printf 'fm-mail-check: FM_MAIL_CHECK_INACTIVITY must be a positive whole number\n' >&2
+    exit 2 ;;
 esac
-
-BUDGET_SECS=${FM_MAIL_CHECK_BUDGET:-15}
-case "$BUDGET_SECS" in
-  ''|*[!0-9]*|0)
-    printf 'fm-mail-check: FM_MAIL_CHECK_BUDGET must be a whole number from 5 to 25\n' >&2
-    exit 2
-    ;;
-esac
-if [ "$BUDGET_SECS" -lt 5 ] || [ "$BUDGET_SECS" -gt 25 ]; then
-  printf 'fm-mail-check: FM_MAIL_CHECK_BUDGET must be a whole number from 5 to 25\n' >&2
-  exit 2
-fi
-
-# fm_run_timed counts a whole second before it alarms, so the budget has to fit
-# inside the watcher's own bound with the alarm and kill margins left over.
-BUDGET_MAX=$((CHECK_TIMEOUT - 3))
-[ "$BUDGET_MAX" -ge 1 ] || BUDGET_MAX=1
-if [ "$BUDGET_SECS" -gt "$BUDGET_MAX" ]; then
-  BUDGET_SECS=$BUDGET_MAX
-fi
 
 # One poll summary, built only from the poll's own combined output. The
 # poll's own "fm-mail: ..." diagnostics name the missing setup value, the
@@ -207,9 +190,9 @@ action_check() {
   if [ ! -x "$MAIL_BIN" ]; then
     line="fm-mail.sh is missing next to this check ($MAIL_BIN)"
   else
-    out=$(fm_run_timed "$BUDGET_SECS" "$MAIL_BIN" poll 2>&1) || rc=$?
+    out=$(fm_run_progress "$POLL_INACTIVITY" "$MAIL_BIN" poll 2>&1) || rc=$?
     if [ "${rc:-0}" -eq 124 ]; then
-      line="poll did not finish within the ${BUDGET_SECS}s budget"
+      line="poll progress unknown after ${POLL_INACTIVITY}s of inactivity; retry next pass"
     elif [ "${rc:-0}" -ne 0 ]; then
       line=$(poll_summary "$rc" "$out")
     elif printf '%s\n' "$out" | grep '^fm-mail: woke for ' >/dev/null; then

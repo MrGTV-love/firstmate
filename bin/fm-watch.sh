@@ -370,11 +370,17 @@ watcher_beat() {
 HEARTBEAT=${FM_HEARTBEAT:-600}        # base seconds between heartbeat scans
 HEARTBEAT_MAX=${FM_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
 CHECK_INTERVAL=${FM_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
+# Harm: a silent, CPU-idle check blocks the sweep. Only a consecutive
+# no-progress proof permits stopping it; slow work has no wall-clock cap.
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
+CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-}
 case "$CHECK_TIMEOUT" in
-  *[!0-9]*) ;;
-  *) CHECK_TIMEOUT=$((10#$CHECK_TIMEOUT)) ;;
+  ''|*[!0-9]*) unset FM_CHECK_TIMEOUT ;;
+  *) CHECK_TIMEOUT=$((10#$CHECK_TIMEOUT))
+     if [ "$CHECK_TIMEOUT" -gt 0 ]; then FM_CHECK_TIMEOUT=$CHECK_TIMEOUT; else unset FM_CHECK_TIMEOUT; fi ;;
 esac
+CHECK_TIMEOUT=$(fm_duration_limit check.inactivity "${FM_CHECK_TIMEOUT:-30}")
 HOME_SUMMARY_INTERVAL=${FM_HOME_SUMMARY_INTERVAL:-300}
 case "$HOME_SUMMARY_INTERVAL" in
   ''|*[!0-9]*|0) HOME_SUMMARY_INTERVAL=300 ;;
@@ -2256,20 +2262,12 @@ procevent_surface_queued() {
 run_check_process() {
   local c=$1
   shift
-  if [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v timeout >/dev/null 2>&1; then
-    exec timeout "$CHECK_TIMEOUT" bash "$c" "$@"
-  elif [ "${FM_CHECK_FORCE_FALLBACK:-0}" != 1 ] && command -v gtimeout >/dev/null 2>&1; then
-    exec gtimeout "$CHECK_TIMEOUT" bash "$c" "$@"
-  else
-    # Both sides setpgrp (unowned case) so a child slow to be scheduled on a loaded host
-    # still has its group before the bound fires; see fm_timeout_perl_bound.
-    # shellcheck disable=SC2016  # single quotes are deliberate: Perl expands its own variables.
-    exec perl -e 'my $t = shift; my $owned = shift; my $pid = fork; die "fork failed" unless defined $pid; if (!$pid) { setpgrp(0, 0) unless $owned; exec @ARGV } setpgrp($pid, $pid) unless $owned; my $group = $owned ? getpgrp(0) : $pid; my $stop = sub { $SIG{HUP} = $SIG{INT} = $SIG{TERM} = "IGNORE"; kill "TERM", -$group; select undef, undef, undef, 0.2; kill "KILL", -$group; waitpid $pid, 0; exit 124 }; local $SIG{ALRM} = $stop; local $SIG{HUP} = $stop; local $SIG{INT} = $stop; local $SIG{TERM} = $stop; alarm $t; waitpid $pid, 0; exit($? >> 8)' "$CHECK_TIMEOUT" "${FM_CHECK_OWNED_GROUP:-0}" bash "$c" "$@"
-  fi
+  exec bash "$c" "$@"
 }
 
 run_check() {
-  ( run_check_process "$@" ) 2>/dev/null || true
+  run_check_capture "$@" || return $?
+  printf '%s' "$FM_CHECK_RESULT"
 }
 
 FM_ACTIVE_CHECK_PID=
@@ -2294,7 +2292,7 @@ fm_check_output_cleanup() {
   fi
   [ -z "$FM_CHECK_WAIT_FIFO" ] || rm -f -- "$FM_CHECK_WAIT_FIFO"
   FM_CHECK_WAIT_FIFO=
-  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.progress"
+  [ -z "$FM_CHECK_OUTPUT" ] || rm -f -- "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.progress" "$FM_CHECK_OUTPUT.stderr"
   FM_CHECK_OUTPUT=
 }
 
@@ -2364,15 +2362,16 @@ watcher_stop_signals() {
 }
 
 # Capture a check without blocking bash inside a command substitution, so the
-# poll shell keeps publishing progress while it waits on the bounded check.
+# poll shell keeps publishing its beacon while observing check progress.
 run_check_capture() {
-  FM_CHECK_OWNED_GROUP=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
+  FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
 }
 
 # With FM_CAPTURE_PROGRESS=1 the timeout is an inactivity bound, not a
 # wall-clock one: from the second liveness tick, fm_progress_check samples the
-# capture's process tree, and only a tree with no CPU progress for the timeout
-# is stopped as stalled (124). Without a POSIX python3 nothing is proven stalled.
+# capture's process tree and private output streams. Only a tree with no CPU
+# or output progress is stopped as stalled (124). Without a POSIX python3
+# nothing is proven stalled.
 run_owned_capture() {
   local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started completion
   local progress_rc progress_sampled=
@@ -2382,6 +2381,9 @@ run_owned_capture() {
   FM_CHECK_STATUS=0
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
+  if [ "$capture_stderr" = discard ]; then
+    (umask 077; : > "$FM_CHECK_OUTPUT.stderr") || { fm_check_output_cleanup; return 1; }
+  fi
   fm_check_wait_open || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
   # Defer stop signals only until the check's process group is recorded for
@@ -2393,7 +2395,7 @@ run_owned_capture() {
   (
     eval "exec $FM_CHECK_WAIT_FD<&-"
     if [ "$capture_stderr" = discard ]; then
-      "$@" 2>/dev/null
+      "$@" 2> "$FM_CHECK_OUTPUT.stderr"
     else
       "$@" 2>&1
     fi
@@ -2412,7 +2414,7 @@ run_owned_capture() {
     fm_check_output_cleanup
     return 1
   fi
-  # Also enforce the same deadline if the timeout controller stops responding.
+  # Sample progress (or enforce the explicit deadline for non-progress callers).
   # EOF wakes read immediately. A descendant may retain its writer after the
   # leader exits, so also recheck that leader once per second using a timed
   # read, without spawning a timer on each tick.
@@ -2423,6 +2425,7 @@ run_owned_capture() {
       progress_rc=0
       [ -z "$progress_sampled" ] \
         || fm_progress_check "$FM_CHECK_OUTPUT.progress" "$FM_ACTIVE_CHECK_PID" "$capture_timeout" \
+          "$FM_CHECK_OUTPUT" "$FM_CHECK_OUTPUT.stderr" \
         || progress_rc=$?
       progress_sampled=1
     elif [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then

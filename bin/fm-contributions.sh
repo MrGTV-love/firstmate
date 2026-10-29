@@ -44,29 +44,19 @@
 # retirement always records the captain's word: the script cannot verify who
 # runs it, and the authority to retire is the captain's.
 #
-# poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read,
-# and spends at most FM_CONTRIBUTIONS_BUDGET seconds on forge reads (default 20,
-# 1..25). A configured value rides the generated check shim into watcher runs
-# and is cut down to the watcher's own per-check bound (FM_CHECK_TIMEOUT,
-# default 30, read from the poll's environment because the watcher runs it as
-# a direct child) with a three-second margin. Every read is capped at five
-# seconds, and a read killed at that bound or at the deadline is budget
-# refusal, never a forge failure. A pull observation has three
-# dependent waves: core, six independent reads, then the closing head read;
-# an issue has two waves. Before starting a URL, poll reserves the smaller of
-# the effective budget and 15 seconds for those waves. URLs needing forge
-# reads are sorted by URL and rotated by the current five-minute epoch bucket
-# modulo their count, without stored scheduling state or freshness-based
-# reordering. Terminal URLs settle separately before the forge budget starts
-# and consume no rotation slots.
-# A deliberately smaller configured budget remains bounded and may be
-# unmeasured, rather than being mislabeled unavailable. Each distinct URL is
-# attempted at most once per poll and its observation applied to every owner.
-# A final observation applies
-# to every owner without another forge read. When the budget refuses a read
-# mid-observation, that URL's records stay untouched unless quota protection applies, and the poll moves
-# to the next URL that still has a full observation reserve; a genuine forge failure or head change
-# records an error. docs/configuration.md "GitHub REST reads and the quota floor" owns quota degradation.
+# poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
+# Each forge read runs through fm_run_progress: only a lack of output and
+# process-tree CPU progress stops it. FM_CONTRIBUTIONS_INACTIVITY sets a minimum for
+# the contributions.read ledger interval (five-second cold-start fallback).
+# There is no sweep deadline or observation reservation. A stopped read is
+# unknown: keep that URL's saved observation untouched and retry next pass.
+# A pull observation has three waves: core, six independent reads, closing
+# head; an issue has two. URLs are sorted and rotated by the five-minute
+# epoch bucket modulo their count; each distinct URL is attempted at most
+# once per poll and applied to every owner. Final URLs settle locally before
+# rotation and are never re-read. Genuine forge failures or head changes
+# record an error. docs/configuration.md "GitHub REST reads and the quota floor"
+# owns quota degradation, which remains authoritative for unknown reads too.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # A URL whose last good observation is merged or closed is final: it is
@@ -115,15 +105,13 @@ command -v jq >/dev/null 2>&1 || fail 'jq is required to measure contribution co
 NOW=${FM_CONTRIBUTIONS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 EPOCH=$(jq -nr --arg now "$NOW" '$now | fromdateiso8601') || fail 'invalid observation clock'
 MAX_AGE=${FM_CONTRIBUTIONS_MAX_AGE:-900}
-BUDGET=${FM_CONTRIBUTIONS_BUDGET:-20}
 case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
-case "$BUDGET" in ''|*[!0-9]*) fail 'invalid poll budget' ;; esac
-[ "$BUDGET" -ge 1 ] && [ "$BUDGET" -le 25 ] || fail 'poll budget must be 1..25 seconds'
-CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}
-case "$CHECK_TIMEOUT" in ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;; esac
-BUDGET_CAP=$((CHECK_TIMEOUT - 3))
-[ "$BUDGET_CAP" -ge 1 ] || BUDGET_CAP=1
-[ "$BUDGET" -le "$BUDGET_CAP" ] || BUDGET=$BUDGET_CAP
+# Harm: a forge command with no output or CPU progress holds the observation.
+# A stopped read is unknown, leaving the saved coherent observation untouched.
+# shellcheck source=bin/fm-duration-lib.sh
+. "$SCRIPT_DIR/fm-duration-lib.sh"
+READ_INACTIVITY=$(fm_duration_limit contributions.read "${FM_CONTRIBUTIONS_INACTIVITY:-5}")
+case "$READ_INACTIVITY" in ''|*[!0-9]*|0*) fail 'invalid read inactivity interval' ;; esac
 TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
 cleanup() {
@@ -221,19 +209,15 @@ write_record() { # task record-json-file
 }
 
 forge() {
-  local remaining rc=0 forge_err=${FORGE_ERR:-$TMP/forge.err}
-  remaining=$((DEADLINE - $(date +%s)))
-  # The budget, not the forge, refused this read.
-  [ "$remaining" -gt 0 ] || { BUDGET_EXHAUSTED=1; : > "$TMP/budget-exhausted"; return 1; }
-  [ "$remaining" -le 5 ] || remaining=5
+  local rc=0 forge_err=${FORGE_ERR:-$TMP/forge.err}
   if [ "$1" = api ]; then
     shift # REST reads are conditional, record the quota headers, and refuse below the floor
-    fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+    fm_run_progress "$READ_INACTIVITY" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
       "$SCRIPT_DIR/fm-gh-rest.sh" get "$@" 2> "$forge_err" || rc=$?
   else
     "$SCRIPT_DIR/fm-gh-rest.sh" guard > "$forge_err" 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
-      fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+      fm_run_progress "$READ_INACTIVITY" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
         gh "$@" 2> "$forge_err" || rc=$?
     fi
   fi
@@ -241,11 +225,11 @@ forge() {
     head -1 "$forge_err" > "$TMP/quota-low"
     return "$rc"
   fi
-  # A kill at the read bound or the deadline is budget refusal too; only the
-  # forge's own nonzero exit is unavailable evidence.
+  # Inactivity means unknown, not forge failure; only a completed nonzero
+  # response is unavailable evidence.
   if [ "$rc" -eq 124 ]; then
-    BUDGET_EXHAUSTED=1
-    : > "$TMP/budget-exhausted"
+    READ_UNKNOWN=1
+    : > "$TMP/read-unknown"
   elif [ "$rc" -ne 0 ]; then
     : > "$TMP/forge-unavailable"
   fi
@@ -280,10 +264,10 @@ mark_quota_stale() { # canonical-url task... : keep the last observation, make t
 wait_forges() { # background forge pids from one independent read wave
   local pid rc=0
   for pid in "$@"; do wait "$pid" || rc=1; done
-  # A known failed parallel read is unavailable even if another read reached
-  # the deadline. Only an otherwise successful wave cut short is unmeasured.
-  if [ ! -e "$TMP/forge-unavailable" ] && [ -e "$TMP/budget-exhausted" ]; then
-    BUDGET_EXHAUSTED=1
+  # A completed failure remains evidence even beside an unknown peer read.
+  # Only an otherwise successful wave stopped for inactivity is unmeasured.
+  if [ ! -e "$TMP/forge-unavailable" ] && [ -e "$TMP/read-unknown" ]; then
+    READ_UNKNOWN=1
   fi
   return "$rc"
 }
@@ -293,8 +277,8 @@ observe() { # canonical GitHub URL -> normalized JSON
   case "$url" in https://github.com/*) ;; *) return 1 ;; esac
   part=${url#https://github.com/}; number=${part##*/}; part=${part%/*}; kind=${part##*/}; part=${part%/*}
   case "$kind" in pull) endpoint="repos/$part/pulls/$number" ;; issues) endpoint="repos/$part/issues/$number" ;; *) return 1 ;; esac
-  rm -f -- "$TMP/budget-exhausted" "$TMP/forge-unavailable" "$TMP/quota-low"
-  BUDGET_EXHAUSTED=0
+  rm -f -- "$TMP/read-unknown" "$TMP/forge-unavailable" "$TMP/quota-low"
+  READ_UNKNOWN=0
   forge api "$endpoint" > "$TMP/core.json" || return 1
   jq -e '(.state == "open" or .state == "closed") and (.user.login | type == "string")' "$TMP/core.json" >/dev/null || return 1
   if [ "$kind" = pull ]; then
@@ -433,8 +417,6 @@ poll() {
   jq -Rnr --argjson bucket "$((EPOCH / 300))" '
     [inputs] | if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"
-  DEADLINE=$(( $(date +%s) + BUDGET ))
-  OBSERVATION_RESERVE=$((BUDGET < 15 ? BUDGET : 15))
   QUOTA_ANNOUNCE=0
   QUOTA_REASON=
   while IFS=$'\t' read -r -a row; do
@@ -443,7 +425,6 @@ poll() {
       mark_quota_stale "${row[0]}" "${row[@]:1}"
       continue
     fi
-    [ $((DEADLINE - $(date +%s))) -ge "$OBSERVATION_RESERVE" ] || break
     url=${row[0]}
     observed=0
     observe "$url" || observed=$?
@@ -456,7 +437,7 @@ poll() {
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi
-    [ "$BUDGET_EXHAUSTED" -eq 0 ] || continue
+    [ "$READ_UNKNOWN" -eq 0 ] || continue
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
@@ -509,9 +490,6 @@ arm() {
     "export FM_HOME=$(printf '%q' "$FM_HOME")"
     "export FM_STATE_OVERRIDE=$(printf '%q' "$STATE")"
     "export FM_DATA_OVERRIDE=$(printf '%q' "$DATA")")
-  if [ -n "${FM_CONTRIBUTIONS_BUDGET:-}" ]; then
-    shim+=("export FM_CONTRIBUTIONS_BUDGET=$(printf '%q' "$FM_CONTRIBUTIONS_BUDGET")")
-  fi
   shim+=("exec $(printf '%q' "$SCRIPT_DIR/fm-contributions.sh") poll")
   printf '%s\n' "${shim[@]}" > "$staged"
   chmod 700 "$staged"

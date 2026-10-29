@@ -55,7 +55,7 @@ SH
 }
 
 # make_slow_copy <dir> <command> <seconds>: a copy that answers far too late, so a
-# case can spend the sweep budget the way a hung tool would.
+# case can exercise a silent, CPU-idle probe.
 make_slow_copy() {
   local dir=$1 command_name=$2 seconds=$3
   mkdir -p "$dir"
@@ -96,10 +96,7 @@ fixture_path() {
   printf '%s:%s\n' "$1" "$PATH"
 }
 
-# The watcher check timeout is pinned to its documented default here, because the
-# sweep budget is cut to fit it and an operator's ambient value would otherwise
-# add a report line to cases that mean to be silent. The one case that exercises
-# the cut sets its own value.
+# Use an isolated home and disable the reporting cadence gate for each case.
 run_check() {
   local home=$1 path=$2 out=$3
   shift 3
@@ -365,39 +362,30 @@ test_one_broken_pattern_does_not_blind_the_rest_of_the_sweep() {
   pass "a broken pattern is reported for its own tool and the rest of the sweep still reports"
 }
 
-test_an_unchecked_announcement_source_is_not_read_as_current() {
-  local home dir out report
-  # When the budget is gone the separate announcement command cannot run, and the
-  # version probe's output never carries the announcement. Searching that output
-  # anyway would present a source that was never asked as a clean result, which is
-  # the same silently dead source announce_args was added to close.
-  home=$(make_home announce-budget)
-  dir="$TMP_ROOT/announce-budget/bin"
-  mkdir -p "$dir"
-  cat > "$dir/no-mistakes-fixture" <<'SH'
+test_progressing_version_probe_reaches_announcement() {
+  local home dir out report factor
+  for factor in 1 5; do
+    home=$(make_home "announce-progress-$factor")
+    dir="$home/bin"
+    mkdir -p "$dir"
+    cat > "$dir/no-mistakes-fixture" <<'SH'
 #!/usr/bin/env bash
-if [ "${1:-}" = "--version" ]; then
+if [ "${1:-}" = --version ]; then
+  for ((step=0; step<10; step++)); do printf 'progress\n' >&2; sleep "$FM_TEST_DELAY"; done
   printf 'no-mistakes version v1.46.0\n'
-  sleep 30
-  exit 0
+else
+  printf 'A new version of no-mistakes is available: v1.46.0 -> v1.53.0\n' >&2
 fi
-printf 'A new version of no-mistakes is available: v1.46.0 -> v1.53.0\n' >&2
 SH
-  chmod 0755 "$dir/no-mistakes-fixture"
-  write_config "$home" '{"tools":[{"name":"no-mistakes","command":"no-mistakes-fixture","version_args":["--version"],"announce_args":["--help"],"announce_pattern":"A new version of no-mistakes is available: [^ ]+ -> [^ ]+"}]}'
-  out="$home/out.txt"
-  # The deadline is whole-second granular (real_epoch is `date +%s`), so a
-  # budget of 1 leaves headroom anywhere in (0, 1] seconds: when the sweep
-  # starts near the end of a second the very first budget check already reads
-  # as exhausted and the sweep reports "before every copy answered" instead of
-  # reaching the announcement step this case is about. A budget of 2 guarantees
-  # more than a full second of headroom for the millisecond-scale work before
-  # the copy loop, while the version probe below (bounded, then sleeping 30)
-  # still exhausts the budget before the announcement check.
-  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_BUDGET_SECS=2
-  report=$(cat "$out")
-  assert_contains "$report" "no-mistakes check failed: the time budget ran out before the update announcement was checked" "an announcement source that was never asked was not reported"
-  pass "an announcement source the budget could not reach is reported, not read as current"
+    chmod 0755 "$dir/no-mistakes-fixture"
+    write_config "$home" '{"tools":[{"name":"no-mistakes","command":"no-mistakes-fixture","version_args":["--version"],"announce_args":["--help"],"announce_pattern":"A new version of no-mistakes is available: [^ ]+ -> [^ ]+"}]}'
+    out="$home/out.txt"
+    run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=2 FM_TEST_DELAY="0.$factor"
+    report=$(cat "$out")
+    assert_contains "$report" 'no-mistakes update available' "${factor}x version probe prevented the announcement read"
+    assert_not_contains "$report" 'check unknown' 'progress was treated as a stall'
+  done
+  pass 'a progressing version probe at 1x and 5x still reaches its separate announcement source'
 }
 
 test_an_announcement_probe_that_does_not_answer_is_reported() {
@@ -421,7 +409,7 @@ SH
   out="$home/out.txt"
   run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
-  assert_contains "$report" "no-mistakes check failed: $dir/no-mistakes-fixture did not answer when asked for its update announcement" "an announcement probe that never answered was read as a clean sweep"
+  assert_contains "$report" "no-mistakes check unknown: $dir/no-mistakes-fixture did not answer when asked for its update announcement" "an announcement probe that never answered was read as a clean sweep"
   pass "an announcement probe that does not answer is reported, not read as current"
 }
 
@@ -570,25 +558,21 @@ test_missing_branch_on_a_readable_remote_is_still_reported() {
   pass "a branch a readable remote does not have is still reported as missing"
 }
 
-test_git_probes_stop_when_the_sweep_budget_is_gone() {
+test_git_probes_continue_after_an_unknown_command() {
   local home work slow out report
-  # The git probes are the several-in-a-row case, two of them over the network,
-  # so they are the ones that can push a sweep past the watcher's own timeout and
-  # leave it killed with nothing printed at all. Here the tool's command probe
-  # spends the whole budget, so its git probes must not start: the sweep says
-  # which tool it did not finish instead of quietly running on.
-  home=$(make_home git-budget)
-  work=$(git_fixture git-budget-repo)
+  home=$(make_home git-after-unknown)
+  work=$(git_fixture git-after-unknown-repo)
   git -C "$work" reset -q --hard HEAD~2
-  slow="$TMP_ROOT/git-budget/bin"
+  slow="$home/bin"
   make_slow_copy "$slow" "$TOOL" 30
   write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"command\":\"$TOOL\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
   out="$home/out.txt"
-  run_check "$home" "$(fixture_path "$slow")" "$out" FM_TOOL_UPDATE_BUDGET_SECS=1
+  run_check "$home" "$(fixture_path "$slow")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
-  assert_contains "$report" "check incomplete: the time budget ran out before firstmate" "a sweep with no budget left did not say which tool it did not finish"
-  assert_not_contains "$report" "commits behind" "the git probes ran after the sweep budget was already gone"
-  pass "git probes stop and name their tool once the sweep budget is gone"
+  assert_contains "$report" 'check unknown' 'silent version probe was not detected'
+  assert_contains "$report" '2 commits behind' 'a stopped version probe prevented independent git evidence'
+  assert_absent "$home/state/.tool-updates" 'unknown read recorded a completed sweep'
+  pass 'independent git reads still run after a silent command probe is stopped'
 }
 
 test_a_git_probe_that_does_not_answer_is_not_an_update() {
@@ -628,9 +612,9 @@ SH
   run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=3
   report=$(cat "$out")
   assert_not_contains "$report" "update available" "a probe that never answered was reported as an available update"
-  assert_contains "$report" "firstmate check failed: $work did not answer whether it already has" "the stalled object query was not the reported failure"
+  assert_contains "$report" "firstmate check unknown: $work did not answer whether it already has" "the stalled object query was not the reported failure"
   [ "$(git -C "$work" rev-parse HEAD)" = "$head_before" ] || fail "the check moved the watched repository's HEAD"
-  pass "a git probe that does not answer is reported as a failure, never as an update"
+  pass "a git probe that does not answer is unknown, never an update"
 }
 
 test_a_stalled_repository_probe_is_not_reported_as_not_a_repository() {
@@ -660,7 +644,7 @@ SH
   out="$home/out.txt"
   run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
   report=$(cat "$out")
-  assert_contains "$report" "firstmate check failed: $work did not answer whether it is a git repository" "a repository probe that never answered was not reported as such"
+  assert_contains "$report" "firstmate check unknown: $work did not answer whether it is a git repository" "a repository probe that never answered was not reported as such"
   assert_not_contains "$report" "is not a git repository" "a repository probe that never answered was reported as not a repository"
   pass "a stalled repository probe is reported as no answer, not as not a repository"
 }
@@ -812,52 +796,20 @@ test_probes_are_skipped_between_intervals() {
   pass "probes run once per interval, not on every poll"
 }
 
-test_an_oversized_budget_is_cut_to_fit_and_reported() {
-  local home stale fresh out report status
-  # A sweep budget larger than the watcher's own per check bound lets the watcher
-  # kill the run, which prints nothing and records nothing, so the same silence
-  # repeats on every poll. Cutting it keeps the detector alive, and the cut is
-  # reported so the operator can see the setting was not used as written.
-  home=$(make_home budget-cut)
-  stale="$TMP_ROOT/budget-cut/mise/installs/herdr/latest/bin"
-  fresh="$TMP_ROOT/budget-cut/local/bin"
+test_sweep_is_independent_of_watcher_inactivity() {
+  local home stale fresh out report
+  home=$(make_home no-sweep-cap)
+  stale="$home/old/bin"
+  fresh="$home/new/bin"
   make_copy "$stale" "$TOOL" 'herdr 0.8.0'
   make_copy "$fresh" "$TOOL" 'herdr 0.8.2'
   write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
   out="$home/out.txt"
-  status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_TOOL_UPDATE_BUDGET_SECS=60 FM_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
-  expect_code 0 "$status" "oversized budget exit"
+  run_check "$home" "$(fixture_path "$stale:$fresh")" "$out" FM_CHECK_TIMEOUT=1
   report=$(cat "$out")
-  # The cut leaves room for the whole-second rounding and the kill grace as well
-  # as one probe bound, so a cut sweep really does end before the watcher bound.
-  assert_contains "$report" "sweep budget 60s cut to 27s to stay inside the watcher check timeout of 30s" "a budget that cannot fit the watcher bound was not cut and reported"
-  assert_contains "$report" "herdr update not in effect" "the detector went quiet instead of sweeping with the cut budget"
-
-  # The default budget of 20s fits the default bound, so it is used as written.
-  # The record is cleared first because the no-nag gate would otherwise suppress
-  # this run, whose bare skew line differs from the cut run's line above.
-  rm -f "$home/state/.tool-updates"
-  status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_CHECK_TIMEOUT=30 "$CHECK" >"$out" 2>&1 || status=$?
-  expect_code 0 "$status" "default budget exit"
-  report=$(cat "$out")
-  assert_not_contains "$report" "sweep budget" "the default budget was cut at the default watcher bound"
-  assert_contains "$report" "herdr update not in effect" "the sweep stopped reporting with the default budget"
-
-  # A budget the watcher bound has room for is used as written. The cleared
-  # record keeps the no-nag gate from hiding this run's repeat of the same line.
-  rm -f "$home/state/.tool-updates"
-  status=0
-  env FM_HOME="$home" PATH="$(fixture_path "$stale:$fresh")" FM_TOOL_UPDATE_INTERVAL=0 \
-    FM_TOOL_UPDATE_BUDGET_SECS=60 FM_CHECK_TIMEOUT=120 "$CHECK" >"$out" 2>&1 || status=$?
-  expect_code 0 "$status" "fitting budget exit"
-  report=$(cat "$out")
-  assert_not_contains "$report" "sweep budget" "a budget that fits the watcher bound was cut anyway"
-  assert_contains "$report" "herdr update not in effect" "the sweep stopped reporting with a budget that fits"
-  pass "a budget that cannot fit the watcher bound is cut and reported, and the sweep keeps working"
+  assert_contains "$report" 'herdr update not in effect' 'independent probe policy lost PATH skew'
+  assert_not_contains "$report" 'sweep budget' 'a derived sweep budget still exists'
+  pass 'tool sweeps do not derive a deadline from the watcher interval'
 }
 
 test_invalid_environment_and_action_refuse() {
@@ -870,8 +822,8 @@ test_invalid_environment_and_action_refuse() {
   FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=0 "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "zero probe bound exit"
   status=0
-  FM_HOME="$home" FM_TOOL_UPDATE_BUDGET_SECS=999 "$CHECK" >/dev/null 2>&1 || status=$?
-  expect_code 2 "$status" "oversized budget exit"
+  FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=invalid "$CHECK" >/dev/null 2>&1 || status=$?
+  expect_code 2 "$status" "invalid inactivity interval exit"
   status=0
   FM_HOME="$home" "$CHECK" sweep >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "unknown action exit"
@@ -1067,7 +1019,7 @@ test_announced_update_newer_than_installed_is_still_reported
 test_announcement_is_read_from_a_second_command
 test_unusable_announce_pattern_is_reported_not_read_as_silence
 test_one_broken_pattern_does_not_blind_the_rest_of_the_sweep
-test_an_unchecked_announcement_source_is_not_read_as_current
+test_progressing_version_probe_reaches_announcement
 test_an_announcement_probe_that_does_not_answer_is_reported
 test_quiet_tool_with_announce_pattern_is_silent
 test_commits_behind_origin_are_reported
@@ -1077,7 +1029,7 @@ test_current_and_ahead_repositories_are_silent
 test_unusable_git_source_is_reported
 test_unreadable_remote_is_not_reported_as_a_missing_branch
 test_missing_branch_on_a_readable_remote_is_still_reported
-test_git_probes_stop_when_the_sweep_budget_is_gone
+test_git_probes_continue_after_an_unknown_command
 test_a_git_probe_that_does_not_answer_is_not_an_update
 test_a_stalled_repository_probe_is_not_reported_as_not_a_repository
 test_absent_registry_is_silent
@@ -1086,7 +1038,7 @@ test_findings_are_reported_once_until_they_change
 test_an_overlong_report_says_it_was_cut
 test_a_finding_past_the_cut_is_still_reported
 test_probes_are_skipped_between_intervals
-test_an_oversized_budget_is_cut_to_fit_and_reported
+test_sweep_is_independent_of_watcher_inactivity
 test_invalid_environment_and_action_refuse
 test_arm_registers_the_check_and_disarm_removes_it
 test_arm_refuses_a_symlink_at_the_shim_path
