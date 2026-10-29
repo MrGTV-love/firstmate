@@ -62,7 +62,7 @@ CREATE TABLE agent_invocations (run_id TEXT, step_name TEXT, agent TEXT, model T
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run-a', 'rebase', 'claude', 'claude-sonnet-5-5', 'anthropic', 'completed'))
     step = 'rebase' if sys.argv[6].startswith('rebase-') else 'review'
     if not sys.argv[6].startswith('ship-') and sys.argv[6] not in ('missing-db-direct', 'fail-typed-group', 'rebase-then-clean'):
-        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'opus' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
+        db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', step, 'claude', 'mystery-9' if sys.argv[6] in ('typed-unknown', 'alias-command') else 'claude-sonnet-5-5', 'anthropic', 'completed'))
     if sys.argv[6] == 'mixed-unknown':
         db.execute('INSERT INTO agent_invocations VALUES (?, ?, ?, ?, ?, ?)', ('run', 'review', 'acp:omp', None, None, 'completed'))
     if sys.argv[6] == 'cancelled-claude':
@@ -125,7 +125,7 @@ PY
       ship-multi-read)
         record_review "$case_dir" "$url" "$head" --author-groups '{"ship":["gpt-5.1-codex","claude-opus-5-5"]}' --reader-model gemini-3-pro >/dev/null || fail 'record independent read of both ship families' ;;
       typed-unknown)
-        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","opus"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown typed constraint' ;;
+        record_review "$case_dir" "$url" "$head" --author-groups '{"all":["gpt-5.1-codex","mystery-9"]}' --reader-model gemini-3-pro >/dev/null || fail 'record unknown typed constraint' ;;
       named-ship-only)
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' >/dev/null || fail 'record named Claude read'
         record_review "$case_dir" "$url" "$head" --author-groups "$groups" --covered-groups '["ship"]' --reader-model gpt-5.1-codex >/dev/null || fail 'record named OpenAI read' ;;
@@ -710,7 +710,7 @@ test_review_record_derives_model_families() {
   record_review "$case_dir" "$url" "$head" --reader-model openrouter/x-ai/grok-4 --author-groups '{
     "a":["claude-opus-5-5[1m]","anthropic/claude-haiku-5-5"],"o":["gpt-5.1-codex","chatgpt-4o","o4-mini","codex-mini"],
     "g":["gemini-3-pro","gemma-3"],"d":["deepseek-v4"],"m":["kimi-k2","moonshot-v1"],"l":["llama-4-maverick"],
-    "u":["mistral-large","opus-5"]}' > /dev/null || fail "record every family"
+    "u":["mistral-large","mystery-9"]}' > /dev/null || fail "record every family"
   review_record_command "$case_dir" latest --pr "$url" > "$case_dir/latest" || fail "read derived families"
   "$JQ_BIN" -e '.review | .reader_family == "xai" and (.author_groups | map_values(map(.family))) ==
     {a:["anthropic","anthropic"],o:["openai","openai","openai","openai"],g:["google","google"],

@@ -8,11 +8,16 @@
 # invokes this owner on its default (no explicit-path) path, which CI and
 # commands.lint both use.
 #
+# The actionlint version is a maintained pin, not a freeze: CI and
+# --strict-version refuse a different local actionlint, while an ordinary local
+# run warns and proceeds so a newer local tool is not a wall.
+#
 # Usage:
 #   fm-lint-workflows.sh                 lint workflows under this repo
 #   fm-lint-workflows.sh --root <dir>    lint workflows under <dir>
 #   fm-lint-workflows.sh <path>...       lint explicit workflow files
 #   fm-lint-workflows.sh --required-version
+#   fm-lint-workflows.sh --strict-version
 #   fm-lint-workflows.sh --help
 set -eu
 
@@ -27,10 +32,15 @@ if [ "${1:-}" = "--required-version" ]; then
 fi
 
 fm_lint_workflows_usage() {
-  sed -n '2,16{s/^# \{0,1\}//;p;}' "$SELF"
+  awk '
+    NR == 1 { next }
+    /^#/ { sub(/^# ?/, ""); print; next }
+    { exit }
+  ' "$SELF"
 }
 
 EXPLICIT_ROOT=
+STRICT_VERSION=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --root)
@@ -43,6 +53,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --root=*)
       EXPLICIT_ROOT=${1#*=}
+      shift
+      ;;
+    --strict-version)
+      STRICT_VERSION=1
       shift
       ;;
     --help|-h)
@@ -116,9 +130,14 @@ ACTIONLINT_BIN=$(command -v actionlint)
 resolved=$("$ACTIONLINT_BIN" -version | awk 'NR==1 {print; exit}')
 printf 'fm-lint-workflows.sh: actionlint %s (pinned %s)\n' "$resolved" "$REQUIRED_ACTIONLINT" >&2
 if [ "$resolved" != "$REQUIRED_ACTIONLINT" ]; then
-  printf 'fm-lint-workflows.sh: actionlint %s required for CI parity, found %s. Install %s with bin/fm-install-actionlint.sh <destination-directory>.\n' \
-    "$REQUIRED_ACTIONLINT" "$resolved" "$REQUIRED_ACTIONLINT" >&2
-  exit 1
+  if [ "${STRICT_VERSION:-0}" = 1 ] || [ "${FM_LINT_STRICT_VERSION:-0}" = 1 ] \
+    || [ "${GITHUB_ACTIONS:-}" = true ] || [ "${CI:-}" = true ]; then
+    printf 'fm-lint-workflows.sh: actionlint %s required for CI parity, found %s. Install %s with bin/fm-install-actionlint.sh <destination-directory>.\n' \
+      "$REQUIRED_ACTIONLINT" "$resolved" "$REQUIRED_ACTIONLINT" >&2
+    exit 1
+  fi
+  printf 'fm-lint-workflows.sh: WARNING: actionlint %s differs from the CI pin %s; local workflow findings may differ. Install %s with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to refuse.\n' \
+    "$resolved" "$REQUIRED_ACTIONLINT" "$REQUIRED_ACTIONLINT" >&2
 fi
 
 # fm-lint.sh owns ShellCheck of the canonical shell set. Disable actionlint's
