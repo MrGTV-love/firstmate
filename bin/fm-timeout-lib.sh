@@ -187,8 +187,10 @@ fm_run_perl_progress() {
     my %sink = (fileno($out_r) => \*STDOUT, fileno($err_r) => \*STDERR);
     my (%observed, $last_cpu, $blind, $warned, $active, $last_tree);
     my $last_progress = clock_gettime(CLOCK_MONOTONIC);
-    my $next_sample = 0;
     my $cadence = $idle / 4 < 1 ? $idle / 4 : 1;
+    # A read that ends within one cadence never pays for a ps sample; start
+    # time is already the progress baseline.
+    my $next_sample = $last_progress + $cadence;
     my $proc = $ENV{FM_PROC_ROOT_OVERRIDE} || "/proc";
     my $ticks = eval { POSIX::sysconf(POSIX::_SC_CLK_TCK()) } || 100;
     my $cpu = sub {
