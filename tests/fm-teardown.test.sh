@@ -1200,6 +1200,51 @@ test_pipeline_input_silent_record_read_is_unknown() {
   pass "a silent run-record read is unknown and retried, while an answered one still refuses"
 }
 
+# SQLite's own busy wait is the one wait the record reader cannot watch: a writer
+# that holds the database lock past it makes the read give up with "database is
+# locked". That is a read that ran out of time, not an answer, so it is unknown
+# and retried exactly like a silent read, never a refusal. The stand-in shortens
+# only that busy wait so the case does not sit out the real 30 s.
+test_pipeline_input_locked_record_read_is_unknown() {
+  local case_dir pr_head local_head rc events real_python holder
+  pr_head=$(pipeline_input_case pipeline-input-locked-read rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-locked-read"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  events="$case_dir/guard-events.jsonl"
+  write_nm_run_record "$case_dir" 01RUNLOCKED "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+  real_python=$(python3 -c 'import sys; print(sys.executable)')
+  cat > "$case_dir/fakebin/python3" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = -I ] && [ "\${2:-}" = - ]; then
+  exec "$real_python" -I -c 'import sqlite3, sys
+connect = sqlite3.connect
+sqlite3.connect = lambda *args, **kwargs: connect(*args, **dict(kwargs, timeout=0.2))
+exec(compile(sys.stdin.read(), "<stdin>", "exec"), {"__name__": "__main__"})' "\${@:3}"
+fi
+exec "$real_python" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/python3"
+  "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked" &
+  holder=$!
+  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+
+  rc=$(FM_GUARD_EVENT_LOG="$events" FM_TEARDOWN_NM_STALL_SECS=60 run_teardown_status "$case_dir")
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  expect_code 75 "$rc" "pipeline-input-locked-read: a lock-blocked record read should exit for a retry"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "unknown: the no-mistakes run record did not answer; retry teardown" "$case_dir/stderr" \
+    "pipeline-input-locked-read: teardown did not say the record did not answer"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-locked-read: a locked read was reported as a refusal"
+  ! grep -q teardown-unlanded "$events" 2>/dev/null \
+    || fail "pipeline-input-locked-read: a locked read fired the unlanded-work guard: $(cat "$events")"
+  assert_refusal_retained_task_state "$case_dir" pipeline-input-locked-read "$local_head"
+  pass "a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused"
+}
+
 # A copy that lags the run's input head is not the input the run started from.
 test_pipeline_input_refuses_copy_behind_the_input_head() {
   local case_dir pr_head input_head local_head
@@ -2640,6 +2685,7 @@ test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
 test_pipeline_input_slow_record_read_still_proves_the_copy
 test_pipeline_input_silent_record_read_is_unknown
+test_pipeline_input_locked_record_read_is_unknown
 test_pipeline_input_refuses_copy_behind_the_input_head
 test_pipeline_input_ties_the_run_by_pushed_head_allows
 test_pipeline_input_refuses_commit_made_after_the_run_started

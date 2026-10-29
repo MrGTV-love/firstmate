@@ -257,7 +257,7 @@ reap_one() {  # <task-id> <status-line>
     return 0
   fi
   if [ "$rc" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
-    add_row lock-skipped "$id" - - "teardown closed nothing and asked to be retried: another operation holds or is queued for the task's project lock, or a no-mistakes read it needs went silent"
+    add_row lock-skipped "$id" - - "teardown asked to be retried: another operation holds or is queued for the task's project lock, or a no-mistakes read it needs went silent"
     return 0
   fi
   # The first line that names a refusal is the reason; fall back to the last

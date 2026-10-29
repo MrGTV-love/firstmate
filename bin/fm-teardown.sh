@@ -2258,7 +2258,9 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   fi
   # A read-only query against the daemon's database, stopped only by silence: a
   # reader blocked on a lock burns no CPU and prints nothing, a slow one on a busy
-  # host does, so how long it takes says nothing about whether it is hung.
+  # host does, so how long it takes says nothing about whether it is hung. The
+  # 30 s is SQLite's busy wait for a writer's lock, the one wait this reader cannot
+  # watch; running out of it is answered as busy, an unknown like silence.
   FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
 import re
 import sqlite3
@@ -2283,6 +2285,8 @@ try:
                 values = ["" if value is None else str(value) for value in row]
                 if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
                     print("run|" + "|".join(values))
+except sqlite3.OperationalError as error:
+    print("busy|" if "locked" in str(error) else "unreadable|")
 except (OSError, ValueError, sqlite3.Error):
     print("unreadable|")
 PY
@@ -2299,6 +2303,11 @@ PY
         return 1
         ;;
       unreadable)
+        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      busy)
+        TEARDOWN_NM_RECORD_SILENT=1
         TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
         return 1
         ;;

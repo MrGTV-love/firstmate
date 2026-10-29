@@ -264,6 +264,7 @@ LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
 # the same 15-minute inactivity policy as fm-duration.py, never a 10s wall kill.
 NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-$((15 * 60))}
 case "$NM_TIMEOUT" in ''|*[!0-9]*|0) NM_TIMEOUT=$((15 * 60)) ;; esac
+: "${FM_DOD_NM_STALL_SECS:=$NM_TIMEOUT}"
 # Shell-local: only this read-only consumer opts into the shared runner mode.
 FM_NM_READ_PROGRESS=1
 FM_NM_READ_STALLED=0

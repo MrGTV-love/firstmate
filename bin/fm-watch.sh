@@ -2790,7 +2790,7 @@ watch_lock_wait_tick() {  # <lock> <wait-start-SECONDS> <waiter-pid>
 # tick start after that record.
 PR_READY_RECONCILE_PID=
 PR_READY_RECONCILE_TIMEOUT=${FM_PR_READY_RECONCILE_TIMEOUT:-}
-# Seconds of silence that stop one pass; each of the helper's own reads gets the same interval through FM_PR_READY_RECONCILE_STALL_SECS.
+# Seconds of silence that stop one pass; the helper reads the same setting for each of its own reads.
 case "$PR_READY_RECONCILE_TIMEOUT" in ''|*[!0-9]*|0*) PR_READY_RECONCILE_TIMEOUT=120 ;; esac
 pr_ready_reconcile_tick() {
   if [ -n "$PR_READY_RECONCILE_PID" ]; then
@@ -2798,7 +2798,7 @@ pr_ready_reconcile_tick() {
     wait "$PR_READY_RECONCILE_PID" 2>/dev/null || true
   fi
   ( fm_run_progress "$PR_READY_RECONCILE_TIMEOUT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    FM_PR_READY_RECONCILE_STALL_SECS="$PR_READY_RECONCILE_TIMEOUT" \
+    FM_PR_READY_RECONCILE_TIMEOUT="$PR_READY_RECONCILE_TIMEOUT" \
     "$SCRIPT_DIR/fm-pr-ready-reconcile.sh" ) </dev/null >&2 &
   PR_READY_RECONCILE_PID=$!
 }

@@ -328,7 +328,7 @@ printf 'working [at=1792479210]: validating with /no-mistakes\n' > "$CASE/home/s
 : > "$CASE/crew-state-hang.a-slow"
 rc=0
 fm_run_timed 60 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
-  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_STALL_SECS=2 \
+  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_TIMEOUT=2 \
   FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
   PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1 || rc=$?
 out=$(cat "$CASE/pass.out")
@@ -351,7 +351,7 @@ printf 'state: done · source: run-step · checks green: PR ready for review (st
 : > "$CASE/crew-state-burn.a-slow"
 rc=0
 fm_run_timed 120 env FM_READY_CASE="$CASE" FM_ROOT_OVERRIDE="$CASE/root" \
-  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_STALL_SECS=2 \
+  FM_HOME="$CASE/home" FM_STATE_OVERRIDE="$CASE/home/state" FM_PR_READY_RECONCILE_TIMEOUT=2 \
   FM_CONFIG_OVERRIDE="$CASE/home/config" FM_CREW_STATE_BIN="$FAKEBIN/fm-crew-state" \
   PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-pr-ready-reconcile.sh" > "$CASE/pass.out" 2>&1 || rc=$?
 out=$(cat "$CASE/pass.out")

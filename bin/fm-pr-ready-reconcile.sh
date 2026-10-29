@@ -70,7 +70,7 @@ READY_DETAIL='checks green: PR ready for review'
 # repo-wide quiet interval. The read searches a full ci log and asks a daemon that
 # can sit quiet while the host is busy, so how long it takes says nothing about
 # whether it is hung; only silence does.
-CREW_STATE_STALL_SECS=${FM_PR_READY_RECONCILE_STALL_SECS:-}
+CREW_STATE_STALL_SECS=${FM_PR_READY_RECONCILE_TIMEOUT:-}
 case "$CREW_STATE_STALL_SECS" in ''|*[!0-9]*|0*) CREW_STATE_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
 
 # The PR URL fm-crew-state.sh names in its checks-green reading, if any; 124
@@ -79,7 +79,7 @@ crew_state_ready_url() {  # <id>
   local line component rc=0
   line=$(fm_run_progress "$CREW_STATE_STALL_SECS" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_CREW_STATE_NO_FORGE=1 FM_CREW_STATE_NM_TIMEOUT="$CREW_STATE_STALL_SECS" \
-    FM_DOD_NM_STALL_SECS="$CREW_STATE_STALL_SECS" "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
+    "$CREW_STATE_BIN" "$1" 2>/dev/null) || rc=$?
   ! fm_timed_out "$rc" || return 124
   [ "$rc" -eq 0 ] || return 1
   case "$line" in "state: done · "*" · $READY_DETAIL"*': '*) ;; *) return 1 ;; esac
@@ -170,8 +170,8 @@ reconcile_one() {  # <meta> <id>
   fi
 }
 
-# The record cap bounds local reads and forge attempts; the watcher deadline
-# bounds their duration. Advance before calling the registrar, not after it:
+# The record cap bounds local reads and forge attempts; the watcher's stall
+# interval stops a pass that goes silent. Advance before calling the registrar, not after it:
 # a timeout must preserve progress even when no refusal can be recorded.
 CURSOR="$CACHE/cursor"
 cursor=
