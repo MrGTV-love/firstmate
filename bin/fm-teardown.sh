@@ -311,8 +311,9 @@
 # installed treehouse has no --path. After the reservation and the held-copy
 # record checks, a lease an earlier teardown took by name on a same-named
 # current-pool slot is released with treehouse return <path> --if-lease-holder
-# <this task> when no other task claims it and no process runs inside it
-# (docs/configuration.md "Superseded pool folders").
+# <this task> when no other task claims it, no process runs inside it, and no
+# copy is registered or recorded inside it (docs/configuration.md "Superseded
+# pool folders").
 # Placing an unleased slot, or one held by this task's own lease, is fast where
 # Treehouse has pool-dir; otherwise it costs one 11-23 s treehouse status listing
 # per teardown under the project lock.
