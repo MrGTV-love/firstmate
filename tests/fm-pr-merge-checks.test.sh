@@ -1605,10 +1605,8 @@ test_merge_gate_reads_a_parent_owned_hold_without_captain_words() {
   add_gh_mocks "$case_dir" "$head"
   hold_fixture_task_owned "$case_dir" parent
 
-  set +e
-  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "merge-gate-parent-owned: an open parent decision must refuse the merge"
   assert_grep "task task-x1 is still waiting on the parent firstmate's decision; nothing was merged" \
     "$case_dir/stderr" "merge-gate-parent-owned: the refusal did not name the parent's decision"
@@ -1624,10 +1622,8 @@ test_merge_gate_reads_a_parent_owned_hold_without_captain_words() {
     >/dev/null 2>&1; then
     fail "merge-gate-parent-owned: the captain's answer path released a parent decision"
   fi
-  set +e
-  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "merge-gate-parent-owned: a refused captain answer must not unblock the merge"
 
   printf '%s\n' 'retry the failing check once on the unchanged head' > "$case_dir/parent-decision"
@@ -1657,10 +1653,8 @@ test_merge_gate_still_refuses_a_captain_owned_hold_after_a_parent_decision() {
     >/dev/null 2>&1; then
     fail "merge-gate-captain-owned: the parent's decision released a captain-owned hold"
   fi
-  set +e
-  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "merge-gate-captain-owned: a captain-owned hold must still refuse the merge"
   assert_grep 'task task-x1 is still held for the captain; nothing was merged' "$case_dir/stderr" \
     "merge-gate-captain-owned: the refusal did not name the captain"
