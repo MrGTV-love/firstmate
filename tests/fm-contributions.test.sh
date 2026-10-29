@@ -1073,14 +1073,8 @@ test_retired_pr_poll_starts_a_new_stop_episode() {
 # path must be added to this table.
 test_every_disarm_path_starts_a_new_stop_episode() {
   local row home failed=
-  for row in copy-sweep startup-growth mail tool-updates contributions custom delivery x-watch; do
-    home=$(new_home "disarm-path-$row")
-    forge_home "$home"
-    printf '%s\n' 'FM_MAIL_USER=test@example.invalid' 'FM_MAIL_PASS=test-pass' \
-      'FM_IMAP_HOST=imap.test.invalid' 'FM_SMTP_HOST=smtp.test.invalid' > "$home/.env"
-    printf '{"tools":[{"name":"herdr","command":"herdr"}]}\n' > "$home/config/watched-tools.json"
-    printf '#!/usr/bin/env bash\nsleep 30\n' > "$home/silent.sh"
-    cat > "$home/disarm-path.sh" <<'SH'
+  write_disarm_runner() {  # <path>
+    cat > "$1" <<'SH'
 #!/usr/bin/env bash
 # <watcher> <repo-root> <row> <silent-check> <home> <base-path>
 . "$1"
@@ -1107,6 +1101,9 @@ row_arm() {
         && "$ROOT/bin/fm-check-register.sh" custom ;;
     delivery) "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 ;;
     x-watch) x_mode on && [ -e "$STATE/x-watch.check.sh" ] ;;
+    task-x1)
+      printf '#!/usr/bin/env bash\nexit 0\n' > "$STATE/task-x1.check.sh" && chmod 0700 "$STATE/task-x1.check.sh" \
+        && "$ROOT/bin/fm-check-register.sh" task-x1 ;;
   esac > /dev/null 2>&1
 }
 row_disarm() {
@@ -1121,6 +1118,7 @@ row_disarm() {
         && fm_pr_poll_retirement_publish "$STATE" delivery "$SCRIPT_DIR/fm-pr-poll.sh" merged \
         && fm_pr_poll_retirement_recover_one "$STATE" delivery "$SCRIPT_DIR/fm-pr-poll.sh" ;;
     x-watch) x_mode off && [ ! -e "$STATE/x-watch.check.sh" ] ;;
+    task-x1) "$ROOT/bin/fm-teardown.sh" task-x1 ;;
   esac > /dev/null 2>&1
 }
 row_arm || exit 20
@@ -1131,6 +1129,35 @@ row_arm || exit 24
 run_check_capture "$ROW" "$SILENT" || exit 25
 [ -n "$FM_CHECK_STOP_NOTICE" ] || exit 26
 SH
+  }
+  for row in copy-sweep startup-growth mail tool-updates contributions custom delivery x-watch teardown; do
+    if [ "$row" = teardown ]; then
+      # Teardown retires a whole task, so this row uses the teardown suite's task fixture.
+      (
+        base_path=$PATH
+        # shellcheck source=/dev/null
+        . "$ROOT/tests/fm-teardown-helpers.sh"
+        case_dir=$(make_case disarm-path-teardown)
+        write_meta "$case_dir" no-mistakes ship
+        printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
+        seed_backlog_in_flight "$case_dir"
+        printf '#!/usr/bin/env bash\nsleep 30\n' > "$case_dir/silent.sh"
+        write_disarm_runner "$case_dir/disarm-path.sh"
+        FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
+          FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" \
+          PATH="$case_dir/fakebin:$base_path" \
+          bash "$case_dir/disarm-path.sh" "$ROOT/bin/fm-watch.sh" "$ROOT" task-x1 "$case_dir/silent.sh" "$case_dir" "$base_path" \
+          > "$case_dir/disarm-path.out" 2> "$case_dir/disarm-path.err"
+      ) || failed="$failed $row(rc=$?)"
+      continue
+    fi
+    home=$(new_home "disarm-path-$row")
+    forge_home "$home"
+    printf '%s\n' 'FM_MAIL_USER=test@example.invalid' 'FM_MAIL_PASS=test-pass' \
+      'FM_IMAP_HOST=imap.test.invalid' 'FM_SMTP_HOST=smtp.test.invalid' > "$home/.env"
+    printf '{"tools":[{"name":"herdr","command":"herdr"}]}\n' > "$home/config/watched-tools.json"
+    printf '#!/usr/bin/env bash\nsleep 30\n' > "$home/silent.sh"
+    write_disarm_runner "$home/disarm-path.sh"
     with_home "$home" bash "$home/disarm-path.sh" "$ROOT/bin/fm-watch.sh" "$ROOT" "$row" "$home/silent.sh" "$home" "$PATH" \
       > "$home/disarm-path.out" 2> "$home/disarm-path.err" || failed="$failed $row(rc=$?)"
   done

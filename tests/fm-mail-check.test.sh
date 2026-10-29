@@ -326,17 +326,35 @@ test_watcher_stopped_poll_rings_queued_mail_next_pass() {
 }
 
 test_idle_poll_inside_its_socket_timeout_succeeds() {
-  local home out
+  local home wrapper
   home=$(make_home idle-eighteen)
   write_env "$home"
   enter_mailbox "$home" \
     'sleep 18
 printf "uidvalidity\\t20002\\n"
 printf "42\\t2026-09-05T00:00:00Z\\talice@example.com\\tHello\\n"'
-  out="$home/out.txt"
-  run_check "$home" "$out" "$CHECK" FM_DURATION_FILE="$home/empty-durations.jsonl"
-  assert_contains "$(cat "$out")" "mail: new mail: woke for 42" "an 18 s idle-CPU poll inside FM_MAIL_TIMEOUT was stopped"
-  pass 'with default settings and an empty duration ledger, an 18 s idle-CPU poll delivers its mail'
+  # Only the check sees the fake python3; the watcher's own helpers stay real.
+  wrapper="$home/mail-check-wrapper.sh"
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016 # The wrapper expands its own PATH.
+    printf 'PATH=%q:"$PATH" exec %q check\n' "$FAKEBIN" "$CHECK"
+  } > "$wrapper"
+  chmod +x "$wrapper"
+  # The watcher keeps its default check inactivity bound, derived from an empty duration ledger.
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST -u FM_CHECK_TIMEOUT \
+    FM_HOME="$home" FM_DURATION_FILE="$home/empty-durations.jsonl" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      run_check_capture mail "$2" || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] || exit 22
+      case "$FM_CHECK_RESULT" in *"mail: new mail: woke for 42"*) ;; *) exit 23 ;; esac
+    ' _ "$ROOT/bin/fm-watch.sh" "$wrapper" > "$home/watch.out" 2> "$home/watch.err" \
+    || fail "the watcher stopped an 18 s idle-CPU poll inside FM_MAIL_TIMEOUT: $(cat "$home/watch.err")"
+  pass 'with the default watcher bound and an empty duration ledger, an 18 s idle-CPU poll delivers its mail'
 }
 
 test_disarmed_check_starts_a_new_stop_episode() {
