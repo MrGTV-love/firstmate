@@ -722,7 +722,7 @@ Teardown also ends a job working at the copy root.
 So a job in the task's terminal pane (tmux or herdr) whose working directory is inside the copy keeps it with one wake before teardown runs, too; a shell, the worker's agent, what the agent started, and the processes it runs under do not count here.
 
 A refusal that only means "not now" is retried on later ticks and says nothing.
-That covers the task lease or project lock held by another actor, a teardown that outlasts its limit, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
+That covers the task lease or project lock held by another actor, a teardown stopped because it went silent, a teardown that exits 75 because a no-mistakes read it needed went silent, a worker that is not finished yet, a landing proof that went stale because the copy's HEAD moved while teardown ran, and another lifecycle action already running.
 The retry waits 60 seconds, then doubles up to 3600 seconds.
 One wake is raised if the task is still not pruned after 24 attempts.
 
@@ -2180,7 +2180,7 @@ my-project 2
 ```
 
 [`bin/fm-project-capacity-lib.sh`](../bin/fm-project-capacity-lib.sh) owns declaration syntax, clone-name matching, same-origin occupancy, and the concurrency invariant.
-A PR-ready handoff, or a no-mistakes run that `bin/fm-crew-state.sh` reads as checks green naming its PR (a ten-second read that searches the run's full ci log for its newest checks marker, skipped for that pass when slower), is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason and is retried after ten minutes, and `bin/fm-pr-check.sh <id> <PR url>` by hand remains for a fixed refusal or a lane with neither reading; local-only ships and scouts retain theirs until cleanup.
+A PR-ready handoff, or a no-mistakes run that `bin/fm-crew-state.sh` reads as checks green naming its PR (a read that searches the run's full ci log for its newest checks marker, stopped only when it goes silent and then skipped for that pass as unknown), is registered automatically by the watcher's bounded rotating housekeeping pass and frees a place; a refusal raises one `pr-ready-refused:<id>` check wake per distinct reason and is retried after ten minutes, and `bin/fm-pr-check.sh <id> <PR url>` by hand remains for a fixed refusal or a lane with neither reading; local-only ships and scouts retain theirs until cleanup.
 The cap covers local homes on this machine, not workers on a remote host.
 When every place is held, `bin/fm-spawn.sh` launches nothing, creates no record, leaves the backlog item queued, prints one `deferred:` line naming the holders, and exits 75, so Firstmate dispatches the item again once a place frees.
 A malformed or unreadable file refuses every fresh ship or scout spawn until it is fixed, rather than guessing the intended limit, and so does a local home's state directory or task record that cannot be read while counting a capped project's holders.
