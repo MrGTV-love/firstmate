@@ -1,0 +1,10 @@
+base rc=0 records=5
+fix rc=0 records=5
+secondmate_current identical (clock fields dropped)
+fix event notes as parsed:
+mate1: "plain review underway"
+mate2: "lead and trail  "
+mate3: "tab\there \"quoted\" é ✓"
+mate4: "dollar $HOME `x`"
+mate5: ""
+lab torn down

@@ -1,0 +1,4 @@
+20 trivial reads each, load={ 64.09 58.91 48.51 }
+fm_run_timed: .0620s per read
+fm_run_progress: .9513s per read
+fm_run_perl_progress: .0859s per read

@@ -1,0 +1,5 @@
+15-secondmate lab fleet, real tmux panes on private socket
+BASE run 1: rc=0 wall=11.9s jq_starts=426 secondmate_records=15 terminal_captured=15 load={ 25.92 23.91 24.68 }
+FIX  run 1: rc=0 wall=12.8s jq_starts=186 secondmate_records=15 terminal_captured=15 load={ 24.73 23.76 24.62 }
+BASE run 2: rc=0 wall=7.2s jq_starts=426 secondmate_records=15 terminal_captured=15 load={ 23.71 23.56 24.54 }
+FIX  run 2: rc=0 wall=10.8s jq_starts=186 secondmate_records=15 terminal_captured=15 load={ 21.69 23.13 24.37 }

@@ -1,0 +1,14 @@
+# base-first
+lab=/Users/charlesabrooker/tmp/fm-lab.02G901 mates=3 windows=4
+pair 1: base=3.18s rc=0 captured=3 registry=true activity_ok=3 | fix=3.67s rc=0 captured=3 registry=true activity_ok=3 | load={ 70.84 57.06 46.80 }
+pair 2: base=3.85s rc=0 captured=3 registry=true activity_ok=3 | fix=3.52s rc=0 captured=3 registry=true activity_ok=3 | load={ 68.69 56.84 46.78 }
+pair 3: base=4.01s rc=0 captured=3 registry=true activity_ok=3 | fix=3.80s rc=0 captured=3 registry=true activity_ok=3 | load={ 66.99 56.86 46.91 }
+pair 4: base=3.27s rc=0 captured=3 registry=true activity_ok=3 | fix=6.21s rc=0 captured=3 registry=true activity_ok=3 | load={ 69.61 57.74 47.33 }
+lab torn down
+# fix-first
+lab=/Users/charlesabrooker/tmp/fm-lab.Qhd3Dy mates=3 windows=4
+pair 1: base=10.28s rc=0 captured=3 registry=true activity_ok=3 | fix=5.75s rc=0 captured=3 registry=true activity_ok=3 | load={ 72.06 58.84 47.90 }
+pair 2: base=5.61s rc=0 captured=3 registry=true activity_ok=3 | fix=8.60s rc=0 captured=3 registry=true activity_ok=3 | load={ 72.65 59.65 48.39 }
+pair 3: base=4.14s rc=0 captured=3 registry=true activity_ok=3 | fix=4.69s rc=0 captured=3 registry=true activity_ok=3 | load={ 72.04 59.94 48.62 }
+pair 4: base=4.21s rc=0 captured=3 registry=true activity_ok=3 | fix=3.09s rc=0 captured=3 registry=true activity_ok=3 | load={ 69.95 59.71 48.61 }
+lab torn down

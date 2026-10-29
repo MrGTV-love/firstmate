@@ -1,0 +1,6 @@
+same 15-secondmate lab home, alternating base/fix, wall seconds
+pair 1: base=5.63 fix=11.71 load={ 17.35 21.81 23.83 }
+pair 2: base=6.04 fix=11.34 load={ 17.35 21.54 23.69 }
+pair 3: base=7.11 fix=17.36 load={ 18.98 21.59 23.64 }
+pair 4: base=5.98 fix=11.73 load={ 17.57 21.10 23.42 }
+pair 5: base=6.6 fix=15.74 load={ 20.37 21.53 23.52 }

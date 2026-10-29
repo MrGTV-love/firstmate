@@ -1,0 +1,6 @@
+PATH=<tmpdir> (every PATH entry linked except perl*)
+perl: not on PATH
+load={ 43.23 53.15 47.58 }
+not ok - the producer failed: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AAAHZ1EP4BQX517VAGB94/bin/fm-hold-reason-lib.sh: line 22: perl: command not found
+fm-fleet-snapshot: backlog read failed
+exit=1 wall=12s

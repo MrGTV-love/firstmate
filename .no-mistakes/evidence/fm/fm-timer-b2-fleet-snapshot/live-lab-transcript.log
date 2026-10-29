@@ -1,0 +1,81 @@
+=== FIX: sources 3s slow (silent), default settings, CPU-burn neighbours (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.DvwL9h) ===
+tmux socket dir: /tmp/fml.YTGxAw
+firstmate:0: fm-mate* (1 panes) [80x24] 
+host load at start: { 25.68 23.48 24.61 }
+snapshot rc=0 wall=12s
+{
+  "registry": {
+    "available": true,
+    "complete": true,
+    "records": [
+      "mate"
+    ]
+  },
+  "activity_scan": {
+    "available": true,
+    "records": [
+      "review"
+    ]
+  },
+  "terminal": {
+    "captured": true,
+    "freshness": "fresh",
+    "reason": null,
+    "event_note_seen": true
+  },
+  "current_state": "unknown"
+}
+lab torn down
+=== BASE: sources 3s slow (silent), default settings, CPU-burn neighbours (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Ks1vvr) ===
+tmux socket dir: /tmp/fml.u1LqtY
+firstmate:0: fm-mate* (1 panes) [80x24] 
+host load at start: { 25.38 23.51 24.59 }
+snapshot rc=0 wall=8s
+{
+  "registry": {
+    "available": false,
+    "complete": false,
+    "records": []
+  },
+  "activity_scan": {
+    "available": false,
+    "records": []
+  },
+  "terminal": {
+    "captured": false,
+    "freshness": "unknown",
+    "reason": "terminal capture timed out",
+    "event_note_seen": false
+  },
+  "current_state": "unknown"
+}
+lab torn down
+=== FIX: terminal capture hangs silently, inactivity bound set to 3s (FM_HOME=/Users/charlesabrooker/tmp/fm-lab.nAaaNQ) ===
+tmux socket dir: /tmp/fml.Gt0c6t
+firstmate:0: fm-mate* (1 panes) [80x24] 
+host load at start: { 25.30 23.56 24.60 }
+snapshot rc=0 wall=6s
+{
+  "registry": {
+    "available": true,
+    "complete": true,
+    "records": [
+      "mate"
+    ]
+  },
+  "activity_scan": {
+    "available": true,
+    "records": [
+      "review"
+    ]
+  },
+  "terminal": {
+    "captured": false,
+    "freshness": "unknown",
+    "reason": "terminal capture timed out",
+    "event_note_seen": false
+  },
+  "current_state": "unknown"
+}
+hung capture reader pid=85757 was reaped
+lab torn down

@@ -1,0 +1,12 @@
+load={ 56.76 57.72 48.50 }
+ok - the producer summarizes a 27-task fleet with 115 jq starts (bound 200)
+ok - registry, parent activities and terminal evidence survive 1x source delay (32 jq starts)
+ok - registry, parent activities and terminal evidence survive 5x source delay (32 jq starts)
+ok - registry silent reader is reaped and its evidence remains unknown
+ok - activities silent reader is reaped and its evidence remains unknown
+ok - terminal silent reader is reaped and its evidence remains unknown
+
+real	0m54.469s
+user	0m10.218s
+sys	0m18.246s
+exit=0

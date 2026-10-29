@@ -1,0 +1,7 @@
+lab=/Users/charlesabrooker/tmp/fm-lab.mCPfEO mates=15 windows=16
+pair 1: base=10.81s rc=0 captured=15 registry=true activity_ok=15 | fix=11.80s rc=0 captured=15 registry=true activity_ok=15 | load={ 71.64 51.57 43.67 }
+pair 2: base=8.98s rc=0 captured=15 registry=true activity_ok=15 | fix=10.55s rc=0 captured=15 registry=true activity_ok=15 | load={ 68.18 52.07 44.03 }
+pair 3: base=10.64s rc=0 captured=15 registry=true activity_ok=15 | fix=14.50s rc=0 captured=15 registry=true activity_ok=15 | load={ 69.99 53.77 44.88 }
+pair 4: base=9.16s rc=0 captured=15 registry=true activity_ok=15 | fix=12.97s rc=0 captured=15 registry=true activity_ok=15 | load={ 65.48 53.82 45.10 }
+pair 5: base=17.81s rc=0 captured=15 registry=true activity_ok=15 | fix=8.46s rc=0 captured=15 registry=true activity_ok=15 | load={ 69.14 55.83 46.13 }
+lab torn down

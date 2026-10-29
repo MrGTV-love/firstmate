@@ -1,0 +1,234 @@
+ok - the producer summarizes a 27-task fleet with 115 jq starts (bound 200)
+ok - registry, parent activities and terminal evidence survive 1x source delay (48 jq starts)
+not ok - 5x source delay discarded healthy evidence: {
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-29T07:57:37Z",
+  "fm_home": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home",
+  "roots": {
+    "fm_root": "/tmp/fm-b2-base.WlVX",
+    "state": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/state",
+    "data": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/data",
+    "config": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/config",
+    "projects": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/projects"
+  },
+  "backlog": {
+    "path": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/data/backlog.md",
+    "present": false,
+    "records": []
+  },
+  "tasks": [
+    {
+      "id": "mate",
+      "kind": "secondmate",
+      "harness": "codex",
+      "mode": "",
+      "yolo": "",
+      "branch": null,
+      "project": "",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/state/mate.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/state/mate.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "review underway",
+            "raw": "working [key=review]: review underway",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": null,
+          "present": false
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/data/mate/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "none",
+        "detail": "worktree gone (torn down?)",
+        "raw": "state: unknown · source: none · worktree gone (torn down?)",
+        "observed_at": "2026-10-29T07:57:37Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "firstmate:fm-mate",
+        "exists": true,
+        "agent_alive": "alive",
+        "status": "alive",
+        "observed_at": "2026-10-29T07:57:37Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "open_decisions_unreadable": false,
+        "scout_report_present": false,
+        "last_event_text": "working [key=review]: review underway"
+      },
+      "actions": {
+        "send": "bin/fm-send.sh fm-mate '<request>'",
+        "watch": "read status/doc return channel; do not routinely fm-peek a secondmate for answers",
+        "return_channel_note": "Secondmate answers come back through status/doc paths after a marked fm-send request."
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": false,
+    "proven_clear": false,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 1,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": true,
+      "available": false,
+      "complete": false,
+      "reason": "registered secondmate table read timed out",
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/tmp/fm-fleet-cost.oRP8Z1/read-home/data/secondmates.md",
+      "freshness": {
+        "status": "unavailable",
+        "observed_at": "2026-10-29T07:57:37Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [
+        "registered secondmate table read timed out"
+      ],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [
+      {
+        "id": "mate",
+        "home": null,
+        "host": null,
+        "remote": false,
+        "registered": null,
+        "spawn_gen": null,
+        "current": {
+          "state": "unknown",
+          "reason": "secondmate registration is unknown because the registry read is incomplete or unavailable"
+        },
+        "invalidity": null,
+        "reconcile_inventory": null,
+        "provenance": {
+          "selected": "parent-event-fallback",
+          "structured_home": null,
+          "parent_event_role": "fallback-only-not-current"
+        },
+        "freshness": {
+          "status": "historical-event",
+          "observed_at": "2026-10-29T07:57:37Z",
+          "age_seconds": 5
+        },
+        "active_children": [],
+        "decisions_open": [],
+        "holds": [],
+        "queued": [],
+        "landed": [],
+        "endpoints": [],
+        "counts": {
+          "active_children": 0,
+          "decisions_open": 0,
+          "holds": 0,
+          "queued": 0,
+          "landed": 0,
+          "endpoints": 0
+        },
+        "omitted": [],
+        "parent_event": {
+          "raw": "working [key=review]: review underway",
+          "note": "review underway",
+          "age_seconds": null,
+          "open_activities": [],
+          "open_decisions": [],
+          "activity_scan": {
+            "records": [],
+            "available": false,
+            "input_truncated": false,
+            "retained_truncated": false,
+            "reasons": [
+              "timeout"
+            ],
+            "lines_in_window": 0,
+            "records_in_window": 0
+          }
+        },
+        "terminal_evidence": {
+          "provenance": "parent-direct-report-terminal",
+          "trust": "untrusted-supplement",
+          "captured": false,
+          "observed_at": "2026-10-29T07:57:37Z",
+          "freshness": "unknown",
+          "reason": "terminal capture timed out",
+          "lines": 0,
+          "bytes": 0,
+          "event_note_seen": false,
+          "contradiction": false
+        },
+        "contradiction": false
+      }
+    ],
+    "total_registered": 0,
+    "total": 1,
+    "shown": 1,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [
+      "<mate: unavailable>"
+    ],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}
+bin/fm-proc-budget.sh -- bash tests/fm-fleet-snapshot-fleet-cost.test.sh  9.57s user 16.96s system 70% cpu 37.494 total

@@ -1,0 +1,7 @@
+ok - the producer summarizes a 27-task fleet with 115 jq starts (bound 200)
+ok - registry, parent activities and terminal evidence survive 1x source delay (32 jq starts)
+ok - registry, parent activities and terminal evidence survive 5x source delay (32 jq starts)
+ok - registry silent reader is reaped and its evidence remains unknown
+ok - activities silent reader is reaped and its evidence remains unknown
+ok - terminal silent reader is reaped and its evidence remains unknown
+bin/fm-proc-budget.sh -- bash tests/fm-fleet-snapshot-fleet-cost.test.sh  11.79s user 20.73s system 64% cpu 50.207 total

@@ -1,0 +1,4 @@
+same 15-mate lab; fix-with-hard-timer = fix commit with the 3 reads switched back to fm_run_timed (isolation only)
+round 1: base=7.46 fix=12.03 fix-with-hard-timer=4.93 load={ 18.94 21.05 23.24 }
+round 2: base=14.47 fix=15.72 fix-with-hard-timer=5.84 load={ 23.23 21.98 23.50 }
+round 3: base=13.5 fix=12.83 fix-with-hard-timer=5.38 load={ 24.22 22.50 23.63 }
