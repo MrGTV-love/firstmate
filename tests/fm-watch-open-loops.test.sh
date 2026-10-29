@@ -864,16 +864,4 @@ tests=(
   test_fresh_observation_rearms_recovery_during_blocked_stale_append
   test_corrupt_fresh_ledger_preserves_cooldowns_until_valid_degraded_recovery
 )
-if [ "$#" -gt 0 ]; then
-  for requested in "$@"; do
-    selected=0
-    for candidate in "${tests[@]}"; do
-      [ "$requested" != "$candidate" ] || selected=1
-    done
-    [ "$selected" -eq 1 ] || fail "unknown watcher ledger test: $requested"
-  done
-  tests=("$@")
-fi
-for selected_test in "${tests[@]}"; do
-  "$selected_test" || exit "$?"
-done
+fm_test_run_cases "${tests[@]}" -- "$@"
