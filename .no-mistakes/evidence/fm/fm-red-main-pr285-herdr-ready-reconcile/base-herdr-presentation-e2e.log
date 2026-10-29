@@ -1,0 +1,17 @@
+# red-first: tests/fm-backend-herdr-presentation-e2e.test.sh at base 7b5c75cc2 (old '- Source:' anchor fixture), rest of tree at head
+FM_TEST_BEGIN 2026-10-29T03:23:16Z tests/fm-backend-herdr-presentation-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+not ok - opted-out anchor spawn failed: error: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/.no-mistakes/test-tmp/fm-herdr-presentation.ZjXDGo/home/data/anchor/brief.md cannot be dispatched; every input problem is listed once:
+  mandatory item has no id: Expected: anchor reaches the spawn, flat fallback, refusal, teardown, or recovery outcome specified by its owning test case.
+  mandatory item has no id: Verify: run tests/fm-backend-herdr-presentation-e2e.test.sh through bin/fm-test-run.sh and satisfy every applicable existing assertion.
+  mandatory item has no id: Edge/negative: failed operations and lock contention preserve the asserted exact endpoint ownership and captain focus.
+  mandatory item has no id: Evidence place: the runner output and the fixture's stdout, stderr, Herdr call log, move log, and focus audit under /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/.no-mistakes/test-tmp/fm-herdr-presentation.ZjXDGo.
+  mandatory item has no id: Authority: grader.
+  no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+error: repair: edit /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/.no-mistakes/test-tmp/fm-herdr-presentation.ZjXDGo/home/data/anchor/brief.md and replace {TASK} and {FIRSTMATE_SPEC} in ## Captain's intent and ## Firstmate spec, list the excluded work under ### Out of scope or write None, then fill every listed task Definition of Done token, or put an unfenced 'DoD file: <absolute path>' line inside ## Definition Of Done (task) naming a finished criteria file; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds a complete brief
+FM_TEST_END 2026-10-29T03:28:15Z tests/fm-backend-herdr-presentation-e2e.test.sh exit=1 duration_ms=298064 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=302601
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=298064 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-backend-herdr-presentation-e2e.test.sh duration_ms=298064
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1

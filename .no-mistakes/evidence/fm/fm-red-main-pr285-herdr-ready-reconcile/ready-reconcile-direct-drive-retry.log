@@ -1,0 +1,35 @@
+===== new attempt 1 (load averages: 62.14 71.71 69.78)
+pr-ready: ready: registered https://github.com/example/project/pull/192
+--- shape=new: resulting ready.meta pr/pr_head lines
+pr=https://github.com/example/project/pull/192
+pr_head=91fb9ce38f457c79ca39fd514cb0d7b598e475af
+===== new attempt 2 (load averages: 53.11 68.50 68.69)
+pr-ready: ready: registered https://github.com/example/project/pull/192
+--- shape=new: resulting ready.meta pr/pr_head lines
+pr=https://github.com/example/project/pull/192
+pr_head=5c0ee63e84cca0a4f1c87c4c8c02ea71480f3045
+===== new attempt 3 (load averages: 50.71 65.29 67.49)
+--- shape=new: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=new: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)
+===== old attempt 1 (load averages: 49.49 63.04 66.56)
+--- shape=old: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=old: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)
+===== old attempt 2 (load averages: 51.02 62.03 66.05)
+--- shape=old: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=old: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)
+===== tampered attempt 1 (load averages: 67.47 64.16 66.43)
+--- shape=tampered: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=tampered: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)
+===== tampered attempt 2 (load averages: 75.46 67.86 67.64)
+--- shape=tampered: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=tampered: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)

@@ -1,0 +1,10 @@
+$ PATH=<fake actionlint 0.0.1-fake>:$PATH bin/fm-lint-workflows.sh   # default: warn and continue
+fm-lint-workflows.sh: actionlint 0.0.1-fake (pinned 1.7.12)
+fm-lint-workflows.sh: WARNING: actionlint 0.0.1-fake differs from the CI pin 1.7.12; local workflow findings may differ. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to make this an error.
+fm-lint-workflows.sh: 4 workflow files valid
+exit=0
+
+$ PATH=<fake actionlint 0.0.1-fake>:$PATH bin/fm-lint-workflows.sh --strict-version   # must still stop
+fm-lint-workflows.sh: actionlint 0.0.1-fake (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 0.0.1-fake. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+exit=1

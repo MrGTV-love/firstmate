@@ -1,0 +1,22 @@
+===== old
+--- shape=old: real bin/fm-crew-state.sh ready
+state: unknown · source: run-step · run evidence unverified: the run exposes no verification-plan snapshot, so its review coverage cannot be accounted for
+--- shape=--- shape=new: real bin/fm-crew-state.sh ready
+state: done · source: run-step · checks green: PR ready for review (still monitoring for merge/close): https://github.com/example/project/pull/192
+--- shape=new: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: registered https://github.com/example/project/pull/192
+--- shape=new: resulting ready.meta pr/pr_head lines
+pr=https://github.com/example/project/pull/192
+pr_head=aee77347dd68512c1715df702241a4d860777f13
+===== tampered
+Terminated: 15
+this pass
+--- shape=new: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)
+===== tampered
+--- shape=tampered: real bin/fm-crew-state.sh ready
+state: unknown · source: run-step · run evidence unverified: this task's verification-plan source bytes do not match the run's captured snapshot: /Users/charlesabrooker/tmp/fm-drive-ready.tmTV9K/case/home/data/ready/verification-plan.md
+--- shape=tampered: real bin/fm-pr-ready-reconcile.sh
+pr-ready: ready: run reading exceeded 10s; skipped this pass
+--- shape=tampered: resulting ready.meta pr/pr_head lines
+(no pr= line: ready PR not recorded)

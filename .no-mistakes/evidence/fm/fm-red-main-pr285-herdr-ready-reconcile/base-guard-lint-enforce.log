@@ -1,0 +1,11 @@
+$ bin/fm-guard-lint.sh --mode enforce --counts   # at base 7b5c75cc2 tree (git archive scratch copy)
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=37 retired=14 beyond_audit=12 excluded=1 unregistered=847 audited=30 beyond_audit_active=10 sites=897 mapped=50
+VIOLATION S1 site:bin/fm-dod-lib.sh:bf661459c8: bin/fm-dod-lib.sh:839 [B] printf 'error: verification plan refuses %s: %s\\n%s\\n' "$dod_file" "$problem" "$(fm_dod_item_shape rule)" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-dod-lib.sh:b3c4d2287b: bin/fm-dod-lib.sh:846 [B] printf 'error: verification plan refuses the task Definition Of Done: %s\\n%s\\n' "$problem" "$(fm_dod_item_shap maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-dod-lib.sh:feb60e146f: bin/fm-dod-lib.sh:1666 [B] 'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry mandat maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-lint-workflows.sh:3999e1ed18: bin/fm-lint-workflows.sh:139 [B] printf 'fm-lint-workflows.sh: WARNING: actionlint %s differs from the CI pin %s; local workflow findings may d maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-lint.sh:ee74b58c38: bin/fm-lint.sh:1747 [B] printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s w maps to no registry entry: add a sites marker to the guard that owns it
+STALE S1 site:bin/fm-dod-lib.sh:180a6754ae: allowlisted violation no longer occurs; remove the entry
+LINT_SUMMARY mode=enforce guards=37 violations=847 allowlisted=842 stale=1 shown=5 sites=897
+exit=1

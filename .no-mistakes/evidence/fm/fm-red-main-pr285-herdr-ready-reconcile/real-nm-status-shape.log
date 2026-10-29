@@ -1,0 +1,13 @@
+$ no-mistakes axi status --run 01M62PQEK7ERZE6CQ40K8F9JZY   # real status shape the ready-reconcile fixture now mirrors (head_sha + verification_plan block)
+run:
+  id: "01M62PQEK7ERZE6CQ40K8F9JZY"
+  branch: fm/fm-red-main-pr285-herdr-ready-reconcile
+  status: running
+  head: d20a26e6
+  head_sha: d20a26e6e7b093c7ee9714dbead9a9e3d9c6b9b9
+  verification_plan:
+    path: /Users/charlesabrooker/.no-mistakes/run-inputs/01M62PQEK7ERZE6CQ40K8F9JZY/verification-plan.txt
+    sha256: 8fc8fc5ed4567d15e3fbe919e06d51fed13aaa5eb21271be88fd33668f97d939
+    source_path: /Users/charlesabrooker/firstmate/data/fm-red-main-pr285-herdr-ready-reconcile/verification-plan.md
+    captured_at: 1793239792
+  findings: none

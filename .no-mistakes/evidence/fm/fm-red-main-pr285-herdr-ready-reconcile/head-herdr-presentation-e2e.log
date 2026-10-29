@@ -1,0 +1,28 @@
+FM_TEST_BEGIN 2026-10-29T02:19:47Z tests/fm-backend-herdr-presentation-e2e.test.sh family=real-herdr-gated expected_gate_skip=herdr
+ok - real Herdr lab: an opted-out spawn retains the Stage 1 Herdr command sequence with zero ordering calls
+ok - real Herdr lab: a home that configured nothing is projected by default on herdr 0.9.5
+ok - real Herdr lab: every projected create, task-tab create, seeded prune, and move preserves active workspace and tab
+ok - real Herdr lab: persisted-focused seeded prune proceeds when no live client is attached
+ok - real Herdr lab: bounded lock contention warns and falls back flat without projection or focus drift
+ok - real Herdr lab: concurrent primary workers form one stable contiguous block without active workspace/tab drift
+ok - real Herdr lab: forced workspace.move failure leaves a successful worker in default order with a warning and no cleanup
+ok - real Herdr lab: concurrent post-create abort cleanup stays serialized with exact focus restoration
+ok - real Herdr lab: Treehouse commands and metadata shape are byte-identical except for endpoint IDs and spawn incarnation
+ok - real Herdr lab: exact task-pane close removes the projected workspace with no unrestored wrong-focus interval
+ok - real Herdr lab: concurrent projected cleanup is serialized and leaves active workspace/tab unchanged
+ok - real Herdr lab: three repeated concurrent create/order/cleanup waves have zero active workspace or tab drift
+ok - real Herdr lab: the primary presentation setting inherits into real secondmate homes
+ok - real Herdr lab: primary and two secondmate homes each own a top-level contiguous child block
+ok - real Herdr lab: concurrent primary/A/B spawns preserve parent order and exact focus
+ok - real Herdr lab: session lock contention from a secondmate home falls back flat with no journal
+ok - real Herdr lab: Hi Bit and Wheelhouse-style same-identity restarts reclaim one nested space with exact focus and idempotence
+not ok - cross-home same-identity reclaim failed: warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/.no-mistakes/test-tmp/fm-herdr-presentation.UlIB6q/home-2ndmate-alpha/data/wheel-child-resume/launch-brief.md records no ship branch; defaulting to legacy branch fm/wheel-child-resume
+warning: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/.no-mistakes/test-tmp/fm-herdr-presentation.UlIB6q/home-2ndmate-alpha/data/wheel-child-resume/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: existing herdr endpoint for wheel-child-resume is unknown; refusing duplicate launch
+FM_TEST_END 2026-10-29T02:41:32Z tests/fm-backend-herdr-presentation-e2e.test.sh exit=1 duration_ms=1304608 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=1306414
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=1304608 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-backend-herdr-presentation-e2e.test.sh duration_ms=1304608
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62PQEK7ERZE6CQ40K8F9JZY/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=1
