@@ -2403,12 +2403,13 @@ watcher_stop_signals() {
 # A stopped check has no result for this pass: one triage line names it. The
 # first stop of an episode also sets FM_CHECK_STOP_NOTICE, which the sweep
 # raises as that check's wake, so a check that keeps being stopped still reaches
-# firstmate once; the check's next completed run ends the episode.
-run_check_capture() {  # <name> <check> [args...]
+# firstmate once. state/<id>.check-stopped marks the episode; the check's next
+# completed run ends it, and disarming or retiring the check removes it.
+run_check_capture() {  # <check-id> <check> [args...]
   local name=$1 started episode notice
   shift
   FM_CHECK_STOP_NOTICE=
-  episode="$STATE/.check-stopped.$(printf '%s\n' "$name" "${@:2}" | shasum -a 256 | cut -c1-16)"
+  episode="$STATE/$name.check-stopped"
   started=$SECONDS
   FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
   if [ -n "$FM_CHECK_STOPPED" ]; then
@@ -3812,6 +3813,10 @@ prelude_phase() {
   if prelude_step_begin 10 && [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=
+    for stopped in "$STATE"/*.check-stopped; do
+      [ -e "$stopped" ] || continue
+      [ -e "${stopped%-stopped}.sh" ] || rm -f -- "$stopped"
+    done
     for c in "$STATE"/*.check.sh; do
       signal_phase_flush
       [ -e "$c" ] || continue
@@ -3844,7 +3849,7 @@ prelude_phase() {
             triage_log "PR poll for $id changed before its validated check; skipping the stale snapshot"
             continue
           fi
-          run_check_capture pr-poll "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
+          run_check_capture "$id" "$SCRIPT_DIR/fm-pr-poll.sh" --validated \
             "$provider" "$url" "$host" "$path" "$number" || exit 1
           out=$FM_CHECK_RESULT
         elif fm_custom_check_snapshot_prepare "$STATE" "$id"; then

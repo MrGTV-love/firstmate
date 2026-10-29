@@ -1014,6 +1014,7 @@ x_mode_setup() {
   x_mode_remove_artifacts() {
     local failed=0
     x_mode_remove_artifact "$shim" || failed=1
+    rm -f -- "${shim%.sh}-stopped" || failed=1
     x_mode_remove_artifact "$cadence" || failed=1
     [ "$failed" -eq 0 ]
   }

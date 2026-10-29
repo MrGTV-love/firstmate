@@ -53,7 +53,10 @@
 # reservation. A stopped read is unknown: keep that URL's saved observation
 # untouched, and dial no further URL this pass, because the next read would
 # most likely wait on the same unreachable forge; every remaining URL is
-# unknown for this pass and keeps its row, and the next pass retries. Every
+# unknown for this pass and keeps its row, and the next pass retries. The URL
+# whose read ended unknown moves to the back of the order
+# (state/.contributions-deferred), so the next pass reads every other live URL
+# first and one always-silent URL cannot starve the rest. Every
 # pass prints a contribution-wake line for each contribution row still waiting
 # in the wake queue, so a row queued by a pass that was later stopped still
 # doorbells.
@@ -391,7 +394,7 @@ settle_final() { # canonical-url task... : copy the URL's final observation to e
 }
 
 poll() {
-  local task url old kind error observed
+  local task url old kind error observed deferred_tmp
   local -a row
   acquire
   get_input
@@ -415,8 +418,13 @@ poll() {
       (IFS=$'\t'; printf '%s\n' "${row[*]}") >> "$TMP/live.tsv"
     fi
   done < "$TMP/known.tsv"
-  jq -Rnr --argjson bucket "$((EPOCH / 300))" '
-    [inputs] | if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end
+  DEFERRED=$(cat "$STATE/.contributions-deferred" 2>/dev/null || true)
+  jq -Rnr --argjson bucket "$((EPOCH / 300))" --arg deferred "$DEFERRED" '
+    [inputs]
+    | (if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end) as $rows
+    | ($deferred | split("\n") | map(select(length > 0))) as $last
+    | ($rows | map(select((split("\t")[0]) as $u | ($last | index([$u])) == null)))
+      + [$last[] as $u | $rows[] | select(split("\t")[0] == $u)]
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"
   QUOTA_ANNOUNCE=0
   QUOTA_REASON=
@@ -442,8 +450,11 @@ poll() {
     fi
     if [ "$READ_UNKNOWN" -ne 0 ]; then
       PASS_UNKNOWN=1
+      deferred_drop "$url"
+      DEFERRED=${DEFERRED:+$DEFERRED$'\n'}$url
       continue
     fi
+    deferred_drop "$url"
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
@@ -475,8 +486,15 @@ poll() {
       publish_pending "$task" "$url" "$TMP/row.json"
     done
   done < "$TMP/known.tsv"
+  deferred_tmp=$(mktemp "$STATE/.contributions-deferred.XXXXXX")
+  printf '%s\n' "$DEFERRED" | grep -Fx -f <(cut -f1 "$TMP/live.tsv") > "$deferred_tmp" || true
+  mv -f -- "$deferred_tmp" "$STATE/.contributions-deferred"
   [ "$QUOTA_ANNOUNCE" -eq 0 ] || printf 'contributions: %s; last observations kept, marked stale\n' "$QUOTA_REASON"
   ring_undrained
+}
+
+deferred_drop() { # url: take it out of this pass's back-of-the-order list
+  DEFERRED=$(printf '%s\n' "$DEFERRED" | grep -Fxv -- "$1" || true)
 }
 
 ring_undrained() { # one contribution-wake line per contribution row still in the wake queue

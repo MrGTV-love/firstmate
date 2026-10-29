@@ -402,13 +402,21 @@ test_stopped_check_wakes_once_per_episode() {
   local dir state pid i run notices
   dir=$(make_case check-stop-episode)
   state="$dir/state"
-  # shellcheck disable=SC2016 # The generated check expands its own state.
-  printf '#!/usr/bin/env bash\n[ ! -e "$FM_STATE_OVERRIDE/hang" ] || sleep 30\nexit 0\n' > "$state/a-flaky.check.sh"
-  chmod 0700 "$state/a-flaky.check.sh"
-  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" a-flaky >/dev/null \
-    || fail 'registration of a-flaky failed'
-  for run in stop repeat complete again; do
+  arm_flaky() {
+    # shellcheck disable=SC2016 # The generated check expands its own state.
+    printf '#!/usr/bin/env bash\n[ ! -e "$FM_STATE_OVERRIDE/hang" ] || sleep 30\nexit 0\n' > "$state/a-flaky.check.sh"
+    chmod 0700 "$state/a-flaky.check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" a-flaky >/dev/null \
+      || fail 'registration of a-flaky failed'
+  }
+  arm_flaky
+  for run in stop repeat complete again rearmed; do
     case "$run" in complete) rm -f "$state/hang" ;; *) : > "$state/hang" ;; esac
+    if [ "$run" = rearmed ]; then
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-unregister.sh" a-flaky >/dev/null \
+        || fail 'disarming a-flaky failed'
+      arm_flaky
+    fi
     rm -f "$state/.last-check"
     : > "$state/.wake-queue"
     # Each later run is the successor started after the previous run's wake.
@@ -428,11 +436,11 @@ test_stopped_check_wakes_once_per_episode() {
       '$4 == c && index($5, "check a-flaky stopped after") && index($5, "result unknown, retry next pass") { n++ } END { print n + 0 }' \
       "$state/.wake-queue")
     case "$run" in
-      stop|again) [ "$notices" = 1 ] || fail "the $run stop gave $notices unknown wakes, not one" ;;
+      stop|again|rearmed) [ "$notices" = 1 ] || fail "the $run stop gave $notices unknown wakes, not one" ;;
       *) [ "$notices" = 0 ] || fail "the $run sweep gave $notices unknown wakes, not none" ;;
     esac
   done
-  pass 'a stopped check wakes once per episode, and its next completed run starts a new episode'
+  pass 'a stopped check wakes once per episode; its next completed run or a disarm and re-arm starts a new episode'
 }
 
 test_check_stderr_capture_keeps_a_capped_tail() {

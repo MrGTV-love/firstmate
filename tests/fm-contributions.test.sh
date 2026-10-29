@@ -675,6 +675,7 @@ case "$fault:$plain" in
   down:*) printf 'HTTP 502\n' >&2; exit 1 ;;
   not-found:'api repos/o/r/'*) printf 'HTTP 404\n' >&2; exit 1 ;;
   silent:*) printf '%s\n' "$$" > "$FORGE/hung-pid"; sleep 90 ;;
+  silent-9:'api repos/o/r/pulls/9') printf '%s\n' "$$" > "$FORGE/hung-pid"; sleep 90 ;;
   quiet:'api repos/o/r/pulls/8') sleep 10 ;;
   # The second core read keeps burning CPU, so only its owner can stop it.
   spin-second:'api repos/o/r/pulls/8'|spin-second:'api repos/o/r/pulls/9')
@@ -978,6 +979,37 @@ test_first_unknown_read_defers_the_rest_of_the_pass() {
   done
   [ ! -s "$home/state/.wake-queue" ] || fail 'an unknown pass enqueued a failure wake'
   pass 'after the first unknown read a pass dials nothing more, keeps every row, and the next pass dials again'
+}
+
+test_always_silent_url_does_not_starve_the_others() {
+  local home out task pass now child
+  home=$(new_home silent-one)
+  forge_home "$home"
+  wrap_forge "$home"
+  record "$home" second 9 open mergeable
+  record "$home" third 10 open mergeable
+  printf 'silent-9\n' > "$home/forge/fault"
+  for pass in 1 2 3; do
+    now=$(jq -nr --arg now "$NOW" --argjson shift "$(( (pass - 1) * 300 ))" '$now | fromdateiso8601 + $shift | todateiso8601')
+    for task in delivery third; do
+      mutate_record "$home" "$task" '.records[0].checked_at="2026-09-15T08:00:00Z"'
+    done
+    cp "$home/data/second/contributions.json" "$home/prior-second.json"
+    out=$(with_home "$home" env FM_CONTRIBUTIONS_NOW="$now" FM_DURATION_FILE="$home/empty-durations.jsonl" \
+      "$ROOT/bin/fm-contributions.sh" poll) || fail "pass $pass failed"
+    [ -z "$out" ] || fail "pass $pass printed unavailable: $out"
+    cmp -s "$home/prior-second.json" "$home/data/second/contributions.json" \
+      || fail "pass $pass rewrote the always-silent URL's row"
+    [ "$pass" -gt 1 ] || continue
+    for task in delivery third; do
+      jq -e --arg now "$now" '.records[0] | .checked_at == $now and .error == null' \
+        "$home/data/$task/contributions.json" >/dev/null || fail "pass $pass starved $task behind the always-silent URL"
+    done
+    IFS= read -r child < "$home/forge/hung-pid"
+    ! kill -0 "$child" 2>/dev/null || fail 'the silent forge read survived its read stop'
+  done
+  [ ! -s "$home/state/.wake-queue" ] || fail 'an unknown read enqueued a failure wake'
+  pass 'one always-silent URL stays unknown while every other URL is refreshed on every later pass'
 }
 
 test_reads_are_independent_of_watcher_interval() {
@@ -1379,7 +1411,7 @@ test_http_shim_preserves_backend_failures() {
 }
 
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_quiet_read_inside_its_cold_start_returns_rows test_first_unknown_read_defers_the_rest_of_the_pass test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_quiet_read_inside_its_cold_start_returns_rows test_first_unknown_read_defers_the_rest_of_the_pass test_always_silent_url_does_not_starve_the_others test_reads_are_independent_of_watcher_interval test_watcher_stopped_check_rings_queued_row_next_pass test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
