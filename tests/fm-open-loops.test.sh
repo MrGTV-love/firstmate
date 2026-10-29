@@ -4036,7 +4036,19 @@ assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done prere
 (fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
     'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
 assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite whose PR merged has landed'
-# A done prerequisite with no recorded PR has landed: its report is its delivery.
+# A done note naming an open PR keeps the prerequisite live before pr= is registered, until that PR's merge is recorded.
+fx = waiting_fixture('done-note')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR https://github.com/test/project/pull/290 opened; awaiting review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done note naming an open PR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('a done note naming an open PR accepts a new wait', renewed.stdout)
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the PR its done note named merged'
+# A done prerequisite with no PR from any source has landed: its report is its delivery.
 fx = waiting_fixture('done-no-pr')
 (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: findings reported\n')
 fx['activity']('idle')

@@ -1493,8 +1493,8 @@ class WaitVerifier:
     def live_task(self, task):
         """A named prerequisite is live: assigned, a live fm-crew-state.sh verdict, unmerged, not stalled or failed.
 
-        A done task with no recorded PR has landed, since its report is its delivery; a done task with a PR stays
-        live until its merge is recorded.
+        A done task with no PR from any source (task_pr) has landed, since its report is its delivery; a done task
+        with a PR stays live until that PR's merge is recorded.
 
         It binds the prerequisite's launch generation and status stream, not its latest status line or whether it
         is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
@@ -1514,9 +1514,10 @@ class WaitVerifier:
         if state not in LIVE_STATES:
             raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
                              " follow up on it")
-        if state == "done" and not fields.get("pr"):
+        pr = self.task_pr(path, fields, verdict)
+        if state == "done" and not pr:
             raise ValueError("prerequisite task is done with no PR; its report is its delivery; follow up on its result")
-        if fields.get("pr") and merge_marker(c.state, fields["pr"]):
+        if pr and merge_marker(c.state, pr):
             raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
                and row.get("overdue") and not row.get("informational") and not row.get("stale")
@@ -1525,6 +1526,23 @@ class WaitVerifier:
         stat = path.stat()
         return dict(c.task_source(task), generation=fingerprint(fields["spawn_gen"]), kind="task-live",
                     stream=[stat.st_dev, stat.st_ino])
+
+    def task_pr(self, path, fields, verdict):
+        """A task's PR: its recorded pr=, the PR its done note names, or its no-mistakes run's ready PR."""
+        if fields.get("pr"):
+            return fields["pr"]
+        named = self.collector.bash('. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; '
+                                    'line=$(last_status_line "$2") || exit 0; case "$line" in done*) ;; *) exit 0 ;; '
+                                    'esac; status_line_note "$line" note; fm_dod_pr_url_from_done_note "$note" || :',
+                                    BIN, path).strip()
+        if named:
+            return named
+        ready = " · checks green: PR ready for review"
+        if verdict.startswith("state: done · ") and ready in verdict:
+            component = verdict.split(ready, 1)[1].split(" · ", 1)[0]
+            if ": " in component:
+                return component.rsplit(": ", 1)[1]
+        return ""
 
     def verify_source(self, source):
         if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):

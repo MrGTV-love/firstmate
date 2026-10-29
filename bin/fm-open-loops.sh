@@ -42,7 +42,8 @@
 # inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`, or the reason for the wait,
 # which stands while that task is live: same launch, a live fm-crew-state.sh verdict (working, parked, done,
 # paused or blocked, which for a finished or parked run can outlast its session; done counts only while the task
-# has a recorded PR, because a done task with no PR has landed), unmerged, not stalled or failed
+# has a PR, which is its recorded pr=, the PR its done note names or its no-mistakes run's PR, because a done task
+# with none of these has landed), with no merge recorded for that PR, not stalled or failed
 # (only an open_pr or red_check row may take this reason form).
 # docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
 # verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
