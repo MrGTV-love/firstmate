@@ -313,8 +313,9 @@
 # current-pool slot is released with treehouse return <path> --if-lease-holder
 # <this task> when no other task claims it and no process runs inside it
 # (docs/configuration.md "Superseded pool folders").
-# Placing an unleased slot is fast where Treehouse has pool-dir; otherwise it
-# costs one 11-23 s treehouse status listing per teardown under the project lock.
+# Placing an unleased slot, or one held by this task's own lease, is fast where
+# Treehouse has pool-dir; otherwise it costs one 11-23 s treehouse status listing
+# per teardown under the project lock.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
