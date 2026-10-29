@@ -1,0 +1,5 @@
+# mutant slow60-old: SAMPLE_INTERVAL 0.2 -> 60.0 (sampler far slower than fork speed); test file: base cce2dd36b; 1 run
+not ok - a tree past its own limit: expected exit 98, got 127
+SUMMARY pass=0 fail=1 of 1
+bin/fm-proc-budget.sh -- "$EV/run-one-case.sh" "$LAB/$v" 1  6.94s user 33.62s system 38% cpu 1:45.03 total
+exit=0

@@ -1,0 +1,6 @@
+# mutant slow-old: ---; test file: base cce2dd36b; 3 runs
+ok - a runaway tree is stopped at its own limit (depth 159) and leaves no process behind
+ok - a runaway tree is stopped at its own limit (depth 214) and leaves no process behind
+ok - a runaway tree is stopped at its own limit (depth 224) and leaves no process behind
+SUMMARY pass=3 fail=0 of 3
+exit=0

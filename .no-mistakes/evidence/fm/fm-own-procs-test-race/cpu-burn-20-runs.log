@@ -1,0 +1,26 @@
+# head ca1b68a63f9335d62ce1794cf242c1b0f1141855, 18 CPU-burn loops on 18 CPUs, 20 runs
+Thu Oct 29 11:52:44 CDT 2026
+11:52  up 1 day,  1:52, 4 users, load averages: 61.59 51.32 51.30
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+SUMMARY pass=20 fail=0 of 20
+bin/fm-proc-budget.sh -- "$EV/run-one-case.sh" "$PWD" 20  6.71s user 25.84s system 21% cpu 2:33.87 total
+11:55  up 1 day,  1:55, 4 users, load averages: 78.56 63.64 56.39

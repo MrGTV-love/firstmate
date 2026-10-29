@@ -1,0 +1,6 @@
+# mutant slow-new: ---; test file: head ca1b68a63; 3 runs
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+SUMMARY pass=3 fail=0 of 3
+exit=0

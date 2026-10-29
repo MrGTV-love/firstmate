@@ -1,0 +1,25 @@
+== slow-new
+42c42
+< SAMPLE_INTERVAL = 0.2
+---
+> SAMPLE_INTERVAL = 3.0
+== slow-old
+42c42
+< SAMPLE_INTERVAL = 0.2
+---
+> SAMPLE_INTERVAL = 3.0
+== nostop
+260c260
+<                 if count > limit:
+---
+>                 if False and count > limit:
+== eager
+260c260
+<                 if count > limit:
+---
+>                 if count > 10:
+== slow60-old
+42c42
+< SAMPLE_INTERVAL = 0.2
+---
+> SAMPLE_INTERVAL = 60.0

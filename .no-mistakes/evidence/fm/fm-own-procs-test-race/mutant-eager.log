@@ -1,0 +1,5 @@
+# mutant eager: ---; test file: head ca1b68a63; 2 runs
+not ok - the tree never outgrew the limit (      14 members recorded): the case would be vacuous: fm-proc-budget: command tree held 15 processes, over the own-tree limit of 100; ended
+not ok - the tree never outgrew the limit (      16 members recorded): the case would be vacuous: fm-proc-budget: command tree held 17 processes, over the own-tree limit of 100; ended
+SUMMARY pass=0 fail=2 of 2
+exit=0

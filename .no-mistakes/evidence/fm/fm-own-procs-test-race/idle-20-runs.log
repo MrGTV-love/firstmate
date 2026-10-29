@@ -1,0 +1,24 @@
+# head ca1b68a63f9335d62ce1794cf242c1b0f1141855, idle host, 20 runs of test_own_procs_stops_a_runaway_tree
+Thu Oct 29 11:50:23 CDT 2026
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+SUMMARY pass=20 fail=0 of 20
+bin/fm-proc-budget.sh -- "$EV/run-one-case.sh" "$PWD" 20  6.97s user 27.34s system 25% cpu 2:13.74 total

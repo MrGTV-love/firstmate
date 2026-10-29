@@ -1,0 +1,9 @@
+# mutant nostop: own-count stop disabled (if False and count > limit); test file head ca1b68a63; 1 run, 150 s watchdog
+--- after 150 s:
+case still running: no exit 98, no pass line (the leash never stopped the tree)
+supervisor pids: 48114
+held members (sleep 5003) alive:        1
+not ok - a tree past its own limit: expected exit 98, got 143
+SUMMARY pass=0 fail=1 of 1
+driver exit after TERM to supervisor: 0
+held members alive after TERM:        0

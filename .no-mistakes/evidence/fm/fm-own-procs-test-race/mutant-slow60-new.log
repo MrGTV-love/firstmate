@@ -1,0 +1,5 @@
+# mutant slow60-new: SAMPLE_INTERVAL 0.2 -> 60.0 (sampler far slower than fork speed); test file: head ca1b68a63; 1 run
+ok - a runaway tree is stopped at its own limit and leaves no process behind
+SUMMARY pass=1 fail=0 of 1
+bin/fm-proc-budget.sh -- "$EV/run-one-case.sh" "$LAB/$v" 1  5.08s user 23.92s system 25% cpu 1:52.98 total
+exit=0
