@@ -425,6 +425,52 @@ SH
   assert_clean "$tmp" "a released scratch entry"
   pass "fm_scratch_new never enters a symlinked container and survives a container removed under it"
 
+  # A release removes the empty container and another caller makes it again,
+  # both between this caller's mkdir and mktemp, three times in a row; the
+  # request must still succeed in its container.
+  tmp=$(new_tmp)
+  mkdir -p "$TMP_ROOT/remake-bin"
+  cat > "$TMP_ROOT/remake-bin/mktemp" <<'SH'
+#!/usr/bin/env bash
+n=$(cat "$RACE_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((n + 1))" > "$RACE_COUNT"
+if [ "$n" -lt 3 ]; then
+  for last; do :; done
+  rmdir "${last%/*}"
+  mkdir -m 700 "${last%/*}"
+  exit 1
+fi
+exec "$RACE_REAL_MKTEMP" "$@"
+SH
+  chmod +x "$TMP_ROOT/remake-bin/mktemp"
+  rm -f "$TMP_ROOT/remake-count"
+  path=$(scratch_new "$tmp" f fm-timeout-status PATH="$TMP_ROOT/remake-bin:$PATH" \
+    RACE_COUNT="$TMP_ROOT/remake-count" RACE_REAL_MKTEMP="$(command -v mktemp)") \
+    || fail "fm_scratch_new failed when a peer removed and remade its container under it"
+  assert_equals 4 "$(cat "$TMP_ROOT/remake-count")" "the remake fixture did not race the container three times"
+  case "$path" in "$tmp/fm-timeout-status.scratch/"*) ;; *) fail "fm_scratch_new made its entry elsewhere after a remade container: $path" ;; esac
+  assert_present "$path" "fm_scratch_new reported an entry it did not make after a remade container"
+  env TMPDIR="$tmp" bash -c '. "$1"; fm_scratch_release "$2"' _ "$ROOT/bin/fm-scratch-lib.sh" "$path"
+  assert_clean "$tmp" "a scratch entry released after a remade container"
+
+  # Many callers make and release entries of one prefix at once; every call
+  # gets its entry and nothing is left.
+  tmp=$(new_tmp)
+  out=$(env TMPDIR="$tmp" bash -c '
+    . "$1"
+    for i in $(seq 1 24); do
+      (
+        for j in 1 2 3 4 5 6 7 8; do
+          p=$(fm_scratch_new f fm-timeout-status) && [ -f "$p" ] || { echo miss; exit 1; }
+          fm_scratch_release "$p"
+        done
+      ) &
+    done
+    wait' _ "$ROOT/bin/fm-scratch-lib.sh" 2>&1)
+  [ -z "$out" ] || fail "parallel fm_scratch_new calls on one prefix did not all get an entry: $out"
+  assert_clean "$tmp" "parallel scratch entries of one prefix"
+  pass "fm_scratch_new survives a container removed and remade by peers under it"
+
   # Another user plants the container as a symlink between the check and mkdir.
   tmp=$(new_tmp)
   outside=$(new_tmp)

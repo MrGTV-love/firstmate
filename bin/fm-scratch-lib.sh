@@ -50,12 +50,12 @@ fm_scratch_new() {  # <f|d> <prefix>
   [ "$kind" != d ] || fm_scratch_dir=1
   container=${base%/}/$2.scratch
   fm_scratch_reap "$2"
-  # A concurrent release removes the container once it is empty, which can fall
-  # between mkdir and mktemp; only a container that vanished is worth a retry.
-  while :; do
-    if ! (umask 077; mkdir -p -- "$container") 2>/dev/null && [ ! -e "$container" ] && [ ! -L "$container" ]; then
-      return 1
-    fi
+  # A concurrent release removes the container once it is empty, and another
+  # caller may make it again, anywhere between mkdir and mktemp; so the whole
+  # make-container-then-mktemp sequence gets a few tries.
+  for _ in 1 2 3 4 5; do
+    [ -d "$container" ] || mkdir -m 700 -- "$container" 2>/dev/null \
+      || [ -e "$container" ] || [ -L "$container" ] || continue
     if [ -L "$container" ] || { [ -e "$container" ] && ! fm_scratch_owned "$container"; }; then
       (umask 077; mktemp ${fm_scratch_dir:+"-d"} "${base%/}/$2.XXXXXX")
       return
@@ -64,8 +64,8 @@ fm_scratch_new() {  # <f|d> <prefix>
       printf '%s\n' "$fm_scratch_path"
       return 0
     fi
-    [ ! -d "$container" ] || return 1
   done
+  return 1
 }
 
 fm_scratch_release() {  # <path>
