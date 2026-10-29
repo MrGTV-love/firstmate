@@ -1,0 +1,110 @@
+T0 (main)=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490  PR287 head=b966b37485b8fbe70388ad0158678fa320fd45a0  PR188 head=e145e831bacea0e25a477007a8a527530dd913e6 (both built on T0)
+
+=================== queuesetup-287 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/287 
+head=b966b37485b8fbe70388ad0158678fa320fd45a0  main before=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490
+exit code: 0
+--- real forge log ---
+real-compare #1: main=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 merge_base=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 behind_by=0
+real-compare #2: main=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 merge_base=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 behind_by=0
+real-merge: squashed b966b37485b8fbe70388ad0158678fa320fd45a0; main now 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 287 --repo example/repo --match-head-commit b966b37485b8fbe70388ad0158678fa320fd45a0 --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stdout ---
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/287 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr ---
+verified: https://github.com/example/repo/pull/287 is open and mergeable, with every unwaived required check reported and every unwaived check green at head b966b37485b8fbe70388ad0158678fa320fd45a0, which contains the current main tip 2d3c16a7626288bf31f4a2249c8b3eadbf8ca490
+review: PASS
+main after=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+
+=================== queue-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 --attended-override -- --auto --squash
+head=e145e831bacea0e25a477007a8a527530dd913e6  main before=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+exit code: 0
+--- real forge log ---
+real-queue: enqueued (main untouched; the queue would test head+tip itself)
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 188 --repo example/repo --match-head-commit e145e831bacea0e25a477007a8a527530dd913e6 --auto --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stdout ---
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/188 is queued (state=OPEN, merged=false, isInMergeQueue=true)
+--- stderr ---
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head e145e831bacea0e25a477007a8a527530dd913e6, which enters the merge queue of base branch main
+review: PASS
+main after=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+
+=================== queuenochecks-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 --attended-override -- --auto --squash
+head=e145e831bacea0e25a477007a8a527530dd913e6  main before=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+exit code: 1
+--- real forge log ---
+real-compare #1: main=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 merge_base=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 behind_by=1
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stdout ---
+armed: state/task-x1.check.sh
+--- stderr ---
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head e145e831bacea0e25a477007a8a527530dd913e6 lacks the current tip 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 of base branch main (1 commits behind): it was built on main at 2d3c16a7626288bf31f4a2249c8b3eadbf8ca490, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+
+=================== queuedirect-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 --attended-override -- --squash
+head=e145e831bacea0e25a477007a8a527530dd913e6  main before=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+exit code: 1
+--- real forge log ---
+real-compare #1: main=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 merge_base=2d3c16a7626288bf31f4a2249c8b3eadbf8ca490 behind_by=1
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stdout ---
+armed: state/task-x1.check.sh
+--- stderr ---
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head e145e831bacea0e25a477007a8a527530dd913e6 lacks the current tip 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 of base branch main (1 commits behind): it was built on main at 2d3c16a7626288bf31f4a2249c8b3eadbf8ca490, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+
+=================== autoblocked-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 --attended-override -- --auto --squash
+head=e65e07df3329020ac21b18c39667196145e0d1cc  main before=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+exit code: 1
+--- real forge log ---
+real-compare #1: main=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 merge_base=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 behind_by=0
+real-compare #2: main=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 merge_base=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57 behind_by=0
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stdout ---
+armed: state/task-x1.check.sh
+--- stderr ---
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head e65e07df3329020ac21b18c39667196145e0d1cc, which contains the current main tip 6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+review: PASS
+error: refusing to merge https://github.com/example/repo/pull/188: --auto on base branch main, which has no proven merge queue, needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is BLOCKED, so GitHub would arm auto-merge instead, and that can land later on a base tip no check ran with; clear what holds the pull request, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=6ca353ac60835aa0ff7e67ba6a81a1d95e568f57
+

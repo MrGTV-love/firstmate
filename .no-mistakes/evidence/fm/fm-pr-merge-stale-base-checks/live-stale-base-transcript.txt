@@ -1,0 +1,150 @@
+T0 (main)=f995f185297f064d5825ca36d573b9741e2fb80f  PR287 head=f30620b437da0b2b9b8c24a6e6160578038a4c4e  PR188 head=f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5 (both built on T0)
+
+=================== before-287 ===================
+script: /Users/charlesabrooker/tmp/fm-pr-merge-tests.5cYzxO/base-root/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/287 
+head=f30620b437da0b2b9b8c24a6e6160578038a4c4e  main before=f995f185297f064d5825ca36d573b9741e2fb80f
+exit code: 0
+--- real forge log ---
+real-merge: squashed f30620b437da0b2b9b8c24a6e6160578038a4c4e; main now 7c0c8a9df0ad0c8304f1ef2914795173b70e8fbc
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 287 --repo example/repo --match-head-commit f30620b437da0b2b9b8c24a6e6160578038a4c4e --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stderr ---
+verified: https://github.com/example/repo/pull/287 is open and mergeable, with every unwaived required check reported and every unwaived check green at head f30620b437da0b2b9b8c24a6e6160578038a4c4e
+review: PASS
+main after=7c0c8a9df0ad0c8304f1ef2914795173b70e8fbc
+
+=================== before-188 ===================
+script: /Users/charlesabrooker/tmp/fm-pr-merge-tests.5cYzxO/base-root/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 
+head=f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5  main before=7c0c8a9df0ad0c8304f1ef2914795173b70e8fbc
+exit code: 0
+--- real forge log ---
+real-merge: squashed f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5; main now 3d0310cbe11edb81e49f53fa0dc54f83155f6576
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 188 --repo example/repo --match-head-commit f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5 --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stderr ---
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5
+review: PASS
+main after=3d0310cbe11edb81e49f53fa0dc54f83155f6576
+
+landed tree after the old script (main=3d0310cbe11edb81e49f53fa0dc54f83155f6576):
+budget.txt
+shard-a.txt
+shard-b.txt
+was the landed tree ever a PR head tree a check ran on? NO
+
+##### main reset to T0 for the fixed script #####
+
+=================== after-287 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/287 
+head=f30620b437da0b2b9b8c24a6e6160578038a4c4e  main before=f995f185297f064d5825ca36d573b9741e2fb80f
+exit code: 0
+--- real forge log ---
+real-compare #1: main=f995f185297f064d5825ca36d573b9741e2fb80f merge_base=f995f185297f064d5825ca36d573b9741e2fb80f behind_by=0
+real-compare #2: main=f995f185297f064d5825ca36d573b9741e2fb80f merge_base=f995f185297f064d5825ca36d573b9741e2fb80f behind_by=0
+real-merge: squashed f30620b437da0b2b9b8c24a6e6160578038a4c4e; main now 3dba7c06c7179cc34d1676e933b08606a58f515c
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 287 --repo example/repo --match-head-commit f30620b437da0b2b9b8c24a6e6160578038a4c4e --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stderr ---
+verified: https://github.com/example/repo/pull/287 is open and mergeable, with every unwaived required check reported and every unwaived check green at head f30620b437da0b2b9b8c24a6e6160578038a4c4e, which contains the current main tip f995f185297f064d5825ca36d573b9741e2fb80f
+review: PASS
+main after=3dba7c06c7179cc34d1676e933b08606a58f515c
+
+=================== after-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 
+head=f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5  main before=3dba7c06c7179cc34d1676e933b08606a58f515c
+exit code: 1
+--- real forge log ---
+real-compare #1: main=3dba7c06c7179cc34d1676e933b08606a58f515c merge_base=f995f185297f064d5825ca36d573b9741e2fb80f behind_by=1
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stderr ---
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5 lacks the current tip 3dba7c06c7179cc34d1676e933b08606a58f515c of base branch main (1 commits behind): it was built on main at f995f185297f064d5825ca36d573b9741e2fb80f, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 3dba7c06c7179cc34d1676e933b08606a58f515c (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=3dba7c06c7179cc34d1676e933b08606a58f515c
+
+=================== waiver-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 --attended-override --allow-red ci --allow-missing ci
+head=f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5  main before=3dba7c06c7179cc34d1676e933b08606a58f515c
+exit code: 1
+--- real forge log ---
+real-compare #1: main=3dba7c06c7179cc34d1676e933b08606a58f515c merge_base=f995f185297f064d5825ca36d573b9741e2fb80f behind_by=1
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stderr ---
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head f98f8835e5fe78c506b3b9ea9fbb9dbda3214dc5 lacks the current tip 3dba7c06c7179cc34d1676e933b08606a58f515c of base branch main (1 commits behind): it was built on main at f995f185297f064d5825ca36d573b9741e2fb80f, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 3dba7c06c7179cc34d1676e933b08606a58f515c (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=3dba7c06c7179cc34d1676e933b08606a58f515c
+
+pr188 rebased onto T1=3dba7c06c7179cc34d1676e933b08606a58f515c -> new head 77ad165d0af48a984e884379acf29c6cd04db383
+
+=================== race-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 
+head=77ad165d0af48a984e884379acf29c6cd04db383  main before=3dba7c06c7179cc34d1676e933b08606a58f515c
+exit code: 1
+--- real forge log ---
+real-compare #1: main=3dba7c06c7179cc34d1676e933b08606a58f515c merge_base=3dba7c06c7179cc34d1676e933b08606a58f515c behind_by=0
+race: main moved to b1da55ce0c6d089616c88ef4cadd5865956f4899 after the verify read
+real-compare #2: main=b1da55ce0c6d089616c88ef4cadd5865956f4899 merge_base=3dba7c06c7179cc34d1676e933b08606a58f515c behind_by=1
+--- wrapper stderr ---
+--- gh pr merge calls ---
+(none)
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- stderr ---
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 77ad165d0af48a984e884379acf29c6cd04db383, which contains the current main tip 3dba7c06c7179cc34d1676e933b08606a58f515c
+review: PASS
+error: refusing to merge https://github.com/example/repo/pull/188: base branch main is at b1da55ce0c6d089616c88ef4cadd5865956f4899, not the tip 3dba7c06c7179cc34d1676e933b08606a58f515c that head 77ad165d0af48a984e884379acf29c6cd04db383 was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+main after=b1da55ce0c6d089616c88ef4cadd5865956f4899
+
+pr188 rebased onto main=b1da55ce0c6d089616c88ef4cadd5865956f4899 -> new head c5a21f74d2e378269a0d6eb3439dea7f9d62766f
+
+=================== updated-188 ===================
+script: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh
+args: task-x1 https://github.com/example/repo/pull/188 
+head=c5a21f74d2e378269a0d6eb3439dea7f9d62766f  main before=b1da55ce0c6d089616c88ef4cadd5865956f4899
+exit code: 0
+--- real forge log ---
+real-compare #1: main=b1da55ce0c6d089616c88ef4cadd5865956f4899 merge_base=b1da55ce0c6d089616c88ef4cadd5865956f4899 behind_by=0
+real-compare #2: main=b1da55ce0c6d089616c88ef4cadd5865956f4899 merge_base=b1da55ce0c6d089616c88ef4cadd5865956f4899 behind_by=0
+real-merge: squashed c5a21f74d2e378269a0d6eb3439dea7f9d62766f; main now 761b43b8467a5c3e6bc03e19b2f2d0f38849bac6
+--- wrapper stderr ---
+--- gh pr merge calls ---
+pr merge 188 --repo example/repo --match-head-commit c5a21f74d2e378269a0d6eb3439dea7f9d62766f --squash
+--- guard events ---
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- stderr ---
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head c5a21f74d2e378269a0d6eb3439dea7f9d62766f, which contains the current main tip b1da55ce0c6d089616c88ef4cadd5865956f4899
+review: PASS
+main after=761b43b8467a5c3e6bc03e19b2f2d0f38849bac6
+
+landed tree after the fixed script equals the checked head tree? yes
