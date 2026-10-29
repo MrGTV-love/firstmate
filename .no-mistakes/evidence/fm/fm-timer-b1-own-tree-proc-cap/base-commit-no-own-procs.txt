@@ -1,0 +1,3 @@
+=== Base commit 541b9ff6cc: --own-procs does not exist
+fm-proc-budget: usage: fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>
+base rc=2

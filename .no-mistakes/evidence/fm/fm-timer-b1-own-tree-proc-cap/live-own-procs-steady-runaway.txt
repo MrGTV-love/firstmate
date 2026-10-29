@@ -1,0 +1,5 @@
+=== S4b steady runaway (one new sleep 92573 every 20 ms) stops near its own limit of 40
+fm-proc-budget: command tree held 41 processes, over the own-tree limit of 40; ended
+rc=98
+right after return: 0 rows (state: )
+1 s later: 0 rows

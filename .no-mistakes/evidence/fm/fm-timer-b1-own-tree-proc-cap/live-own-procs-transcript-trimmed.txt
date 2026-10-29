@@ -1,0 +1,45 @@
+# trimmed: 996 'fork: Resource temporarily unavailable' lines from the S4 exponential bomb removed; full file live-own-procs-transcript.txt
+
+=== S1 normal command: status and args pass through
+args: a b c
+rc=7
+
+=== S2 invalid calls refuse (exit 2)
+fm-proc-budget: own-procs limit must be a positive decimal integer
+--own-procs 0 rc=2
+fm-proc-budget: own-procs limit must be a positive decimal integer
+--own-procs -1 rc=2
+fm-proc-budget: own-procs limit must be a positive decimal integer
+--own-procs nope rc=2
+fm-proc-budget: own-procs limit is too large
+--own-procs 1234567890 rc=2
+fm-proc-budget: --memory-kib and --own-procs cannot be combined
+combined rc=2
+
+=== S3 kernel safety net stays at count+1500 inside --own-procs
+user count before=1143 kernel limit inside=2626 (expect about before+1500)
+
+=== S4 runaway tree is stopped at its own limit (exit 98), nothing left
+fm-proc-budget: command tree held 1186 processes, over the own-tree limit of 40; ended
+rc=98
+leftover members: 0
+
+=== S5 neighbours spend the shared count while the tree works 5x slower
+old form, positional extra 64: rc=1 secs=1 out=[] err_tail=[BlockingIOError: [Errno 35] Resource temporarily unavailable]
+new form, --own-procs 128: rc=0 secs=4 out=[work done] err_tail=[]
+
+=== S6 leftover background job is ended when the command exits
+done
+rc=0
+leftover 96664 ended
+
+=== S7 SIGKILL of the supervisor: dead-man reader ends the tree
+/Users/charlesabrooker/.no-mistakes/evidence/01M639Y3YDRDK9QPRXMPY4M959/drive-own-procs.sh: line 69: /Users/charlesabrooker/tmp/fm-own-live.MnI8Cl/dm.pid: No such file or directory
+/Users/charlesabrooker/.no-mistakes/evidence/01M639Y3YDRDK9QPRXMPY4M959/drive-own-procs.sh: line 69: /Users/charlesabrooker/tmp/fm-own-live.MnI8Cl/dm.pid: No such file or directory
+supervisor pid=97531 tree pids=98631 98680 
+98631 ended
+98680 ended
+
+=== S8 TERM to the wrapper ends the tree and returns 128+15
+rc=143
+9175 ended
