@@ -84,7 +84,9 @@ export FM_MERGE_PRUNE=0
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
-# under the marker. A case that verifies the refusal sets FM_TASK_ID itself.
+# under the marker; the omp primary extensions it loads as a home also skip
+# their home setup under it (.omp/extensions/lib/fm-task-worker.ts). A case that
+# verifies either behavior sets FM_TASK_ID itself.
 unset FM_TASK_ID FM_WRITE_CONFINEMENT
 
 # Clear the compact-adviser emergency switch and adviser-only function-hooks
@@ -1096,6 +1098,45 @@ fm_git_add_origin() {
   git clone --quiet --bare "$repo" "$remote"
   remote_abs=$(cd "$remote" && pwd)
   git -C "$repo" remote add origin "file://$remote_abs"
+}
+
+# fm_test_dod_item <id> [<field>=<value>|-<field>]...: one mandatory DoD item
+# line built from `bash bin/fm-dod-lib.sh --shape`, the single owner of the item
+# shape, so a shape edit needs no fixture edit. Every field gets a nonempty
+# value and the authority field its first allowed value; <field>=<value>
+# overrides one field and -<field> omits it. A field outside the shape fails.
+fm_test_dod_item() {
+  local id=$1 shape lead fields authority_field authorities arg name field value line omit
+  local -a names
+  shift
+  shape=$(bash "$ROOT/bin/fm-dod-lib.sh" --shape) || return 1
+  lead=$(printf '%s\n' "$shape" | sed -n 's/^lead=//p')
+  fields=$(printf '%s\n' "$shape" | sed -n 's/^fields=//p')
+  authority_field=$(printf '%s\n' "$shape" | sed -n 's/^authority_field=//p')
+  authorities=$(printf '%s\n' "$shape" | sed -n 's/^authorities=//p')
+  for arg in "$@"; do
+    name=${arg#-}
+    name=${name%%=*}
+    case "|$lead|$fields|" in
+      *"|$name|"*) ;;
+      *) printf 'fm_test_dod_item: %s is not a field of the item shape\n' "$name" >&2; return 1 ;;
+    esac
+  done
+  IFS='|' read -ra names <<<"$lead|$fields"
+  line="- $id"
+  for field in "${names[@]}"; do
+    value="$id $field value"
+    [ "$field" != "$authority_field" ] || value=${authorities%%|*}
+    omit=0
+    for arg in "$@"; do
+      case "$arg" in
+        "-$field") omit=1 ;;
+        "$field="*) value=${arg#*=} ;;
+      esac
+    done
+    [ "$omit" = 1 ] || line+=" $field: ${value%.}."
+  done
+  printf '%s\n' "$line"
 }
 
 # fm_git_worktree <repo> <worktree> <branch>: initialize <repo> with one commit
