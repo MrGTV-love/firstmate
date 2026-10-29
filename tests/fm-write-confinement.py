@@ -868,7 +868,6 @@ for harness in ("claude", "omp"):
             build_profile(repo, manifest, harness, profile, env)
             if harness == "claude" and mode == "baseline":
                 invalid_project_source(repo, manifest, base, env)
-                reftable_source(repo, manifest, base, env)
             # A process of this user whose arguments ps must escape: non-ASCII
             # bytes, a newline, a tab and an empty word.
             unusual = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(300)", "jos\u00e9", "a\nb", "t\tb", ""])
@@ -908,3 +907,5 @@ for harness in ("claude", "omp"):
                     assert actual[name] is False, (harness, mode, name, actual)
         else:
             assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
+            if harness == "claude":
+                reftable_source(repo, manifest, base, env)
