@@ -1996,6 +1996,43 @@ test_an_unreadable_queue_proof_is_retried_not_judged_lacking_the_tip() {
   pass "fm-pr-merge retries an unreadable queue proof instead of judging the head to lack the tip"
 }
 
+# When verify relied on the queue, a queue read that fails immediately before
+# the merge leaves it unknown whether the head must contain the tip, so the run
+# refuses as an unreadable re-read, never as a tip that moved.
+test_a_queue_proof_unreadable_before_the_merge_refuses_as_unreadable() {
+  local case_dir rc head built_on tip=b34192a213f406add8809a34224315cdc9073798
+  head=2424242424242424242424242424242424242424
+  case_dir=$(make_case github-queue-proof-unreadable-before-merge)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
+  built_on=$(cat "$case_dir/github-base")
+  write_github_compare "$case_dir" "$tip" "$built_on" 3
+  printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+  printf '2\n' > "$case_dir/github-rules-fail-from"
+
+  set +e
+  FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "queue-proof-unreadable-before-merge: an unreadable queue re-read must refuse"
+  assert_grep 'whether this --auto merge enters the merge queue of base branch main could not be re-read immediately before the merge; re-run this merge' \
+    "$case_dir/stderr" "queue-proof-unreadable-before-merge: the refusal did not name the unreadable re-read"
+  assert_no_grep "that head $head was verified to contain" "$case_dir/stderr" \
+    "queue-proof-unreadable-before-merge: an unreadable re-read was reported as a moved tip"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "queue-proof-unreadable-before-merge: gh pr merge ran with an unreadable queue re-read"
+  assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
+    "queue-proof-unreadable-before-merge: the refusal did not record one merge-green-head deny"
+  assert_equals false "$("$JQ_BIN" -s '[.[] | select(.guard == "merge-green-head" and .decision == "deny")][0].source_ok' \
+    "$case_dir/guard-events.jsonl")" \
+    "queue-proof-unreadable-before-merge: the deny recorded a readable source"
+  pass "fm-pr-merge refuses a queue proof unreadable before the merge as unreadable, not as a moved tip"
+}
+
 # Off a proven merge queue, --auto merges at once only in a state where gh
 # merges at once; in any other state GitHub would arm auto-merge, which lands
 # later on whatever the base tip is then.
@@ -2283,6 +2320,7 @@ test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried
 test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses
 test_an_unreadable_queue_proof_is_retried_not_judged_lacking_the_tip
+test_a_queue_proof_unreadable_before_the_merge_refuses_as_unreadable
 test_off_queue_auto_merges_only_where_github_merges_at_once
 test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly
 test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly

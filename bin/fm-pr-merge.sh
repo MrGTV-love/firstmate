@@ -1999,7 +1999,15 @@ case "$PROVIDER" in
     # and a tip that moved since the verify read refuses. A tip that lands in
     # the seconds between this read and GitHub applying the merge is not closed.
     merge_enters_queue=false
-    github_merge_enters_queue "$FM_PR_GITHUB_BASE" && merge_enters_queue=true
+    queue_status=0
+    github_merge_enters_queue "$FM_PR_GITHUB_BASE" || queue_status=$?
+    [ "$queue_status" -ne 0 ] || merge_enters_queue=true
+    if [ "$queue_status" -eq 2 ] && [ -z "$FM_PR_MERGE_BASE_TIP" ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
+      printf 'error: refusing to merge %s: whether this --auto merge enters the merge queue of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
+        "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
+      exit 1
+    fi
     if [ "$merge_enters_queue" = false ]; then
       if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
         "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null

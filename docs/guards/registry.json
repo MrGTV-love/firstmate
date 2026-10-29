@@ -412,8 +412,8 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 4},
-        {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge"},
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 5},
+        {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge", "count": 2},
         {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"},
         {"file": "bin/fm-pr-merge.sh", "match": "where GitHub merges at once"}
       ],

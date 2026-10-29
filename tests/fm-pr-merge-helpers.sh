@@ -382,6 +382,13 @@ case "${1:-} ${2:-}" in
       [ ! -f "$FM_TEST_GH_RULES_FAIL.once" ] || rm "$FM_TEST_GH_RULES_FAIL"
       exit 1
     fi
+    # A case can fail the merge-queue read from a given call number on, so a
+    # read that verify passed can fail when it is repeated before the merge.
+    calls=$(( $(cat "$FM_TEST_GH_RULES_CALLS" 2>/dev/null || echo 0) + 1 ))
+    printf '%s\n' "$calls" > "$FM_TEST_GH_RULES_CALLS"
+    if [ -f "${FM_TEST_GH_RULES_FAIL_FROM:-}" ] && [ "$calls" -ge "$(cat "$FM_TEST_GH_RULES_FAIL_FROM")" ]; then
+      exit 1
+    fi
     cat "$FM_TEST_GH_RULES"
     exit 0
     ;;
@@ -816,6 +823,8 @@ run_pr_merge() {
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
   FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
   FM_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \
+  FM_TEST_GH_RULES_FAIL_FROM="$case_dir/github-rules-fail-from" \
+  FM_TEST_GH_RULES_CALLS="$case_dir/github-rules-calls" \
   FM_TEST_GH_RULES_FAIL_BODY="$case_dir/github-rules-fail-body" \
   FM_TEST_GH_BRANCH="$case_dir/github-branch.json" \
   FM_TEST_GH_BRANCH_FAIL="$case_dir/github-branch-fail" \
