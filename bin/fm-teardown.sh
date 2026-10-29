@@ -902,15 +902,43 @@ teardown_lease_slot_by_path() {  # <slot> <project> <holder>
 # A reservation that an earlier teardown took by slot NAME while the project's
 # pool had moved to a new folder leased a same-named copy of the current pool
 # for this task. Release such a lease, and only it: its holder is this task, no
-# other task claims the slot, no process is inside it, and the return is the
+# other task claims the slot, no process is inside it, no copy is registered
+# inside it, no local task record names a copy in it, and the return is the
 # conditional one a holder match gates, never forced. A lease that cannot be
-# released is reported with its exact command and never blocks this teardown.
+# released or found is reported with its exact command and never blocks this
+# teardown.
 teardown_release_misdirected_leases() {  # <project> <task-id>
-  local project=$1 task_id=$2 path procs
-  fm_task_copy_current_pool_listing "$project" || return 0
+  local project=$1 task_id=$2 path procs state_dir meta copy record records_known=1 named
+  local -a record_copies=()
+  if ! fm_task_copy_current_pool_listing "$project"; then
+    echo "warning: treehouse status cannot be read from $project, so a lease an earlier teardown may have taken for $task_id by slot name in the current pool cannot be found; inspect with (cd '$project' && treehouse status), and release a slot leased to $task_id with: (cd '$project' && treehouse return '<slot path>' --if-lease-holder '$task_id' </dev/null)" >&2
+    return 0
+  fi
+  if fm_local_firstmate_state_dirs "$STATE"; then
+    for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+      for meta in "$state_dir"/*.meta; do
+        [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+        copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$meta" worktree)") && record_copies+=("$copy")
+      done
+    done
+  else
+    records_known=0
+  fi
   while IFS=$'\t' read -r path procs; do
     path=${path#P}
     [ -n "$path" ] || continue
+    if ! teardown_slot_registered_copies "$path" || [ "${#TEARDOWN_SLOT_COPIES[@]}" -gt 0 ]; then
+      echo "warning: leaving $path leased to $task_id: copies are registered inside it, or its copies cannot be listed; once inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+      continue
+    fi
+    named=0
+    for record in ${record_copies[@]+"${record_copies[@]}"}; do
+      fm_task_copy_paths_overlap "$record" "$(fm_task_copy_canonical_dir "$path")" && named=1 && break
+    done
+    if [ "$records_known" = 0 ] || [ "$named" = 1 ]; then
+      echo "warning: leaving $path leased to $task_id: a local task record names a copy in it, or the local task records cannot be read; once inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+      continue
+    fi
     fm_treehouse_slot_owner_state "$path" "$task_id"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
       mine|absent) ;;
@@ -945,7 +973,9 @@ teardown_release_misdirected_leases() {  # <project> <task-id>
 # project when its state can be neither proved held nor leased: the caller
 # then keeps project custody through the return, which names the slot by path.
 # Sets TEARDOWN_SLOT_SUPERSEDED to 1 when the slot is unleased in a superseded
-# pool folder; a held close then leases it by path
+# pool folder, or, for a held close, when it is held there by this task's own
+# lease, which only an earlier held close's lease by path takes; a held close
+# leases an unleased one by path
 # (teardown_lease_slot_by_path), and the caller releases this task's
 # misdirected leases (teardown_release_misdirected_leases) after the
 # reservation and the held-copy record checks.
@@ -960,6 +990,11 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   if fm_task_copy_pool_slot_held "$slot"; then
     TEARDOWN_SLOT_CUSTODY=lease
+    if [ -n "${TEARDOWN_HELD_SLOT:-}" ] && [ "${FM_TASK_COPY_SLOT_HOLDER:-}" = "$task_id" ] \
+        && ! fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
+        && [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+      TEARDOWN_SLOT_SUPERSEDED=1
+    fi
     return 0
   fi
   if [ "$FM_TASK_COPY_SLOT_STATE" != unleased ]; then
@@ -5957,13 +5992,14 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
     if ! teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" \
         || { [ -n "$TEARDOWN_HELD_SLOT" ] && [ "$TEARDOWN_SLOT_CUSTODY" != lease ] \
-          && { [ "$TEARDOWN_SLOT_SUPERSEDED" != 1 ] || ! teardown_lease_slot_by_path "$TEARDOWN_RESERVED_SLOT" "$PROJ" "$ID"; }; }; then
+          && { [ "$TEARDOWN_SLOT_SUPERSEDED" != 1 ] \
+            || ! { teardown_lease_slot_by_path "$TEARDOWN_RESERVED_SLOT" "$PROJ" "$ID" && TEARDOWN_SLOT_CUSTODY=lease; }; }; }; then
       [ -z "$TEARDOWN_HELD_SLOT" ] || echo "REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed." >&2
       exit 1
     fi
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
-  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ] || teardown_release_project_lock || exit 1
   teardown_owns_worktree || teardown_reprove_reassigned_slot
 fi
 if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
@@ -5971,7 +6007,10 @@ if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
-[ "$TEARDOWN_SLOT_SUPERSEDED" != 1 ] || teardown_release_misdirected_leases "$PROJ" "$ID"
+if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
+  teardown_release_misdirected_leases "$PROJ" "$ID"
+  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \

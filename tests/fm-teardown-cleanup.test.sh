@@ -5060,7 +5060,8 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
 # never hands it out over the held copies, even once that folder is current
 # again. A lease an earlier teardown took by name on a same-named slot of the
 # current pool is released after the reservation and the held-copy record
-# checks, so a close those checks refuse changes no lease. Without lease --path
+# checks, so a close those checks refuse releases no such lease, and its rerun,
+# whose own slot is by then leased by path, releases it. Without lease --path
 # the close refuses and the copies stay held.
 held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
   local cur
@@ -5069,7 +5070,8 @@ held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
   held_plain_get_slot "$FOREIGN_CASE"
   [ "${3:-}" = no-lease-path ] || : > "$FOREIGN_CASE/lease-path"
   cur=$FOREIGN_CASE/current-pool/1/project
-  mkdir -p "$cur"
+  mkdir -p "${cur%/*}"
+  git -C "$FOREIGN_CASE/project" worktree add -q --detach "$cur" main
   HELD_CURRENT_SLOT=$(cd "$cur" && pwd -P)
   if [ "$2" = misdirected ]; then
     printf '[{"name":"1","path":"%s","lease_holder":"task-x1","processes":[]}]\n' "$HELD_CURRENT_SLOT"
@@ -5080,9 +5082,18 @@ held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
 }
 
 test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path() {
-  local rc shape
+  local rc shape lock
   for shape in plain misdirected; do
     held_superseded_case "held-superseded-$shape" "$shape"
+    lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project")
+    mv "$FOREIGN_CASE/fakebin/docker" "$FOREIGN_CASE/fakebin/docker-store"
+    cat > "$FOREIGN_CASE/fakebin/docker" <<SH
+#!/usr/bin/env bash
+if [ -e "$lock" ]; then echo locked; else echo free; fi >> "$FOREIGN_CASE/docker-lock.log"
+exec "$FOREIGN_CASE/fakebin/docker-store" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/docker"
     run_foreign_teardown rc
     expect_code 0 "$rc" "held-superseded-$shape: a landed task must close beside a held copy in a superseded pool folder: $(cat "$FOREIGN_CASE/stderr")"
     held_assert_closed "held-superseded-$shape"
@@ -5102,6 +5113,9 @@ test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path() {
     fi
     assert_grep "is reserved under a durable lease and stays claimed" "$FOREIGN_CASE/stdout" \
       "held-superseded-$shape: the output did not say the slot is reserved"
+    assert_present "$FOREIGN_CASE/docker-lock.log" "held-superseded-$shape: the Docker cleanup did not run"
+    assert_no_grep locked "$FOREIGN_CASE/docker-lock.log" \
+      "held-superseded-$shape: the project lock was still held through Docker cleanup after the slot was leased by its path"
   done
   pass "a held close in a superseded pool folder leases the slot by its exact path and releases only this task's misdirected lease"
 }
@@ -5133,7 +5147,14 @@ test_a_refused_held_close_releases_no_misdirected_lease() {
     "held-superseded-refused: the refusal leased anything but the exact slot it keeps held"
   assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
   held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
-  pass "a held close that refuses releases no lease, not even a misdirected one"
+  rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-superseded-refused: the rerun must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
+    "held-superseded-refused: the rerun did not release the misdirected lease by the conditional return alone"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-refused: the rerun leased the slot again"
+  pass "a held close that refuses releases no misdirected lease, and its rerun, with its own slot leased by path, releases it"
 }
 
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {

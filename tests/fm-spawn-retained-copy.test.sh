@@ -524,47 +524,69 @@ test_nested_copy_in_leased_slot_allows_allocation() {
   pass "a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn"
 }
 
-# treehouse get allocates from the project's current pool only, so an unleased
-# slot in a superseded pool folder that holds a live record's nested copy does
-# not stop a spawn into the current pool. Each start judges this again: once the
-# folder is current again, the same slot refuses with its lease remedy.
+# The allocation guard's harm is a start receiving a slot that holds a live
+# record's nested current copy. treehouse get allocates from the current pool
+# folder only, so an unleased slot in a superseded pool folder that holds such a
+# copy does not stop a spawn, and the spawn never receives that slot: it lands
+# in the current pool. The guard asks Treehouse at each start, through
+# treehouse pool-dir or, without it, the status listing: once Treehouse names
+# the old folder as current again, the same slot refuses with its lease remedy
+# before treehouse get, so the harm is still caught.
 test_nested_copy_in_superseded_slot_allows_allocation() {
-  local name=superseded-nested out rc=0 current
-  make_retained_case "$name"
-  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
-  current="$CASE_DIR/current-pool/1/project"
-  mkdir -p "${current%/*}"
-  git -C "$PROJECT_DIR" worktree add --quiet --detach "$current"
-  current=$(cd "$current" && pwd -P)
-  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$current" > "$CASE_DIR/current-pool/treehouse-state.json"
-  PANE_DIR=$current
-  cat > "$FAKEBIN_DIR/treehouse" <<SH
+  local mode name out rc current old
+  for mode in status pool-dir; do
+    name="superseded-nested-$mode"
+    rc=0
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    current="$CASE_DIR/current-pool/1/project"
+    mkdir -p "${current%/*}"
+    git -C "$PROJECT_DIR" worktree add --quiet --detach "$current"
+    current=$(cd "$current" && pwd -P)
+    old=${SLOT_DIR%/*/*}
+    printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$current" > "$CASE_DIR/current-pool/treehouse-state.json"
+    PANE_DIR=$current
+    cat > "$FAKEBIN_DIR/treehouse" <<SH
 #!/usr/bin/env bash
-[ "\${1:-}" != status ] || cat "$CASE_DIR/status.json"
+case "\${1:-}" in
+  pool-dir) [ ! -f "$CASE_DIR/pool-dir" ] || cat "$CASE_DIR/pool-dir" ;;
+  status) printf 'status\n' >> "$CASE_DIR/status-calls"; [ ! -f "$CASE_DIR/status.json" ] || cat "$CASE_DIR/status.json" ;;
+esac
 exit 0
 SH
-  chmod +x "$FAKEBIN_DIR/treehouse"
-  printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
-  retained_fingerprint > "$CASE_DIR/before-copy"
-  cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
-  out=$(run_retained_spawn "$name") || rc=$?
-  expect_code 0 "$rc" "a nested copy in a superseded pool folder stopped the spawn"$'\n'"$out"
-  assert_not_contains "$out" "refusing allocation" "a superseded slot still blocked allocation"
-  assert_contains "$out" "spawned new-$name" "spawn did not launch"
-  assert_grep "task=new-$name" "$CASE_DIR/current-pool/1/.fm-slot-owner" "spawn did not claim the current-pool slot it acquired"
-  [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "spawn claimed the superseded slot"
-  retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "spawn changed the superseded slot"
-  cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "spawn changed the holder's record"
+    chmod +x "$FAKEBIN_DIR/treehouse"
+    if [ "$mode" = status ]; then
+      printf '[{"name":"1","path":"%s"}]\n' "$current" > "$CASE_DIR/status.json"
+    else
+      printf '%s\n' "${current%/*/*}" > "$CASE_DIR/pool-dir"
+    fi
+    retained_fingerprint > "$CASE_DIR/before-copy"
+    cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+    out=$(run_retained_spawn "$name") || rc=$?
+    expect_code 0 "$rc" "$mode: a nested copy in a superseded pool folder stopped the spawn"$'\n'"$out"
+    assert_not_contains "$out" "refusing allocation" "$mode: a superseded slot still blocked allocation"
+    assert_contains "$out" "spawned new-$name" "$mode: spawn did not launch"
+    assert_grep "task=new-$name" "$CASE_DIR/current-pool/1/.fm-slot-owner" "$mode: spawn did not claim the current-pool slot it acquired"
+    assert_grep "worktree=$current" "$HOME_DIR/state/new-$name.meta" "$mode: spawn did not record the current-pool slot"
+    [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$mode: spawn claimed the superseded slot"
+    retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$mode: spawn changed the superseded slot"
+    cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$mode: spawn changed the holder's record"
+    [ "$mode" = status ] || [ ! -e "$CASE_DIR/status-calls" ] || fail "$mode: the guard read a status listing although pool-dir answered"
 
-  printf '[{"name":"1","path":"%s"}]\n' "$SLOT_DIR" > "$CASE_DIR/status.json"
-  fm_test_spawn_brief "$HOME_DIR" "new-$name-again"
-  PANE_DIR=$SLOT_DIR
-  : > "$CASE_DIR/pane-log"
-  : > "$CASE_DIR/launch-log"
-  assert_retained_refusal "$name-again" "contains task holder's current copy" \
-    "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
-  assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "refusal lost the nested work"
-  pass "a nested copy in an unleased slot of a superseded pool folder does not stop a spawn, and refuses again once the folder is current"
+    if [ "$mode" = status ]; then
+      printf '[{"name":"1","path":"%s"}]\n' "$SLOT_DIR" > "$CASE_DIR/status.json"
+    else
+      printf '%s\n' "$old" > "$CASE_DIR/pool-dir"
+    fi
+    fm_test_spawn_brief "$HOME_DIR" "new-$name-again"
+    PANE_DIR=$SLOT_DIR
+    : > "$CASE_DIR/pane-log"
+    : > "$CASE_DIR/launch-log"
+    assert_retained_refusal "$name-again" "contains task holder's current copy" \
+      "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
+    assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$mode: refusal lost the nested work"
+  done
+  pass "a spawn never receives a superseded slot holding a nested copy, and refuses before treehouse get once Treehouse names that folder current"
 }
 
 test_secondmate_home_slot_with_other_project_copy_allows_allocation() {

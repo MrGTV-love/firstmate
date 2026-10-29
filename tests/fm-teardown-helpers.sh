@@ -2412,7 +2412,8 @@ SH
 # both at the landed main. shape=enclosing records worktree=N and
 # prior_worktree=S (the task moved into N); shape=reverse records worktree=S and
 # prior_worktree=N (the task moved back). Sets NESTED_CASE, NESTED_SLOT and
-# NESTED_COPY.
+# NESTED_COPY. Its Treehouse stand-in logs every call except the read-only
+# pool-dir and status queries, which it answers with nothing.
 make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   local case_dir mode=${4:-no-mistakes}
   case_dir=$(make_case "$1")
@@ -2428,6 +2429,7 @@ make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   printf 'task=task-x1\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 exit 0
 SH

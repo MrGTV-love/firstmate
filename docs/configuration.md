@@ -589,7 +589,7 @@ When the installed Treehouse has no `pool-dir`, or its output is not one absolut
 `treehouse get` allocates from the current pool only, so an unleased slot in a superseded folder does not stop a start; each start judges this again, so a folder that becomes current again is protected again.
 A held close, and a shared slot's claimant record retiring with one remaining record, leave copies in the slot, so they lease a superseded-folder slot by its exact path with `treehouse lease --path`, and Treehouse then never hands it out, whichever folder is current; without `lease --path` (treehouse v3.1.7-fm or later) they refuse and the copies stay held.
 The landed-work test is unchanged for such a copy, so an unlanded or dirty copy in an old folder is still refused.
-A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, after the reservation and the held-copy record checks, and only when its holder is that task, no other task claims the slot, and no process runs inside it.
+A lease an earlier teardown took by name on a same-named slot of the current pool is released with `treehouse return <path> --if-lease-holder <task>`, after the reservation and the held-copy record checks, and only when its holder is that task, no other task claims the slot, no process runs inside it, no copy is registered inside it, and no local task record names a copy in it; a lease left in place, or a listing that cannot be read, is reported with the command that releases it.
 
 ### Herdr homes and presentation
 

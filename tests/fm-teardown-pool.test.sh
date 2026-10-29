@@ -2347,16 +2347,22 @@ test_superseded_pool_copy_tears_down_without_touching_the_current_pool() {
 # A reservation that an earlier teardown made by name leased a different copy
 # of the current pool for this task. The next teardown releases that lease and
 # only that lease: its holder is this task, the return is the conditional one
-# (never forced), and a slot another task holds, claims, or has working in it
-# stays exactly as it was.
+# (never forced), and a slot another task holds, claims, or has working in it,
+# or that holds a registered copy or a copy a task record names, stays exactly
+# as it was.
 test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks() {
   local shape state case_dir rc returns
-  for shape in own other claimed busy; do
+  for shape in own other claimed busy nested record; do
     state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":false}]}'
     [ "$shape" != other ] || state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"other-task"},{"name":"2","path":"@SLOT2@","leased":false}]}'
     make_superseded_pool_case "pool-wrong-lease-$shape" "$state"
     case_dir=$SUPER_CASE
     [ "$shape" != claimed ] || printf 'task=other-task\nhome=%s\n' "$case_dir/primary-home" > "$case_dir/current-pool/1/.fm-slot-owner"
+    if [ "$shape" = nested ]; then
+      mkdir -p "$SUPER_NEW1/.claude/worktrees"
+      git -C "$case_dir/project" worktree add -q --detach "$SUPER_NEW1/.claude/worktrees/other" main
+    fi
+    [ "$shape" != record ] || fm_write_meta "$case_dir/state/other-task.meta" "worktree=$SUPER_NEW1" "kind=ship"
     cp "$SUPER_NEW_STATE" "$case_dir/current.before"
     rc=0
     FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
@@ -2376,6 +2382,9 @@ test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks
       cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" \
         || fail "$shape: teardown changed a current-pool slot that is not this task's to release: $(cat "$SUPER_NEW_STATE")"
       assert_no_grep "current-pool" "$case_dir/treehouse.log" "$shape: teardown returned a slot of the current pool"
+      case "$shape" in
+        nested|record) assert_grep "leaving $SUPER_NEW1 leased to task-x1" "$case_dir/stderr" "$shape: teardown did not report the lease it left" ;;
+      esac
     fi
     assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
   done
