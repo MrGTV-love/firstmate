@@ -17,9 +17,8 @@ permissions:
 # pending push run replaces the older pending one, so a burst of merges queues
 # one full run for the newest commit instead of one run per merge. Cancellation
 # stays limited to pull_request events, so the running main run always finishes.
-# A skipped main commit has no run of its own; bin/fm-main-ci.sh judges it by the
-# newest completed run that contains it. Evidence and rationale: the September
-# 12 Actions starvation report, section 3 "Workflow mechanics to ship first".
+# Evidence and rationale: the September 12 Actions starvation report, section 3
+# "Workflow mechanics to ship first".
 # The compliance workflow deliberately keeps its own event-specific groups; do
 # not collapse it onto this simpler shape.
 concurrency:
@@ -214,7 +213,7 @@ jobs:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     steps:
       - uses: actions/checkout@v6
         with:

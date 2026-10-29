@@ -332,7 +332,7 @@ Against that table `--check-coverage` refuses twenty-one shards (`portable seria
 It passes twenty-three (`serial_shards=23 serial_unhinted=0 serial_max_ms=1194350 serial_budget_ms=1200000`), but twenty-three leave 135316 ms of lane slack (23 x 1200000 - 27464684), less than one 1200000 ms target, so the [shard-count rule](#portable-serial-ci-shards) refuses them.
 Twenty-four leave 1335316 ms and pass (`serial_shards=24 serial_unhinted=0 serial_max_ms=1144680 serial_budget_ms=1200000`), so twenty-four is the fewest serial shards that pass and keep one target of slack.
 The packing target, the parallel budget, and the 60-minute job timeout are unchanged, and no test was skipped, removed, or loosened.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-four.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` then all named twenty-four; the [2026-10-29 refresh](#portable-serial-ci-shards) moved them to twenty-five.
 Replaying each of the three main runs' own per-script durations through the earlier twenty-three-shard assignment puts the slowest shard at 1188526, 1183517, and 1170514 ms, with 4 members filled from their hints; the model reads 7 to 9 percent high in aggregate (27464684 ms modeled against 25243431 to 25697152 ms replayed).
 The same replay through the newer pull-request runs gives a slowest shard of 1209920, 1316807, and 1834041 ms, where run 40691163806 shows a shard far above the others whose cause this refresh did not investigate; the target bounds the model, not every real shard, as the 2026-10-26 note above already states.
 The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`; the twenty-four-shard assignment has not been replayed.
@@ -398,8 +398,12 @@ Their hints (1853, 2347, and 2712 ms) are the successful `exit=0`, `gate_skip=fa
 On 2026-10-29 seven hints were refreshed to the slowest successful sample across the serial timing artifacts of seven green runs (main runs 40759914461 and 40832695566; pull-request runs 40827497484, 40838643674, 40839568269, 40839791616, and 40845126476).
 `tests/fm-remote-secondmate-trace-context.test.sh` moved from 288623 to 969822 ms (observed 602140-969822 ms), and it had left serial shard 17 at 23.2-29.8 minutes against a 20-minute target.
 `tests/fm-status-runaway-guard.test.sh`, `tests/fm-control.test.sh`, `tests/fm-wake-drain-open-decisions-cursor.test.sh`, `tests/fm-guard-audit-closure.test.sh`, `tests/fm-guard-lint.test.sh`, and `tests/fm-test-reap-orphans.test.sh` were the other six hints more than fifteen percent below their observed maximum.
-Replaying each run's recorded script durations through the new shard membership puts the longest serial shard at 20.1-20.9 minutes in all seven runs, against 20.9-29.8 minutes observed, with an unchanged total of 432-451 serial-script minutes.
-This is a replay of recorded durations, not a measured CI run, and it moves no runner-minutes: the same scripts run.
+Replaying each run's recorded script durations through the twenty-four-shard membership of these hints puts the longest serial shard at 20.1-20.9 minutes in all seven runs, against 20.9-29.8 minutes observed, with an unchanged total of 432-451 serial-script minutes.
+This is a replay of recorded durations, not a measured CI run.
+The refreshed serial hints sum to 28352649 ms, so twenty-four shards still pass `--check-coverage` (`serial_shards=24 serial_unhinted=0 serial_max_ms=1181663 serial_budget_ms=1200000`) but leave only 447351 ms of lane slack (24 x 1200000 - 28352649), less than one 1200000 ms target, and the [shard-count rule](#portable-serial-ci-shards) refuses them.
+Twenty-five leave 1647351 ms and pass (`serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000`), so twenty-five is the fewest serial shards that pass and keep one target of slack.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-five.
+The same scripts run, so serial-script minutes do not change, but the twenty-fifth shard adds one job's setup; the twenty-five-shard assignment has not been replayed.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
@@ -494,10 +498,9 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses thirty long-lived Linux jobs (twenty-four serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty-one long-lived Linux jobs (twenty-five serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession and coalesces main pushes into one group per branch, so a burst of merges queues one pending run for the newest commit and never cancels the running one.
-A commit whose run was replaced is read through `bin/fm-main-ci.sh`, which judges it by the newest completed run that contains it.
 The compliance workflow keeps its own event semantics.
 
 ## Local entry points

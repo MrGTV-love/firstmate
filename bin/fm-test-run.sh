@@ -268,7 +268,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=24
+PORTABLE_SERIAL_SHARDS=25
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -339,10 +339,10 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
 # The shard count is the fewest that pass and leave lane slack of at least one
-# target. The 2026-10-28 hint refresh sums to 27464684 ms, so twenty-three
-# shards pass with only 135316 ms of slack and are refused by that rule;
-# twenty-four leave 1335316 ms and pack at serial_max_ms 1144680 ms
-# (docs/fm-test-portable-shards.md, "Refresh the hints and shard count").
+# target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
+# twenty-four shards pass with only 447351 ms of slack and are refused by that
+# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
+# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -558,7 +558,7 @@ family_for_basename() {
       ;;
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|fm-pr-ready-reconcile.test.sh|\
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
-    fm-pr-reviewers.test.sh|fm-pr-state.test.sh|fm-main-ci.test.sh|\
+    fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
     fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
     fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
@@ -1004,7 +1004,6 @@ tests/fm-live-lab.test.sh 89950
 tests/fm-load-report.test.sh 7402
 tests/fm-mail-check.test.sh 9947
 tests/fm-mail.test.sh 14319
-tests/fm-main-ci.test.sh 3000
 tests/fm-mem-guard.test.sh 836
 tests/fm-merge-prune.test.sh 638686
 tests/fm-model-freshness.test.sh 42946
