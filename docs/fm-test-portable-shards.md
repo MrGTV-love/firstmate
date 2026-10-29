@@ -32,7 +32,7 @@ The per-shard packing check below then refused eighteen and nineteen shards, bec
 The packing target stays at 1200000 ms, and the 60-minute job timeout is unchanged.
 On 2026-10-24 the four unhinted `tests/fm-retired-jev-write-*.test.sh` retirement suites, packed at the 45000 ms default weight, join main's twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=10 serial_max_ms=1155486`); the packing target and job timeout are unchanged.
 They were left at the default because the change that added them read the refcheck guard as forbidding retired ids in the hint table; that guard masks a file which names the retirement test's path before matching the retired id, so the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) measured and hinted them.
-On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, join the twenty-one serial shards, which still pass `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`).
+On 2026-10-27 the unhinted `tests/fm-retired-persistent-cd-guard.test.sh` retirement suite and `tests/fm-home-writes.test.sh` behavioral suite, each packed at the 45000 ms default weight until a green CI run measures it, joined the twenty-one serial shards then, which passed `--check-coverage` (`serial_shards=21 serial_unhinted=5 serial_max_ms=1193769`); the [2026-10-28 refresh](#refresh-the-hints-and-shard-count) measured both and moved the lane to twenty-four shards.
 The guard checks each shard on its own: it refuses a shard whose packed sum is above the target and above that shard's own largest script.
 So a shard that holds one indivisible script alone may exceed the target, and no other shard may borrow that size; `serial_indivisible_ms` reports the largest single script.
 `tests/fm-watch-triage-waits.test.sh` and `tests/fm-control-relaunch.test.sh` were the two remaining indivisible members and are now four and three independently runnable groups, as [Split watch-triage-waits and control-relaunch](#split-watch-triage-waits-and-control-relaunch) describes.
@@ -70,6 +70,7 @@ A failed script's duration is excluded even when its lane uploaded an artifact.
 Three supplemental hints come from completed successful shards of the partial [run 37654991238](https://github.com/MrGTV-love/firstmate/actions/runs/37654991238) on 2026-10-07: `tests/fm-session-launch-policy-inherit.test.sh` measured 16144 ms on shard 4, `tests/fm-session-launch-policy-receipt.test.sh` measured 2166 ms on shard 9, and `tests/fm-session-launch-policy.test.sh` measured 229671 ms on shard 7.
 All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
 `tests/fm-review-agent-select.test.sh` has a serial hint of 14400 ms that is a local macOS arm64 sample, not a CI measurement: one successful `bin/fm-duration.py run` invocation on 2026-10-15 UTC; replace it with completed healthy CI measurements when available.
+`tests/fm-review-record.test.sh` has a serial hint of 7000 ms that is a conservative local macOS arm64 sample, not a CI measurement: three successful direct runs on 2026-10-27 UTC measured 6815, 6623, and 6656 ms; replace it with completed healthy CI measurements when available.
 `tests/fm-duration.test.sh` has a serial hint of 7990 ms that is a local macOS arm64 sample, not a CI measurement: one successful `bin/fm-test-run.sh --jobs 2` invocation on 2026-10-13 UTC (`exit=0`, `gate_skip=false`), because no CI serial shard has run the new suite yet; replace it with completed healthy CI measurements when available.
 `tests/fm-nm-read-cache.test.sh` has a serial hint of 22000 ms that is a conservative bound, not a CI measurement: the latest local macOS arm64 sample is one successful `bin/fm-duration.py run` of the suite on 2026-10-17 UTC (`exit=0`, tree CPU 4.4 s, 37 s wall on a host at load 66), and the hint stays at the bound the packing check below was run against instead of dropping to that sample, because no CI serial shard has run the suite yet; replace it with completed healthy CI measurements when available.
 The existing fourteen serial shards were full (`serial_max_ms=1199961` before this suite), so the suite brought a fifteenth serial shard (`serial_shards=15 serial_max_ms=1121528`); this is a dated packing check on 2026-10-17, not a CI duration.
@@ -312,9 +313,28 @@ The 1200000 ms target therefore bounds the model, not the slowest real shard: it
 Bounding real shard walls instead would take the mean of several runs plus a variance term rather than the slowest sample, which is a change to the weight basis and not to this table.
 The seven-way concurrent evidence for the fm-lint groups in [fm-test-isolation-proof.md](fm-test-isolation-proof.md#fm-lint-split-re-check) still stands, and a full portable-pool isolation proof remains outstanding.
 
-The serial member `tests/fm-status-runaway-guard.test.sh` (199417 ms, one local run of `bin/fm-test-run.sh`, not a CI measurement) joins main's twenty-one serial shards with no shard change.
-On 2026-10-27, `bin/fm-test-run.sh --check-coverage` on that branch reported `serial_shards=21` and `serial_max_ms=1196944`, inside the 1200000 ms packing target.
-The packing target, the shard count and the 60-minute job timeout are unchanged.
+## Refresh the hints and shard count
+
+On 2026-10-28 `bin/fm-test-run.sh --check-coverage` failed at main `8e1f3bf0e` (exit 1): `portable serial shard 1 of 21 packs 1205290ms above the 1200000ms target and beyond its own largest script (1036787ms), so the excess is packing`.
+It had passed at `b34192a21` (`serial_max_ms=1193769`) and first failed at `a9838c1a3`, which joined `tests/fm-status-runaway-guard.test.sh` with a hint of 199417 ms from one local `bin/fm-test-run.sh` run.
+The "Test coverage guard" and "Behavior portable parallel 1" checks fail on every pull request while main is in that state.
+The cause is the hint basis, not a shard: three members entered the table without a CI sample (the local 199417 ms value, and two suites packed at the 45000 ms default), and the CI samples of the members measured in the newest runs had drifted from the 2026-10-26 table, 197 of 268 upward.
+So this refresh repairs the table by the procedure in [Portable serial CI shards](#portable-serial-ci-shards), and no target is raised.
+
+It takes the slowest successful (`exit=0`, `gate_skip=false`) `duration_ms` per script across the `fm-test-timing-aggregate` artifacts of the three newest green main runs: [40697506351](https://github.com/MrGTV-love/firstmate/actions/runs/40697506351), [40695923462](https://github.com/MrGTV-love/firstmate/actions/runs/40695923462), and [40690399356](https://github.com/MrGTV-love/firstmate/actions/runs/40690399356).
+Those runs cover 270 of the 330 serial members: 197 hints rose, 71 fell, and `tests/fm-merge-prune.test.sh` and `tests/fm-pr-ready-reconcile.test.sh` gained their first measured hint.
+No green main run yet carries the suites that landed after them, so five members take their sample from newer green pull-request runs, the way the 2026-10-21 refresh did: `tests/fm-status-runaway-guard.test.sh` 349169 ms (199417 ms before) from [40710096878](https://github.com/MrGTV-love/firstmate/actions/runs/40710096878) of PR #188, `tests/fm-home-writes.test.sh` 37642 ms and `tests/fm-retired-persistent-cd-guard.test.sh` 2647 ms from [40718399489](https://github.com/MrGTV-love/firstmate/actions/runs/40718399489) of PR #264, and the gate-skipped `tests/fm-write-confinement.test.sh` 889 ms (its slowest record across the six runs, also from 40718399489) and `tests/fm-remote-secondmate-stay-live-e2e.test.sh` 386 ms from [40691163806](https://github.com/MrGTV-love/firstmate/actions/runs/40691163806) of PR #212.
+The other 55 members have no successful ungated sample in these runs and keep their hints.
+The serial hints then sum to 27464684 ms, against 25312015 ms before (the 330 members with the 45000 ms default for the six that had no hint), and `serial_unhinted` is 0.
+
+Against that table `--check-coverage` refuses twenty-one shards (`portable serial shard 1 of 21 packs 1307844ms`) and twenty-two (`portable serial shard 1 of 22 packs 1248539ms`).
+It passes twenty-three (`serial_shards=23 serial_unhinted=0 serial_max_ms=1194350 serial_budget_ms=1200000`), but twenty-three leave 135316 ms of lane slack (23 x 1200000 - 27464684), less than one 1200000 ms target, so the [shard-count rule](#portable-serial-ci-shards) refuses them.
+Twenty-four leave 1335316 ms and pass (`serial_shards=24 serial_unhinted=0 serial_max_ms=1144680 serial_budget_ms=1200000`), so twenty-four is the fewest serial shards that pass and keep one target of slack.
+The packing target, the parallel budget, and the 60-minute job timeout are unchanged, and no test was skipped, removed, or loosened.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-four.
+Replaying each of the three main runs' own per-script durations through the earlier twenty-three-shard assignment puts the slowest shard at 1188526, 1183517, and 1170514 ms, with 4 members filled from their hints; the model reads 7 to 9 percent high in aggregate (27464684 ms modeled against 25243431 to 25697152 ms replayed).
+The same replay through the newer pull-request runs gives a slowest shard of 1209920, 1316807, and 1834041 ms, where run 40691163806 shows a shard far above the others whose cause this refresh did not investigate; the target bounds the model, not every real shard, as the 2026-10-26 note above already states.
+The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`; the twenty-four-shard assignment has not been replayed.
 
 ## Portable serial remainder
 
@@ -349,6 +369,8 @@ Balance is still worth keeping current, because enough unmeasured scripts let on
 `bin/fm-test-run.sh --check-coverage` reports the unmeasured share as `serial_unhinted=` and refuses past `PORTABLE_SERIAL_MAX_UNHINTED_PERCENT`.
 That catches missing hints, not stale existing hints: the host suite still had a 41512 ms hint after growing to over 1000 seconds in CI, so the old split placed it beside another 12 minutes of work while passing the guard.
 Refresh the hints whenever a serial member grows materially or the lane gains scripts, rather than waiting for missing-hint coverage to trip.
+Choose the fewest shard count that passes and leaves lane slack of at least one shard target (`PORTABLE_SERIAL_MAX_WEIGHT_MS`): the shard count times the target, minus the serial hint sum, is at least the target.
+A count that passes with less slack is refused, because the next unhinted member or upward refresh pushes every packing of it over the target.
 
 `bin/fm-test-run.sh` owns the per-shard packing, so its `--check-coverage` output is the current account of lane size and coverage rather than a copied inventory.
 Its header and `--help` own the modeled-budget check and output fields; read the current estimates from `--check-coverage` instead of retaining copied lane sums here.
@@ -466,7 +488,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses twenty-seven long-lived Linux jobs (twenty-one serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty long-lived Linux jobs (twenty-four serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

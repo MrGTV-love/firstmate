@@ -1848,7 +1848,7 @@ install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
   mkdir -p "$repo/.omp/extensions/lib"
-  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$repo/.omp/extensions/lib/"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$ROOT/.omp/extensions/lib/fm-task-worker.ts" "$repo/.omp/extensions/lib/"
   cp "$ROOT/bin/fm-parent-channel-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$repo/bin/"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
@@ -1995,6 +1995,72 @@ EOF
   expect_code 0 "$status" "omp watch extension contract: $out"
   [ -z "$out" ] || fail "omp watch extension test printed output: $out"
   pass ".omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up"
+}
+
+# A ship or scout worker whose task copy is a checkout of this repository loads
+# the tracked primary extensions (omp auto-discovers <cwd>/.omp/extensions) with
+# no FM_HOME, so the copy itself reads as the home. Run both extensions the way
+# a session does, from a copy with no FM_HOME: with FM_TASK_ID (the worker
+# marker bin/fm-spawn.sh exports) the copy must stay clean, and without it (a
+# primary or secondmate home) the four home paths are still written. Both keep
+# the watcher-arm seatbelt: a backgrounded arm is denied either way.
+run_omp_primary_extensions() {  # <repo> [FM_TASK_ID value]
+  local repo=$1 task=${2:-}
+  (
+    cd "$repo" || exit 1
+    unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_TASK_ID
+    [ -z "$task" ] || export FM_TASK_ID="$task"
+    FM_OMP_ARM_READY_TIMEOUT_MS=3000 FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+      REPO="$repo" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+const handlers = new Map();
+const pi = {
+  on(e, h) { const list = handlers.get(e) ?? []; list.push(h); handlers.set(e, list); },
+  registerCommand() {}, registerTool() {}, sendMessage() {}, sendUserMessage() {},
+};
+for (const file of ["fm-primary-omp-watch.ts", "fm-primary-turnend-guard.ts"]) {
+  const mod = await import(pathToFileURL(`${process.env.REPO}/.omp/extensions/${file}`).href);
+  mod.default(pi);
+}
+const ctx = { sessionManager: { getSessionId: () => "s1" }, model: { provider: "deepseek", id: "deepseek-v4-pro" }, isIdle: () => true };
+for (const name of ["session_start", "before_agent_start", "agent_start", "session_stop", "agent_end"]) {
+  for (const handler of handlers.get(name) ?? []) await handler({ type: name }, ctx);
+}
+const seatbelt = await Promise.all((handlers.get("tool_call") ?? []).map((handler) =>
+  handler({ type: "tool_call", toolName: "bash", input: { command: "bin/fm-watch-arm.sh &" } }, {})));
+if (!seatbelt.some((result) => result?.block === true)) console.log(`the watcher-arm seatbelt did not deny a backgrounded arm: ${JSON.stringify(seatbelt)}`);
+for (const handler of handlers.get("session_shutdown") ?? []) await handler({}, ctx);
+process.exit(0);
+EOF
+  )
+}
+
+test_primary_extensions_leave_a_task_worker_copy_clean() {
+  local repo out path
+  # A task worker: no state directory exists, and none may appear.
+  repo="$TMP_ROOT/worker-copy/repo"
+  install_omp_extension_fixture "$repo"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  cp -R "$repo" "$TMP_ROOT/worker-copy/home"
+  out=$(run_omp_primary_extensions "$repo" fm-example-task) || fail "worker-copy extensions run failed: $out"
+  [ -z "$out" ] || fail "worker-copy extensions printed output: $out"
+  assert_absent "$repo/state" "a task worker copy must get no state directory from the primary extensions"
+  for path in state/.omp-live-model state/.omp-turnend-extension-loaded state/.omp-watch-extension-loaded state/extensions/omp-primary-watch; do
+    assert_absent "$repo/$path" "a task worker copy must not hold $path"
+  done
+  # The same copy as a home: every one of the four paths is written.
+  repo="$TMP_ROOT/worker-copy/home"
+  mkdir -p "$repo/state"
+  out=$(run_omp_primary_extensions "$repo") || fail "home extensions run failed: $out"
+  [ -z "$out" ] || fail "home extensions printed output: $out"
+  for path in state/.omp-live-model state/.omp-turnend-extension-loaded state/.omp-watch-extension-loaded state/extensions/omp-primary-watch; do
+    [ -e "$repo/$path" ] || fail "a home must still write $path"
+  done
+  pass ".omp primary extensions: a task worker copy stays clean and keeps the arm seatbelt, a home still writes its four paths"
 }
 
 test_watch_extension_reads_durable_payloads() {
@@ -4909,6 +4975,7 @@ test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation
 test_watch_extension_arms_and_delivers
+test_primary_extensions_leave_a_task_worker_copy_clean
 test_watch_extension_reads_durable_payloads
 test_watch_extension_runs_the_supervision_host
 test_watch_extension_runs_the_supervision_host quiet
