@@ -412,7 +412,9 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny"}
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 3},
+        {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge"},
+        {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"}
       ],
       "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while that head lacks the base branch's live tip, so the landed tree is one no check ran on",
       "layer": "runtime-block",
