@@ -1,0 +1,13 @@
+# serial hint sum and slack (head)
+serial_hint_sum_ms=28352649
+slack_24=447351 slack_25=1647351 target=1200000
+
+# adversarial: stale 24-shard lane name
+$ bin/fm-test-run.sh --list --lane portable-serial-1of24
+fm-test-run: lane 'portable-serial-1of24' asks for 24 portable serial shards but this runner is configured for 25 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-26of25
+fm-test-run: lane 'portable-serial-26of25' shard index is outside 1..25 (see --list-lanes)
+exit=2
+$ bin/fm-test-run.sh --list --lane portable-serial-25of25 | wc -l
+      14

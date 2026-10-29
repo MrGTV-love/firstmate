@@ -1,0 +1,9 @@
+# CI job (check) names rendered from ci.yml by matrix expansion
+base jobs=      34 head jobs=      35
+--- names removed at head:
+--- names added at head:
+Behavior portable serial 25
+--- CONTRIBUTING.md required serial range:
+Behavior portable serial 1` through `Behavior portable serial 25
+--- head serial names:
+Behavior portable serial 1,Behavior portable serial 2,Behavior portable serial 3,Behavior portable serial 4,Behavior portable serial 5,Behavior portable serial 6,Behavior portable serial 7,Behavior portable serial 8,Behavior portable serial 9,Behavior portable serial 10,Behavior portable serial 11,Behavior portable serial 12,Behavior portable serial 13,Behavior portable serial 14,Behavior portable serial 15,Behavior portable serial 16,Behavior portable serial 17,Behavior portable serial 18,Behavior portable serial 19,Behavior portable serial 20,Behavior portable serial 21,Behavior portable serial 22,Behavior portable serial 23,Behavior portable serial 24,Behavior portable serial 25,

@@ -1,0 +1,3 @@
+$ bin/fm-proc-budget.sh -- bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=380 parallel=31 parallel_max_ms=3088788 parallel_imbalance_ms=26570 parallel_unhinted=0 parallel_jobs=3 parallel_effective_jobs=3 parallel_makespan_ms=1030514 parallel_budget_ms=1200000 serial=331 serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000 serial_indivisible_ms=1005601 herdr=18
+exit=0

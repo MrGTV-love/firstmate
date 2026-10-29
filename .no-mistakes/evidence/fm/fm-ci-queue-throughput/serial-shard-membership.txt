@@ -1,0 +1,32 @@
+head (25 shards): scripts=     331 unique=     331
+base (24 shards): scripts=     331 unique=     331
+--- scripts only in base serial lane (dropped by head):
+--- scripts only in head serial lane (added by head):
+--- all-tests list diff (base vs head --list --all):
+identical
+--- head scripts per shard:
+shard 1: 11 scripts
+shard 2: 11 scripts
+shard 3: 12 scripts
+shard 4: 12 scripts
+shard 5: 12 scripts
+shard 6: 13 scripts
+shard 7: 13 scripts
+shard 8: 13 scripts
+shard 9: 13 scripts
+shard 10: 13 scripts
+shard 11: 13 scripts
+shard 12: 14 scripts
+shard 13: 14 scripts
+shard 14: 14 scripts
+shard 15: 14 scripts
+shard 16: 14 scripts
+shard 17: 14 scripts
+shard 18: 13 scripts
+shard 19: 14 scripts
+shard 20: 14 scripts
+shard 21: 14 scripts
+shard 22: 14 scripts
+shard 23: 14 scripts
+shard 24: 14 scripts
+shard 25: 14 scripts

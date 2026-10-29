@@ -1,0 +1,11 @@
+# concurrency rendered from ci.yml (event, pr, run_id, ref -> group | cancel-in-progress)
+base push         pr=    run=900010 ref=refs/heads/main        -> ci-CI-push-900010 | cancel=false
+base push         pr=    run=900011 ref=refs/heads/main        -> ci-CI-push-900011 | cancel=false
+base push         pr=    run=900012 ref=refs/heads/release     -> ci-CI-push-900012 | cancel=false
+base pull_request pr=108 run=900013 ref=refs/pull/108/merge    -> ci-CI-pull_request-108 | cancel=true
+base pull_request pr=108 run=900014 ref=refs/pull/108/merge    -> ci-CI-pull_request-108 | cancel=true
+head push         pr=    run=900010 ref=refs/heads/main        -> ci-CI-push-refs/heads/main | cancel=false
+head push         pr=    run=900011 ref=refs/heads/main        -> ci-CI-push-refs/heads/main | cancel=false
+head push         pr=    run=900012 ref=refs/heads/release     -> ci-CI-push-refs/heads/release | cancel=false
+head pull_request pr=108 run=900013 ref=refs/pull/108/merge    -> ci-CI-pull_request-108 | cancel=true
+head pull_request pr=108 run=900014 ref=refs/pull/108/merge    -> ci-CI-pull_request-108 | cancel=true
