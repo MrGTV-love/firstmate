@@ -45,8 +45,9 @@
 # found complete and non-empty, skips that containment rule and never the check
 # reads, because the queue runs those required checks on the combined tree
 # itself; an unreadable queue rule or required set is retried as unreadable at
-# verify and, at the last read where verify relied on the queue, refused as
-# unreadable, never judged as a head that lacks the tip;
+# verify, and when verify relied on the queue, a last read that cannot prove
+# the queue again, whether unreadable or not, refuses as unreadable, never
+# judged as a head that lacks the tip;
 # github_merge_enters_queue below owns that proof. Off a proven queue, an
 # attended --auto merge also needs a live mergeStateStatus at that last read
 # where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
