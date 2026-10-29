@@ -4023,10 +4023,27 @@ assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an absent ta
 fx = waiting_fixture('idle-turn')
 fx['activity']('idle')
 assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an idle prerequisite between turns still carries the wait'
-for parked in (f'done [at={now}]: PR 290 opened; awaiting other-family review\n',
-               f'needs-decision [at={now}] [key=review]: PR 290 parked awaiting review\n'):
-    (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + parked)
-    assert fx['call'](fx['loops'], '--check-actions').returncode == 0, ('a parked prerequisite still carries the wait', parked)
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'needs-decision [at={now}] [key=review]: PR 290 parked awaiting review\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a parked prerequisite still carries the wait'
+# A done prerequisite with an unmerged recorded PR stays live until its merge is recorded.
+fx = waiting_fixture('done-pr')
+(fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=https://github.com/test/project/pull/290\n')
+(fx['home'] / 'state/repair-owner.status').write_text(
+    fx['working'] + f'done [at={now}]: PR 290 opened; awaiting other-family review\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a done prerequisite with an unmerged PR carries the wait'
+(fx['home'] / 'state/repair-owner.pr-poll-merge-notified').write_text(
+    'fm-pr-poll-merge-notified-v1\ngithub\ngithub.com\ntest/project\n290\n')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite whose PR merged has landed'
+# A done prerequisite with no recorded PR has landed: its report is its delivery.
+fx = waiting_fixture('done-no-pr')
+(fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: findings reported\n')
+fx['activity']('idle')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'a done prerequisite with no PR has landed'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+assert landed.returncode == 1 and 'done with no PR' in landed.stdout, landed
 fx = wait_fixture('idle')
 boundary = fx['drain']()
 fx['activity']('idle')
@@ -4045,7 +4062,8 @@ own = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence'
 assert own.returncode == 1 and 'distinct' in own.stdout, own
 assert json.loads(fx['ledger'].read_text())['handling']['actions'][fx['red']['id']]['evidence'] == reason
 print('PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, '
-      'loses its session or record, is replaced or comes due; a prerequisite that is not live is refused', flush=True)
+      'loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live '
+      'is refused', flush=True)
 
 # The delivery form of a task wait shares the steer's boundary: the start of the row's current overdue episode.
 def delivery(fx, record, sent):

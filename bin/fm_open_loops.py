@@ -1493,6 +1493,9 @@ class WaitVerifier:
     def live_task(self, task):
         """A named prerequisite is live: assigned, a live fm-crew-state.sh verdict, unmerged, not stalled or failed.
 
+        A done task with no recorded PR has landed, since its report is its delivery; a done task with a PR stays
+        live until its merge is recorded.
+
         It binds the prerequisite's launch generation and status stream, not its latest status line or whether it
         is busy right now, so ordinary progress, an idle turn end or a parked PR awaiting review keeps the wait
         standing; a finished or parked run's verdict can outlast its session. A replacement, a gone, dead or
@@ -1511,6 +1514,8 @@ class WaitVerifier:
         if state not in LIVE_STATES:
             raise ValueError("prerequisite task is not live (its session is gone, dead, failed or unreadable);"
                              " follow up on it")
+        if state == "done" and not fields.get("pr"):
+            raise ValueError("prerequisite task is done with no PR; its report is its delivery; follow up on its result")
         if fields.get("pr") and merge_marker(c.state, fields["pr"]):
             raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
