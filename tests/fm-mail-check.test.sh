@@ -339,6 +339,33 @@ printf "42\\t2026-09-05T00:00:00Z\\talice@example.com\\tHello\\n"'
   pass 'with default settings and an empty duration ledger, an 18 s idle-CPU poll delivers its mail'
 }
 
+test_disarmed_check_starts_a_new_stop_episode() {
+  local home
+  home=$(make_home disarm-episode)
+  write_env "$home"
+  FM_HOME="$home" "$CHECK" arm >/dev/null || fail 'arm failed'
+  printf '#!/usr/bin/env bash\nsleep 30\n' > "$home/silent.sh"
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  env FM_HOME="$home" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      CHECK_TIMEOUT=1
+      run_check_capture mail "$2" || exit 21
+      [ -n "$FM_CHECK_STOP_NOTICE" ] || exit 22
+      "$3" arm >/dev/null || exit 23
+      run_check_capture mail "$2" || exit 24
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || exit 25
+      "$3" disarm >/dev/null || exit 26
+      "$3" arm >/dev/null || exit 27
+      run_check_capture mail "$2" || exit 28
+      [ -n "$FM_CHECK_STOP_NOTICE" ] || exit 29
+    ' _ "$ROOT/bin/fm-watch.sh" "$home/silent.sh" "$CHECK" > "$home/watch.out" 2> "$home/watch.err" \
+    || fail "a disarm and re-arm before any sweep did not start a new stop episode: $(cat "$home/watch.err")"
+  pass 'a re-arm keeps the mail stop episode; a disarm and re-arm before any sweep starts a new one'
+}
+
 test_progressing_poll_survives_fivefold_slowdown() {
   local tmpbin home factor out
   tmpbin="$TMP_ROOT/progress/bin"
@@ -575,6 +602,7 @@ test_silent_poll_is_unknown_and_retried
 test_repeated_timeout_still_wakes
 test_watcher_stopped_poll_rings_queued_mail_next_pass
 test_idle_poll_inside_its_socket_timeout_succeeds
+test_disarmed_check_starts_a_new_stop_episode
 test_progressing_poll_survives_fivefold_slowdown
 test_fail_closed_poll_after_wake_reports_the_failure
 test_repeated_status4_fail_closed_still_wakes

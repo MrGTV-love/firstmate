@@ -2404,7 +2404,8 @@ watcher_stop_signals() {
 # first stop of an episode also sets FM_CHECK_STOP_NOTICE, which the sweep
 # raises as that check's wake, so a check that keeps being stopped still reaches
 # firstmate once. state/<id>.check-stopped marks the episode; the check's next
-# completed run ends it, and disarming or retiring the check removes it.
+# completed run ends it, every disarm or retirement removes it
+# (fm_check_stop_episode_clear), and a routine re-arm keeps it.
 run_check_capture() {  # <check-id> <check> [args...]
   local name=$1 started episode notice
   shift

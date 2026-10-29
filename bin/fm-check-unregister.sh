@@ -46,8 +46,9 @@ for artifact in "$CHECK" "$TRUST"; do
   fi
 done
 
-rm -f -- "$CHECK" "$TRUST" "$STATE/$ID.check-stopped" || {
+rm -f -- "$CHECK" "$TRUST" || {
   echo "error: custom check could not be removed" >&2
   exit 1
 }
+fm_check_stop_episode_clear "$STATE" "$ID"
 printf 'unregistered: state/%s.check.sh\n' "$ID"
