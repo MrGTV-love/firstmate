@@ -1865,7 +1865,7 @@ The address selects the existing shared server; it does not authorize starting o
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
 Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
-The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
+The grading section says a session that did not build the work grades it; that each mandatory item is graded pass, fail, or unresolved; that a downstream-pending item is never a pass but does not by itself block proceeding, while any other unresolved item blocks; that supporting items never offset a failed mandatory one; and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.

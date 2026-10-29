@@ -397,7 +397,7 @@ The shape check is mechanical: the independent grader still decides whether each
 
 ## How You're Graded
 - A session that did not build this work grades it, against the items above and the evidence places they name.
-- Mandatory items are pass or fail and release-blocking. One failed mandatory item fails the task.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
 - Supporting items earn partial credit and never offset a failed mandatory item.
 - A crossed hard gate fails the task. Stop and report it.
 - Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
