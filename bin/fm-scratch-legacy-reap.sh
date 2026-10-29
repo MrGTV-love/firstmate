@@ -2,7 +2,7 @@
 # fm-scratch-legacy-reap.sh - one-time removal of scratch entries that commands made before bin/fm-scratch-lib.sh.
 #
 # Usage:
-#   fm-scratch-legacy-reap.sh [--tmpdir DIR] [--min-age-days N] [--apply]
+#   fm-scratch-legacy-reap.sh --tmpdir DIR [--min-age-days N] [--apply]
 #   fm-scratch-legacy-reap.sh --help
 #
 # Before the scratch library, these commands made `<prefix>.XXXXXX` directly in
@@ -23,16 +23,16 @@
 # lsof must run and answer; if it cannot, nothing is removed.
 #
 # Without --apply it only prints each entry it would remove and why. With
-# --apply it removes them and prints one `removed` line each. It never touches anything
-# outside DIR (default: $TMPDIR, else /tmp) and never recurses into a candidate
-# that is a symlink.
+# --apply it removes them and prints one `removed` line each. DIR is required,
+# so no run ever falls back to the live temp dir. It never touches anything
+# outside DIR and never recurses into a candidate that is a symlink.
 #
 # Regression coverage: tests/fm-scratch-legacy-reap.test.sh.
 set -u
 
 usage() { sed -n '2,/^set -u$/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//'; }
 
-TMPDIR_ARG=${TMPDIR:-/tmp}
+TMPDIR_ARG=
 MIN_AGE_DAYS=2
 APPLY=0
 while [ "$#" -gt 0 ]; do
@@ -46,6 +46,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 case "$MIN_AGE_DAYS" in ''|*[!0-9]*) echo "fm-scratch-legacy-reap: --min-age-days needs a whole number" >&2; exit 2 ;; esac
+[ -n "$TMPDIR_ARG" ] || { echo "fm-scratch-legacy-reap: --tmpdir DIR is required" >&2; usage >&2; exit 2; }
 [ -d "$TMPDIR_ARG" ] || { echo "fm-scratch-legacy-reap: no such directory: $TMPDIR_ARG" >&2; exit 2; }
 DIR=$(CDPATH='' cd -P -- "$TMPDIR_ARG" && pwd -P) || exit 2
 command -v lsof >/dev/null 2>&1 || { echo "fm-scratch-legacy-reap: lsof is required to prove an entry is not in use" >&2; exit 1; }

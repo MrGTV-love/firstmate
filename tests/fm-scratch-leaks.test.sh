@@ -208,7 +208,7 @@ run_ingest() {  # <tmpdir> [result]
 }
 
 test_remote_reply_ingest() {
-  local tmp sig
+  local tmp sig empty out
   tmp=$(new_tmp)
   make_result "$TMP_ROOT/result.good" $'working: remote check\n'
   make_result "$TMP_ROOT/result.bad" $'working: remote check\n'
@@ -219,6 +219,12 @@ test_remote_reply_ingest() {
   assert_clean "$tmp" "a normal remote reply ingest"
   run_ingest "$tmp" "$TMP_ROOT/result.bad" >/dev/null 2>&1 && fail "a forged remote reply ingested"
   assert_clean "$tmp" "a remote reply ingest that exited on an error"
+  empty=$(printf '' | shasum -a 256 | awk '{print $1}')
+  printf 'schema=fm-remote-delta.v1\nstatus=continuity-broken\npath=state/parent-replies.status\nfrom_offset=0\nto_offset=0\nfrom_prefix_sha256=%s\nto_prefix_sha256=%s\npayload_sha256=%s\npayload_bytes=0\nreason=truncated\n\n' \
+    "$empty" "$empty" "$empty" > "$TMP_ROOT/result.broken"
+  out=$(run_ingest "$tmp" "$TMP_ROOT/result.broken" 2>&1) && fail "a continuity break ingested as a delta"
+  assert_contains "$out" "continuity-broken: ios" "the continuity break was not handled: $out"
+  assert_clean "$tmp" "a remote reply ingest that handled a continuity break"
   cat > "$FAKEBIN/tail" <<'SH'
 #!/usr/bin/env bash
 if [ -n "${FAKE_STALL_PIDFILE:-}" ]; then
@@ -378,7 +384,7 @@ scratch_new() {  # <tmpdir> <f|d> <prefix> [env...]
 }
 
 test_scratch_lib() {
-  local tmp outside dead path
+  local tmp outside dead path out
   # A container path that is a symlink is neither reaped through nor used.
   tmp=$(new_tmp)
   outside=$(new_tmp)
@@ -418,6 +424,36 @@ SH
   env TMPDIR="$tmp" bash -c '. "$1"; fm_scratch_release "$2"' _ "$ROOT/bin/fm-scratch-lib.sh" "$path"
   assert_clean "$tmp" "a released scratch entry"
   pass "fm_scratch_new never enters a symlinked container and survives a container removed under it"
+
+  # Another user plants the container as a symlink between the check and mkdir.
+  tmp=$(new_tmp)
+  outside=$(new_tmp)
+  mkdir -p "$TMP_ROOT/plant-bin"
+  cat > "$TMP_ROOT/plant-bin/mkdir" <<'SH'
+#!/usr/bin/env bash
+for last; do :; done
+ln -s "$PLANT_TARGET" "$last"
+SH
+  chmod +x "$TMP_ROOT/plant-bin/mkdir"
+  path=$(scratch_new "$tmp" f fm-timeout-status PATH="$TMP_ROOT/plant-bin:$PATH" PLANT_TARGET="$outside") \
+    || fail "fm_scratch_new failed when its container was planted as a symlink"
+  case "$path" in "$tmp/fm-timeout-status."??????) ;; *) fail "fm_scratch_new used a container planted as a symlink: $path" ;; esac
+  [ -z "$(entries "$outside")" ] || fail "fm_scratch_new wrote into the target of a planted container"
+  pass "fm_scratch_new checks the container it made, not only the path before mkdir"
+
+  # A copy of fm-timeout-lib.sh or fm-gh-rest.sh without its sibling library
+  # still runs its command and leaves nothing behind.
+  tmp=$(new_tmp)
+  mkdir -p "$TMP_ROOT/alone-bin"
+  cp "$ROOT/bin/fm-timeout-lib.sh" "$ROOT/bin/fm-gh-rest.sh" "$TMP_ROOT/alone-bin/"
+  out=$(env TMPDIR="$tmp" bash -c '. "$1"; fm_run_timed 5 echo ran' _ "$TMP_ROOT/alone-bin/fm-timeout-lib.sh" 2>&1) \
+    || fail "a lone copy of fm-timeout-lib.sh did not run its command: $out"
+  assert_equals ran "$out" "a lone copy of fm-timeout-lib.sh printed more than its command's output"
+  assert_clean "$tmp" "a bounded command run from a lone copy of fm-timeout-lib.sh"
+  out=$(env TMPDIR="$tmp" FM_STATE_OVERRIDE="$TMP_ROOT/gh-state" PATH="$FAKEBIN:$PATH" \
+    bash "$TMP_ROOT/alone-bin/fm-gh-rest.sh" get repos/o/r/items 2>&1) || fail "a lone copy of fm-gh-rest.sh failed: $out"
+  assert_clean "$tmp" "a read through a lone copy of fm-gh-rest.sh"
+  pass "lone copies of fm-timeout-lib.sh and fm-gh-rest.sh keep working without fm-scratch-lib.sh"
 }
 
 test_gh_rest

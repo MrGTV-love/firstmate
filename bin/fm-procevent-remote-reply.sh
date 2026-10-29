@@ -608,6 +608,8 @@ cmd_ingest() {
     fi
     [ "$append_rc" -ne 2 ] || { fm_lock_release "$lock"; die "cannot append continuity escalation"; }
     fm_lock_release "$lock"
+    trap - EXIT
+    fm_scratch_release "$tmp"
     printf 'continuity-broken: %s (%s)\n' "$id" "$reason"
     return 3
   fi

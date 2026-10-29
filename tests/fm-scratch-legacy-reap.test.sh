@@ -80,3 +80,11 @@ if bash "$REAPER" --tmpdir "$DIR" --min-age-days nope >/dev/null 2>&1; then
   fail "a nonnumeric age floor was accepted"
 fi
 pass "the legacy reaper refuses a nonnumeric age floor"
+
+: > "$DIR/fm-gh-rest.LLLLLL"; old "$DIR/fm-gh-rest.LLLLLL"
+status=0
+out=$(cd "$DIR" && TMPDIR="$DIR" bash "$REAPER" --apply 2>&1) || status=$?
+assert_equals 2 "$status" "the legacy reaper ran without --tmpdir"
+assert_contains "$out" "--tmpdir DIR is required" "the legacy reaper did not name the missing --tmpdir"
+assert_present "$DIR/fm-gh-rest.LLLLLL" "the legacy reaper removed an entry of TMPDIR without --tmpdir"
+pass "the legacy reaper refuses to run without an explicit --tmpdir, even with --apply"

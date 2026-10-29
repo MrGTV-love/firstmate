@@ -544,20 +544,26 @@ FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity shell root entry
   local pattern='fm-test-*'
-  local -a markers=() reaper_args=()
+  local seen=$'\n'
+  local -a markers=() candidates=() reaper_args=()
   [ "${FM_TEST_SWEEP_ALL:-0}" != 1 ] || pattern='fm-*'
   for shell in "$FM_TEST_OWNERS_DIR"/*; do
     [ -d "$shell" ] && [ ! -L "$shell" ] || continue
     # A shell's fixture roots go before its record, which is removed last.
     if [ -f "$shell/cleanup" ] && [ ! -L "$shell/cleanup" ]; then
       while IFS= read -r root; do
-        [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] && markers+=("$root/.fm-test-fixture")
+        [ -n "$root" ] && [ -f "$root/.fm-test-fixture" ] || continue
+        markers+=("$root/.fm-test-fixture")
+        seen+="$root/.fm-test-fixture"$'\n'
       done < "$shell/cleanup"
     fi
     [ -f "$shell/.fm-test-fixture" ] && markers+=("$shell/.fm-test-fixture")
   done
   for marker in "$FM_TEST_TMPDIR"/$pattern/.fm-test-fixture; do
-    [ -e "$marker" ] && markers+=("$marker")
+    [ -e "$marker" ] || continue
+    case "$seen" in *$'\n'"$marker"$'\n'*) continue ;; esac
+    markers+=("$marker")
+    candidates+=("${marker%/.fm-test-fixture}")
   done
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
     # Registries from before the per-shell records lived beside the fixture roots.
@@ -582,8 +588,8 @@ fm_test_reap_orphans() {
     reaper_args=(--tmpdir "$FM_TEST_TMPDIR")
   else
     reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
-    for marker in "${markers[@]}"; do
-      case "$marker" in "$FM_TEST_OWNERS_DIR"/*) ;; *) reaper_args+=(--candidate "${marker%/.fm-test-fixture}") ;; esac
+    for dir in ${candidates[@]+"${candidates[@]}"}; do
+      reaper_args+=(--candidate "$dir")
     done
   fi
   "$ROOT/bin/fm-test-reap-orphans.sh" "${reaper_args[@]}" >/dev/null 2>&1 || true

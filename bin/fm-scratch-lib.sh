@@ -55,17 +55,17 @@ fm_scratch_new() {  # <f|d> <prefix>
   local kind=$1 container path dir='' base=${TMPDIR:-/tmp}
   [ "$kind" != d ] || dir=1
   container=$(fm_scratch_container "$2")
-  if [ -e "$container" ] || [ -L "$container" ]; then
-    if ! fm_scratch_owned "$container"; then
-      (umask 077; mktemp ${dir:+"-d"} "${base%/}/$2.XXXXXX")
-      return
-    fi
-    fm_scratch_reap "$2"
-  fi
+  fm_scratch_reap "$2"
   # A concurrent release removes the container once it is empty, which can fall
   # between mkdir and mktemp; only a container that vanished is worth a retry.
   while :; do
-    (umask 077; mkdir -p -- "$container") 2>/dev/null || return 1
+    if ! (umask 077; mkdir -p -- "$container") 2>/dev/null && [ ! -e "$container" ] && [ ! -L "$container" ]; then
+      return 1
+    fi
+    if [ -L "$container" ] || { [ -e "$container" ] && ! fm_scratch_owned "$container"; }; then
+      (umask 077; mktemp ${dir:+"-d"} "${base%/}/$2.XXXXXX")
+      return
+    fi
     if path=$(umask 077; mktemp ${dir:+"-d"} "$container/$$.XXXXXX" 2>/dev/null); then
       printf '%s\n' "$path"
       return 0
