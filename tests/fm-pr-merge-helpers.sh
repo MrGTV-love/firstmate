@@ -389,6 +389,11 @@ case "${1:-} ${2:-}" in
     if [ -f "${FM_TEST_GH_RULES_FAIL_FROM:-}" ] && [ "$calls" -ge "$(cat "$FM_TEST_GH_RULES_FAIL_FROM")" ]; then
       exit 1
     fi
+    # Or drop every rule from a given call number on, so a queue verify saw is
+    # gone when the read is repeated before the merge.
+    if [ -f "${FM_TEST_GH_RULES_EMPTY_FROM:-}" ] && [ "$calls" -ge "$(cat "$FM_TEST_GH_RULES_EMPTY_FROM")" ]; then
+      exit 0
+    fi
     cat "$FM_TEST_GH_RULES"
     exit 0
     ;;
@@ -824,6 +829,7 @@ run_pr_merge() {
   FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
   FM_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \
   FM_TEST_GH_RULES_FAIL_FROM="$case_dir/github-rules-fail-from" \
+  FM_TEST_GH_RULES_EMPTY_FROM="$case_dir/github-rules-empty-from" \
   FM_TEST_GH_RULES_CALLS="$case_dir/github-rules-calls" \
   FM_TEST_GH_RULES_FAIL_BODY="$case_dir/github-rules-fail-body" \
   FM_TEST_GH_BRANCH="$case_dir/github-branch.json" \
