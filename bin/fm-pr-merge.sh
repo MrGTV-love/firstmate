@@ -1735,9 +1735,9 @@ FM_PR_GITHUB_MERGE_ACCEPTED=false
 FM_PR_GITHUB_CALLER_METHOD=
 
 # The single gate every statement about what the forge accepted, armed, or
-# reported has to pass. A merge command that failed accepted nothing, so no
-# such statement may be made on its path, and routing them all through one
-# predicate keeps a later one from being written without the gate.
+# reported has to pass. A merge command that failed proves nothing accepted,
+# so no such statement may be made on its path, and routing them all through
+# one predicate keeps a later one from being written without the gate.
 github_merge_command_succeeded() {
   [ "$FM_PR_GITHUB_MERGE_ACCEPTED" = true ]
 }
@@ -1825,7 +1825,7 @@ github_report_unmerged_outcome() {
       printf 'error: auto-merge was requested and armed for %s, but nothing is merged or in the merge queue yet, so this run refuses instead of reporting an unproved merge\n' \
         "$URL" >&2
     else
-      printf 'error: auto-merge was requested for %s, but the merge command itself failed, so nothing was enabled, merged or queued\n' \
+      printf 'error: auto-merge was requested for %s, but the merge command itself failed, so nothing is proven merged or queued\n' \
         "$URL" >&2
     fi
   fi

@@ -2061,6 +2061,12 @@ test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly() 
       "failed-auto-$scenario: the original forge error was masked"
     assert_grep 'pr merge 188 --repo example/repo --disable-auto' "$case_dir/gh.log" \
       "failed-auto-$scenario: a failed --auto merge command was not disarmed"
+    assert_no_grep 'nothing was enabled' "$case_dir/stderr" \
+      "failed-auto-$scenario: the refusal claimed nothing was enabled although the failed command may have armed auto-merge"
+    if [ "$scenario" != outcome-unreadable ]; then
+      assert_grep 'the merge command itself failed, so nothing is proven merged or queued' "$case_dir/stderr" \
+        "failed-auto-$scenario: the refusal did not say only what is proven"
+    fi
     if [ "$scenario" = unlanded-disarm-fails ]; then
       assert_grep 'AUTO-MERGE MAY STILL BE ARMED for https://github.com/example/repo/pull/188' \
         "$case_dir/stderr" "failed-auto-$scenario: the unconfirmed disarm was not reported loudly"
