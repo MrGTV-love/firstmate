@@ -571,6 +571,37 @@ def packed_refs_results(manifest, primary, worktree):
         deleted.returncode != 0 and f"unable to create file {packed}.new: Operation not permitted" in deleted.stderr
         and packed.read_text() == original
         and git("-C", primary, "rev-parse", "--verify", "-q", gone).stdout.strip() == manifest["forged_sha"])
+    # A commondir file in the shared Git directory makes the primary checkout
+    # read its refs from the folder it names, here one with a forged branch.
+    scratch = Path(os.environ["TMPDIR"])
+    forged_common = scratch / "forged-common"
+    (forged_common / "refs/heads/fm").mkdir(parents=True)
+    (forged_common / "objects").symlink_to(Path(primary) / ".git/objects")
+    (forged_common / "HEAD").write_text("ref: refs/heads/main\n")
+    (forged_common / "refs/heads/fm/packed").write_text(manifest["forged_sha"] + "\n")
+    commondir = packed.with_name("commondir")
+    results["refused-commondir"] = unchanged(lambda: commondir.write_text(str(forged_common) + "\n"), restore=False)
+    commondir.unlink(missing_ok=True)
+    # The shared config is writable, so it can select reftable storage; a
+    # reftable folder built elsewhere would then hold every ref Git reads.
+    forged_reftable = scratch / "forged-reftable.git"
+    assert git("init", "-q", "--bare", "--ref-format=reftable", str(forged_reftable)).returncode == 0
+    (forged_reftable / "objects/info/alternates").write_text(str(Path(primary) / ".git/objects") + "\n")
+    assert git("--git-dir", str(forged_reftable), "update-ref", "refs/heads/fm/packed", manifest["forged_sha"]).returncode == 0
+    config, reftable = packed.with_name("config"), packed.with_name("reftable")
+    saved = config.read_bytes()
+    switched = all(git("-C", primary, "config", key, value).returncode == 0
+                   for key, value in (("core.repositoryformatversion", "1"), ("extensions.refStorage", "reftable")))
+    try:
+        shutil.copytree(forged_reftable / "reftable", reftable)
+        planted = True
+    except PermissionError:
+        planted = False
+    switched_sha = resolved()
+    config.write_bytes(saved)
+    shutil.rmtree(reftable, ignore_errors=True)
+    results["refused-reftable-switch"] = (switched and not planted and switched_sha != manifest["forged_sha"]
+                                          and resolved() == manifest["packed_sha"])
     # A replace ref makes every Git command in the primary checkout show other
     # objects for a commit, so it changes what a branch holds.
     head = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()

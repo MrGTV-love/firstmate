@@ -216,6 +216,11 @@ def build(args):
     # fetch.prune=false for the confined launch so a plain fetch prunes nothing.
     for name in ("packed-refs", "packed-refs.new"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
+    # A commondir file makes the primary checkout read every ref from the Git
+    # directory it names, and a reftable folder holds every ref once the
+    # writable config selects reftable storage, so both stay refused.
+    lines.append(f"(deny file-write* (literal {quoted(Path(common) / 'commondir')}))")
+    lines.append(f"(deny file-write* (subpath {quoted(Path(common) / 'reftable')}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
     # sibling /tmp/fm-<id>+<token>, and ~/tmp entries whose name carries the id.
     tmp = canonical("/tmp")
