@@ -96,18 +96,6 @@ if [ "${BASH_VERSINFO[0]}" -gt 4 ] \
     fi
   }
 fi
-sleep() {
-  local completed
-  if [ "${FUNCNAME[1]:-}" = event_wait_or_sleep ] \
-    && [ "$BASH_SUBSHELL" -eq 0 ] \
-    && [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ]; then
-    _FM_TEST_POLL_COUNT=$((${_FM_TEST_POLL_COUNT:-0} + 1))
-    completed="$FM_STATE_OVERRIDE/.test-poll-completed-$WATCHER_PID"
-    printf '%s\n' "$_FM_TEST_POLL_COUNT" > "$completed.tmp" \
-      && mv -f "$completed.tmp" "$completed" || exit 1
-  fi
-  command sleep "$@"
-}
 SH
 }
 

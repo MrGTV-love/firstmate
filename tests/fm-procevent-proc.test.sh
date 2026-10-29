@@ -59,9 +59,16 @@ in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >
 sleep 3
 [ -s "$HOME_A/state/procevent/proc-guard.runner" ] || fail "arm left no listener"
 kill -0 "$(cat "$HOME_A/state/procevent/proc-guard.runner")" 2>/dev/null || fail "idle lease expired the standing listener"
-in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1 >/dev/null \
+CHANGED_SAMPLES="$HOME_A/state/.test-sampler-cycles-changed"
+PYTHONPATH="$SAMPLER_PROBE${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$CHANGED_SAMPLES" \
+  in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1 >/dev/null \
   || fail "rearming with a changed limit failed"
-fm_test_wait_until --progress-file "$HOME_A/state/procevent-inbox/proc-guard.1.result" -- test -e "$HOME_A/state/procevent-inbox/proc-guard.1.result" \
+runner_replaced() { local current; current=$(cat "$1" 2>/dev/null) && [ -n "$current" ] && [ "$current" != "$2" ]; }
+fm_test_wait_until --progress-file "$HOME_A/state/procevent/proc-guard.runner" -- \
+  runner_replaced "$HOME_A/state/procevent/proc-guard.runner" "$prior_runner" \
+  || fail "the changed limit never published its listener"
+fm_test_wait_until --while-alive "$(cat "$HOME_A/state/procevent/proc-guard.runner")" --cycles 20 "$CHANGED_SAMPLES" \
+  --progress-file "$HOME_A/state/procevent-inbox/proc-guard.1.result" -- test -e "$HOME_A/state/procevent-inbox/proc-guard.1.result" \
   || fail "the changed limit never reached the sampler"
 changed_result="$HOME_A/state/procevent-inbox/proc-guard.1.result"
 grep -qx 'limit: 1' "$changed_result" || fail "the replacement sampler retained the old limit"
@@ -71,7 +78,6 @@ A_SAMPLES="$HOME_A/state/.test-sampler-cycles"
 PYTHONPATH="$SAMPLER_PROBE${PYTHONPATH:+:$PYTHONPATH}" FM_TEST_SAMPLER_CYCLES="$A_SAMPLES" \
   in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
   || fail "restoring the quiet sampler failed"
-runner_replaced() { local current; current=$(cat "$1" 2>/dev/null) && [ -n "$current" ] && [ "$current" != "$2" ]; }
 fm_test_wait_until --progress-file "$HOME_A/state/procevent/proc-guard.runner" -- \
   runner_replaced "$HOME_A/state/procevent/proc-guard.runner" "$changed_runner" \
   || fail "the quiet replacement never published its listener"
