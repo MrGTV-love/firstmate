@@ -1,0 +1,511 @@
+#### S1 (M1): a steer sent after the overdue episode began still counts when the unchanged row is re-presented
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-stalled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793279997	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 86933.1793279997.j80VE8
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s1-steer/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-stalled steered --evidence 001.msg
+  exit=0
+  | action: "row-stalled"
+  | kind: steered
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=0
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-stalled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793279999	2	check	report	check: again ten minutes later
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 91903.1793279999.Lhozhw
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-stalled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+$ bin/fm-open-loops.sh action row-stalled steered --evidence 001.msg
+  exit=1
+  | error: "steered evidence must be a new delivery sent after this row's presentation"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-stalled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+==> FAIL: S1 same 001.msg accepted again on re-presentation, no new message needed 
+
+#### S1b (M1 adversarial): a delivery from before the episode, or older than four hours, is refused
+$ bin/fm-open-loops.sh action row-stalled steered --evidence 000.msg
+  exit=1
+  | error: "steered evidence must be a new delivery sent after this row's presentation"
+$ bin/fm-open-loops.sh action row-stalled steered --evidence 001.msg
+  exit=1
+  | error: "steered evidence must be a new delivery sent after this row's presentation"
+==> FAIL: S1b pre-episode and >4h deliveries refused 
+
+#### S1c (M1): a firstmate-owned steer message shows the time left from the delivery, not a fixed 14400
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-fm","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280001	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 95320.1793280001.0roT4Z
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s1c-remaining/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-fm steered --evidence 001.msg
+  exit=1
+  | error: "steered evidence must be a new delivery sent after this row's presentation"
+==> FAIL: S1c message says 13200 seconds remain (delivery was 1200 s ago) 
+
+#### S4 (M4): a remote secondmate delivered pending-reply id is accepted as steered evidence
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-remote","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280002	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 97759.1793280002.Jdy1Gl
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s4-remote/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-remote steered --evidence 0123456789abcdef
+  exit=1
+  | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+$ bin/fm-open-loops.sh action row-remote steered --evidence fedcba9876543210
+  exit=1
+  | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+$ bin/fm-open-loops.sh action row-remote steered --evidence aabbccddeeff0011
+  exit=1
+  | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-remote","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+==> FAIL: S4 delivered id accepted and acknowledges; undelivered and foreign ids refused 
+
+#### S3 (M3): printed captain_visible and the deferral refusal agree
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-vis","worker:worker","https://github.com/t/p/pull/9","diagnose: code or test",7200,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280003	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 509.1793280003.B7JhMm
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s3-visibility/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-vis deferred --evidence lint running --recheck 2026-10-29T13:29:57Z
+  exit=0
+  | action: "row-vis"
+  | kind: deferred
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=0
+$ bin/fm-open-loops.sh action row-vis deferred --evidence lint still running --recheck 2026-10-29T13:34:57Z
+  exit=1
+  | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-vis","worker:worker","https://github.com/t/p/pull/9","diagnose: code or test",7900,"waiting for lint.full.whole; declaration age 7200s",true
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280005	2	check	report	check: lapsed
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 4978.1793280005.STEgh6
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-vis deferred --evidence still running --recheck 2026-10-29T13:41:37Z
+  exit=1
+  | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+==> FAIL: S3 standing deferral refuses repeat without marking; after lapse printed=true, refusal, stored=true (printed captain_visible=true)
+
+#### S3b (M3 adversarial): a deferral on review_pass_not_merged never stands, and printed/stored/refusal agree
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-rp","firstmate","https://github.com/t/p/pull/10","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7200,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280006	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 8832.1793280006.u1Kruw
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s3b-review-pass/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-rp deferred --evidence awaiting slot --recheck 2026-10-29T13:29:57Z
+  exit=0
+  | action: "row-rp"
+  | kind: deferred
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=0
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-rp","firstmate","https://github.com/t/p/pull/10","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7260,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280008	2	check	report	check: again
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 12761.1793280008.cds5Qu
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action row-rp deferred --evidence awaiting slot --recheck 2026-10-29T13:34:57Z
+  exit=1
+  | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+==> FAIL: S3b printed captain_visible=true and second deferral refused as captain-visible (no false "already stands") (printed=false)
+
+#### S2 (M2): a red PR row parked until another task merges is recorded as waiting on that named live task
+published row: category=red_check owner=worker:parked-job id=4969e21a2cd39f57c69f06e8
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4969e21a2cd39f57c69f06e8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280009	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 15824.1793280009.xQFoLa
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2-live/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action 4969e21a2cd39f57c69f06e8 waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4969e21a2cd39f57c69f06e8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4969e21a2cd39f57c69f06e8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280011	2	check	report	check: next drain
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 15824.1793280009.xQFoLa
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4969e21a2cd39f57c69f06e8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4969e21a2cd39f57c69f06e8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+==> FAIL: S2 wait recorded on live task; it stands across a later drain and --check-actions is satisfied 
+
+#### S2b (M2): the row resurfaces when the prerequisite merges
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280013	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 23815.1793280013.Fx7UB9
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2b-merged/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action ae0c04d43d7275134ecf25e5 waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280015	2	check	report	check: after merge
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 23815.1793280013.Fx7UB9
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "ae0c04d43d7275134ecf25e5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+==> FAIL: S2b wait stands before merge, then --check-actions exits 1 and ack is refused after merge 
+
+#### S2c (M2): the row resurfaces when the prerequisite fails
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "071f6064ba2edf2fec2c3a34","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280017	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 34604.1793280017.YRhaLp
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2c-failed/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action 071f6064ba2edf2fec2c3a34 waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "071f6064ba2edf2fec2c3a34","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "071f6064ba2edf2fec2c3a34","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+==> PASS: S2c --check-actions exits 1 after prerequisite fails 
+
+#### S2d (M2): the row resurfaces when the prerequisite stalls
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d5bef0421b648996abc75346","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280020	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 45285.1793280020.7dd3kg
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2d-stalled/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action d5bef0421b648996abc75346 waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d5bef0421b648996abc75346","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "d5bef0421b648996abc75346","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+==> PASS: S2d --check-actions exits 1 after prerequisite gets an overdue stalled_worker row 
+
+#### S2e (M2 adversarial): a wait on a task that is not live is refused
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "5de073c8a315cec1f031b34f","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280023	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54379.1793280023.YjmnbM
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2e-refuse/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action 5de073c8a315cec1f031b34f waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 5de073c8a315cec1f031b34f waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task no-such-task --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 5de073c8a315cec1f031b34f waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task parked-job --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 5de073c8a315cec1f031b34f waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T14:19:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+==> FAIL: S2e dead session, unknown task, own task, and done-with-no-PR task are all refused 
+
+#### S2f (M2 adversarial): the wait never stands past its recheck
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "c30abbceea5347bda7eee6a0","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280026	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 61963.1793280026.0UHoO2
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s2f-recheck/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-open-loops.sh action c30abbceea5347bda7eee6a0 waiting --evidence PR 283 is red because main is red; worker parked until fm-test-serial-shard-rebalance merges --prerequisite-task fm-test-serial-shard-rebalance --recheck 2026-10-29T13:29:57Z
+  exit=1
+  | error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "c30abbceea5347bda7eee6a0","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134397,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "c30abbceea5347bda7eee6a0","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",134997,"Behavior portable serial 17",false
+==> PASS: S2f --check-actions exits 1 once the recheck is due 
+
+#### S5 (M5): a green PR row with no review requested points at AGENTS.md section 7, never asks for approval
+published row: category=open_pr owner=firstmate next_action="route the green PR's review and obtain merge approval"
+$ bin/fm-open-loops.sh
+  exit=0
+  | bin: /Users/charlesabrooker/tmp/fm-lab.cX7PmF/code/bin/fm-open-loops.sh
+  | description: Reconcile assigned work against live delivery evidence
+  | complete: true
+  | generated_epoch: 1793279997
+  | rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  |   "open_pr","https://github.com/test/project/pull/283","firstmate","route the green PR's review and obtain merge approval",7200,true,""
+  |   "silent_report","fm-test-serial-shard-rebalance","firstmate","check in: progress, blockers, cross-workstream dependencies",0,false,"last heard: status=1793279997; inbox acknowledgement=None; resolved reply=None"
+  |   "silent_report","parked-job","firstmate","check in: progress, blockers, cross-workstream dependencies",0,false,"last heard: status=1793279997; inbox acknowledgement=None; resolved reply=None"
+  | help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+==> FAIL: S5 open_pr next_action names AGENTS.md section 7 and no row says approval 
+
+#### S6 (M6): a row nobody handled still goes overdue and is re-presented on every drain
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280029	1	check	report	check: board report
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 69749.1793280029.uoKKef
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-lab.cX7PmF/s6-unhandled/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+$ bin/fm-wake-drain.sh
+  exit=0
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+  | help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  | 1793280030	2	check	report	check: later
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 69749.1793280029.uoKKef
+  | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  | WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ bin/fm-wake-drain.sh --ack-through ... (acknowledge the drain)
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+==> PASS: S6 overdue row printed on both drains; ack refused and --check-actions exits 1 while unanswered 
+
+SUMMARY
+  FAIL  S1 same 001.msg accepted again on re-presentation, no new message needed
+  FAIL  S1b pre-episode and >4h deliveries refused
+  FAIL  S1c message says 13200 seconds remain (delivery was 1200 s ago)
+  FAIL  S4 delivered id accepted and acknowledges; undelivered and foreign ids refused
+  FAIL  S3 standing deferral refuses repeat without marking; after lapse printed=true, refusal, stored=true
+  FAIL  S3b printed captain_visible=true and second deferral refused as captain-visible (no false "already stands")
+  FAIL  S2 wait recorded on live task; it stands across a later drain and --check-actions is satisfied
+  FAIL  S2b wait stands before merge, then --check-actions exits 1 and ack is refused after merge
+  PASS  S2c --check-actions exits 1 after prerequisite fails
+  PASS  S2d --check-actions exits 1 after prerequisite gets an overdue stalled_worker row
+  FAIL  S2e dead session, unknown task, own task, and done-with-no-PR task are all refused
+  PASS  S2f --check-actions exits 1 once the recheck is due
+  FAIL  S5 open_pr next_action names AGENTS.md section 7 and no row says approval
+  PASS  S6 overdue row printed on both drains; ack refused and --check-actions exits 1 while unanswered

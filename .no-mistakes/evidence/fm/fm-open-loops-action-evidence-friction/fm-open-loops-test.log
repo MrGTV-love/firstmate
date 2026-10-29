@@ -23,4 +23,49 @@ PASS: standing pauses survive unrelated answers; resumption and authoritative cu
 PASS: generation-invalidated snapshots retain coverage failures despite live stop events
 PASS: only dispatched ready work is overdue
 PASS: ordinary recovery adapters and source degradation
-Terminated: 15
+PASS: publication suppression reset success/failure/skip
+PASS: held-gate singleflight and child cleanup
+PASS: unset and empty address overrides share shell defaults before collection
+PASS: no-progress source failure owns resistant descendant cleanup
+PASS: live process-group EPERM still refuses and leaves the process running
+PASS: an all-zombie or vanished process group swallows the Darwin EPERM race
+PASS: no-progress expiry reports the configured interval and keeps captured output
+PASS: unchanged forge reads are 304s and a run below the quota floor publishes stale rows with the reset time
+PASS: owned-work categories, owners, ages, degraded row, and atomic publication
+PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run
+PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop
+PASS: live and aged captain holds share unresolved-question coverage with status decisions
+PASS: unreadable tmux degrades coverage without fabricating missing worker
+PASS: current-state timeout retains independent observation failure
+PASS: real snapshot unreadable metadata/status inventory stays degraded
+PASS: real snapshot nested no-progress cut reaps its group and removes temporary inventory
+PASS: PR provenance steers use own inbox or handled records, reject foreign and old evidence, and permit acknowledgement
+PASS: a steer on a row with a non-object source falls back to its owner inbox
+PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates, repeat, fresh steers, standing captain receipts, and empty turns
+PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers
+PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup
+PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger; a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not
+PASS: batch validates per row, preserves valid actions and uses one real snapshot
+PASS: drain and refused acknowledgement preserve unchanged recorded work
+PASS: stdin batch recovery and partial acknowledgements preserve completed actions
+PASS: every obligation identity change requires new evidence
+PASS: firstmate escalation and steer stand for four hours, then require action
+PASS: an unclosed turn cannot hide a free-text escalation beyond four hours
+PASS: elapsed-time counters never void a deferral, steer or escalation; real evidence changes do
+PASS: a pane timer in any unit changes no obligation; a different task still does
+PASS: an unreadable config file never blocks the receipt gate
+PASS: second deferral requires new follow-up even after a standing escalation
+PASS: reviewed PRs keep their next-turn action requirement
+PASS: a refused batch line leaks no state into its siblings
+PASS: a hold ending or becoming unreadable restores the same-turn action requirement
+PASS: a home without a ledger acknowledges without the receipt command
+PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
+PASS: a steer delivered after the overdue episode began counts on every re-presentation of the unchanged row
+PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused
+PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say
+PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused
+PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check
+PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live is refused
+PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; one older than the episode is refused; a row no longer overdue closes its episode
+PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows are refused that form and still wait through a delivery naming them
+ok - open-work reconciliation reports owned obligations from live records
