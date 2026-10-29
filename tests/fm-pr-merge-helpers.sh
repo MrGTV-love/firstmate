@@ -244,6 +244,14 @@ case "${1:-} ${2:-}" in
     esac
     ;;
   "pr merge")
+    # Disarming auto-merge is its own call: it changes no merge state here,
+    # and the auto-merge read below answers what a case says is still armed.
+    case " $* " in
+      *" --disable-auto "*)
+        [ ! -e "$FM_TEST_GH_DISABLE_AUTO_FAIL" ] || exit 1
+        exit 0
+        ;;
+    esac
     if [ -n "${FM_TEST_META_AT_MERGE:-}" ] && [ -f "${FM_STATE_OVERRIDE:-}/task-x1.meta" ]; then
       cat "$FM_STATE_OVERRIDE/task-x1.meta" > "$FM_TEST_META_AT_MERGE"
     fi
@@ -291,6 +299,14 @@ case "${1:-} ${2:-}" in
             nodes:(.statusCheckRollup | to_entries | map(.value + {id:("fixture-" + (.key | tostring))}))
           }} end)}}}}' "$FM_TEST_GH_VIEW_CURRENT"
         exit $?
+        ;;
+      *autoMergeRequest*)
+        if [ -f "$FM_TEST_GH_AUTO_MERGE_STATE" ]; then
+          cat "$FM_TEST_GH_AUTO_MERGE_STATE"
+        else
+          echo disarmed
+        fi
+        exit 0
         ;;
     esac
     if [ -f "${FM_TEST_GH_GRAPHQL_FAIL:-}" ]; then
@@ -794,6 +810,8 @@ run_pr_merge() {
   FM_TEST_GH_COMPARE_CALLS="$case_dir/compare-calls" \
   FM_TEST_GH_RUNS_CALLS="$case_dir/github-runs-calls" \
   FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
+  FM_TEST_GH_DISABLE_AUTO_FAIL="$case_dir/github-disable-auto-fails" \
+  FM_TEST_GH_AUTO_MERGE_STATE="$case_dir/github-auto-merge-state" \
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
   FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
   FM_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \

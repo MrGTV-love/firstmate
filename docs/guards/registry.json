@@ -412,14 +412,15 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 3},
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 4},
         {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge"},
-        {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"}
+        {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"},
+        {"file": "bin/fm-pr-merge.sh", "match": "where GitHub merges at once"}
       ],
-      "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while that head lacks the base branch's live tip, so the landed tree is one no check ran on",
+      "invariant": "a PR is never merged while a required check is red or has not reported at that head, or while that head lacks the base branch's live tip, so the landed tree is one no check ran on; nor does an off-queue --auto request leave auto-merge armed to land later on a moved tip",
       "layer": "runtime-block",
       "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
-      "trigger": "any unwaived required check at the current head is not green, or the head does not contain the base branch's live tip, read before verifying and again immediately before the merge; an attended --auto merge into a base with exactly one recognised merge_queue rule, proven live at both reads, skips only the tip containment, because the queue runs the required checks on its own combined tree before landing",
+      "trigger": "any unwaived required check at the current head is not green, or the head does not contain the base branch's live tip, read before verifying and again immediately before the merge; an attended --auto merge into a base with exactly one recognised merge_queue rule, proven live at both reads, skips only the tip containment, because the queue runs the required checks on its own combined tree before landing; off a proven queue, --auto also refuses unless the live mergeStateStatus at that last read is CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once instead of arming auto-merge, and an armed request that reads back neither merged nor queued is disarmed and confirmed by a fresh read, or reported loudly as possibly still armed",
       "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a head that lacks the base tip clears only by updating the branch so CI runs on the combined tree, and no waiver applies",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",

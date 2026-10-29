@@ -1933,6 +1933,129 @@ test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
   pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, or an unreadable queue"
 }
 
+# Off a proven merge queue, --auto merges at once only in a state where gh
+# merges at once; in any other state GitHub would arm auto-merge, which lands
+# later on whatever the base tip is then.
+test_off_queue_auto_merges_only_where_github_merges_at_once() {
+  local case_dir rc head state
+  head=1818181818181818181818181818181818181818
+  case_dir=$(make_case github-off-queue-auto-clean)
+  add_gh_mocks "$case_dir" "$head"
+
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "off-queue-auto-clean: --auto on a CLEAN pull request must merge"$'\n'"$(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --auto --squash
+  assert_no_grep '--disable-auto' "$case_dir/gh.log" \
+    "off-queue-auto-clean: a merged pull request was disarmed"
+
+  for state in BLOCKED unreadable; do
+    case_dir=$(make_case "github-off-queue-auto-$state")
+    add_gh_mocks "$case_dir" "$head"
+    if [ "$state" = unreadable ]; then
+      "$JQ_BIN" -c '.mergeStateStatus = null' "$case_dir/github-view.json" > "$case_dir/view.tmp"
+    else
+      "$JQ_BIN" -c --arg s "$state" '.mergeStateStatus = $s' "$case_dir/github-view.json" > "$case_dir/view.tmp"
+    fi
+    mv "$case_dir/view.tmp" "$case_dir/github-view.json"
+
+    set +e
+    FM_GUARD_EVENT_LOG="$case_dir/guard-events.jsonl" \
+      run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+        --attended-override -- --auto --squash \
+        > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+
+    expect_code 1 "$rc" "off-queue-auto-$state: --auto that GitHub would arm must refuse"
+    assert_grep "needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is $state, so GitHub would arm auto-merge instead" \
+      "$case_dir/stderr" \
+      "off-queue-auto-$state: the refusal did not name the state and the armed auto-merge"
+    assert_no_grep 'pr merge' "$case_dir/gh.log" \
+      "off-queue-auto-$state: gh pr merge ran although GitHub would arm auto-merge"
+    assert_equals 1 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head deny)" \
+      "off-queue-auto-$state: the refusal did not record one merge-green-head deny"
+    assert_equals 0 "$(count_guard_events "$case_dir/guard-events.jsonl" merge-green-head allow)" \
+      "off-queue-auto-$state: an allow was recorded for a refused merge"
+  done
+  pass "fm-pr-merge lets off-queue --auto run only where GitHub merges at once"
+}
+
+# The backstop: an off-queue --auto request that reads back armed with nothing
+# merged or queued is disarmed, and a disarm a fresh read cannot confirm is
+# reported loudly.
+test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly() {
+  local case_dir rc head
+  head=1919191919191919191919191919191919191919
+  case_dir=$(make_case github-off-queue-auto-armed)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_outcome "$case_dir" OPEN false false main
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "off-queue-auto-armed: an armed auto-merge that landed nothing must refuse"
+  assert_grep 'auto-merge was requested and armed for https://github.com/example/repo/pull/188' \
+    "$case_dir/stderr" "off-queue-auto-armed: the refusal did not name the armed auto-merge"
+  assert_grep 'pr merge 188 --repo example/repo --disable-auto' "$case_dir/gh.log" \
+    "off-queue-auto-armed: the armed auto-merge was not disarmed"
+  assert_grep 'no auto-merge is armed for https://github.com/example/repo/pull/188' \
+    "$case_dir/stderr" "off-queue-auto-armed: the confirmed disarm was not reported"
+
+  case_dir=$(make_case github-off-queue-auto-disarm-fails)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_outcome "$case_dir" OPEN false false main
+  : > "$case_dir/github-disable-auto-fails"
+  printf 'armed\n' > "$case_dir/github-auto-merge-state"
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "off-queue-auto-disarm-fails: an unconfirmed disarm must still refuse"
+  assert_grep 'AUTO-MERGE MAY STILL BE ARMED for https://github.com/example/repo/pull/188: disarming it could not be confirmed (the fresh read shows armed)' \
+    "$case_dir/stderr" "off-queue-auto-disarm-fails: the unconfirmed disarm was not reported loudly"
+  assert_grep 'disarm it now with: gh pr merge 188 --repo example/repo --disable-auto' \
+    "$case_dir/stderr" "off-queue-auto-disarm-fails: the refusal did not name the manual disarm"
+  pass "fm-pr-merge disarms an off-queue auto-merge left armed, or reports it loudly"
+}
+
+# A proven queue keeps its path: its --auto request is neither held to the
+# merge-at-once states nor disarmed, because the queue checks the combined tree.
+test_queue_auto_is_neither_held_to_merge_at_once_states_nor_disarmed() {
+  local case_dir rc head
+  head=2020202020202020202020202020202020202020
+  case_dir=$(make_case github-queue-auto-blocked)
+  add_gh_mocks "$case_dir" "$head"
+  "$JQ_BIN" -c '.mergeStateStatus = "BLOCKED"' "$case_dir/github-view.json" > "$case_dir/view.tmp"
+  mv "$case_dir/view.tmp" "$case_dir/github-view.json"
+  printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+  write_github_outcome "$case_dir" OPEN false false main
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    --attended-override -- --auto --squash \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "queue-auto-blocked: a request not yet in the queue still refuses"
+  assert_logged_gh_merge "$case_dir" 188 example/repo --auto --squash
+  assert_no_grep 'where GitHub merges at once' "$case_dir/stderr" \
+    "queue-auto-blocked: the queue path was held to the merge-at-once states"
+  assert_no_grep '--disable-auto' "$case_dir/gh.log" \
+    "queue-auto-blocked: the queue path's auto-merge was disarmed"
+  pass "fm-pr-merge keeps the queue path's --auto unchanged"
+}
+
 test_an_unreadable_base_comparison_refuses() {
   local case_dir rc head
   head=1313131313131313131313131313131313131313
@@ -2015,6 +2138,9 @@ test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses
 test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried
 test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses
+test_off_queue_auto_merges_only_where_github_merges_at_once
+test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly
+test_queue_auto_is_neither_held_to_merge_at_once_states_nor_disarmed
 test_an_unreadable_base_comparison_refuses
 )
 pr_merge_run "$@"

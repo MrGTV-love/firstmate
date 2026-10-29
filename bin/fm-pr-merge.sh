@@ -43,7 +43,12 @@
 # this script cannot close. Only a merge that enters the base's merge queue,
 # proven live at both reads, skips that containment rule and never the check
 # reads, because the queue checks the combined tree itself;
-# github_merge_enters_queue below owns that proof.
+# github_merge_enters_queue below owns that proof. Off a proven queue, an
+# attended --auto merge also needs a live mergeStateStatus at that last read
+# where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
+# other state GitHub arms auto-merge, which can land later on a tip no check
+# ran with; and when such a request still reads back neither merged nor queued,
+# github_disarm_auto_merge below disarms it and confirms that with a fresh read.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -1834,6 +1839,29 @@ github_report_unmerged_outcome() {
   github_report_queue_rules
 }
 
+# Disarm any auto-merge an off-queue --auto request may have left armed with
+# nothing proven merged or queued, then confirm with a fresh read that none is
+# armed, because an armed auto-merge can land later on a base tip no check ran
+# with. The fresh read is the proof, not the disarm command's own exit status,
+# and a disarm it cannot confirm is reported loudly.
+github_disarm_auto_merge() {
+  local armed=''
+  gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" --disable-auto >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
+  if armed=$(gh api graphql \
+      -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){autoMergeRequest{enabledAt}}}}' \
+      -F "owner=$PR_OWNER" -F "repo=$PR_REPO" -F "number=$PR_NUMBER" \
+      --jq '.data.repository.pullRequest | if . == null then "unknown" elif .autoMergeRequest == null then "disarmed" else "armed" end' \
+      2>/dev/null) \
+    && [ "$armed" = disarmed ]; then
+    printf 'error: no auto-merge is armed for %s: gh pr merge --disable-auto ran and a fresh read shows none armed, so nothing can land later on a base tip no check ran with\n' \
+      "$URL" >&2
+  else
+    printf 'error: AUTO-MERGE MAY STILL BE ARMED for %s: disarming it could not be confirmed (the fresh read shows %s), so the pull request may still merge later onto a base tip no check ran with; disarm it now with: gh pr merge %s --repo %s/%s --disable-auto\n' \
+      "$URL" "${armed:-nothing readable}" "$PR_NUMBER" "$PR_OWNER" "$PR_REPO" >&2
+  fi
+}
+
 gitlab_confirm_merged() {
   local json state
   if ! json=$(GITLAB_HOST="$FM_PR_HOST" glab mr view "$PR_NUMBER" \
@@ -1951,7 +1979,9 @@ case "$PROVIDER" in
     # base's merge queue, read live again here, the base tip is read once more
     # and a tip that moved since the verify read refuses. A tip that lands in
     # the seconds between this read and GitHub applying the merge is not closed.
-    if ! github_merge_enters_queue "$FM_PR_GITHUB_BASE"; then
+    merge_enters_queue=false
+    github_merge_enters_queue "$FM_PR_GITHUB_BASE" && merge_enters_queue=true
+    if [ "$merge_enters_queue" = false ]; then
       if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
         "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
         printf 'error: refusing to merge %s: the tip of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
@@ -1963,6 +1993,22 @@ case "$PROVIDER" in
         printf 'error: refusing to merge %s: base branch %s is at %s, not the tip %s that head %s was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
           "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
         exit 1
+      fi
+      # Off a merge queue, --auto lands now only in a state where gh merges at
+      # once; in any other state GitHub arms auto-merge, which can land later
+      # on a base tip no check ran with.
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ]; then
+        merge_state=$(gh pr view "$URL" --json mergeStateStatus 2>/dev/null \
+          | jq -er '.mergeStateStatus | select(type == "string" and . != "")' 2>/dev/null) || merge_state=
+        case "$merge_state" in
+          CLEAN|HAS_HOOKS|UNSTABLE) ;;
+          *)
+            "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok "$([ -n "$merge_state" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+            printf 'error: refusing to merge %s: --auto on base branch %s, which has no proven merge queue, needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is %s, so GitHub would arm auto-merge instead, and that can land later on a base tip no check ran with; clear what holds the pull request, then re-run this merge: %s %s %s\n' \
+              "$URL" "$FM_PR_GITHUB_BASE" "${merge_state:-unreadable}" "$0" "$ID" "$URL" >&2
+            exit 1
+            ;;
+        esac
       fi
     fi
     "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
@@ -1992,6 +2038,9 @@ case "$PROVIDER" in
     fi
     if ! github_read_outcome; then
       github_report_forge_output "$merge_output"
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
+      fi
       exit 1
     fi
     if [ "$FM_PR_GITHUB_MERGED" = true ]; then
@@ -2004,6 +2053,9 @@ case "$PROVIDER" in
     else
       github_report_forge_output "$merge_output"
       github_report_unmerged_outcome
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
+      fi
       exit 1
     fi
     ;;
