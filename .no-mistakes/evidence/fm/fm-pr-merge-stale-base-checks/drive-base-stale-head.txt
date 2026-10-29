@@ -1,0 +1,17 @@
+=== [BASE-e27bbad9b] scenario: stale-head
+forge: T0=88ebe7ad36fe697563de201c562478a2d6eea2e0  main(T1, after #287)=9d17657641ca3b70b8613a684770bd3e87f3a2ea  #188 head=9d5a35c6d5f9410184daacceb0cfae0c0f688eda (built on T0)
+whole-tree check: T1=SUCCESS (2/2 shard files)
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/188 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 9d5a35c6d5f9410184daacceb0cfae0c0f688eda
+review: PASS
+--- exit: 0
+--- gh calls: compare=0 pr-merge=1
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- forge main after: 130df3c4708fa0f84f5b3f647d893a5333250639  whole-tree check on main: FAILURE (3/2 shard files)

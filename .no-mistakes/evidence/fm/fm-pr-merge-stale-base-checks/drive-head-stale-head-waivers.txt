@@ -1,0 +1,45 @@
+=== [HEAD-45d492750] scenario: stale-head-waivers
+forge: T0=0638f43303b93c4490b86204d991ffe663f6cc9c  main(T1, after #287)=351d557bf99a5481ecec07773ae65e648ed823ef  #188 head=d3da01c8e68b6a9ecb578fc18b37b94777e20e86 (built on T0)
+whole-tree check: T1=SUCCESS (2/2 shard files)
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 --allow-red ci
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head d3da01c8e68b6a9ecb578fc18b37b94777e20e86 lacks the current tip 351d557bf99a5481ecec07773ae65e648ed823ef of base branch main (1 commits behind): it was built on main at 0638f43303b93c4490b86204d991ffe663f6cc9c, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 351d557bf99a5481ecec07773ae65e648ed823ef (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64X4A5HY6PXPK4BKNFWZ71Y/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+--- exit: 1
+--- gh calls: compare=1 pr-merge=0
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- forge main after: 351d557bf99a5481ecec07773ae65e648ed823ef  whole-tree check on main: SUCCESS (2/2 shard files)
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 --allow-missing ci
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head d3da01c8e68b6a9ecb578fc18b37b94777e20e86 lacks the current tip 351d557bf99a5481ecec07773ae65e648ed823ef of base branch main (1 commits behind): it was built on main at 0638f43303b93c4490b86204d991ffe663f6cc9c, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 351d557bf99a5481ecec07773ae65e648ed823ef (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64X4A5HY6PXPK4BKNFWZ71Y/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+--- exit: 1
+--- gh calls: compare=1 pr-merge=0
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- forge main after: 351d557bf99a5481ecec07773ae65e648ed823ef  whole-tree check on main: SUCCESS (2/2 shard files)
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 --attended-override -- --admin --squash
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+error: refusing to merge https://github.com/example/repo/pull/188
+  - head d3da01c8e68b6a9ecb578fc18b37b94777e20e86 lacks the current tip 351d557bf99a5481ecec07773ae65e648ed823ef of base branch main (1 commits behind): it was built on main at 0638f43303b93c4490b86204d991ffe663f6cc9c, so no check ran on the tree this merge would land
+Update the branch so its head contains main at 351d557bf99a5481ecec07773ae65e648ed823ef (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64X4A5HY6PXPK4BKNFWZ71Y/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+--- exit: 1
+--- gh calls: compare=1 pr-merge=0
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"deny","source_ok":true}
+--- forge main after: 351d557bf99a5481ecec07773ae65e648ed823ef  whole-tree check on main: SUCCESS (2/2 shard files)

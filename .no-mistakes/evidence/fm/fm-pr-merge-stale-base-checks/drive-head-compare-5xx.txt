@@ -1,0 +1,15 @@
+=== [HEAD-45d492750] scenario: compare-5xx
+forge: T0=d1601b1192fd56a3a2b3c17f24c5d4648559104c  main(T1, after #287)=b1249ce9c3d84e2423e89cd62cba87ca28190135  #188 head=1711309415079ee6640c36350593fca152ee806d (built on T0)
+whole-tree check: T1=SUCCESS (2/2 shard files)
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 
+--- stdout
+armed: state/task-x1.check.sh
+--- stderr
+error: refusing to merge https://github.com/example/repo/pull/188
+  - whether head 1711309415079ee6640c36350593fca152ee806d contains the current tip of base branch main could not be read
+--- exit: 1
+--- gh calls: compare=5 pr-merge=0
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+--- forge main after: b1249ce9c3d84e2423e89cd62cba87ca28190135  whole-tree check on main: SUCCESS (2/2 shard files)

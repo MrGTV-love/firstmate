@@ -1,0 +1,18 @@
+=== [HEAD-45d492750] scenario: fresh-head
+forge: T0=52854dbe86da9895fda28cc62ffe1a4def986c8a  main(T1, after #287)=e9696c1f945f06d6bcd62c23a52272fdae4e9ed5  #188 head=f962f5d7e746da30b7a87690fe62f13f8f364a87 (built on T0)
+whole-tree check: T1=SUCCESS (2/2 shard files)
+#188 rebased head=685ab8d9188d3f684f3dd839e9c7fb2cb7cf7a80
+head check 'ci' on the PR head's own tree: SUCCESS (2/2 shard files)
+$ fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 
+--- stdout
+armed: state/task-x1.check.sh
+verified: https://github.com/example/repo/pull/188 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- stderr
+verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 685ab8d9188d3f684f3dd839e9c7fb2cb7cf7a80, which contains the current main tip e9696c1f945f06d6bcd62c23a52272fdae4e9ed5
+review: PASS
+--- exit: 0
+--- gh calls: compare=2 pr-merge=1
+--- guard events
+{"guard":"merge-held-task","decision":"allow","source_ok":true}
+{"guard":"merge-green-head","decision":"allow","source_ok":true}
+--- forge main after: 0bc7bef09fa8245c97f2c99c86adda107bbced32  whole-tree check on main: SUCCESS (2/2 shard files)
