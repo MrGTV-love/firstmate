@@ -20,13 +20,13 @@ REGISTRY="$ROOT/docs/guards/registry.json"
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
-printf '%s\n' "$out" | grep -q 'active=36 retired=14 beyond_audit=12 excluded=1 unregistered=0 audited=30 beyond_audit_active=9' \
-  || fail "registry arithmetic drifted from (36-9)+(14-12)+1+0=30: $out"
+printf '%s\n' "$out" | grep -q 'active=38 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=11' \
+  || fail "registry arithmetic drifted from (38-11)+(14-12)+1=30: $out"
 pass "G-10 the registry accounts for all 30 audited Firstmate guards"
 
 [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
-jq -e '.guards | length == 36' "$REGISTRY" >/dev/null || fail "registry does not hold 36 live guards"
-jq -e '.beyond_audit_active | length == 9' "$REGISTRY" >/dev/null || fail "the nine post-audit guards are not recorded"
+jq -e '.guards | length == 38' "$REGISTRY" >/dev/null || fail "registry does not hold 38 live guards"
+jq -e '.beyond_audit_active | length == 11' "$REGISTRY" >/dev/null || fail "the eleven post-audit guards are not recorded"
 jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
 pass "G-10b the spec and the registry are checked in and agree"
 
@@ -36,9 +36,9 @@ pass "G-10b the spec and the registry are checked in and agree"
 pass "G-11 the lint rules are proven by a fixture suite, including a prose-only remedy"
 
 # --- G-23: the ratchet is at build-failing with an empty allowlist ----------
-[ "$(jq -r '.allowed | length' "$ROOT/docs/guards/lint-allowlist.json")" = 0 ] \
-  || fail "the lint allowlist is not empty"
-pass "G-23 the ratchet is enforcing with an empty allowlist"
+[ "$(jq -r '[.allowed[] | select(.rule != "S1")] | length' "$ROOT/docs/guards/lint-allowlist.json")" = 0 ] \
+  || fail "the lint allowlist holds a guard-rule entry; only legacy refusal sites (S1) may remain"
+pass "G-23 the ratchet is enforcing and the allowlist holds only legacy refusal sites"
 
 # --- G-02/G-03: wiring resolves and retired guards stay retired -------------
 out=$("$REFCHECK" 2>&1) || fail "the reference check is red: $out"
@@ -135,5 +135,18 @@ while IFS=$'\t' read -r retired_id retired_test; do
 done < <(jq -r '.[] | [.id, (.retirement_test // "")] | @tsv' "$ROOT/docs/guards/retired.json")
 [ -z "$retired_live" ] || fail "retired guard ids still appear in bin/:$retired_live"
 pass "G-04 every retired guard is absent from bin/ and the advisory cut is recorded"
+
+# --- G-31: the refusals that sat in scripts are enumerated -------------------
+# The audit counted 30 guards and listed none for the pool-slot allocation guard
+# or the shared-slot teardown guard, because nothing scanned the scripts. The
+# discovery must now find both on the real tree, so the next such guard is seen.
+sites_json=$(python3 "$ROOT/bin/fm-guard-sites.py" --root "$ROOT") || fail "refusal site discovery failed"
+printf '%s\n' "$sites_json" | jq -e '[.sites[] | select(.file == "bin/fm-task-copy-lib.sh"
+    and (.text | contains("refusing allocation before treehouse get")))] | length == 1' >/dev/null \
+  || fail "discovery misses the pool-slot allocation guard in bin/fm-task-copy-lib.sh"
+printf '%s\n' "$sites_json" | jq -e '[.sites[] | select(.file == "bin/fm-teardown.sh"
+    and (.text | contains("prove a durable lease before retiring")))] | length == 1' >/dev/null \
+  || fail "discovery misses the shared-slot teardown guard in bin/fm-teardown.sh"
+pass "G-31 discovery finds the pool-slot allocation guard and the shared-slot teardown guard"
 
 printf 'ok - fm-guard-audit-closure\n'

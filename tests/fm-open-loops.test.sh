@@ -129,6 +129,14 @@ stalled = task_copy('stalled', commit_age=5)
 fresh = task_copy('fresh', commit_age=0)
 merged = task_copy('merged', commit_age=50)
 covered = task_copy('covered', commit_age=50)
+review_author = task_copy('review-author')
+# The record owner derives PR authors from the owning task's commits outside the
+# live base, so PR 9's head is a real commit in that task's copy (no ref moves).
+review_base = git(review_author, 'rev-parse', 'HEAD')
+review_head = git(review_author, 'commit-tree', git(review_author, 'rev-parse', 'HEAD^{tree}'),
+                  '-p', review_base, '-m', 'review work')
+author_meta_text = lambda model, gen: f'model={model}\nspawn_gen={gen}\nworktree={review_author}\nmode=direct-PR\n'
+(home / 'state/review-author.meta').write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
 merged_head = git(merged, 'rev-parse', 'HEAD')
 covered_head = git(covered, 'rev-parse', 'HEAD')
 for name, path in (('stalled', stalled), ('fresh', fresh)):
@@ -141,6 +149,7 @@ os.utime(logs, (hours(5), hours(5)))
 PR_URL = 'https://github.com/test/project/pull/'
 tasks = [task('lost', lost), task('stalled', stalled), task('fresh', fresh),
          task('merged', merged, pr=PR_URL + '5'), task('covered', covered, pr=PR_URL + '7'),
+         task('review-author', review_author, pr=PR_URL + '9'),
          task('gone', world / 'nowhere', exists=False, alive='dead'),
          task('broken', world / 'nowhere', state='failed')]
 backlog = [
@@ -164,14 +173,14 @@ double = dict(
     pulls=[dict(number=7, html_url=PR_URL + '7', head=dict(sha=covered_head), state='open', draft=False, updated_at=iso(hours(3))),
            dict(number=8, html_url=PR_URL + '8', head=dict(sha='b' * 40), draft=False, updated_at=iso(hours(2)),
                 requested_reviewers=[dict(login='reviewer')]),
-           dict(number=9, html_url=PR_URL + '9', head=dict(sha='c' * 40), draft=False, updated_at=iso(hours(1)))],
+           dict(number=9, html_url=PR_URL + '9', head=dict(sha=review_head), draft=False, updated_at=iso(hours(1)))],
     checks={covered_head: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4)))],
             'b' * 40: [dict(id=1, name='unit', app=dict(id=3), status='completed', conclusion='failure',
                            completed_at=iso(hours(4))),
                        dict(id=2, name='unit', app=dict(id=3), status='completed', conclusion='success',
                            completed_at=iso(hours(3)))],
-            'c' * 40: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
+            review_head: [dict(id=4, name='unit', app=dict(id=3), status='completed', conclusion='success')]},
     single={'5': dict(merged_at=iso(hours(1)), head=dict(sha=merged_head)), '7': dict(merged_at=None)})
 (world / 'gh.json').write_text(json.dumps(double))
 
@@ -223,26 +232,133 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
-# Independent review must bind the exact live head; absent required checks prevent readiness.
-review_path = home / 'state/review-lane.status'
-review_url, review_head = PR_URL + '9', 'c' * 40
-review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+# Independent review is only the record owner's verified exact-head evidence.
+# review_lanes is a discovery hint, not authority: the ledger asks
+# bin/fm-review-record.py once for the live head and consumes one atomic
+# fm-review-verification.v1 object. Typed not-qualified is ordinary absence;
+# unreadable or corrupt history degrades coverage instead of reading as unreviewed.
+review_url = PR_URL + '9'
+review_report = world / 'review.md'
+review_records = home / 'state/review-records.jsonl'
 config_path = home / 'config/open-loops.json'
-config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane']},
+author_meta = home / 'state/review-author.meta'
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
+# The lane ids are only discovery hints: no status or metadata file exists for them.
+config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane', 'second-lane']},
                                      age_limits_seconds={'review_pass_not_merged': 600})))
-double['pulls'][2]['base'] = dict(ref='main')
+double['pulls'][2]['base'] = dict(ref='main', sha=review_base)
 double['checks'][review_head][0]['completed_at'] = iso(now - 700)
 (world / 'gh.json').write_text(json.dumps(double))
-reviewed = ledger('--heartbeat')
-assert rows(reviewed, 'review_pass_not_merged')[review_url]['overdue'], reviewed
-assert review_url not in rows(reviewed, 'open_pr'), 'one actionable obligation per reviewed PR'
-review_path.write_text(f'done [at={now - 601}]: review PASS head={"d" * 40} PR {review_url}\n')
-assert not rows(ledger(), 'review_pass_not_merged'), 'replaced-head review is stale'
-review_path.write_text(f'done [at={now - 601}]: review FAIL head={review_head} PR {review_url}\n')
-assert not rows(ledger(), 'review_pass_not_merged'), 'latest review rejection supersedes PASS'
-review_path.write_text(f'done [at={now - 599}]: review PASS head={review_head} PR {review_url}\n')
+
+def record_review(head=review_head, verdict='PASS', reader='openai-codex/gpt-6.1-sol',
+                  authors=None, trigger=None, pr=review_url):
+    review_report.write_text(f'VERDICT: {verdict} head={head}\nIndependent reader evidence.\n')
+    flags = {'loosens-deny-allow-list': 'no', 'widens-guard': 'no', 'customer-data-billing-spend': 'no'}
+    if trigger:
+        flags[trigger.replace('_', '-')] = 'yes'
+    args = [code / 'bin/fm-review-record.py', 'review', '--pr', pr, '--head', head,
+            '--verdict', verdict, '--reader-model', reader,
+            '--author-groups', json.dumps(authors or {'all': ['anthropic/claude-sonnet-5']}),
+            '--report', str(review_report)]
+    for flag, value in flags.items():
+        args += ['--' + flag, value]
+    done = run(args)
+    assert done.returncode == 0, (done.stdout, done.stderr)
+
+def clear_reviews():
+    if review_records.exists() or review_records.is_symlink():
+        review_records.unlink()
+
+def set_review_age(seconds):
+    stored = [json.loads(line) for line in review_records.read_text().splitlines()]
+    for item in stored:
+        if item.get('kind') == 'review':
+            item['at'] = now - seconds
+    review_records.write_text(''.join(json.dumps(item, separators=(',', ':')) + '\n' for item in stored))
+
+def assert_no_qualifying_review(label):
+    current = ledger()
+    assert not rows(current, 'review_pass_not_merged'), (label, current)
+    assert current['complete'] is True and 'ledger degraded' not in rows(current, 'coverage'), (label, current)
+    assert review_url in rows(current, 'open_pr'), (label, 'not-qualified must leave an ordinary open obligation')
+
+# A verified independent PASS at the exact live head is the valid control.
+record_review()
+set_review_age(601)
+assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'a recorded independent PASS did not qualify'
+assert 'openai reviewing anthropic' in rows(ledger(), 'review_pass_not_merged')[review_url]['evidence'], \
+    'the review evidence did not name both model families'
+assert review_url not in rows(ledger(), 'open_pr'), 'one actionable obligation per reviewed PR'
+
+# review_lanes is a discovery hint only: dropping it stops the check even though
+# the record still holds a valid PASS, and restoring it resumes the same answer.
+config_path.write_text(json.dumps(dict(age_limits_seconds={'review_pass_not_merged': 600})))
+assert not rows(ledger(), 'review_pass_not_merged'), 'an unconfigured repository must not be checked for review'
+config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane', 'second-lane']},
+                                     age_limits_seconds={'review_pass_not_merged': 600})))
+assert rows(ledger(), 'review_pass_not_merged'), 'restoring the discovery hint must resume the check'
+
+# A lane status PASS is not authority anymore: only the record qualifies.
+review_lane_status = home / 'state/review-lane.status'
+review_lane_status.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+clear_reviews()
+assert_no_qualifying_review('a lane status file alone must not qualify')
+review_lane_status.unlink()
+assert_no_qualifying_review('a missing review record must not qualify')
+
+# Every typed not-qualified answer is ordinary absence of qualifying review.
+record_review(head='d' * 40)
+assert_no_qualifying_review('a stale-head record must not qualify')
+clear_reviews(); record_review(verdict='FAIL')
+assert_no_qualifying_review('a FAIL record must not qualify')
+clear_reviews(); record_review(reader='anthropic/claude-opus-5')
+assert_no_qualifying_review('a same-family reader must not qualify')
+clear_reviews(); record_review(authors={'all': ['mystery-9']})
+assert_no_qualifying_review('an unknown author family must not qualify')
+clear_reviews(); record_review(reader='mystery-9')
+assert_no_qualifying_review('an unknown reader family must not qualify')
+clear_reviews(); record_review(trigger='widens_guard')
+assert_no_qualifying_review('a yes escalation trigger must not qualify')
+clear_reviews()
+word = run([code / 'bin/fm-review-record.py', 'captain-word', '--pr', review_url, '--head', review_head,
+            '--words', 'Merge it.'])
+assert word.returncode == 0, (word.stdout, word.stderr)
+assert_no_qualifying_review('a captain-word alone must not qualify')
+
+# Unreadable or corrupt history is degraded coverage, not a silent "no review".
+clear_reviews()
+review_records.write_text('{"schema":"fm-review-record.v1"\n')
+degraded_report = ledger()
+assert degraded_report['complete'] is False, degraded_report
+assert 'review record' in rows(degraded_report, 'coverage')['ledger degraded']['evidence'], degraded_report
+assert review_url in rows(degraded_report, 'open_pr'), 'degraded review coverage must still leave the PR open'
+review_records.unlink()
+review_records.symlink_to(world / 'no-such-ledger')
+unreadable = ledger()
+assert unreadable['complete'] is False, unreadable
+assert 'review record' in rows(unreadable, 'coverage')['ledger degraded']['evidence'], unreadable
+review_records.unlink()
+
+# Authors are re-derived from the owning task at every read: a relaunch in the
+# reader's family withdraws the qualifying review. The recorded review itself is
+# immutable, so a later report edit does not change it.
+record_review()
+set_review_age(601)
+author_meta.write_text(author_meta_text('openai/gpt-6.1-sol', f's{now - 1}.1.1'))
+assert_no_qualifying_review('a same-family relaunch must withdraw the independent review')
+author_meta.write_text(author_meta_text('anthropic/claude-sonnet-5', f's{now - 7200}.1.1'))
+review_report.write_text(f'VERDICT: PASS head={review_head}\nA later, unrelated edit.\n')
+invariant = rows(ledger(), 'review_pass_not_merged')[review_url]
+assert invariant['overdue'] and 'openai reviewing anthropic' in invariant['evidence'], invariant
+
+# The reviewed-green age begins at the later of the review and the checks.
+set_review_age(599)
 assert not rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'one interval grace boundary'
-review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+set_review_age(601)
+assert rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'past the interval boundary'
+set_review_age(-60)
+assert_no_qualifying_review('a review recorded after the sweep began must not read as overdue')
+set_review_age(601)
 double['rules'] = [dict(type='required_status_checks', parameters=dict(required_status_checks=[
     dict(context='missing', integration_id=3)]))]
 (world / 'gh.json').write_text(json.dumps(double))
@@ -273,8 +389,9 @@ double['pulls'].append(review_pr)
 double['single'].pop('9')
 (world / 'gh.json').write_text(json.dumps(double))
 config_path.unlink()
-review_path.unlink()
-print('PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion', flush=True)
+review_records.unlink()
+review_report.unlink()
+print('PASS: record-owned live-head review, discovery hint, typed absence versus degraded, interval boundary, required checks, merge completion', flush=True)
 
 # Unseen presented rows stay stale and not overdue until a complete sweep; resolved rows drop their receipts.
 def loops(*args, **kw):
@@ -323,7 +440,7 @@ for name in ('a', 'b'):
     (home / f'state/{name}.status').write_text(f'blocked [at={hours(10)}] [key=answer]: {name} needs an answer\n')
     (home / f'state/{name}.meta').write_text(f'kind=scout\nspawn_gen={name}-generation\n')
 a_meta = home / 'state/a.meta'
-lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/route-9.meta'
+lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/review-author.meta'
 for refresh in (False, True):
     if refresh:
         ledger('--heartbeat')
@@ -331,6 +448,8 @@ for refresh in (False, True):
     a_meta.unlink()
     a_meta.symlink_to(home / 'missing-meta')
     lost_meta.symlink_to(home / 'missing-meta')
+    if pr_meta.exists():
+        pr_meta.unlink()
     pr_meta.symlink_to(home / 'missing-meta')
     degraded = ledger('--heartbeat')
     assert not degraded['complete'], degraded
@@ -1455,6 +1574,59 @@ time.sleep(120)
                     except ProcessLookupError:
                         pass
     print('PASS: no-progress source failure owns resistant descendant cleanup', flush=True)
+
+# A genuine live process group plus a syscall-level EPERM still refuses cleanup:
+# only a completed child or a group with no live member may swallow the refusal.
+import importlib.util
+from unittest import mock
+seam_spec = importlib.util.spec_from_file_location('fm_open_loops_regression', code / 'bin/fm_open_loops.py')
+seam_module = importlib.util.module_from_spec(seam_spec)
+seam_spec.loader.exec_module(seam_module)
+seam_home = world / 'killpg-seam-home'
+(seam_home / 'config').mkdir(parents=True)
+(seam_home / 'state').mkdir()
+seam_collector = seam_module.Collector(seam_home, int(time.time()))
+live = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], start_new_session=True)
+try:
+    with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+        try:
+            seam_collector.signal_command_group(live, signal.SIGSTOP)
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError('a live process group must keep the EPERM refusal')
+    assert live.poll() is None, 'the refused group signal must leave the live process running'
+finally:
+    try:
+        os.killpg(live.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    live.wait()
+print('PASS: live process-group EPERM still refuses and leaves the process running', flush=True)
+
+# The Darwin race the seam exists for: EPERM arrives while poll() has not yet
+# observed the exit. A group whose members are all zombies, or a group that is
+# already gone, needs no signal, so the refusal is swallowed for exactly those.
+class RacingChild:
+    def __init__(self, pid):
+        self.pid = pid
+    def poll(self):
+        return None
+zombie = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+try:
+    deadline = time.monotonic() + 30
+    while not (states := seam_collector.group_state(zombie.pid)) \
+            or not all(state.startswith(('Z', 'X')) for state in states):
+        assert time.monotonic() < deadline, 'the unreaped leader never became a zombie'
+        time.sleep(0.05)
+    with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+        seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+finally:
+    zombie.wait()
+assert seam_collector.group_state(zombie.pid) == [], 'a reaped group must read as having no members'
+with mock.patch.object(os, 'killpg', side_effect=PermissionError(1, 'Operation not permitted')):
+    seam_collector.signal_command_group(RacingChild(zombie.pid), signal.SIGSTOP)
+print('PASS: an all-zombie or vanished process group swallows the Darwin EPERM race', flush=True)
 
 interval_home = world / 'interval-home'
 for name in ('state', 'data', 'config', 'projects'):

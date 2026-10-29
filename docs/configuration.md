@@ -829,7 +829,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
-| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
+| `review_pass_not_merged` | the review-record owner verifies an independent PASS (see `review_lanes` below) for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable, so coverage is incomplete; an unsupported forge is instead an informational skip | 0 s |
 
@@ -992,7 +992,10 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 Age limits are non-negative integer seconds for the categories above.
 `review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
-For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
+The map only names the local review task ids as a discovery hint for a repository, so a repository absent from it is not checked for review readiness; it supplies no verdict, model metadata, or PASS spelling.
+For a configured repository, the ledger asks `bin/fm-review-record.py verify --task <owning task> --base <live base sha> --review-only --json` once for an owned PR's exact live head and consumes that single atomic owner output; a PR no task owns is not checked.
+That owner is the only authority: it applies the merge gate's exact-head, derived-author coverage and FAIL rules without any captain-word, and also requires no escalation trigger on the newest PASS. Authors are derived again from the owning task's commits and launch evidence at every read, so a relaunch in the reader's family withdraws an earlier qualifying review, while the recorded review fields themselves are immutable.
+A missing, stale-head, FAIL, same-family, unknown-family, or yes-trigger record is not-qualified and leaves an ordinary open obligation, while unreadable or corrupt record history, unreadable author evidence or invalid input degrades coverage instead of reading as unreviewed; a `captain-word` alone is never independent review.
 The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
 Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` selects each source command's no-output/no-process-tree-CPU interval, defaults to 900 seconds, and accepts integers from 1 through 900.
@@ -1861,7 +1864,7 @@ The address selects the existing shared server; it does not authorize starting o
 ## Task Definition of Done (ship and scout briefs)
 
 Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
-Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
 The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
 A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
@@ -1875,6 +1878,14 @@ A fresh spawn of a brief with no such section at all is not refused: it prints o
 The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
 `bin/fm-dod-lib.sh` owns the scaffold text, criteria check, and separate no-mistakes verification-plan construction; its header and executable `--help` own extraction, line-ending support, and malformed or missing-input behavior.
 The shared [review rubric](review-rubric.md) owns the criteria used by that plan and independent review readers; `fm-spawn.sh` renders its text into every ship and scout launch's role instructions, including legacy briefs and relaunches.
+`bin/fm-dod-lib.sh` also owns the one mandatory item shape: each item starts its own line with a unique id and carries every field nonempty, with Authority taken from a fixed set; `bash bin/fm-dod-lib.sh --shape` prints the id pattern, lead and trailing fields, allowed Authority values, one-line item form that a criteria refusal names, and the rule sentence that the scaffold and a verification-plan refusal print.
+It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+This is an objective shape check only: it never claims the criteria are semantically adequate, and the independent grader still decides whether each item is true and complete.
+A promoted scout's original Definition of Done is scout-time context, labeled as such in the verification plan, and is not re-read as current ship mandatory criteria; a current ship brief still must satisfy the shape.
+A passing `mode=no-mistakes` run is completion evidence only when the supported `no-mistakes axi status` surface exposes the run's immutable verification-plan snapshot, the snapshot bytes still hash to its recorded `sha256`, the run head is the task's recorded forge `pr_head` or attributes to the copy's `HEAD` (equal to it, a descendant of it such as a pipeline fix commit, or carrying its tree), and the snapshot `source_path` is this task's durable `<data>/<task-id>/verification-plan.md` whose current bytes also hash to that same snapshot value.
+A missing or mismatched snapshot, a replaced plan at the same path, a different task's plan, or a coarse inventory word reads `unknown` with the exact reason; the same task-bound check applies to a final CI-ready status-log `done:`.
+The only evidence-free final path is an actually merged PR whose worker copy is gone, so no review re-read is possible; a recorded open PR head proves publication, not validation, and does not skip the check.
+This proves planning and revision accounting, never that every item was graded correctly or that semantic quality is established.
 The scaffold's nested `### Out of scope` list is authored under `## Firstmate spec`; `bin/fm-brief.sh` owns its default and `bin/fm-dod-lib.sh` owns its extraction, including legacy `Out of scope:` paragraphs.
 A fresh dispatch refuses a scaffolded brief whose list is still blank, because independent review reads that list as the task's stated boundary and `None` is how to state that there is none.
 The fresh ship/scout concrete-ask refusal is a mechanical minimum owned by the `bin/fm-spawn.sh` header, not a semantic judgment or a recheck of existing work.
@@ -4351,7 +4362,7 @@ FM_MODEL_PICKER_SHADOW=  # opt-in observe-only shadow model picker inside fm-dis
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
-FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set
+FM_TASK_ID=             # internal task-worker marker fm-spawn.sh exports into ship and scout panes, never set by hand; bin/fm-test-run.sh refuses to execute in the repository primary checkout while it is set, and the omp primary extensions skip their home markers, home watch, and home digest while it is set (.omp/extensions/lib/fm-task-worker.ts)
 FM_TASK_INBOX=          # internal: absolute path of the task's steering inbox (state/<id>.inbox) that fm-spawn.sh exports into every ship, scout, and secondmate launch, never set by hand; the steering doorbell names "$FM_TASK_INBOX"
 HERDR_SESSION=default  # herdr-only: named session for normal backend ops; not enough for destructive cleanup (docs/herdr-backend.md)
 FM_BACKEND_HERDR_SUBMIT_POLLS=6  # herdr-only: agent-state samples spread across each Enter attempt's budget when confirming a submit (docs/herdr-backend.md "Current transport behavior")

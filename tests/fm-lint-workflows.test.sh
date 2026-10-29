@@ -269,9 +269,42 @@ test_pins_an_explicit_version() {
   pass "fm-lint-workflows.sh pins an explicit actionlint version ($REQUIRED)"
 }
 
-test_rejects_wrong_actionlint_version() {
+test_strict_actionlint_version_refuses() {
+  local tmp fakebin out rc mode
+  tmp=$(fm_test_tmproot fm-lint-wf-strict-ver)
+  fakebin=$(fm_fakebin "$tmp")
+  mkdir -p "$tmp/.github/workflows"
+  write_valid_workflow "$tmp/.github/workflows/ci.yml"
+  cat > "$fakebin/actionlint" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "-version" ]; then
+  printf '0.0.0\n'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$fakebin/actionlint"
+  for mode in strict ci; do
+    rc=0
+    case "$mode" in
+      strict)
+        out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' "$LINT_WF" --strict-version --root "$tmp" 2>&1) || rc=$?
+        ;;
+      ci)
+        out=$(PATH="$fakebin:$PATH" CI=true GITHUB_ACTIONS=true "$LINT_WF" --root "$tmp" 2>&1) || rc=$?
+        ;;
+    esac
+    expect_code 1 "$rc" "$mode must refuse a non-pinned actionlint: $out"
+    assert_contains "$out" "$REQUIRED" "$mode refusal did not name the pin"
+    assert_contains "$out" "0.0.0" "$mode refusal did not name the resolved version"
+    assert_contains "$out" "fm-install-actionlint.sh" "$mode refusal did not name the installer"
+  done
+  pass "fm-lint-workflows.sh refuses a non-pinned actionlint in strict and CI modes"
+}
+
+test_local_wrong_actionlint_warns_and_proceeds() {
   local tmp fakebin out rc
-  tmp=$(fm_test_tmproot fm-lint-wf-ver)
+  tmp=$(fm_test_tmproot fm-lint-wf-local-ver)
   fakebin=$(fm_fakebin "$tmp")
   mkdir -p "$tmp/.github/workflows"
   write_valid_workflow "$tmp/.github/workflows/ci.yml"
@@ -285,11 +318,14 @@ exit 0
 SH
   chmod +x "$fakebin/actionlint"
   rc=0
-  out=$(PATH="$fakebin:$PATH" "$LINT_WF" --root "$tmp" 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail "fm-lint-workflows.sh accepted an actionlint version other than the pin"$'\n'"$out"
-  assert_contains "$out" "$REQUIRED" "fm-lint-workflows.sh did not name the required version on mismatch"
-  assert_contains "$out" "0.0.0" "fm-lint-workflows.sh did not report the resolved (wrong) version"
-  pass "fm-lint-workflows.sh refuses to lint under a non-pinned actionlint version"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' "$LINT_WF" --root "$tmp" 2>&1) || rc=$?
+  expect_code 0 "$rc" "a newer local actionlint must not be a wall: $out"
+  assert_contains "$out" "WARNING" "local mismatch did not warn"
+  assert_contains "$out" "0.0.0" "local warning did not name the resolved version"
+  assert_contains "$out" "$REQUIRED" "local warning did not name the CI pin"
+  assert_contains "$out" "fm-install-actionlint.sh" "local warning did not name the installer"
+  assert_contains "$out" "workflow files valid" "local mismatch did not proceed to lint"
+  pass "fm-lint-workflows.sh warns and proceeds under a newer local actionlint"
 }
 
 test_installer_retries_transient_download_failure() {
@@ -523,7 +559,8 @@ test_empty_workflows_dir_fails
 test_explicit_broken_path_fails
 test_non_mapping_root_fails
 test_missing_actionlint_fails_closed
-test_rejects_wrong_actionlint_version
+test_strict_actionlint_version_refuses
+test_local_wrong_actionlint_warns_and_proceeds
 test_installer_retries_transient_download_failure
 test_installer_selects_platform_archive_url_and_checksum
 test_installer_rejects_wrong_checksum

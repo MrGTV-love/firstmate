@@ -86,6 +86,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
       - name: Prove complete regression partition
         run: bin/fm-test-run.sh --check-coverage
       # The guard audit's Stage 0 machine: a registered hook path that does not
@@ -95,6 +97,11 @@ jobs:
         run: bin/fm-guard-refcheck.sh
       - name: Enforce the guard registry contract and its ratchet
         run: bin/fm-guard-lint.sh --mode enforce --counts
+      # New work cannot add debt: a refusal site on a changed line must map to a
+      # guard, and the burn-down allowlist may not grow against the PR base.
+      - name: Enforce the guard ratchet against the pull request base
+        if: github.event_name == 'pull_request'
+        run: bin/fm-guard-lint.sh --mode new-or-touched --base HEAD^1
 
   # Two duration-balanced portable parallel shards of the Phase 2 proven-isolated
   # set only. Composition owner: bin/fm-test-run.sh (docs/fm-test-portable-shards.md).
