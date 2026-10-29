@@ -1319,12 +1319,21 @@ def captain_visible(action, row, now):
         action.get("deferrals", 0) >= 1 and not deferral_stands(action, row, now))
 
 
+def overdue_since(row, now):
+    """When an overdue row, aged to now by overdue_rows, became overdue; now when its record cannot say."""
+    age, limit = row.get("age_seconds"), row.get("limit_seconds")
+    if type(age) is not int or type(limit) is not int or limit < 0 or age < limit:
+        return now
+    return now - age + limit
+
+
 def note_episode(controls, row, now):
-    """Open a row's overdue episode when it is first presented, or when its evidence materially changed."""
+    """Open a row's overdue episode at the moment it became overdue, or now when its evidence materially changed."""
     episodes = controls.setdefault("episodes", {})
     digest = row_digest(row)
-    if not isinstance(episodes.get(row["id"]), dict) or episodes[row["id"]].get("digest") != digest:
-        episodes[row["id"]] = dict(digest=digest, start=now)
+    current = episodes.get(row["id"])
+    if not isinstance(current, dict) or current.get("digest") != digest:
+        episodes[row["id"]] = dict(digest=digest, start=now if isinstance(current, dict) else overdue_since(row, now))
 
 
 def episode_boundary(controls, row, actor, now):

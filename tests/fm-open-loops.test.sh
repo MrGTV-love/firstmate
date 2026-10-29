@@ -2251,7 +2251,7 @@ assert ack(boundary).returncode == 0
 # A steer must be a delivery sent after the row's overdue episode began; re-presenting the unchanged row accepts it again.
 home, ledger, row, call, ok, drain, ack = case('steer-fresh')
 _, boundary = drain()
-inbox(home, '003.msg', handled=True, offset=-60)
+inbox(home, '003.msg', handled=True, offset=-3700)
 stale = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '003.msg')
 assert stale.returncode == 1 and 'new delivery' in stale.stdout, stale
 inbox(home, '004.msg')
@@ -2277,7 +2277,7 @@ for handled in (False, True):
     (home / 'state/worker.inbox/001.msg').unlink()
     refused = call(*args, '001.msg')
     assert refused.returncode == 1 and 'task inbox' in refused.stdout, refused
-    inbox(home, '002.msg', handled=handled, offset=-60)
+    inbox(home, '002.msg', handled=handled, offset=-3700)
     refused = call(*args, '002.msg')
     assert refused.returncode == 1 and 'new delivery' in refused.stdout, refused
     inbox(home, '003.msg', handled=handled, offset=1)
@@ -3716,7 +3716,7 @@ print('PASS: a steer delivered after the overdue episode began counts on every r
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('old-steer', age_seconds=100000)
 _, boundary = drain()
 inbox(home, '001.msg', offset=1)
-inbox(home, '002.msg', offset=-60)
+inbox(home, '002.msg', offset=-96500)
 before = act('steered', '002.msg')
 assert before.returncode == 1 and 'new delivery' in before.stdout, before
 clock['now'] = now + 5 * 3600
@@ -3741,6 +3741,29 @@ assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode ==
 clock['now'] = now
 print('PASS: a steer older than four hours, one sent before the episode, or one predating changed evidence is refused', flush=True)
 
+# The episode opens when the row became overdue, not when a drain first presents it.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('overdue-before-presentation')
+inbox(home, '001.msg', offset=-3700)
+inbox(home, '002.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now - 3600, stored()['handling']['episodes']
+before = act('steered', '001.msg')
+assert before.returncode == 1 and 'became overdue' in before.stdout, ('a delivery before the row went overdue', before.stdout)
+after = act('steered', '002.msg')
+assert after.returncode == 0, ('a delivery after the row went overdue but before its first presentation', after.stdout)
+assert ack(boundary).returncode == 0
+# A record that cannot say when it became overdue falls back to its first presentation, never earlier.
+home, ledger, row, call, ok, wake, drain, ack, act, stored = case('uncomputable-overdue', age_seconds=None)
+inbox(home, '001.msg', offset=-60)
+_, boundary = drain()
+assert stored()['handling']['episodes'][row['id']]['start'] == now, stored()['handling']['episodes']
+early = act('steered', '001.msg')
+assert early.returncode == 1 and 'became overdue' in early.stdout, early
+inbox(home, '002.msg', offset=1)
+assert act('steered', '002.msg').returncode == 0 and ack(boundary).returncode == 0
+print('PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say',
+      flush=True)
+
 # 2. A remote secondmate keeps its inbox record on its own host; the parent's pending-reply record is the delivery id.
 def reply_record(home, corr, task='mini', delivered=''):
     directory = home / 'state/pending-replies'
@@ -3757,7 +3780,7 @@ assert undelivered.returncode == 1 and 'task inbox' in undelivered.stdout, undel
 reply_record(home, 'fedcba9876543210', task='other', delivered=str(now + 5))
 foreign = act('steered', 'fedcba9876543210')
 assert foreign.returncode == 1, foreign
-reply_record(home, '0011223344556677', delivered=str(now - 600))
+reply_record(home, '0011223344556677', delivered=str(now - 3700))
 early = act('steered', '0011223344556677')
 assert early.returncode == 1 and 'new delivery' in early.stdout, early
 reply_record(home, 'aabbccddeeff0011', delivered=str(now + 5))
@@ -4006,10 +4029,13 @@ def delivery(fx, record, sent):
     path.write_text(f'schema=fm-task-inbox.v1\nat={iso(sent)}\n--\nopen-loop-row: {fx["red"]["id"]}\nland the red-main fix\n')
 fx = wait_fixture('delivery-episode')
 boundary = fx['drain']()
-episode = json.loads(fx['ledger'].read_text())['handling']['episodes'][fx['red']['id']]['start']
+published = json.loads(fx['ledger'].read_text())
+episode = published['handling']['episodes'][fx['red']['id']]['start']
+red = next(r for r in published['rows'] if r['id'] == fx['red']['id'])
+assert episode == published['generated_epoch'] - red['age_seconds'] + red['limit_seconds'], (episode, red)
 fx['env']['FM_OPEN_LOOPS_NOW'] = str(now + 60)
 delivery(fx, '001.msg', now + 60)
-delivery(fx, '002.msg', now - 60)
+delivery(fx, '002.msg', episode - 60)
 assert fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
                   '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 200)).returncode == 0
 assert fx['ack'](boundary).returncode == 0
