@@ -151,14 +151,14 @@ fm_process_fill() {
 fm_run_progress() {
   local seconds=$1 helper record=
   shift
-  if fm_process_tree; then
-    fm_process_reserve record fm_run_progress || return 125
-  fi
   helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
   if fm_posix_python; then
+    if fm_process_tree; then
+      fm_process_reserve record fm_run_progress || return 125
+    fi
     python3 "$helper" keep-going ${record:+--record "$record"} "$seconds" -- "$@"
   elif command -v perl >/dev/null 2>&1; then
-    fm_run_perl_progress "$record" "$seconds" "$@"
+    fm_run_perl_progress "$seconds" "$@"
   else
     printf 'fm_run_progress: Python 3 or Perl is required to observe command progress\n' >&2
     return 127
@@ -216,8 +216,11 @@ fm_progress_check() {
 # TERM cleanup; while no sample is available one warning names the platform and
 # nothing is stopped for inactivity. Parent death and signals clean up the owned
 # command group.
-fm_run_perl_progress() {  # <record-or-empty> <seconds> <command...>
-  local owner=${BASHPID:-$$}
+fm_run_perl_progress() {  # <seconds> <command...>
+  local owner=${BASHPID:-$$} record=
+  if fm_process_tree; then
+    fm_process_reserve record fm_run_perl_progress || return 125
+  fi
   # shellcheck disable=SC2016 # Perl, not the sourcing shell, expands this program.
   perl -MPOSIX=WNOHANG -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -MIO::Select -MIO::Handle -e '
     my ($owner, $record, $idle) = (shift, shift, shift);
@@ -368,7 +371,7 @@ fm_run_perl_progress() {  # <record-or-empty> <seconds> <command...>
         }
       }
     }
-  ' "$owner" "$@"
+  ' "$owner" "$record" "$@"
 }
 
 fm_timeout_mechanism() {
