@@ -1,0 +1,12 @@
+== run 1
+ok - fixture cleanup after a teardown leaves no home-summary refresh worker
+bin/fm-proc-budget.sh -- bash tests/fm-teardown-cleanup.test.sh   5.24s user 13.16s system 76% cpu 23.932 total
+rc=0
+== run 2
+ok - fixture cleanup after a teardown leaves no home-summary refresh worker
+bin/fm-proc-budget.sh -- bash tests/fm-teardown-cleanup.test.sh   4.95s user 11.98s system 87% cpu 19.315 total
+rc=0
+== run 3
+ok - fixture cleanup after a teardown leaves no home-summary refresh worker
+bin/fm-proc-budget.sh -- bash tests/fm-teardown-cleanup.test.sh   5.25s user 14.09s system 58% cpu 33.017 total
+rc=0

@@ -1,0 +1,106 @@
+=== iteration 1 lab /Users/charlesabrooker/tmp/fm-lab.IZbIW1
+lab tmux server up on /tmp/fml.3F78R7
+holder=16700 late=
+-- t=1s procs:
+18765     1 S       00:02 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19536 18765 S       00:02 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19546 19536 S       00:02 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=18765 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+20512 19546 Ss      00:02 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=4s procs:
+18765     1 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19536 18765 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19546 19536 S       00:06 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=18765 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+20512 19546 Ss      00:06 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=8s procs:
+18765     1 S       00:10 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19536 18765 S       00:10 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+19546 19536 S       00:10 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=18765 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+20512 19546 Ss      00:10 bash /Users/charlesabrooker/tmp/fm-lab.IZbIW1/code-root/bin/fm-home-summary-refresh.sh --_worker
+published 1s after release
+ITER 1 PASS
+lab /Users/charlesabrooker/tmp/fm-lab.IZbIW1 removed
+=== iteration 2 lab /Users/charlesabrooker/tmp/fm-lab.w5KrM1
+lab tmux server up on /tmp/fml.QgnDUi
+holder=71564 late=
+-- t=1s procs:
+72836     1 S       00:03 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73817 72836 S       00:02 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73835 73817 S       00:02 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=72836 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+74758 73835 Ss      00:02 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=4s procs:
+72836     1 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73817 72836 S       00:05 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73835 73817 S       00:05 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=72836 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+74758 73835 Ss      00:05 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=8s procs:
+72836     1 S       00:11 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73817 72836 S       00:10 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --best-effort
+73835 73817 S       00:10 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=72836 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+74758 73835 Ss      00:10 bash /Users/charlesabrooker/tmp/fm-lab.w5KrM1/code-root/bin/fm-home-summary-refresh.sh --_worker
+published 1s after release
+ITER 2 PASS
+lab /Users/charlesabrooker/tmp/fm-lab.w5KrM1 removed
+=== iteration 3 lab /Users/charlesabrooker/tmp/fm-lab.FnFFhb
+lab tmux server up on /tmp/fml.4zY15M
+holder=23159 late=
+-- t=1s procs:
+24719     1 S       00:02 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25442 24719 S       00:02 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25447 25442 S       00:02 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=24719 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+26628 25447 Ss      00:02 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=4s procs:
+24719     1 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25442 24719 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25447 25442 S       00:06 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=24719 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+26628 25447 Ss      00:06 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=8s procs:
+24719     1 S       00:11 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25442 24719 S       00:11 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --best-effort
+25447 25442 S       00:11 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=24719 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+26628 25447 Rs      00:11 bash /Users/charlesabrooker/tmp/fm-lab.FnFFhb/code-root/bin/fm-home-summary-refresh.sh --_worker
+published 1s after release
+ITER 3 PASS
+lab /Users/charlesabrooker/tmp/fm-lab.FnFFhb removed
+=== iteration 4 lab /Users/charlesabrooker/tmp/fm-lab.IKHh2E
+lab tmux server up on /tmp/fml.JT4KqZ
+holder=90130 late=
+-- t=1s procs:
+92733     1 S       00:04 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94230 92733 S       00:03 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94238 94230 S       00:03 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=92733 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+95428 94238 Ss      00:03 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=4s procs:
+92733     1 S       00:07 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94230 92733 S       00:06 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94238 94230 S       00:06 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=92733 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+95428 94238 Ss      00:06 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+-- t=8s procs:
+92733     1 S       00:12 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94230 92733 S       00:11 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --best-effort
+94238 94230 S       00:11 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=92733 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+95428 94238 Rs      00:11 bash /Users/charlesabrooker/tmp/fm-lab.IKHh2E/code-root/bin/fm-home-summary-refresh.sh --_worker
+published 1s after release
+ITER 4 PASS
+lab /Users/charlesabrooker/tmp/fm-lab.IKHh2E removed
+=== iteration 5 lab /Users/charlesabrooker/tmp/fm-lab.6pVHVj
+lab tmux server up on /tmp/fml.TrU9FS
+holder=92169 late=
+-- t=1s procs:
+ 1592 98741 S       00:03 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+ 1634  1592 S       00:03 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=98741 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+ 3592  1634 Rs      00:03 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+98741     1 S       00:04 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+-- t=4s procs:
+ 1592 98741 S       00:07 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+ 1634  1592 S       00:07 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=98741 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+ 3592  1634 Rs      00:07 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+98741     1 S       00:08 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+-- t=8s procs:
+ 1592 98741 S       00:12 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+ 1634  1592 S       00:12 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=98741 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+ 3592  1634 Ss      00:12 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --_worker
+98741     1 S       00:13 bash /Users/charlesabrooker/tmp/fm-lab.6pVHVj/code-root/bin/fm-home-summary-refresh.sh --best-effort
+published 1s after release
+ITER 5 PASS
+lab /Users/charlesabrooker/tmp/fm-lab.6pVHVj removed
+OVERALL RC=0

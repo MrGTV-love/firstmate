@@ -1,0 +1,60 @@
+lab home: /Users/charlesabrooker/tmp/fm-lab.XenFHA
+lab tmux server up on /tmp/fml.XtbPpE
+
+=== S-live-1 (M4): plain detached refresh of a real home publishes
+detach rc=0
+{"schema":"fm-secondmate-home-summary.v1","generated":"2026-10-29T08:15:05Z","generated_epoch":1793261705}
+waited 1s
+PASS no refresh process left
+
+=== S-live-2: worker waits on a LIVE fence holder (no clock cut), then publishes after release
+state before reset: .fm-lab-tmux-dir home-summary.json 
+holder pid 91189 took /Users/charlesabrooker/tmp/fm-lab.XenFHA/state/.home-summary-refresh.lock.steal while the worker held its publication temp file
+after 8s with live holder:
+92749     1 S    00:09 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+93524 92749 S    00:09 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+93532 93524 S    00:09 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=92749 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+94162 93532 Ss   00:09 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+PASS worker still waiting on live holder
+PASS published 1s after release
+waited 0s
+PASS no refresh process left
+
+=== S-live-3: fence holder SIGKILLed -> stale reclaim -> publish
+state before reset: .armed .fm-lab-tmux-dir .holder .release home-summary.json 
+holder pid 29525 took /Users/charlesabrooker/tmp/fm-lab.XenFHA/state/.home-summary-refresh.lock.steal while the worker held its publication temp file
+31243     1 S    00:04 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+32191 31243 S    00:04 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+32203 32191 S    00:04 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=31243 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+32753 32203 Ss   00:04 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+killed holder 29525 (I started it)
+/Users/charlesabrooker/.no-mistakes/evidence/01M638Q0A4VWFB9Z90N1THTX1G/live-lab-fence-driver.sh: line 68: 29525 Killed: 9               nohup bash -c '. "$1"; st=${2%/*}; : > "$st/.armed"
+    while :; do for f in "$st"/.home-summary.json.?*; do [ -e "$f" ] && break 2; done; done
+    fm_lock_acquire_wait "$2"; [ -e "$st/home-summary.json" ] && echo late > "$st/.late"; echo $$ > "$3"
+    while [ ! -e "$4" ] && [ -d "$5" ]; do sleep 0.2; done; fm_lock_release "$2"' _ "$WT/bin/fm-wake-lib.sh" "$1/state/.home-summary-refresh.lock.steal" "$1/state/.holder" "$1/state/.release" "${2:-$1/state}" > /dev/null 2>&1 < /dev/null
+PASS published 1s after holder died
+waited 0s
+PASS no refresh process left
+
+=== S-live-4 (M3, adversarial): home state removed while worker waits on a holder that stays alive
+state before reset: .armed .fm-lab-tmux-dir .holder home-summary.json 
+holder pid 51054 took /Users/charlesabrooker/tmp/fm-lab.XenFHA/state/.home-summary-refresh.lock.steal while the worker held its publication temp file
+waiting processes before removal:
+53052     1 S    00:06 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+54204 53052 S    00:06 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --best-effort
+54215 54204 R    00:06 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-duration.py keep-going 900 -- env FM_HOME_SUMMARY_PARENT_PID=53052 FM_HOME_SUMMARY_WORKER_BEST_EFFORT=1 FM_HOME_SUMMARY_IF_IDLE=1 /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+55109 54215 Ss   00:05 bash /Users/charlesabrooker/tmp/fm-lab.XenFHA/code-root/bin/fm-home-summary-refresh.sh --_worker
+removed /Users/charlesabrooker/tmp/fm-lab.XenFHA/state at 03:15:31
+waited 2s
+PASS worker ended after home state removal
+holder 51054 still alive (my own), stopping it
+
+=== teardown
+/Users/charlesabrooker/.no-mistakes/evidence/01M638Q0A4VWFB9Z90N1THTX1G/live-lab-fence-driver.sh: line 80: 51054 Terminated: 15          nohup bash -c '. "$1"; st=${2%/*}; : > "$st/.armed"
+    while :; do for f in "$st"/.home-summary.json.?*; do [ -e "$f" ] && break 2; done; done
+    fm_lock_acquire_wait "$2"; [ -e "$st/home-summary.json" ] && echo late > "$st/.late"; echo $$ > "$3"
+    while [ ! -e "$4" ] && [ -d "$5" ]; do sleep 0.2; done; fm_lock_release "$2"' _ "$WT/bin/fm-wake-lib.sh" "$1/state/.home-summary-refresh.lock.steal" "$1/state/.holder" "$1/state/.release" "${2:-$1/state}" > /dev/null 2>&1 < /dev/null
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M638Q0A4VWFB9Z90N1THTX1G/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.XenFHA && rm -rf /Users/charlesabrooker/tmp/fm-lab.XenFHA
+teardown rc=0
+lab removed
+OVERALL RC=0

@@ -1,0 +1,5 @@
+red copy: /Users/charlesabrooker/tmp/fm-red.PBvgc7/src (base refresh script sha d3f7fd7c7358743a853f4e7cfa9b65f6d7d386f9)
+not ok - the home-summary refresh worker 87616 outlived its fixture's cleanup
+test rc=1
+refresh processes this red run left behind: none
+after cleanup: 
