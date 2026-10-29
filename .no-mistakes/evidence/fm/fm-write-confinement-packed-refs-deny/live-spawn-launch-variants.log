@@ -1,0 +1,29 @@
+LIVE unconfined codex launch: GIT_CONFIG_COUNT=1 fetch.prune=
+ok - non-measured harness launches unchanged and explicitly reports unconfined coverage
+LIVE omp delivered launch probe:
+  foreign=refused
+  status=appended
+  tmpdir=/tmp/fm-settle-confined-omp-z8
+  confinement=seatbelt-v1
+  fetch-prune=false
+  launch text: . '/tmp/fm-settle-confined-omp-z8+42337834137abcb04681acfa804dd292277837e1faab097e0e69f8b4708cd4c1/launch.s1793269189.13745.6685.sh'
+LIVE claude delivered launch probe:
+  foreign=refused
+  status=appended
+  tmpdir=/tmp/fm-settle-confined-claude-z8
+  confinement=seatbelt-v1
+  fetch-prune=false
+  launch text: . '/tmp/fm-settle-confined-claude-z8+5372d21cecd929472747e7ba8653675d337cac59750a9c7ef3e7ce0c03c5e46b/launch.s1793269195.29360.32661.sh'
+ok - measured harness launches run inside their generated write profile
+warning: re-init: ignored --initial-branch=main
+fatal: destination path '/Users/charlesabrooker/tmp/fm-spawn-worktree-settle.nT2s21/confined-omp/project.origin.git' already exists and is not an empty directory.
+error: remote origin already exists.
+fatal: a branch named 'wt-confined-omp' already exists
+warning: re-init: ignored --initial-branch=main
+tests/.nm-live-settle.tmp.sh: line 404: /config/crew-harness: No such file or directory
+tests/.nm-live-settle.tmp.sh: line 410: /omp: Read-only file system
+chmod: /omp: No such file or directory
+cat: /README.md: No such file or directory
+tests/.nm-live-settle.tmp.sh: line 441: /config/launch-env-allowlist: No such file or directory
+LIVE: launch-env-allowlist present (env -i path)
+not ok - confined omp spawn was refused: mkdir: /state: Read-only file system: expected exit 0, got 1

@@ -1,0 +1,72 @@
+== [HEAD] fixture: fm/other=6c4825fb98bebbcaa9429d322cf30a27ac359419 (packed), forged target=3866d5973446d948dd7d98ca4f95766ae0b01c92
+6c4825fb98bebbcaa9429d322cf30a27ac359419 refs/heads/fm/other
+6c4825fb98bebbcaa9429d322cf30a27ac359419 refs/remotes/no-mistakes/fm/gone
+== [HEAD] profile packed-refs rules:
+54:(deny file-write* (subpath "/private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/refs/replace"))
+59:(deny file-write* (literal "/private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs"))
+60:(deny file-write* (literal "/private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new"))
+
+== [HEAD] attack 1: rewrite packed-refs in place with a forged fm/other line
+_: /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs: Operation not permitted
+exit=1
+rev-parse fm/other -> 6c4825fb98bebbcaa9429d322cf30a27ac359419
+
+== [HEAD] attack 2: write a forged file to packed-refs.lock and rename it over packed-refs
+mv: rename /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.lock to /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs: Operation not permitted
+exit=1
+rev-parse fm/other -> 6c4825fb98bebbcaa9429d322cf30a27ac359419
+
+== [HEAD] attack 3: git update-ref -d of the packed fm/other from the worktree
+error: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+exit=1
+rev-parse fm/other -> 6c4825fb98bebbcaa9429d322cf30a27ac359419
+
+== [HEAD] legit: own commit, gate push, archive ref, loose stash push/pop
+commit=ok
+push exit=0
+own archive create exit=0
+Deleted branch archive/task-submitted-0123abcd (was b353ed9).
+own loose archive delete exit=0
+Already up to date.
+stash=ok
+
+== [HEAD] attack 4: git pack-refs --all from the worktree
+fatal: unable to write new packed-refs: unable to create file /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new: Operation not permitted
+pack-refs exit=128
+
+== [HEAD] attack 5: git replace of the task HEAD
+error: cannot lock ref 'refs/replace/b353ed9f321dd8f7315bcb3312a70311232156c7': unable to create directory for /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/refs/replace/b353ed9f321dd8f7315bcb3312a70311232156c7
+replace exit=255
+replace refs: 0
+
+== [HEAD] decided refusals: drop the packed shared stash entry, delete the packed own archive
+error: unable to create file /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new: Operation not permitted
+Dropped refs/stash@{0} (37bd3de5db35971aacd6f8538f842ec2ac6fc4fe)
+stash drop exit=0
+refs/stash: 37bd3de5db35971aacd6f8538f842ec2ac6fc4fe
+error: could not delete reference refs/heads/archive/task-pipeline-89abcdef: unable to create file /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new: Operation not permitted
+packed own archive delete exit=1
+archive/task-pipeline-89abcdef: 6c4825fb98bebbcaa9429d322cf30a27ac359419
+
+== [HEAD] fetch with host fetch.prune=true and the gate's fm/gone deleted, WITHOUT the launch entry
+error: could not delete reference refs/remotes/no-mistakes/fm/gone: unable to create file /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new: Operation not permitted
+From /private/tmp/nm-live-packed.g0mKDu/gate
+ - [deleted]         (none)     -> no-mistakes/fm/gone
+exit=1
+
+== [HEAD] same fetch WITH the launch GIT_CONFIG entry fm-spawn.sh adds
+fetch.prune=false
+exit=0
+fm/gone still tracked: yes
+
+== [HEAD] git gc from the worktree
+fatal: unable to write new packed-refs: unable to create file /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/packed-refs.new: Operation not permitted
+error: failed to run pack-refs
+gc exit=0
+
+== [HEAD] observation: own branch packed by Main's gc, refs/heads/fm folder gone, then a worker commit
+refs/heads entry: archive
+fatal: cannot lock ref 'HEAD': unable to create directory for /private/tmp/nm-live-packed.g0mKDu/home/projects/project/.git/refs/heads/fm/task
+commit exit=128
+
+== [HEAD] final: fm/other -> 6c4825fb98bebbcaa9429d322cf30a27ac359419 (real 6c4825fb98bebbcaa9429d322cf30a27ac359419)

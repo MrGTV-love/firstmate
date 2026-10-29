@@ -1,0 +1,67 @@
+== [BASE] fixture: fm/other=91b11bfd3ef4d1a272d89ca769414059238a1099 (packed), forged target=e3f6aa0c6dd1cec244ad3d2368c16c5227054126
+91b11bfd3ef4d1a272d89ca769414059238a1099 refs/heads/fm/other
+91b11bfd3ef4d1a272d89ca769414059238a1099 refs/remotes/no-mistakes/fm/gone
+== [BASE] profile packed-refs rules:
+
+== [BASE] attack 1: rewrite packed-refs in place with a forged fm/other line
+exit=0
+rev-parse fm/other -> e3f6aa0c6dd1cec244ad3d2368c16c5227054126
+
+== [BASE] attack 2: write a forged file to packed-refs.lock and rename it over packed-refs
+exit=0
+rev-parse fm/other -> 91b11bfd3ef4d1a272d89ca769414059238a1099
+
+== [BASE] attack 3: git update-ref -d of the packed fm/other from the worktree
+error: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+exit=1
+rev-parse fm/other -> 91b11bfd3ef4d1a272d89ca769414059238a1099
+
+== [BASE] legit: own commit, gate push, archive ref, loose stash push/pop
+commit=ok
+push exit=0
+own archive create exit=0
+Deleted branch archive/task-submitted-0123abcd (was 4f10608).
+own loose archive delete exit=0
+Already up to date.
+stash=ok
+
+== [BASE] attack 4: git pack-refs --all from the worktree
+error: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+pack-refs exit=0
+
+== [BASE] attack 5: git replace of the task HEAD
+replace exit=0
+replace refs: 1
+
+== [BASE] decided refusals: drop the packed shared stash entry, delete the packed own archive
+Dropped refs/stash@{0} (059515a2ee6409698e17c2b739a0ef5fecf6eff5)
+stash drop exit=0
+refs/stash: MISSING
+Deleted branch archive/task-pipeline-89abcdef (was 91b11bf).
+packed own archive delete exit=0
+archive/task-pipeline-89abcdef: MISSING
+
+== [BASE] fetch with host fetch.prune=true and the gate's fm/gone deleted, WITHOUT the launch entry
+From /private/tmp/nm-live-packed.M6jx1v/gate
+ - [deleted]         (none)     -> no-mistakes/fm/gone
+exit=0
+
+== [BASE] same fetch WITH the launch GIT_CONFIG entry fm-spawn.sh adds
+fetch.prune=false
+exit=0
+fm/gone still tracked: no
+
+== [BASE] git gc from the worktree
+error: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+error: cannot lock ref 'main-worktree/HEAD': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/HEAD.lock': Operation not permitted
+error: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+error: cannot lock ref 'refs/heads/main': Unable to create '/private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/main.lock': Operation not permitted
+error: failed to run reflog
+gc exit=0
+
+== [BASE] observation: own branch packed by Main's gc, refs/heads/fm folder gone, then a worker commit
+refs/heads entry: archive
+fatal: cannot lock ref 'HEAD': unable to create directory for /private/tmp/nm-live-packed.M6jx1v/home/projects/project/.git/refs/heads/fm/task
+commit exit=128
+
+== [BASE] final: fm/other -> 91b11bfd3ef4d1a272d89ca769414059238a1099 (real 91b11bfd3ef4d1a272d89ca769414059238a1099)

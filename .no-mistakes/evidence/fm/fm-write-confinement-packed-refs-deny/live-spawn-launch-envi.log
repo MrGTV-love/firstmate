@@ -1,0 +1,18 @@
+LIVE: empty config/launch-env-allowlist present (env -i path)
+LIVE omp delivered launch probe:
+  foreign=refused
+  status=appended
+  tmpdir=/tmp/fm-settle-confined-omp-z8
+  confinement=seatbelt-v1
+  fetch-prune=false
+  staged launch lines with env -i: 1
+LIVE: empty config/launch-env-allowlist present (env -i path)
+LIVE claude delivered launch probe:
+  foreign=refused
+  status=appended
+  tmpdir=/tmp/fm-settle-confined-claude-z8
+  confinement=seatbelt-v1
+  fetch-prune=false
+  staged launch lines with env -i: 1
+ok - measured harness launches run inside their generated write profile
+# live env -i settle variant passed
