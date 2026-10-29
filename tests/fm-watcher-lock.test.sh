@@ -347,6 +347,83 @@ SH
   pass 'SIGKILL owner loss independently cleans a progressing TERM-resistant check tree'
 }
 
+test_check_backstop_stops_endless_progress_as_unknown() {
+  local dir state ledger pid endless mode i
+  for mode in spin spam; do
+    dir=$(make_case "check-backstop-$mode")
+    state="$dir/state"
+    ledger="$dir/durations.jsonl"
+    # Completed runs of about 100 ms calibrate a one-second backstop for this key.
+    for i in 1 2 3 4 5; do
+      FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record "check.a-$mode" 100 0 2>/dev/null \
+        || fail 'could not write the duration fixture'
+    done
+    {
+      printf '#!/usr/bin/env bash\n'
+      # shellcheck disable=SC2016 # The generated check expands its own PID and state.
+      printf 'printf "%%s\\n" "$$" > "$FM_STATE_OVERRIDE/endless-pid"\n'
+      if [ "$mode" = spin ]; then
+        printf 'while :; do :; done\n'
+      else
+        printf 'while :; do printf "retrying\\n" >&2; sleep 0.1; done\n'
+      fi
+    } > "$state/a-$mode.check.sh"
+    printf '#!/usr/bin/env bash\nprintf "after-ran\\n"\n' > "$state/b-after.check.sh"
+    chmod 0700 "$state/a-$mode.check.sh" "$state/b-after.check.sh"
+    for i in "a-$mode" b-after; do
+      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" "$i" >/dev/null \
+        || fail "registration of $i failed"
+    done
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_FILE="$ledger" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=30 \
+      "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch.err"
+    [ -s "$state/endless-pid" ] || fail "$mode check never started: $(cat "$dir/watch.err")"
+    IFS= read -r endless < "$state/endless-pid"
+    if is_live_non_zombie "$endless"; then
+      kill -KILL "$endless" 2>/dev/null || true
+      fail "$mode check outlived its backstop"
+    fi
+    [ -e "$state/.last-check" ] || fail "$mode check blocked the rest of the sweep: $(cat "$dir/watch.err")"
+    grep -F "check a-$mode stopped after" "$state/.watch-triage.log" 2>/dev/null \
+      | grep -F '(backstop); result unknown, retry next pass' >/dev/null \
+      || fail "$mode backstop did not name the check and its runtime: $(cat "$state/.watch-triage.log" 2>/dev/null)"
+    grep -F "check: $state/b-after.check.sh: after-ran" "$state/.wake-queue" >/dev/null \
+      || fail "the check after a $mode backstop did not run"
+    ! grep -F "a-$mode.check.sh" "$state/.wake-queue" >/dev/null \
+      || fail "a $mode backstop produced a check verdict"
+  done
+  pass 'a spinning or stderr-spamming check ends at its ledger backstop as unknown and the sweep continues'
+}
+
+test_check_stderr_capture_keeps_a_capped_tail() {
+  local dir state
+  dir=$(make_case check-stderr-cap)
+  state="$dir/state"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      CHECK_STDERR_CAP_BYTES=4096
+      CHECK_STDERR_TAIL_BYTES=1024
+      seen_tick() { cp "$FM_CHECK_OUTPUT.stderr" "$STATE/stderr-seen" 2>/dev/null || true; }
+      FM_CAPTURE_TICK=seen_tick run_owned_capture 10 0 discard bash -c '\''head -c 100000 /dev/zero | tr "\\0" x >&2; printf "\\nTAIL-MARK\\n" >&2; sleep 3; printf check-finished'\'' || exit 21
+      [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = check-finished ] || exit 22
+      size=$(wc -c < "$STATE/stderr-seen") || exit 23
+      [ "$size" -le 4096 ] || exit 24
+      grep -F TAIL-MARK "$STATE/stderr-seen" >/dev/null || exit 25
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "private stderr capture was not capped to its tail: $(cat "$dir/capture.err")"
+  pass 'private check stderr is capped and keeps its newest tail'
+}
+
 test_check_wait_has_no_per_tick_processes() {
   local dir state fakebin
   dir=$(make_case check-wait-processes)
@@ -388,7 +465,7 @@ SH
       ! kill -0 "$descendant_pid" 2>/dev/null || exit 30
       [ ! -s "$FM_TEST_WAIT_LAUNCHES" ] || exit 31
       CHECK_TIMEOUT=2
-      run_check_capture "$STATE/controller-check.sh" || exit 32
+      run_check_capture controller "$STATE/controller-check.sh" || exit 32
       [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 33
       IFS= read -r controller_child_pid < "$STATE/controller-child-pid"
       ! kill -0 "$controller_child_pid" 2>/dev/null || exit 34
@@ -3144,6 +3221,8 @@ test_slow_check_beats_but_stopped_poll_goes_stale
 test_check_inactivity_configuration_and_launch_allowance
 test_check_progress_survives_fivefold_slowdown
 test_check_sigkill_owner_cleans_progressing_tree
+test_check_backstop_stops_endless_progress_as_unknown
+test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings
 test_lock_single_winner_under_concurrency

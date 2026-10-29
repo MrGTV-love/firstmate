@@ -145,6 +145,15 @@ SH
   fm_gh_http_shim "$home/fakebin"
 }
 
+# duration_fixture <ledger> <key> <milliseconds>: five completed samples, so the
+# ledger calibrates <key> to a short inactivity interval (p95 x 3, whole seconds).
+duration_fixture() {
+  local _
+  for _ in 1 2 3 4 5; do
+    FM_DURATION_FILE=$1 python3 "$ROOT/bin/fm-duration.py" record "$2" "$3" 0 2>/dev/null || return 1
+  done
+}
+
 with_home() {
   local home=$1; shift
   PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" GH_SHIM_LOG="$home/forge/shim.log" \
@@ -700,7 +709,8 @@ test_clock_or_stall_preserves_evidence() { # exhaust|hang
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   /bin/date +%s > "$home/forge/clock"
   printf '%s\n' "$mode" > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_INACTIVITY=1 "$ROOT/bin/fm-contributions.sh" poll) \
+  duration_fixture "$home/durations.jsonl" contributions.read 300 || fail 'could not write the duration fixture'
+  out=$(with_home "$home" env FM_DURATION_FILE="$home/durations.jsonl" "$ROOT/bin/fm-contributions.sh" poll) \
     || fail "poll failed ($mode)"
   [ -z "$out" ] || fail "a clock leap or unknown read printed a failure: $out"
   grep -F 'api repos/o/r/pulls/8' "$home/forge/calls" >/dev/null \
@@ -928,7 +938,8 @@ test_progressing_reads_survive_fivefold_slowdown() {
     wrap_forge "$home"
     mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
     printf 'progress\n' > "$home/forge/fault"
-    out=$(with_home "$home" env FM_CONTRIBUTIONS_INACTIVITY=2 FORGE_PROGRESS_DELAY="0.$factor" \
+    duration_fixture "$home/durations.jsonl" contributions.read 600 || fail 'could not write the duration fixture'
+    out=$(with_home "$home" env FM_DURATION_FILE="$home/durations.jsonl" FORGE_PROGRESS_DELAY="0.$factor" \
       "$ROOT/bin/fm-contributions.sh" poll) || fail 'slow progressing read failed'
     [ -z "$out" ] || fail "slow progressing read printed unavailable: $out"
     jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
@@ -949,7 +960,8 @@ test_unmeasured_url_does_not_starve_the_tail() {
   mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   printf 'hang\n' > "$home/forge/fault"
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_INACTIVITY=1 "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll failed'
+  duration_fixture "$home/durations.jsonl" contributions.read 300 || fail 'could not write the duration fixture'
+  out=$(with_home "$home" env FM_DURATION_FILE="$home/durations.jsonl" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll failed'
   [ -z "$out" ] || fail "unknown read printed unavailable: $out"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" || fail 'unknown read rewrote freshness'
   for task in second third; do
@@ -984,7 +996,8 @@ test_armed_shim_preserves_unknown_read_evidence() {
   printf 'hang\n' > "$home/forge/fault"
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
   with_home "$home" "$ROOT/bin/fm-contributions.sh" arm >/dev/null || fail 'arm failed'
-  out=$(with_home "$home" env FM_CONTRIBUTIONS_INACTIVITY=1 bash "$home/state/contributions.check.sh") || fail 'shim failed'
+  duration_fixture "$home/durations.jsonl" contributions.read 300 || fail 'could not write the duration fixture'
+  out=$(with_home "$home" env FM_DURATION_FILE="$home/durations.jsonl" bash "$home/state/contributions.check.sh") || fail 'shim failed'
   [ -z "$out" ] || fail "shim reported unknown as unavailable: $out"
   cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" || fail 'shim rewrote an unknown observation'
   pass 'registered shim preserves unknown-read evidence using runtime inactivity policy'

@@ -22,7 +22,7 @@ set -u
 CHECK="$ROOT/bin/fm-mail-check.sh"
 TMP_ROOT=$(fm_test_tmproot fm-mail-check)
 
-# Clear ambient mail configuration and inactivity so the poll's
+# Clear ambient mail configuration so the poll's
 # readiness decision comes from the fixture .env alone. The check binary is an
 # explicit argument so the missing-mail-plane case runs a copy without fm-mail.sh.
 run_check() {
@@ -30,7 +30,6 @@ run_check() {
   shift 3
   local status=0
   env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST \
-    -u FM_MAIL_CHECK_INACTIVITY \
     FM_CHECK_TIMEOUT=30 \
     "$@" FM_HOME="$home" PATH="$FAKEBIN:$PATH" \
     "$check" check >"$out" 2>&1 || status=$?
@@ -73,6 +72,15 @@ enter_mailbox() {
 }
 
 REAL_PYTHON=$(command -v python3)
+# duration_fixture <ledger> <key> <milliseconds>: five completed samples, so the
+# ledger calibrates <key> to a short inactivity interval (p95 x 3, whole seconds).
+duration_fixture() {
+  local _
+  for _ in 1 2 3 4 5; do
+    FM_DURATION_FILE=$1 python3 "$ROOT/bin/fm-duration.py" record "$2" "$3" 0 2>/dev/null || return 1
+  done
+}
+
 FAKEBIN="$TMP_ROOT/fakebin"
 
 test_help_and_usage() {
@@ -228,13 +236,14 @@ test_silent_poll_is_unknown_and_retried() {
   write_env "$home"
   # shellcheck disable=SC2016 # PID and home are resolved by the generated poll process.
   enter_mailbox "$home" 'printf "%s\n" "$$" > "$FM_HOME/poll-pid"; sleep 30'
+  duration_fixture "$home/durations.jsonl" mail-check.poll 300 || fail 'could not write the duration fixture'
   for attempt in 1 2; do
     out="$home/out-$attempt.txt"
-    run_check "$home" "$out" "$CHECK" FM_MAIL_CHECK_INACTIVITY=1
+    run_check "$home" "$out" "$CHECK" FM_DURATION_FILE="$home/durations.jsonl"
     assert_contains "$(cat "$out")" 'mail: poll progress unknown' 'silent poll must be unknown, not clean or failed'
     IFS= read -r child < "$home/poll-pid"
     ! kill -0 "$child" 2>/dev/null || fail 'silent mail child survived cleanup'
-    [ "$(wc -l < "$out" | tr -d '[:space:]')" = 1 ] || fail 'unknown poll must report one line'
+    [ "$(grep -c '^mail:' "$out")" = 1 ] || fail 'unknown poll must report one line'
   done
   pass 'a silent mail poll is stopped, cleaned up and retried on the next check'
 }
@@ -256,7 +265,8 @@ SH
   for factor in 1 5; do
     home=$(make_home "progress-$factor")
     out="$home/out.txt"
-    run_check "$home" "$out" "$tmpbin/fm-mail-check.sh" FM_MAIL_CHECK_INACTIVITY=2 FM_TEST_DELAY="0.$factor"
+    duration_fixture "$home/durations.jsonl" mail-check.poll 600 || fail 'could not write the duration fixture'
+    run_check "$home" "$out" "$tmpbin/fm-mail-check.sh" FM_DURATION_FILE="$home/durations.jsonl" FM_TEST_DELAY="0.$factor"
     assert_contains "$(cat "$out")" 'mail: new mail: woke for 42' "${factor}x poll lost its new mail"
   done
   pass 'mail polls deliver new mail at 1x and 5x while making progress'

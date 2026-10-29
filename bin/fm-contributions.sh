@@ -46,8 +46,8 @@
 #
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_run_progress: only a lack of output and
-# process-tree CPU progress stops it. FM_CONTRIBUTIONS_INACTIVITY sets a minimum for
-# the contributions.read ledger interval (five-second cold-start fallback).
+# process-tree CPU progress for the contributions.read ledger interval stops
+# it (five-second cold start until that key is calibrated).
 # There is no sweep deadline or observation reservation. A stopped read is
 # unknown: keep that URL's saved observation untouched and retry next pass.
 # A pull observation has three waves: core, six independent reads, closing
@@ -110,8 +110,7 @@ case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
 # A stopped read is unknown, leaving the saved coherent observation untouched.
 # shellcheck source=bin/fm-duration-lib.sh
 . "$SCRIPT_DIR/fm-duration-lib.sh"
-READ_INACTIVITY=$(fm_duration_limit contributions.read "${FM_CONTRIBUTIONS_INACTIVITY:-5}")
-case "$READ_INACTIVITY" in ''|*[!0-9]*|0*) fail 'invalid read inactivity interval' ;; esac
+READ_INACTIVITY=$(fm_duration_measured contributions.read 5)
 TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
 cleanup() {

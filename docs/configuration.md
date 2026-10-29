@@ -3371,7 +3371,8 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 | `FM_TOOL_UPDATE_PROBE_SECS` | Ledger-derived, cold-start 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
 
 A sweep has no wall-clock budget.
-An inactive probe reports uncertainty, preserves the last completed report and cadence stamp, and is retried on the next pass.
+An inactive probe reports uncertainty, and the sweep still stamps its attempt, so it is retried after the normal interval.
+A repeated identical unknown stays silent; a changed result, known or unknown, reports.
 The script header owns the progress and ledger mechanics.
 
 ## Mail plane (.env)
@@ -3418,7 +3419,7 @@ Arming writes `state/mail.check.sh` and registers it with the watcher's slow-che
 Same-line silence is only for a proven no-op: a successful poll with no new mail, or a repeated identical pre-wake failure that cannot have queued mail.
 A fail-closed poll that already queued a wake, and a timeout, always print so the watcher wakes to drain it.
 
-`bin/fm-mail-check.sh` owns progress-based poll supervision and its `FM_MAIL_CHECK_INACTIVITY` minimum; a stopped poll is unknown and retried, not evidence of an empty inbox.
+`bin/fm-mail-check.sh` owns progress-based poll supervision; a stopped poll is unknown and retried, not evidence of an empty inbox.
 `bin/fm-mail-check.sh disarm` removes the standing check.
 
 ## Slack decision plane (.env)
@@ -4468,9 +4469,7 @@ FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
 FM_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before a stuck-busy stale wake; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/fm-task-inbox-lib.sh
-FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; ledger check.inactivity, cold-start 30s; output or process-tree CPU progress keeps checks alive
-FM_CONTRIBUTIONS_INACTIVITY=   # optional positive whole-second read inactivity minimum; ledger contributions.read, cold-start 5s
-FM_MAIL_CHECK_INACTIVITY=   # optional positive whole-second poll inactivity minimum; ledger mail-check.poll, cold-start 15s
+FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; ledger check.inactivity, cold-start 30s; output or process-tree CPU progress keeps checks alive until the per-check runtime backstop (ledger check.<name> p99 x 10, cold-start 900s), whose expiry is unknown and retried next pass
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400

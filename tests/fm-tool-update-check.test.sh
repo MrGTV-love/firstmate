@@ -571,7 +571,7 @@ test_git_probes_continue_after_an_unknown_command() {
   report=$(cat "$out")
   assert_contains "$report" 'check unknown' 'silent version probe was not detected'
   assert_contains "$report" '2 commits behind' 'a stopped version probe prevented independent git evidence'
-  assert_absent "$home/state/.tool-updates" 'unknown read recorded a completed sweep'
+  assert_grep 'fm-tool-updates-v1' "$home/state/.tool-updates" 'an unknown sweep did not stamp its attempt'
   pass 'independent git reads still run after a silent command probe is stopped'
 }
 
@@ -794,6 +794,54 @@ test_probes_are_skipped_between_intervals() {
   expect_code 0 "$status" "due cadence run exit"
   assert_contains "$(cat "$out")" "did not report a version" "the run after the interval did not probe"
   pass "probes run once per interval, not on every poll"
+}
+
+test_a_repeated_unknown_is_silent_until_the_result_changes() {
+  local home first second log out now dir report
+  home=$(make_home unknown-cadence)
+  first="$home/first/bin"
+  second="$home/second/bin"
+  log="$home/probes.log"
+  mkdir -p "$first" "$second"
+  for dir in "$first" "$second"; do
+    cat > "$dir/$TOOL" <<SH
+#!/usr/bin/env bash
+printf 'probed\n' >> '$log'
+sleep 30
+SH
+    chmod 0755 "$dir/$TOOL"
+  done
+  write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
+  out="$home/out.txt"
+  now=1700000000
+  cadence_run() {  # <path> <epoch>
+    local status=0
+    FM_HOME="$home" PATH="$1" FM_CHECK_TIMEOUT=30 FM_TOOL_UPDATE_INTERVAL=900 FM_TOOL_UPDATE_NOW="$2" \
+      FM_TOOL_UPDATE_PROBE_SECS=1 "$CHECK" >"$out" 2>&1 || status=$?
+    expect_code 0 "$status" "cadence run at $2"
+  }
+
+  cadence_run "$(fixture_path "$first")" "$now"
+  assert_contains "$(cat "$out")" "herdr check unknown: $first/$TOOL" 'the first unknown was not reported'
+  [ "$(wc -l < "$log" | tr -d '[:space:]')" = 1 ] || fail 'the first sweep did not probe exactly once'
+
+  cadence_run "$(fixture_path "$first")" "$((now + 300))"
+  [ ! -s "$out" ] || fail "an unknown sweep was retried inside the interval: $(cat "$out")"
+  [ "$(wc -l < "$log" | tr -d '[:space:]')" = 1 ] || fail 'the unknown attempt did not stamp the cadence'
+
+  cadence_run "$(fixture_path "$first")" "$((now + 901))"
+  [ "$(wc -l < "$log" | tr -d '[:space:]')" = 2 ] || fail 'the unknown was not retried after the interval'
+  [ ! -s "$out" ] || fail "a repeated identical unknown woke again: $(cat "$out")"
+
+  cadence_run "$(fixture_path "$second")" "$((now + 1802))"
+  assert_contains "$(cat "$out")" "herdr check unknown: $second/$TOOL" 'a different unknown stayed silent'
+
+  make_copy "$second" "$TOOL" 'no version here'
+  cadence_run "$(fixture_path "$second")" "$((now + 2703))"
+  report=$(cat "$out")
+  assert_contains "$report" "herdr check failed: $second/$TOOL did not report a version" 'unknown to known stayed silent'
+  assert_not_contains "$report" 'check unknown' 'a known result still read as unknown'
+  pass 'a repeated unknown is retried on the cadence silently and reports only when its result changes'
 }
 
 test_sweep_is_independent_of_watcher_inactivity() {
@@ -1038,6 +1086,7 @@ test_findings_are_reported_once_until_they_change
 test_an_overlong_report_says_it_was_cut
 test_a_finding_past_the_cut_is_still_reported
 test_probes_are_skipped_between_intervals
+test_a_repeated_unknown_is_silent_until_the_result_changes
 test_sweep_is_independent_of_watcher_inactivity
 test_invalid_environment_and_action_refuse
 test_arm_registers_the_check_and_disarm_removes_it

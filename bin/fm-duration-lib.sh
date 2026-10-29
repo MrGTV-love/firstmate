@@ -5,6 +5,9 @@
 # fm_duration_record_batch: stdin rows key<TAB>ms<TAB>exit<TAB>calibration<TAB>load-start<TAB>load-end<TAB>timed-out
 # fm_duration_limit <key> <existing-fallback-seconds> [95|99]
 #   a fallback of 0 means the caller had no deadline: record only, never a measured kill
+# fm_duration_measured <key> <cold-start-seconds> [95|99] [margin]
+#   the measured limit once the key is calibrated, else the cold start; unlike
+#   fm_duration_limit, the cold start is not a floor under the measured value
 # fm_duration_timed <key> <existing-fallback-seconds> <command...>
 # Only the owner of a limit says a timeout happened (timed-out 1); an exit of
 # 124 or 137 is never inferred to be one here.
@@ -66,6 +69,15 @@ fm_duration_limit() {
     printf 'fm-duration: calibration unavailable for %s (%s); existing fallback %ss\n' "$1" "$bound" "$2" >&2
     printf '%s\n' "$2"
   fi
+}
+
+fm_duration_measured() {
+  local bound=
+  if [ "${FM_DURATION_FILE:-}" != off ] && [ -r "$FM_DURATION_HELPER" ] && command -v python3 >/dev/null 2>&1; then
+    bound=$(python3 "$FM_DURATION_HELPER" limit "$1" --fallback 0 --percentile "${3:-95}" --margin "${4:-3}") || bound=
+  fi
+  case "$bound" in ''|0|*[!0-9]*) bound=$2 ;; esac
+  printf '%s\n' "$bound"
 }
 
 fm_duration_timed() {
