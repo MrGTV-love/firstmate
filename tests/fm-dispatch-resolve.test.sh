@@ -1082,6 +1082,7 @@ eval "set -- ${profile_line#  profile: }"
 assert_equals 4 "$#" 'shell-safe profile output preserves four argument boundaries'
 assert_equals claude "$2" 'shell-safe profile output preserves the selected harness'
 assert_equals 'foo --harness grok   profile: injected' "$4" 'shell-safe profile output keeps model flags inside one argument'
+assert_not_contains "$OUT" '--dispatch-rule' 'a rule without a fallback or hard eligibility records no dispatch rule'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 pass 'rules snapshots and shell quoting preserve the profile protocol'
 
@@ -1717,7 +1718,8 @@ assert_contains "$OUT" "--dispatch-rule 'rule_4'" 'the launch carries the select
 jq 'del(.rules[3].fallback)' "$TMP_ROOT/pool-rules.json" > "$RULES"
 keyed -- "$BRIEF"
 assert_contains "$OUT" "--model 'openai-codex/gpt-6-luna'" 'a rule without a fallback policy still resolves'
-assert_not_contains "$OUT" '--dispatch-rule' 'a rule without a fallback policy emits no rule identifier'
+assert_not_contains "$OUT" '--dispatch-rule' 'a rule without a fallback policy is not named for launch'
+assert_not_contains "$OUT" '--dispatch-route' 'a rule without a fallback policy carries no route constraint'
 cp "$TMP_ROOT/pool-rules.json" "$RULES"
 jq '.reports[].metadata.meterStates.chat = {allowed:false,limitReached:true}' "$POOL" > "$TMP_ROOT/all-empty.json"
 cp "$POOL" "$TMP_ROOT/mixed-pool.json"

@@ -559,7 +559,7 @@ family_for_basename() {
     fm-check-unregister.test.sh|fm-pipeline-spend.test.sh|fm-pr-check-security.test.sh|fm-pr-ready-reconcile.test.sh|\
     fm-pr-merge.test.sh|fm-pr-merge-forges.test.sh|fm-pr-merge-checks.test.sh|\
     fm-pr-reviewers.test.sh|fm-pr-state.test.sh|\
-    fm-review-diff.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
+    fm-review-diff.test.sh|fm-review-record.test.sh|fm-teardown.test.sh|fm-teardown-pool.test.sh|\
     fm-teardown-cleanup.test.sh|fm-idle-session-reap.test.sh|fm-open-loops.test.sh|fm-x-mode.test.sh)
       printf '%s\n' pr-forge
       ;;
@@ -1097,6 +1097,7 @@ tests/fm-retired-jev-write-remainder-shapes.test.sh 1646
 tests/fm-retired-jev-write-secrets-kind.test.sh 1971
 tests/fm-retired-persistent-cd-guard.test.sh 2647
 tests/fm-review-agent-select.test.sh 11455
+tests/fm-review-record.test.sh 7000
 tests/fm-rovo-harness.test.sh 22027
 tests/fm-rovo-signals-live-e2e.test.sh 1068
 tests/fm-secondmate-busy-contract-live-e2e.test.sh 7103
@@ -3397,7 +3398,7 @@ else
       trap - EXIT HUP INT TERM
       set +e
       unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
-        FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
+        FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND FM_TASK_ID 2>/dev/null || true
       cd "$ROOT" || exit 1
       if declare -F fm_duration_load >/dev/null 2>&1; then
         fm_duration_load >"$work/load_start"

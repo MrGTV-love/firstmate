@@ -240,6 +240,8 @@ That run is not a clean pass, so the family was run again.
 `tests/fm-open-loops.test.sh` exited 0 in that run (757127 ms), and the three fm-pr-merge groups exited 0 at 350116 ms for `fm-pr-merge-checks`, 246981 ms for `fm-pr-merge-forges`, and 265749 ms for `fm-pr-merge`.
 This clean run covers the 15-member family, so `fm-pr-merge-forges` and `fm-pr-merge-checks` keep the family's four-worker admission.
 It does not admit them to the proven-isolated portable set; the [fm-pr-merge split re-check](#fm-pr-merge-split-re-check) owns that decision.
+`tests/fm-review-record.test.sh` joined this family after that date, so the fifteen-member result does not cover it.
+A 2026-10-27 fourteen-member run on the pre-split family passed with the new test, but the current seventeen-member family has not been re-proved, so the 2026-10-24 fifteen-member result remains the recorded admission for the members it measured.
 
 ### secondmate: admitted
 

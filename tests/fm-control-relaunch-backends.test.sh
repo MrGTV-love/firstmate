@@ -2099,20 +2099,29 @@ test_retiring_omp_for_an_unconfined_harness_removes_its_profile() {
 }
 
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
-  local dir out rc recorded id
-  for recorded in none stale; do
-    id=rl-unlabeled-$recorded
-    dir=$(new_case "unlabeled-$recorded" "$id")
-    add_ship_task "$dir" "$id" claude
-    [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
-    mkdir -p "$dir/home/config"
-    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
-    out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
-    expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
-    assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
-    assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
-  done
-  pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
+  local dir out rc id
+  id=rl-unlabeled-none
+  dir=$(new_case unlabeled-none "$id")
+  add_ship_task "$dir" "$id" claude
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+  out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+  expect_code 0 "$rc" "no recorded rule with an ambiguous match must relaunch as before: $out"
+  assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
+  assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
+
+  # A recorded identity that no longer resolves is treated as no recorded rule:
+  # recovery keeps the task's own route instead of inferring a replacement.
+  id=rl-unlabeled-stale
+  dir=$(new_case unlabeled-stale "$id")
+  add_ship_task "$dir" "$id" claude
+  printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config"
+  printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"lab/native-model","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+  out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+  expect_code 0 "$rc" "a recorded rule that no longer exists must relaunch as before: $out"
+  assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
+  pass "relaunch treats an ambiguous or vanished recorded rule as no fallback and keeps prior behavior"
 }
 
 control_relaunch_test_cases=(
