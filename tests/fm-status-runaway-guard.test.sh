@@ -1960,16 +1960,4 @@ tests=(
   test_a_killed_drain_leaves_no_large_cursor_file
 )
 # Named cases run alone, for a mutation check of one guard.
-if [ "$#" -gt 0 ]; then
-  for requested in "$@"; do
-    selected=0
-    for candidate in "${tests[@]}"; do
-      [ "$requested" != "$candidate" ] || selected=1
-    done
-    [ "$selected" -eq 1 ] || fail "unknown status runaway guard test: $requested"
-  done
-  tests=("$@")
-fi
-for selected_test in "${tests[@]}"; do
-  "$selected_test" || exit "$?"
-done
+fm_test_run_cases "${tests[@]}" -- "$@"
