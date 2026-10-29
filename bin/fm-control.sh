@@ -326,6 +326,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
@@ -2633,7 +2635,7 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home
+  local exit_result state note_line secondmate_home owned_copy
   local -a spawn_args
   local owned_path
 
@@ -2727,6 +2729,15 @@ do_relaunch() {
   require_live_task_attribution \
     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
+  if [ "${#OWNED_PATHS[@]}" -gt 0 ]; then
+    ! grep -q '^slot_owned_path=' "$META" \
+      || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
+    owned_copy=$WT
+    [ "$RELOCATING" = 0 ] || owned_copy=$RELOCATE_DEST
+    [ "$KIND" != secondmate ] &&
+      { grep -q '^slot_manifest=' "$META" || fm_slot_required "$(fm_meta_get "$META" project)" "$owned_copy"; } \
+      || die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+  fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
     [ -n "$secondmate_home" ] || secondmate_home=$WT

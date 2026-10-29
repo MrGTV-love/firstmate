@@ -6205,7 +6205,7 @@ fi
 # A governed provisioner refusal retains this assigned copy and its endpoint:
 # ordinary acquisition-abort cleanup must not release its lease or remove it.
 spawn_slot_refused() {
-  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref=
+  local recovery="$STATE/.$ID.meta.slot-refused.${BASHPID:-$$}" window=$T owned_path update_recovery=0 fresh_ref= adopt_scope=0
   [ "$BACKEND" != orca ] || window=$W
   SPAWN_TREEHOUSE_ABORT_TARGET=
   HERDR_PROJECTION_ABORT_CLEANUP=0
@@ -6262,8 +6262,17 @@ spawn_slot_refused() {
     # on this refused attempt; save that identity once, preserving the entire
     # existing contract so newer upstream cannot change subsequent retries.
     [ "$SPAWN_FRESH_SOURCE" = 0 ] || fresh_ref=$SLOT_SOURCE_REF
-    if awk -v head="$FM_SLOT_PREPARED_HEAD" -v ref="$fresh_ref" -v sha="$SLOT_SOURCE_SHA" \
-      '1; END { print "slot_prepared_head=" head; if (ref != "") print "slot_source_ref=" ref "\nslot_base_sha=" sha }' "$RELAUNCH_META" >"$recovery"; then
+    if ! grep -q '^slot_owned_path=' "$RELAUNCH_META" &&
+      fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} >/dev/null 2>&1; then
+      adopt_scope=1
+    fi
+    if {
+      awk -v head="$FM_SLOT_PREPARED_HEAD" -v ref="$fresh_ref" -v sha="$SLOT_SOURCE_SHA" \
+        '1; END { print "slot_prepared_head=" head; if (ref != "") print "slot_source_ref=" ref "\nslot_base_sha=" sha }' "$RELAUNCH_META" &&
+        if [ "$adopt_scope" = 1 ]; then
+          for owned_path in "${SLOT_OWNED_PATHS[@]}"; do echo "slot_owned_path=$owned_path"; done
+        fi
+    } >"$recovery"; then
       update_recovery=1
     else
       echo "error: could not record prepared task commit $FM_SLOT_PREPARED_HEAD for retained copy $WT" >&2

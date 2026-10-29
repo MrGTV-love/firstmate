@@ -1307,8 +1307,8 @@ preflight_task_temp() { # <id>
 
 # An origin-equal attempt records no local plan. When its retry finishes first
 # admission after accepted local-only A advanced main, it must select A afresh.
-run_local_only_equal_retry_case() { # <advanced|diverged|invalid-ref>
-  local shape=$1 id rec remote local_a before out rc=0 publisher
+run_local_only_equal_retry_case() { # <advanced|adopted-scope|diverged|invalid-ref>
+  local shape=$1 id rec remote local_a before out rc=0 publisher scope_args=()
   id="pool-local-equal-$shape-$(date +%s)-$$"
   rec=$(make_case "$id" "$id")
   read_case_record "$rec"
@@ -1325,16 +1325,26 @@ run_local_only_equal_retry_case() { # <advanced|diverged|invalid-ref>
   remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
   [ "$(git -C "$PROJECT_DIR" rev-parse main)" = "$remote" ] || fail 'origin-equal setup was not equal'
   preflight_task_temp "$id"
-  printf 'operator scratch\n' > "$POOL_DIR/scratch.txt"
-  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
-    --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
-  [ "$rc" -ne 0 ] || fail 'dirty origin-equal attempt admitted a worker'
-  assert_contains "$out" dirty_worktree 'origin-equal attempt did not refuse dirt'
-  [ ! -e "$CASE_DIR/provisioner.called" ] || fail 'dirty copy reached the project owner'
-  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'dirty refusal lost recovery'
+  if [ "$shape" = adopted-scope ]; then
+    # The first attempt omits scope; its remedy supplies scope on retry.
+    out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
+      --mode local-only --yolo off 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'scope-less governed attempt admitted a worker'
+    assert_contains "$out" 'governed slot provisioning requires --owned-path' 'scope-less attempt lost its remedy'
+    assert_no_grep 'slot_owned_path=' "$HOME_DIR/state/$id.meta" 'scope-less attempt recorded inferred scope'
+    scope_args=(--owned-path README.md)
+  else
+    printf 'operator scratch\n' > "$POOL_DIR/scratch.txt"
+    out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
+      --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'dirty origin-equal attempt admitted a worker'
+    assert_contains "$out" dirty_worktree 'origin-equal attempt did not refuse dirt'
+    rm "$POOL_DIR/scratch.txt"
+  fi
+  [ ! -e "$CASE_DIR/provisioner.called" ] || fail 'unprepared copy reached the project owner'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'first refusal lost recovery'
   assert_no_grep 'slot_source_ref=' "$HOME_DIR/state/$id.meta" 'origin-equal attempt recorded a local plan'
   assert_no_grep 'slot_prepared_head=' "$HOME_DIR/state/$id.meta" 'unprepared attempt gained a prepared identity'
-  rm "$POOL_DIR/scratch.txt"
   printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
   git -C "$PROJECT_DIR" add accepted-a.txt
   git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
@@ -1356,7 +1366,7 @@ run_local_only_equal_retry_case() { # <advanced|diverged|invalid-ref>
   before=$(git -C "$POOL_DIR" rev-parse HEAD)
   make_stopped_tmux "$CASE_DIR/stopped"
   rc=0
-  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" 2>&1) || rc=$?
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" ${scope_args[@]+"${scope_args[@]}"} 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "deliberately refusing project admitted a relaunched worker: $shape"
   case "$shape" in
     diverged|invalid-ref)
@@ -1370,7 +1380,7 @@ run_local_only_equal_retry_case() { # <advanced|diverged|invalid-ref>
       git -C "$PROJECT_DIR" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null && fail 'refused source selection prepared a task branch'
       assert_no_grep 'slot_prepared_head=' "$HOME_DIR/state/$id.meta" 'refused source selection recorded a prepared identity'
       ;;
-    advanced)
+    advanced|adopted-scope)
       assert_contains "$out" fixture_provisioner_must_refuse 'retry did not reach the project owner'
       python3 - "$CASE_DIR/relaunch.called" "$local_a" <<'PY'
 import json, sys
@@ -1384,6 +1394,16 @@ PY
       assert_grep "slot_prepared_head=$local_a" "$HOME_DIR/state/$id.meta" 'retry lost prepared identity'
       assert_grep 'slot_source_ref=refs/heads/main' "$HOME_DIR/state/$id.meta" 'retry lost its selected local source'
       assert_grep "slot_base_sha=$local_a" "$HOME_DIR/state/$id.meta" 'retry lost its selected local baseline'
+      [ "$(sed -n 's/^slot_owned_path=//p' "$HOME_DIR/state/$id.meta")" = README.md ] || fail 'refused retry lost its exact scope'
+      if [ "$shape" = adopted-scope ]; then
+        cp "$HOME_DIR/state/$id.meta" "$CASE_DIR/meta.adopted"
+        rc=0
+        out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/override.called" run_relaunch "$id" --owned-path scripts 2>&1) || rc=$?
+        [ "$rc" -ne 0 ] || fail 'retry replaced adopted scope'
+        assert_contains "$out" 'cannot override it' 'adopted-scope override refusal reason missing'
+        [ ! -e "$CASE_DIR/override.called" ] || fail 'scope override reached the project owner'
+        cmp -s "$HOME_DIR/state/$id.meta" "$CASE_DIR/meta.adopted" || fail 'scope override changed the task record'
+      fi
       # The prepared retry resumes that exact local pin rather than an origin merge-base.
       rc=0
       out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/resume.called" run_relaunch "$id" 2>&1) || rc=$?
@@ -1394,7 +1414,9 @@ import json, sys
 args = json.load(open(sys.argv[1]))
 assert args[args.index('--base-source') + 1] == 'local-default', args
 assert args[args.index('--base-sha') + 1] == sys.argv[2], args
+assert args[args.index('--owned-path') + 1] == 'README.md' and args.count('--owned-path') == 1, args
 PY
+      [ "$(sed -n 's/^slot_owned_path=//p' "$HOME_DIR/state/$id.meta")" = README.md ] || fail 'normal retry changed its exact scope'
       ;;
   esac
   [ "$(git -C "$CASE_DIR/origin.git" rev-parse refs/heads/main)" = "$remote" ] || fail 'retry published or relabeled local work'
@@ -1404,6 +1426,7 @@ PY
 
 test_local_only_equal_retry_selects_local() { run_local_only_equal_retry_case advanced; }
 test_local_only_equal_retry_divergence() { run_local_only_equal_retry_case diverged; }
+test_local_only_adopted_scope_retry() { run_local_only_equal_retry_case adopted-scope; }
 test_local_only_equal_retry_invalid_ref() { run_local_only_equal_retry_case invalid-ref; }
 
 write_passing_slot_owner() { # <repository>
@@ -1498,7 +1521,7 @@ PY
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1510,6 +1533,7 @@ test_local_only_source_binding
 test_local_only_unprepared_retry
 test_local_only_equal_retry_selects_local
 test_local_only_equal_retry_divergence
+test_local_only_adopted_scope_retry
 test_local_only_equal_retry_invalid_ref
 test_legacy_relaunch_scope_adoption
 test_local_only_origin_early

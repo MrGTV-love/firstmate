@@ -2245,6 +2245,54 @@ if [ "${1:-}" = --jev-guard ]; then
   exit 0
 fi
 
+# Invalid relaunch scope refuses at the public control boundary, before the
+# live worker is stopped or its record changes; fm-spawn stays the final guard.
+test_owned_path_relaunch_refuses_before_stop() {
+  local shape dir id out rc before meta note_args
+  for shape in scoped ungoverned secondmate; do
+    id="rl-owned-$shape-$$"
+    [ ! -e "/tmp/fm-$id" ] && [ ! -L "/tmp/fm-$id" ] || fail "task temp already exists: /tmp/fm-$id"
+    dir=$(new_case "owned-$shape" "$id")
+    meta="$dir/home/state/$id.meta"
+    note_args=(--note 'scope the existing task')
+    if [ "$shape" = secondmate ]; then
+      note_args=()
+      mkdir -p "$dir/home/config" "$dir/home/data/$id"
+      printf '# secondmate brief\n' > "$dir/home/data/$id/brief.md"
+      fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
+      mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin" "$dir/smhome/scripts/git-stability"
+      printf '%s\n' "$id" > "$dir/smhome/.fm-secondmate-home"
+      printf '# agents\n' > "$dir/smhome/AGENTS.md"
+      printf 'raise SystemExit(2)\n' > "$dir/smhome/scripts/git-stability/provision_existing_slot.py"
+      printf 'window=fmses:fm-%s\nendpoint_task_id=%s\nworktree=%s\nproject=%s\nharness=claude\nkind=secondmate\nmode=secondmate\nyolo=off\nmodel=default\neffort=default\nhome=%s\n' \
+        "$id" "$id" "$dir/smhome" "$dir/smhome" "$dir/smhome" > "$meta"
+      printf '%s\n' "fm-$id" > "$dir/fake/windows"
+      printf '%s' "$dir/smhome" > "$dir/fake/cwd"
+    else
+      add_ship_task "$dir" "$id" claude
+      if [ "$shape" = scoped ]; then
+        mkdir -p "$dir/proj/scripts/git-stability"
+        printf 'raise SystemExit(2)\n' > "$dir/proj/scripts/git-stability/provision_existing_slot.py"
+        printf 'slot_owned_path=README.md\n' >> "$meta"
+      fi
+    fi
+    before=$(cat "$meta")
+    out=$(run_control "$dir" "$id" relaunch --owned-path scripts ${note_args[@]+"${note_args[@]}"}); rc=$?
+    expect_code 1 "$rc" "$shape --owned-path relaunch must refuse: $out"
+    if [ "$shape" = scoped ]; then
+      assert_contains "$out" 'cannot override it' 'recorded scope override reason missing'
+    else
+      assert_contains "$out" 'only scopes a governed task with no recorded slot scope' "$shape scope refusal reason missing"
+    fi
+    assert_contains "$out" 'the running agent was not stopped' "$shape refusal did not report the worker untouched"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "$shape scope refusal stopped the running agent"
+    [ ! -s "$dir/fake/literal" ] || fail "$shape scope refusal sent lifecycle input"
+    [ "$before" = "$(cat "$meta")" ] || fail "$shape scope refusal changed the task record"
+    [ ! -e "$dir/home/state/$id.control-relaunch" ] || fail "$shape scope refusal opened a relaunch transaction"
+  done
+  pass "fm-control relaunch: invalid --owned-path refuses before stopping a live worker"
+}
+
 control_relaunch_test_cases=(
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
@@ -2280,6 +2328,7 @@ test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
 test_stale_replacement_model_refuses_before_stop_unless_pinned
+test_owned_path_relaunch_refuses_before_stop
 test_relaunch_onto_an_unverified_harness_is_refused
 test_no_helper_task_refuses_a_harness_switch_before_stopping
 test_prior_harness_turnend_registry_entry_is_cleared
