@@ -1,0 +1,21 @@
+scenario=shared-merged claimant PR state=MERGED shared slot=$CASE/thr/.treehouse/proj-45252b/1/proj
+== before: pool-dir=$CASE/thr/.treehouse/proj-ca8cba
+== before: OLD pool state (holds the shared copy) sha256=04aaa6164e490aa2
+{"name":"1","path":"$CASE/thr/.treehouse/proj-45252b/1/proj","lease_holder":null}
+== before: NEW pool state sha256=13562dcf35c5da89
+{"name":"1","path":"$CASE/thr/.treehouse/proj-ca8cba/1/proj","lease_holder":null}
+== before: claimant record present: yes; parked record present: yes; shared copy HEAD: fm/shared-superseded-slot
+== fm-teardown.sh shared-superseded exit=0
+== treehouse commands teardown ran:
+pool-dir
+lease --path $CASE/thr/.treehouse/proj-45252b/1/proj --lease-holder parked
+== teardown output (pool/refusal lines):
+notice: task shared-superseded shares recorded pool slot $CASE/thr/.treehouse/proj-45252b/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+🌳 Leased worktree 1 at $CASE/thr/.treehouse/proj-45252b/1/proj. Run 'treehouse return $CASE/thr/.treehouse/proj-45252b/1/proj' to release it.
+teardown shared-superseded complete (window fmses:fm-shared-superseded; shared pool slot $CASE/thr/.treehouse/proj-45252b/1/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+== after: pool-dir=$CASE/thr/.treehouse/proj-ca8cba
+== after: OLD pool state (holds the shared copy) sha256=2e342f7665a48018
+{"name":"1","path":"$CASE/thr/.treehouse/proj-45252b/1/proj","lease_holder":"parked"}
+== after: NEW pool state sha256=13562dcf35c5da89
+{"name":"1","path":"$CASE/thr/.treehouse/proj-ca8cba/1/proj","lease_holder":null}
+== after: claimant record present: no; parked record present: yes; shared copy HEAD: fm/shared-superseded-slot

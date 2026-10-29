@@ -1,0 +1,3 @@
+warning: pool slot $CASE/thr/.treehouse/project-a1622e/2/project is in a superseded Treehouse pool folder (treehouse status from $CASE/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it
+🌳 Worktree returned to pool.
+teardown: released the lease on $CASE/thr/.treehouse/project-f5daf5/2/project that an earlier teardown took by slot name in the project's current pool

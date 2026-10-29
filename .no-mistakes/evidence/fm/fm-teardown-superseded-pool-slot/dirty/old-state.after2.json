@@ -1,0 +1,19 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.Cj9GdW/dirty/thr/.treehouse/project-042db1/1/project",
+      "created_at": "2026-10-29T18:00:34.086917-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "7734af4bd8915d13f73440695ab57756ea1e31b4f63118a72fe2b563a3e0c537"
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.Cj9GdW/dirty/thr/.treehouse/project-042db1/2/project",
+      "created_at": "2026-10-29T18:00:34.762736-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "21bbdb7009e185e9d4603ef119dfac3e4669efd8ce8373a56d67cb9e3f87c0e3"
+    }
+  ]
+}

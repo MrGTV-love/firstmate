@@ -1,0 +1,3 @@
+notice: task shared-superseded shares recorded pool slot $CASE/thr/.treehouse/proj-1052e7/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: task shared-superseded shares pool slot $CASE/thr/.treehouse/proj-1052e7/1/proj, but its recorded PR is not confirmed merged and its own branch fm/shared-superseded is not proved landed; its record and slot claim stay in place.
+Land this task's deliverable before re-running bin/fm-teardown.sh shared-superseded; the shared slot will not be returned.

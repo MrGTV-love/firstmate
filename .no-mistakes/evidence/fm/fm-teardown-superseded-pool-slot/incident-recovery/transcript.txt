@@ -1,0 +1,55 @@
+scenario=incident-recovery  recorded copy=$CASE/thr/.treehouse/project-8c5be8/2/project
+old pool=$CASE/thr/.treehouse/project-8c5be8  new pool=$CASE/thr/.treehouse/project-e77ccb
+== before: treehouse pool-dir (from project): $CASE/thr/.treehouse/project-e77ccb
+== before: OLD pool state $CASE/thr/.treehouse/project-8c5be8/treehouse-state.json sha256=dda3b1ba7c1ec7f4
+{"name":"1","path":"$CASE/thr/.treehouse/project-8c5be8/1/project","leased":false,"lease_holder":null}
+{"name":"2","path":"$CASE/thr/.treehouse/project-8c5be8/2/project","leased":false,"lease_holder":null}
+== before: NEW (current) pool state $CASE/thr/.treehouse/project-e77ccb/treehouse-state.json sha256=643cb043a717f18a
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","leased":true,"lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","leased":false,"lease_holder":null}
+== before: real treehouse status --json (current pool)
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","status":"leased","lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","status":"available","lease_holder":""}
+== before: recorded copy HEAD: fm/pool-root claim-marker: present
+== before: task record present: yes
+== run1: fm-teardown.sh task-x1 exit=1 (code: /Users/charlesabrooker/tmp/fm-base-bin.dGshUF/bin)
+== run1: treehouse commands teardown ran:
+lease 2 --lease-holder task-x1
+== run1: teardown stderr (filtered to pool lines):
+🌳 Leased worktree 2 at $CASE/thr/.treehouse/project-e77ccb/2/project. Run 'treehouse return $CASE/thr/.treehouse/project-e77ccb/2/project' to release it.
+REFUSED: pool slot $CASE/thr/.treehouse/project-8c5be8/2/project was not proved durably leased after reservation; retaining its task record and contents
+== after1: treehouse pool-dir (from project): $CASE/thr/.treehouse/project-e77ccb
+== after1: OLD pool state $CASE/thr/.treehouse/project-8c5be8/treehouse-state.json sha256=dda3b1ba7c1ec7f4
+{"name":"1","path":"$CASE/thr/.treehouse/project-8c5be8/1/project","leased":false,"lease_holder":null}
+{"name":"2","path":"$CASE/thr/.treehouse/project-8c5be8/2/project","leased":false,"lease_holder":null}
+== after1: NEW (current) pool state $CASE/thr/.treehouse/project-e77ccb/treehouse-state.json sha256=8269d7f8f9027beb
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","leased":true,"lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","leased":true,"lease_holder":"task-x1"}
+== after1: real treehouse status --json (current pool)
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","status":"leased","lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","status":"leased","lease_holder":"task-x1"}
+== after1: recorded copy HEAD: fm/pool-root claim-marker: present
+== after1: task record present: yes
+== rerun with the fixed code (target commit)
+== run2: fm-teardown.sh task-x1 exit=0 (code: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M64WB5CT0JQ3NYPW4N4MGYCN/bin)
+== run2: treehouse commands teardown ran:
+pool-dir
+status --json
+return $CASE/thr/.treehouse/project-e77ccb/2/project --if-lease-holder task-x1
+return --force $CASE/thr/.treehouse/project-8c5be8/2/project
+== run2: teardown stderr (filtered to pool lines):
+warning: pool slot $CASE/thr/.treehouse/project-8c5be8/2/project is in a superseded Treehouse pool folder (treehouse status from $CASE/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it
+🌳 Worktree returned to pool.
+teardown: released the lease on $CASE/thr/.treehouse/project-e77ccb/2/project that an earlier teardown took by slot name in the project's current pool
+== after2: treehouse pool-dir (from project): $CASE/thr/.treehouse/project-e77ccb
+== after2: OLD pool state $CASE/thr/.treehouse/project-8c5be8/treehouse-state.json sha256=dda3b1ba7c1ec7f4
+{"name":"1","path":"$CASE/thr/.treehouse/project-8c5be8/1/project","leased":false,"lease_holder":null}
+{"name":"2","path":"$CASE/thr/.treehouse/project-8c5be8/2/project","leased":false,"lease_holder":null}
+== after2: NEW (current) pool state $CASE/thr/.treehouse/project-e77ccb/treehouse-state.json sha256=643cb043a717f18a
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","leased":true,"lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","leased":false,"lease_holder":null}
+== after2: real treehouse status --json (current pool)
+{"name":"1","path":"$CASE/thr/.treehouse/project-e77ccb/1/project","status":"leased","lease_holder":"other-task"}
+{"name":"2","path":"$CASE/thr/.treehouse/project-e77ccb/2/project","status":"available","lease_holder":""}
+== after2: recorded copy HEAD: detached claim-marker: absent
+== after2: task record present: no

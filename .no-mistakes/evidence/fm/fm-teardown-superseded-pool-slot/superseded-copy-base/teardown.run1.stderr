@@ -1,0 +1,2 @@
+🌳 Leased worktree 2 at $CASE/thr/.treehouse/project-0010ea/2/project. Run 'treehouse return $CASE/thr/.treehouse/project-0010ea/2/project' to release it.
+REFUSED: pool slot $CASE/thr/.treehouse/project-cb9a00/2/project was not proved durably leased after reservation; retaining its task record and contents

@@ -1,0 +1,1 @@
+warning: pool slot $CASE/thr/.treehouse/project-042db1/2/project is in a superseded Treehouse pool folder (treehouse status from $CASE/project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it

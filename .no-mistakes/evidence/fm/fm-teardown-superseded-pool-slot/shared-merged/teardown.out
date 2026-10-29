@@ -1,0 +1,4 @@
+notice: task shared-superseded shares recorded pool slot $CASE/thr/.treehouse/proj-45252b/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+🌳 Leased worktree 1 at $CASE/thr/.treehouse/proj-45252b/1/proj. Run 'treehouse return $CASE/thr/.treehouse/proj-45252b/1/proj' to release it.
+teardown shared-superseded complete (window fmses:fm-shared-superseded; shared pool slot $CASE/thr/.treehouse/proj-45252b/1/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: shared-superseded just finished (this home keeps no markdown backlog at $CASE/case/home/data/backlog.md). Update $CASE/case/home/data/backlog.md - move shared-superseded to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.

@@ -1,0 +1,9 @@
+ok - a copy in a superseded pool folder is returned by path and no slot of the current pool is leased, returned or changed
+ok - a lease this task took on a same-named slot of the current pool is released by the conditional return, and no other holder is touched
+grep: /Users/charlesabrooker/tmp/fm-teardown-tests.zV7qdx/pool-superseded-unlanded-dirty/treehouse.log: No such file or directory
+grep: /Users/charlesabrooker/tmp/fm-teardown-tests.zV7qdx/pool-superseded-unlanded-commit/treehouse.log: No such file or directory
+ok - an unlanded copy in a superseded pool folder is refused without touching any pool, and the landed retry returns it by path
+ok - an unreadable Treehouse status keeps project custody and never leases a slot by name
+ok - a copy in the pool folder treehouse pool-dir names is reserved by name with no listing, and the same folder name under another root is returned by path
+ok - the current-pool proof follows the directory treehouse pool-dir prints, and otherwise reads one status listing per project
+pool rc=0

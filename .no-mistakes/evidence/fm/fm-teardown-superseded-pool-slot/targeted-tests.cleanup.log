@@ -1,0 +1,5 @@
+ok - a held close in a superseded pool folder leases the slot by its exact path and releases only this task's misdirected lease
+ok - a held close in a superseded pool folder refuses with the treehouse build it needs when lease --path is missing, and changes nothing
+ok - a held close that refuses releases no misdirected lease, and its rerun, with its own slot leased by path, releases it
+ok - an ordinary rerun after a refused held close releases the misdirected lease its task still holds
+cleanup rc=0

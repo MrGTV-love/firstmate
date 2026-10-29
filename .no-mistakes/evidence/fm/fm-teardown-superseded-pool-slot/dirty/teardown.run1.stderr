@@ -1,0 +1,5 @@
+REFUSED: worktree $CASE/thr/.treehouse/project-042db1/2/project has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  unfinished.txt
+Commit them (or get the captain's explicit OK to discard, then --force).

@@ -1,0 +1,23 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.j8nGL1/superseded-copy-base/thr/.treehouse/project-0010ea/1/project",
+      "created_at": "2026-10-29T17:57:17.411723-05:00",
+      "leased": true,
+      "lease_id": "aea13f1a1b46c639a80998e5c6fb6b31",
+      "lease_holder": "other-task",
+      "leased_at": "2026-10-29T17:57:19.240043-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "bcb38eecaf674dbcc14bc4bc201deda2ef73830c5a650b72640ef18f4e46d755"
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.j8nGL1/superseded-copy-base/thr/.treehouse/project-0010ea/2/project",
+      "created_at": "2026-10-29T17:57:17.881385-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "3f8732d130d12734905d361244d6851ac68c0a355d230268d9ae3f5a8506813d"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+scenario=shared-unmerged claimant PR state=OPEN shared slot=$CASE/thr/.treehouse/proj-1052e7/1/proj
+== before: pool-dir=$CASE/thr/.treehouse/proj-83ae4c
+== before: OLD pool state (holds the shared copy) sha256=042c5cb2dfc8f6e3
+{"name":"1","path":"$CASE/thr/.treehouse/proj-1052e7/1/proj","lease_holder":null}
+== before: NEW pool state sha256=ed7072abf9b1e836
+{"name":"1","path":"$CASE/thr/.treehouse/proj-83ae4c/1/proj","lease_holder":null}
+== before: claimant record present: yes; parked record present: yes; shared copy HEAD: fm/shared-superseded-slot
+== fm-teardown.sh shared-superseded exit=1
+== treehouse commands teardown ran:
+pool-dir
+== teardown output (pool/refusal lines):
+notice: task shared-superseded shares recorded pool slot $CASE/thr/.treehouse/proj-1052e7/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: task shared-superseded shares pool slot $CASE/thr/.treehouse/proj-1052e7/1/proj, but its recorded PR is not confirmed merged and its own branch fm/shared-superseded is not proved landed; its record and slot claim stay in place.
+Land this task's deliverable before re-running bin/fm-teardown.sh shared-superseded; the shared slot will not be returned.
+== after: pool-dir=$CASE/thr/.treehouse/proj-83ae4c
+== after: OLD pool state (holds the shared copy) sha256=042c5cb2dfc8f6e3
+{"name":"1","path":"$CASE/thr/.treehouse/proj-1052e7/1/proj","lease_holder":null}
+== after: NEW pool state sha256=ed7072abf9b1e836
+{"name":"1","path":"$CASE/thr/.treehouse/proj-83ae4c/1/proj","lease_holder":null}
+== after: claimant record present: yes; parked record present: yes; shared copy HEAD: fm/shared-superseded-slot

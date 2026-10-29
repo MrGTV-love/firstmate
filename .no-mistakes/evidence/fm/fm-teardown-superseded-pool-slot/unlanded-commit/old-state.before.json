@@ -1,0 +1,19 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.R0LnAe/unlanded-commit/thr/.treehouse/project-a2586f/1/project",
+      "created_at": "2026-10-29T18:00:03.265739-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "039dc2e9495a0e62ab2c2b72ec0ee050d440982daa531ddfb1d79387ff9277be"
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/tmp/fm-teardown-tests.R0LnAe/unlanded-commit/thr/.treehouse/project-a2586f/2/project",
+      "created_at": "2026-10-29T18:00:03.710936-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "1ac8442d97af8a7713370100ca80eebb47cf25813d412a534dd8a50c7cb02d23"
+    }
+  ]
+}
