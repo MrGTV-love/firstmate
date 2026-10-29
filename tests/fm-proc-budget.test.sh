@@ -937,16 +937,20 @@ import subprocess
 import sys
 
 count, ready, pids = int(sys.argv[1]), sys.argv[2], sys.argv[3]
-kids = [subprocess.Popen(["/bin/sleep", "86400"]) for _ in range(count)]
-with open(pids + ".tmp", "w") as handle:
-    handle.write(" ".join(str(kid.pid) for kid in kids))
-os.rename(pids + ".tmp", pids)
-open(ready, "w").close()
-sys.stdin.read()  # the test closes the pipe, or dies, to release the neighbours
-for kid in kids:
-    kid.kill()
-for kid in kids:
-    kid.wait()
+kids = []
+try:
+    for _ in range(count):
+        kids.append(subprocess.Popen(["/bin/sleep", "86400"]))
+    with open(pids + ".tmp", "w") as handle:
+        handle.write(" ".join(str(kid.pid) for kid in kids))
+    os.rename(pids + ".tmp", pids)
+    open(ready, "w").close()
+    sys.stdin.read()  # the test closes the pipe, or dies, to release the neighbours
+finally:
+    for kid in kids:
+        kid.kill()
+    for kid in kids:
+        kid.wait()
 PY
   mkfifo "$dir/hold"
   python3 "$dir/spawn.py" "$1" "$dir/ready" "$dir/pids" <"$dir/hold" &
