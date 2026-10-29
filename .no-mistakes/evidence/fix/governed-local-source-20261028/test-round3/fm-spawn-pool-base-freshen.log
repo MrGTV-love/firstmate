@@ -1,0 +1,149 @@
+start=2026-10-29T22:21:53Z head=957c2adebfec710297ad6ccab9763aacab162871 python3=3.13.6 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+load={ 13.42 12.69 11.64 } user_procs=1132 note=final head
+ok - local-only source selection: local
+ok - local-only source selection: equal
+ok - local-only source selection: remote
+ok - local-only source selection: diverged
+ok - local-only source selection: missing
+ok - local-only source selection: alias
+ok - local-only source selection: moved
+ok - local-only source selection: feature
+ok - local-only source selection: dirty
+ok - local-only source selection: dirty-copy
+ok - local-only source selection: publish
+ok - local-only source selection: scout
+ok - local-only source selection: no-origin
+ok - local-only source selection: named
+ok - qualified local source is bound to provisioner arguments, refusal metadata and relaunch
+ok - unprepared refused retry preserves local evidence and work without origin fallback
+ok - origin-equal refused retry after local advance: advanced
+ok - origin-equal refused retry after local advance: diverged
+ok - origin-equal refused retry after local advance: adopted-scope
+ok - origin-equal refused retry after local advance: invalid-ref
+ok - legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it
+origin_control=origin-early task=pool-local-origin-early-1793312633-21309 exit=1 expected_local=ea0c9108f748b8c83616c9b3340ce1a584397b17 assigned_before=ee7a360997910be42e68169531a02bf325a101f6 assigned_after=ee7a360997910be42e68169531a02bf325a101f6
+A_FILE_MISSING
+error: local-only origin qualification changed since source planning; preserving the assigned copy
+ok - local-only source selection: origin-early
+origin_control=origin-late task=pool-local-origin-late-1793312635-21309 exit=1 expected_local=c63ec77d58443da677b01c66311a783a662da2cf assigned_before=25f8be25be0b034fa3ed61fe3ebbe27ea79df582 assigned_after=25f8be25be0b034fa3ed61fe3ebbe27ea79df582
+A_FILE_MISSING
+warning: task pool-local-origin-late-1793312635-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-late-1793312635-21309/home/data/pool-local-origin-late-1793312635-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-late-1793312635-21309/home/data/pool-local-origin-late-1793312635-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-late-1793312635-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-late-1793312635-21309/home/data/pool-local-origin-late-1793312635-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-late-1793312635-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only origin qualification changed since source planning; preserving the assigned copy
+ok - local-only source selection: origin-late
+origin_control=origin-freshness task=pool-local-origin-freshness-1793312639-21309 exit=1 expected_local=c6c9304de6c0779c0188fa728b9daad1252b62cc assigned_before=887166def8d56e57c066e1e5163ecdd3432bd760 assigned_after=887166def8d56e57c066e1e5163ecdd3432bd760
+A_FILE_MISSING
+warning: task pool-local-origin-freshness-1793312639-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-freshness-1793312639-21309/home/data/pool-local-origin-freshness-1793312639-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-freshness-1793312639-21309/home/data/pool-local-origin-freshness-1793312639-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-freshness-1793312639-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-freshness-1793312639-21309/home/data/pool-local-origin-freshness-1793312639-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-freshness-1793312639-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: planned local-only origin qualification vanished at freshness; preserving the assigned copy
+ok - local-only source selection: origin-freshness
+origin_control=origin-copy-missing task=pool-local-origin-copy-missing-1793312644-21309 exit=1 expected_local=b30ffec334ed7a1835dd3d10440a15f80f027c54 assigned_before=b446e103be33d72c8fd3e3a5f8567d161cdc8575 assigned_after=b446e103be33d72c8fd3e3a5f8567d161cdc8575
+A_FILE_MISSING
+warning: task pool-local-origin-copy-missing-1793312644-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-copy-missing-1793312644-21309/home/data/pool-local-origin-copy-missing-1793312644-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-copy-missing-1793312644-21309/home/data/pool-local-origin-copy-missing-1793312644-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-copy-missing-1793312644-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-copy-missing-1793312644-21309/home/data/pool-local-origin-copy-missing-1793312644-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-copy-missing-1793312644-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only primary and assigned-copy origin qualification disagree; preserving the assigned copy
+ok - local-only source selection: origin-copy-missing
+origin_control=origin-primary-missing task=pool-local-origin-primary-missing-1793312648-21309 exit=1 expected_local=094259e3d121d20f2d735fd132922713f55ce979 assigned_before=2c4306f0fcd1e1fa891cf89a16162247f93457a8 assigned_after=2c4306f0fcd1e1fa891cf89a16162247f93457a8
+A_FILE_MISSING
+warning: task pool-local-origin-primary-missing-1793312648-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-primary-missing-1793312648-21309/home/data/pool-local-origin-primary-missing-1793312648-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-primary-missing-1793312648-21309/home/data/pool-local-origin-primary-missing-1793312648-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-local-origin-primary-missing-1793312648-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-local-origin-primary-missing-1793312648-21309/home/data/pool-local-origin-primary-missing-1793312648-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-local-origin-primary-missing-1793312648-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: local-only primary and assigned-copy origin qualification disagree; preserving the assigned copy
+ok - local-only source selection: origin-primary-missing
+case=introduced kind=ship task=pool-owner-introduced-ship-1793312652-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309 before=b428008b37533d13768f20f211a35ae4c91bce72 advanced=e38b802da5bfa66c3ab09e4e41ecca6c595ad89f temp=/tmp/fm-pool-owner-introduced-ship-1793312652-21309 staging=/tmp/fm-pool-owner-introduced-ship-1793312652-21309+e762c05ec4b78af30aaaa371946e4ee541349ec2a2d8bc0b1b0797ea4791865a
+spawn_exit=1 after=e38b802da5bfa66c3ab09e4e41ecca6c595ad89f
+warning: task pool-owner-introduced-ship-1793312652-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309/home/data/pool-owner-introduced-ship-1793312652-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309/home/data/pool-owner-introduced-ship-1793312652-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-introduced-ship-1793312652-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309/home/data/pool-owner-introduced-ship-1793312652-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-introduced-ship-1793312652-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@b428008b37533d13768f20f211a35ae4c91bce72 origin=main@e38b802da5bfa66c3ab09e4e41ecca6c595ad89f selected=origin/main@e38b802da5bfa66c3ab09e4e41ecca6c595ad89f
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-introduced-ship-1793312652-21309 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309/home/data/pool-owner-introduced-ship-1793312652-21309/slot-provision-spawn.99930.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-ship-1793312652-21309/pool and endpoint firstmate:fm-pool-owner-introduced-ship-1793312652-21309 retained; no worker admitted
+ok - final revision governance: introduced ship
+case=introduced kind=scout task=pool-owner-introduced-scout-1793312658-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-scout-1793312658-21309 before=b0a159a09d287b5dd3e91669a9168c75fde24ca0 advanced=24c014b79e6d463e115f86b46e30e1ed95f2ca28 temp=/tmp/fm-pool-owner-introduced-scout-1793312658-21309 staging=/tmp/fm-pool-owner-introduced-scout-1793312658-21309+a0a8ea18ec78df6f36ace86e5c1d938a18eb7e06c887a28b35ecf3b2af4284b5
+spawn_exit=1 after=24c014b79e6d463e115f86b46e30e1ed95f2ca28
+warning: task pool-owner-introduced-scout-1793312658-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-scout-1793312658-21309/home/data/pool-owner-introduced-scout-1793312658-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-introduced-scout-1793312658-21309 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-scout-1793312658-21309/home/data/pool-owner-introduced-scout-1793312658-21309/slot-provision-spawn.18756.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-introduced-scout-1793312658-21309/pool and endpoint firstmate:fm-pool-owner-introduced-scout-1793312658-21309 retained; no worker admitted
+ok - final revision governance: introduced scout
+case=missing-scope kind=ship task=pool-owner-missing-scope-ship-1793312663-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-missing-scope-ship-1793312663-21309 before=750b0e852a4d3aee86de379ada2184aefb2a7d53 advanced=e855480bb9c298372a7a77d467ca30c6cd9faa10 temp=/tmp/fm-pool-owner-missing-scope-ship-1793312663-21309 staging=/tmp/fm-pool-owner-missing-scope-ship-1793312663-21309+f0b8830ef287fd8f2e788ce5f88b28de0e1ccd598f1538f656511d70b0338494
+spawn_exit=1 after=e855480bb9c298372a7a77d467ca30c6cd9faa10
+warning: task pool-owner-missing-scope-ship-1793312663-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-missing-scope-ship-1793312663-21309/home/data/pool-owner-missing-scope-ship-1793312663-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-missing-scope-ship-1793312663-21309/home/data/pool-owner-missing-scope-ship-1793312663-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-missing-scope-ship-1793312663-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-missing-scope-ship-1793312663-21309/home/data/pool-owner-missing-scope-ship-1793312663-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-missing-scope-ship-1793312663-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@750b0e852a4d3aee86de379ada2184aefb2a7d53 origin=main@e855480bb9c298372a7a77d467ca30c6cd9faa10 selected=origin/main@e855480bb9c298372a7a77d467ca30c6cd9faa10
+error: governed slot provisioning requires --owned-path <tracked-path> (repeatable)
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-missing-scope-ship-1793312663-21309/pool and endpoint firstmate:fm-pool-owner-missing-scope-ship-1793312663-21309 retained; no worker admitted
+ok - final revision governance: missing-scope ship
+case=present kind=ship task=pool-owner-present-ship-1793312667-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309 before=68d4e7e364d8b5526e5b76ddd4cb48cc252a3e34 advanced=fdd8d6c74307446e7c76bd590e59e75f2784fa57 temp=/tmp/fm-pool-owner-present-ship-1793312667-21309 staging=/tmp/fm-pool-owner-present-ship-1793312667-21309+7882ab613539a1a73e7ad3b7098603434603c1c8c04a0b49a943105f0cdb620f
+spawn_exit=1 after=68d4e7e364d8b5526e5b76ddd4cb48cc252a3e34
+warning: task pool-owner-present-ship-1793312667-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309/home/data/pool-owner-present-ship-1793312667-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309/home/data/pool-owner-present-ship-1793312667-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-present-ship-1793312667-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309/home/data/pool-owner-present-ship-1793312667-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-present-ship-1793312667-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@68d4e7e364d8b5526e5b76ddd4cb48cc252a3e34 origin=main@fdd8d6c74307446e7c76bd590e59e75f2784fa57 selected=origin/main@fdd8d6c74307446e7c76bd590e59e75f2784fa57
+{"state": "BLOCKED", "reason": "fixture_provisioner_must_refuse"}
+error: slot provisioner refused task pool-owner-present-ship-1793312667-21309 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309/home/data/pool-owner-present-ship-1793312667-21309/slot-provision-spawn.43440.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-present-ship-1793312667-21309/pool and endpoint firstmate:fm-pool-owner-present-ship-1793312667-21309 retained; no worker admitted
+ok - final revision governance: present ship
+case=absent kind=ship task=pool-owner-absent-ship-1793312675-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-absent-ship-1793312675-21309 before=16ccba394791a24e988ee79018e1d79ec505e18e advanced=5c1961a652a91f53ca6f2a311014f01b9824184e temp=/tmp/fm-pool-owner-absent-ship-1793312675-21309 staging=/tmp/fm-pool-owner-absent-ship-1793312675-21309+7bc21c3379adc8c518f2742ed047b683fbb7d3d09a426f2d94520380f388c749
+spawn_exit=0 after=5c1961a652a91f53ca6f2a311014f01b9824184e
+warning: task pool-owner-absent-ship-1793312675-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-absent-ship-1793312675-21309/home/data/pool-owner-absent-ship-1793312675-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-absent-ship-1793312675-21309/home/data/pool-owner-absent-ship-1793312675-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-absent-ship-1793312675-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-absent-ship-1793312675-21309/home/data/pool-owner-absent-ship-1793312675-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-absent-ship-1793312675-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@16ccba394791a24e988ee79018e1d79ec505e18e origin=main@5c1961a652a91f53ca6f2a311014f01b9824184e selected=origin/main@5c1961a652a91f53ca6f2a311014f01b9824184e
+skill selection for pool-owner-absent-ship-1793312675-21309: unavailable - no TypeSafe or OpenRouter key
+confinement audit: harness=codex write_confinement=unconfined-macos-codex
+spawned pool-owner-absent-ship-1793312675-21309 harness=codex kind=ship mode=local-only yolo=off window=firstmate:fm-pool-owner-absent-ship-1793312675-21309 worktree=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-absent-ship-1793312675-21309/pool
+ok - final revision governance: absent ship
+case=removed kind=ship task=pool-owner-removed-ship-1793312682-21309 root=/Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309 before=293e5e14fe48fb7bda91cb1c200b99b15679a4a2 advanced=ed4c8e30f6f15d9189791e120e871ed8823de3c8 temp=/tmp/fm-pool-owner-removed-ship-1793312682-21309 staging=/tmp/fm-pool-owner-removed-ship-1793312682-21309+9add6ad75b8630eab34507261eea0c5539f571ab02f8b4fff75fbaf295722ad5
+spawn_exit=1 after=293e5e14fe48fb7bda91cb1c200b99b15679a4a2
+warning: task pool-owner-removed-ship-1793312682-21309: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309/home/data/pool-owner-removed-ship-1793312682-21309/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309/home/data/pool-owner-removed-ship-1793312682-21309/launch-brief.md records no ship branch; defaulting to legacy branch fm/pool-owner-removed-ship-1793312682-21309
+warning: /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309/home/data/pool-owner-removed-ship-1793312682-21309/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: pool-owner-removed-ship-1793312682-21309 ships mode=local-only while the standing posture for project is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+local-only source: local=main@293e5e14fe48fb7bda91cb1c200b99b15679a4a2 origin=main@ed4c8e30f6f15d9189791e120e871ed8823de3c8 selected=origin/main@ed4c8e30f6f15d9189791e120e871ed8823de3c8
+error: slot provisioner is missing from assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309/pool
+error: assigned copy /Users/charlesabrooker/tmp/fm-spawn-pool-base-freshen.yY1WOR/pool-owner-removed-ship-1793312682-21309/pool and endpoint firstmate:fm-pool-owner-removed-ship-1793312682-21309 retained; no worker admitted
+ok - final revision governance: removed ship
+ok - a remote-seeded secondmate home allocates and launches from its Treehouse pool
+ok - a Treehouse slot claim names the launched task, refuses when unclaimable, and is dropped by a locked abort
+ok - linked spawning home: primary preserves the primary before any refresh
+ok - linked spawning home: primary-alias preserves the primary before any refresh
+ok - linked spawning home: spawning preserves the primary before any refresh
+ok - linked spawning home: scout preserves the primary before any refresh
+ok - a stale pooled worktree refreshes to current origin/main before a crew branch is created
+ok - --base-branch picks the copy's starting point and is recorded; a missing or local-only base refuses
+ok - a spawn refuses when --base-branch and the brief's Base branch lines disagree
+ok - a Base branch line in the captain's intent neither blocks nor redirects a spawn
+ok - a based scout on a forge=gerrit project is refused at spawn
+ok - a stale pooled worktree resolves and refreshes a non-main default branch
+ok - direct-PR ships and scouts both refresh stale pooled worktrees before launch
+ok - a dirty pooled worktree is refused without discarding its local work
+ok - an unresolved remote default branch refuses the pooled worktree
+ok - an unreachable origin refuses a potentially stale pooled worktree
+ok - an origin-less pooled worktree launches as-is, skipping the freshness gate
+ok - a dirty origin-less pooled worktree is refused without discarding its local work
+ok - an origin configuration without a URL refuses the pooled worktree
+ok - an empty origin configuration section refuses the pooled worktree
+ok - an empty-only included origin section documents the accepted detection boundary
+ok - an inactive conditional origin include leaves the pooled worktree origin-less
+ok - an origin-less pool with a stale submodule pin refuses while naming both pins and no remedy
+ok - an unpushed submodule commit keeps the uncommitted-work refusal and survives it
+ok - work inside a submodule is still refused as uncommitted work, not called stale
+ok - a stale pin carrying real work is refused conservatively, never called stale
+ok - a stale pin beside other dirt yields the conservative refusal alone, with no stale-pin line
+# all fm-spawn-pool-base-freshen tests passed
+EXIT=0
+load_end={ 17.35 14.93 12.99 } end=2026-10-29T22:27:59Z

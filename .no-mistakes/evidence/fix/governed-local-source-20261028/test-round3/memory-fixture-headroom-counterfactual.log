@@ -1,0 +1,11 @@
+start=2026-10-29T22:42:42Z head=957c2adebfec710297ad6ccab9763aacab162871 python3=3.13.6 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+inherited_soft=10666 inherited_hard=16000 maxprocperuid=10666 user_procs=1038 extra_sleepers=1700
+fixture=old consume=0 trial=1 exit=99 user_procs_before=1034 at_release=1036 payload_nproc='2520 2520' pids=22783,22887, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213248 KiB; ended|
+fixture=old consume=1 trial=1 exit=128 user_procs_before=1072 at_release=2747 payload_nproc='' pids= stderr=/Users/charlesabrooker/.no-mistakes/worktrees/e871d0686a3b/01M64MA08ACXYHWXY8R4SJ7ZMA/bin/fm-proc-budget.sh: fork: Resource temporarily unavailable|
+fixture=new consume=0 trial=1 exit=99 user_procs_before=1017 at_release=1023 payload_nproc='10666 10666' pids=48836,48884, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213664 KiB; ended|
+fixture=new consume=1 trial=1 exit=99 user_procs_before=1025 at_release=2721 payload_nproc='10666 10666' pids=59805,59877, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213744 KiB; ended|
+fixture=old consume=0 trial=2 exit=99 user_procs_before=1031 at_release=1042 payload_nproc='2514 2514' pids=66424,66499, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 214112 KiB; ended|
+fixture=old consume=1 trial=2 exit=128 user_procs_before=1037 at_release=2740 payload_nproc='' pids= stderr=/Users/charlesabrooker/.no-mistakes/worktrees/e871d0686a3b/01M64MA08ACXYHWXY8R4SJ7ZMA/bin/fm-proc-budget.sh: fork: Resource temporarily unavailable|
+fixture=new consume=0 trial=2 exit=99 user_procs_before=1059 at_release=1056 payload_nproc='10666 10666' pids=85159,85231, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213536 KiB; ended|
+fixture=new consume=1 trial=2 exit=99 user_procs_before=1046 at_release=2734 payload_nproc='10666 10666' pids=268,354, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213392 KiB; ended|
+user_procs_end=1026 end=2026-10-29T22:43:11Z

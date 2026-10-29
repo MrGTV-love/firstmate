@@ -1,0 +1,43 @@
+start=2026-10-29T21:53:11Z head=9609c7169f6c27f3b74fa51f92bd0fdc6cfbf0ce python3=3.13.6 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+load={ 10.70 10.76 10.66 } user_procs=794 note=solo, after concurrent runs
+ok - invalid memory bounds refuse before launch
+ok - no memory option needs no reader or watcher
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+ok - default budget is the current count plus 1500
+ok - explicit extra sets the budget
+ok - a budget only ever tightens the limit it inherits
+ok - a retained soft limit seals the inherited hard limit
+ok - exit status and arguments pass through
+ok - bad calls and an unreadable process count never run the command
+ok - a budgeted runaway tree stops at depth 312 while an unbudgeted probe forks freely
+ok - invalid or combined own-procs calls refuse before launch
+ok - a Linux /proc row yields parent, group, start identity and zombie state
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - own-procs passes the exit status and arguments through
+ok - an unreadable sample is skipped and reported; only an unreadable launch table refuses
+ok - a background job left behind by a finished command is ended and the wrapper returns
+ok - TERM to the wrapper ends the whole tree and returns 128 plus the signal
+ok - a TERM caught at the release ends the started command and returns 128 plus the signal
+ok - a supervisor killed mid-run, alone or with its caller's group, leaves no tree member running
+ok - a runaway tree is stopped at its own limit (depth 134) and leaves no process behind
+ok - a lower outer own-tree limit counts and ends a nested wrapper's tree
+ok - the kernel limit still stops a tree the own-tree limit cannot reach
+ok - neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower
+EXIT=0
+load_end={ 9.77 10.50 10.57 } end=2026-10-29T21:54:07Z

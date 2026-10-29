@@ -1,0 +1,165 @@
+head=957c2adebfec710297ad6ccab9763aacab162871 start=2026-10-29T22:21:25Z
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.N4hHTT
+
+===== S1 named scout: refusal -> scout commits -> retry reaches owner
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e871d0686a3b/01M64MA08ACXYHWXY8R4SJ7ZMA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting named to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-named-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-named-50252/slot-provision-promote.51646.json
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/named-slot:
+refs/heads/main 87736da
+refs/heads/scout-work 87736da
+HEAD=87736da symbolic=refs/heads/scout-work
+PASS: S1 first promote refused (nonzero exit)
+PASS: S1 refusal shows project reason
+PASS: S1 own alias fm/<id> removed
+PASS: S1 scout back on scout-work at original commit
+PASS: S1 meta still scout, no ship instructions
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting named to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-named-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-named-50252/slot-provision-promote.63404.json
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/named-slot:
+refs/heads/main 87736da
+refs/heads/scout-work 9103ab5
+HEAD=9103ab5 symbolic=refs/heads/scout-work
+PASS: S1 retry not blocked; reaches project owner
+PASS: S1 advanced and original commits kept
+
+===== S2 detached scout: refusal -> detached commit -> retry
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting detached to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-detached-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-detached-50252/slot-provision-promote.68549.json
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/detached-slot:
+refs/heads/main f10e0aa
+HEAD=f10e0aa symbolic=DETACHED
+PASS: S2 refused, no preserve warning (alias proved unused)
+PASS: S2 copy restored detached at exact original commit
+PASS: S2 own alias removed
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting detached to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-detached-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-detached-50252/slot-provision-promote.72021.json
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/detached-slot:
+refs/heads/main f10e0aa
+HEAD=736e616 symbolic=DETACHED
+PASS: S2 retry not blocked; reaches project owner
+PASS: S2 detached work and original commit kept
+
+===== S3 project-declared alias: PASS manifest, scripts/ vs scripts mismatch
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting declared to no-mistakes off
+error: invalid slot provisioner attestation: provisioner identity mismatch: owned_paths
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/declared-slot.manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/declared-slot", "owner_id": "live-declared-50252", "branch": "fm/live-declared-50252", "base_sha": "0b18e096a801176aa23616d32c7b638a495131d0", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+error: slot provisioner refused task live-declared-50252 (exit 1); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-declared-50252/slot-provision-promote.76875.json
+warning: preserving task branch fm/live-declared-50252 created by this refused promotion: the project report may declare it
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/declared-slot:
+refs/heads/fm/live-declared-50252 0b18e09
+refs/heads/main 0b18e09
+refs/heads/scout-work 0b18e09
+HEAD=0b18e09 symbolic=refs/heads/scout-work
+--- manifest:
+{
+ "worktree_path": "/Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/declared-slot",
+ "owner_id": "live-declared-50252",
+ "branch": "fm/live-declared-50252",
+ "base_sha": "0b18e096a801176aa23616d32c7b638a495131d0",
+ "owned_paths": [
+  "scripts"
+ ],
+ "lifecycle_state": "worktree_active"
+}
+PASS: S3 attestation still refuses the mismatch
+PASS: S3 warns it preserves declared alias
+PASS: S3 declared alias kept
+PASS: S3 project manifest untouched, still names fm/<id>
+PASS: S3 meta scope not normalized/rewritten
+
+===== S4 adversarial: pre-existing fm/<id> branch survives refusal
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting existing to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-existing-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-existing-50252/slot-provision-promote.82609.json
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/existing-slot:
+refs/heads/fm/live-existing-50252 1cf3cf2
+refs/heads/main 1cf3cf2
+refs/heads/scout-work 1cf3cf2
+HEAD=1cf3cf2 symbolic=refs/heads/scout-work
+PASS: S4 pre-existing branch kept
+
+===== S5 adversarial: provisioner commits on the alias, then refuses
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting moved to no-mistakes off
+{"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_reasons": ["manifest_live_owner"]}
+error: slot provisioner refused task live-moved-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-moved-50252/slot-provision-promote.85091.json
+error: cannot lock ref 'refs/heads/fm/live-moved-50252': is at bd701380c31d1f03b43ae16946ecbd191a3dd8f5 but expected 006a7c7fd2af3f46b8b87754bf578f743fe6afff
+warning: preserving task branch fm/live-moved-50252 created by this refused promotion: fm/live-moved-50252 moved from 006a7c7fd2af3f46b8b87754bf578f743fe6afff
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/moved-slot:
+refs/heads/fm/live-moved-50252 bd70138
+refs/heads/main 006a7c7
+refs/heads/scout-work 006a7c7
+HEAD=006a7c7 symbolic=refs/heads/scout-work
+PASS: S5 warns moved branch preserved
+PASS: S5 branch with new work kept
+
+===== S6 adversarial: BLOCKED report that names a manifest_path
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting blockedman to no-mistakes off
+{"state": "BLOCKED", "reason": "x", "manifest_path": "/nonexistent"}
+error: slot provisioner refused task live-blockedman-50252 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-blockedman-50252/slot-provision-promote.88103.json
+warning: preserving task branch fm/live-blockedman-50252 created by this refused promotion: the project report may declare it
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/blockedman-slot:
+refs/heads/fm/live-blockedman-50252 4d19269
+refs/heads/main 4d19269
+refs/heads/scout-work 4d19269
+HEAD=4d19269 symbolic=refs/heads/scout-work
+PASS: S6 alias kept when report names a manifest
+
+===== S7 adversarial: provisioner prints non-JSON and refuses
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting garbage to no-mistakes off
+Traceback: boom
+error: slot provisioner refused task live-garbage-50252 (exit 1); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-garbage-50252/slot-provision-promote.90702.json
+warning: preserving task branch fm/live-garbage-50252 created by this refused promotion: the project report may declare it
+exit=1
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/garbage-slot:
+refs/heads/fm/live-garbage-50252 f1a059c
+refs/heads/main f1a059c
+refs/heads/scout-work f1a059c
+HEAD=f1a059c symbolic=refs/heads/scout-work
+PASS: S7 unreadable report -> alias preserved with warning
+
+===== S8 happy path: matching PASS attestation promotes and keeps fm/<id>
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+warn: no registry at /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/projects.md; defaulting happy to no-mistakes off
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/happy-slot.manifest.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/happy-slot", "owner_id": "live-happy-50252", "branch": "fm/live-happy-50252", "base_sha": "79eecef53139009d3d508584ccb5fefdbaba269d", "owned_paths": ["scripts"], "lifecycle_state": "worktree_active"}
+promoted live-happy-50252 to ship mode=local-only yolo=off (teardown protection restored)
+wrote ship instructions for mode=local-only: /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-happy-50252/ship-instructions.md
+next: FM_HOME=/Users/charlesabrooker/tmp/fm-lab.N4hHTT bin/fm-send.sh fm-live-happy-50252 "$(cat /Users/charlesabrooker/tmp/fm-lab.N4hHTT/data/live-happy-50252/ship-instructions.md)"
+exit=0
+--- refs/HEAD in /Users/charlesabrooker/tmp/fm-lab.N4hHTT/projects/happy-slot:
+refs/heads/fm/live-happy-50252 79eecef
+refs/heads/main 79eecef
+refs/heads/scout-work 79eecef
+HEAD=79eecef symbolic=refs/heads/fm/live-happy-50252
+PASS: S8 promotion admitted: kind=ship and ship instructions written
+PASS: S8 copy on fm/<id> task branch
+
+TOTAL pass=24 fail=0
+lab torn down: /Users/charlesabrooker/tmp/fm-lab.N4hHTT
+EXIT=0

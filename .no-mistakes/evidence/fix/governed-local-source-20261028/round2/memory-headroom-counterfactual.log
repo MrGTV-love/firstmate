@@ -1,0 +1,6 @@
+start=2026-10-29T21:52:55Z python3=3.13.6 /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 maxprocperuid=10666 user_procs=793
+arm=control trial=1 exit=99 user_procs_at_outer_start~795 user_procs_at_release=797 pids=52886,52898, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 213104 KiB; ended|
+arm=consume trial=1 exit=128 user_procs_at_outer_start~799 user_procs_at_release=2499 pids= stderr=/Users/charlesabrooker/.no-mistakes/worktrees/e871d0686a3b/01M64MA08ACXYHWXY8R4SJ7ZMA/bin/fm-proc-budget.sh: fork: Resource temporarily unavailable|
+arm=control trial=2 exit=99 user_procs_at_outer_start~799 user_procs_at_release=799 pids=56579,56581, stderr=fm-proc-budget: command tree exceeded 131072 KiB memory limit at 212736 KiB; ended|
+arm=consume trial=2 exit=128 user_procs_at_outer_start~798 user_procs_at_release=2515 pids= stderr=/Users/charlesabrooker/.no-mistakes/worktrees/e871d0686a3b/01M64MA08ACXYHWXY8R4SJ7ZMA/bin/fm-proc-budget.sh: fork: Resource temporarily unavailable|
+user_procs_end=809 end=2026-10-29T21:53:05Z
