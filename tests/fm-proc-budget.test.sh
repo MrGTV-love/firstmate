@@ -993,12 +993,14 @@ open(done, "w").close()
 PY
 }
 
-# run_slow_tree <neighbours> <wrapper args...>: prints the wrapper's exit status.
+# run_slow_tree <neighbours> <runner...>: runs the slowed tree behind the runner
+# command (a wrapper call ending in --, or a helper that wraps its arguments)
+# and prints the runner's exit status.
 run_slow_tree() {
   local dir="$TMP_ROOT/slow-tree" neighbours=$1 wrapper rc
   shift
   rm -f "$dir/ready" "$dir/go" "$dir/done"
-  PATH="$dir/shim:$PATH" "$WRAP" "$@" -- "$SLOW_TREE_PYTHON" "$dir/tree.py" "$dir/ready" "$dir/go" "$dir/done" \
+  PATH="$dir/shim:$PATH" "$@" "$SLOW_TREE_PYTHON" "$dir/tree.py" "$dir/ready" "$dir/go" "$dir/done" \
     2>"$dir/err" &
   wrapper=$!
   wait_for_file "$dir/ready" "$wrapper" || { wait "$wrapper"; echo $?; return; }
@@ -1019,14 +1021,47 @@ test_own_procs_survives_neighbours_on_a_slow_host() {
   make_slow_tree
   # Control: the positional extra of 16 is spent by 300 neighbour processes, so
   # the rest of the user would have to free 284 processes to leave it unstarved.
-  rc=$(run_slow_tree 300 16) || exit 1
+  rc=$(run_slow_tree 300 "$WRAP" 16 --) || exit 1
   [ "$rc" != 0 ] || fail "the control was not starved: the scenario would be vacuous"
   assert_absent "$dir/done" "the starved control must not have finished"
   assert_contains "$(cat "$dir/err")" "BlockingIOError" "the control lost its forks to the neighbours"
-  rc=$(run_slow_tree 300 --own-procs 128) || exit 1
+  rc=$(run_slow_tree 300 "$WRAP" --own-procs 128 --) || exit 1
   expect_code 0 "$rc" "a tree under its own limit while neighbours spend the shared count"
   assert_present "$dir/done" "the slowed tree finished its work"
   pass "neighbours starve the positional extra of 16 but not --own-procs 128, with the tree's work five times slower"
+}
+
+# The suites' own leash (tests/lib.sh fm_test_tree_leash) in the same scenario.
+# The control is the retired form, a fixed count of 128 over the whole user.
+test_suite_tree_leash_survives_neighbours_on_a_slow_host() {
+  local dir="$TMP_ROOT/slow-tree" rc
+  make_slow_tree
+  rc=$(run_slow_tree 300 "$WRAP" 128 --) || exit 1
+  [ "$rc" != 0 ] || fail "the retired fixed count was not starved: the scenario would be vacuous"
+  assert_absent "$dir/done" "the starved control must not have finished"
+  assert_contains "$(cat "$dir/err")" "BlockingIOError" "the retired fixed count lost its forks to the neighbours"
+  rc=$(run_slow_tree 300 fm_test_tree_leash) || exit 1
+  expect_code 0 "$rc" "a suite tree under the leash while neighbours spend the shared count"
+  assert_present "$dir/done" "the slowed suite tree finished its work"
+  pass "neighbours starve a fixed count of 128 but not the suites' own-tree leash, with the tree's work five times slower"
+}
+
+test_suite_tree_leash_stops_a_runaway_tree() {
+  local bomb="$TMP_ROOT/leash-bomb" log="$TMP_ROOT/leash-bomb.log" pids="$TMP_ROOT/leash-bomb.pids"
+  local err="$TMP_ROOT/leash-bomb.err" depth rc
+  make_bomb "$bomb"
+  : >"$log"
+  : >"$pids"
+  fm_test_tree_leash env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_PIDS="$pids" SHIM_MAX_DEPTH=1500 \
+    date +%s >"$TMP_ROOT/leash-bomb.out" 2>"$err"
+  rc=$?
+  expect_code 98 "$rc" "a suite tree past the leash"
+  depth=$(tail -1 "$log")
+  [ -n "$depth" ] && [ "$depth" -gt 20 ] || fail "the bomb did not recurse (depth ${depth:-none}): the case would be vacuous"
+  [ "$depth" -lt 1500 ] || fail "the leash did not stop the runaway tree (depth $depth)"
+  assert_contains "$(grep 'fm-proc-budget:' "$err")" "over the own-tree limit of $FM_TEST_TREE_PROCS" "the reason names the leash"
+  wait_pids_ended "$pids"
+  pass "a runaway suite tree is stopped by the leash (depth $depth) and leaves no process behind"
 }
 
 test_own_procs_reads_a_linux_stat_row() {
@@ -1075,3 +1110,5 @@ test_own_procs_stops_a_runaway_tree
 test_own_procs_nested_wrapper
 test_own_procs_keeps_the_kernel_limit
 test_own_procs_survives_neighbours_on_a_slow_host
+test_suite_tree_leash_survives_neighbours_on_a_slow_host
+test_suite_tree_leash_stops_a_runaway_tree
