@@ -1636,7 +1636,8 @@ fm_test_base_path_sans() {
 # FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
 # holds it; await-removal records the worker's pid in
 # FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
-# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# FM_TEST_FENCE_HOME is gone or FM_TEST_FENCE_HOME/state/.test-fence-release
+# exists, and refuses the mutex; hold starts a live process
 # that takes the mutex first, records its pid in
 # FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
 # FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
@@ -1658,7 +1659,9 @@ case "${*: -1}" in
       refuse) : > "$state/.test-fence-refused"; exit 1 ;;
       await-removal)
         printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
-        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ] && [ ! -e "$state/.test-fence-release" ]; do
+          sleep 0.1
+        done
         exit 1
         ;;
       hold)

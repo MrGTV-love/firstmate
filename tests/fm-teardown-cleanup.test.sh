@@ -45,8 +45,8 @@ test_local_only_force_overrides_unpushed() {
 # and, once the fixture that owned the home is cleaned up, can never be stopped
 # by anything that looks at the fixture: its command line names only the shared
 # code. The child runs a real teardown case with its refresh worker held at the
-# fence until the home is gone, then exits so its own fixture cleanup removes the
-# home under the waiting worker; no worker may remain.
+# fence, then exits so its own fixture cleanup releases the waiting worker before
+# the normal writer drain and root removal; no worker may remain.
 test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
   local child out stub worker identity
   child="$TMP_ROOT/fixture-cleanup-child.sh"
@@ -59,6 +59,7 @@ set -u
 # shellcheck source=tests/fm-teardown-helpers.sh
 . "$1/tests/fm-teardown-helpers.sh"
 case_dir=$(make_case leak-child)
+trap ': > "$case_dir/state/.test-fence-release"; teardown_fixture_cleanup' EXIT
 write_meta "$case_dir" local-only ship
 wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
