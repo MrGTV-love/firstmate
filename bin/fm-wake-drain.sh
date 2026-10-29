@@ -890,14 +890,16 @@ fi
 # records no action and acknowledges only the wakes it handled; the obligation
 # stays gated in the ledger for firstmate's own acknowledgement.
 OVERDUE_SECTION=
-if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
-  if [ -n "$ACK_THROUGH" ]; then
-    if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
-      "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
-    fi
-  else
-    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
+present_open_work() {
+  if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
+    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue "$@") || return 1
     [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
+  fi
+  return 0
+}
+if [ -n "$ACK_THROUGH" ] && { [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; }; then
+  if [ "${FM_WAKE_ACK_AWAY_DAEMON:-}" != 1 ] || [ ! -e "$STATE/.afk" ]; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
   fi
 fi
 rotate_scratch_locked
@@ -1038,6 +1040,7 @@ if [ -n "$ACK_THROUGH" ]; then
 fi
 
 if [ ! -s "$FM_WAKE_QUEUE" ]; then
+  present_open_work || exit 1
   : > "$FM_WAKE_QUEUE"
   fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
   RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
@@ -1078,6 +1081,7 @@ if [ "$ACTOR" = main ]; then
   fi
   claim_main_rows_locked || exit 1
   if [ ! -s "$MAIN_ROWS_FILE" ]; then
+    present_open_work || exit 1
     # Every remaining row is reserved by the live branch grant, which presents
     # and acknowledges them itself. Say so rather than exiting silently: a
     # drain that prints nothing while the queue is visibly non-empty reads as a
@@ -1129,6 +1133,16 @@ awk -F '\t' -v seqs="$ACTOR_ROWS_FILE" '
 RAW_ROWS=$(fm_wake_print_deduped "$DRAIN_VIEW_TMP") || exit "$?"
 rm -f -- "$DRAIN_VIEW_TMP" || exit 1
 DRAIN_VIEW_TMP=
+LEDGER_RESURFACE=false
+if printf '%s\n' "$RAW_ROWS" | awk -F '\t' '
+  $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
+  END { exit !found }
+'; then
+  LEDGER_RESURFACE=true
+  present_open_work --include-standing || exit 1
+else
+  present_open_work || exit 1
+fi
 ACK_THROUGH=$(printf '%s\n' "$RAW_ROWS" | awk -F '\t' '$2 ~ /^[0-9]+$/ && $2 > max { max=$2 } END { print max + 0 }') || exit 1
 case "${FM_WAKE_DRAIN_TEST_DELAY_BEFORE_COMMIT:-0}" in
   0) ;;
@@ -1140,10 +1154,7 @@ if [ -n "$RAW_ROWS" ]; then
 fi
 # Only a periodic resurface wake this actor owns carries the full waiting list;
 # a change wake presents only the OVERDUE rows that still need an action.
-if printf '%s\n' "$RAW_ROWS" | awk -F '\t' '
-  $3 == "check" && $4 == "open-loop-ledger-resurface" { found=1 }
-  END { exit !found }
-'; then
+if [ "$LEDGER_RESURFACE" = true ]; then
   "$SCRIPT_DIR/fm-open-loops.sh" --digest || exit 1
 fi
 fm_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1

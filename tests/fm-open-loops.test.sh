@@ -2003,7 +2003,7 @@ def case(name, actor='main', empty=False, **fields):
                     '--recovery-generation', boundary[1])
     return home, ledger, row, call, ok, drain, ack
 
-# New rows gate; an unchanged captain-owned row stays covered by its escalation and is listed in the periodic waiting list.
+# New rows gate; an unchanged captain-owned row remains listed without unproved captain-delivery status.
 home, ledger, row, call, ok, drain, ack = case('change-gating', owner='captain')
 _, boundary = drain()
 assert ack(boundary).returncode == 1
@@ -2013,14 +2013,15 @@ assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger "check: open-loop-ledger (1 overdue)"',
    '_', code / 'bin/fm-wake-lib.sh')
 change_wake, boundary = drain()
-assert ack(boundary).returncode == 0, 'a pending escalation never blocks an acknowledgement'
+assert ack(boundary).returncode == 0, 'an unchanged unproved escalation needs no new action'
 assert 'WAITING OPEN WORK' not in change_wake.stdout, 'a change wake printed the full waiting list'
 ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: open-loop-ledger-resurface (1 overdue)"',
    '_', code / 'bin/fm-wake-lib.sh')
 unchanged, boundary = drain()
-assert ack(boundary).returncode == 0, 'a pending escalation never blocks an acknowledgement'
+assert ack(boundary).returncode == 0, 'an unchanged unproved escalation needs no new action'
 assert 'WAITING OPEN WORK' in unchanged.stdout and row['id'] in unchanged.stdout, unchanged.stdout
-assert '7200' in unchanged.stdout and 'escalated, waiting on the captain' in unchanged.stdout, unchanged.stdout
+assert '7200' in unchanged.stdout and 'escalated, no proof it reached the captain' in unchanged.stdout, unchanged.stdout
+assert 'escalated, waiting on the captain' not in unchanged.stdout, unchanged.stdout
 clock['now'] = now + 30
 assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0
 record = json.loads(ledger.read_text())
@@ -2041,7 +2042,7 @@ digest = ok(code / 'bin/fm-open-loops.sh', '--digest')
 assert missing.returncode == 1 and 'new-row' in missing.stdout
 assert row['id'] in digest.stdout and 'new-row' not in digest.stdout
 clock['now'] = now
-print('PASS: new/changed gate, unchanged acknowledgement, escalations listed as waiting on the captain, and gate/digest coverage')
+print('PASS: new/changed gate, unchanged acknowledgement, no unproved captain-delivery label, and gate/digest coverage')
 
 # A stamped escalation with no captain hold binding is never captain waiting: its unchanged row needs no new action
 # and stays in the periodic waiting list without that label, and a change gates it again.
@@ -2371,7 +2372,7 @@ result, boundary = drain()
 assert row['id'] in result.stdout and 'STANDING' not in result.stdout, result
 assert ack(boundary).returncode == 1, 'a deferral cannot hold a mergeable reviewed PR across turns'
 
-# One escalation of a captain-owned row covers it until the row changes.
+# An unproved escalation of a captain-owned row needs no new action until its evidence changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
                                                owner='captain', next_action='resolve the captain hold',
                                                evidence='awaiting budget approval', limit_seconds=1800)
@@ -2411,7 +2412,11 @@ record = json.loads(ledger.read_text())
 record['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker', owner='worker:other-worker'))
 ledger.write_text(json.dumps(record))
 mixed = ok(code / 'bin/fm-wake-drain.sh')
-assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout and mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING'), mixed
+assert 'row-fresh' in mixed.stdout and 'STANDING' not in mixed.stdout and row['id'] not in mixed.stdout, mixed
+ok('bash', '-c', '. "$1"; fm_wake_append check open-loop-ledger-resurface "check: periodic waiting list"',
+   '_', code / 'bin/fm-wake-lib.sh')
+periodic = ok(code / 'bin/fm-wake-drain.sh')
+assert 'STANDING' in periodic.stdout and row['id'] in periodic.stdout, periodic
 
 # An unreadable ledger never blocks a drain or an acknowledgement; it names the exact repair command.
 for label in ('corrupt', 'symlink'):
@@ -3044,14 +3049,13 @@ assert call(loops, '--check-actions').returncode == 0
 (home / 'state/.wake-queue').write_text('')
 idle = ok(code / 'bin/fm-wake-drain.sh')
 assert 'OVERDUE' not in idle.stdout and 'WAKE_ACK_REQUIRED' not in idle.stderr, idle
-# Beside new work it is listed under STANDING, after the row that needs an action.
+# A change wake presents only the fresh row; a periodic wake includes the covered row.
 record_ = stored()
 record_['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker',
                             owner='worker:other-worker', source=None))
 ledger.write_text(json.dumps(record_))
 mixed, boundary = drain('mixed')
-assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout, mixed
-assert mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING') and mixed.stdout.count(row['id']) == 1, mixed
+assert 'row-fresh' in mixed.stdout and 'STANDING' not in mixed.stdout and row['id'] not in mixed.stdout, mixed
 assert ack(boundary).returncode == 1, 'the fresh row still needs its own action'
 
 # One receipt binds exactly one held task: the explicit --hold, else the first held of the row's key, its legacy

@@ -1449,7 +1449,7 @@ def receipt_covers(action, row, now, waits=None):
     """The last action still answers the row: a standing receipt, or an escalation waiting on the captain.
 
     A standing receipt answers its row on unchanged evidence; a reviewed green PR never has one.
-    An escalation never stands: only a captain-owned row or a bound captain hold is proof it waits on the captain,
+    An escalation never stands: only a bound captain hold is proof it waits on the captain,
     and the end of that hold is a change that needs firstmate's next action.
     A row whose age clock restarted after the one the action observed (a new PR head, push, status or hold),
     including between that ledger's generation and the record time, is changed work too.
@@ -1461,7 +1461,7 @@ def receipt_covers(action, row, now, waits=None):
     if kind == "escalated":
         if action.get("hold"):
             return waits is not None and waits.hold_stands(action, row)
-        return row.get("owner") == "captain"
+        return False
     if kind == "waiting":
         return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
@@ -1614,7 +1614,7 @@ def ledger_action(args, state, now, batch=()):
         write_ledger(state, report, receipt=True)
         if needing:
             print(render_overdue(needing))
-            if standing:
+            if standing and args.include_standing:
                 print(render_overdue(standing).replace(
                     "OVERDUE:", "STANDING (unchanged since its last action; no action needed):", 1))
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
@@ -1842,6 +1842,8 @@ def main():
     parser.add_argument("--check-in", metavar="TASK_ID", help="send one inbox check-in for an overdue silent report")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
+    parser.add_argument("--include-standing", action="store_true",
+                        help="include covered rows in a periodic overdue presentation")
     modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
     modes.add_argument("--report", action="store_true", help="report all overdue rows with current ages without collecting")
     modes.add_argument("--complete-actions", action="store_true",
@@ -1860,6 +1862,8 @@ def main():
     dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
     dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
     args = parser.parse_args()
+    if args.include_standing and not args.present_overdue:
+        parser.error("--include-standing requires --present-overdue")
     receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report \
         or args.complete_actions or args.digest
     if args.command == "action":

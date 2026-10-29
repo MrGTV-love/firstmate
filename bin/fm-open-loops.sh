@@ -15,9 +15,9 @@
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --digest lists unchanged overdue rows, their current ages, status and last actions for the
-# periodic open-loop-ledger-resurface wake; an escalation the captain has not answered is
-# listed as "escalated, waiting on the captain" only on a captain-owned row or with a bound
-# captain hold. Printing the list delivers nothing.
+# periodic open-loop-ledger-resurface wake; an escalation is listed as
+# "escalated, waiting on the captain" only with a bound captain hold the captain has not answered.
+# Printing the list delivers nothing.
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
@@ -28,8 +28,8 @@
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
-# requirements; rows that need no action or are already answered this turn are listed after them and print
-# nothing when only they remain.
+# requirements; --include-standing also lists covered rows after them when action is needed, for periodic
+# resurface drains only. It prints nothing when only covered rows remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # --complete-actions closes this actor's handling turn; fm-wake-drain.sh runs it after a successful
 # acknowledgement (internal integration, not for direct use).
@@ -37,7 +37,7 @@
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred. An escalation never
-# stands; one without a bound captain hold, unless the captain owns the row, has no proof it
+# stands; one without a bound captain hold has no proof it
 # reached the captain, so its unchanged row stays in the periodic waiting list as
 # "escalated, no proof it reached the captain", and the end of a bound hold returns the row for a new action.
 # --hold TASK_ID, valid only with escalated, names the one task held for the captain that a firstmate-owned

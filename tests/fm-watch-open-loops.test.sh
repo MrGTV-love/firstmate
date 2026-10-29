@@ -289,6 +289,16 @@ test_resurface_wake_is_periodic_and_separate_from_changes() {
   wait_watch_exit "$pid" 100 || { reap "$pid"; fail "the resurface interval passed without the periodic wake"; }
   assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
   ack_stopped_cycle "$state" || fail "could not acknowledge the resurface wake"
+  # Changes in the due cycle must not starve the periodic list.
+  set_mtime "$(( $(date +%s) - 3700 ))" "$resurfaced"
+  publish_ledger "$state" lost-launcher forgotten-guard resumed-worker
+  watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
+  pid=$!
+  wait_watch_exit "$pid" 100 || { reap "$pid"; fail "changed rows suppressed a due periodic wake"; }
+  assert_ledger_queue_reason "$state" "$out" open-loop-ledger-resurface
+  grep -q "$(printf '\tcheck\topen-loop-ledger\t')" "$state/.wake-queue" \
+    || fail "a due periodic wake suppressed the changed-row wake"
+  ack_stopped_cycle "$state" || fail "could not acknowledge simultaneous change and periodic wakes"
   watch_ledger "$state" "$fakebin" "$out" FM_OPEN_LOOPS_INTERVAL=999999 FM_OPEN_LOOPS_RESURFACE=3600
   pid=$!
   wait_poll_cycle "$state" "$pid" || { reap "$pid"; fail "the periodic list repeated within its interval"; }

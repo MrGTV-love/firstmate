@@ -3306,18 +3306,21 @@ open_loops_surface() {
   digest=$(printf '%s\n' "$ids" | cksum | awk '{print $1 "-" $2}')
   previous=$(cat "$marker" 2>/dev/null || true)
   overdue=$(printf '%s\n' "$ids" | wc -l | tr -d '[:space:]')
+  reason=
   if [ "$previous" != "$digest" ]; then
     reason="check: open-loop-ledger ($overdue overdue assigned obligations; read state/open-loops.json)"
     fm_wake_append check open-loop-ledger "$reason" || exit 1
     printf '%s\n' "$digest" > "$marker"
     [ -e "$resurfaced" ] || date '+%s' > "$resurfaced"
-    wake "$reason"
-  elif [ ! -e "$resurfaced" ] || [ "$(age_of "$resurfaced")" -ge "$OPEN_LOOPS_RESURFACE" ]; then
+  fi
+  # A changed row must not postpone a due periodic list. Publish both durable
+  # records before wake() exits; only the periodic record restamps its timer.
+  if [ ! -e "$resurfaced" ] || [ "$(age_of "$resurfaced")" -ge "$OPEN_LOOPS_RESURFACE" ]; then
     reason="check: open-loop-ledger-resurface ($overdue overdue assigned obligations; periodic waiting list)"
     fm_wake_append check open-loop-ledger-resurface "$reason" || exit 1
     date '+%s' > "$resurfaced"
-    wake "$reason"
   fi
+  [ -z "$reason" ] || wake "$reason"
 }
 
 # One reconcile pass can wait on a single shared launch-confirmation window of up
