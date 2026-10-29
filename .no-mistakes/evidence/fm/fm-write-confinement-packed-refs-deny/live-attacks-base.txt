@@ -1,0 +1,21 @@
+[BASE] packed-refs has fm/other: True | loose fm/other file: False
+[BASE] builder rc=0 
+[BASE] 1 in-place write rc=0 
+[BASE] 1 in-place write: primary rev-parse fm/other = f3211bc88e20 -> FORGED
+[BASE] 2 rename-over rc=0 
+[BASE] 2 rename-over: primary rev-parse fm/other = f3211bc88e20 -> FORGED
+[BASE] 3a update-ref -d packed remote ref rc=0 
+[BASE]    origin/main still resolves: False
+[BASE] 4 commondir write rc=0 
+[BASE] 4 commondir: primary rev-parse fm/other = f3211bc88e20 -> FORGED
+[BASE] 5 reftable switch rc=0 
+[BASE] 5 reftable switch: primary rev-parse fm/other = f3211bc88e20 -> FORGED
+[BASE] 6 confined fetch (with fm-spawn env) rc=0 
+[BASE] 6b confined fetch WITHOUT fm-spawn env rc=0 From /Users/charlesabrooker/tmp/fmlive-oyuykop0/origin
+ - [deleted]         (none)     -> origin/doomed
+[BASE] 7 own commit+push rc=0 fm/task
+[BASE] 8 update-ref other branch rc=128 fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fmlive-oyuykop0/fmhome/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+[BASE] 8 loose other branch: primary rev-parse fm/other = debbba5bdcb8 -> REAL
+[BASE] 9 payload refStorage (documented open) rc=0 
+[BASE] 9 payload refStorage: primary rev-parse fm/other = f3211bc88e20 -> FORGED
+[BASE] packed-refs unchanged at end: False

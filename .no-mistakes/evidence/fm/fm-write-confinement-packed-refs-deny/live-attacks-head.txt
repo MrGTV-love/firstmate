@@ -1,0 +1,22 @@
+[HEAD] packed-refs has fm/other: True | loose fm/other file: False
+[HEAD] builder rc=0 
+[HEAD] 1 in-place write rc=1 /bin/sh: /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/packed-refs: Operation not permitted
+[HEAD] 1 in-place write: primary rev-parse fm/other = 7970b23f167b -> REAL
+[HEAD] 2 rename-over rc=1 mv: rename /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/forged.tmp to /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/packed-refs: Operation not permitted
+[HEAD] 2 rename-over: primary rev-parse fm/other = 7970b23f167b -> REAL
+[HEAD] 3a update-ref -d packed remote ref rc=1 error: unable to create file /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/packed-refs.new: Operation not permitted
+[HEAD]    origin/main still resolves: True
+[HEAD] 4 commondir write rc=1 /bin/sh: /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/commondir: Operation not permitted
+[HEAD] 4 commondir: primary rev-parse fm/other = 7970b23f167b -> REAL
+[HEAD] 5 reftable switch rc=1 cp: /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/reftable: Operation not permitted
+[HEAD] 5 reftable switch: primary rev-parse fm/other = fm/other -> OTHER
+[HEAD] 6 confined fetch (with fm-spawn env) rc=0 
+[HEAD] 6b confined fetch WITHOUT fm-spawn env rc=1 error: could not delete reference refs/remotes/origin/doomed: unable to create file /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/packed-refs.new: Operation not permitted
+From /Users/charlesabrooker/tmp/fmlive-0wa6ovuv/origin
+ - [deleted]         (none)     -> origin/doomed
+[HEAD] 7 own commit+push rc=0 fm/task
+[HEAD] 8 update-ref other branch rc=128 fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/Users/charlesabrooker/tmp/fmlive-0wa6ovuv/fmhome/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted
+[HEAD] 8 loose other branch: primary rev-parse fm/other = 7970b23f167b -> REAL
+[HEAD] 9 payload refStorage (documented open) rc=0 
+[HEAD] 9 payload refStorage: primary rev-parse fm/other = b03082ef8063 -> FORGED
+[HEAD] packed-refs unchanged at end: True
