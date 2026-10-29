@@ -4,8 +4,9 @@
 # Origin: the 2026-09-12 GitHub Actions starvation incident. firstmate CI had no
 # concurrency deduplication, so every superseded PR head kept its full job
 # fan-out, and four jobs carried no timeout at all. These tests hold both
-# safeguards: PR runs supersede within one PR while main pushes are never
-# cancelled, and every CI job carries a finite hang tripwire drawn from the
+# safeguards: PR runs supersede within one PR, main pushes coalesce into one
+# running plus one pending run per branch without ever cancelling the running
+# one, and every CI job carries a finite hang tripwire drawn from the
 # three-tier timeout policy that docs/fm-test-portable-shards.md "Timeouts"
 # owns (fast, normal, heavy), so no job drifts back to a one-off number.
 #
@@ -27,7 +28,7 @@ command -v ruby >/dev/null 2>&1 \
 # print "<group><TAB><cancel-in-progress>". Only the two expression constructs
 # this workflow uses are resolved: an `a || b` fallback and an `==` comparison.
 resolve_concurrency() {
-  local event=$1 pr_number=$2 run_id=$3
+  local event=$1 pr_number=$2 run_id=$3 ref=${4:-refs/heads/main}
   ruby -ryaml -e '
 doc = YAML.load_file(ARGV[0])
 concurrency = doc.fetch("concurrency")
@@ -36,6 +37,7 @@ context = {
   "github.event_name" => ARGV[1],
   "github.event.pull_request.number" => ARGV[2],
   "github.run_id" => ARGV[3],
+  "github.ref" => ARGV[4],
 }
 
 value = lambda do |token|
@@ -61,7 +63,7 @@ end
 
 puts [interpolate.call(concurrency.fetch("group")),
       interpolate.call(concurrency.fetch("cancel-in-progress"))].join("\t")
-' "$CI_WORKFLOW" "$event" "$pr_number" "$run_id"
+' "$CI_WORKFLOW" "$event" "$pr_number" "$run_id" "$ref"
 }
 
 job_timeout() {
@@ -122,15 +124,21 @@ test_separate_prs_do_not_cancel_each_other() {
   pass "distinct PRs get distinct concurrency groups"
 }
 
-test_main_pushes_are_never_cancelled() {
-  local first second
+test_main_pushes_coalesce_without_cancelling() {
+  local first second pr other_branch
   first=$(resolve_concurrency push '' 900010) || fail "could not resolve push concurrency"
   second=$(resolve_concurrency push '' 900011) || fail "could not resolve push concurrency"
-  [ "$(group_of "$first")" != "$(group_of "$second")" ] \
-    || fail "each main push must get its own concurrency group, got $(group_of "$first") twice"
+  [ "$(group_of "$first")" = "$(group_of "$second")" ] \
+    || fail "every push to one branch must share a group so a burst keeps one pending run, got $(group_of "$first") and $(group_of "$second")"
   [ "$(cancel_of "$first")" = false ] \
-    || fail "push runs must never cancel an in-progress run, got $(cancel_of "$first")"
-  pass "every main push keeps its own group and is never cancelled"
+    || fail "push runs must never cancel the running run, got $(cancel_of "$first")"
+  pr=$(resolve_concurrency pull_request 108 900012) || fail "could not resolve PR concurrency"
+  [ "$(group_of "$first")" != "$(group_of "$pr")" ] \
+    || fail "a main push must not share a group with a pull request run ($(group_of "$pr"))"
+  other_branch=$(resolve_concurrency push '' 900013 refs/heads/release) || fail "could not resolve push concurrency"
+  [ "$(group_of "$first")" != "$(group_of "$other_branch")" ] \
+    || fail "pushes to different branches must not share a group ($(group_of "$other_branch"))"
+  pass "main pushes share one group per branch and never cancel the running run"
 }
 
 test_every_job_has_a_finite_timeout() {
@@ -292,7 +300,7 @@ RUBY
 test_ci_matrices_match_executable_partitions
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
-test_main_pushes_are_never_cancelled
+test_main_pushes_coalesce_without_cancelling
 test_every_job_has_a_finite_timeout
 test_every_job_belongs_to_exactly_one_timeout_tier
 test_fast_tier_shares_one_short_tripwire
