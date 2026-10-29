@@ -41,7 +41,7 @@
 # --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence is either its new
 # inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`, or the reason for the wait,
 # which stands while that task is live: same launch, session alive, unmerged, not stalled or failed
-# (a red_check row may take this form).
+# (only an open_pr or red_check row may take this reason form).
 # docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
 # verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
 # resolves the obligation.

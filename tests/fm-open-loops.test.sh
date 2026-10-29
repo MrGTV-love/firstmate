@@ -4028,5 +4028,26 @@ assert fx['ack'](boundary).returncode == 0
 fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
 print('PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; '
       'one older than the episode is refused', flush=True)
+
+# Only a PR row waits on a task by reason alone; a question or unlanded-commit row cites a delivery naming it.
+fx = wait_fixture('reason-scope')
+boundary = fx['drain']()
+for number, category in enumerate(('open_pr', 'red_check', 'unanswered_question', 'unlanded_commit'), 1):
+    published = json.loads(fx['ledger'].read_text())
+    next(r for r in published['rows'] if r['id'] == fx['red']['id'])['category'] = category
+    fx['ledger'].write_text(json.dumps(published))
+    by_reason = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                           '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    if category in ('open_pr', 'red_check'):
+        assert by_reason.returncode == 0, (category, 'a PR row waits on a live task by reason', by_reason.stdout)
+        continue
+    assert by_reason.returncode == 1 and 'NNN.msg' in by_reason.stdout, (category, by_reason.stdout)
+    record = f'{number:03d}.msg'
+    delivery(fx, record, now)
+    by_delivery = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', record,
+                             '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3600))
+    assert by_delivery.returncode == 0, (category, 'the delivery form still binds this row', by_delivery.stdout)
+print('PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows '
+      'are refused that form and still wait through a delivery naming them', flush=True)
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

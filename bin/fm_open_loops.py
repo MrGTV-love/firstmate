@@ -46,6 +46,8 @@ ELAPSED_TIME = re.compile(r"\b\d+(?:[.]\d+)?[hms](?: ?\d+(?:[.]\d+)?[hms])*\b")
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
 # A wait on a named live task may also bind a red PR whose worker is parked until that task lands.
 TASK_WAITABLE = CAPTAIN_PARKABLE + ("red_check",)
+# Only a PR row may wait on a named task by reason alone; other rows need a delivery naming them.
+REASON_WAITABLE = ("open_pr", "red_check")
 # Merge authority for a reviewed, green PR is AGENTS.md section 7's standing rule; the ledger only points at it.
 MERGE_ACTION_REVIEWED_PR = "merge through bin/fm-pr-merge.sh under AGENTS.md section 7"
 MERGE_ACTION_GREEN_PR = "route the green PR's review; merge it under AGENTS.md section 7"
@@ -1541,6 +1543,9 @@ class WaitVerifier:
             raise ValueError("waiting requires a distinct assigned prerequisite task")
         c = self.collector
         if not RECORD_NAME.fullmatch(evidence):
+            if row["category"] not in REASON_WAITABLE:
+                raise ValueError("only a PR row can wait on a task by reason; cite the prerequisite-task delivery"
+                                 " (NNN.msg) whose body names open-loop-row: " + row["id"])
             # Free-text evidence is the reason for the wait; the prerequisite's own live state is the proof.
             dep_source = self.current_source(dict(c.source_context(), kind="task-live", task=task))
             return dict(source=source, dependency=dep_source, reason=evidence)
