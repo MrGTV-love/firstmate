@@ -555,7 +555,11 @@
 #   dirty relaunches refuse rather than bypassing attestation. --owned-path on a
 #   relaunch never overrides recorded scope: it is accepted only to scope a task
 #   with none recorded (for example, admitted before its project was governed),
-#   which then runs the same governed preparation; elsewhere it refuses. Provisioner or
+#   which then runs the same governed preparation; elsewhere it refuses. If that
+#   relaunch is refused, its valid explicit scope is still recorded, and later
+#   relaunches reuse it and refuse a different --owned-path. An admitted legacy
+#   record gains only that scope: no recovery marker, prepared commit or source pin.
+#   A fresh spawn's provisioner or
 #   dependency refusal retains the copy, lease, endpoint, branches and manifests,
 #   records recovery=slot-provision-refused, and prints the actual refusal/report.
 #   Once that cause clears on a backend with existing recovery-grade control
