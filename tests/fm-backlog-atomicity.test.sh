@@ -3507,13 +3507,7 @@ test_bootstrap_healing_respects_task_control_custody() (
 )
 
 if [ "$#" -gt 0 ]; then
-  for test_name in "$@"; do
-    case "$test_name" in
-      test_*) declare -F "$test_name" >/dev/null || fail "unknown test: $test_name" ;;
-      *) fail "expected a test function name: $test_name" ;;
-    esac
-    "$test_name" || exit $?
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 

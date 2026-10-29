@@ -1191,11 +1191,7 @@ SH
 }
 
 if [ "$#" -gt 0 ]; then
-  for selected_test in "$@"; do
-    case "$selected_test" in test_*) ;; *) fail "unknown test: $selected_test" ;; esac
-    declare -F "$selected_test" >/dev/null || fail "unknown test: $selected_test"
-    "$selected_test" || exit "$?"
-  done
+  fm_test_run_cases -- "$@"
   exit 0
 fi
 
