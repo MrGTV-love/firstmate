@@ -295,6 +295,7 @@ When finished and parked ordinary tasks both record the same pool slot root, rea
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
 An absent claim counts as ownership for this protection, as it does for teardown's slot-owner check.
 An unleased slot refuses with the command to lease that exact slot in place without changing its contents.
+An unleased slot in a [superseded pool folder](configuration.md#superseded-pool-folders) with exactly one other root record does not refuse when the installed treehouse has `lease --path`: once every refusal check has passed, and before anything is removed, teardown leases it by its exact path for that record, so a close that refuses leaves no new lease.
 A recovered-state lease has no supported non-forcing replacement on Treehouse 2.3.1-fm; retain the records and copies and report the slot, state file, lease holder, and installed version for operator recovery rather than returning the slot to change its lease.
 When exactly one other root record names the slot, the command names it as the lease holder; when several do, it names none, lists every candidate with its last recorded status line, and the operator selects the live one.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.

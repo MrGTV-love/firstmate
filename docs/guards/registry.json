@@ -546,12 +546,12 @@
       "id": "teardown-superseded-slot-lease",
       "owner": "bin/fm-teardown.sh",
       "sites": [
-        {"file": "bin/fm-teardown.sh", "match": "is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path"}
+        {"file": "bin/fm-teardown.sh", "match": "is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path", "count": 2}
       ],
       "invariant": "a teardown never leases a slot in a superseded Treehouse pool folder by its slot name",
       "layer": "runtime-block",
       "source": "treehouse status from the project, which lists only the current pool folder, and treehouse lease --help for --path",
-      "trigger": "a slot that must stay held is in a pool folder treehouse status no longer lists, and the installed treehouse has no lease --path",
+      "trigger": "a slot that must stay held is in a pool folder treehouse status no longer lists, and the installed treehouse has no lease --path or its lease by path cannot be proved",
       "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, and rerun bin/fm-teardown.sh <task>",
       "budget": 1,
       "test": "tests/fm-teardown-cleanup.test.sh",

@@ -892,12 +892,14 @@ teardown_treehouse_supports_lease() {
 # a superseded pool folder that keeps copies needs this: a lease by name would
 # hold a same-named copy of the current pool. Without --path it prints one line
 # naming the treehouse build that has it and changes nothing.
+teardown_lease_path_supported() {  # <slot>
+  teardown_treehouse_supports_lease && [ "$TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT" = 1 ] && return 0
+  echo "REFUSED: pool slot $1 is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path, which needs treehouse v3.1.7-fm or later (treehouse lease --path); the installed treehouse has no lease --path, so the copies stay held and nothing was changed." >&2
+  return 1
+}
 teardown_lease_slot_by_path() {  # <slot> <project> <holder>
   local slot=$1 project=$2 holder=$3
-  if ! teardown_treehouse_supports_lease || [ "$TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT" != 1 ]; then
-    echo "REFUSED: pool slot $slot is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path, which needs treehouse v3.1.7-fm or later (treehouse lease --path); the installed treehouse has no lease --path, so the copies stay held and nothing was changed." >&2
-    return 1
-  fi
+  teardown_lease_path_supported "$slot" || return 1
   (cd "$project" && treehouse lease --path "$slot" --lease-holder "$holder" </dev/null) >/dev/null || return 1
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -4112,6 +4114,7 @@ require_owned_task_worktree_slot() {
 # determination and never enters this route.
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
+TEARDOWN_SHARED_LEASE_HOLDER=
 require_shared_task_worktree_slot() {
   local slot state_dir other_meta copy kind marker holder i last
   local -a sharers=() sharer_metas=()
@@ -4146,12 +4149,13 @@ require_shared_task_worktree_slot() {
       # guard for nested current copies. Keep Treehouse itself from handing
       # out this slot throughout that interval, not just during our lock.
       # A slot in a superseded pool folder with one remaining record is leased
-      # by its exact path for that record, as its lease remedy would hold it.
+      # by its exact path for that record, as its lease remedy would hold it,
+      # after every refusal check (TEARDOWN_SHARED_LEASE_HOLDER).
       if ! fm_task_copy_pool_slot_held "$slot" \
           && { [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] \
             || fm_task_copy_slot_in_current_pool "$PROJ" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
             || [ "$FM_TASK_COPY_POOL_CURRENCY" != superseded ] || [ "${#sharers[@]}" -ne 1 ] \
-            || ! teardown_lease_slot_by_path "$slot" "$PROJ" "${sharers[0]}"; }; then
+            || ! teardown_lease_path_supported "$slot"; }; then
         holder='<remaining-task>'
         [ "${#sharers[@]}" -ne 1 ] || holder="'${sharers[0]}'"
         echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
@@ -4183,6 +4187,7 @@ require_shared_task_worktree_slot() {
         fi
         return 1
       fi
+      [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] || TEARDOWN_SHARED_LEASE_HOLDER=${sharers[0]}
       TEARDOWN_SLOT_REASSIGNED_TO=${sharers[*]}
       TEARDOWN_SLOT_REASSIGNED_HOME=
       ;;
@@ -6014,6 +6019,17 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
   teardown_owns_worktree || teardown_reprove_reassigned_slot
 fi
 if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+  if [ -n "$TEARDOWN_SHARED_LEASE_HOLDER" ]; then
+    teardown_acquire_project_lock || exit $?
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    if ! fm_task_copy_pool_slot_held "$TEARDOWN_SHARED_SLOT" \
+        && ! teardown_lease_slot_by_path "$TEARDOWN_SHARED_SLOT" "$PROJ" "$TEARDOWN_SHARED_LEASE_HOLDER"; then
+      echo "REFUSED: shared pool slot $TEARDOWN_SHARED_SLOT is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path, and a durable lease for task $TEARDOWN_SHARED_LEASE_HOLDER could not be proved, so another allocation could reset the remaining copies before reassociation; nothing was removed. Hold it in place by its exact path without touching its contents: (cd '$PROJ' && treehouse lease --path '$TEARDOWN_SHARED_SLOT' --lease-holder '$TEARDOWN_SHARED_LEASE_HOLDER')" >&2
+      exit 1
+    fi
+    teardown_release_project_lock || exit 1
+  fi
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi

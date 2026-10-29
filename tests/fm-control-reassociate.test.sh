@@ -1514,11 +1514,12 @@ test_unleased_shared_slot_gates_only_the_claimant() {
 # A shared slot in a superseded pool folder keeps its remaining record's copy, so
 # its claimant's record retires once the slot is leased by its exact path for
 # that record, never by name; without lease --path it refuses, naming the
-# treehouse build it needs. A shared slot the current pool lists still refuses
-# with its lease remedy.
+# treehouse build it needs. A claimant whose PR is not merged refuses and leaves
+# no new lease. A shared slot the current pool lists still refuses with its
+# lease remedy.
 test_superseded_shared_slot_retires_its_claimant() {
-  local id=shared-superseded shape dir slot out rc
-  for shape in current superseded superseded-no-path; do
+  local id=shared-superseded shape dir slot out rc pr_state
+  for shape in current superseded superseded-unmerged superseded-no-path; do
     dir=$(new_case "shared-superseded-$shape" "$id")
     slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
     printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
@@ -1536,9 +1537,11 @@ test_superseded_shared_slot_retires_its_claimant() {
     cp "$dir/home/state/parked.meta" "$dir/parked-before"
     cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
     copy_fingerprint "$slot" > "$dir/slot-before"
-    [ "$shape" != superseded ] || : > "$dir/lease-path"
+    case "$shape" in superseded|superseded-unmerged) : > "$dir/lease-path" ;; esac
+    pr_state=MERGED
+    [ "$shape" != superseded-unmerged ] || pr_state=OPEN
     rc=0
-    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    out=$(FM_SHARED_PR_STATE=$pr_state run_case_teardown "$dir" "$id") || rc=$?
     case "$shape" in
       superseded)
         expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
@@ -1547,6 +1550,11 @@ test_superseded_shared_slot_retires_its_claimant() {
           'the slot was not leased once, by its exact path, for the remaining record'
         jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "parked"' "$dir/pool/treehouse-state.json" >/dev/null \
           || fail "the old folder does not record the shared slot as leased: $(cat "$dir/pool/treehouse-state.json")"
+        ;;
+      superseded-unmerged)
+        expect_code 1 "$rc" "a superseded shared slot's claimant with an unmerged PR must refuse"$'\n'"$out"
+        assert_contains "$out" 'is not confirmed merged' 'the refusal did not name the unmerged PR'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
         ;;
       superseded-no-path)
         expect_code 1 "$rc" "a superseded shared slot must refuse without lease --path"$'\n'"$out"
@@ -1567,7 +1575,7 @@ test_superseded_shared_slot_retires_its_claimant() {
       ! grep -Eq '^lease' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup leased a slot: $(cat "$dir/treehouse.log")"
     fi
   done
-  pass 'a superseded shared slot is leased by its exact path before its claimant retires, refuses without lease --path, and a current-pool one still refuses'
+  pass 'a superseded shared slot is leased by its exact path before its claimant retires, an unmerged claimant refuses with no new lease, it refuses without lease --path, and a current-pool one still refuses'
 }
 
 # The lease remedy names the remaining record that stays in the slot, never
