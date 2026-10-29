@@ -369,7 +369,7 @@ cp -R "$ROOT/bin" "$CASE/bin"
 cat > "$CASE/bin/fm-pr-check.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_READY_CASE/pr-check.calls"
-echo 'error: the no-mistakes run for this copy did not answer (no output or CPU progress), so whether its fixes are recovered is unknown and not refused for good; read it again' >&2
+echo 'error: the no-mistakes run for this copy did not answer (no output or CPU progress), so whether its fixes are recovered is unknown, not a verdict; read it again' >&2
 exit 75
 SH
 chmod +x "$CASE/bin/fm-pr-check.sh"

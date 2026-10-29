@@ -1487,7 +1487,7 @@ fm_dod_nm_status_out() {  # <worktree>
 
 # Reason line for a status read that went silent: unknown, not a verdict.
 fm_dod_nm_unanswered() {  # <what the read was for>
-  printf '%s\n' "the no-mistakes run for this copy did not answer (no output or CPU progress), so $1 is unknown and not refused for good; read it again"
+  printf '%s\n' "the no-mistakes run for this copy did not answer (no output or CPU progress), so $1 is unknown, not a verdict; read it again"
 }
 
 # 0 when the run for this copy exposes usable revision-bound verification-plan
