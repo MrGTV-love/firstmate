@@ -2004,7 +2004,7 @@ test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly() {
     "$case_dir/stderr" "off-queue-auto-armed: the refusal did not name the armed auto-merge"
   assert_grep 'pr merge 188 --repo example/repo --disable-auto' "$case_dir/gh.log" \
     "off-queue-auto-armed: the armed auto-merge was not disarmed"
-  assert_grep 'no auto-merge is armed for https://github.com/example/repo/pull/188' \
+  assert_grep 'auto-merge is off for https://github.com/example/repo/pull/188' \
     "$case_dir/stderr" "off-queue-auto-armed: the confirmed disarm was not reported"
 
   case_dir=$(make_case github-off-queue-auto-disarm-fails)
@@ -2026,6 +2026,79 @@ test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly() {
   assert_grep 'disarm it now with: gh pr merge 188 --repo example/repo --disable-auto' \
     "$case_dir/stderr" "off-queue-auto-disarm-fails: the refusal did not name the manual disarm"
   pass "fm-pr-merge disarms an off-queue auto-merge left armed, or reports it loudly"
+}
+
+# A failed gh pr merge --auto can still have armed auto-merge before it failed,
+# so the off-queue backstop runs on that path too: when the outcome reads back
+# neither merged nor queued, and when the outcome cannot be read at all.
+test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly() {
+  local case_dir rc head scenario
+  head=2121212121212121212121212121212121212121
+  for scenario in unlanded unlanded-disarm-fails outcome-unreadable; do
+    case_dir=$(make_case "github-failed-auto-$scenario")
+    add_gh_mocks_merge_fails "$case_dir" "$head"
+    write_github_outcome "$case_dir" OPEN false false main
+    case "$scenario" in
+      unlanded-disarm-fails)
+        : > "$case_dir/github-disable-auto-fails"
+        printf 'armed\n' > "$case_dir/github-auto-merge-state"
+        ;;
+      outcome-unreadable)
+        add_gh_mock_outcome_read_fails "$case_dir"
+        add_gh_axi_mock_view_fails "$case_dir"
+        ;;
+    esac
+
+    set +e
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+      --attended-override -- --auto --squash \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+
+    expect_code 1 "$rc" "failed-auto-$scenario: a failed merge command must still fail"
+    assert_grep 'error: pr merge failed' "$case_dir/stderr" \
+      "failed-auto-$scenario: the original forge error was masked"
+    assert_grep 'pr merge 188 --repo example/repo --disable-auto' "$case_dir/gh.log" \
+      "failed-auto-$scenario: a failed --auto merge command was not disarmed"
+    if [ "$scenario" = unlanded-disarm-fails ]; then
+      assert_grep 'AUTO-MERGE MAY STILL BE ARMED for https://github.com/example/repo/pull/188' \
+        "$case_dir/stderr" "failed-auto-$scenario: the unconfirmed disarm was not reported loudly"
+    else
+      assert_grep 'auto-merge is off for https://github.com/example/repo/pull/188' \
+        "$case_dir/stderr" "failed-auto-$scenario: the confirmed disarm was not reported"
+    fi
+  done
+  pass "fm-pr-merge disarms an off-queue --auto request whose merge command failed, or reports it loudly"
+}
+
+# Waiting cannot change a tree, so a head that lacks the tip is refused at once
+# even when another source could not be read, and the refusal still names it.
+test_a_head_that_lacks_the_tip_beside_an_unreadable_source_is_not_retried() {
+  local case_dir rc head built_on tip=b34192a213f406add8809a34224315cdc9073798
+  head=2222222222222222222222222222222222222222
+  case_dir=$(make_case github-lacks-tip-unreadable-source)
+  add_gh_mocks "$case_dir" "$head"
+  printf 'gh: Not Found (HTTP 404)\n' > "$case_dir/github-branch-fail"
+  built_on=$(cat "$case_dir/github-base")
+  write_github_compare "$case_dir" "$tip" "$built_on" 2
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "lacks-tip-unreadable-source: a head without the tip must refuse"
+  assert_grep "head $head lacks the current tip $tip of base branch main" "$case_dir/stderr" \
+    "lacks-tip-unreadable-source: the refusal did not name the missing tip"
+  assert_grep 'could not be read, so a required check that has not reported cannot be ruled out' \
+    "$case_dir/stderr" "lacks-tip-unreadable-source: the refusal dropped the unreadable source"
+  assert_equals 1 "$(grep -c '/compare/' "$case_dir/gh.log")" \
+    "lacks-tip-unreadable-source: a head that lacks the tip was retried as transient"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "lacks-tip-unreadable-source: gh pr merge ran on a tree no check ran on"
+  pass "fm-pr-merge refuses a head that lacks the tip at once, even beside an unreadable source"
 }
 
 # A proven queue keeps its path: its --auto request is neither held to the
@@ -2140,6 +2213,8 @@ test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses
 test_off_queue_auto_merges_only_where_github_merges_at_once
 test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly
+test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly
+test_a_head_that_lacks_the_tip_beside_an_unreadable_source_is_not_retried
 test_queue_auto_is_neither_held_to_merge_at_once_states_nor_disarmed
 test_an_unreadable_base_comparison_refuses
 )

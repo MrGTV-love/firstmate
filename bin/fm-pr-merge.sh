@@ -47,8 +47,9 @@
 # attended --auto merge also needs a live mergeStateStatus at that last read
 # where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
 # other state GitHub arms auto-merge, which can land later on a tip no check
-# ran with; and when such a request still reads back neither merged nor queued,
-# github_disarm_auto_merge below disarms it and confirms that with a fresh read.
+# ran with; and when such a request, whether or not gh succeeded, does not
+# read back merged or queued, github_disarm_auto_merge below disarms it and
+# confirms that with a fresh read.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -1340,8 +1341,9 @@ EOF
         done
       fi
     fi
+    [ -z "$lacks_tip" ] || return 1
     [ "$source_unreadable" = false ] || return 4
-    if [ -z "$other_refusals" ] && [ -z "$lacks_tip" ] && [ -n "$unreported" ] \
+    if [ -z "$other_refusals" ] && [ -n "$unreported" ] \
       && { [ "$mergeable" = MERGEABLE ] || [ "$mergeable" = UNKNOWN ]; }; then
       return 4
     fi
@@ -1854,7 +1856,7 @@ github_disarm_auto_merge() {
       --jq '.data.repository.pullRequest | if . == null then "unknown" elif .autoMergeRequest == null then "disarmed" else "armed" end' \
       2>/dev/null) \
     && [ "$armed" = disarmed ]; then
-    printf 'error: no auto-merge is armed for %s: gh pr merge --disable-auto ran and a fresh read shows none armed, so nothing can land later on a base tip no check ran with\n' \
+    printf 'error: auto-merge is off for %s: gh pr merge --disable-auto ran and a fresh read shows it off, so nothing can land later on a base tip no check ran with\n' \
       "$URL" >&2
   else
     printf 'error: AUTO-MERGE MAY STILL BE ARMED for %s: disarming it could not be confirmed (the fresh read shows %s), so the pull request may still merge later onto a base tip no check ran with; disarm it now with: gh pr merge %s --repo %s/%s --disable-auto\n' \
@@ -2026,13 +2028,19 @@ case "$PROVIDER" in
       fm_lock_release "$MERGE_CONTROL_LOCK" || true
       MERGE_CONTROL_LOCK=
       [ -z "$merge_output" ] || printf '%s\n' "$merge_output" >&2
+      outcome_landed=false
       if github_read_outcome; then
         if [ "$FM_PR_GITHUB_MERGED" != true ] && [ "$FM_PR_GITHUB_QUEUED" != true ]; then
           github_report_unmerged_outcome
         else
+          outcome_landed=true
           printf 'actionable: the merge command for %s failed, but the pull request reads back as state=%s, merged=%s, isInMergeQueue=%s\n' \
             "$URL" "$FM_PR_GITHUB_STATE" "$FM_PR_GITHUB_MERGED" "$FM_PR_GITHUB_QUEUED" >&2
         fi
+      fi
+      if [ "$outcome_landed" = false ] && [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] \
+        && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
       fi
       exit "$merge_status"
     fi
