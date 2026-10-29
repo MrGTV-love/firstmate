@@ -239,15 +239,30 @@ assert_memory_pid_ended() {
   fail "memory stop left descendant $pid alive ($state)"
 }
 
+# This case proves the memory stop, not the process budget, so it must not
+# also carry the default user-count + 1500 cap: the kernel counts that cap for
+# the whole user, and other processes of the user spending it fail the forks
+# before the payload starts (128, or 125 before launch). The stub `ps` reports
+# the inherited soft limit as the count, so count + 1500 is above it and both
+# nested wrappers keep that limit (the hard one is sealed at it, never raised).
+# The budget-arithmetic, sealing, refusal and runaway cases above keep the real
+# budget coverage.
 test_memory_tree_over_limit() {
-  local rc pid
+  local rc pid soft
+  soft=$(ulimit -S -u)
+  case "$soft" in
+    ''|*[!0-9]*) fail "the memory case needs a finite inherited process limit, got '$soft'" ;;
+  esac
   cat >"$TMP_ROOT/memory-tree.py" <<'PY'
 import os
+import resource
 import subprocess
 import sys
 import time
 
 if len(sys.argv) == 1:
+    with open(os.environ["FM_MEMORY_NPROC"], "w") as handle:
+        handle.write("%d %d\n" % resource.getrlimit(resource.RLIMIT_NPROC))
     subprocess.Popen([sys.executable, __file__, "child"])
     time.sleep(60)
 else:
@@ -259,10 +274,12 @@ else:
     allocation = bytearray(80 * 1024 * 1024)
     time.sleep(60)
 PY
-  FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" run_memory_case \
+  PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=$soft \
+    FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" FM_MEMORY_NPROC="$TMP_ROOT/memory.nproc" run_memory_case \
     "$WRAP" --memory-kib 131072 -- python3 "$TMP_ROOT/memory-tree.py" 2>"$TMP_ROOT/memory.err"
   rc=$?
   expect_code 99 "$rc" "over-limit command tree: $(<"$TMP_ROOT/memory.err")"
+  assert_equals "$soft $soft" "$(cat "$TMP_ROOT/memory.nproc")" "the memory payload keeps the inherited soft process limit, with no extra user-count cap"
   assert_contains "$(cat "$TMP_ROOT/memory.err")" "exceeded 131072 KiB" "over-limit reason names the bound"
   [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
   [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
