@@ -23,6 +23,12 @@
 #   - the durable captain-hold `open --any-owner` predicate confirms no open
 #     captain call or parent decision (an open one or an inconclusive read is
 #     parked, not reaped);
+#   - no open captain hold in this home, or in any local home above a
+#     secondmate home, declares the task's project frozen
+#     (`fm-captain-hold.sh frozen`, asked last, once every other gate here
+#     passes; a freeze or an inconclusive read is parked with its reason, never
+#     offered to teardown, and needs no refusal memo because the next sweep
+#     after the hold is answered finds it eligible);
 #   - landing evidence exists locally, without any forge call: a scout needs a
 #     nonempty regular data/<id>/report.md, and a ship needs the merge poll's
 #     state/<id>.pr-poll-merge-notified marker for the PR recorded in its meta;

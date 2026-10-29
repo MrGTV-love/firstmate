@@ -579,6 +579,34 @@ test_task_archives_ignore_other_tasks_and_non_custody_names() {
   pass "teardown judges only the task's exact custody archive names, never another task's"
 }
 
+test_task_archives_keep_links_to_other_refs() {
+  local case_dir base head rc=0 archives
+  case_dir=$(make_case archive-links)
+  write_meta "$case_dir" no-mistakes ship
+  base=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch fm/other-symref "$base"
+  git -C "$case_dir/project" branch fm/other-symlink "$base"
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$head"
+  git -C "$case_dir/project" symbolic-ref refs/heads/archive/task-x1-submitted-0a0a0a02 refs/heads/fm/other-symref
+  archives="$case_dir/project/.git/refs/heads/archive"
+  ln -s ../fm/other-symlink "$archives/task-x1-pipeline-0b0b0b01"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "linked archives: teardown failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a01 ""
+  assert_grep 'reaped archive/task-x1-submitted-0a0a0a01' "$case_dir/stderr" "ordinary archive was not reaped"
+  assert_archive_ref "$case_dir" fm/other-symref "$base"
+  assert_archive_ref "$case_dir" fm/other-symlink "$base"
+  [ "$(git -C "$case_dir/project" symbolic-ref refs/heads/archive/task-x1-submitted-0a0a0a02)" = refs/heads/fm/other-symref ] \
+    || fail "symbolic archive was not kept"
+  [ -L "$archives/task-x1-pipeline-0b0b0b01" ] || fail "symlinked archive was not kept"
+  assert_grep 'keeping archive/task-x1-submitted-0a0a0a02' "$case_dir/stderr" "symbolic archive was not named"
+  assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "symlinked archive was not named"
+  pass "archives that link to another ref stay named and never reap the linked branch"
+}
+
 test_task_archives_keep_unproven_and_checked_out_refs() {
   local case_dir landed extra merge edited rc=0 name
   case_dir=$(make_case archive-unproven)
@@ -2622,6 +2650,7 @@ test_squash_merged_branch_deleted_allows
 test_task_archives_reap_only_carried_refs
 test_task_archives_ignore_other_tasks_and_non_custody_names
 test_task_archives_keep_unproven_and_checked_out_refs
+test_task_archives_keep_links_to_other_refs
 test_task_archives_require_matching_squash_content
 test_task_archives_include_deleted_and_literal_paths_in_merge_proof
 test_task_archives_survive_refusal_and_forced_discard
