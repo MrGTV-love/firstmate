@@ -268,7 +268,7 @@ PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=24
+PORTABLE_SERIAL_SHARDS=25
 
 # How many scripts each portable-parallel job is modeled to run at once. The
 # lane membership is exactly the proven-isolated set, whose recorded four-way
@@ -339,10 +339,10 @@ PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 # now split into separately packed groups (docs/fm-test-portable-shards.md,
 # "Split watch-triage-waits and control-relaunch").
 # The shard count is the fewest that pass and leave lane slack of at least one
-# target. The 2026-10-28 hint refresh sums to 27464684 ms, so twenty-three
-# shards pass with only 135316 ms of slack and are refused by that rule;
-# twenty-four leave 1335316 ms and pack at serial_max_ms 1144680 ms
-# (docs/fm-test-portable-shards.md, "Refresh the hints and shard count").
+# target. After the 2026-10-29 hint refresh the table sums to 28352649 ms, so
+# twenty-four shards pass with only 447351 ms of slack and are refused by that
+# rule; twenty-five leave 1647351 ms and pack at serial_max_ms 1134269 ms
+# (docs/fm-test-portable-shards.md, "Portable serial CI shards").
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -929,7 +929,7 @@ tests/fm-control-reassociate.test.sh 395783
 tests/fm-control-relaunch-backends.test.sh 681931
 tests/fm-control-relaunch-recovery.test.sh 550782
 tests/fm-control-relaunch.test.sh 340032
-tests/fm-control.test.sh 148832
+tests/fm-control.test.sh 186185
 tests/fm-copy-sweep.test.sh 438967
 tests/fm-cpu-pass.test.sh 26583
 tests/fm-cursor-harness.test.sh 30553
@@ -968,8 +968,8 @@ tests/fm-gitignore-config.test.sh 340
 tests/fm-gotmp.test.sh 3241
 tests/fm-grok-continuity-live-e2e.test.sh 566
 tests/fm-grok-stop-live-e2e.test.sh 786
-tests/fm-guard-audit-closure.test.sh 18503
-tests/fm-guard-lint.test.sh 6376
+tests/fm-guard-audit-closure.test.sh 50569
+tests/fm-guard-lint.test.sh 23440
 tests/fm-guard-refcheck.test.sh 1423
 tests/fm-guard-stale-banner.test.sh 26224
 tests/fm-guard-telemetry.test.sh 4443
@@ -1080,7 +1080,7 @@ tests/fm-remote-secondmate-lifecycle-e2e.test.sh 544475
 tests/fm-remote-secondmate-parent-binding.test.sh 129105
 tests/fm-remote-secondmate-relaunch.test.sh 73777
 tests/fm-remote-secondmate-stay-live-e2e.test.sh 386
-tests/fm-remote-secondmate-trace-context.test.sh 288623
+tests/fm-remote-secondmate-trace-context.test.sh 969822
 tests/fm-remote-transport-lanes.test.sh 84946
 tests/fm-retired-jev-channel-consistency.test.sh 1217
 tests/fm-retired-jev-omp-result-screen.test.sh 768
@@ -1146,7 +1146,7 @@ tests/fm-startup-growth-check.test.sh 9250
 tests/fm-startup-memory-budget.test.sh 13411
 tests/fm-startup-network.test.sh 105223
 tests/fm-stat-shadowing.test.sh 906
-tests/fm-status-runaway-guard.test.sh 349169
+tests/fm-status-runaway-guard.test.sh 411458
 tests/fm-stow-cascade.test.sh 4153
 tests/fm-supervision-events.test.sh 24334
 tests/fm-supervision-fork-budget.test.sh 13905
@@ -1168,7 +1168,7 @@ tests/fm-teardown.test.sh 321463
 tests/fm-test-fixture-cleanup.test.sh 4736
 tests/fm-test-fixtures.test.sh 18329
 tests/fm-test-isolation-proof.test.sh 4963
-tests/fm-test-reap-orphans.test.sh 24849
+tests/fm-test-reap-orphans.test.sh 38552
 tests/fm-timeout-lib.test.sh 35202
 tests/fm-tmux-agent-liveness.test.sh 4922
 tests/fm-tool-update-check.test.sh 20060
@@ -1182,7 +1182,7 @@ tests/fm-update.test.sh 17611
 tests/fm-vendor-auth-probe.test.sh 44798
 tests/fm-voice-relay.test.sh 30282
 tests/fm-wake-daemon-lifecycle-e2e.test.sh 10810
-tests/fm-wake-drain-open-decisions-cursor.test.sh 123600
+tests/fm-wake-drain-open-decisions-cursor.test.sh 160891
 tests/fm-wake-drain-open-decisions.test.sh 9973
 tests/fm-wake-drain-outcome-backstop.test.sh 50352
 tests/fm-wake-drain-unread-status.test.sh 56930
