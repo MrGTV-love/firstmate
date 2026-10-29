@@ -1,0 +1,18 @@
+Descendant-walk sync proof: tests/fm-backend-herdr.test.sh (fix f812b41d8 vs base ea82acdaf)
+Host: macOS, 18 cores. Every run under bin/fm-proc-budget.sh.
+Delay shim: slowsh/sh (PATH shim; delays or kills only the `sh -c "'<lab>/pi' 300; :"` fixture shell before its child exec).
+Fixed/base copies were truncated right after the spaced-path test call; the code under test is byte-identical to each commit.
+
+1. Normal, full file, fix:           exit 0, 259 ok   -> run-fixed-normal.log (both tests ok, lines 27-28)
+2. Child delayed 1.5 s (5x), fix:    exit 0           -> run-fixed-delay1.5.log (both ok)
+3. Child delayed 1.5 s, base:        exit 1           -> run-base-delay1.5.log
+     "not ok - a registered agent with a live agent-named descendant must stay live/alive, got 'stale-agent dead refused'"
+4. Child delayed 1.5 s, base, spaced test only: exit 1 -> run-base-delay1.5-spaced-only.log
+     "not ok - an agent-named descendant under a spaced install path must stay live/alive, got 'stale-agent dead refused'"
+5. Child delayed 6 s (20x), fix:     exit 0           -> run-fixed-delay6.log, shim-delay6.log (07:43:07->07:43:14, 07:43:15->07:43:21)
+6. 36 `yes` CPU burners (load avg ~48), fix:  exit 0  -> run-fixed-cpuburn.log
+7. 36 `yes` CPU burners, base:                exit 0  -> run-base-cpuburn.log (base did NOT reproduce under local CPU burn alone)
+8. Shell dies 0.5 s after start, no child ever, fix, first test:  exit 1 at 07:46:50 (shim start 07:46:50)
+     "not ok - the shell died before its agent-named child appeared"   -> run-fixed-shell-dies-first.log
+9. Same, spaced test only:  exit 1 at 07:47:22 (shim start 07:47:21) -> run-fixed-shell-dies-spaced.log
+No leftover pi or test processes after the runs.

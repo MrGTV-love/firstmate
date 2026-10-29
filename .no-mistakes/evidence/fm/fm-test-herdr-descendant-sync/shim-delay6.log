@@ -1,0 +1,4 @@
+07:43:07 shim pid=66656 mode=delay delay=6 start
+07:43:14 shim pid=66656 exec child now
+07:43:15 shim pid=80148 mode=delay delay=6 start
+07:43:21 shim pid=80148 exec child now

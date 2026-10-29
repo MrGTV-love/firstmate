@@ -1,0 +1,30 @@
+.............................
+----------------------------------------------------------------------
+Ran 29 tests in 28.676s
+
+OK
+ok - fm_backend_herdr_version_check: accepts the current protocol (14)
+ok - fm_backend_herdr_version_check: refuses an old protocol loudly
+ok - fm_backend_herdr_version_check: refuses loudly when herdr is not installed
+ok - Herdr admission: every shared gate refuses missing python3 before runtime access
+ok - fm_backend_herdr_workspace_label: a primary home (no marker) resolves to 'firstmate'
+ok - fm_backend_herdr_workspace_label: a secondmate home (.fm-secondmate-home) resolves to '2ndmate-<id>'
+ok - fm_backend_herdr_workspace_label: trims whitespace around the marker's secondmate id
+ok - fm_backend_herdr_workspace_label: an empty marker file falls back to the primary label 'firstmate'
+ok - fm_backend_herdr_workspace_label: two different secondmate homes get two different, non-colliding labels
+ok - fm_backend_herdr_cli: sets HERDR_SESSION AND appends a trailing --session flag on every call
+ok - herdr client selection: a live pane behind a stale shadowing client reads alive
+ok - herdr passive classifier reads the pane first and consults status only for an uninterpretable pane
+ok - herdr stale registration: a shell-only pane with a lingering Pi record is agent-free with an explicit reason
+ok - herdr missing registration: only process proof establishes live agents or agent-free shells
+ok - herdr stale registration: no registered status can outrank a shell-only process view
+ok - herdr pane agent session: a resumable reference is reported with the agent label that reported it
+ok - herdr pane agent session: anything unresumable degrades to a nonzero read with no output
+ok - herdr stale registration: a registered agent with a live Pi foreground process still reads alive
+ok - herdr stale registration: only a shell-only pane demotes a registration
+ok - herdr stale registration: a transient prompt helper settles into stale-agent instead of reading live
+ok - herdr stale registration: an exhausted settle window still reads a non-shell foreground as live
+sh: line 1: 25427 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.ITXra2/stale-reg-descendant-bin/pi' 300
+ok - herdr stale registration: an agent process outside the foreground group still counts as alive
+sh: line 1: 29522 Terminated: 15          '/Users/charlesabrooker/tmp/fm-backend-herdr-tests.ITXra2/stale-reg-spaced-bin/Application Support/Some Dir/pi' 300
+ok - herdr stale registration: the descendant walk reads a spaced executable path whole

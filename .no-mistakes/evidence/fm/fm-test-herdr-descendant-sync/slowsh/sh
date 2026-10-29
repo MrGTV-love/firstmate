@@ -1,0 +1,13 @@
+#!/bin/sh
+# Test-only PATH shim for `sh`. Only the descendant-walk fixture shell
+# (`sh -c "'<lab>/pi' 300; :"`) is changed; every other sh call passes through.
+case "${2-}" in
+  *"/pi' 300; :")
+    [ -z "${FM_SLOW_LOG-}" ] || echo "$(date +%T) shim pid=$$ mode=${FM_SLOW_MODE:-delay} delay=${FM_SLOW_DELAY-} start" >> "$FM_SLOW_LOG"
+    case "${FM_SLOW_MODE:-delay}" in
+      delay) sleep "${FM_SLOW_DELAY:-1.5}" ;;          # child exec starts >=5x later than the old 0.3 s
+      die)   sleep "${FM_SLOW_DELAY:-0.5}"; exit 3 ;;  # shell dies before any child appears
+    esac ;;
+esac
+[ -z "${FM_SLOW_LOG-}" ] || case "${2-}" in *"/pi' 300; :") echo "$(date +%T) shim pid=$$ exec child now" >> "$FM_SLOW_LOG";; esac
+exec /bin/sh "$@"
