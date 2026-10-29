@@ -1,0 +1,19 @@
+### S5: PR 283's checks turn green; the reconciler renders an open_pr row
+$ fm-open-loops.sh --heartbeat --json  (rows for PR 283)
+exit=0
+{
+ "category": "open_pr",
+ "owner": "firstmate",
+ "subject": "https://github.com/test/project/pull/283",
+ "next_action": "route the green PR's review; merge it under AGENTS.md section 7",
+ "overdue": true
+}
+{
+ "category": "red_check",
+ "owner": "worker:parked-job",
+ "subject": "https://github.com/test/project/pull/283",
+ "next_action": "diagnose: code or test",
+ "overdue": false
+}
+$ fm-open-loops.sh  (default TOON view)
+  "open_pr","https://github.com/test/project/pull/283","firstmate","route the green PR's review; merge it under AGENTS.md section 7",25200,true,""

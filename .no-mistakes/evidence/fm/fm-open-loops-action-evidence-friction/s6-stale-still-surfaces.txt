@@ -1,0 +1,39 @@
+### S6: an overdue row with no real handling still re-presents and blocks acknowledgement
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+## No action recorded: acknowledgement is refused
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 64183.1793249837.JLDnfE   [clock now+0]
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+exit=1
+$ bin/fm-open-loops.sh --check-actions   [clock now+0]
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+exit=1
+## Next turn: the same row is presented again
+$ bin/fm-wake-drain.sh   [clock now+600]
+OVERDUE:
+  "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+## Report still lists it with its current age
+$ bin/fm-open-loops.sh --report   [clock now+600]
+generated_epoch: 1793249837
+complete: true
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "row-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+exit=0
+
+### S1b: a firstmate-owned steer delivered 10 minutes ago reports the time it actually still stands
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-fm-steer","firstmate","worker","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+$ bin/fm-open-loops.sh action row-fm-steer steered --evidence 005.msg   [clock now+0]
+action: "row-fm-steer"
+kind: steered
+standing: unchanged row; re-present after 13800 seconds
+exit=0

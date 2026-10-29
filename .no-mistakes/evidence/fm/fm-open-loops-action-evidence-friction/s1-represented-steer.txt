@@ -1,0 +1,70 @@
+### S1: steer recorded on the red PR row keeps counting when the unchanged row is re-presented
+## Turn 1 at now+60: drain presents the red row (the wait lapsed when repair-owner's session died)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7260,"Behavior portable serial 17",false
+STANDING (a receipt stands; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793249643	3	check	report	check: turn1
+boundary: --ack-through 3 --recovery-generation 44105.1793249564.w99JdA
+episode start: {'digest': '581e24ffc9322b90bcc69d32', 'start': 1793242249}
+## Adversarial: a delivery older than the overdue episode is refused
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 001.msg
+action: "f3f35a90171e328452cb2b77"
+kind: steered
+exit=0
+## Steer the worker: 002.msg delivered now; record steered
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 002.msg
+action: "f3f35a90171e328452cb2b77"
+kind: steered
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 44105.1793249564.w99JdA
+exit=0
+
+## Turn 2 at now+300: the unchanged row is re-presented
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7500,"Behavior portable serial 17",false
+STANDING (a receipt stands; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793249656	4	check	report	check: turn2
+boundary: --ack-through 4 --recovery-generation 9736.1793249656.4noA9X
+## Same 002.msg cited again -> accepted, no newer message needed
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 002.msg
+action: "f3f35a90171e328452cb2b77"
+kind: steered
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 9736.1793249656.4noA9X
+exit=0
+
+## Adversarial: 5 hours later, the same 002.msg is past the four-hour window
+OVERDUE:
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",25200,"Behavior portable serial 17",false
+  "44014fb17d50f1010270df7f","firstmate","parked-job","check in: progress, blockers, cross-workstream dependencies",18000,"last heard: status=1793249449; inbox acknowledgement=None; resolved reply=None",false
+  "bd38737e19788221398bf632","firstmate","repair-owner","check in: progress, blockers, cross-workstream dependencies",18000,"last heard: status=1793249449; inbox acknowledgement=None; resolved reply=None",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793249665	5	check	report	check: turn3
+boundary: --ack-through 5 --recovery-generation 45234.1793249665.js7UHc
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 002.msg
+error: "steered evidence is older than four hours; send a new delivery"
+exit=1
+## A fresh steer 003.msg still works
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 003.msg
+action: "f3f35a90171e328452cb2b77"
+kind: steered
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 45234.1793249665.js7UHc
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+  "44014fb17d50f1010270df7f","firstmate","parked-job","check in: progress, blockers, cross-workstream dependencies",18000,"last heard: status=1793249449; inbox acknowledgement=None; resolved reply=None",false
+  "bd38737e19788221398bf632","firstmate","repair-owner","check in: progress, blockers, cross-workstream dependencies",18000,"last heard: status=1793249449; inbox acknowledgement=None; resolved reply=None",false
+exit=1
+
+## Correction: 001.msg above was stamped exactly at the episode start (1793242249), which counts (boundary is inclusive).
+episode start: {'digest': '581e24ffc9322b90bcc69d32', 'start': 1793242249}
+## Adversarial: 004.msg stamped 100s BEFORE the episode start is refused
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 steered --evidence 004.msg
+error: "steered evidence must be a new delivery sent after this row became overdue or its evidence last changed"
+exit=1

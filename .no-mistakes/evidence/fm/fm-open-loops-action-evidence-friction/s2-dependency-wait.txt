@@ -1,0 +1,158 @@
+### S2: red PR row (PR 283, parked-job) waits on live task repair-owner (real tmux pane on lab socket)
+$ fm_wake_append check report "check: dependency followup"; fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4e3ec8d080b14294265510ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness parked-job: worker liveness is inconclusive: not_checked; worker current state parked-job: worktree gone (torn down?); worker liveness repair-owner: worker liveness is inconclusive: ambiguous; unlanded work repair-owner: default branch is unknown",false
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793249513	1	check	report	check: dependency followup
+exit=0
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 29419.1793249513.O6GGGY
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M62413GRH8TCJXTH0F7CK0BN/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+## Adversarial: wait on a task that does not exist
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task no-such-task --recheck 2026-10-29T05:50:49Z
+error: "[Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.IIUes9/state/no-such-task.meta'"
+exit=1
+
+## Adversarial: wait on the row's own task
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task parked-job --recheck 2026-10-29T05:50:49Z
+error: "waiting requires a distinct assigned prerequisite task"
+exit=1
+
+## Happy path: wait on live task repair-owner by reason (no inbox message)
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-29T05:50:49Z
+action: "f3f35a90171e328452cb2b77"
+kind: waiting
+exit=0
+
+## Acknowledge the drain turn
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 29419.1793249513.O6GGGY
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4e3ec8d080b14294265510ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness parked-job: worker liveness is inconclusive: not_checked; worker current state parked-job: worktree gone (torn down?); worker liveness repair-owner: worker liveness is inconclusive: ambiguous; unlanded work repair-owner: default branch is unknown",false
+exit=1
+
+## --check-actions while the prerequisite is live
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4e3ec8d080b14294265510ac","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness parked-job: worker liveness is inconclusive: not_checked; worker current state parked-job: worktree gone (torn down?); worker liveness repair-owner: worker liveness is inconclusive: ambiguous; unlanded work repair-owner: default branch is unknown",false
+exit=1
+
+## stored action
+{
+ "kind": "waiting",
+ "evidence": "PR is red because main is red; parked until repair-owner merges",
+ "at_epoch": 1793249449,
+ "sequence": 1,
+ "deferrals": 0,
+ "captain_visible": false,
+ "digest": "581e24ffc9322b90bcc69d32",
+ "cited": [],
+ "binding": {
+  "source": {
+   "home": "/Users/charlesabrooker/tmp/fm-lab.IIUes9",
+   "state": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/state",
+   "data": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/data",
+   "config": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/config",
+   "task": "parked-job",
+   "generation": "e5e2926d95f5fe88fd2935198ecdb53d90a80a9846510e47adcbba6f45066455",
+   "kind": "pr",
+   "url": "https://github.com/test/project/pull/283",
+   "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "dependency": {
+   "home": "/Users/charlesabrooker/tmp/fm-lab.IIUes9",
+   "state": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/state",
+   "data": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/data",
+   "config": "/Users/charlesabrooker/tmp/fm-lab.IIUes9/config",
+   "task": "repair-owner",
+   "generation": "3dd1764e863764da13dd0fe25e8151772b6a43847bef128eb8b1bc263200be84",
+   "kind": "task-live",
+   "stream": [
+    16777233,
+    965310117
+   ]
+  },
+  "reason": "PR is red because main is red; parked until repair-owner merges"
+ },
+ "recheck_epoch": 1793253049
+}
+
+## Lab-only coverage row (pane runs sleep, not an agent): escalate it so the turn can close
+$ bin/fm-open-loops.sh action 4e3ec8d080b14294265510ac escalated --evidence lab fixture: pane runs sleep, no agent
+action: "4e3ec8d080b14294265510ac"
+kind: escalated
+standing: unchanged row; re-present after 14400 seconds
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 29419.1793249513.O6GGGY
+exit=0
+
+## Next drain: the unchanged live wait stands (no action needed for the red row)
+$ bin/fm-wake-drain.sh
+1793249564	2	check	report	check: second look
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 44105.1793249564.w99JdA
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+exit=0
+$ bin/fm-open-loops.sh --check-actions
+exit=0
+
+## Resurface 1: prerequisite repair-owner's PR 290 merges (merge-poll marker written)
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+exit=1
+(restore: marker removed, meta restored)
+$ bin/fm-open-loops.sh --check-actions
+exit=0
+
+## Resurface 2: prerequisite fails (status line 'failed', harness idle)
+state: failed · source: status-log · tests still red
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+exit=1
+(restore: status working, harness busy)
+$ bin/fm-open-loops.sh --check-actions
+exit=0
+
+## Resurface 3: prerequisite stalls (overdue stalled_worker row for repair-owner in the published ledger)
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+exit=1
+(restore ledger)
+$ bin/fm-open-loops.sh --check-actions
+exit=0
+
+## Resurface 4: prerequisite session dies (tmux window killed on the lab socket)
+no server running on /private/tmp/fml.nJdZwe/tmux-501/default
+state: unknown · source: none · backend target gone: fm:fm-repair-owner
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f3f35a90171e328452cb2b77","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+exit=1
+
+## Adversarial: a new wait on that no-longer-live task is refused
+$ bin/fm-open-loops.sh action f3f35a90171e328452cb2b77 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-29T05:50:49Z
+error: "prerequisite task is not live (its session is gone, dead, failed or unreadable); follow up on it"
+exit=1

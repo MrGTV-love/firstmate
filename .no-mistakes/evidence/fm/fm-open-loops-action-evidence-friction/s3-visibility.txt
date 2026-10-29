@@ -1,0 +1,50 @@
+### S3a: stalled_worker row: deferral lapses -> printed captain_visible, stored value and second-deferral refusal agree
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-visibility","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+$ bin/fm-open-loops.sh action row-visibility deferred --evidence lint running --recheck 2026-10-29T05:06:06Z   [clock now+0]
+action: "row-visibility"
+kind: deferred
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 61870.1793249766.SBojjZ   [clock now+0]
+
+exit=0
+## While the first deferral stands, a repeat is refused for that reason and marks nothing
+$ bin/fm-open-loops.sh action row-visibility deferred --evidence lint still running --recheck 2026-10-29T05:11:06Z   [clock now+0]
+error: "a deferral already stands until 2026-10-29T05:06:06Z; one deferral per row, so follow up when it lapses"
+exit=1
+stored action: {'captain_visible': False, 'requires_followup': None}
+## Deferral lapsed (now+700): re-presented row
+$ bin/fm-wake-drain.sh   [clock now+700]
+OVERDUE:
+  "row-visibility","worker:worker","worker","follow up on lint.full.whole",7900,"waiting for lint.full.whole; declaration age 7200s",true
+$ bin/fm-open-loops.sh action row-visibility deferred --evidence still running --recheck 2026-10-29T05:17:46Z   [clock now+700]
+error: "second deferral refused; row is captain-visible; steer, merge, wait on a named live task or escalate it"
+exit=1
+stored action captain_visible: True | stored row captain_visible: True
+$ bin/fm-open-loops.sh action row-visibility escalated --evidence second deferral escalated   [clock now+700]
+action: "row-visibility"
+kind: escalated
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 89079.1793249773.gxJmcA   [clock now+700]
+
+exit=0
+
+### S3b: review_pass_not_merged row: a deferral never stands, so the printed row, stored row and refusal agree
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-review","worker:worker","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7200,"independent review PASS at live head",false
+$ bin/fm-open-loops.sh action row-review deferred --evidence waiting --recheck 2026-10-29T05:06:06Z   [clock now+0]
+action: "row-review"
+kind: deferred
+exit=0
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 73504.1793249792.0sRivq   [clock now+0]
+
+exit=0
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-review","worker:worker","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7200,"independent review PASS at live head",true
+$ bin/fm-open-loops.sh action row-review deferred --evidence still waiting --recheck 2026-10-29T05:06:06Z   [clock now+0]
+error: "second deferral refused; row is captain-visible; steer, merge, wait on a named live task or escalate it"
+exit=1
+stored action: {'captain_visible': True, 'requires_followup': True} | stored row captain_visible: True

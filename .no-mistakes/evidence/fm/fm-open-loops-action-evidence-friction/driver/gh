@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+# Local forge double for `gh api -i` (stands in for GitHub only; the ledger product is real).
+import hashlib, json, os, re, sys
+args = sys.argv[1:]
+assert args[:2] == ['api', '-i'], args
+d = json.load(open(os.path.join(os.environ['FM_HOME'], 'forge.json')))
+path = '/' + args[-1].lstrip('/')
+with open(os.path.join(os.environ['FM_HOME'], 'gh-requests.log'), 'a') as s: s.write(path + '\n')
+if '/check-runs' in path:
+    v = {'check_runs': d['checks'].get(path.split('/commits/')[1].split('/')[0], [])}
+elif '/statuses' in path: v = []
+elif re.search(r'/pulls\?', path): v = d['pulls']
+elif '/rules/branches/' in path: v = []
+elif '/branches/' in path: v = {'protected': False}
+else: v = next(p for p in d['pulls'] if str(p['number']) == path.rsplit('/', 1)[1])
+body = json.dumps(v)
+etag = '"' + hashlib.sha1(body.encode()).hexdigest()[:16] + '"'
+sys.stdout.write('HTTP/2.0 200 OK\r\nEtag: ' + etag + '\r\nX-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: 4000\r\nX-Ratelimit-Reset: 9999999999\r\nX-Ratelimit-Resource: core\r\n\r\n' + body)

@@ -1,0 +1,30 @@
+### S4: a remote secondmate (task mini) is steered; the parent pending-reply correlation id is the delivery id
+$ bin/fm-wake-drain.sh   [clock now+0]
+OVERDUE:
+  "row-remote","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+## Adversarial: undelivered id
+$ bin/fm-open-loops.sh action row-remote steered --evidence 0123456789abcdef   [clock now+0]
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+exit=1
+## Adversarial: delivered id for another task
+$ bin/fm-open-loops.sh action row-remote steered --evidence fedcba9876543210   [clock now+0]
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+exit=1
+## Adversarial: delivered before the overdue episode
+$ bin/fm-open-loops.sh action row-remote steered --evidence 0011223344556677   [clock now+0]
+error: "steered evidence must be a new delivery sent after this row became overdue or its evidence last changed"
+exit=1
+## Adversarial: symlinked id
+$ bin/fm-open-loops.sh action row-remote steered --evidence 2211221122112211   [clock now+0]
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+exit=1
+## Happy path: delivered id for mini after the episode began
+$ bin/fm-open-loops.sh action row-remote steered --evidence aabbccddeeff0011   [clock now+0]
+action: "row-remote"
+kind: steered
+standing: unchanged row; re-present after 14400 seconds
+exit=0
+stored evidence: aabbccddeeff0011
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 49882.1793249811.OcmhLE   [clock now+0]
+
+exit=0
