@@ -1544,10 +1544,10 @@ class WaitVerifier:
             'pr "$(fm_dod_pr_url_from_done_note "$note")" && exit 0; fi; '
             '[ -n "$3" ] && [ -d "$3" ] && command -v no-mistakes >/dev/null 2>&1 || exit 0; '
             'branch=$(git -C "$3" symbolic-ref --quiet --short HEAD 2>/dev/null) || exit 0; '
-            'out=$(fm_nm_run_bounded "$3" 30 axi status 2>/dev/null) || exit 0; '
+            'out=$(FM_NM_READ_PROGRESS=1 fm_nm_run_bounded "$3" "$4" axi status 2>/dev/null) || exit 0; '
             '[ "$(fm_nm_strip_quotes "$(fm_nm_field "$out" branch)")" = "$branch" ] || exit 0; '
             'pr "$(fm_nm_strip_quotes "$(fm_nm_field "$out" pr)")" || :',
-            BIN, path, fields.get("worktree", "")).strip()
+            BIN, path, fields.get("worktree", ""), str(self.collector.timeout)).strip()
 
     def verify_source(self, source):
         if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):
