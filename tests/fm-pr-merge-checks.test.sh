@@ -43,11 +43,9 @@ test_single_pr_task_with_a_local_only_head_is_still_refused() {
   add_gh_mocks "$case_dir" cccccccccccccccccccccccccccccccccccccccc
   write_ready_reports "$case_dir" https://github.com/example/repo/pull/3197
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "single-pr-local-tip: a head only the copy holds must refuse"
   assert_grep "named head $tip is unreachable outside the worker copy" "$case_dir/stderr" \
     "single-pr-local-tip: the refusal did not name the local-only head"
@@ -68,11 +66,9 @@ test_multi_pr_task_without_a_reported_forge_head_is_still_refused() {
     https://github.com/example/repo/pull/3196 \
     https://github.com/example/repo/pull/3197
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "multi-pr-no-forge-head: an unreported forge head must refuse"
   assert_grep "named head $tip is unreachable outside the worker copy" "$case_dir/stderr" \
     "multi-pr-no-forge-head: the refusal did not name the local-only head"
@@ -92,11 +88,9 @@ test_multi_pr_task_with_a_red_head_is_still_refused() {
     https://github.com/example/repo/pull/3196 \
     https://github.com/example/repo/pull/3197
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "multi-pr-red-head: a red head must refuse"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "multi-pr-red-head: the red check was not named"
@@ -121,11 +115,9 @@ test_github_draft_or_unreadable_draft_state_refuses() {
     jq -c "$filter" "$case_dir/github-view.json" > "$case_dir/github-view.tmp"
     mv "$case_dir/github-view.tmp" "$case_dir/github-view.json"
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/82 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "github-$label: a pull request not read as non-draft must refuse"
     assert_grep "the pull request is a draft" "$case_dir/stderr" \
       "github-$label: the draft state was not named"
@@ -172,11 +164,9 @@ test_check_runs_never_supersede_status_contexts() {
     "$(status_context ci FAILURE)" \
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:09Z)"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/97 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-cross-check-kind: a failing status context must refuse"
   assert_grep "check 'ci' is not green" "$case_dir/stderr" \
     "github-cross-check-kind: the status context was not named"
@@ -197,11 +187,9 @@ test_current_failed_check_run_still_refuses() {
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:01Z)" \
     "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:09Z)"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/91 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-current-red: a currently failing check must refuse"
   assert_grep "check 'ci' is not green" "$case_dir/stderr" \
     "github-current-red: the red check was not named"
@@ -221,11 +209,9 @@ test_late_finishing_old_success_does_not_hide_current_failure() {
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:01Z 2026-01-01T00:00:10Z)" \
     "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:09Z 2026-01-01T00:00:09Z)"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/98 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-old-success-finishes-last: the later-started failure must refuse"
   assert_grep "check 'ci' is not green" "$case_dir/stderr" \
     "github-old-success-finishes-last: the current failure was not named"
@@ -265,11 +251,9 @@ test_unfinished_rerun_keeps_a_check_red() {
       "$(check_run ci COMPLETED "$prior" 2026-01-01T00:00:01Z)" \
       "$(check_run ci IN_PROGRESS - -)"
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/92 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "github-pending-rerun-$prior: an unfinished re-run must refuse"
     assert_grep "check 'ci' is not green" "$case_dir/stderr" \
       "github-pending-rerun-$prior: the pending check was not named"
@@ -291,11 +275,9 @@ test_supersession_never_crosses_check_names() {
     "$(check_run lint COMPLETED FAILURE 2026-01-01T00:00:01Z)" \
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:09Z)"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/93 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "github-cross-name: another check passing must not clear this failure"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "github-cross-name: the red check was not named"
@@ -326,11 +308,9 @@ test_undated_runs_never_supersede() {
       "$(check_run ci COMPLETED FAILURE "$older")" \
       "$(check_run ci COMPLETED SUCCESS "$newer")"
 
-    set +e
+    rc=0
     run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/94 \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "github-undated-$label: an unproven supersession must refuse"
     assert_grep "check 'ci' is not green" "$case_dir/stderr" \
       "github-undated-$label: the red check was not named"
@@ -354,11 +334,9 @@ test_allow_red_still_waives_only_the_current_failure() {
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:09Z)" \
     "$(check_run lint COMPLETED FAILURE 2026-01-01T00:00:09Z)"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/95 \
-    --allow-red ci > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    --allow-red ci > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "superseded-allow-red-wrong-name: waiving the green check must not merge"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "superseded-allow-red-wrong-name: the unwaived red check was not named"
@@ -387,12 +365,10 @@ test_allow_red_is_refused_while_away() {
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/82 \
     --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "github-allow-red-away: --allow-red must be refused while away"
   assert_grep '--allow-red is attended-only' "$case_dir/stderr" \
     "github-allow-red-away: refusal did not name attended-only"
@@ -405,12 +381,10 @@ test_allow_red_is_refused_while_away() {
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   mv "$case_dir/state/.afk-contract" "$case_dir/away-record-after-view"
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/82 \
     --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "github-allow-red-away-after-view: late away publication must refuse --allow-red"
   assert_grep '--allow-red is attended-only' "$case_dir/stderr" \
     "github-allow-red-away-after-view: late refusal did not name attended-only"
@@ -449,11 +423,9 @@ test_allow_red_requires_one_separate_name() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/87 \
-    --allow-red=lint > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    --allow-red=lint > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "github-allow-red-equals: equals form must be refused"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "github-allow-red-equals: gh pr merge ran for the equals alias"
@@ -462,11 +434,9 @@ test_allow_red_requires_one_separate_name() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/88 \
-    --allow-red lint --allow-red unit > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    --allow-red lint --allow-red unit > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "github-allow-red-duplicate: duplicate waiver must be refused"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "github-allow-red-duplicate: gh pr merge ran for duplicate waivers"
@@ -544,11 +514,9 @@ test_away_branch_actor_merges_green_under_the_record() {
   case_dir=$(make_case away-branch-attended)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 6 "$rc" "away-branch-attended: an attended branch must be refused at the partition"
   assert_grep 'the supervision branch never performs this action' "$case_dir/stderr" \
     "away-branch-attended: refusal lost the partition wording"
@@ -577,21 +545,17 @@ test_away_branch_actor_merges_green_under_the_record() {
   write_github_rollup_json "$case_dir" "$head" \
     '{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-09-01T00:00:00Z"}'
   write_away_record "$case_dir" --words 'merge task-x1 even if lint is red'
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "away-branch-red: a red check must refuse the branch whatever the words say"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "away-branch-red: refusal did not name the red check"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "away-branch-red: gh pr merge ran for a red branch merge while away"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-branch-red: --allow-red must stay attended-only for the branch"
   assert_grep 'allow-red is attended-only' "$case_dir/stderr" \
     "away-branch-red: refusal did not name the attended-only waiver"
@@ -615,11 +579,9 @@ test_away_branch_refuses_when_record_archived_during_preflight() {
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   : > "$case_dir/away-record-after-view"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 6 "$rc" "away-branch-archived-during-preflight: an archived record must refuse the branch under the lock"
   assert_grep 'main is parked' "$case_dir/stderr" \
     "away-branch-archived-during-preflight: the opening partition never saw the live record"
@@ -641,11 +603,9 @@ test_away_posture_refuses_asynchronous_merge_paths() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" --attended-override -- --auto --merge \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-auto-refused: auto-merge must be attended-only"
   assert_grep '--auto is attended-only' "$case_dir/stderr" \
     "away-auto-refused: refusal did not name the asynchronous flag"
@@ -657,11 +617,9 @@ test_away_posture_refuses_asynchronous_merge_paths() {
   add_gh_mocks "$case_dir" "$head"
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-queue-refused: a required merge queue must refuse before submission"
   assert_grep 'merge-queue state does not prove an immediate merge' "$case_dir/stderr" \
     "away-queue-refused: refusal did not explain the away restriction"
@@ -670,11 +628,9 @@ test_away_posture_refuses_asynchronous_merge_paths() {
 
   case_dir=$(make_gitlab_case away-gitlab-auto)
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" --attended-override -- --auto-merge \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-gitlab-auto: GitLab auto-merge must refuse"
   assert_grep 'GitLab auto-merge is attended-only' "$case_dir/stderr" \
     "away-gitlab-auto: refusal did not name auto-merge"
@@ -683,11 +639,9 @@ test_away_posture_refuses_asynchronous_merge_paths() {
 
   case_dir=$(make_gitlab_case away-gitlab-configured merge_when_pipeline_succeeds=true)
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-gitlab-configured: configured auto-merge must refuse"
   [ -z "$(glab_merge_line "$case_dir/glab.log")" ] \
     || fail "away-gitlab-configured: glab received a configured asynchronous merge"
@@ -734,11 +688,9 @@ test_away_record_does_not_bypass_red_or_identity() {
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/84 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "away-record-red: the record must not waive red checks"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "away-record-red: C1 did not refuse the red check"
@@ -749,11 +701,9 @@ test_away_record_does_not_bypass_red_or_identity() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   printf '\npr=https://github.com/example/repo/pull/99\n' >> "$case_dir/state/task-x1.meta"
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/85 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "pr-identity: a different recorded URL must refuse"
   assert_grep 'is bound to https://github.com/example/repo/pull/99' "$case_dir/stderr" \
     "pr-identity: refusal did not name the recorded URL"
@@ -766,11 +716,9 @@ test_unreadable_away_record_refuses_merge() {
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae
   printf 'not-a-contract\n' > "$case_dir/state/.afk-contract"
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/86 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "away-unreadable: an unreadable away record must refuse"
   assert_grep 'away-posture record could not be read' "$case_dir/stderr" \
     "away-unreadable: refusal did not fail closed"
@@ -795,11 +743,9 @@ SH
   )
 
   export FM_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/71 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   unset FM_TEST_AWAY_MUTATE_AT_MERGE
 
   expect_code 0 "$rc" "away-archive-at-merge: the green merge should still land"
@@ -829,11 +775,9 @@ SH
 SH
   )
   export FM_TEST_AWAY_MUTATE_AT_MERGE="$mutate"
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/72 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   unset FM_TEST_AWAY_MUTATE_AT_MERGE
 
   expect_code 0 "$rc" "away-replace-at-merge: the green merge should still land"
@@ -857,11 +801,9 @@ test_a_record_made_unreadable_before_the_merge_refuses_it() {
   printf 'not-a-contract\n' > "$case_dir/away-record-after-view"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/73 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "away-unreadable-before-merge: a record made unreadable before the authority read must refuse"
   assert_grep 'away-posture record could not be read' "$case_dir/stderr" \
@@ -899,11 +841,9 @@ test_merge_refuses_when_the_away_record_cannot_be_locked() {
     || { kill "$holder_pid" 2>/dev/null || true; fail "away-lock-unavailable: the fixture never took the record lock"; }
 
   export FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT=1
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/74 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   unset FM_TEST_AFK_CONTRACT_LOCK_TIMEOUT
   : > "$case_dir/release-holder"
   wait "$holder_pid" || fail "away-lock-unavailable: the fixture holder did not release cleanly"
@@ -919,11 +859,9 @@ test_merge_refuses_when_the_away_record_cannot_be_locked() {
 test_allow_red_refused_on_gitlab() {
   local case_dir rc
   case_dir=$(make_gitlab_case gitlab-allow-red)
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "gitlab-allow-red: --allow-red must not apply on GitLab"
   assert_grep '--allow-red does not apply to GitLab' "$case_dir/stderr" \
     "gitlab-allow-red: refusal did not name GitLab"
@@ -1171,11 +1109,9 @@ test_allow_missing_follows_the_allow_red_rules() {
     "unreported-away: gh pr merge ran with an unreported check while away"
 
   case_dir=$(make_gitlab_case gitlab-allow-missing)
-  set +e
+  RC=0
   run_pr_merge "$case_dir" task-x1 "$MR_URL" --allow-missing validate \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  RC=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || RC=$?
   expect_code 2 "$RC" "gitlab-allow-missing: the waiver must not apply on GitLab"
   assert_grep '--allow-missing does not apply to GitLab' "$case_dir/stderr" \
     "gitlab-allow-missing: the refusal did not name GitLab"
@@ -1490,11 +1426,9 @@ test_required_partial_reads_report_all_failures() {
 test_allow_red_refused_on_forgejo() {
   local case_dir rc
   case_dir=$(make_forgejo_case forgejo-allow-red)
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "forgejo-allow-red: --allow-red must not apply on Forgejo"
   assert_grep '--allow-red does not apply to Forgejo' "$case_dir/stderr" \
     "forgejo-allow-red: refusal did not name Forgejo"
@@ -1505,11 +1439,9 @@ test_allow_red_refused_on_forgejo() {
 test_allow_missing_refused_on_forgejo() {
   local case_dir rc
   case_dir=$(make_forgejo_case forgejo-allow-missing)
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$FJ_URL" --allow-missing validate \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "forgejo-allow-missing: --allow-missing must not apply on Forgejo"
   assert_grep '--allow-missing does not apply to Forgejo' "$case_dir/stderr" \
     "forgejo-allow-missing: refusal did not name Forgejo"
@@ -1533,11 +1465,9 @@ test_green_head_refusal_names_each_check_and_its_repair() {
     "$(check_run docs IN_PROGRESS -)"
   write_github_required "$case_dir" classic:ci ruleset:validate
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "green-head-message: the refusal must keep its exit status"
   assert_grep "check 'ci' is not green: it failed, and it is required by base branch main" \
     "$case_dir/stderr" \
@@ -1581,11 +1511,9 @@ test_away_waiver_refusal_names_the_posture_and_the_attended_path() {
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" --allow-red lint \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 2 "$rc" "away-waiver-message: --allow-red must still be refused while away"
   assert_grep '--allow-red is attended-only' "$case_dir/stderr" \
     "away-waiver-message: the refusal no longer names attended-only"
@@ -1603,11 +1531,9 @@ test_away_waiver_refusal_names_the_posture_and_the_attended_path() {
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "https://github.com/example/repo/pull/196" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "away-waiver-message: an away red merge must still refuse"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "away-waiver-message: the away green-head refusal did not name the check"
@@ -1632,11 +1558,9 @@ test_held_task_refusal_prints_the_exact_release_command() {
   add_gh_mocks "$case_dir" "$head"
   hold_fixture_task "$case_dir"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 "$url" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "held-task-message: a held task must still refuse the merge"
   assert_grep 'task task-x1 is still held for the captain; nothing was merged' \
     "$case_dir/stderr" \
@@ -1759,12 +1683,10 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
 
-  set +e
+  rc=0
   FM_GUARD_EVENT_LOG="$case_dir/refused-guard-events.jsonl" \
     run_pr_merge "$case_dir" task-x1 "$url" \
-      > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "guard-events: a refused merge must keep its exit status"
   assert_grep "check 'lint' is not green" "$case_dir/stderr" \
     "guard-events: the refused merge no longer names the red check"
@@ -1780,12 +1702,10 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
     "guard-events: the deny did not record elapsed-ms 0"
 
   mkdir -p "$case_dir/guard-events-dir"
-  set +e
+  rc=0
   FM_GUARD_EVENT_LOG="$case_dir/guard-events-dir" \
     run_pr_merge "$case_dir" task-x1 "$url" \
-      > "$case_dir/stdout-unwritable" 2> "$case_dir/stderr-unwritable"
-  rc=$?
-  set -e
+      > "$case_dir/stdout-unwritable" 2> "$case_dir/stderr-unwritable" || rc=$?
   expect_code 1 "$rc" "guard-events: an unwritable log must not change the refusal's exit status"
   assert_grep "check 'lint' is not green" "$case_dir/stderr-unwritable" \
     "guard-events: an unwritable log changed what the refusal said"
@@ -1818,11 +1738,9 @@ test_github_review_required_refuses() {
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/gh.log"
 
-  set +e
+  rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/86 \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "github-review-required: a PR awaiting review must refuse"
   assert_grep 'reviewDecision is REVIEW_REQUIRED' "$case_dir/stderr" \

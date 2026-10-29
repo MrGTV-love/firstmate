@@ -961,11 +961,9 @@ away_change_script() {  # <case-dir> <name>; script body on stdin
 run_required_case() {
   local case_dir=$1 number=$2
   shift 2
-  set +e
+  RC=0
   run_pr_merge "$case_dir" task-x1 "https://github.com/example/repo/pull/$number" "$@" \
-    > "$case_dir/stdout" 2> "$case_dir/stderr"
-  RC=$?
-  set -e
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || RC=$?
 }
 
 write_rollup_response() {  # <case-dir> <output>
@@ -975,26 +973,10 @@ write_rollup_response() {  # <case-dir> <output>
   }}}}}}' "$1/github-view.json" > "$2"
 }
 
-# Validate one group's registered selection and run it in the order the group
-# registered. Each group assigns pr_merge_test_cases before calling this.
+# Run one group's registered selection in the order the group registered it.
+# Each group assigns pr_merge_test_cases before calling this; tests/lib.sh's
+# fm_test_run_cases owns the selection and refuses an unknown name.
 pr_merge_run() {
-  local requested_case test_case registered_case
-  for requested_case in "$@"; do
-    registered_case=false
-    # shellcheck disable=SC2154 # Each group assigns pr_merge_test_cases before calling this.
-    for test_case in "${pr_merge_test_cases[@]}"; do
-      if [ "$requested_case" = "$test_case" ]; then registered_case=true; break; fi
-    done
-    if [ "$registered_case" = false ]; then
-      printf 'Unknown test case: %s\n' "$requested_case" >&2
-      printf 'Usage: bash %s [test_function_name ...]\n' "${BASH_SOURCE[1]##*/}" >&2
-      exit 2
-    fi
-  done
-  for test_case in "${pr_merge_test_cases[@]}"; do
-    if [ "$#" -eq 0 ]; then "$test_case"; continue; fi
-    for requested_case in "$@"; do
-      if [ "$requested_case" = "$test_case" ]; then "$test_case"; break; fi
-    done
-  done
+  # shellcheck disable=SC2154 # Each group assigns pr_merge_test_cases before calling this.
+  fm_test_run_cases "${pr_merge_test_cases[@]}" -- "$@"
 }

@@ -431,20 +431,8 @@ SH
 # Runs this suite's `tests` array, or only the named cases, then proves cleanup
 # left no process-event runner or watchdog behind.
 captain_hold_run_tests() {  # [case-name...]
-  local requested candidate selected selected_test
-  if [ "$#" -gt 0 ]; then
-    for requested in "$@"; do
-      selected=0
-      for candidate in "${tests[@]}"; do
-        [ "$requested" != "$candidate" ] || selected=1
-      done
-      [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
-    done
-    tests=("$@")
-  fi
-  for selected_test in "${tests[@]}"; do
-    "$selected_test" || exit "$?"
-  done
+  # shellcheck disable=SC2154 # Each suite assigns its tests array before calling this.
+  fm_test_run_cases "${tests[@]}" -- "$@"
 
   # Run the ordinary home-scoped cleanup before checking actual process state.
   # The watchdog may be asleep until its next owner check after a runner exits.

@@ -160,6 +160,111 @@ pass() {
   printf 'ok - %s\n' "$1"
 }
 
+# --- single-case selection --------------------------------------------------
+#
+# Every test file that can run one named case goes through this section, so one
+# rule decides which names are cases and what the file's exit status is. A bare
+# `"$FM_TEST_ONLY"; exit 0` ran an unknown name as a command, printed "command
+# not found", and exited 0, and it exited 0 for a case that returned nonzero, so
+# a renamed case left CI's stock-Bash lane green with nothing tested.
+#
+# fm_test_run_cases [registered-case...] -- [requested-case...]
+#   Refuses an unknown requested name before running anything: "Unknown test
+#   case: <name>" on stderr, exit 2. With registered cases, a requested name must
+#   be one of them and the requested cases run in registration order, or every
+#   registered case runs when none is requested. Without them, a requested name
+#   must be a defined test_ function and runs in the order given. The first case
+#   to return nonzero ends the file with that status, and a case that turns
+#   errexit (set -e) on or off fails the file, so a case sees the same errexit
+#   state in a full run as when it runs alone. A file that must prepare
+#   state at a particular point in its registry defines fm_test_before_case,
+#   which receives each registered case name in order, selected or not, so a
+#   selected case runs in the same shell state as in the full run.
+# fm_test_only [short-name=test_function...]
+#   For a file that selects one case by FM_TEST_ONLY: does nothing when the
+#   variable is empty, otherwise runs that case, or the case a given short name
+#   stands for, and exits with its status. No other file reads FM_TEST_ONLY.
+# fm_test_case_known <name> [registered-case...]
+#   The membership test both use.
+
+fm_test_case_known() {
+  local name=$1 registered
+  shift
+  if [ "$#" -gt 0 ]; then
+    for registered in "$@"; do
+      if [ "$name" = "$registered" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
+  case "$name" in
+    test_*[!A-Za-z0-9_]*) return 1 ;;
+    test_?*) declare -F "$name" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+fm_test_run_one() {
+  local rc errexit=${-//[!e]/}
+  "$1"
+  rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  [ "${-//[!e]/}" = "$errexit" ] || fail "$1 changed errexit (set -e); a case must leave it as it found it"
+}
+
+fm_test_run_cases() {
+  local -a registered=()
+  local name case_name selected
+  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+    registered+=("$1")
+    shift
+  done
+  [ "$#" -gt 0 ] || fail "fm_test_run_cases: put -- between the registered cases and the requested ones"
+  shift
+
+  for name in "$@"; do
+    if [ "${#registered[@]}" -gt 0 ]; then
+      if fm_test_case_known "$name" "${registered[@]}"; then continue; fi
+    elif fm_test_case_known "$name"; then
+      continue
+    fi
+    printf 'Unknown test case: %s (not defined by %s)\n' "$name" "$(basename "$0")" >&2
+    exit 2
+  done
+
+  if [ "${#registered[@]}" -eq 0 ]; then
+    for case_name in "$@"; do
+      fm_test_run_one "$case_name"
+    done
+    return 0
+  fi
+
+  for case_name in "${registered[@]}"; do
+    if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$case_name"; fi
+    if [ "$#" -gt 0 ]; then
+      selected=false
+      for name in "$@"; do
+        if [ "$name" = "$case_name" ]; then selected=true; fi
+      done
+      [ "$selected" = true ] || continue
+    fi
+    fm_test_run_one "$case_name"
+  done
+  return 0
+}
+
+# shellcheck disable=SC2120 # Most callers pass no short names.
+fm_test_only() {
+  local requested=${FM_TEST_ONLY:-} short_name
+  [ -n "$requested" ] || return 0
+  for short_name in "$@"; do
+    if [ "${short_name%%=*}" = "$requested" ]; then requested=${short_name#*=}; fi
+  done
+  fm_test_run_cases -- "$requested"
+  exit 0
+}
+
 # --- self-cleaning temp root ------------------------------------------------
 #
 # fm_test_tmproot <prefix> echoes a fresh temp dir and registers it for removal
