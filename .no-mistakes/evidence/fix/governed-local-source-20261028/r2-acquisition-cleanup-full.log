@@ -1,0 +1,16 @@
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+ok - tmux provisioning runs in the acquired shell ancestry before admitting its worker
+ok - tmux busy provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux stalled provisioning wait is bounded and stops only its own helper before restoring the copy
+ok - tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work
+env -u FM_ROOT_OVERRIDE bash tests/fm-spawn-acquisition-cleanup.test.sh  20.46s user 36.53s system 35% cpu 2:40.10 total
+exit=0

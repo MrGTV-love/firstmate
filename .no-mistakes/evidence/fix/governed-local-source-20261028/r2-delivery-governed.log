@@ -1,0 +1,6 @@
+warning: re-init: ignored --initial-branch=main
+ok - governed promotion preserves scout metadata, instructions and checkout on actual refusal
+warning: re-init: ignored --initial-branch=main
+ok - promotion refuses to override recorded slot scope before provisioning or rewriting the record
+  2.09s user 8.68s system 91% cpu 11.738 total
+exit=0

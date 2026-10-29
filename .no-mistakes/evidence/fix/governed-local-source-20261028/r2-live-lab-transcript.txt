@@ -1,0 +1,212 @@
+# Round-2 live lab at target 6707f740: real bin/fm-spawn.sh, fm-merge-local.sh, fm-teardown.sh, fm-control.sh; real treehouse v3.1.4 pool; real tmux on the lab's private socket; disposable git repos with fixture project provisioners.
+# FM_HOME=/Users/charlesabrooker/tmp/fm-lab.D4yNAq (marked lab home)  TREEHOUSE_ROOT=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse  worker = raw launch command 'sleep 3600' (no model agent)
+
+======== spawnA.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@3e4d6d5f332af2bd18783cb4b674f683d2512707 origin=main@3e4d6d5f332af2bd18783cb4b674f683d2512707 selected=origin/main@3e4d6d5f332af2bd18783cb4b674f683d2512707
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj/.git/lab-slot-manifests/lab-a-1793268166.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj", "owner_id": "lab-a-1793268166", "branch": "fm/lab-a-1793268166", "base_sha": "3e4d6d5f332af2bd18783cb4b674f683d2512707", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active"}
+skill selection for lab-a-1793268166: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-a-1793268166 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-lab-a-1793268166 worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj
+rc=0
+
+======== mergeA.out
+merged fm/lab-a-1793268166 into local main (3e4d6d5 -> d201d6a) in /Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj
+rc=0
+
+======== teardownA.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+A new version of treehouse is available: v3.1.4 → v3.1.7
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at ~/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj. Run 'treehouse return ~/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj' to release it.
+/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj
+teardown: reaping leaked worktree process(es) for lab-a-1793268166: 4354 19568
+teardown: force-killing leaked worktree process(es) for lab-a-1793268166: 4354
+failed to connect to the docker API at unix:///Users/charlesabrooker/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/charlesabrooker/.docker/run/docker.sock: connect: no such file or directory
+A new version of treehouse is available: v3.1.4 → v3.1.7
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown lab-a-1793268166 complete (window firstmate:fm-lab-a-1793268166, worktree /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj)
+Backlog: lab-a-1793268166 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/backlog.md - move lab-a-1793268166 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+rc=0
+
+======== spawnB.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@d201d6a36b7a53833c095a8d7078413eb9e87c48 origin=main@3e4d6d5f332af2bd18783cb4b674f683d2512707 selected=refs/heads/main@d201d6a36b7a53833c095a8d7078413eb9e87c48
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj/.git/lab-slot-manifests/lab-b-1793268166.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj", "owner_id": "lab-b-1793268166", "branch": "fm/lab-b-1793268166", "base_sha": "d201d6a36b7a53833c095a8d7078413eb9e87c48", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active", "base_source": "local-default", "base_ref": "refs/heads/main"}
+skill selection for lab-b-1793268166: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-b-1793268166 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-lab-b-1793268166 worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj
+rc=0
+
+======== relaunchB-dirty.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+error: task lab-b-1793268166 records harness 'sleep', which has no verified control mechanics; fm-control refuses to guess an interrupt key or exit command
+rc=1
+
+======== lab-c-1793268166.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+error: local-only local and remote defaults diverge or cannot be compared; reconcile them before assigning a task copy
+rc=1
+
+======== lab-d-1793268166.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@585cb041de055cce2c42df2fa115563412742076 origin=main@94fc2a9af8c840abbfb4272a33d891e388273e0a selected=refs/heads/main@585cb041de055cce2c42df2fa115563412742076
+usage: provision_existing_slot.py [-h] --repo-root REPO_ROOT
+                                  --worktree-path WORKTREE_PATH
+                                  --owner-id OWNER_ID --branch BRANCH
+                                  --base-sha BASE_SHA --owned-path OWNED_PATH
+provision_existing_slot.py: error: unrecognized arguments: --base-source local-default
+error: slot provisioner refused task lab-d-1793268166 (exit 2); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/lab-d-1793268166/slot-provision-spawn.10192.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/oldproj-66912c/1/oldproj and endpoint firstmate:fm-lab-d-1793268166 retained; no worker admitted
+rc=1
+
+======== lab-f-1793268166.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a origin=main@0bf8151dc426b11b2c44a7767e6f41e96ec1c11b selected=refs/heads/main@1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a
+error: invalid slot provisioner attestation: provisioner did not attest local-default source
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/tamperproj/.git/lab-slot-manifests/lab-f-1793268166.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/tamperproj-0b1ca6/1/tamperproj", "owner_id": "lab-f-1793268166", "branch": "fm/lab-f-1793268166", "base_sha": "1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active"}
+error: slot provisioner refused task lab-f-1793268166 (exit 1); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/lab-f-1793268166/slot-provision-spawn.32789.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/tamperproj-0b1ca6/1/tamperproj and endpoint firstmate:fm-lab-f-1793268166 retained; no worker admitted
+rc=1
+
+======== lab-g-1793268166.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+error: governed slot provisioning requires --owned-path <tracked-path> (repeatable)
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/1/proj3 and endpoint firstmate:fm-lab-g-1793268166 retained; no worker admitted
+rc=1
+
+======== lab-e-1793268166.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672 origin=main@f51431182c66c1485a8dd89eca527a00cf94a7e5 selected=refs/heads/main@4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj3/.git/lab-slot-manifests/lab-e-1793268166.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3", "owner_id": "lab-e-1793268166", "branch": "fm/lab-e-1793268166", "base_sha": "4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active", "base_source": "local-default", "base_ref": "refs/heads/main"}
+skill selection for lab-e-1793268166: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-e-1793268166 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-lab-e-1793268166 worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3
+rc=0
+
+======== relaunchE.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+{"state": "PASS", "manifest_path": "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj3/.git/lab-slot-manifests/lab-e-1793268166.json", "worktree_path": "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3", "owner_id": "lab-e-1793268166", "branch": "fm/lab-e-1793268166", "base_sha": "4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672", "owned_paths": ["README.md"], "lifecycle_state": "worktree_active", "base_source": "local-default", "base_ref": "refs/heads/main", "adopted": true}
+skill selection for lab-e-1793268166: undelivered - raw launch command has no supported brief transport
+confinement audit: harness=sleep write_confinement=unconfined-macos-sleep
+spawned lab-e-1793268166 harness=sleep kind=ship mode=local-only yolo=off window=firstmate:fm-lab-e-1793268166 worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3
+rc=0
+
+======== relaunchE-dirty.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+error: slot provisioning refused: dirty_worktree; preserve and reconcile the scratch state before retrying
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3 and endpoint firstmate:fm-lab-e-1793268166 retained; no worker admitted
+rc=1
+
+======== relaunchD-override.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+error: --relaunch reuses recorded slot scope; --owned-path cannot override it
+rc=1
+
+======== lab-h.out
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.D4yNAq
+local-only source: local=main@fc43387e6d256ffa83be4079c098a7fd2011b850 origin=main@fc43387e6d256ffa83be4079c098a7fd2011b850 selected=origin/main@fc43387e6d256ffa83be4079c098a7fd2011b850
+error: assigned endpoint firstmate:fm-lab-h-1793268166 became unreadable before provisioning completed; its helper is stopped and no worker admitted; report: /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/lab-h-1793268166/slot-provision-spawn.32738.json
+error: slot provisioner refused task lab-h-1793268166 (exit 1); no agent or ship transition admitted; report: /Users/charlesabrooker/tmp/fm-lab.D4yNAq/data/lab-h-1793268166/slot-provision-spawn.32738.json
+error: assigned copy /Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj4-a782eb/1/proj4 and endpoint firstmate:fm-lab-h-1793268166 retained; no worker admitted
+rc=1
+
+======== SHAs
+proj origin start=3e4d6d5 A=d201d6a36b7a53833c095a8d7078413eb9e87c48
+proj3 L1=4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672 L2=ccd2751dbb865a7d60afd191ea4607eb7032367c E1=03bad4b020455662461592ea1d9c098e525853d8
+
+======== proj provisioner calls (argv + process ancestry)
+{"argv": ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj", "--owner-id", "lab-a-1793268166", "--branch", "fm/lab-a-1793268166", "--base-sha", "3e4d6d5f332af2bd18783cb4b674f683d2512707", "--owned-path", "README.md"], "ancestry": ["/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3", "bash", "/bin/zsh", "treehouse", "-zsh", "tmux"]}
+{"argv": ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj", "--owner-id", "lab-b-1793268166", "--branch", "fm/lab-b-1793268166", "--base-sha", "d201d6a36b7a53833c095a8d7078413eb9e87c48", "--base-source", "local-default", "--owned-path", "README.md"], "ancestry": ["/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3", "bash", "/bin/zsh", "treehouse", "-zsh", "tmux"]}
+
+======== proj3 provisioner calls (argv + process ancestry)
+{"argv": ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj3", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3", "--owner-id", "lab-e-1793268166", "--branch", "fm/lab-e-1793268166", "--base-sha", "4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672", "--base-source", "local-default", "--owned-path", "README.md"], "ancestry": ["/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3", "bash", "/bin/zsh", "treehouse", "-zsh", "tmux"]}
+{"argv": ["--repo-root", "/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj3", "--worktree-path", "/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3", "--owner-id", "lab-e-1793268166", "--branch", "fm/lab-e-1793268166", "--base-sha", "4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672", "--base-source", "local-default", "--owned-path", "README.md"], "ancestry": ["/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3", "bash", "/bin/zsh", "treehouse", "-zsh", "tmux"]}
+
+======== state/lab-a-1793268166.meta slot/recovery lines
+(no meta: removed by teardown or never published)
+
+======== state/lab-b-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj
+mode=local-only
+branch=fm/lab-b-1793268166
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj/.git/lab-slot-manifests/lab-b-1793268166.json
+slot_base_sha=d201d6a36b7a53833c095a8d7078413eb9e87c48
+slot_source_ref=refs/heads/main
+slot_owned_path=README.md
+model=default
+
+======== state/lab-d-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/oldproj-66912c/1/oldproj
+recovery=slot-provision-refused
+branch=fm/lab-d-1793268166
+mode=local-only
+model=default
+slot_owned_path=README.md
+slot_prepared_head=585cb041de055cce2c42df2fa115563412742076
+slot_source_ref=refs/heads/main
+slot_base_sha=585cb041de055cce2c42df2fa115563412742076
+
+======== state/lab-e-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/2/proj3
+mode=local-only
+branch=fm/lab-e-1793268166
+slot_manifest=/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj3/.git/lab-slot-manifests/lab-e-1793268166.json
+slot_base_sha=4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672
+slot_source_ref=refs/heads/main
+slot_owned_path=README.md
+model=default
+
+======== state/lab-f-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/tamperproj-0b1ca6/1/tamperproj
+recovery=slot-provision-refused
+branch=fm/lab-f-1793268166
+mode=local-only
+model=default
+slot_owned_path=README.md
+slot_prepared_head=1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a
+slot_source_ref=refs/heads/main
+slot_base_sha=1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a
+
+======== state/lab-g-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj3-682ee5/1/proj3
+recovery=slot-provision-refused
+branch=fm/lab-g-1793268166
+mode=local-only
+model=default
+slot_source_ref=refs/heads/main
+slot_base_sha=4c5ab60dfe50a5eafa9e4e02e5a2ba47da536672
+
+======== state/lab-h-1793268166.meta slot/recovery lines
+worktree=/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj4-a782eb/1/proj4
+recovery=slot-provision-refused
+branch=fm/lab-h-1793268166
+mode=local-only
+model=default
+slot_owned_path=README.md
+slot_prepared_head=fc43387e6d256ffa83be4079c098a7fd2011b850
+
+======== state/lab-c-1793268166.meta
+absent (divergence refused before publication)
+
+======== final refs
+proj local main=d201d6a36b7a53833c095a8d7078413eb9e87c48 origin bare main=d6b0d0a3c1e6ab5005ba1de132434b0f0ffd808b
+oldproj local main=585cb041de055cce2c42df2fa115563412742076 origin bare main=94fc2a9af8c840abbfb4272a33d891e388273e0a
+tamperproj local main=1c6e95f04c30cb2cdbed14dc09b5c48ede0fb99a origin bare main=0bf8151dc426b11b2c44a7767e6f41e96ec1c11b
+proj3 local main=ccd2751dbb865a7d60afd191ea4607eb7032367c origin bare main=f51431182c66c1485a8dd89eca527a00cf94a7e5
+
+======== proj worktree list (one pool slot reused A->B, no nested copies)
+/Users/charlesabrooker/tmp/fm-lab.D4yNAq/projects/proj                               d201d6a [main]
+/Users/charlesabrooker/tmp/fm-lab-fix.TSf34i/treehouse/.treehouse/proj-94874a/1/proj d201d6a [fm/lab-b-1793268166]
+nested .claude/worktrees found: 0
+
+======== tmux windows on the lab socket
+zsh zsh
+fm-lab-b-1793268166 sleep
+fm-lab-d-1793268166 zsh
+fm-lab-f-1793268166 zsh
+fm-lab-g-1793268166 zsh
+fm-lab-e-1793268166 zsh
