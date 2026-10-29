@@ -2290,6 +2290,7 @@ FM_CHECK_OUTPUT=
 FM_CHECK_RESULT=
 FM_CHECK_STATUS=0
 FM_CHECK_STOPPED=
+FM_CHECK_STOP_NOTICE=
 FM_CHECK_SIGNAL_PENDING=
 FM_CHECK_WAIT_FD=
 FM_CHECK_WAIT_WRITER=
@@ -2399,15 +2400,27 @@ watcher_stop_signals() {
 # poll shell keeps publishing its beacon while observing check progress.
 # fm-check-run.py connects a watcher-only pipe to the process-budget guardian:
 # owner EOF or launcher death cleans the tree even when SIGKILL bypasses EXIT.
-# A stopped check has no result for this pass: one triage line names it.
+# A stopped check has no result for this pass: one triage line names it. The
+# first stop of an episode also sets FM_CHECK_STOP_NOTICE, which the sweep
+# raises as that check's wake, so a check that keeps being stopped still reaches
+# firstmate once; the check's next completed run ends the episode.
 run_check_capture() {  # <name> <check> [args...]
-  local name=$1 started
+  local name=$1 started episode notice
   shift
+  FM_CHECK_STOP_NOTICE=
+  episode="$STATE/.check-stopped.$(printf '%s\n' "$name" "${@:2}" | shasum -a 256 | cut -c1-16)"
   started=$SECONDS
   FM_CAPTURE_PROGRESS=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
   if [ -n "$FM_CHECK_STOPPED" ]; then
-    triage_log "check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
+    notice="check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
+    triage_log "$notice"
     FM_CHECK_RESULT=
+    if [ ! -e "$episode" ]; then
+      : 2>/dev/null > "$episode" || true
+      FM_CHECK_STOP_NOTICE=$notice
+    fi
+  else
+    rm -f -- "$episode"
   fi
 }
 
@@ -3845,6 +3858,7 @@ prelude_phase() {
           continue
         fi
       fi
+      [ -z "$FM_CHECK_STOP_NOTICE" ] || out=$FM_CHECK_STOP_NOTICE
       if [ -n "$out" ]; then
         if [ "$(basename "$c")" = contributions.check.sh ]; then
           contribution_check_output=

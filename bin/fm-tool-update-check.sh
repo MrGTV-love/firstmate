@@ -51,10 +51,11 @@
 # FM_TOOL_UPDATE_PROBE_SECS (default 5) is a positive whole-second inactivity
 # interval for one probe.
 # Output or process-tree CPU progress keeps the probe alive. There is no sweep
-# deadline. A stopped probe is unknown, never current or an update. Independent
-# probes continue. The sweep still stamps its attempt time, so an unknown is
-# retried on the normal cadence and, like any finding, is reported again only
-# when the finding set changes.
+# deadline. A stopped probe is unknown, never current or an update. After the
+# first stopped probe the sweep probes nothing more: every remaining tool is
+# reported unknown for this sweep. The sweep still stamps its attempt time, so
+# an unknown is retried on the normal cadence and, like any finding, is
+# reported again only when the finding set changes.
 #
 # The report record state/.tool-updates is written only when a sweep runs to its
 # end, and it carries the whole finding set the last report was made from,
@@ -146,6 +147,7 @@ record_epoch_now() {
 }
 
 FINDINGS=
+PROBE_STOPPED=0
 
 # Each finding is flattened to a single line here, because the whole report must
 # stay one line for the wake record.
@@ -353,6 +355,7 @@ command_findings() {
     out=$(probe_output "$hit" $args_joined)
     status=$?
     if [ "$status" -eq 124 ]; then
+      PROBE_STOPPED=1
       emit "$name check unknown: $hit stopped making progress; retry at the next tool-update interval"
       return 0
     fi
@@ -385,6 +388,7 @@ EOF
       announce_out=$(probe_output "$resolved_path" $announce_args)
       status=$?
       if [ "$status" -eq 124 ]; then
+        PROBE_STOPPED=1
         emit "$name check unknown: $resolved_path did not answer when asked for its update announcement; retry at the next tool-update interval"
         announce_out=
       fi
@@ -441,6 +445,7 @@ git_probe_answered() {
   local status=$1 name=$2 subject=$3 question=$4
   case "$status" in
     124)
+      PROBE_STOPPED=1
       emit "$name check unknown: $subject did not answer $question; retry at the next tool-update interval"
       return 1
       ;;
@@ -615,7 +620,12 @@ action_check() {
   else
     while IFS=$FIELD_SEP read -r name command_name args_joined announce announce_args repo remote branch; do
       [ -n "$name" ] || continue
+      if [ "$PROBE_STOPPED" -ne 0 ]; then
+        emit "$name check unknown: not probed after an earlier probe stopped making progress; retry at the next tool-update interval"
+        continue
+      fi
       [ -z "$command_name" ] || command_findings "$name" "$command_name" "$args_joined" "$announce" "$announce_args"
+      [ "$PROBE_STOPPED" -eq 0 ] || continue
       [ -z "$repo" ] || git_findings "$name" "$repo" "$remote" "$branch"
     done < <(config_records)
   fi

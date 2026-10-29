@@ -558,21 +558,34 @@ test_missing_branch_on_a_readable_remote_is_still_reported() {
   pass "a branch a readable remote does not have is still reported as missing"
 }
 
-test_git_probes_continue_after_an_unknown_command() {
-  local home work slow out report
-  home=$(make_home git-after-unknown)
-  work=$(git_fixture git-after-unknown-repo)
+test_a_stopped_probe_defers_the_rest_of_the_sweep() {
+  local home work dir log out report run
+  home=$(make_home stopped-defers)
+  work=$(git_fixture stopped-defers-repo)
   git -C "$work" reset -q --hard HEAD~2
-  slow="$home/bin"
-  make_slow_copy "$slow" "$TOOL" 30
-  write_config "$home" "{\"tools\":[{\"name\":\"firstmate\",\"command\":\"$TOOL\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
-  out="$home/out.txt"
-  run_check "$home" "$(fixture_path "$slow")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1
-  report=$(cat "$out")
-  assert_contains "$report" 'check unknown' 'silent version probe was not detected'
-  assert_contains "$report" '2 commits behind' 'a stopped version probe prevented independent git evidence'
+  dir="$home/bin"
+  log="$home/probes.log"
+  mkdir -p "$dir"
+  cat > "$dir/$TOOL" <<SH
+#!/usr/bin/env bash
+printf 'probed\n' >> '$log'
+sleep 30
+SH
+  chmod 0755 "$dir/$TOOL"
+  write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"},{\"name\":\"firstmate\",\"git\":{\"repo\":\"$work\",\"remote\":\"origin\",\"branch\":\"main\"}}]}"
+  for run in 1 2; do
+    out="$home/out-$run.txt"
+    run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=1 \
+      FM_DURATION_FILE="$home/empty-durations.jsonl"
+    [ "$(wc -l < "$log" | tr -d '[:space:]')" = "$run" ] || fail "sweep $run did not make exactly one probe"
+  done
+  report=$(cat "$home/out-1.txt")
+  assert_contains "$report" "herdr check unknown: $dir/$TOOL stopped making progress" 'the silent version probe was not reported unknown'
+  assert_contains "$report" 'firstmate check unknown: not probed after an earlier probe stopped making progress' \
+    'a tool the sweep skipped was not reported unknown'
+  assert_not_contains "$report" '2 commits behind' 'git was probed after an earlier probe stopped'
   assert_grep 'fm-tool-updates-v1' "$home/state/.tool-updates" 'an unknown sweep did not stamp its attempt'
-  pass 'independent git reads still run after a silent command probe is stopped'
+  pass 'after the first stopped probe a sweep probes nothing more, reports the rest unknown, and the next sweep probes again'
 }
 
 test_a_git_probe_that_does_not_answer_is_not_an_update() {
@@ -1077,7 +1090,7 @@ test_current_and_ahead_repositories_are_silent
 test_unusable_git_source_is_reported
 test_unreadable_remote_is_not_reported_as_a_missing_branch
 test_missing_branch_on_a_readable_remote_is_still_reported
-test_git_probes_continue_after_an_unknown_command
+test_a_stopped_probe_defers_the_rest_of_the_sweep
 test_a_git_probe_that_does_not_answer_is_not_an_update
 test_a_stalled_repository_probe_is_not_reported_as_not_a_repository
 test_absent_registry_is_silent

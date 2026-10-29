@@ -49,11 +49,14 @@
 # contributions.read.<read> key: its sample is recorded, and only output and
 # process-tree CPU silence past that key's bound stops it. The bound starts at
 # 30 seconds, main's per-check allowance, so no read stops sooner than on main;
-# measured samples can only raise it. There is no sweep deadline or observation reservation. A
-# stopped read is unknown: keep that URL's saved observation untouched, go on
-# with the other URLs, and retry next pass. Every pass prints a
-# contribution-wake line for each contribution row still waiting in the wake
-# queue, so a row queued by a pass that was later stopped still doorbells.
+# measured samples can only raise it. There is no sweep deadline or observation
+# reservation. A stopped read is unknown: keep that URL's saved observation
+# untouched, and dial no further URL this pass, because the next read would
+# most likely wait on the same unreachable forge; every remaining URL is
+# unknown for this pass and keeps its row, and the next pass retries. Every
+# pass prints a contribution-wake line for each contribution row still waiting
+# in the wake queue, so a row queued by a pass that was later stopped still
+# doorbells.
 # A pull observation has three waves: core, six independent reads, closing
 # head; an issue has two. URLs are sorted and rotated by the five-minute
 # epoch bucket modulo their count; each distinct URL is attempted at most
@@ -417,7 +420,9 @@ poll() {
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"
   QUOTA_ANNOUNCE=0
   QUOTA_REASON=
+  PASS_UNKNOWN=0
   while IFS=$'\t' read -r -a row; do
+    [ "$PASS_UNKNOWN" -eq 0 ] || continue
     [ -n "$QUOTA_REASON" ] || QUOTA_REASON=$("$SCRIPT_DIR/fm-gh-rest.sh" guard) || true
     if [ -n "$QUOTA_REASON" ]; then
       mark_quota_stale "${row[0]}" "${row[@]:1}"
@@ -435,7 +440,10 @@ poll() {
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi
-    [ "$READ_UNKNOWN" -eq 0 ] || continue
+    if [ "$READ_UNKNOWN" -ne 0 ]; then
+      PASS_UNKNOWN=1
+      continue
+    fi
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;

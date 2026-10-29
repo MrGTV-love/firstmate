@@ -391,10 +391,48 @@ test_check_absolute_limit_stops_endless_progress_as_unknown() {
       || fail "$mode stop did not name the check and its runtime: $(cat "$state/.watch-triage.log" 2>/dev/null)"
     grep -F "check: $state/b-after.check.sh: after-ran" "$state/.wake-queue" >/dev/null \
       || fail "the check after a stopped $mode check did not run"
-    ! grep -F "a-$mode.check.sh" "$state/.wake-queue" >/dev/null \
-      || fail "a stopped $mode check produced a check verdict"
+    awk -F '\t' -v c="$state/a-$mode.check.sh" '$4 == c && index($5, "result unknown, retry next pass") { found = 1 }
+      $4 == c && !index($5, "result unknown, retry next pass") { bad = 1 } END { exit !(found && !bad) }' \
+      "$state/.wake-queue" || fail "a stopped $mode check did not wake as unknown, or produced a verdict"
   done
   pass 'a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues'
+}
+
+test_stopped_check_wakes_once_per_episode() {
+  local dir state pid i run notices
+  dir=$(make_case check-stop-episode)
+  state="$dir/state"
+  # shellcheck disable=SC2016 # The generated check expands its own state.
+  printf '#!/usr/bin/env bash\n[ ! -e "$FM_STATE_OVERRIDE/hang" ] || sleep 30\nexit 0\n' > "$state/a-flaky.check.sh"
+  chmod 0700 "$state/a-flaky.check.sh"
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" a-flaky >/dev/null \
+    || fail 'registration of a-flaky failed'
+  for run in stop repeat complete again; do
+    case "$run" in complete) rm -f "$state/hang" ;; *) : > "$state/hang" ;; esac
+    rm -f "$state/.last-check"
+    : > "$state/.wake-queue"
+    # Each later run is the successor started after the previous run's wake.
+    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" \
+      FM_WATCH_HANDLING_SUCCESSOR="$([ "$run" = stop ] && echo 0 || echo 1)" \
+      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=1 \
+      "$WATCH" > "$dir/watch-$run.out" 2> "$dir/watch-$run.err" &
+    pid=$!
+    for ((i = 0; i < 400; i++)); do
+      [ ! -e "$state/.last-check" ] || break
+      is_live_non_zombie "$pid" || break
+      sleep 0.1
+    done
+    stop_seed_watcher "$pid" "$dir/watch-$run.err"
+    [ -e "$state/.last-check" ] || fail "$run sweep never finished: $(cat "$dir/watch-$run.err")"
+    notices=$(awk -F '\t' -v c="$state/a-flaky.check.sh" \
+      '$4 == c && index($5, "check a-flaky stopped after") && index($5, "result unknown, retry next pass") { n++ } END { print n + 0 }' \
+      "$state/.wake-queue")
+    case "$run" in
+      stop|again) [ "$notices" = 1 ] || fail "the $run stop gave $notices unknown wakes, not one" ;;
+      *) [ "$notices" = 0 ] || fail "the $run sweep gave $notices unknown wakes, not none" ;;
+    esac
+  done
+  pass 'a stopped check wakes once per episode, and its next completed run starts a new episode'
 }
 
 test_check_stderr_capture_keeps_a_capped_tail() {
@@ -3217,6 +3255,7 @@ test_check_inactivity_configuration_and_launch_allowance
 test_check_progress_survives_fivefold_slowdown
 test_check_sigkill_owner_cleans_progressing_tree
 test_check_absolute_limit_stops_endless_progress_as_unknown
+test_stopped_check_wakes_once_per_episode
 test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings

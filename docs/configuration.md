@@ -3371,7 +3371,7 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 | `FM_TOOL_UPDATE_PROBE_SECS` | 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
 
 A sweep has no wall-clock budget.
-An inactive probe reports uncertainty, and the sweep still stamps its attempt, so it is retried after the normal interval.
+An inactive probe reports uncertainty, and the sweep then probes nothing more: every remaining tool reports unknown for that sweep. The sweep still stamps its attempt, so it is retried after the normal interval.
 A repeated identical unknown stays silent; a changed result, known or unknown, reports.
 The script header owns the progress mechanics.
 
