@@ -4402,7 +4402,6 @@ FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it 
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory
 FM_LAVISH_AUTO_RETIRE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-procevent-lavish.sh
 FM_HOME_SUMMARY_TIMEOUT=900    # no-output/no-CPU seconds for home-summary initialization through atomic publication, never a wall-clock cutoff; independent failure-accounting bounds are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 900
-FM_HOME_SUMMARY_FENCE_TIMEOUT=60   # seconds a home-summary refresh waits for its lock fence before it fails and logs why; the wait also ends at once when the home's state directory is gone; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2
 FM_SNAPSHOT_CREW_STATE_TIMEOUT=900   # no-output/no-process-tree-CPU seconds for a local current-state read; productive reads finish and are included regardless of elapsed time; remote endpoint liveness is not probed here

@@ -27,10 +27,14 @@
 # Failure logging, streak accounting, and owner-checked release have independent
 # deadlines of 4, 10, and 4 seconds, so logging failure cannot skip the latter two.
 # The progress owner counts a polling loop's forks as progress, so waiting for the
-# fence has its own end: it fails at once when the home's state directory is gone
-# (a retired home or a removed test fixture can never grant it) and otherwise after
-# FM_HOME_SUMMARY_FENCE_TIMEOUT seconds (default 60), the way fm_lock_acquire_wait
-# already gives up on a lock whose directory is gone.
+# fence ends on what the wait is for, never on elapsed time. The fence is the lock's
+# short critical-section mutex, not the refresh itself (the refresh lock above
+# coalesces concurrent refreshes), so a waiter cannot skip it: it still has to hand
+# off, publish, or account. It waits only while another live process holds the fence
+# (or is publishing it) and fails at once when the home's state directory is gone (a
+# retired home or a removed test fixture can never grant it), when nothing holds the
+# fence yet it cannot be created, or when its holder is gone and the existing
+# stale-owner reclaim in fm_lock_try_acquire_steal_mutex could not take it over.
 # No reader can observe temporary output through the ledger path.
 #
 # With --best-effort, a failure is appended to the bounded home-local
@@ -77,8 +81,6 @@ ERROR_LOG_MAX_BYTES=${FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES:-65536}
 # Match fm-duration.py's 15-minute no-progress policy, not a wall deadline.
 HOME_SUMMARY_TIMEOUT=${FM_HOME_SUMMARY_TIMEOUT:-$((15 * 60))}
 HOME_SUMMARY_IF_IDLE=${FM_HOME_SUMMARY_IF_IDLE:-0}
-# measured: value=60 date=2026-10-29 host=Mac-Studio margin=3.7x (eight processes contending for the fence mutex around the production wait loop, 200 acquisitions at load average 80, waited 16.2 s at the slowest and 1.5 s on average; real contention is at most three)
-HOME_SUMMARY_FENCE_TIMEOUT=${FM_HOME_SUMMARY_FENCE_TIMEOUT:-60}
 BEST_EFFORT=0
 DETACH=0
 HOME_SUMMARY_MODE=parent
@@ -117,10 +119,6 @@ case "$ERROR_LOG_MAX_BYTES" in
 esac
 case "$HOME_SUMMARY_TIMEOUT" in
   ''|*[!0-9]*|0) HOME_SUMMARY_TIMEOUT=$((15 * 60)) ;;
-esac
-case "$HOME_SUMMARY_FENCE_TIMEOUT" in
-  # measured: value=60 date=2026-10-29 host=Mac-Studio margin=3.7x (the default bound above)
-  ''|*[!0-9]*|0) HOME_SUMMARY_FENCE_TIMEOUT=60 ;;
 esac
 case "$HOME_SUMMARY_IF_IDLE" in
   0|1) ;;
@@ -324,7 +322,7 @@ home_summary_unfence() {
 
 home_summary_fence() {
   local parent_pid=${FM_HOME_SUMMARY_PARENT_PID:-} owner_pid=${1:-${FM_HOME_SUMMARY_PARENT_PID:-}}
-  local deadline=$((SECONDS + HOME_SUMMARY_FENCE_TIMEOUT))
+  local holder gone_holder=
   case "$parent_pid" in ''|*[!0-9]*|0) return 1 ;; esac
   while ! fm_lock_try_acquire_steal_mutex "$REFRESH_LOCK.steal"; do
     # The mutex cannot be created in a state directory that is gone, and the
@@ -333,9 +331,24 @@ home_summary_fence() {
       home_summary_fail "refresh home is gone: $STATE"
       return 1
     fi
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      home_summary_fail "could not take the refresh fence within ${HOME_SUMMARY_FENCE_TIMEOUT} seconds"
+    # Waiting helps only while another actor holds the fence. FM_LOCK_BUSY is 0
+    # when the refusal was an acquisition error that no wait can clear.
+    if [ "${FM_LOCK_BUSY:-0}" != 1 ]; then
+      home_summary_fail "could not create the refresh fence and no process holds it"
       return 1
+    fi
+    # A holder that is gone yet still blocks the reclaim above, seen on two
+    # consecutive attempts so a reclaim in flight is not mistaken for it, will not
+    # release the fence: stop instead of waiting for it.
+    holder=$(cat "$REFRESH_LOCK.steal/pid" 2>/dev/null || true)
+    if fm_lock_owner_alive "$REFRESH_LOCK.steal" "$holder" \
+      || fm_lock_mid_acquire_is_fresh "$REFRESH_LOCK.steal" "$holder"; then
+      gone_holder=
+    elif [ "$gone_holder" = "${holder:-none}" ]; then
+      home_summary_fail "refresh fence holder ${holder:-unknown} is gone and the fence could not be reclaimed"
+      return 1
+    else
+      gone_holder=${holder:-none}
     fi
     sleep 0.1
   done

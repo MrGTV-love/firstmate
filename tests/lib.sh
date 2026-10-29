@@ -1326,22 +1326,41 @@ fm_test_base_path_sans() {
 # fm_test_refresh_fence_stub <dir>
 # Writes a stub ln into <dir> (put it first on PATH) that pins the instant a
 # home-summary refresh worker, which already owns the refresh lock, first reaches
-# for its fence (the lock's steal mutex): with FM_TEST_FENCE_ACTION=remove it
-# removes FM_TEST_FENCE_HOME, with =refuse it creates
-# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex, and in every
-# other case, or for any other target, it runs the real ln. A refresh bound
-# for a fence it cannot take is reproduced this way without timing luck.
+# for its fence (the lock's steal mutex). FM_TEST_FENCE_ACTION picks what happens
+# there: remove deletes FM_TEST_FENCE_HOME; refuse writes
+# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
+# holds it; hold starts a live process that takes the mutex first, records its pid
+# in FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
+# FM_TEST_FENCE_HOME/state/.test-fence-release exists (or it is killed). Any other
+# case, or any other target, runs the real ln. A refresh waiting on a fence is
+# reproduced this way without timing luck.
 fm_test_refresh_fence_stub() {
   mkdir -p "$1" || return 1
   FM_TEST_REAL_LN=$(command -v ln)
-  export FM_TEST_REAL_LN
+  FM_TEST_FENCE_LIB="$ROOT/bin/fm-wake-lib.sh"
+  export FM_TEST_REAL_LN FM_TEST_FENCE_LIB
   cat > "$1/ln" <<'SH'
 #!/usr/bin/env bash
 case "${*: -1}" in
   */.home-summary-refresh.lock.steal)
+    state=${FM_TEST_FENCE_HOME:-}/state
     case "${FM_TEST_FENCE_ACTION:-}" in
       remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
-      refuse) : > "${FM_TEST_FENCE_HOME:?}/state/.test-fence-refused"; exit 1 ;;
+      refuse) : > "$state/.test-fence-refused"; exit 1 ;;
+      hold)
+        if [ ! -e "$state/.test-fence-holder" ]; then
+          env -u FM_TEST_FENCE_ACTION nohup bash -c '
+            . "$1"
+            fm_lock_acquire_wait "$2"
+            printf "%s\n" "$$" > "$3"
+            while [ ! -e "$4" ]; do sleep 0.1; done
+            fm_lock_release "$2"
+          ' _ "$FM_TEST_FENCE_LIB" "${*: -1}" "$state/.test-fence-holder" "$state/.test-fence-release" \
+            >/dev/null 2>&1 </dev/null &
+          i=0
+          while [ ! -s "$state/.test-fence-holder" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+        fi
+        ;;
     esac
     ;;
 esac
