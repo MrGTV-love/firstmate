@@ -421,8 +421,15 @@ SH
 }
 
 # Runs this suite's `tests` array, or only the named cases, then proves cleanup
-# left no process-event runner or watchdog behind.
+# left no process-event runner or watchdog behind. These suites run under
+# `set -u` only, so every registered case must start with errexit off, as it
+# does when run alone; an earlier case that turned errexit on fails here.
 captain_hold_run_tests() {  # [case-name...]
+  fm_test_before_case() {
+    case $- in
+      *e*) fail "errexit was on before $1: an earlier case turned on set -e" ;;
+    esac
+  }
   # shellcheck disable=SC2154 # Each suite assigns its tests array before calling this.
   fm_test_run_cases "${tests[@]}" -- "$@"
 
