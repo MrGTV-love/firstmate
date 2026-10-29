@@ -1439,6 +1439,9 @@ import sys
 from pathlib import Path
 
 Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+if os.environ.get("FM_TEST_SLOT_REFUSE"):
+    print(json.dumps({"state": "BLOCKED", "reason": "fixture_owner_refused_legacy_scope"}))
+    raise SystemExit(2)
 p = argparse.ArgumentParser()
 for flag in ("repo-root", "worktree-path", "owner-id", "branch", "base-sha"):
     p.add_argument("--" + flag, required=True)
@@ -1456,7 +1459,7 @@ PY
 # A task admitted before its project gained an owner records no scope. It is
 # recoverable only through explicit relaunch scope, never inferred or overridden.
 test_legacy_relaunch_scope_adoption() {
-  local id rec out rc=0 meta
+  local id rec out rc=0 meta head
   id="pool-legacy-scope-$(date +%s)-$$"
   rec=$(make_case "$id" "$id")
   read_case_record "$rec"
@@ -1492,10 +1495,30 @@ test_legacy_relaunch_scope_adoption() {
   ! grep -q '^slot_' "$meta" || fail 'unscoped legacy refusal recorded slot state'
   [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$PROJECT_DIR" rev-parse main)" ] || fail 'legacy refusal moved the task'
 
+  # The owner refuses the first explicit scope: only that scope is retained.
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  cp "$meta" "$CASE_DIR/meta.legacy"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/refused.called" FM_TEST_SLOT_REFUSE=1 \
+    run_relaunch "$id" --owned-path README.md 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'refusing project owner admitted the legacy relaunch'
+  assert_contains "$out" fixture_owner_refused_legacy_scope 'legacy refusal lost the owner reason'
+  [ -f "$CASE_DIR/refused.called" ] || fail 'explicit legacy scope did not reach the project owner'
+  [ "$(sed -n 's/^slot_owned_path=//p' "$meta")" = README.md ] || fail 'refused legacy relaunch lost explicit scope'
+  diff <(grep -v '^slot_owned_path=' "$meta") "$CASE_DIR/meta.legacy" >/dev/null || fail 'refused legacy relaunch changed other record facts'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] || fail 'refused legacy relaunch moved the task'
+  cp "$meta" "$CASE_DIR/meta.retained"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/drift.called" run_relaunch "$id" --owned-path scripts 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'relaunch replaced owner-refused legacy scope'
+  assert_contains "$out" 'cannot override it' 'refused-scope override reason missing'
+  [ ! -e "$CASE_DIR/drift.called" ] || fail 'refused-scope override reached the project owner'
+  cmp -s "$meta" "$CASE_DIR/meta.retained" || fail 'refused-scope override changed the task record'
+
   rc=0
   out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/adopt.called" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
-    run_relaunch "$id" --owned-path README.md 2>&1) || rc=$?
-  expect_code 0 "$rc" "explicit legacy scope adoption failed: $out"
+    run_relaunch "$id" 2>&1) || rc=$?
+  expect_code 0 "$rc" "retained legacy scope adoption failed: $out"
   python3 - "$CASE_DIR/adopt.called" "$id" <<'PY'
 import json, sys
 args = json.load(open(sys.argv[1]))
@@ -1514,7 +1537,7 @@ PY
   assert_contains "$out" 'cannot override it' 'recorded-scope override refusal reason missing'
   [ ! -e "$CASE_DIR/override.called" ] || fail 'scope override reached the project owner'
   cmp -s "$meta" "$CASE_DIR/meta.scoped" || fail 'scope override changed the task record'
-  pass 'legacy relaunch refuses inferred scope, adopts explicit scope once, and never overrides it'
+  pass 'legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it'
 }
 
 # Explicit selection keeps focused acquisition regressions independently runnable.
