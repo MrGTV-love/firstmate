@@ -2760,7 +2760,7 @@ Writes are allowed by default; the profile denies writes to these named protecte
 - every other task's `state/<other>.*` records, every task's `state/<id>.meta` and `state/<id>.control-relaunch*` records, this task's other Main-owned records and the shared legacy `state/jev-guard.jsonl`; the rest of `state/`, such as `state/procevent/`, `state/friction.jsonl` and the fleet ledger, stays writable;
 - the home `data/` root, including every `data/<other>/` directory and the Main-loaded `data/secondmates.md`, `data/captain.md` and `data/backlog.md`, apart from this task's own `data/<task>/` directory and the duration ledger `data/command-durations.jsonl` with its `.lock` and `.compact` siblings;
 - every other task's temp roots: `/tmp/fm-<other>` and its `/tmp/fm-<other>+<token>` launch sibling, every other session directory under `/private/tmp/claude-<uid>/`, and every `~/tmp` entry whose name carries another task's id, unless the name also carries this task's longer id;
-- other tasks' branches, loose or packed, the shared `refs/replace` and `hooks` folders, and the primary checkout's own `HEAD` and index, in the shared Git directory;
+- other tasks' branches, loose or packed, the shared `refs/replace` folder, and the primary checkout's own `HEAD` and index, in the shared Git directory;
 - the harness config homes `~/.claude`, `~/.claude.json`, `~/.omp`, `~/.codex`, `~/.dsh`, `~/.pi`, `~/.grok`, `~/.kimi`, `~/.kimi-code`, `~/.cursor`, `~/.gemini`, `~/.rovo`, `~/.rovodev` and opencode's config and data directories, apart from the running harness's measured runtime state below;
 - every other local Firstmate home: the root home and each registered local secondmate home;
 - the no-mistakes gate repository of every other project under `$NM_HOME/repos` (default `~/.no-mistakes/repos`).
@@ -2771,15 +2771,23 @@ In that shared Git directory the task keeps its own declared branch and the two 
 Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
 When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
-The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so a branch Git has packed cannot be repointed or removed by a file write, by a rename onto `packed-refs` or by a Git command.
+The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so a ref Git has packed cannot be repointed or removed by a file write, by a rename onto `packed-refs` or by a Git command.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
-The commands that rewrite `packed-refs` fail instead: deleting a ref that is packed, pruning a packed remote-tracking ref with `git fetch --prune`, dropping a packed stash entry, and the pack-refs step of `git gc`, which reports `failed to run pack-refs` and leaves the refs as they were.
-Creating or updating a ref, `git commit`, `git fetch`, `git stash`, `git push -u` and the task's own archives keep working, because Git writes those refs as loose files.
+Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.
+`fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` and `git pull` exit 0 and keep the remote-tracking ref of a branch the remote deleted: a confined worker's fetch never prunes.
+These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
+
+- `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`;
+- `git branch -d` or `-D` and `git update-ref -d` of a packed ref, the task's own packed archive included, exit 1 with `could not delete reference <ref>`;
+- `git stash drop` or `git stash pop` of the last entry when `refs/stash` is packed exits 0, and the pop applies the entry, but `refs/stash` still names the dropped stash commit, with `git stash list` empty, until a later `git stash push` replaces it;
+- the pack-refs step of `git gc` reports `failed to run pack-refs`.
+
+The shared `info/grafts` and `shallow` files stay writable, so a worker can still change the history the primary checkout sees through them; the `refs/replace` deny does not close that route.
 A repository with reftable ref storage refuses the launch, because its refs are not in files this profile can name.
 Main-owned records of this task include `state/<task>.meta`, `state/<task>.control-relaunch`, the installed `state/<task>.git-hooks` and the launch author history `state/<task>.launch-models`.
 The worker's own records are its status, turn-end marker, busy-state record with its lock and temporary siblings, live-model record, native session proof, task audit log, Claude diagnostics file and inbox.
 The worker's own Claude session directory under `/private/tmp/claude-<uid>/` is the one Claude names from its worktree path.
-The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch`, `git stash` and `git push -u` keep working.
+The task's own gate repository is the one no-mistakes names from the first 12 hex digits of the SHA-256 of the primary checkout path, so a gate push, `no-mistakes init`, the duration ledger, test slots, tool caches, `git fetch` without pruning, `git stash` and `git push -u` keep working.
 Native temp selectors point at the task temporary root.
 A declared nested `.claude/worktrees/fm-*` worktree is treated as the task root, not rejected by its spelling.
 The measured harness contracts are omp and Claude.

@@ -132,6 +132,8 @@ done
 printf '%s\\n' "$command" >> "$gate/fixture-daemon.log"
 '''
 PACKED_HEADER = "# pack-refs with: peeled fully-peeled sorted \n"
+# This task's own archive branch, packed as Main's gc leaves it.
+OWN_PACKED_ARCHIVE = "archive/task-submitted-fedcba98"
 # Results that must be false in the unconfined control: each proves the
 # fixture write is possible without the profile.
 CONTROL_KEYS = ("a", "b", "c", "e-other.status", "e-task.other.status", "foreign-audit-denied", "symlink")
@@ -223,11 +225,34 @@ def child(manifest):
                             and git("--git-dir", str(own_gate), "rev-parse", "refs/heads/fm/task").stdout.strip() == head
                             and daemon_log.exists() and daemon_log.read_text().split() == ["admit-push", "notify-push"])
     results["push-upstream"] = git("-C", str(worktree), "config", "branch.fm/task.remote").stdout.strip() == "no-mistakes"
+    # The gate deleted fm/gone, whose remote-tracking ref is packed, and the
+    # repository asks fetch to prune. Pruning it needs a packed-refs rewrite.
+    packed_refs = Path(manifest["packed_refs"])
+    packed_before = packed_refs.read_bytes()
+    refusal = f"unable to create file {packed_refs}.new: Operation not permitted"
+    gone = "refs/remotes/no-mistakes/fm/gone"
+
+    def resolves(ref, sha):
+        return git("-C", str(worktree), "rev-parse", "--verify", "-q", ref).stdout.strip() == sha
+
     fetch = git("-C", str(worktree), "fetch", "no-mistakes")
-    results["fetch"] = fetch.returncode == 0 and git("-C", str(worktree), "rev-parse", "refs/remotes/no-mistakes/fm/task").returncode == 0
+    results["fetch"] = (fetch.returncode == 0 and git("-C", str(worktree), "rev-parse", "refs/remotes/no-mistakes/fm/task").returncode == 0
+                        and resolves(gone, manifest["forged_sha"]))
+    pruned = git("-C", str(worktree), "fetch", "--prune", "no-mistakes")
+    results["refused-fetch-prune-packed"] = (pruned.returncode == 1 and f"could not delete reference {gone}: {refusal}" in pruned.stderr
+                                             and resolves(gone, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
+    # The shared stash holds one packed entry. Popping that last entry applies
+    # it and exits 0, but Git cannot remove the packed refs/stash line.
     (worktree / "new-file").write_text("stashed change")
     stash = git("-C", str(worktree), "stash", "push", "-m", "probe")
-    results["stash"] = stash.returncode == 0 and git("-C", str(worktree), "stash", "drop").returncode == 0
+    dropped = git("-C", str(worktree), "stash", "drop")
+    popped = git("-C", str(worktree), "stash", "pop")
+    results["stash"] = (stash.returncode == 0 and dropped.returncode == 0 and popped.returncode == 0
+                        and (worktree / "README").read_text() == "stashed in fixture"
+                        and git("-C", str(worktree), "stash", "list").stdout == "")
+    results["refused-packed-stash-drop"] = (f"error: {refusal}" in popped.stderr and resolves("refs/stash", manifest["stash_sha"])
+                                            and packed_refs.read_bytes() == packed_before)
+    git("-C", str(worktree), "checkout", "--", "README")
     foreign_push = git("-C", str(worktree), "push", str(other_gate), "fm/task")
     results["refused-other-gate-push"] = (foreign_push.returncode != 0
                                           and git("--git-dir", str(other_gate), "rev-parse", "--verify", "-q", "refs/heads/fm/task").returncode != 0)
@@ -271,6 +296,10 @@ def child(manifest):
                         ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
                         ("outside-archive", "task-submitted-0123abcd")):
         results[f"refused-archive-{label}"] = ref_refused(name)
+    deleted = git("-C", str(worktree), "branch", "-d", OWN_PACKED_ARCHIVE)
+    results["refused-packed-own-archive-delete"] = (
+        deleted.returncode == 1 and f"error: could not delete reference refs/heads/{OWN_PACKED_ARCHIVE}: {refusal}" in deleted.stderr
+        and resolves("refs/heads/" + OWN_PACKED_ARCHIVE, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
     # The primary checkout's HEAD stays refused; a failed attempt changes nothing.
     primary = str(Path(manifest["home"]) / "projects/project")
     results.update(packed_refs_results(manifest, primary, worktree))
@@ -575,16 +604,29 @@ def fixture(repo, base, harness, user_home, other):
                  ["-C", str(project), "worktree", "add", "-q", "-b", "fm/pool", str(pool)]):
         result = git(*args)
         assert result.returncode == 0, (args, result.stderr)
-    # Another task's branch as Git leaves it once packed: no loose file, one
-    # line in packed-refs, on a commit that differs from the one a forged line
-    # would name.
+    # Refs as Git leaves them once packed: no loose file, one line in
+    # packed-refs. Another task's branch sits on a commit that differs from the
+    # one a forged line would name; this task's own archive, a remote-tracking
+    # ref of a branch the gate no longer has and the shared stash's one entry
+    # are packed beside it.
     init_sha = git("-C", str(project), "rev-parse", "HEAD").stdout.strip()
     packed = git("-C", str(project), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit-tree", init_sha + "^{tree}", "-p", init_sha, "-m", "packed").stdout.strip()
     assert git("-C", str(project), "update-ref", "refs/heads/fm/packed", packed).returncode == 0
     (project / ".git/refs/heads/fm/packed").unlink()
-    write(project / ".git/packed-refs", PACKED_HEADER + f"{packed} refs/heads/fm/packed\n")
-    assert git("-C", str(project), "rev-parse", "fm/packed").stdout.strip() == packed
+    write(worktree / "README", "stashed in fixture")
+    assert git("-C", str(worktree), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+               "stash", "push", "-q", "-m", "fixture").returncode == 0
+    stash_sha = git("-C", str(project), "rev-parse", "refs/stash").stdout.strip()
+    (project / ".git/refs/stash").unlink()
+    lines = {"refs/heads/fm/packed": packed, "refs/heads/" + OWN_PACKED_ARCHIVE: init_sha,
+             "refs/remotes/no-mistakes/fm/gone": init_sha, "refs/stash": stash_sha}
+    write(project / ".git/packed-refs", PACKED_HEADER + "".join(f"{sha} {name}\n" for name, sha in sorted(lines.items())))
+    for name, sha in lines.items():
+        assert git("-C", str(project), "rev-parse", name).stdout.strip() == sha
+    # Stands in for a host's global fetch.prune=true, which GIT_CONFIG_GLOBAL
+    # hides here; the launch's own GIT_CONFIG entry outranks both.
+    assert git("-C", str(project), "config", "fetch.prune", "true").returncode == 0
     own_gate = nm / "repos" / (hashlib.sha256(str(project).encode()).hexdigest()[:12] + ".git")
     other_gate = nm / "repos/000000000000.git"
     fake_client = base / "bin/no-mistakes"
@@ -642,7 +684,6 @@ def fixture(repo, base, harness, user_home, other):
         "shared-legacy-audit": state / "jev-guard.jsonl",
         "main-meta": state / "task.meta", "main-control-relaunch": state / "task.control-relaunch",
         "main-git-hooks": state / "task.git-hooks/pre-commit",
-        "primary-hooks": project / ".git/hooks/fm-probe",
         "data-secondmates": data / "secondmates.md", "data-captain": data / "captain.md", "data-backlog": data / "backlog.md",
     }
     # A task created after the profile was built: its records are written
@@ -652,7 +693,7 @@ def fixture(repo, base, harness, user_home, other):
     renamed = {"other-data": data / "other", "worktree-parent": pool.parent, "gates": nm / "repos",
                "state": state, "claude-temp-session": claude_tmp / f"base.{other}",
                "git-refs": project / ".git/refs", "git-worktrees": project / ".git/worktrees",
-               "git-packed-refs": project / ".git/packed-refs", "git-hooks": project / ".git/hooks"}
+               "git-packed-refs": project / ".git/packed-refs"}
     slug = re.sub(r"[^A-Za-z0-9]", "-", str(worktree))
     claude_code = (".claude/CLAUDE.md", ".claude/rules/rule.md", ".claude/agents/agent.md", ".claude/commands/command.md",
                    ".claude/skills/skill/SKILL.md", ".claude/plugins/plugin.json", ".claude/hooks/hook.sh", ".claude/settings.json",
@@ -690,13 +731,19 @@ def fixture(repo, base, harness, user_home, other):
                                "omp-session": user_home / ".omp/agent/sessions/session.jsonl",
                                "omp-daemon-scope": user_home / ".omp/run/daemons" / scope_key(worktree) / "broker.pid"})
     return {"repo": str(repo), "home": str(home), "nm": str(nm), "worktree": str(worktree), "nested": str(nested), "pool": str(pool),
-            "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha,
+            "packed_refs": str(project / ".git/packed-refs"), "packed_sha": packed, "forged_sha": init_sha, "stash_sha": stash_sha,
             "own_gate": str(own_gate), "other_gate": str(other_gate), "other_home": str(base / "other-home"), "other": other,
             "claude_tmp": str(claude_tmp), "user_tmp": str(user_tmp), "late": [str(path) for path in late.values()],
             "transcript_container": str(user_home / f".claude/projects/{slug}") if harness == "claude" else "",
             "protected": {name: str(path) for name, path in protected.items()},
             "writable": {name: str(path) for name, path in writable_paths.items()},
             "renamed": {name: str(path) for name, path in renamed.items()}}
+
+
+def launch_git_env(env):
+    """The child's environment with the GIT_CONFIG entry fm-spawn.sh appends to a confined launch."""
+    count = int(env.get("GIT_CONFIG_COUNT") or 0)
+    return dict(env, GIT_CONFIG_COUNT=str(count + 1), **{f"GIT_CONFIG_KEY_{count}": "fetch.prune", f"GIT_CONFIG_VALUE_{count}": "false"})
 
 
 def build_profile(repo, manifest, harness, profile, env, agent_dir=None, worktree=None):
@@ -880,7 +927,8 @@ for harness in ("claude", "omp"):
             remove_archive_folders(manifest)
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
-            result = subprocess.run(invocation, capture_output=True, text=True, env=env)
+            result = subprocess.run(invocation, capture_output=True, text=True, env=launch_git_env(env))
+            git("-C", manifest["worktree"], "update-ref", "-d", "refs/heads/" + OWN_PACKED_ARCHIVE)
             expected_identity = pid_identity(str(repo), unusual.pid, base / "identity-state")
             unusual.kill()
             unusual.wait()

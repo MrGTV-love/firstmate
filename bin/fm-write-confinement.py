@@ -199,9 +199,9 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
-    # Folders no task operation writes: a replace ref or a hook runs inside the
-    # primary checkout's own Git commands, outside this profile.
-    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace", "hooks")]
+    # No task operation writes a replace ref, and one changes what a commit
+    # holds for every Git command in the primary checkout.
+    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):
@@ -212,7 +212,8 @@ def build(args):
     # the rewrite however the bytes arrive. packed-refs.lock stays writable:
     # Git takes it to delete any ref, the task's own archives included, and
     # holding it changes no ref. Deleting a packed ref, pruning one and gc's
-    # pack-refs step rewrite the file, so they fail here.
+    # pack-refs step rewrite the file, so they fail here; fm-spawn.sh sets
+    # fetch.prune=false for the confined launch so a plain fetch prunes nothing.
     for name in ("packed-refs", "packed-refs.new"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
