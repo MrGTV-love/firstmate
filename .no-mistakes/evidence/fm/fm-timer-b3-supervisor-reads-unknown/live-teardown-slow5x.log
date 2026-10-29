@@ -1,0 +1,21 @@
+### mode=slow5x lab=/Users/charlesabrooker/tmp/fm-lab.BQkybz stall=3s
+### exit=0 elapsed=18s
+### stderr (filtered: no guard banner)
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: task-x1 is still waiting on a no-mistakes read
+teardown: no-mistakes run for task-x1 is parked at a gate; aborting before the worker is removed
+### daemon calls
+1793274111 axi status
+abort axi abort --run 01LABRUN
+1793274126 axi status --run 01LABRUN
+### worktree present: yes; meta present: no
+### unknown log:
+(none)
+### guard events with unlanded:
+(none)
+### lab removed: yes

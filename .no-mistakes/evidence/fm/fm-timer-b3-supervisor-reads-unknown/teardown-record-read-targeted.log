@@ -1,0 +1,3 @@
+ok - a slow but working run-record read still proves the copy was the pipeline's input
+ok - a silent run-record read is unknown and retried, while an answered one still refuses
+ok - merged PR still refuses a copy that is behind the recorded run's input head

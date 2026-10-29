@@ -1,0 +1,7 @@
+### daemon=silent exit=75 elapsed=4s
+error: the no-mistakes run for this copy did not answer (no output or CPU progress), so whether its fixes are recovered is unknown and not refused for good; read it again
+### pr= recorded: 0
+### daemon=answered exit=1 elapsed=1s
+error: the no-mistakes run for this copy has outcome (none), not a pass, so the published work is not validated
+### pr= recorded: 0
+### lab removed: yes

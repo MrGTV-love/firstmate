@@ -1,0 +1,11 @@
+### mode=slow5x lab=/Users/charlesabrooker/tmp/fm-lab.VjSo7j stall=3s
+### exit=0 elapsed=14s
+### stderr (filtered: no guard banner)
+### daemon calls
+1793274158 axi status
+### worktree present: yes; meta present: no
+### unknown log:
+(none)
+### guard events with unlanded:
+(none)
+### lab removed: yes

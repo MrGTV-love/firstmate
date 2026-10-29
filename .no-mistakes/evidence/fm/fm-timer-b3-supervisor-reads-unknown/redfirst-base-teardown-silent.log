@@ -1,0 +1,11 @@
+### mode=silent lab=/Users/charlesabrooker/tmp/fm-lab.PWl6iT stall=3s
+### exit=0 elapsed=14s
+### stderr (filtered: no guard banner)
+### daemon calls
+1793274142 axi status
+### worktree present: yes; meta present: no
+### unknown log:
+(none)
+### guard events with unlanded:
+(none)
+### lab removed: yes

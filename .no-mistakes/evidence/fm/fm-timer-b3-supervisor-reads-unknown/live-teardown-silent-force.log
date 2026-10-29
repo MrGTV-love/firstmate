@@ -1,0 +1,13 @@
+### mode=silent-force lab=/Users/charlesabrooker/tmp/fm-lab.NtGt90 stall=3s
+### exit=0 elapsed=8s
+### stderr (filtered: no guard banner)
+warning: the no-mistakes daemon went silent (no output or CPU progress for 3s), so whether a run for task-x1 is parked at a gate is unknown; --force goes on with the no-mistakes run state unknown.
+teardown: recorded the unknown no-mistakes run state in /Users/charlesabrooker/tmp/fm-lab.NtGt90/data/task-x1/no-mistakes-unknown.log
+### daemon calls
+1793274103 axi status
+### worktree present: yes; meta present: no
+### unknown log:
+2026-10-29T11:41:47Z forced teardown went on with the no-mistakes run state unknown: the no-mistakes daemon went silent (no output or CPU progress for 3s), so whether a run for task-x1 is parked at a gate is unknown
+### guard events with unlanded:
+(none)
+### lab removed: yes

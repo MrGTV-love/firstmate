@@ -1,0 +1,3 @@
+ok - a teardown that goes silent is stopped and retried quietly, and the log names the silence
+ok - end to end: a silent daemon makes the real teardown exit 75 as unknown, the prune retries without a wake, and then reaps
+ok - end to end: a teardown waiting quietly on a slow daemon prints progress, is not cut, and reaps the copy

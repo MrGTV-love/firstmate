@@ -1,0 +1,12 @@
+== change
+root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63F0AWFYPDF486ZE6T631A3  bound=1s
+real walk, file written: probe rc=0 (written) elapsed=0s
+walk slowed 5x (5s CPU burn): probe rc=0 (written) elapsed=5s
+silent walk (hung mount): probe rc=2 (unknown) elapsed=1s
+real walk, nothing written: probe rc=1 (no evidence) elapsed=1s
+== base (red-first)
+root=/tmp/fm-b3-drive/base  bound=1s
+real walk, file written: probe rc=0 (written) elapsed=0s
+walk slowed 5x (5s CPU burn): probe rc=1 (no evidence) elapsed=1s
+silent walk (hung mount): probe rc=1 (no evidence) elapsed=1s
+real walk, nothing written: probe rc=1 (no evidence) elapsed=0s

@@ -1,0 +1,2 @@
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - a forced teardown over a silent daemon waits one stall interval, not one per root

@@ -1,0 +1,7 @@
+ok - teardown refuses before reap or removal when a task-owned run remains parked
+ok - a silent daemon leaves teardown unknown and closing nothing, not fail-open
+ok - a slow, working daemon still lets teardown find and abort the parked run, with progress while it waits
+ok - a silent confirmation after the abort is unknown, not a still-parked verdict
+ok - a forced teardown goes on past a silent daemon and records the run state as unknown
+ok - a forced teardown goes on past a silent abort confirmation and records it as unknown
+bin/fm-proc-budget.sh -- bash tests/fm-teardown-cleanup.test.sh        17.78s user 15.19s system 66% cpu 49.794 total

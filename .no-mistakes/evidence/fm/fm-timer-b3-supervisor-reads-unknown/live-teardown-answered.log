@@ -1,0 +1,14 @@
+### mode=answered lab=/Users/charlesabrooker/tmp/fm-lab.rEvEQC stall=3s
+### exit=0 elapsed=4s
+### stderr (filtered: no guard banner)
+teardown: no-mistakes run for task-x1 is parked at a gate; aborting before the worker is removed
+### daemon calls
+1793274130 axi status
+abort axi abort --run 01LABRUN
+1793274130 axi status --run 01LABRUN
+### worktree present: yes; meta present: no
+### unknown log:
+(none)
+### guard events with unlanded:
+(none)
+### lab removed: yes
