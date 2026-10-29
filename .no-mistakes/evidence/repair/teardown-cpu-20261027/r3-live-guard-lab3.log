@@ -1,0 +1,34 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.dwWTKs
+### needed=true, first in episode (marker cleared before each)
+== base-first rc= stderr_bytes=987
+== target-first rc= stderr_bytes=987
+== target-first-optin rc= stderr_bytes=987
+IDENTICAL: base-first vs target-first
+IDENTICAL: target-first vs target-first-optin
+### needed=true, repeat in same episode (marker kept)
+== base-repeat rc= stderr_bytes=123
+== target-repeat rc= stderr_bytes=123
+== target-repeat-optin rc= stderr_bytes=123
+IDENTICAL: base-repeat vs target-repeat
+IDENTICAL: target-repeat vs target-repeat-optin
+### needed=false early exit clears marker
+== base-idle rc= stderr_bytes=0
+base: marker cleared
+== tmp-arm rc= stderr_bytes=987
+== target-idle-optin rc= stderr_bytes=0
+target opt-in: marker cleared
+IDENTICAL: base-idle vs target-idle-optin
+-- target-first stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- opt-in artifacts:
+none: no duration file created by any opt-in run
+-- duration-like files in lab home:
+(end)
+teardown_rc=0
+cleanup_done

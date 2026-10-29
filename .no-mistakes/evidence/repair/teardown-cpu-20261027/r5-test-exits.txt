@@ -1,0 +1,4 @@
+fm-guard-stale-banner exit=0
+fm-tangle-guard exit=0
+fm-guard-audit-closure exit=1
+force-override exit=0

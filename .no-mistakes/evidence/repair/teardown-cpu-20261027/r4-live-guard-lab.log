@@ -1,0 +1,45 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.RPek08
+base fm-guard.sh blob: ed9eebd1de826a0c5e8a9e42a9dd5b532278a71e
+target fm-guard.sh blob: 206fdc6e659b500f048e6febacb7a2eb52af5765
+env bash: 3.2.57(1)-release darwin26
+### early exit path (idle lab home, needed=false)
+== base-idle rc=0 stdout_bytes=0 stderr_bytes=0
+== target-idle rc=0 stdout_bytes=0 stderr_bytes=0
+== target-idle-optin rc=0 stdout_bytes=0 stderr_bytes=0
+== target-idle-optin-b3clock rc=0 stdout_bytes=0 stderr_bytes=0
+IDENTICAL: base-idle vs target-idle
+IDENTICAL: target-idle vs target-idle-optin
+IDENTICAL: target-idle vs target-idle-optin-b3clock
+### final exit path (one task .meta in flight, no watcher -> needed=true)
+== first-base rc=0 stdout_bytes=0 stderr_bytes=1008
+== first-target rc=0 stdout_bytes=0 stderr_bytes=1046
+== first-target-optin rc=0 stdout_bytes=0 stderr_bytes=1046
+DIFFERENT: first-base vs first-target
+6c6
+< ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-guard-base.V6IJUU/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+---
+> ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M62MG0VGDFGP22031A9GTH1Z/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+IDENTICAL: first-target vs first-target-optin
+== repeat-base rc=0 stdout_bytes=0 stderr_bytes=123
+== repeat-target rc=0 stdout_bytes=0 stderr_bytes=123
+== repeat-target-optin rc=0 stdout_bytes=0 stderr_bytes=123
+IDENTICAL: repeat-base vs repeat-target
+IDENTICAL: repeat-target vs repeat-target-optin
+-- first-target stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M62MG0VGDFGP22031A9GTH1Z/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- repeat-target stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+== idle-after-base rc=0 stdout_bytes=0 stderr_bytes=0
+marker cleared by needed=false exit
+-- opt-in artifacts:
+none: no duration file created by any opt-in run on Darwin Bash 3.2
+-- duration-like files in lab home:
+(end)
+teardown_rc=0
+cleanup_done

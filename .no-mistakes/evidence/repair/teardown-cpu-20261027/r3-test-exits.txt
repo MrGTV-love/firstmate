@@ -1,0 +1,3 @@
+fm-tangle-guard exit=0
+fm-guard-stale-banner exit=0
+fm-guard-lint exit=0

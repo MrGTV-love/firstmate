@@ -1,0 +1,1 @@
+ok - signal written while no watcher runs is caught on next run

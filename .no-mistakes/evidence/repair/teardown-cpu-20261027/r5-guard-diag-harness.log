@@ -1,0 +1,205 @@
+== disabled-path cases
+
+### probe probe: opt-in file empty
+no-diag-functions
+enabled=false t0=UNSET
+ok - probe: opt-in file empty: no helper defined, no clock read (t0 unset)
+
+### probe probe: darwin OSTYPE
+no-diag-functions
+enabled=false t0=UNSET
+ok - probe: darwin OSTYPE: no helper defined, no clock read (t0 unset)
+
+### probe probe: Bash3 with inherited numeric EPOCHREALTIME
+no-diag-functions
+enabled=false t0=UNSET
+ok - probe: Bash3 with inherited numeric EPOCHREALTIME: no helper defined, no clock read (t0 unset)
+
+### case off-empty (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+ok - opt-in unset/empty: exit 0, no source, no batch, no artifact
+
+### case off-darwin (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+ok - darwin OSTYPE with opt-in: exit 0, no source, no batch, no artifact
+
+### case off-bash3 (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+ok - Bash3 with ordinary numeric clock (old false-zero producer): exit 0, no source, no batch, no artifact
+
+### case off-bash4 (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+ok - Bash4 with opt-in: exit 0, no source, no batch, no artifact
+
+### case off-bash3-early (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+early-exit
+--- writer log
+ok - Bash3 early exit path: exit 0, no source, no batch, no artifact
+== enabled happy paths
+
+### case on-final (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/on-final.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	2	0			0
+diag.guard.force-override.tangle	1	3	0			0
+diag.guard.force-override.status-liveness	243	4	0			0
+diag.guard.force-override.suffix	36	5	0			0
+
+endbatch
+ok - final exit: 5 ordered 7-field rows, saved statuses 0/2/3/4/5, one source, one batch, exit 0, final stdout kept
+
+### case on-early (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+early-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/on-early.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	2	0			0
+diag.guard.force-override.tangle	1	3	0			0
+diag.guard.force-override.status-liveness	243	4	0			0
+diag.guard.force-override.suffix	36	5	0			0
+
+endbatch
+ok - early exit: 5 ordered 7-field rows, saved statuses 0/2/3/4/5, one source, one batch, exit 0, early stdout kept
+== malformed / missing / backward pairs
+
+### case malformed-t2 (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/malformed-t2.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.status-liveness	243	0	0			0
+diag.guard.force-override.suffix	36	0	0			0
+
+endbatch
+ok - malformed t2 omits only actor-init and tangle
+
+### case missing-t4 (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/missing-t4.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	0	0			0
+diag.guard.force-override.tangle	1	0	0			0
+
+endbatch
+ok - missing t4 omits only status-liveness and suffix
+
+### case backward-t3 (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/backward-t3.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	0	0			0
+diag.guard.force-override.status-liveness	245	0	0			0
+diag.guard.force-override.suffix	36	0	0			0
+
+endbatch
+ok - backward tangle pair omits only tangle (no clamp, no zero row)
+
+### case missing-t5-final (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/missing-t5-final.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	0	0			0
+diag.guard.force-override.tangle	1	0	0			0
+diag.guard.force-override.status-liveness	243	0	0			0
+
+endbatch
+ok - missing final stamp omits only suffix
+
+### case comma-leading-zero (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/comma-leading-zero.jsonl
+diag.guard.force-override.loading	12	0	0			0
+diag.guard.force-override.actor-init	8	0	0			0
+diag.guard.force-override.tangle	1	0	0			0
+diag.guard.force-override.status-liveness	243	0	0			0
+diag.guard.force-override.suffix	36	0	0			0
+
+endbatch
+ok - comma locale and leading-zero stamps parse as base 10
+
+### case thirteen-digit (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/thirteen-digit.jsonl
+diag.guard.force-override.actor-init	8	0	0			0
+diag.guard.force-override.tangle	1	0	0			0
+diag.guard.force-override.status-liveness	243	0	0			0
+diag.guard.force-override.suffix	36	0	0			0
+
+endbatch
+ok - 13-digit seconds rejected, only loading omitted
+
+### case short-fraction (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+sourced
+batch file=/Users/charlesabrooker/tmp/r5-harness.XBMgFL/short-fraction.jsonl
+diag.guard.force-override.tangle	1	0	0			0
+diag.guard.force-override.status-liveness	243	0	0			0
+diag.guard.force-override.suffix	36	0	0			0
+
+endbatch
+ok - 5-digit fraction rejected, its two rows omitted
+== zero valid rows means zero writer
+
+### case allbad-final (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+final-exit
+--- writer log
+ok - final exit with no valid rows: no source, no batch, no artifact, exit 0
+
+### case allbad-early (exit 0)
+--- stdout
+product-stdout-before-exit-branch
+early-exit
+--- writer log
+ok - early exit with no valid rows: no source, no batch, no artifact, exit 0
+
+SUMMARY pass=19 fail=0

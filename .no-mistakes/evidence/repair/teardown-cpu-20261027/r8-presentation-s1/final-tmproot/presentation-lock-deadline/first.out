@@ -1,0 +1,2 @@
+1793256123	1	signal	task.status	signal: /Users/charlesabrooker/tmp/fm-wake-tests.0W6D75/presentation-lock-deadline/state/task.status
+STATUS PRESENTATION SKIPPED: lock remains held by live pid 23913 after 1s; retry on the next drain.

@@ -1,0 +1,4 @@
+predeclared sample count: 3 (original mode, sequential, all retained)
+sample 1 rc=0 load={ 34.69 39.97 46.13 } ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity drain timing: queue held=1321ms control=3546ms drain timing: presentation held=6065ms control=4810ms 
+sample 2 rc=0 load={ 28.38 35.41 43.32 } ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity drain timing: queue held=1293ms control=2608ms drain timing: presentation held=3171ms control=2416ms 
+sample 3 rc=0 load={ 36.56 36.28 42.74 } ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity drain timing: queue held=1341ms control=2810ms drain timing: presentation held=2927ms control=2181ms 

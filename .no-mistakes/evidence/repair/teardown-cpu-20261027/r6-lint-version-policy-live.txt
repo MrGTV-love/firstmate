@@ -1,0 +1,27 @@
+=== fm-lint.sh mode=local (fake ShellCheck 0.9.9; pin 0.11.0) ===
+fm-lint.sh: ShellCheck 0.9.9 (pinned 0.11.0)
+fm-lint.sh: WARNING: ShellCheck 0.9.9 differs from the CI pin 0.11.0; local findings may differ. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>, or pass --strict-version to refuse.
+fm-lint.sh: full ShellCheck extended analysis enabled
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M62MG0VGDFGP22031A9GTH1Z/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+exit=0; shellcheck-invoked-on: /tmp/fm-r6-lint.bL75kv/root.sh 
+=== fm-lint.sh mode=strict (fake ShellCheck 0.9.9; pin 0.11.0) ===
+fm-lint.sh: ShellCheck 0.9.9 (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found 0.9.9. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+exit=1; shellcheck-invoked-on: 
+=== fm-lint.sh mode=ci (fake ShellCheck 0.9.9; pin 0.11.0) ===
+fm-lint.sh: ShellCheck 0.9.9 (pinned 0.11.0)
+fm-lint.sh: ShellCheck 0.11.0 required for CI parity, found 0.9.9. Install 0.11.0 with bin/fm-install-shellcheck.sh <destination-directory>.
+exit=1; shellcheck-invoked-on: 
+=== fm-lint-workflows.sh mode=local (fake actionlint 0.0.1; pin 1.7.12) ===
+fm-lint-workflows.sh: actionlint 0.0.1 (pinned 1.7.12)
+fm-lint-workflows.sh: WARNING: actionlint 0.0.1 differs from the CI pin 1.7.12; local workflow findings may differ. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to refuse.
+fm-lint-workflows.sh: 4 workflow files valid
+exit=0; actionlint-invoked: 1
+=== fm-lint-workflows.sh mode=strict (fake actionlint 0.0.1; pin 1.7.12) ===
+fm-lint-workflows.sh: actionlint 0.0.1 (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 0.0.1. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+exit=1; actionlint-invoked: 0
+=== fm-lint-workflows.sh mode=ci (fake actionlint 0.0.1; pin 1.7.12) ===
+fm-lint-workflows.sh: actionlint 0.0.1 (pinned 1.7.12)
+fm-lint-workflows.sh: actionlint 1.7.12 required for CI parity, found 0.0.1. Install 1.7.12 with bin/fm-install-actionlint.sh <destination-directory>.
+exit=1; actionlint-invoked: 0

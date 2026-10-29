@@ -1,0 +1,41 @@
+=== control: valid inline DoD ===
+exit=1 stderr=error: verification plan refuses the task Definition Of Done: ### Mandatory items is missing
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+=== unreadable brief (missing path) ===
+error: verification-plan brief is not a readable file: /tmp/fm-r6-dod.CTPzE9/nope.md
+exit=1
+=== NUL-bearing brief ===
+error: malformed input /tmp/fm-r6-dod.CTPzE9/nul.md: NUL bytes are not supported; replace them with text or line endings
+exit=1
+=== DoD file named but missing ===
+error: verification-plan DoD file is not a readable file: /tmp/fm-r6-dod.CTPzE9/missing-dod.md
+exit=1
+=== DoD file without mandatory item shape (site 839) ===
+error: verification plan refuses /tmp/fm-r6-dod.CTPzE9/bad-dod.md: no mandatory item in the shape <ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+exit=1
+=== present but empty inline DoD (site 846) ===
+error: verification plan refuses the task Definition Of Done: ### Mandatory items is missing
+Each mandatory item starts its own line as `<ID> Source: ... Expected: ... Verify: ... Edge/negative: ... Evidence place: ... Authority: ...`, with an id matching `[A-Za-z][A-Za-z0-9_.-]*` that is unique within the section and every field nonempty; Authority is exactly agent, gate, or grader.
+exit=1
+=== --help (site 1666) ===
+Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>
+       bash bin/fm-dod-lib.sh --shape
+Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.
+CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.
+--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.
+exit=0
+=== control (corrected): valid inline DoD with ### Mandatory items ===
+# Verification plan
+Author-supplied verification evidence, not captain intent or authorization to broaden scope.
+
+## Task Definition Of Done
+### Mandatory items
+C1 Source: x Expected: y Verify: z Edge/negative: w Evidence place: v Authority: gate
+
+## Out-of-scope list
+Out-of-scope list: no recognized `### Out of scope` subsection or column-0 `Out of scope:` paragraph was found in this brief; check the Firstmate spec for inline exclusions.
+
+# Shared review rubric
+
+exit=0

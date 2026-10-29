@@ -1,0 +1,5 @@
+1793255653	1	signal	task.status	signal: /Users/charlesabrooker/tmp/fm-wake-tests.BIipVO/signal/state/task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: blocked: first
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task blocked: first
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

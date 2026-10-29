@@ -1,0 +1,5 @@
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.6IXYQx
+bash used by guard shebang: #!/usr/bin/env bash; env bash -> GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+== base-plain rc=0 stdout_bytes=       0 stderr_bytes=       0
+== target-plain rc=0 stdout_bytes=       0 stderr_bytes=       0
+== target-optin-darwin rc=0 stdout_bytes=       0 stderr_bytes=       0

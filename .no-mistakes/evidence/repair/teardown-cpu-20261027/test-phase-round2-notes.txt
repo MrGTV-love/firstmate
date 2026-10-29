@@ -1,0 +1,7 @@
+test-1: removed docs/guards/lint-allowlist.json entry site:bin/fm-dod-lib.sh:180a6754ae.
+  Its text ("...refuses construction; legacy briefs state a...") was replaced by #285 (f40a7809, commit 75d0fb42) before the #283 squash (7b5c75cc) landed; 0 matches in bin/fm-dod-lib.sh now. Lint stale=0 after removal.
+  Remaining: 5 S1 violations from #285 lines (fm-dod-lib.sh:839,846,1666; fm-lint-workflows.sh:139; fm-lint.sh:1747). No registry guard owns them. Allowlist growth is forbidden (user decision + S5 ratchet). Needs a human guard-ownership decision on main.
+test-2: host load avg 46-66 on 18 CPUs during runs (sysctl vm.loadavg).
+  Full suite run: presentation held=22943ms control=3490ms -> fail.
+  Isolated case x3 (FM_TEST_ONLY): control (no holder) = 11895, 2179/2970, 2960 ms; run1 failed (8734 vs 5723), runs 2,3 passed.
+  Identical no-holder control drains vary ~5x, more than the 2500ms margin. Cause not proven beyond host saturation; no source change made.

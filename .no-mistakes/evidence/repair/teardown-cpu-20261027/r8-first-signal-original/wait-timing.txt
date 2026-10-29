@@ -1,0 +1,4 @@
+wait_for_exit pid=80687 limit=40 real_s=5.406
+  rc=0
+wait_for_exit pid=19994 limit=40 real_s=2.957
+  rc=0

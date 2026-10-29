@@ -1,0 +1,2 @@
+wait_for_exit pid=61519 limit=40 real_s=2.619
+  rc=0

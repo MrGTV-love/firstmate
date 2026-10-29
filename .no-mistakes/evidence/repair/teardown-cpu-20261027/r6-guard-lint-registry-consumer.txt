@@ -1,0 +1,26 @@
+=== HEAD 609f8093: bin/fm-guard-lint.sh --mode enforce --counts ===
+INFO guard-watcher-down-warning: exemptions=1
+INFO inventory: active=40 retired=14 beyond_audit=12 excluded=1 unregistered=842 audited=30 beyond_audit_active=13 sites=897 mapped=55
+LINT_SUMMARY mode=enforce guards=40 violations=842 allowlisted=842 stale=0 shown=0 sites=897
+exit=
+=== adversarial: registry with 'verification-plan-invalid-dod-input' removed ===
+INFO inventory: active=39 retired=14 beyond_audit=12 excluded=1 unregistered=845 audited=30 beyond_audit_active=12 sites=897 mapped=52
+VIOLATION S1 site:bin/fm-dod-lib.sh:bf661459c8: bin/fm-dod-lib.sh:839 [B] printf 'error: verification plan refuses %s: %s\\n%s\\n' "$dod_file" "$problem" "$(fm_dod_item_shape rule)" >&2 maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-dod-lib.sh:b3c4d2287b: bin/fm-dod-lib.sh:846 [B] printf 'error: verification plan refuses the task Definition Of Done: %s\\n%s\\n' "$problem" "$(fm_dod_item_shap maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S1 site:bin/fm-dod-lib.sh:feb60e146f: bin/fm-dod-lib.sh:1666 [B] 'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; a present DoD must carry mandat maps to no registry entry: add a sites marker to the guard that owns it
+exit=
+=== adversarial: registry with 'actionlint-local-version-warning' removed ===
+INFO inventory: active=39 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=12 sites=897 mapped=54
+VIOLATION S1 site:bin/fm-lint-workflows.sh:3999e1ed18: bin/fm-lint-workflows.sh:139 [B] printf 'fm-lint-workflows.sh: WARNING: actionlint %s differs from the CI pin %s; local workflow findings may d maps to no registry entry: add a sites marker to the guard that owns it
+exit=
+=== adversarial: registry with 'shellcheck-local-version-warning' removed ===
+INFO inventory: active=39 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=12 sites=897 mapped=54
+VIOLATION S1 site:bin/fm-lint.sh:ee74b58c38: bin/fm-lint.sh:1747 [B] printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s w maps to no registry entry: add a sites marker to the guard that owns it
+exit=
+=== adversarial: shellcheck entry with a site match that names no source line ===
+INFO inventory: active=40 retired=14 beyond_audit=12 excluded=1 unregistered=843 audited=30 beyond_audit_active=13 sites=897 mapped=54
+VIOLATION S1 site:bin/fm-lint.sh:ee74b58c38: bin/fm-lint.sh:1747 [B] printf 'fm-lint.sh: WARNING: ShellCheck %s differs from the CI pin %s; local findings may differ. Install %s w maps to no registry entry: add a sites marker to the guard that owns it
+VIOLATION S2 shellcheck-local-version-warning: site marker 'text that does not exist' in bin/fm-lint.sh matches no site; remove or update it
+exit=
+exit code HEAD registry: 0
+exit code with shellcheck entry removed: 1

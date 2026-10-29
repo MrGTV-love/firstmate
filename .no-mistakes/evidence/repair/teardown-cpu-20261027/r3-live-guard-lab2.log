@@ -1,0 +1,31 @@
+basebin fm-guard.sh == 7b5c75cc
+bash on PATH: 3.2.57(1)-release darwin26
+### early exit path (idle lab home, needed=false)
+IDENTICAL: base-plain vs target-plain
+IDENTICAL: target-plain vs target-optin-darwin
+== b3-numeric-clock rc=0 stdout_bytes=0 stderr_bytes=0
+IDENTICAL: target-plain vs b3-numeric-clock
+### final exit path (one task .meta in flight, no watcher -> needed=true)
+== base-needed rc=0 stdout_bytes=0 stderr_bytes=987
+== target-needed rc=0 stdout_bytes=0 stderr_bytes=123
+== target-needed-optin rc=0 stdout_bytes=0 stderr_bytes=123
+DIFFERENT: base-needed vs target-needed
+1,7c1
+< ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+< ●  WATCHER DOWN - SUPERVISION IS OFF
+< ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+< ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+< ●  This is a supervision warning only; the guarded operation WILL still run.
+< ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+< ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
+> WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+IDENTICAL: target-needed vs target-needed-optin
+-- target-needed stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+-- opt-in artifacts present in ART:
+none: no duration file created by any opt-in run
+-- duration-like files in lab home:
+(end)
+teardown_rc=0
+cleanup_done

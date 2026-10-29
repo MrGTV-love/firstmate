@@ -1,0 +1,347 @@
+ok - --queued returns exact append-order rows without presentation, locks, or acknowledgement side effects
+ok - --queued succeeds empty for missing state/queue and marker-only state without creating records
+ok - --queued filters live branch ownership and reads stale grants without repairing state
+ok - --queued rejects invalid arguments, unreadable paths, failed reads, and malformed rows without returning work
+ok - re-emit serializes claim publication and preserves queued and empty downtime episodes
+ok - an abandoned same-process lock hold is reclaimed; a parent's live hold is not
+ok - all lock waiters refuse an unremovable self-held lock without waiting or claiming success
+ok - all lock waiters refuse a dead lock they cannot reclaim instead of waiting on their own steal mutex
+ok - a lock wait ends when its lock directory is gone and survives a brief absence
+ok - lock-wait diagnostics never recreate a vanished state directory
+ok - without BASHPID a subshell cannot release or reclaim its parent lock and owns its own hold
+ok - bounded acquire hands ownership to the waiting caller after contention
+ok - bounded deadline preserves contention when the observed holder releases
+ok - a malformed steal mutex reports acquisition error instead of contention
+drain timing: queue held=1442ms control=2805ms
+drain timing: presentation held=4418ms control=3301ms
+ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity
+ok - malformed presentation locks report acquire failure instead of contention
+tests/wake-helpers.sh: line 327: 36610 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+tests/wake-helpers.sh: line 327: 42771 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+tests/wake-helpers.sh: line 327: 76828 Killed: 9               PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch-$leg.out" 2> "$dir/watch-$leg.err"
+ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+ok - declared external-wait pause rows do not feed secondmate wake-loop escalation
+ok - a reprovisioned queue generation starts a fresh no-progress interval
+ok - an active turn defers the secondmate stall escalation without cancelling it
+ok - a long-lived mate mid-turn is not a stall, but a queue frozen past the busy bound still alarms
+ok - a proven-idle mate with a proven-empty composer is rung so its child home drains without a parent alarm
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - an exactly idle live mate with unknown draft risk retains the parent alert without a drain steer or input
+ok - TERM stops a watcher blocked in the drain-ring idle capture and runs its cleanup
+ok - busy panes defer without a ring and unknown panes keep the parent alarm
+ok - a leftover row that survives a proven-idle ring still surfaces as a genuine stall
+ok - idle omp retains the bounded durable parent alarm without input or foreign queue changes
+ok - secondmate stall markers reject symlinks without touching their targets
+ok - stall publication acknowledgement closes the pre-marker crash window
+ok - empty prefix mate cleanup preserves another mate's stall receipt
+ok - self-announced appends suppress only their own bytes and fail toward waking
+ok - separate self-announced answers after a fold stay owned; worker decisions and later lines still wake
+ok - an unreadable status still reads as unreported, with or without owned growth
+ok - a worker resolved in fold lag still wakes after this home's close
+ok - owned growth suppresses the wake without hiding the turn-ended annotation
+ok - historical annotations replay nothing already announced and keep everything new
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30364 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=R since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=U since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30360 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31116 state=?E since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238980
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30389 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30711 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=31424 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30573 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30230 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30665 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30313 state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30680 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30563 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30569 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30964 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30445 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=unknown state=unknown since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=U since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=R since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30730 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30733 state=S since=1793238981
+fm-lock: waiting lock=/Users/charlesabrooker/tmp/fm-wake-tests.vINqWn/concurrent/state/.wake-queue.lock owner=30518 state=S since=1793238981
+ok - concurrent append plus drain preserves durable records through acknowledgement
+ok - signal written while no watcher runs is caught on next run
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 82872.1793239101.1AWokv
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - stale wake is queued before suppressor state is advanced
+wait_for_exit: owned pid 13492 exceeded 40 polls; sending TERM
+13492   273 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/e2f2c2589455/01M62MG0VGDFGP22031A9GTH1Z/bin/fm-watch.sh
+not ok - watcher did not surface a not-provably-working stale

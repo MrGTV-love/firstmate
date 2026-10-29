@@ -1,0 +1,32 @@
+diff --git a/tests/wake-helpers.sh b/tests/wake-helpers.sh
+index a3f1370b..f175b663 100644
+--- a/tests/wake-helpers.sh
++++ b/tests/wake-helpers.sh
+@@ -336,6 +336,11 @@ wait_for_exit() {
+   done
+   printf 'wait_for_exit: owned pid %s exceeded %s polls; sending TERM\n' "$pid" "$limit" >&2
+   ps -p "$pid" -o pid= -o ppid= -o stat= -o command= >&2 2>/dev/null || true
++  if [ -n "${FM_R10_EVIDENCE:-}" ] && [ ! -e "$FM_R10_EVIDENCE/pre-term.done" ]; then  # R10-TEMP
++    printf 'pre-term copy start=%s pid=%s limit=%s case=%s\n' "$(date +%s)" "$pid" "$limit" "${dir:-}" >> "$FM_R10_EVIDENCE/pre-term.meta"  # R10-TEMP
++    [ -n "${dir:-}" ] && cp -Rp "$dir" "$FM_R10_EVIDENCE/pre-term-case" 2>> "$FM_R10_EVIDENCE/pre-term.meta"  # R10-TEMP
++    printf 'pre-term copy end=%s\n' "$(date +%s)" >> "$FM_R10_EVIDENCE/pre-term.meta"; : > "$FM_R10_EVIDENCE/pre-term.done"  # R10-TEMP
++  fi  # R10-TEMP
+   kill -TERM "$pid" 2>/dev/null || true
+   i=0
+   while [ "$i" -lt 20 ] && is_live_non_zombie "$pid"; do
+@@ -401,3 +406,15 @@ dead_pid() {
+   done
+   printf '%s\n' "$p"
+ }
++
++if [ -n "${FM_R10_EVIDENCE:-}" ]; then  # R10-TEMP
++  fail() {  # R10-TEMP
++    printf 'not ok - %s\n' "$1" >&2  # R10-TEMP
++    if [ ! -e "$FM_R10_EVIDENCE/fail.done" ]; then  # R10-TEMP
++      printf 'fail copy start=%s case=%s msg=%s\n' "$(date +%s)" "${dir:-}" "$1" >> "$FM_R10_EVIDENCE/fail.meta"  # R10-TEMP
++      [ -n "${dir:-}" ] && cp -Rp "$dir" "$FM_R10_EVIDENCE/fail-case" 2>> "$FM_R10_EVIDENCE/fail.meta"  # R10-TEMP
++      printf 'fail copy end=%s\n' "$(date +%s)" >> "$FM_R10_EVIDENCE/fail.meta"; : > "$FM_R10_EVIDENCE/fail.done"  # R10-TEMP
++    fi  # R10-TEMP
++    exit 1  # R10-TEMP
++  }  # R10-TEMP
++fi  # R10-TEMP

@@ -1,0 +1,4 @@
+# diff: base 7b5c75cc bin/fm-guard.sh  vs  target HEAD bin/fm-guard.sh with the 7 diagnostic blocks removed
+IDENTICAL (exit 0)
+# diff: ba1910 stripped vs target stripped
+IDENTICAL (exit 0)

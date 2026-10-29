@@ -1,0 +1,7 @@
+paired isolated runs of test_live_presentation_holder_is_deadlined_without_weakening_ack; base=7b5c75cc (git archive in /tmp/fm-r6-base.vED4SP) target=609f80937aeb735531f3c818ffd78a66ac36ff4c
+run1 target rc=1 load=[38.86 40.49 46.49] drain timing: queue held=1338ms control=4079ms not ok - presentation lock delayed the drain 17878ms against a 4080ms control 
+run1 base rc=0 load=[45.91 42.21 46.45] drain timing: queue held=1344ms control=2462ms drain timing: presentation held=7128ms control=8136ms ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity 
+run2 target rc=0 load=[43.33 42.72 46.19] drain timing: queue held=1245ms control=1990ms drain timing: presentation held=3458ms control=2095ms ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity 
+run2 base rc=0 load=[31.44 39.37 44.70] drain timing: queue held=1256ms control=2340ms drain timing: presentation held=3612ms control=2051ms ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity 
+run3 target rc=0 load=[37.63 39.81 44.38] drain timing: queue held=1435ms control=10063ms drain timing: presentation held=3150ms control=2649ms ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity 
+run3 base rc=0 load=[34.14 38.21 43.36] drain timing: queue held=1426ms control=3297ms drain timing: presentation held=3181ms control=3037ms ok - presentation lock waits are bounded and retriable without weakening acknowledgement atomicity 

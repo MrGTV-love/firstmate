@@ -1,0 +1,3 @@
+1793255729	1	stale	test:fm-stale	stale: test:fm-stale
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+stale done: ready in branch fm/stale

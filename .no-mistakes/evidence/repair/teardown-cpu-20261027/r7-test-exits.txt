@@ -1,0 +1,1 @@
+fm-guard-audit-closure exit=0
