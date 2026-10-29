@@ -92,10 +92,12 @@
 # (as a nested Perl watchdog has); group signals alone cannot reach it.
 set -u
 
-_fm_timeout_scratch_lib="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-scratch-lib.sh"
+# The sourced word names the file literally so fm-lint-cache.pl can resolve
+# it; a whole path held in a variable makes every caller uncacheable.
+_fm_timeout_dir="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
 # shellcheck source=bin/fm-scratch-lib.sh
-[ ! -f "$_fm_timeout_scratch_lib" ] || . "$_fm_timeout_scratch_lib"
-unset _fm_timeout_scratch_lib
+[ ! -f "$_fm_timeout_dir/fm-scratch-lib.sh" ] || . "$_fm_timeout_dir/fm-scratch-lib.sh"
+unset _fm_timeout_dir
 
 # fm_run_progress <no-progress-seconds> <command...>: keep slow work running
 # while stdout, stderr or cumulative process-tree CPU advances. Unlike the hard
