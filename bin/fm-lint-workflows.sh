@@ -136,7 +136,7 @@ if [ "$resolved" != "$REQUIRED_ACTIONLINT" ]; then
       "$REQUIRED_ACTIONLINT" "$resolved" "$REQUIRED_ACTIONLINT" >&2
     exit 1
   fi
-  printf 'fm-lint-workflows.sh: WARNING: actionlint %s differs from the CI pin %s; local workflow findings may differ. Install %s with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to refuse.\n' \
+  printf 'fm-lint-workflows.sh: WARNING: actionlint %s differs from the CI pin %s; local workflow findings may differ. Install %s with bin/fm-install-actionlint.sh <destination-directory>, or pass --strict-version to make this an error.\n' \
     "$resolved" "$REQUIRED_ACTIONLINT" "$REQUIRED_ACTIONLINT" >&2
 fi
 

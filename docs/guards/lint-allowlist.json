@@ -295,7 +295,6 @@
     {"id": "site:bin/fm-copy-sweep.sh:f7e10cba1a", "rule": "S1", "text": "echo \"REFUSED: Vernant's closeout driver did not release $shown (exit $rc): $words\" >&2"},
     {"id": "site:bin/fm-copy-sweep.sh:f9f22a7d61", "rule": "S1", "text": "refusal=$(printf '%s\\n' \"$err\" | sed -n '/^REFUSED:/,$p')"},
     {"id": "site:bin/fm-copy-sweep.sh:f7031d0539", "rule": "S1", "text": "REMOVAL_REPORT=\"${REMOVAL_REPORT}FAILED\"$'\\t'\"$copy\"$'\\t'\"git worktree remove refused and the copy w"},
-    {"id": "site:bin/fm-dod-lib.sh:180a6754ae", "rule": "S1", "text": "'CRLF input is accepted; unreadable or NUL-bearing input refuses construction; legacy briefs state a"},
     {"id": "site:bin/fm-duration.py:66aff1ff07", "rule": "S1", "text": "if not REFUSED:"},
     {"id": "site:bin/fm-duration.py:efa40fa5b6", "rule": "S1", "text": "scalar('ledger', f'refused, nothing recorded: {reason}', sys.stderr)"},
     {"id": "site:bin/fm-duration.py:c185ddd360", "rule": "S1", "text": "return refuse(str(error))"},
