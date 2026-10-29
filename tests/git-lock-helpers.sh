@@ -2,7 +2,7 @@
 # Real Git lock owners for fleet-sync and teardown behavior tests.
 # Source after tests/lib.sh. One fixture at a time uses fd9 for its stdin FIFO;
 # the background Git stays in the test shell's job table for failure cleanup.
-# Readiness follows the Git owner's CPU and transaction output through the
+# Readiness follows the Git owner's liveness and transaction output through the
 # shared progress-aware wait; a slow lock preparation is not a failed fixture.
 
 # The optional owner cwd lets a linked worktree own the repository's common lock.
