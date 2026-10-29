@@ -1690,10 +1690,14 @@ lab workspace get "$DUP2_WSID" >/dev/null 2>&1 || fail "duplicate-token recovery
 
 # Herdr drops a registration whose pane runs no agent process, so the live
 # duplicate is a real agent-named foreground process plus its registration.
+# The stand-in is a renamed Python interpreter, not a renamed sleep: a
+# multicall coreutils (uutils on Ubuntu 26.04) picks its applet from argv[0],
+# so a sleep linked as `codex` exits at once and the pane stays a shell.
 DUP_AGENT_DIR="$TMP_ROOT/duplicate-agent"
 mkdir -p "$DUP_AGENT_DIR"
-ln -s "$(command -v sleep)" "$DUP_AGENT_DIR/codex" || fail "could not name the duplicate agent stand-in"
-lab pane run "$DUP1_PANE" "'$DUP_AGENT_DIR/codex' 600" >/dev/null \
+DUP_PYTHON_BIN=$(python3 -c 'import sys; print(sys.executable)') || fail "python3 not found"
+ln -s "$DUP_PYTHON_BIN" "$DUP_AGENT_DIR/codex" || fail "could not name the duplicate agent stand-in"
+lab pane run "$DUP1_PANE" "'$DUP_AGENT_DIR/codex' -c 'import time; time.sleep(600)'" >/dev/null \
   || fail "could not start the duplicate-live-agent risk fixture"
 DUP_AGENT_STATE=
 for _ in $(seq 1 100); do
