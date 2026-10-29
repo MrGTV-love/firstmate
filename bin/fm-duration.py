@@ -755,12 +755,6 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
     proven dead/zombie/reused peer, independently of the inactivity verdict,
     and counts only watched-file changes as progress.
     """
-    def unknown():
-        # An unreadable interval cannot be evidence of continuous inactivity.
-        with contextlib.suppress(OSError):
-            path.unlink()
-        return 0
-
     observed = {}
     identity = ()
     runnable = False
@@ -790,9 +784,9 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
         cpu, runnable = tree_cpu(pid, observed)
         if cpu is None:
             warn_blind_telemetry()
-            return unknown()
+            return 0
         if not any(child == pid for child, _ in observed):
-            return unknown()
+            return 0
         identity = next(identity for (child, identity) in observed if child == pid)
     files = []
     for name in paths:
@@ -802,7 +796,7 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
         except FileNotFoundError:
             files.append([name, None])
         except OSError:
-            return unknown()
+            return 0
     now = time.monotonic()
     record = dict(pid=pid, identity=list(identity), files=files,
                   cpu=[[child, list(start), value] for (child, start), value in observed.items()],
@@ -827,7 +821,7 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
         temporary.write_text(json.dumps(record))
         os.replace(temporary, path)
     except OSError:
-        return unknown()  # Unpublishable evidence is not permission to stop work.
+        return 0  # Unpublishable evidence is not permission to stop work.
     finally:
         with contextlib.suppress(OSError):
             temporary.unlink()

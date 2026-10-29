@@ -190,8 +190,9 @@ done
 pass "waits require a producer observable and reject the old capped interface"
 
 # Exercise the observer's public CLI with a controlled kernel table and a real
-# live PID. An unreadable interval breaks the inactivity evidence chain; a
-# genuinely reused identity or two valid quiet observations still gets caught.
+# live PID. An unreadable sample is unknown: it neither stops work nor resets the
+# window, so two valid quiet observations across it, or a genuinely reused
+# identity, still get caught.
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 import json
 import os
@@ -222,8 +223,7 @@ try:
     time.sleep(0.2)
     sample(0, dict(env, FM_PROC_ROOT_OVERRIDE=str(tmp / 'absent-proc'),
                    PATH=str(tmp / 'blind/fakebin') + os.pathsep + env['PATH']))
-    sample(0)
-    time.sleep(0.2)
+    assert record.exists(), 'an unknown sample must keep the observation record'
     sample(124)
     fields[19] = '20'
     kernel()
@@ -234,5 +234,5 @@ try:
 finally:
     peer.terminate()
     peer.wait()
-print('ok - unknown intervals reset evidence, genuine inactivity and reused peers are caught, corrupt evidence is retried')
+print('ok - unknown samples keep the window, genuine inactivity and reused peers are caught, corrupt evidence is retried')
 PY
