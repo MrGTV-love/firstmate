@@ -731,17 +731,17 @@ def invalid_project_source(repo, manifest, base, env):
 def reftable_source(repo, manifest, base, env):
     # Reftable keeps every ref, the task's own and every other task's, in files
     # no packed-refs or refs/heads rule names, so the builder must refuse it.
-    source, linked = base / "reftable-source", base / "reftable-worktree"
+    source, linked = base / "rs", base / "rw"
     for args in (["init", "-q", "--ref-format=reftable", "-b", "main", str(source)],
                  ["-C", str(source), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "--allow-empty", "-m", "init"],
                  ["-C", str(source), "worktree", "add", "-q", "-b", "fm/task", str(linked)]):
         result = git(*args)
         assert result.returncode == 0, (args, result.stderr)
-    profile = base / "reftable.sb"
+    profile = base / "rs.sb"
     try:
         build_profile(repo, manifest, "claude", profile, env, worktree=str(linked))
     except subprocess.CalledProcessError as error:
-        assert error.returncode == 1 and "reftable" in error.stderr, error.stderr
+        assert error.returncode == 1 and "reftable ref storage cannot be confined" in error.stderr, error.stderr
         assert not profile.exists(), "reftable repository published a confinement profile"
     else:
         raise AssertionError("a reftable repository was confined as if its refs were files")
