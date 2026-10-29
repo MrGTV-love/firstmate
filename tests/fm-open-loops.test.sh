@@ -2263,6 +2263,12 @@ assert ack(boundary).returncode == 1, 'a steer answers only the turn it followed
 reused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
 assert reused.returncode == 0, ('the same unchanged row needs no newer message', reused)
 assert ack(boundary).returncode == 0
+# A firstmate-owned steer stands for four hours from its delivery, and its message says how long remains.
+home, ledger, row, call, ok, drain, ack = case('steer-remaining', owner='firstmate')
+_, boundary = drain()
+inbox(home, '005.msg', offset=-600)
+steered = ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
+assert 'standing: unchanged row; re-present after 13800 seconds' in steered.stdout, steered.stdout
 
 # PR URLs do not encode the owning task; provenance selects its inbox in both delivery locations.
 for handled in (False, True):
@@ -2350,6 +2356,23 @@ ok('bash', '-c', '. "$1"; fm_wake_append check report "check: deferred approval 
 result, boundary = drain()
 assert row['id'] in result.stdout and 'STANDING' not in result.stdout, result
 assert ack(boundary).returncode == 1, 'a deferral cannot hold a mergeable reviewed PR across turns'
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral that never stands leaves the printed row captain-visible', shown)
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is True, record['handling']['actions']
+assert record['handling']['actions'][row['id']]['requires_followup'] is True, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
+# An action marked for follow-up never lets its deferral stand, whatever its stored visibility mark says.
+home, ledger, row, call, ok, drain, ack = case('followup-deferred')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']].update(requires_followup=True, captain_visible=False)
+ledger.write_text(json.dumps(record))
+again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
 
 # One escalation of a captain-owned row stands until the row changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
@@ -2443,12 +2466,14 @@ assert ack(boundary).returncode == 0
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
 _, boundary = drain()
+assert row['id'] in json.loads(ledger.read_text())['handling']['episodes'], 'presentation opens the overdue episode'
 inbox(home, '030.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '030.msg')
 clock['now'] = now + 3600
 first = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 kept = next(r for r in first['rows'] if r['id'] == row['id'])
 assert kept['stale'] and kept['last_seen'] == now and row['id'] in first['handling']['actions'], first
+assert row['id'] not in first['handling']['episodes'], 'a published row that is no longer overdue closes its episode'
 clock['now'] = now + 86400
 second = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
 assert row['id'] not in {r['id'] for r in second['rows']}, second

@@ -1202,8 +1202,9 @@ class Collector:
                                          for actor, pending in handling["presentations"].items()}
             handling["presented_at"] = {actor: {ident: stamp for ident, stamp in stamps.items() if ident in published}
                                         for actor, stamps in handling.get("presented_at", {}).items()}
+            overdue = {row["id"] for row in report["rows"] if row.get("overdue")}
             handling["episodes"] = {ident: episode for ident, episode in handling.get("episodes", {}).items()
-                                    if ident in published}
+                                    if ident in overdue}
             for row in report["rows"]:
                 if captain_visible(handling["actions"].get(row["id"], {}), row, self.now):
                     row["captain_visible"] = True
@@ -1304,8 +1305,9 @@ def parkable(row):
 
 
 def deferral_stands(action, row, now):
-    """A recorded deferral still answers its unchanged row."""
-    return action.get("kind") == "deferred" and action.get("digest") == row_digest(row) \
+    """A recorded deferral still answers its unchanged row; never a reviewed-green PR or a row needing follow-up."""
+    return action.get("kind") == "deferred" and row.get("category") != "review_pass_not_merged" \
+        and not action.get("requires_followup") and action.get("digest") == row_digest(row) \
         and action.get("recheck_epoch", 0) > now
 
 
@@ -1633,7 +1635,7 @@ def action_answers(action, row, required, now, waits):
         return False
     kind = action.get("kind")
     if kind == "deferred":
-        return action.get("recheck_epoch", 0) > now and not captain_visible(action, row, now)
+        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "waiting" or action.get("hold"):
         return receipt_stands(action, row, now, waits)
     return 0 <= now - answered_at(action) < RECEIPT_SECONDS
@@ -1954,7 +1956,7 @@ def record_action(args, state, now, report, waits, waits_error):
                    " or that hold is answered or released")
     elif by_id[ident].get("owner") == "firstmate" and args.kind in ("escalated", "steered") \
             and by_id[ident].get("category") != "review_pass_not_merged":
-        message = f"unchanged row; re-present after {RECEIPT_SECONDS} seconds"
+        message = f"unchanged row; re-present after {RECEIPT_SECONDS - (now - answered_at(actions[ident]))} seconds"
         if parked and unverified:
             message += f"; captain hold could not be verified ({unverified})"
     return message
