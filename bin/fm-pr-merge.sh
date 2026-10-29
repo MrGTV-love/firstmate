@@ -41,9 +41,11 @@
 # head binding below does not extend to the base; a tip that lands in the
 # seconds between that last read and GitHub applying the merge is a residual
 # this script cannot close. Only a merge that enters the base's merge queue,
-# proven live at both reads together with a complete, non-empty required set,
-# skips that containment rule and never the check reads, because the queue
-# runs those required checks on the combined tree itself;
+# proven live at both reads, into a base whose required set the verify read
+# found complete and non-empty, skips that containment rule and never the check
+# reads, because the queue runs those required checks on the combined tree
+# itself; an unreadable queue rule or required set is retried as unreadable,
+# never judged as a head that lacks the tip;
 # github_merge_enters_queue below owns that proof. Off a proven queue, an
 # attended --auto merge also needs a live mergeStateStatus at that last read
 # where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
@@ -1110,7 +1112,7 @@ github_verify_mergeable() {
   local state='' draft='' review_decision='' mergeable='' merge_state='' live_head='' base=''
   local kind action req_text required_known=true
   local any_pending=false any_failed=false
-  local lacks_tip='' queued=false
+  local lacks_tip='' queued=false queue_status
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
@@ -1286,8 +1288,14 @@ EOF
   # The head must contain the base branch's live tip, so the landed tree is the
   # one its checks ran on, unless this merge enters the base's merge queue;
   # github_read_base_containment and github_merge_enters_queue own the rule.
-  if github_merge_enters_queue "$base"; then
+  queue_status=0
+  github_merge_enters_queue "$base" || queue_status=$?
+  if [ "$queue_status" -eq 0 ]; then
     queued=true
+  elif [ "$queue_status" -eq 2 ]; then
+    source_unreadable=true
+    refusals="$refusals  - whether this --auto merge enters the merge queue of base branch $base, and so whether head $live_head must contain its tip, could not be read
+"
   elif ! github_read_base_containment "$live_head" "$base"; then
     source_unreadable=true
     refusals="$refusals  - whether head $live_head contains the current tip of base branch $base could not be read
@@ -1494,23 +1502,28 @@ github_branch_rules_unavailable_on_plan() {
   return 1
 }
 
-# Whether this merge enters the given base branch's merge queue, read live:
-# the caller asked for --auto, the only path this script sends into a queue,
-# the base's rules name exactly one recognised merge_queue rule, and the base's
-# required set reads completely and names at least one check. A queue builds
-# its merge group on its own tip and runs the required checks on that combined
-# tree before anything lands, so a landed tree no check ran on cannot happen
-# there and the head need not contain the tip. A direct merge, no queue rule, an
-# unreadable, conflicting or unrecognised rule, a plan without branch rules, or
-# a required set that is unreadable or empty, where the queue would land its
-# group with no check run on it, all return 1, so the containment rule applies
-# unchanged. Sets FM_PR_GITHUB_BASE to the base it read.
+# Whether this merge enters the given base branch's merge queue: the caller
+# asked for --auto, the only path this script sends into a queue, the base's
+# rules, read live, name exactly one recognised merge_queue rule, and the
+# required set that github_verify_mergeable last read through
+# github_read_required_contexts is complete and names at least one check. A
+# queue builds its merge group on its own tip and runs the required checks on
+# that combined tree before anything lands, so a landed tree no check ran on
+# cannot happen there and the head need not contain the tip. Returns 0 then.
+# A direct merge, no queue rule, a conflicting or unrecognised rule, a plan
+# without branch rules, or an empty required set, where the queue would land
+# its group with no check run on it, returns 1, so the containment rule
+# applies unchanged. An unreadable queue rule or required set returns 2,
+# because whether the containment rule applies at all is then unknown. Sets
+# FM_PR_GITHUB_BASE to the base it read.
 github_merge_enters_queue() {
   [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] || return 1
   FM_PR_GITHUB_BASE=$1
   github_read_queue_method
+  [ "$FM_PR_GITHUB_QUEUE_STATUS" != unreadable ] || return 2
   [ "$FM_PR_GITHUB_QUEUE_STATUS" = single ] || return 1
-  github_read_required_contexts "$1" && [ "$FM_PR_GITHUB_REQUIRED" != '[]' ]
+  [ -z "$FM_PR_GITHUB_REQUIRED_ERROR" ] || return 2
+  [ "$FM_PR_GITHUB_REQUIRED" != '[]' ] || return 1
 }
 
 # Read the effective merge-queue method for the observed base branch. The four

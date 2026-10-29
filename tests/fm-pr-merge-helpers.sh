@@ -379,6 +379,7 @@ case "${1:-} ${2:-}" in
       exit 1
     fi
     if [ -f "${FM_TEST_GH_RULES_FAIL:-}" ]; then
+      [ ! -f "$FM_TEST_GH_RULES_FAIL.once" ] || rm "$FM_TEST_GH_RULES_FAIL"
       exit 1
     fi
     cat "$FM_TEST_GH_RULES"

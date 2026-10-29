@@ -1901,7 +1901,7 @@ test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment() {
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
   local case_dir rc head built_on scenario tip=b34192a213f406add8809a34224315cdc9073798
   head=1717171717171717171717171717171717171717
-  for scenario in direct-merge-into-queue auto-without-queue auto-unreadable-queue auto-queue-without-required; do
+  for scenario in direct-merge-into-queue auto-without-queue auto-queue-without-required; do
     case_dir=$(make_case "github-lacks-tip-$scenario")
     add_gh_mocks "$case_dir" "$head"
     built_on=$(cat "$case_dir/github-base")
@@ -1912,10 +1912,6 @@ test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
         set -- -- --squash
         ;;
       auto-without-queue)
-        set -- --attended-override -- --auto --squash
-        ;;
-      auto-unreadable-queue)
-        : > "$case_dir/github-rules-fail"
         set -- --attended-override -- --auto --squash
         ;;
       auto-queue-without-required)
@@ -1936,7 +1932,68 @@ test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses() {
     assert_no_grep 'pr merge' "$case_dir/gh.log" \
       "$scenario: gh pr merge ran on a tree no check ran on"
   done
-  pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, an unreadable queue, or a queue with no required check"
+  pass "fm-pr-merge keeps the tip containment for a direct merge, no queue, or a queue with no required check"
+}
+
+# Whether an --auto merge enters the queue decides whether the head must contain
+# the tip at all, so a queue rule or required set that cannot be read is an
+# unreadable source: retried within the bound, and if it stays unreadable,
+# refused as unreadable, never as a head that lacks the tip.
+test_an_unreadable_queue_proof_is_retried_not_judged_lacking_the_tip() {
+  local case_dir rc head built_on scenario tip=b34192a213f406add8809a34224315cdc9073798
+  head=2323232323232323232323232323232323232323
+  for scenario in queue-rules-fail-once required-rules-fail-once queue-rules-fail-always; do
+    case_dir=$(make_case "github-unreadable-queue-proof-$scenario")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_required "$case_dir" classic:ci
+    built_on=$(cat "$case_dir/github-base")
+    write_github_compare "$case_dir" "$tip" "$built_on" 3
+    printf 'merge_method=SQUASH\n' > "$case_dir/github-rules"
+    write_github_outcome "$case_dir" OPEN false true main
+    case "$scenario" in
+      queue-rules-fail-once)
+        : > "$case_dir/github-rules-fail"
+        : > "$case_dir/github-rules-fail.once"
+        ;;
+      required-rules-fail-once)
+        printf 'gh: Server Error (HTTP 502)\n' > "$case_dir/github-required-rules-fail"
+        : > "$case_dir/github-required-rules-fail.once"
+        ;;
+      queue-rules-fail-always)
+        : > "$case_dir/github-rules-fail"
+        ;;
+    esac
+
+    set +e
+    run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/188 \
+      --attended-override -- --auto --squash \
+      > "$case_dir/stdout" 2> "$case_dir/stderr"
+    rc=$?
+    set -e
+
+    assert_no_grep "lacks the current tip" "$case_dir/stderr" \
+      "$scenario: an unreadable queue proof was judged as a head that lacks the tip"
+    assert_no_grep 'Update the branch so its head contains' "$case_dir/stderr" \
+      "$scenario: an unreadable queue proof was told to update the branch"
+    assert_no_grep '/compare/' "$case_dir/gh.log" \
+      "$scenario: the tip containment was read while the queue proof was unknown"
+    case "$scenario" in
+      queue-rules-fail-always)
+        expect_code 1 "$rc" "$scenario: a queue proof that stays unreadable must refuse"
+        assert_grep "whether this --auto merge enters the merge queue of base branch main, and so whether head $head must contain its tip, could not be read" \
+          "$case_dir/stderr" "$scenario: the refusal did not name the unreadable queue proof"
+        assert_no_grep 'pr merge' "$case_dir/gh.log" \
+          "$scenario: gh pr merge ran with an unreadable queue proof"
+        ;;
+      *)
+        expect_code 0 "$rc" "$scenario: one failed read must be retried into the queue merge"$'\n'"$(cat "$case_dir/stderr")"
+        assert_logged_gh_merge "$case_dir" 188 example/repo --auto --squash
+        assert_grep 'verified: https://github.com/example/repo/pull/188 is queued' "$case_dir/stdout" \
+          "$scenario: the queued outcome was not reported"
+        ;;
+    esac
+  done
+  pass "fm-pr-merge retries an unreadable queue proof instead of judging the head to lack the tip"
 }
 
 # Off a proven merge queue, --auto merges at once only in a state where gh
@@ -2225,6 +2282,7 @@ test_a_base_tip_that_cannot_be_re_read_before_the_merge_refuses
 test_a_head_that_lacks_the_tip_beside_an_unreported_check_is_not_retried
 test_a_head_entering_the_base_merge_queue_skips_only_the_tip_containment
 test_a_head_that_lacks_the_tip_without_a_proven_queue_merge_refuses
+test_an_unreadable_queue_proof_is_retried_not_judged_lacking_the_tip
 test_off_queue_auto_merges_only_where_github_merges_at_once
 test_off_queue_auto_left_armed_is_disarmed_or_reported_loudly
 test_off_queue_auto_whose_merge_command_failed_is_disarmed_or_reported_loudly
