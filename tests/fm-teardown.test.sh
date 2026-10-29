@@ -91,10 +91,8 @@ test_local_only_fork_remote_allows() {
   printf '%s\tattempt\n' "$(date +%s)" > "$case_dir/state/.session-end-relaunch-task-x1"
   printf 'g1\t1\trelaunched\n' > "$case_dir/state/.session-end-handled-task-x1"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "fork-allow: teardown should succeed when HEAD is on a fork remote"
   ! grep -q REFUSED "$case_dir/stderr" || fail "fork-allow: teardown printed a REFUSED line"
@@ -144,10 +142,8 @@ test_teardown_does_not_wait_for_the_home_summary_refresh() {
   ' _ "$ROOT" "$case_dir" "$marker" &
   holder=$!
   fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
-  set +e
-  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "teardown should succeed with a refresh in flight"
   fm_test_wait_until 60 test -e "$case_dir/state/.home-summary-refresh.pending" \
     || { kill "$holder" 2>/dev/null; fail "the teardown trigger left no marker for the refresh in flight"; }
@@ -338,10 +334,8 @@ test_local_only_truly_unpushed_refuses() {
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
   # No fork, no push to origin, not merged into main.
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "truly-unpushed: teardown should refuse"
   grep -q REFUSED "$case_dir/stderr" || fail "truly-unpushed: no REFUSED line in stderr"
@@ -488,10 +482,8 @@ test_no_mistakes_truly_unpushed_refuses() {
   # landed on origin/main: genuinely unlanded work that must still refuse.
   wt_commit_file "$case_dir" feature.txt hello "unpushed work"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "nm-unpushed: teardown should refuse"
   grep -q REFUSED "$case_dir/stderr" || fail "nm-unpushed: no REFUSED line in stderr"
@@ -511,10 +503,8 @@ test_squash_merged_branch_deleted_allows() {
   pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-merged: teardown should succeed when the PR is merged"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-merged: teardown printed a REFUSED line"
@@ -577,6 +567,34 @@ test_task_archives_ignore_other_tasks_and_non_custody_names() {
     fi
   done
   pass "teardown judges only the task's exact custody archive names, never another task's"
+}
+
+test_task_archives_keep_links_to_other_refs() {
+  local case_dir base head rc=0 archives
+  case_dir=$(make_case archive-links)
+  write_meta "$case_dir" no-mistakes ship
+  base=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch fm/other-symref "$base"
+  git -C "$case_dir/project" branch fm/other-symlink "$base"
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$head"
+  git -C "$case_dir/project" symbolic-ref refs/heads/archive/task-x1-submitted-0a0a0a02 refs/heads/fm/other-symref
+  archives="$case_dir/project/.git/refs/heads/archive"
+  ln -s ../fm/other-symlink "$archives/task-x1-pipeline-0b0b0b01"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "linked archives: teardown failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a01 ""
+  assert_grep 'reaped archive/task-x1-submitted-0a0a0a01' "$case_dir/stderr" "ordinary archive was not reaped"
+  assert_archive_ref "$case_dir" fm/other-symref "$base"
+  assert_archive_ref "$case_dir" fm/other-symlink "$base"
+  [ "$(git -C "$case_dir/project" symbolic-ref refs/heads/archive/task-x1-submitted-0a0a0a02)" = refs/heads/fm/other-symref ] \
+    || fail "symbolic archive was not kept"
+  [ -L "$archives/task-x1-pipeline-0b0b0b01" ] || fail "symlinked archive was not kept"
+  assert_grep 'keeping archive/task-x1-submitted-0a0a0a02' "$case_dir/stderr" "symbolic archive was not named"
+  assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "symlinked archive was not named"
+  pass "archives that link to another ref stay named and never reap the linked branch"
 }
 
 test_task_archives_keep_unproven_and_checked_out_refs() {
@@ -728,10 +746,8 @@ test_squash_merged_pr_allows_when_head_ancestor_of_pr_head() {
   pr_head=$(commit_tree_from_wt_head "$case_dir" "$local_head" "no-mistakes follow-up")
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-ancestor: teardown should succeed when local HEAD is in the merged PR head"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-ancestor: teardown printed a REFUSED line"
@@ -761,10 +777,8 @@ test_no_pr_recorded_discovers_merged_pr_by_branch_allows() {
   ! grep -qE '^(pr|pr_head)=' "$case_dir/state/task-x1.meta" \
     || fail "no-pr-branch-discovery: test setup bug, meta unexpectedly has a pr= line"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "no-pr-branch-discovery: teardown should succeed by discovering the merged PR from the branch name"
   ! grep -q REFUSED "$case_dir/stderr" || fail "no-pr-branch-discovery: teardown printed a REFUSED line"
@@ -786,10 +800,8 @@ test_squash_merged_pr_allows_replayed_unpushed_patch() {
   pr_head=$(land_equivalent_patch_on_origin_branch "$case_dir" pr-head feature.txt hello "add feature")
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-replayed-patch: teardown should succeed when unpushed local patch is in the merged PR head"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-replayed-patch: teardown printed a REFUSED line"
@@ -819,10 +831,8 @@ test_landed_proof_ignores_unresolvable_git_directory_in_cwd() {
   ( cd "$dangling" && git rev-parse --show-toplevel >/dev/null 2>&1 ) \
     && fail "landed-proof-cwd: the fixture working directory still resolves a git worktree"
 
-  set +e
-  ( cd "$dangling" && run_teardown "$case_dir" ) > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  ( cd "$dangling" && run_teardown "$case_dir" ) > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "landed-proof-cwd: teardown should succeed when the caller's working directory names an unresolvable git directory: $(cat "$case_dir/stderr")"
   ! grep -q REFUSED "$case_dir/stderr" || fail "landed-proof-cwd: teardown printed a REFUSED line"
@@ -839,10 +849,8 @@ test_merged_pr_with_later_local_commit_refuses() {
   wt_commit_file "$case_dir" later.txt local-only "local follow-up"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "stale-pr-head: teardown should refuse when HEAD moved after PR recording"
   grep -q REFUSED "$case_dir/stderr" || fail "stale-pr-head: no REFUSED line in stderr"
@@ -859,10 +867,8 @@ test_squash_merged_rebased_branch_allows() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-rebased: teardown should succeed when the worktree followed the pipeline rebase"$'\n'"$(cat "$case_dir/stderr")"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-rebased: teardown printed a REFUSED line"
@@ -892,10 +898,8 @@ test_squash_merged_forgejo_pr_allows_when_main_moved_on() {
     add_gh_axi_error "$case_dir"
     add_tea_pull_for_head "$case_dir" "$merged" "$pr_head"
 
-    set +e
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
     expected=1
     [ "$merged" = false ] || expected=0
@@ -920,10 +924,8 @@ test_squash_merged_same_file_different_content_refuses() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "squash-same-path-diverged: teardown should refuse when the same file has different content"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-same-path-diverged: no REFUSED line in stderr"
@@ -945,10 +947,8 @@ test_squash_merged_rebased_local_with_unlanded_commit_refuses() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "squash-rebased-unlanded: teardown should refuse extra local commits that never landed"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-rebased-unlanded: no REFUSED line in stderr"
@@ -967,10 +967,8 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_axi_error "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "squash-stale-offline: teardown should refuse when the forge is down and trees conflict"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-stale-offline: no REFUSED line in stderr"
@@ -992,10 +990,8 @@ test_squash_merged_pushed_prerebase_copy_allows() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-pushed-prerebase: teardown should accept a pre-rebase copy whose every patch is in the merged PR head"$'\n'"$(cat "$case_dir/stderr")"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-prerebase: teardown printed a REFUSED line"
@@ -1029,10 +1025,8 @@ test_squash_merged_pushed_prerebase_copy_missing_commit_refuses() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "squash-pushed-missing: teardown should refuse when one pre-rebase commit's change is not in the PR head"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-missing: no REFUSED line in stderr"
@@ -1055,10 +1049,8 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "squash-pushed-edited-merge: teardown should refuse a merge commit with its own change"$'\n'"$(cat "$case_dir/stderr")"
   grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-edited-merge: no REFUSED line in stderr"
@@ -1108,10 +1100,8 @@ test_squash_merged_prerebase_copy_with_a_later_main_merge_allows() {
     "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "squash-prerebase-later-main: teardown should accept a pre-rebase copy that merged a main commit the PR head lacks"$'\n'"$(cat "$case_dir/stderr")"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-prerebase-later-main: teardown printed a REFUSED line"
@@ -1298,10 +1288,8 @@ test_pr_check_does_not_refresh_stale_pr_head() {
   ! grep -qxF "pr_head=$new_head" "$case_dir/state/task-x1.meta" \
     || fail "pr-check-stale: stale rerun recorded the later local HEAD"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "pr-check-stale: teardown should refuse after a later local commit"
   grep -q REFUSED "$case_dir/stderr" || fail "pr-check-stale: no REFUSED line in stderr"
@@ -1345,11 +1333,9 @@ exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 
-  set +e
+  rc=0
   FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "content-landed: teardown should succeed when content is already in the default branch"
   ! grep -q REFUSED "$case_dir/stderr" || fail "content-landed: teardown printed a REFUSED line"
@@ -1378,10 +1364,8 @@ SH
   printf 'registration refused\n' > "$cache/task-x1.refused"
   printf 'registration refused\n' > "$cache/task-other.refused"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "pr-ready-refusal: teardown should succeed"
   assert_absent "$case_dir/state/task-x1.meta" "pr-ready-refusal: teardown left task metadata"
@@ -1421,10 +1405,8 @@ exit 0
 SH
     chmod +x "$case_dir/fakebin/treehouse"
 
-    set +e
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-    rc=$?
-    set -e
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     if [ "$landed" = base ]; then
       expect_code 0 "$rc" "content-base: content squashed into the recorded base branch should count as landed"
       assert_absent "$case_dir/state/task-x1.meta" "content-base: teardown kept the record of landed work"
@@ -1445,10 +1427,8 @@ test_content_fallback_refreshes_stale_origin_ref() {
   git -C "$case_dir/project" config --add remote.origin.fetch '+refs/heads/not-main:refs/remotes/origin/not-main'
   land_on_origin_main "$case_dir" feature.txt hello
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "content-stale-ref: teardown should use the freshly fetched default branch"
   ! grep -q REFUSED "$case_dir/stderr" || fail "content-stale-ref: teardown printed a REFUSED line"
@@ -1469,10 +1449,8 @@ test_dirty_worktree_refuses() {
   add_gh_pr_merged_for_head "$case_dir" "$pr_head"
   printf '%s\n' "uncommitted edit" > "$case_dir/wt/feature.txt"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "dirty-wt: teardown should refuse a dirty worktree even when the committed work has landed"
   grep -q REFUSED "$case_dir/stderr" || fail "dirty-wt: no REFUSED line in stderr"
@@ -1504,10 +1482,8 @@ test_scout_nested_clone_returns_with_no_untracked_entries() {
   seed_nested_clone_and_scratch "$case_dir" "$wt"
   add_treehouse_clean_fd "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "scout-nested-clean: teardown should return the scratch copy"
   [ -z "$(git -C "$wt" status --porcelain --untracked-files=all)" ] \
@@ -1533,10 +1509,8 @@ exit 0
 EOF
   chmod +x "$case_dir/fakebin/treehouse"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "ship-nested-refuse: teardown should refuse a nested clone"
   assert_grep "REFUSED" "$case_dir/stderr" "ship-nested-refuse: no REFUSED line"
@@ -1560,10 +1534,8 @@ test_dirty_return_warns_which_slot_was_lost() {
   prepare_scout_teardown "$case_dir"
   add_treehouse_that_leaves_residue "$case_dir"
 
-  set +e
-  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 4 "$rc" "dirty-return: a lost slot should exit 4 after cleanup"
   assert_grep "pool slot 9" "$case_dir/stderr" "dirty-return: warning did not name the slot"
@@ -1612,10 +1584,8 @@ exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
 
-  set +e
-  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   chmod u+w "$case_dir/state"
 
   expect_code 1 "$rc" "dirty-return-later-refusal: the later record-removal refusal should fail teardown"
@@ -1735,10 +1705,8 @@ test_scout_ignored_files_survive_scratch_clean() {
   printf 'scratch\n' > "$wt/scratch.txt"
   add_treehouse_clean_fd "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "scout-ignored: teardown should succeed"
   [ "$(cat "$wt/ignored-cache/blob")" = "keep-me" ] \
@@ -1759,10 +1727,8 @@ test_gh_error_and_content_absent_refuses() {
   wt_commit_file "$case_dir" feature.txt hello "add feature"
   add_gh_axi_error "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "gh-error: teardown should refuse when the PR lookup errors and content is not landed"
   grep -q REFUSED "$case_dir/stderr" || fail "gh-error: no REFUSED line in stderr"
@@ -1777,10 +1743,8 @@ test_legacy_record_without_the_flag_refuses() {
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "legacy-noflag: a record without spawn_gen must refuse without --legacy-record"
   grep -q -- '--legacy-record' "$case_dir/stderr" \
@@ -1936,10 +1900,8 @@ test_windowless_legacy_record_still_refuses_unlanded_work() {
   wt_commit_file "$case_dir" feature.txt unique-windowless-content "real unlanded work"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "windowless-unlanded: a still-present unlanded worktree must refuse"
   grep -q REFUSED "$case_dir/stderr" \
@@ -2015,10 +1977,8 @@ test_windowless_leftover_retries_its_retained_legacy_stamp_without_the_flag() {
   add_failing_truncate_perl "$case_dir"
   add_failing_close_publication_mv "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "windowless-retry: an unrecordable close must fail the first attempt"
   [ "$(legacy_meta_gen_count "$case_dir")" = 1 ] \
     || fail "windowless-retry: the failed attempt did not leave its legacy stamp on the record"
@@ -2067,10 +2027,8 @@ test_legacy_record_teardown_refuses_unlanded_work() {
   wt_commit_file "$case_dir" feature.txt unique-legacy-content "real unlanded work"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "legacy-unlanded: --legacy-record must not relax the unlanded-work refusal"
   grep -q REFUSED "$case_dir/stderr" \
@@ -2094,10 +2052,8 @@ test_legacy_record_teardown_refuses_an_ambiguous_endpoint() {
   add_unreadable_tmux "$case_dir"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "legacy-ambiguous: an unreadable endpoint must refuse the legacy acceptance"
   grep -q "not confidently dead or agent-less" "$case_dir/stderr" \
@@ -2120,10 +2076,8 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   add_failing_close_publication_mv "$case_dir"
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
 
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" \
     "legacy-stamp-rollback: an unrecordable close must fail the teardown after accepting the legacy record"
@@ -2132,10 +2086,8 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails() {
   [ "$(backlog_row_state "$case_dir")" = in_flight ] \
     || fail "legacy-stamp-rollback: the failed teardown closed the backlog item anyway"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
   expect_code 1 "$rc" \
     "legacy-stamp-rollback: the flag-less retry must not sail past the endpoint gate on the rolled-back record"
   grep -q -- '--legacy-record' "$case_dir/stderr2" \
@@ -2156,10 +2108,8 @@ test_retained_legacy_stamp_still_faces_the_endpoint_gate() {
   add_failing_truncate_perl "$case_dir"
   add_failing_close_publication_mv "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" \
     "legacy-stamp-retained: an unrecordable close must fail the teardown after accepting the legacy record"
   grep -q "could not be rolled back" "$case_dir/stderr" \
@@ -2172,10 +2122,8 @@ test_retained_legacy_stamp_still_faces_the_endpoint_gate() {
   # not read it as an incarnation some spawn published and sail past the
   # dead-or-agent-less endpoint gate onto a reused endpoint.
   add_unreadable_tmux "$case_dir"
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout2" 2> "$case_dir/stderr2"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
   expect_code 1 "$rc" \
     "legacy-stamp-retained: the retry must re-run the endpoint gate on the retained stamp"
   grep -q "not confidently dead or agent-less" "$case_dir/stderr2" \
@@ -2187,10 +2135,8 @@ test_retained_legacy_stamp_still_faces_the_endpoint_gate() {
   [ "$(backlog_row_state "$case_dir")" = in_flight ] \
     || fail "legacy-stamp-retained: the endpoint refusal closed the backlog item anyway"
 
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout3" 2> "$case_dir/stderr3"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout3" 2> "$case_dir/stderr3" || rc=$?
   expect_code 1 "$rc" \
     "legacy-stamp-retained: a flag-less retry must refuse the retained legacy stamp"
   grep -q -- '--legacy-record' "$case_dir/stderr3" \
@@ -2209,10 +2155,8 @@ test_legacy_record_never_accepts_a_corrupt_spawn_gen() {
   wt_commit "$case_dir" "landed legacy work"
   add_fork_with_pushed_branch "$case_dir"
 
-  set +e
-  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "legacy-corrupt: an ambiguous spawn_gen must refuse even with --legacy-record"
   grep -q "unreadable spawn_gen" "$case_dir/stderr" \
@@ -2240,11 +2184,9 @@ test_stale_index_lock_cleared_and_teardown_succeeds() {
   : > "$lock"
   touch -t 200001010000 "$lock"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "stale-index-lock: teardown should succeed after clearing the provably stale lock"
   assert_grep "removed provably-stale git lock" "$case_dir/stderr" \
@@ -2272,11 +2214,9 @@ test_idle_cwd_does_not_block_stale_index_lock_cleanup() {
   # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
   fm_test_wait_until 20 "$REAL_LSOF_FOR_TEST" -a -p "$idle" -d cwd -- "$case_dir/wt" \
     || fail "idle-index-lock: process did not enter worktree cwd"
-  set +e
+  rc=0
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=30 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   kill "$idle"; wait "$idle" 2>/dev/null || true
   exec 9>&-
   expect_code 0 "$rc" "idle-index-lock: teardown should recover an abandoned lock"
@@ -2302,11 +2242,9 @@ test_live_index_lock_is_never_removed_and_teardown_refuses() {
   "$REAL_LSOF_FOR_TEST" -a -p "$FM_TEST_GIT_LOCK_PID" -- "$lock" >/dev/null \
     || fail "live-index-lock: Git did not retain its lock descriptor"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "live-index-lock: teardown should refuse when the lock has a live holder"
   assert_grep "not provably stale" "$case_dir/stderr" \
@@ -2334,11 +2272,9 @@ test_lsof_error_never_clears_index_lock() {
   : > "$lock"
   touch -t 200001010000 "$lock"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "lsof-error-index-lock: teardown should refuse when lsof errors"
   assert_grep "REFUSED: cannot determine leaked processes" "$case_dir/stderr" \
@@ -2367,11 +2303,9 @@ test_stale_index_lock_cleanup_rechecks_dirty_worktree() {
   : > "$lock"
   touch -t 200001010000 "$lock"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "stale-lock-dirty-recheck: teardown should refuse dirty work after clearing the stale lock"
   assert_grep "removed provably-stale git lock" "$case_dir/stderr" \
@@ -2402,11 +2336,9 @@ test_non_linked_index_lock_path_is_checked_from_worktree() {
   : > "$lock"
   touch -t 200001010000 "$lock"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "non-linked-index-lock: teardown should clear a normal repo index.lock"
   assert_grep "removed provably-stale git lock" "$case_dir/stderr" \
@@ -2439,11 +2371,9 @@ test_index_lock_mtime_read_failure_refuses() {
   : > "$lock"
   touch -t 200001010000 "$lock"
 
-  set +e
+  rc=0
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "mtime-error-index-lock: teardown should refuse when lock mtime cannot be read"
   assert_grep "cannot read mtime for git lock" "$case_dir/stderr" \
@@ -2476,14 +2406,12 @@ test_transient_index_lock_clears_after_first_attempt_and_retry_succeeds() {
   attempt_file="$case_dir/treehouse-attempts"
   : > "$attempt_file"
 
-  set +e
+  rc=0
   TREEHOUSE_ATTEMPT_FILE="$attempt_file" \
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
   FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
   FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "transient-index-lock: teardown should succeed on retry after lock self-clears"
   assert_grep "succeeded on retry" "$case_dir/stderr" \
@@ -2513,13 +2441,11 @@ test_persistent_index_lock_exhausts_retries_and_refuses_loudly() {
   : > "$lock"
   touch "$lock"
 
-  set +e
+  rc=0
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=2 \
   FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
   FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "persistent-index-lock: teardown should refuse when the lock never clears"
   assert_grep "persisted across" "$case_dir/stderr" \
@@ -2552,15 +2478,13 @@ test_empty_retry_wait_uses_default_without_aborting() {
   attempt_file="$case_dir/treehouse-attempts"
   : > "$attempt_file"
 
-  set +e
+  rc=0
   TREEHOUSE_ATTEMPT_FILE="$attempt_file" \
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
   FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS='' \
   FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "empty-retry-wait: teardown should fall back to the default wait"
   assert_grep "waiting 1s and retrying" "$case_dir/stderr" \
@@ -2585,14 +2509,12 @@ test_fractional_legacy_retry_wait_refuses_without_arithmetic_error() {
   mkdir -p "$(dirname "$lock")"
   : > "$lock"
 
-  set +e
+  rc=0
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 \
   FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS='' \
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0.1 \
   FM_STALE_WORKTREE_LOCK_AGE_SECS=3600 \
-    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 1 "$rc" "fractional-legacy-retry-wait: teardown should fail only for the persistent lock"
   assert_grep "waiting 0.1s each" "$case_dir/stderr" \
@@ -2622,6 +2544,7 @@ test_squash_merged_branch_deleted_allows
 test_task_archives_reap_only_carried_refs
 test_task_archives_ignore_other_tasks_and_non_custody_names
 test_task_archives_keep_unproven_and_checked_out_refs
+test_task_archives_keep_links_to_other_refs
 test_task_archives_require_matching_squash_content
 test_task_archives_include_deleted_and_literal_paths_in_merge_proof
 test_task_archives_survive_refusal_and_forced_discard
@@ -2700,31 +2623,4 @@ test_empty_retry_wait_uses_default_without_aborting
 test_fractional_legacy_retry_wait_refuses_without_arithmetic_error
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${teardown_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-teardown.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
-for test_case in "${teardown_test_cases[@]}"; do
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"
