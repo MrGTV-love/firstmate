@@ -1,0 +1,59 @@
+## A. Every base-commit (541b9ff6c) rubric line from '## Review outcomes' onward must appear verbatim in the emitted plan
+KEPT    | ## Review outcomes
+KEPT    | Each finding takes one of these outcomes:
+KEPT    | - A failed DoD mandatory item: block.
+KEPT    | - A real defect that breaks the stated intent, even when no DoD item names it: block.
+KEPT    | - An improvement outside the DoD: a follow-up note, never a block.
+KEPT    | - A change that lets a guard permit more than before, such as an added exception, allow-list entry, trust carve-out, relaxed threshold or widened scope: block with verdict FAIL, even outside the DoD where the follow-up-note outcome would otherwise apply, unless the PR cites a recorded reassessment of that guard's harm model, such as `data/<id>/report.md`, and the change follows it.
+KEPT    | - Removing a guard rule that such a recorded reassessment recommends: not a block.
+KEPT    | - A fix that would add scope beyond the intent: escalate to Main for the owner; never build it silently.
+KEPT    | ## PR body claims
+KEPT    | - Every factual claim in a PR body must be backed by a record: the diff, a test, a check link, or a verification-plan row id.
+KEPT    | - When a record does not prove a claim, delete or narrow the claim to what the record proves, never merely re-word it.
+
+## B. Base rubric lines that are NOT in the emitted plan (expected: only the old pass-or-fail grading line)
+GONE    | - Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+
+## C. Stale pass-or-fail grading restatements in tracked text at target commit (git grep -niE 'pass or fail|pass/fail|PASS or FAIL')
+bin/fm-guard-refcheck.sh:5:# and runs nothing. The audit's Stage 0 turns "scan carefully" into a pass/fail
+bin/fm-review-record.py:213:        raise RecordError("verdict must be PASS or FAIL")
+
+## D. Files changed by this branch (no new file, no new stage)
+M	bin/fm-dod-lib.sh
+M	docs/configuration.md
+M	docs/review-rubric.md
+M	tests/fm-brief.test.sh
+M	tests/fm-dod-lib.test.sh
+
+## E. Private path / model / skill location added? (added lines matching /Users/, ~/, .claude, skills/, claude-)
+(none)
+
+## F. bin/fm-review-record.py and merge/no-mistakes code untouched by this branch
+(empty stat above = untouched)
+## G. Wider sweep: tracked lines that talk about grading mandatory/DoD items (git grep -nE 'mandatory item|DoD item' -- ':!tests')
+bin/fm-dod-lib.sh:321:# The one definition of a mandatory item's shape. An item starts its own line
+bin/fm-dod-lib.sh:361:      printf 'Each mandatory item starts its own line as `%s`, with an id matching `%s` that is unique within the section and every field nonempty; %s is exactly %s.\n' \
+bin/fm-dod-lib.sh:400:- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block
+bin/fm-dod-lib.sh:401:- Supporting items earn partial credit and never offset a failed mandatory item.
+bin/fm-dod-lib.sh:532:          print "mandatory item " id " repeats " label
+bin/fm-dod-lib.sh:544:        print "mandatory item id " id " is duplicated"
+bin/fm-dod-lib.sh:553:          print "mandatory item " id " is missing " f
+bin/fm-dod-lib.sh:556:          print "mandatory item " id " has an empty " f
+bin/fm-dod-lib.sh:563:        print "mandatory item " id " has " authority_field " " auth ", not " authority_words
+bin/fm-dod-lib.sh:627:          print "mandatory item has no id: " s
+bin/fm-dod-lib.sh:635:          print "mandatory item " id " repeats " label
+bin/fm-dod-lib.sh:649:        print "no mandatory item in the shape " template
+bin/fm-dod-lib.sh:1666:        'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exc
+bin/fm-dod-lib.sh:1667:        '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'
+docs/configuration.md:1867:Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items in the item shape described below, supporting items, hard gates, and the honesty rule.
+docs/configuration.md:1868:The grading section says a session that did not build the work grades it; that each mandatory item is graded pass, fail, or unresolved; that a downstream-pending item is never a pass but does not by itself block proceeding, while any
+docs/configuration.md:1881:`bin/fm-dod-lib.sh` also owns the one mandatory item shape: each item starts its own line with a unique id and carries every field nonempty, with Authority taken from a fixed set; `bash bin/fm-dod-lib.sh --shape` prints the id patter
+docs/configuration.md:1882:It also refuses a section with no well-formed mandatory item, an item with a missing or duplicate id, and an item with a missing, empty, or invalid field, whether the items are inline or in the named `DoD file`.
+docs/guards/registry.json:330:      "invariant": "a verification plan is never built from a Definition of Done that holds no mandatory item in the shape fm-dod-lib.sh --shape prints",
+docs/guards/registry.json:333:      "trigger": "fm_dod_criteria_text_problem finds an empty section, a mandatory item with no id, a duplicate id, or an item with a missing or empty field",
+docs/guards/registry.json:334:      "remedy": "edit <brief> so each mandatory item reads as bash bin/fm-dod-lib.sh --shape prints it; bin/fm-brief.sh <task> <repo> --mode <mode> scaffolds the section",
+docs/review-rubric.md:7:- Grade every DoD mandatory item by its id as pass, fail, or unresolved, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+docs/review-rubric.md:18:- A failed DoD mandatory item: block.
+docs/review-rubric.md:19:- A mandatory item whose evidence can only be produced downstream of this review, for example after merge, install or release: listed by id as pending with the evidence still owed.
+docs/review-rubric.md:21:- Any other unresolved mandatory item, such as one assessable now but not assessed, one missing its evidence, or one with an open contract question: block until its evidence or the owner's decision is obtained.
+docs/review-rubric.md:22:- A real defect that breaks the stated intent, even when no DoD item names it: block.

@@ -1,0 +1,40 @@
+===== lab-ship-nm: $ FM_HOME=<lab> bin/fm-brief.sh lab-ship-nm some-proj ... ; section '## How You're Graded' of data/lab-ship-nm/brief.md
+## How You're Graded
+- A session that did not build this work grades it, against the items above and the evidence places they name.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
+- Supporting items earn partial credit and never offset a failed mandatory item.
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+
+-- old line 'Mandatory items are pass or fail' count: 0
+
+===== lab-ship-dp: $ FM_HOME=<lab> bin/fm-brief.sh lab-ship-dp some-proj ... ; section '## How You're Graded' of data/lab-ship-dp/brief.md
+## How You're Graded
+- A session that did not build this work grades it, against the items above and the evidence places they name.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
+- Supporting items earn partial credit and never offset a failed mandatory item.
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+
+-- old line 'Mandatory items are pass or fail' count: 0
+
+===== lab-ship-lo: $ FM_HOME=<lab> bin/fm-brief.sh lab-ship-lo some-proj ... ; section '## How You're Graded' of data/lab-ship-lo/brief.md
+## How You're Graded
+- A session that did not build this work grades it, against the items above and the evidence places they name.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
+- Supporting items earn partial credit and never offset a failed mandatory item.
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+
+-- old line 'Mandatory items are pass or fail' count: 0
+
+===== lab-scout: $ FM_HOME=<lab> bin/fm-brief.sh lab-scout some-proj ... ; section '## How You're Graded' of data/lab-scout/brief.md
+## How You're Graded
+- A session that did not build this work grades it, against the items above and the evidence places they name.
+- Each mandatory item is graded pass, fail, or unresolved. A failed mandatory item is release-blocking and fails the task; an item whose evidence only a downstream step can produce stays pending, never a pass, and does not by itself block proceeding, while any other unresolved item blocks until its evidence or the owner's decision is obtained.
+- Supporting items earn partial credit and never offset a failed mandatory item.
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+
+-- old line 'Mandatory items are pass or fail' count: 0
+
