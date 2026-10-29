@@ -172,10 +172,18 @@ cat > "$READ_BIN/jq" <<SH
 printf 'x\\n' >> "$READ_JQ_STARTS"
 exec "$REAL_JQ" "\$@"
 SH
+READ_PY_STARTS=$TMP_ROOT/read-python-starts
+REAL_PYTHON=$(command -v python3)
+cat > "$READ_BIN/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'fm-duration.py keep-going '*) printf '%s\\n' "\$*" >> "$READ_PY_STARTS" ;; esac
+exec "$REAL_PYTHON" "\$@"
+SH
 chmod +x "$READ_BIN/"*
 
 run_read_snapshot() {  # <dilation> [<hung-source>]
   : > "$READ_JQ_STARTS"
+  : > "$READ_PY_STARTS"
   PATH="$READ_BIN:$PATH" FM_HOME="$READ_HOME" FM_DURATION_FILE=off \
     FM_TEST_DILATION=$1 FM_TEST_HUNG_SOURCE=${2:-} FM_TEST_HUNG_PID="$TMP_ROOT/hung.pid" \
     FM_SNAPSHOT_REGISTRY_TIMEOUT=2 FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=2 \
@@ -200,6 +208,13 @@ for dilation in 1 5; do
   # Same one-secondmate snapshot: 48 starts before batching, 32 after. Leave
   # room for independent observations, but reject a return to per-field parsing.
   [ "$read_starts" -le 40 ] || fail "one secondmate started $read_starts jq processes (bound 40)"
+  # The supplemental reads run serially, once per secondmate. A Python start
+  # each (0.2-0.5 s on a loaded host) made the 15-mate snapshot twice as slow
+  # as base's hard caps. With Perl present they must add no Python starts.
+  py_reads=$(grep -c 'fm-secondmate-registry\|fm-parent-activities\|fm-terminal-capture' "$READ_PY_STARTS")
+  if command -v perl >/dev/null 2>&1 && [ "$py_reads" -gt 0 ]; then
+    fail "$py_reads supplemental reads each started a Python progress runner"
+  fi
   pass "registry, parent activities and terminal evidence survive ${dilation}x source delay ($read_starts jq starts)"
 done
 
