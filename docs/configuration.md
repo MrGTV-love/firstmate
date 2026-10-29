@@ -2771,7 +2771,8 @@ In that shared Git directory the task keeps its own declared branch and the two 
 Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
 When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
-The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so a ref Git has packed cannot be repointed or removed by a file write, by a rename onto `packed-refs` or by a Git command.
+The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so no file write, rename onto `packed-refs` or Git command can rewrite `packed-refs`, and another task's packed branch under `refs/heads` stays protected.
+A Git command can still repoint a packed ref outside `refs/heads`, such as `refs/stash`, a tag or a remote-tracking ref, by writing a loose ref, which takes precedence over the packed line.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
 Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.
 `fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` exits 0 under that setting and keeps the remote-tracking ref of a branch the remote deleted; a `remote.<name>.prune=true` setting or an explicit `--prune` still prunes and fails as listed below.
@@ -2779,7 +2780,8 @@ These commands need a `packed-refs` rewrite and cannot complete in a confined wo
 
 - `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`, or `could not delete references` when they prune more than one ref;
 - `git branch -d` or `-D` of a packed branch, the task's own packed archive included, exits 1 with `could not delete reference <ref>`, and `git update-ref -d` of a packed ref exits 1;
-- `git stash drop` or `git stash pop` of the last entry when `refs/stash` is packed exits 0, and the pop applies the entry, but `refs/stash` still names the dropped stash commit, with `git stash list` empty, until a later `git stash push` replaces it;
+- `git stash drop` or `git stash pop` of the last entry when `refs/stash` is packed exits 0 and prints `unable to create file <common>/packed-refs.new: Operation not permitted` and `Dropped refs/stash@{0} (...)`, and the pop applies the entry;
+  `git stash list` is then empty, but the packed `refs/stash` still names that stash commit, so a bare `git stash pop` or `git stash apply` in any checkout of the repository applies it again until a later `git stash push` replaces it or an unconfined `git stash clear` removes it;
 - the pack-refs step of `git gc` reports `failed to run pack-refs`, and `git gc` still exits 0.
 
 The shared `info/grafts` and `shallow` files stay writable, so a worker can still change the history the primary checkout sees through them; the `refs/replace` deny does not close that route.

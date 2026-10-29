@@ -242,7 +242,8 @@ def child(manifest):
     results["refused-fetch-prune-packed"] = (pruned.returncode == 1 and f"could not delete reference {gone}: {refusal}" in pruned.stderr
                                              and resolves(gone, manifest["forged_sha"]) and packed_refs.read_bytes() == packed_before)
     # The shared stash holds one packed entry. Popping that last entry applies
-    # it and exits 0, but Git cannot remove the packed refs/stash line.
+    # it and exits 0 with the stash list empty, but Git is refused the
+    # packed-refs rewrite, so refs/stash still resolves to the popped commit.
     (worktree / "new-file").write_text("stashed change")
     stash = git("-C", str(worktree), "stash", "push", "-m", "probe")
     dropped = git("-C", str(worktree), "stash", "drop")
@@ -250,8 +251,8 @@ def child(manifest):
     results["stash"] = (stash.returncode == 0 and dropped.returncode == 0 and popped.returncode == 0
                         and (worktree / "README").read_text() == "stashed in fixture"
                         and git("-C", str(worktree), "stash", "list").stdout == "")
-    results["refused-packed-stash-drop"] = (f"error: {refusal}" in popped.stderr and resolves("refs/stash", manifest["stash_sha"])
-                                            and packed_refs.read_bytes() == packed_before)
+    results["refused-packed-stash-removal-ref-kept"] = (f"error: {refusal}" in popped.stderr and resolves("refs/stash", manifest["stash_sha"])
+                                                        and packed_refs.read_bytes() == packed_before)
     git("-C", str(worktree), "checkout", "--", "README")
     foreign_push = git("-C", str(worktree), "push", str(other_gate), "fm/task")
     results["refused-other-gate-push"] = (foreign_push.returncode != 0
