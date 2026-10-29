@@ -45,18 +45,18 @@
 # runs it, and the authority to retire is the captain's.
 #
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
-# Each forge read runs through fm_run_progress: only a lack of output and
-# process-tree CPU progress for the contributions.read ledger interval stops
-# it (five seconds at least; measurement only raises it).
-# There is no sweep deadline or observation reservation. A stopped read is
-# unknown: keep that URL's saved observation untouched and retry next pass.
+# Forge reads have no budget or stop of their own: the whole poll runs under
+# the watcher's check progress rule. There is no sweep deadline or observation
+# reservation. A poll the watcher stops is unknown: each record is written
+# whole, so a URL not yet observed keeps its saved observation, and the next
+# pass retries it.
 # A pull observation has three waves: core, six independent reads, closing
 # head; an issue has two. URLs are sorted and rotated by the five-minute
 # epoch bucket modulo their count; each distinct URL is attempted at most
 # once per poll and applied to every owner. Final URLs settle locally before
 # rotation and are never re-read. Genuine forge failures or head changes
 # record an error. docs/configuration.md "GitHub REST reads and the quota floor"
-# owns quota degradation, which remains authoritative for unknown reads too.
+# owns quota degradation.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # A URL whose last good observation is merged or closed is final: it is
@@ -106,11 +106,6 @@ NOW=${FM_CONTRIBUTIONS_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
 EPOCH=$(jq -nr --arg now "$NOW" '$now | fromdateiso8601') || fail 'invalid observation clock'
 MAX_AGE=${FM_CONTRIBUTIONS_MAX_AGE:-900}
 case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
-# Harm: a forge command with no output or CPU progress holds the observation.
-# A stopped read is unknown, leaving the saved coherent observation untouched.
-# shellcheck source=bin/fm-duration-lib.sh
-. "$SCRIPT_DIR/fm-duration-lib.sh"
-READ_INACTIVITY=$(fm_duration_limit contributions.read 5)
 TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
 cleanup() {
@@ -211,26 +206,18 @@ forge() {
   local rc=0 forge_err=${FORGE_ERR:-$TMP/forge.err}
   if [ "$1" = api ]; then
     shift # REST reads are conditional, record the quota headers, and refuse below the floor
-    fm_run_progress "$READ_INACTIVITY" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+    env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
       "$SCRIPT_DIR/fm-gh-rest.sh" get "$@" 2> "$forge_err" || rc=$?
   else
     "$SCRIPT_DIR/fm-gh-rest.sh" guard > "$forge_err" 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
-      fm_run_progress "$READ_INACTIVITY" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+      env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
         gh "$@" 2> "$forge_err" || rc=$?
     fi
   fi
   if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
     head -1 "$forge_err" > "$TMP/quota-low"
     return "$rc"
-  fi
-  # Inactivity means unknown, not forge failure; only a completed nonzero
-  # response is unavailable evidence.
-  if [ "$rc" -eq 124 ]; then
-    READ_UNKNOWN=1
-    : > "$TMP/read-unknown"
-  elif [ "$rc" -ne 0 ]; then
-    : > "$TMP/forge-unavailable"
   fi
   return "$rc"
 }
@@ -263,11 +250,6 @@ mark_quota_stale() { # canonical-url task... : keep the last observation, make t
 wait_forges() { # background forge pids from one independent read wave
   local pid rc=0
   for pid in "$@"; do wait "$pid" || rc=1; done
-  # A completed failure remains evidence even beside an unknown peer read.
-  # Only an otherwise successful wave stopped for inactivity is unmeasured.
-  if [ ! -e "$TMP/forge-unavailable" ] && [ -e "$TMP/read-unknown" ]; then
-    READ_UNKNOWN=1
-  fi
   return "$rc"
 }
 
@@ -276,8 +258,7 @@ observe() { # canonical GitHub URL -> normalized JSON
   case "$url" in https://github.com/*) ;; *) return 1 ;; esac
   part=${url#https://github.com/}; number=${part##*/}; part=${part%/*}; kind=${part##*/}; part=${part%/*}
   case "$kind" in pull) endpoint="repos/$part/pulls/$number" ;; issues) endpoint="repos/$part/issues/$number" ;; *) return 1 ;; esac
-  rm -f -- "$TMP/read-unknown" "$TMP/forge-unavailable" "$TMP/quota-low"
-  READ_UNKNOWN=0
+  rm -f -- "$TMP/quota-low"
   forge api "$endpoint" > "$TMP/core.json" || return 1
   jq -e '(.state == "open" or .state == "closed") and (.user.login | type == "string")' "$TMP/core.json" >/dev/null || return 1
   if [ "$kind" = pull ]; then
@@ -413,7 +394,6 @@ poll() {
       (IFS=$'\t'; printf '%s\n' "${row[*]}") >> "$TMP/live.tsv"
     fi
   done < "$TMP/known.tsv"
-  [ -s "$TMP/live.tsv" ] || fm_duration_no_work
   jq -Rnr --argjson bucket "$((EPOCH / 300))" '
     [inputs] | if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"
@@ -437,7 +417,6 @@ poll() {
       mark_quota_stale "$url" "${row[@]:1}"
       continue
     fi
-    [ "$READ_UNKNOWN" -eq 0 ] || continue
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;

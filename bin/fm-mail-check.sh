@@ -26,20 +26,19 @@
 #
 # Reporting keeps state/.mail-check as the news key, but prints whenever
 # the poll is not a proven no-op. A proven no-op is a repeated identical
-# line, not a timeout, with no publication evidence. Publication evidence
-# is a timeout, fail-closed-after-queue diagnostics, a queued mail: check
-# key, or growth of state/.mail-woken. Same-line silence is only for a
-# proven no-op: successful poll with no new mail, or a repeated pre-wake
-# failure (missing env, connection refused before wake_for, missing
-# python3, missing fm-mail.sh, heal could not record a uid) that cannot
-# have queued mail. Fail-closed after a queued wake and timeout always
-# doorbell.
+# line with no publication evidence. Publication evidence is
+# fail-closed-after-queue diagnostics, a queued mail: check key, or growth of
+# state/.mail-woken. Same-line silence is only for a proven no-op: successful
+# poll with no new mail, or a repeated pre-wake failure (missing env,
+# connection refused before wake_for, missing python3, missing fm-mail.sh,
+# heal could not record a uid) that cannot have queued mail. Fail-closed
+# after a queued wake always doorbells.
 #
-# The poll has no wall-clock budget. fm_run_progress observes output and
-# process-tree CPU for the mail-check.poll ledger interval (15 seconds at
-# least; measurement only raises it). Only proven inactivity
-# stops a poll. That means unknown, retry next pass, never a clean inbox or
-# mail failure; it still doorbells because mail might already be queued.
+# The poll has no budget or stop of its own. FM_MAIL_TIMEOUT bounds each
+# IMAP/SMTP socket read, and the whole check runs under the watcher's check
+# progress rule. A check the watcher stops is unknown and retried next pass,
+# never a clean inbox or mail failure; mail it already queued is still
+# drained, because the next pass sees the queued mail: check keys.
 set -u
 export LC_ALL=C
 
@@ -90,11 +89,6 @@ record_epoch_now() {
     *) printf '%s\n' "$FM_MAIL_CHECK_NOW" ;;
   esac
 }
-
-# Harm: a poll with no output or CPU progress can hold mail collection forever.
-# shellcheck source=bin/fm-duration-lib.sh
-. "$SCRIPT_DIR/fm-duration-lib.sh"
-POLL_INACTIVITY=$(fm_duration_limit mail-check.poll 15)
 
 # One poll summary, built only from the poll's own combined output. The
 # poll's own "fm-mail: ..." diagnostics name the missing setup value, the
@@ -153,7 +147,6 @@ record_write() {
 # "woke for".
 poll_has_publication_evidence() {
   local rc=${1:-0} out=$2 woken_before=$3
-  [ "$rc" -eq 124 ] && return 0
   if [ -n "$out" ] && printf '%s\n' "$out" | grep -E \
     '^fm-mail: woke for |the wake stays queued|could not clear retry for recovered' >/dev/null
   then
@@ -185,10 +178,8 @@ action_check() {
   if [ ! -x "$MAIL_BIN" ]; then
     line="fm-mail.sh is missing next to this check ($MAIL_BIN)"
   else
-    out=$(fm_run_progress "$POLL_INACTIVITY" "$MAIL_BIN" poll 2>&1) || rc=$?
-    if [ "${rc:-0}" -eq 124 ]; then
-      line="poll progress unknown after ${POLL_INACTIVITY}s of inactivity; retry next pass"
-    elif [ "${rc:-0}" -ne 0 ]; then
+    out=$("$MAIL_BIN" poll 2>&1) || rc=$?
+    if [ "${rc:-0}" -ne 0 ]; then
       line=$(poll_summary "$rc" "$out")
     elif printf '%s\n' "$out" | grep '^fm-mail: woke for ' >/dev/null; then
       # A successful poll can still surface new mail: the poll itself already
@@ -205,8 +196,8 @@ action_check() {
   # Report before recording, so a record that cannot be written costs a
   # repeated report rather than a lost one. The record keeps the whole line so
   # the news key and the printed report never diverge. Invert the print gate:
-  # emit unless this poll is a proven no-op (same line, not a timeout, and no
-  # publication evidence).
+  # emit unless this poll is a proven no-op (same line and no publication
+  # evidence).
   if poll_has_publication_evidence "${rc:-0}" "${out:-}" "$woken_before"; then
     queued=1
   fi

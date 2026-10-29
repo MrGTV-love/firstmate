@@ -383,13 +383,13 @@ esac
 CHECK_TIMEOUT=$(fm_duration_limit check.inactivity "${FM_CHECK_TIMEOUT:-30}")
 # Harm: checks run inline in this loop, so a check that keeps progressing
 # forever (a CPU spin, or a retry loop writing stderr) starves every later
-# watcher duty. Each check is also bounded by the fm-duration.py operational
-# no-progress policy of 15 minutes. Measurement only raises that floor: p99 x 10
-# of the check's completed runtimes on this host (room for the audit's fivefold
-# busy-host slowdown of the slowest run). A run that did no real work marks its
-# sample uncalibrated (fm_duration_no_work). Expiry means unknown, retry next
-# pass, never a check result.
-CHECK_BACKSTOP_COLD=900
+# watcher duty. Progressing work stops only at fm-duration.py's absolute
+# extreme (6 hours wall clock, FM_DURATION_ABSOLUTE_SECS), read from its one
+# definition. Expiry means unknown, retry next pass, never a check result.
+CHECK_ABSOLUTE=$(python3 -c 'import runpy, sys
+d = runpy.run_path(sys.argv[1])
+print(d["positive_override"]("FM_DURATION_ABSOLUTE_SECS", d["ABSOLUTE_LIMIT"]))' \
+  "$SCRIPT_DIR/fm-duration.py" 2>/dev/null) || CHECK_ABSOLUTE=
 # Harm: a check that keeps writing stderr grows its private progress file
 # without bound. Past the cap only the newest tail is kept.
 CHECK_STDERR_CAP_BYTES=1048576
@@ -2399,29 +2399,17 @@ watcher_stop_signals() {
 # poll shell keeps publishing its beacon while observing check progress.
 # fm-check-run.py connects a watcher-only pipe to the process-budget guardian:
 # owner EOF or launcher death cleans the tree even when SIGKILL bypasses EXIT.
-# <name> keys the check's runtime samples and backstop in the duration ledger.
 # A stopped check has no result for this pass: one triage line names it.
 run_check_capture() {  # <name> <check> [args...]
-  local name=$1 backstop started finished_ms started_ms sample=
+  local name=$1 started
   shift
-  backstop=$(fm_duration_limit "check.$name" "$CHECK_BACKSTOP_COLD" 99 10 2>/dev/null)
-  if [ "${FM_DURATION_FILE:-}" != off ] && started_ms=$(fm_check_clock_ms); then
-    sample="check.$name.$started_ms.$$"
-  fi
   started=$SECONDS
-  FM_CHECK_DURATION_KEY="check.$name" FM_CHECK_SAMPLE_ID=$sample \
-    FM_CAPTURE_BACKSTOP=$backstop FM_CAPTURE_PROGRESS=1 \
+  FM_CAPTURE_BACKSTOP=$CHECK_ABSOLUTE FM_CAPTURE_PROGRESS=1 \
     run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@" || return $?
   if [ -n "$FM_CHECK_STOPPED" ]; then
     triage_log "check $name stopped after $((SECONDS - started))s ($FM_CHECK_STOPPED); result unknown, retry next pass"
     FM_CHECK_RESULT=
-  elif [ -n "$sample" ] && finished_ms=$(fm_check_clock_ms); then
-    fm_duration_record "check.$name" "$((finished_ms - started_ms))" "$FM_CHECK_STATUS" "$sample"
   fi
-}
-
-fm_check_clock_ms() {
-  perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1000' 2>/dev/null
 }
 
 fm_check_stderr_cap() {  # <file>
@@ -2505,7 +2493,7 @@ run_owned_capture() {
       if [ "$progress_rc" != 124 ] && [ -n "${FM_CAPTURE_BACKSTOP:-}" ] \
         && [ "$((SECONDS - check_started))" -gt "$FM_CAPTURE_BACKSTOP" ]; then
         progress_rc=124
-        stop_reason=backstop
+        stop_reason='absolute limit'
       fi
     elif [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
       progress_rc=124

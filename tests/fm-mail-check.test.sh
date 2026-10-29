@@ -11,7 +11,7 @@
 #     that matter are the reporting contract: a successful poll that surfaces
 #     new mail emits one wake line (the poll still also surfaces new mail as
 #     durable wakes), a failing poll reports one line, a proven no-op stays
-#     silent, and fail-closed-after-queue or timeout still doorbells.
+#     silent, and fail-closed-after-queue still doorbells.
 #
 # No case ever contacts a real IMAP or SMTP server.
 set -u
@@ -62,16 +62,10 @@ enter_mailbox() {
   mkdir -p "$home/bin" "$FAKEBIN"
   [ -e "$home/bin/fm-wake-lib.sh" ] || ln -s "$ROOT/bin/fm-wake-lib.sh" "$home/bin/fm-wake-lib.sh"
   [ -e "$home/bin/fm-path-lib.sh" ] || ln -s "$ROOT/bin/fm-path-lib.sh" "$home/bin/fm-path-lib.sh"
-  {
-    printf '#!/usr/bin/env bash\n'
-    # shellcheck disable=SC2016 # Positional parameters belong to the generated shim.
-    printf 'case "$1" in -c|*/fm-duration.py) exec %q "$@" ;; esac\n' "$REAL_PYTHON"
-    printf '%s\n' "$generator"
-  } > "$FAKEBIN/python3"
+  printf '%s\n' "$generator" > "$FAKEBIN/python3"
   chmod +x "$FAKEBIN/python3"
 }
 
-REAL_PYTHON=$(command -v python3)
 FAKEBIN="$TMP_ROOT/fakebin"
 
 test_help_and_usage() {
@@ -142,7 +136,7 @@ test_arm_refuses_without_the_mail_plane() {
   home="$TMP_ROOT/plane/home"
   mkdir -p "$tmpbin" "$home/state"
   cp "$ROOT/bin/fm-mail-check.sh" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   out=$(FM_HOME="$home" "$tmpbin/fm-mail-check.sh" arm 2>&1) || rc=$?
@@ -222,20 +216,56 @@ test_unconfigured_home_is_reported_once() {
 }
 
 test_silent_poll_is_unknown_and_retried() {
-  local home out attempt
+  local home attempt child wrapper i
   home=$(make_home silent)
   write_env "$home"
   # shellcheck disable=SC2016 # PID and home are resolved by the generated poll process.
   enter_mailbox "$home" 'printf "%s\n" "$$" > "$FM_HOME/poll-pid"; sleep 30'
+  # Only the check sees the fake python3; the watcher's own helpers stay real.
+  wrapper="$home/mail-check-wrapper.sh"
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016 # The wrapper expands its own PATH.
+    printf 'PATH=%q:"$PATH" exec %q check\n' "$FAKEBIN" "$CHECK"
+  } > "$wrapper"
+  chmod +x "$wrapper"
   for attempt in 1 2; do
-    out="$home/out-$attempt.txt"
-    run_check "$home" "$out" "$CHECK"
-    assert_contains "$(cat "$out")" 'mail: poll progress unknown' 'silent poll must be unknown, not clean or failed'
+    rm -f "$home/poll-pid"
+    # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+    env -u FM_MAIL_USER -u FM_MAIL_PASS -u FM_IMAP_HOST -u FM_SMTP_HOST FM_HOME="$home" bash -c '
+        . "$1"
+        WATCHER_PID=$$
+        trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+        watcher_beat force
+        CHECK_TIMEOUT=2
+        run_check_capture mail "$2" || exit 21
+        [ "$FM_CHECK_STATUS" = 124 ] && [ "$FM_CHECK_STOPPED" = "no progress" ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+      ' _ "$ROOT/bin/fm-watch.sh" "$wrapper" > "$home/watch-$attempt.out" 2> "$home/watch-$attempt.err" \
+      || fail "attempt $attempt: the watcher did not stop a silent poll as unknown: $(cat "$home/watch-$attempt.err")"
+    [ -s "$home/poll-pid" ] || fail "attempt $attempt never ran the poll"
     IFS= read -r child < "$home/poll-pid"
+    for ((i = 0; i < 20; i++)); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done
     ! kill -0 "$child" 2>/dev/null || fail 'silent mail child survived cleanup'
-    [ "$(grep -c '^mail:' "$out")" = 1 ] || fail 'unknown poll must report one line'
   done
-  pass 'a silent mail poll is stopped, cleaned up and retried on the next check'
+  [ "$(grep -F 'check mail stopped after' "$home/state/.watch-triage.log" 2>/dev/null \
+    | grep -cF '(no progress); result unknown, retry next pass')" = 2 ] \
+    || fail "each stopped poll must leave one unknown line: $(cat "$home/state/.watch-triage.log" 2>/dev/null)"
+  [ ! -e "$home/state/.mail-check" ] || fail 'a stopped poll recorded a mail result'
+  pass 'a silent mail poll is stopped by the watcher, cleaned up, and retried on the next pass'
+}
+
+test_idle_poll_inside_its_socket_timeout_succeeds() {
+  local home out
+  home=$(make_home idle-eighteen)
+  write_env "$home"
+  enter_mailbox "$home" \
+    'sleep 18
+printf "uidvalidity\\t20002\\n"
+printf "42\\t2026-09-05T00:00:00Z\\talice@example.com\\tHello\\n"'
+  out="$home/out.txt"
+  run_check "$home" "$out" "$CHECK"
+  assert_contains "$(cat "$out")" "mail: new mail: woke for 42" "an 18 s idle-CPU poll inside FM_MAIL_TIMEOUT was stopped"
+  pass 'an idle-CPU poll that answers in 18 s still delivers its mail'
 }
 
 test_progressing_poll_survives_fivefold_slowdown() {
@@ -243,7 +273,7 @@ test_progressing_poll_survives_fivefold_slowdown() {
   tmpbin="$TMP_ROOT/progress/bin"
   mkdir -p "$tmpbin"
   cp "$CHECK" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   cat > "$tmpbin/fm-mail.sh" <<'SH'
@@ -271,7 +301,7 @@ test_repeated_failure_that_queued_new_mail_still_wakes() {
   mkdir -p "$tmpbin" "$home/state"
   check_bin="$tmpbin/fm-mail-check.sh"
   cp "$ROOT/bin/fm-mail-check.sh" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   printf '%s\n' '#!/usr/bin/env bash' 'echo "fm-mail: woke for 42"' 'echo "fm-mail: connection refused" >&2' 'exit 1' > "$tmpbin/fm-mail.sh"
@@ -298,7 +328,7 @@ test_large_poll_output_is_drained() {
   tmpbin="$TMP_ROOT/large-poll/bin"
   mkdir -p "$tmpbin"
   cp "$CHECK" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   cat > "$tmpbin/fm-mail.sh" <<'SH'
@@ -337,32 +367,6 @@ SH
     done
   done
   pass "fm-mail-check: large repeated polls drain every reader without output noise"
-}
-
-test_repeated_timeout_still_wakes() {
-  # A timeout can kill the poll after wake_for queued mail and before the
-  # woke-for line is printed. Difference-record silence would then leave that
-  # mail undrained; a timeout always prints so the watcher wakes.
-  local tmpbin home out check_bin
-  tmpbin="$TMP_ROOT/repeat-timeout/bin"
-  home="$TMP_ROOT/repeat-timeout/home"
-  mkdir -p "$tmpbin" "$home/state"
-  check_bin="$tmpbin/fm-mail-check.sh"
-  cp "$ROOT/bin/fm-mail-check.sh" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
-    [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
-  done
-  printf '%s\n' '#!/usr/bin/env bash' 'exit 124' > "$tmpbin/fm-mail.sh"
-  chmod +x "$tmpbin/fm-mail.sh"
-
-  out="$home/out1.txt"
-  run_check "$home" "$out" "$check_bin"
-  assert_contains "$(cat "$out")" "mail: poll progress unknown" "the first timeout reports"
-
-  out="$home/out2.txt"
-  run_check "$home" "$out" "$check_bin"
-  assert_contains "$(cat "$out")" "mail: poll progress unknown" "a repeated timeout must still print so queued mail is not stranded"
-  pass "fm-mail-check: a repeated timeout still wakes"
 }
 
 test_fail_closed_poll_after_wake_reports_the_failure() {
@@ -426,7 +430,7 @@ test_repeated_status2_stays_queued_still_wakes() {
   mkdir -p "$tmpbin" "$home/state"
   check_bin="$tmpbin/fm-mail-check.sh"
   cp "$ROOT/bin/fm-mail-check.sh" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   cat > "$tmpbin/fm-mail.sh" <<EOF
@@ -479,7 +483,7 @@ test_missing_mail_plane_is_reported() {
   mkdir -p "$tmpbin" "$home/state"
   check_bin="$tmpbin/fm-mail-check.sh"
   cp "$ROOT/bin/fm-mail-check.sh" "$tmpbin/"
-  for lib in fm-timeout-lib.sh fm-duration-lib.sh fm-duration.py fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
+  for lib in fm-timeout-lib.sh fm-pr-lib.sh fm-file-identity-lib.sh fm-line-cap-lib.sh fm-check-lib.sh; do
     [ -e "$tmpbin/$lib" ] || ln -s "$ROOT/bin/$lib" "$tmpbin/$lib"
   done
   out="$home/out.txt"
@@ -497,12 +501,12 @@ test_successful_poll_with_new_mail_emits_one_wake_line
 test_failure_is_reported_once_until_it_changes
 test_unconfigured_home_is_reported_once
 test_silent_poll_is_unknown_and_retried
+test_idle_poll_inside_its_socket_timeout_succeeds
 test_progressing_poll_survives_fivefold_slowdown
 test_fail_closed_poll_after_wake_reports_the_failure
 test_repeated_status4_fail_closed_still_wakes
 test_repeated_status2_stays_queued_still_wakes
 test_repeated_failure_that_queued_new_mail_still_wakes
 test_large_poll_output_is_drained
-test_repeated_timeout_still_wakes
 test_repeated_heal_failure_stays_silent
 test_missing_mail_plane_is_reported

@@ -3368,12 +3368,12 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `FM_TOOL_UPDATE_INTERVAL` | 900 seconds | Time between probes; `0` probes on every run. |
-| `FM_TOOL_UPDATE_PROBE_SECS` | Ledger-derived, cold-start 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
+| `FM_TOOL_UPDATE_PROBE_SECS` | 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
 
 A sweep has no wall-clock budget.
 An inactive probe reports uncertainty, and the sweep still stamps its attempt, so it is retried after the normal interval.
 A repeated identical unknown stays silent; a changed result, known or unknown, reports.
-The script header owns the progress and ledger mechanics.
+The script header owns the progress mechanics.
 
 ## Mail plane (.env)
 
@@ -3417,9 +3417,9 @@ A home that wants mail polled unattended arms the standing check in the live hom
 Arming writes `state/mail.check.sh` and registers it with the watcher's slow-check cadence (`FM_CHECK_INTERVAL`), so the plane's `poll` runs on its own: new mail still surfaces as `check: mail <uid>` wakes from the poll, and the standing check itself also prints a line (and the watcher turns that line into a wake) unless the poll is a proven no-op.
 
 Same-line silence is only for a proven no-op: a successful poll with no new mail, or a repeated identical pre-wake failure that cannot have queued mail.
-A fail-closed poll that already queued a wake, and a timeout, always print so the watcher wakes to drain it.
+A fail-closed poll that already queued a wake always prints so the watcher wakes to drain it.
 
-`bin/fm-mail-check.sh` owns progress-based poll supervision; a stopped poll is unknown and retried, not evidence of an empty inbox.
+The poll has no stop of its own: `FM_MAIL_TIMEOUT` bounds each socket read and the watcher's check progress rule bounds the check; a stopped check is unknown and retried, not evidence of an empty inbox.
 `bin/fm-mail-check.sh disarm` removes the standing check.
 
 ## Slack decision plane (.env)
@@ -4469,11 +4469,11 @@ FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
 FM_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before a stuck-busy stale wake; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/fm-task-inbox-lib.sh
-FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; ledger check.inactivity, cold-start 30s; output or process-tree CPU progress keeps checks alive until the per-check runtime backstop (at least 900s; ledger check.<name> p99 x 10 of runs that did real work only raises it), whose expiry is unknown and retried next pass
+FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; default 30s; output or process-tree CPU progress keeps checks alive until fm-duration's absolute limit (6 hours, FM_DURATION_ABSOLUTE_SECS), whose expiry is unknown and retried next pass
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400
-FM_TOOL_UPDATE_PROBE_SECS=   # optional positive whole-second probe inactivity minimum; ledger tool-update.probe, cold-start 5s
+FM_TOOL_UPDATE_PROBE_SECS=   # optional positive whole-second probe inactivity interval, default 5s
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool cadence clock
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_COPY_SWEEP_PLAN_TIMEOUT=120   # seconds the nested-copy sweep waits for Vernant's closeout plan of a locked copy before it holds the copy; a non-positive or non-numeric value becomes 120 (see "Nested task copy sweep")

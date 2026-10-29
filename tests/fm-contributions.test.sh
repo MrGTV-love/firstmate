@@ -691,35 +691,23 @@ SH
   chmod +x "$home/fakebin/gh" "$home/fakebin/date"
 }
 
-test_clock_or_stall_preserves_evidence() { # exhaust|hang
-  local mode=$1 home out child
-  home=$(new_home "progress-$mode")
+test_clock_jump_does_not_refuse_a_read() {
+  local home out
+  home=$(new_home progress-exhaust)
   forge_home "$home"
   wrap_forge "$home"
   mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
-  cp "$home/data/delivery/contributions.json" "$home/prior.json"
   /bin/date +%s > "$home/forge/clock"
-  printf '%s\n' "$mode" > "$home/forge/fault"
-  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) \
-    || fail "poll failed ($mode)"
-  [ -z "$out" ] || fail "a clock leap or unknown read printed a failure: $out"
+  printf 'exhaust\n' > "$home/forge/fault"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll failed after a clock leap'
+  [ -z "$out" ] || fail "a clock leap printed a failure: $out"
   grep -F 'api repos/o/r/pulls/8' "$home/forge/calls" >/dev/null \
     || fail 'poll never started the observation'
-  if [ "$mode" = hang ]; then
-    cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
-      || fail 'a stalled read rewrote the prior observation'
-    IFS= read -r child < "$home/forge/hung-pid"
-    ! kill -0 "$child" 2>/dev/null || fail 'stalled forge child survived'
-  else
-    jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
-      "$home/data/delivery/contributions.json" >/dev/null || fail 'wall-clock jump refused a healthy observation'
-  fi
+  jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'wall-clock jump refused a healthy observation'
   [ ! -s "$home/state/.wake-queue" ] || fail 'routine progress handling enqueued a wake'
-  pass "clock-independent observation or stalled-read unknown preserves the correct evidence ($mode)"
+  pass 'a wall-clock jump does not refuse a healthy observation'
 }
-
-test_clock_jump_does_not_refuse_a_read() { test_clock_or_stall_preserves_evidence exhaust; }
-test_silent_read_keeps_prior_observation() { test_clock_or_stall_preserves_evidence hang; }
 
 test_genuine_failure_after_clock_jump_is_unavailable() {
   local home out
@@ -939,30 +927,6 @@ test_progressing_reads_survive_fivefold_slowdown() {
 
 
 
-test_unmeasured_url_does_not_starve_the_tail() {
-  local home out task number
-  home=$(new_home unknown-tail)
-  forge_home "$home"
-  wrap_forge "$home"
-  record "$home" second 9 open mergeable
-  record "$home" third 10 open mergeable
-  mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
-  cp "$home/data/delivery/contributions.json" "$home/prior.json"
-  printf 'hang\n' > "$home/forge/fault"
-  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll failed'
-  [ -z "$out" ] || fail "unknown read printed unavailable: $out"
-  cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" || fail 'unknown read rewrote freshness'
-  for task in second third; do
-    jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
-      "$home/data/$task/contributions.json" >/dev/null || fail "$task starved behind unknown read"
-  done
-  for number in 8 9 10; do
-    [ "$(grep -Fxc "api repos/o/r/pulls/$number" "$home/forge/calls")" = 1 ] || fail "PR $number attempted more than once or not at all"
-  done
-  [ ! -s "$home/state/.wake-queue" ] || fail 'unknown read enqueued a failure wake'
-  pass 'unknown read preserves evidence and every other live URL completes in the same pass'
-}
-
 test_reads_are_independent_of_watcher_interval() {
   local home out
   home=$(new_home independent-read)
@@ -976,18 +940,40 @@ test_reads_are_independent_of_watcher_interval() {
   pass 'read supervision is not a sub-budget of the watcher interval'
 }
 
-test_armed_shim_preserves_unknown_read_evidence() {
-  local home out
-  home=$(new_home arm-progress)
+test_watcher_stopped_read_keeps_evidence_and_retries() {
+  local home child i
+  home=$(new_home watcher-silent-read)
   forge_home "$home"
   wrap_forge "$home"
-  printf 'hang\n' > "$home/forge/fault"
+  mutate_record "$home" delivery '.records[0].checked_at="2026-09-15T08:00:00Z"'
   cp "$home/data/delivery/contributions.json" "$home/prior.json"
+  printf 'hang\n' > "$home/forge/fault"
   with_home "$home" "$ROOT/bin/fm-contributions.sh" arm >/dev/null || fail 'arm failed'
-  out=$(with_home "$home" bash "$home/state/contributions.check.sh") || fail 'shim failed'
-  [ -z "$out" ] || fail "shim reported unknown as unavailable: $out"
-  cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" || fail 'shim rewrote an unknown observation'
-  pass 'registered shim preserves unknown-read evidence using runtime inactivity policy'
+  # shellcheck disable=SC2016 # The child watcher shell expands its own arguments.
+  with_home "$home" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      CHECK_TIMEOUT=2
+      run_check_capture contributions "$STATE/contributions.check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 124 ] && [ "$FM_CHECK_STOPPED" = "no progress" ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+    ' _ "$ROOT/bin/fm-watch.sh" > "$home/watch.out" 2> "$home/watch.err" \
+    || fail "the watcher did not stop a silent forge read as unknown: $(cat "$home/watch.err")"
+  cmp -s "$home/prior.json" "$home/data/delivery/contributions.json" \
+    || fail 'a stopped read rewrote the prior observation'
+  IFS= read -r child < "$home/forge/hung-pid"
+  for ((i = 0; i < 20; i++)); do kill -0 "$child" 2>/dev/null || break; sleep 0.1; done
+  ! kill -0 "$child" 2>/dev/null || fail 'stalled forge child survived the stopped check'
+  grep -F 'check contributions stopped after' "$home/state/.watch-triage.log" 2>/dev/null \
+    | grep -F '(no progress); result unknown, retry next pass' >/dev/null \
+    || fail "the stopped check did not name itself as unknown: $(cat "$home/state/.watch-triage.log" 2>/dev/null)"
+  [ ! -s "$home/state/.wake-queue" ] || fail 'a stopped read enqueued a failure wake'
+  : > "$home/forge/fault"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null || fail 'the next pass failed after a stopped check'
+  jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'the next pass did not retry the unknown observation'
+  pass 'a silent forge read stopped by the watcher keeps its evidence and is retried next pass'
 }
 
 test_unavailable_forge_records_error_and_wakes_once_per_episode() { # genuine outage, two consecutive cycles
@@ -1335,7 +1321,7 @@ test_http_shim_preserves_backend_failures() {
 }
 
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_silent_read_keeps_prior_observation test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_unmeasured_url_does_not_starve_the_tail test_reads_are_independent_of_watcher_interval test_armed_shim_preserves_unknown_read_evidence test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_clock_jump_does_not_refuse_a_read test_genuine_failure_after_clock_jump_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_all_urls_are_attempted_without_reservation test_three_second_pr_reads_complete_fresh_in_one_cycle test_progressing_reads_survive_fivefold_slowdown test_reads_are_independent_of_watcher_interval test_watcher_stopped_read_keeps_evidence_and_retries test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"
