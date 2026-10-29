@@ -1,0 +1,11 @@
+# FM_PROC_ROOT_OVERRIDE=<fakeproc>: every pid 1..99999 has a stat that passes [ -r ] and cannot be read,
+# so every fm_pid_alive call on a live process takes the 'exited between the test and the read' path.
+### bash 5.2.37, HEAD bin/fm-wake-lib.sh
+ok - host: an engine turn that records no outcome hands its durable wake to main
+ok - host: a turn that reports but leaves its granted rows queued hands the wake to main
+ok - host: an attended wake whose mirror is missing, cannot be read (at the feed or at the prompt), or holds a malformed entry reaches main before any engine turn, and the cursor stays put
+exit=0
+
+### bash 5.2.37, BASE bin/fm-wake-lib.sh (cce2dd36b, temporarily swapped in)
+not ok - noreport: the host never started a watcher cycle
+exit=1

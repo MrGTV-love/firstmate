@@ -1,0 +1,59 @@
+### bash 5.2.37, BASE lib (cce2dd36b bin/fm-wake-lib.sh)
+bash 5.2.37(1)-release  lib <worktree>/bin/.lab-base-fm-wake-lib.sh
+case                               expected got      after  stderr
+live, normal stat                  0        0        yes    -  [ok]
+live, stat says zombie             1        1        yes    -  [ok]
+live, comm with ") Z" and newline  0        0        yes    -  [ok]
+live, empty stat                   0        0        yes    -  [ok]
+live, stat read fails (dir)        0        ABORT    NO     <worktree>/bin/.lab-base-fm-wake-lib.sh: line 104: state: unbound variable   [WRONG]
+live, stat open fails (socket)     0        ABORT    NO     <worktree>/bin/.lab-base-fm-wake-lib.sh: line 104: state: unbound variable   [WRONG]
+live, no proc entry (ps path)      0        0        yes    -  [ok]
+exits while its stat is read       1        0        yes    -  [WRONG]
+alive, stat read returns empty     0        0        yes    -  [ok]
+dead before probe, dir stat        1        1        yes    -  [ok]
+real zombie (ps path)              1        1        yes    -  [ok]
+
+### bash 5.2.37, HEAD lib (9b0d4e120)
+bash 5.2.37(1)-release  lib <worktree>/bin/fm-wake-lib.sh
+case                               expected got      after  stderr
+live, normal stat                  0        0        yes    -  [ok]
+live, stat says zombie             1        1        yes    -  [ok]
+live, comm with ") Z" and newline  0        0        yes    -  [ok]
+live, empty stat                   0        0        yes    -  [ok]
+live, stat read fails (dir)        0        0        yes    -  [ok]
+live, stat open fails (socket)     0        0        yes    -  [ok]
+live, no proc entry (ps path)      0        0        yes    -  [ok]
+exits while its stat is read       1        1        yes    -  [ok]
+alive, stat read returns empty     0        0        yes    -  [ok]
+dead before probe, dir stat        1        1        yes    -  [ok]
+real zombie (ps path)              1        1        yes    -  [ok]
+
+### bash 3.2.57 (/bin/bash), BASE lib
+bash 3.2.57(1)-release  lib <worktree>/bin/.lab-base-fm-wake-lib.sh
+case                               expected got      after  stderr
+live, normal stat                  0        0        yes    -  [ok]
+live, stat says zombie             1        1        yes    -  [ok]
+live, comm with ") Z" and newline  0        0        yes    -  [ok]
+live, empty stat                   0        0        yes    -  [ok]
+live, stat read fails (dir)        0        0        yes    -  [ok]
+live, stat open fails (socket)     0        0        yes    -  [ok]
+live, no proc entry (ps path)      0        0        yes    -  [ok]
+exits while its stat is read       1        0        yes    -  [WRONG]
+alive, stat read returns empty     0        0        yes    -  [ok]
+dead before probe, dir stat        1        1        yes    -  [ok]
+real zombie (ps path)              1        1        yes    -  [ok]
+
+### bash 3.2.57 (/bin/bash), HEAD lib
+bash 3.2.57(1)-release  lib <worktree>/bin/fm-wake-lib.sh
+case                               expected got      after  stderr
+live, normal stat                  0        0        yes    -  [ok]
+live, stat says zombie             1        1        yes    -  [ok]
+live, comm with ") Z" and newline  0        0        yes    -  [ok]
+live, empty stat                   0        0        yes    -  [ok]
+live, stat read fails (dir)        0        0        yes    -  [ok]
+live, stat open fails (socket)     0        0        yes    -  [ok]
+live, no proc entry (ps path)      0        0        yes    -  [ok]
+exits while its stat is read       1        1        yes    -  [ok]
+alive, stat read returns empty     0        0        yes    -  [ok]
+dead before probe, dir stat        1        1        yes    -  [ok]
+real zombie (ps path)              1        1        yes    -  [ok]

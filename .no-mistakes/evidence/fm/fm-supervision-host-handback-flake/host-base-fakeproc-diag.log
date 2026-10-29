@@ -1,0 +1,8 @@
+### bash 5.2.37, BASE lib, fakeproc, the host's own output
+--- away-noreport/host.out
+<worktree>/bin/fm-wake-lib.sh: line 104: state: unbound variable
+watcher: FAILED - watcher cycle exited 1 without an actionable reason
+--- away-noreport/host.rc
+0
+not ok - noreport: the host never started a watcher cycle
+exit=1

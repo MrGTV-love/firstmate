@@ -1,0 +1,15 @@
+### new case, bash 5.2.37, HEAD bin/fm-wake-lib.sh
+ok - host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller
+exit=0
+
+### new case, bash 5.2.37, BASE bin/fm-wake-lib.sh (cce2dd36b, temporarily swapped in)
+not ok - a live process whose stat cannot be read (directory) must still answer alive, without an error: got: <worktree>/bin/fm-wake-lib.sh: line 104: state: unbound variable
+exit=1
+
+### new case, bash 3.2.57, BASE bin/fm-wake-lib.sh
+ok - host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller
+exit=0
+
+### new case, bash 3.2.57, HEAD bin/fm-wake-lib.sh
+ok - host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller
+exit=0
