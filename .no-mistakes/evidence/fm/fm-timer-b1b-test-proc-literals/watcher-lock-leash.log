@@ -1,0 +1,62 @@
+# 18:00  up 1 day, 8 hrs, 4 users, load averages: 40.32 38.26 39.29
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a queue lock freed during the alarm check lands the pending append before after-output work
+# test_alarm_after_queue_frees_appends_before_after_output exit=0 17s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - the drain presents a pending append ahead of the alarm that interrupted its wait
+# test_alarm_freed_queue_keeps_producer_order exit=0 13s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a failed lock observation inside a queue wait keeps waiting and lands the pending append
+# test_alarm_observation_failure_keeps_waiting_append exit=0 10s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - every watcher lock wait runs the alarm: a stuck recovery-marker holder alarms at startup and mid-append without losing the row
+# test_alarm_runs_during_watcher_down_waits exit=0 27s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an alarm exit spills a consumed source's pending wake and the next watcher queues it first
+# test_alarm_spills_consumed_append_for_next_watcher exit=0 20s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - dead-owner alarms say trigger=dead-owner and state=dead or Z; unreadable ps never claims death
+# test_dead_owner_alarm_names_its_trigger exit=0 15s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner alarms only after two consecutive blocked checks, revalidated before publication
+# test_dead_owner_alarm_needs_two_checks exit=0 20s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a dead owner with no waiter stays silent; a zombie owner blocking a live waiter alarms
+# test_dead_owner_alarm_requires_blocked_waiter exit=0 14s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - exit cleanup's bounded recovery-marker wait never delivers a second wake
+# test_exit_cleanup_wait_never_delivers_second_wake exit=0 17s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a fresh contended ledger owner can cross the alarm threshold without blocking observation or losing pending capture
+# test_lock_alarm_crosses_threshold_during_capture exit=0 20s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - local observation covers foreign-indexed state locks and never-owned external locks without touching the foreign index
+# test_lock_alarm_discovers_foreign_owners exit=0 14s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - only measured locks alarm on age; other locks alarm on a dead or zombie owner blocking a live waiter
+# test_lock_alarm_project_and_control_limits exit=0 18s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a watcher blocked on a live queue owner still raises the long-held alarm without taking the lock
+# test_lock_alarm_while_queue_append_waits exit=0 14s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a timed-out waiter is pruned without alarming on or changing the fresh live owner
+# test_lock_monitor_prunes_finished_waiters exit=0 9s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - released locks retire their diagnostic receipts across scoped owners without hold telemetry
+# test_lock_receipts_retire_with_release exit=0 8s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - fresh locks stay silent; aged locks report facts once without waiting on or reclaiming a blocked queue
+# test_long_held_lock_alarm exit=0 10s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an alarm delivered during a startup queue wait publishes downtime and releases the watcher lock
+# test_startup_queue_wait_alarm_releases_with_downtime exit=0 18s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - spilled rows wait for a held queue lock, then replay in order ahead of newer rows
+# test_wake_spill_replay_waits_for_held_queue exit=0 16s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a watcher past the alarm limit stays silent about its own and the daemon's singleton locks
+# test_watcher_skips_own_singleton_locks exit=0 17s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - an unreaped SIGKILLed owner is reclaimed without killing its parent
+# test_zombie_owner_is_reclaimed exit=0 14s
+# end 18:05  up 1 day,  8:05, 4 users, load averages: 29.00 31.71 35.90

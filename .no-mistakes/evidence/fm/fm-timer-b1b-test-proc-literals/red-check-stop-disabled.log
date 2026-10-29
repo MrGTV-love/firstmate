@@ -1,0 +1,25 @@
+# RED CHECK 1: fm_test_tree_leash with the own-tree stop disabled; run test_suite_tree_leash_stops_a_runaway_tree
+ok - over-limit child and grandchild are ended with status 99
+ok - lower outer limit accounts for and ends payloads in nested wrapper sessions
+ok - normal memory-bounded command retains output and status
+ok - an unreadable other-user member is left out of the sum and does not end a healthy tree
+ok - the command's exit ends a background job orphaned before the first sample and returns at once
+ok - a SIGKILLed supervisor's command tree is ended by the reader's dead-man link
+ok - an ignored HUP stays ignored by the supervisor and the command
+ok - a seen member in another session is ended by the dead-man link
+ok - a supervisor killed during its own cleanup leaves no TERM-ignoring member behind
+ok - a supervisor killed before its reader is ready leaves no command run or running
+control: status=0 child_alive=False reason=
+fault: status=125 child_alive=False reason=fm-proc-budget: command exited; remaining command tree: tree cleanup failed: [Errno 1] injected supervisor kinfo refusal
+ok - supervisor-only kinfo refusal leaves the guardian armed until the tree ends and returns 125
+ok - a command's kill 0 does not kill its memory reader
+ok - descriptors the caller passes reach the memory-stopped command
+ok - a command that cannot start, or a script without a shebang, behaves as without the option
+ok - unreadable, malformed, exited, and stalled readers fail closed; failed preflight prevents launch
+not ok - a suite tree past the leash: expected exit 98, got 143
+# exit=1
+# note (tester): with the stop disabled the 200-level held tree grew to all 200 levels
+# (201 processes under the driver, far past FM_TEST_TREE_PROCS=128) and hung on its
+# `sleep 5003` leaf for 10+ minutes. The tester sent TERM to that one leaf (pid 99954)
+# so the case could report; it then fails at expect_code 98 (got 143). With the real
+# leash the same case passes in seconds (see fm-proc-budget-test.log).

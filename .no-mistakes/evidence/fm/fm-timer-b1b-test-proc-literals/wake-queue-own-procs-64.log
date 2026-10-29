@@ -1,0 +1,4 @@
+# 17:58  up 1 day,  7:58, 4 users, load averages: 46.89 35.55 38.52
+# cmd: FM_TEST_ONLY=test_lock_wait_diagnostics_never_recreate_a_vanished_parent bin/fm-proc-budget.sh -- bash tests/fm-wake-queue.test.sh
+ok - lock-wait diagnostics never recreate a vanished state directory
+# exit=0
