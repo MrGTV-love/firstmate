@@ -3,11 +3,10 @@
 # fm_duration_load: print the 1-minute load average, or nothing when unavailable
 # fm_duration_record <key> <milliseconds> <exit> [sample-id] [calibration: 0|1] [load-at-start] [timed-out: 0|1]
 # fm_duration_record_batch: stdin rows key<TAB>ms<TAB>exit<TAB>calibration<TAB>load-start<TAB>load-end<TAB>timed-out
-# fm_duration_limit <key> <existing-fallback-seconds> [95|99]
+# fm_duration_limit <key> <existing-fallback-seconds> [95|99] [margin]
 #   a fallback of 0 means the caller had no deadline: record only, never a measured kill
-# fm_duration_measured <key> <cold-start-seconds> [95|99] [margin]
-#   the measured limit once the key is calibrated, else the cold start; unlike
-#   fm_duration_limit, the cold start is not a floor under the measured value
+# fm_duration_no_work: inside a watcher check, mark this run's sample uncalibrated
+#   because it did no real work (FM_CHECK_DURATION_KEY, FM_CHECK_SAMPLE_ID)
 # fm_duration_timed <key> <existing-fallback-seconds> <command...>
 # Only the owner of a limit says a timeout happened (timed-out 1); an exit of
 # 124 or 137 is never inferred to be one here.
@@ -63,7 +62,7 @@ fm_duration_limit() {
     printf '%s\n' "$2"
     return 0
   fi
-  if bound=$(python3 "$FM_DURATION_HELPER" limit "$1" --fallback "$2" --percentile "${3:-95}" --margin 3); then
+  if bound=$(python3 "$FM_DURATION_HELPER" limit "$1" --fallback "$2" --percentile "${3:-95}" --margin "${4:-3}"); then
     printf '%s\n' "$bound"
   else
     printf 'fm-duration: calibration unavailable for %s (%s); existing fallback %ss\n' "$1" "$bound" "$2" >&2
@@ -71,13 +70,9 @@ fm_duration_limit() {
   fi
 }
 
-fm_duration_measured() {
-  local bound=
-  if [ "${FM_DURATION_FILE:-}" != off ] && [ -r "$FM_DURATION_HELPER" ] && command -v python3 >/dev/null 2>&1; then
-    bound=$(python3 "$FM_DURATION_HELPER" limit "$1" --fallback 0 --percentile "${3:-95}" --margin "${4:-3}") || bound=
-  fi
-  case "$bound" in ''|0|*[!0-9]*) bound=$2 ;; esac
-  printf '%s\n' "$bound"
+fm_duration_no_work() {
+  [ -n "${FM_CHECK_DURATION_KEY:-}" ] && [ -n "${FM_CHECK_SAMPLE_ID:-}" ] || return 0
+  fm_duration_record "$FM_CHECK_DURATION_KEY" 0 0 "$FM_CHECK_SAMPLE_ID" 0
 }
 
 fm_duration_timed() {

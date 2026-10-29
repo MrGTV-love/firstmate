@@ -47,7 +47,8 @@
 #
 # Probing costs real time, so `check` runs its probes at most once per
 # FM_TOOL_UPDATE_INTERVAL (default 900, 0 disables the gate, otherwise 60..86400)
-# and stays silent in between. Each probe runs through fm_run_progress;
+# and stays silent in between; a skipped run marks its watcher runtime sample as
+# no work (fm_duration_no_work). Each probe runs through fm_run_progress;
 # FM_TOOL_UPDATE_PROBE_SECS is a positive whole-second inactivity minimum for
 # the tool-update.probe ledger interval (five-second cold-start fallback).
 # Output or process-tree CPU progress keeps the probe alive. There is no sweep
@@ -601,12 +602,13 @@ action_check() {
   local name command_name args_joined announce announce_args repo remote branch
   local line now
 
-  [ -f "$CONFIG" ] || return 0
+  [ -f "$CONFIG" ] || { fm_duration_no_work; return 0; }
 
   record_read
   now=$(record_epoch_now)
   if [ "$INTERVAL" -ne 0 ] && [ "$RECORD_EPOCH" -gt 0 ] \
     && [ "$now" -ge "$RECORD_EPOCH" ] && [ $((now - RECORD_EPOCH)) -lt "$INTERVAL" ]; then
+    fm_duration_no_work
     return 0
   fi
 

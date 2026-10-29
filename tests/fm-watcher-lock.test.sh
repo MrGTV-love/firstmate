@@ -348,16 +348,10 @@ SH
 }
 
 test_check_backstop_stops_endless_progress_as_unknown() {
-  local dir state ledger pid endless mode i
+  local dir state mode
   for mode in spin spam; do
     dir=$(make_case "check-backstop-$mode")
     state="$dir/state"
-    ledger="$dir/durations.jsonl"
-    # Completed runs of about 100 ms calibrate a one-second backstop for this key.
-    for i in 1 2 3 4 5; do
-      FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record "check.a-$mode" 100 0 2>/dev/null \
-        || fail 'could not write the duration fixture'
-    done
     {
       printf '#!/usr/bin/env bash\n'
       # shellcheck disable=SC2016 # The generated check expands its own PID and state.
@@ -367,39 +361,62 @@ test_check_backstop_stops_endless_progress_as_unknown() {
       else
         printf 'while :; do printf "retrying\\n" >&2; sleep 0.1; done\n'
       fi
-    } > "$state/a-$mode.check.sh"
-    printf '#!/usr/bin/env bash\nprintf "after-ran\\n"\n' > "$state/b-after.check.sh"
-    chmod 0700 "$state/a-$mode.check.sh" "$state/b-after.check.sh"
-    for i in "a-$mode" b-after; do
-      FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash "$ROOT/bin/fm-check-register.sh" "$i" >/dev/null \
-        || fail "registration of $i failed"
-    done
-    PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_FILE="$ledger" \
-      FM_POLL=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_CHECK_TIMEOUT=30 \
-      "$WATCH" > "$dir/watch.out" 2> "$dir/watch.err" &
-    pid=$!
-    for ((i = 0; i < 400; i++)); do
-      [ ! -e "$state/.last-check" ] || break
-      is_live_non_zombie "$pid" || break
-      sleep 0.1
-    done
-    stop_seed_watcher "$pid" "$dir/watch.err"
-    [ -s "$state/endless-pid" ] || fail "$mode check never started: $(cat "$dir/watch.err")"
-    IFS= read -r endless < "$state/endless-pid"
-    if is_live_non_zombie "$endless"; then
-      kill -KILL "$endless" 2>/dev/null || true
-      fail "$mode check outlived its backstop"
-    fi
-    [ -e "$state/.last-check" ] || fail "$mode check blocked the rest of the sweep: $(cat "$dir/watch.err")"
-    grep -F "check a-$mode stopped after" "$state/.watch-triage.log" 2>/dev/null \
+    } > "$state/endless-check.sh"
+    printf '#!/usr/bin/env bash\nprintf "after-ran\\n"\n' > "$state/after-check.sh"
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+        . "$1"
+        WATCHER_PID=$$
+        trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+        watcher_beat force
+        CHECK_BACKSTOP_COLD=2
+        run_check_capture endless "$STATE/endless-check.sh" || exit 21
+        [ "$FM_CHECK_STATUS" = 124 ] && [ "$FM_CHECK_STOPPED" = backstop ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+        run_check_capture after "$STATE/after-check.sh" || exit 23
+        [ "$FM_CHECK_STATUS" = 0 ] && [ "$FM_CHECK_RESULT" = after-ran ] || exit 24
+        IFS= read -r endless < "$STATE/endless-pid" || exit 25
+        ! kill -0 "$endless" 2>/dev/null || exit 26
+      ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+      || fail "$mode check did not end at its backstop as unknown before the next check: $(cat "$dir/capture.err")"
+    grep -F 'check endless stopped after' "$state/.watch-triage.log" 2>/dev/null \
       | grep -F '(backstop); result unknown, retry next pass' >/dev/null \
       || fail "$mode backstop did not name the check and its runtime: $(cat "$state/.watch-triage.log" 2>/dev/null)"
-    grep -F "check: $state/b-after.check.sh: after-ran" "$state/.wake-queue" >/dev/null \
-      || fail "the check after a $mode backstop did not run"
-    ! grep -F "a-$mode.check.sh" "$state/.wake-queue" >/dev/null \
-      || fail "a $mode backstop produced a check verdict"
   done
-  pass 'a spinning or stderr-spamming check ends at its ledger backstop as unknown and the sweep continues'
+  pass 'a spinning or stderr-spamming check ends at its backstop as unknown and the next check runs'
+}
+
+test_check_backstop_ignores_no_work_samples() {
+  local dir state ledger
+  dir=$(make_case check-backstop-no-work)
+  state="$dir/state"
+  ledger="$dir/durations.jsonl"
+  mkdir -p "$dir/config"
+  printf '{"tools":[{"name":"slowtool","command":"slowtool"}]}\n' > "$dir/config/watched-tools.json"
+  cat > "$dir/fakebin/slowtool" <<'SH'
+#!/usr/bin/env bash
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do printf 'warming\n' >&2; sleep 0.5; done
+printf 'slowtool 1.0.0\n'
+SH
+  chmod +x "$dir/fakebin/slowtool"
+  printf 'fm-tool-updates-v1\nepoch=1700000000\nreported=\n' > "$state/.tool-updates"
+  PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$state" FM_DURATION_FILE="$ledger" \
+    FM_TOOL_UPDATE_INTERVAL=3600 bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      watcher_beat force
+      for step in 1 2 3 4 5; do
+        FM_TOOL_UPDATE_NOW=$((1700000000 + step * 300)) run_check_capture tool-updates "$2" check || exit 21
+        [ "$FM_CHECK_STATUS" = 0 ] && [ -z "$FM_CHECK_STOPPED" ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+      done
+      FM_TOOL_UPDATE_NOW=1700003601 run_check_capture tool-updates "$2" check || exit 23
+      [ "$FM_CHECK_STATUS" = 0 ] && [ -z "$FM_CHECK_STOPPED" ] || exit 24
+    ' _ "$WATCH" "$ROOT/bin/fm-tool-update-check.sh" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a progressing sweep after five cadence skips was stopped: $(cat "$dir/capture.err" "$state/.watch-triage.log" 2>/dev/null)"
+  grep -Fx 'epoch=1700003601' "$state/.tool-updates" >/dev/null || fail 'the real sweep did not write state/.tool-updates'
+  jq -se '[.[] | select(.key == "check.tool-updates")]
+    | (map(select(.calibration == false)) | length) == 5 and (map(select(.calibration == true)) | length) == 1' \
+    "$ledger" >/dev/null || fail "cadence skips were not recorded as uncalibrated: $(cat "$ledger")"
+  pass 'five cadence-skip samples stay uncalibrated, so a progressing real sweep completes and writes its record'
 }
 
 test_check_stderr_capture_keeps_a_capped_tail() {
@@ -3222,6 +3239,7 @@ test_check_inactivity_configuration_and_launch_allowance
 test_check_progress_survives_fivefold_slowdown
 test_check_sigkill_owner_cleans_progressing_tree
 test_check_backstop_stops_endless_progress_as_unknown
+test_check_backstop_ignores_no_work_samples
 test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings

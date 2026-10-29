@@ -47,7 +47,7 @@
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_run_progress: only a lack of output and
 # process-tree CPU progress for the contributions.read ledger interval stops
-# it (five-second cold start until that key is calibrated).
+# it (five seconds at least; measurement only raises it).
 # There is no sweep deadline or observation reservation. A stopped read is
 # unknown: keep that URL's saved observation untouched and retry next pass.
 # A pull observation has three waves: core, six independent reads, closing
@@ -110,7 +110,7 @@ case "$MAX_AGE" in ''|*[!0-9]*) fail 'invalid freshness bound' ;; esac
 # A stopped read is unknown, leaving the saved coherent observation untouched.
 # shellcheck source=bin/fm-duration-lib.sh
 . "$SCRIPT_DIR/fm-duration-lib.sh"
-READ_INACTIVITY=$(fm_duration_measured contributions.read 5)
+READ_INACTIVITY=$(fm_duration_limit contributions.read 5)
 TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
 cleanup() {
@@ -413,6 +413,7 @@ poll() {
       (IFS=$'\t'; printf '%s\n' "${row[*]}") >> "$TMP/live.tsv"
     fi
   done < "$TMP/known.tsv"
+  [ -s "$TMP/live.tsv" ] || fm_duration_no_work
   jq -Rnr --argjson bucket "$((EPOCH / 300))" '
     [inputs] | if length == 0 then . else ($bucket % length) as $offset | .[$offset:] + .[:$offset] end
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"

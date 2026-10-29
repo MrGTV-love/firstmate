@@ -36,8 +36,8 @@
 # doorbell.
 #
 # The poll has no wall-clock budget. fm_run_progress observes output and
-# process-tree CPU for the mail-check.poll ledger interval (15-second cold
-# start until that key is calibrated). Only proven inactivity
+# process-tree CPU for the mail-check.poll ledger interval (15 seconds at
+# least; measurement only raises it). Only proven inactivity
 # stops a poll. That means unknown, retry next pass, never a clean inbox or
 # mail failure; it still doorbells because mail might already be queued.
 set -u
@@ -94,7 +94,7 @@ record_epoch_now() {
 # Harm: a poll with no output or CPU progress can hold mail collection forever.
 # shellcheck source=bin/fm-duration-lib.sh
 . "$SCRIPT_DIR/fm-duration-lib.sh"
-POLL_INACTIVITY=$(fm_duration_measured mail-check.poll 15)
+POLL_INACTIVITY=$(fm_duration_limit mail-check.poll 15)
 
 # One poll summary, built only from the poll's own combined output. The
 # poll's own "fm-mail: ..." diagnostics name the missing setup value, the
