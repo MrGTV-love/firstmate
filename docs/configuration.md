@@ -2777,10 +2777,10 @@ Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and th
 `fm-spawn.sh` adds `fetch.prune=false` to the confined launch's `GIT_CONFIG_COUNT` entries, which outrank a global or repository `fetch.prune=true`, so `git fetch` and `git pull` exit 0 and keep the remote-tracking ref of a branch the remote deleted: a confined worker's fetch never prunes.
 These commands need a `packed-refs` rewrite and cannot complete in a confined worker; each prints `unable to create file <common>/packed-refs.new: Operation not permitted` and leaves `packed-refs` as it was:
 
-- `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`;
-- `git branch -d` or `-D` and `git update-ref -d` of a packed ref, the task's own packed archive included, exit 1 with `could not delete reference <ref>`;
+- `git fetch --prune`, `git remote prune`, or a fetch under `remote.<name>.prune=true`, when a pruned remote-tracking ref is packed, exit 1 with `could not delete reference <ref>`, or `could not delete references` when they prune more than one ref;
+- `git branch -d` or `-D` of a packed branch, the task's own packed archive included, exits 1 with `could not delete reference <ref>`, and `git update-ref -d` of a packed ref exits 1;
 - `git stash drop` or `git stash pop` of the last entry when `refs/stash` is packed exits 0, and the pop applies the entry, but `refs/stash` still names the dropped stash commit, with `git stash list` empty, until a later `git stash push` replaces it;
-- the pack-refs step of `git gc` reports `failed to run pack-refs`.
+- the pack-refs step of `git gc` reports `failed to run pack-refs`, and `git gc` still exits 0.
 
 The shared `info/grafts` and `shallow` files stay writable, so a worker can still change the history the primary checkout sees through them; the `refs/replace` deny does not close that route.
 A repository with reftable ref storage refuses the launch, because its refs are not in files this profile can name.
