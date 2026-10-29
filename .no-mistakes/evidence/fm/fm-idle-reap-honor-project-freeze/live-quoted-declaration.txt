@@ -1,0 +1,21 @@
+$ fm-captain-hold.sh hold quoted-note ...
+quoted-note
+[rc=0]
+update rc=0
+--- quoted-note body:
+  held: yes
+  hold_kind: captain
+  body: "Captain hold set: 2026-10-29T00:00:00Z\n\nNote: someone wrote this line in a comment:\nCaptain hold freezes project: sample"
+$ fm-captain-hold.sh frozen sample-task
+[rc=1]  (1 = not frozen)
+$ fm-captain-hold.sh freeze quoted-note --project sample
+quoted-note
+[rc=0]
+  body: "Captain hold set: 2026-10-29T00:00:00Z\nCaptain hold freezes project: sample\n\nNote: someone wrote this line in a comment:\nCaptain hold freezes project: sample"
+$ fm-captain-hold.sh frozen sample-task
+quoted-note
+[rc=0]  (0 = frozen)
+$ fm-captain-hold.sh freeze not-a-hold --project sample  (adversarial: no such open captain hold)
+fm-captain-hold: task not-a-hold does not exist; hold it for the captain first
+[rc=1]
+lab-removed
