@@ -223,6 +223,7 @@ SH
     # Execute the real staged pane input, not the wrapper in isolation. The
     # child has no backend config/override; the surrounding shell stays native.
     mkdir -p "$CASE_DIR/pane-home"
+    # shellcheck disable=SC2016 # The destination shell must expand this code.
     env -i HOME="$CASE_DIR/pane-home" FM_HOME="$WT_DIR" \
       PATH="$FAKEBIN:$PATH" TERM=xterm HERDR_ENV=1 HERDR_PANE_ID=%9 \
       HERDR_SESSION=fm-shell-test FM_TEST_RUNTIME_ROOT="$ROOT" \
