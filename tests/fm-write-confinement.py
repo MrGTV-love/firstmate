@@ -233,6 +233,50 @@ def child(manifest):
     other_branch = git("-C", str(worktree), "rev-parse", "fm/other").stdout
     git("-C", str(worktree), "update-ref", "refs/heads/fm/other", "HEAD")
     results["refused-other-branch"] = git("-C", str(worktree), "rev-parse", "fm/other").stdout == other_branch
+    # The custody-return route creates this task's own archive branches. They
+    # must work with the route's own git commands, while no other ref name
+    # does: another task's archive, ids that contain or extend this task's id,
+    # and names outside the two documented shapes. No case-only variant of an
+    # own name is tried: the default macOS volume is case-insensitive, so that
+    # path is the very same file and the kernel treats it as one.
+    def ref_exists(name):
+        return git("-C", str(worktree), "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
+
+    def ref_refused(name):
+        failed = git("-C", str(worktree), "update-ref", "refs/heads/" + name, "HEAD").returncode != 0 and not ref_exists(name)
+        git("-C", str(worktree), "update-ref", "-d", "refs/heads/" + name)  # leave the unconfined control clean
+        return failed
+
+    head, base = (git("-C", str(worktree), "rev-parse", ref).stdout.strip() for ref in ("HEAD", "HEAD~1"))
+    for kind, hex8 in (("submitted", "0123abcd"), ("pipeline", "89abcdef")):
+        name = f"archive/task-{kind}-{hex8}"
+        created = git("-C", str(worktree), "branch", name, head)
+        again = git("-C", str(worktree), "branch", name, head)
+        moved = git("-C", str(worktree), "update-ref", "refs/heads/" + name, base, head)
+        reflog = git("-C", str(worktree), "reflog", "show", "--format=%H", "refs/heads/" + name).stdout.split()
+        results[f"archive-own-{kind}-create"] = (created.returncode == 0 and again.returncode != 0
+                                                  and git("-C", str(worktree), "rev-parse", "refs/heads/" + name).stdout.strip() == base)
+        results[f"archive-own-{kind}-update"] = moved.returncode == 0 and bool(reflog)
+        deleted = git("-C", str(worktree), "branch", "-D", name)
+        results[f"archive-own-{kind}-delete"] = deleted.returncode == 0 and not ref_exists(name)
+    for label, name in (("other-task", "archive/other-submitted-0123abcd"),
+                        ("extending-id", "archive/task-2-submitted-0123abcd"),
+                        ("contained-id", "archive/tas-submitted-0123abcd"),
+                        ("containing-id", "archive/xtask-submitted-0123abcd"),
+                        ("own-id-other-shape", "archive/task-other-0123abcd"),
+                        ("own-id-short-hex", "archive/task-submitted-0123abc"),
+                        ("own-id-long-hex", "archive/task-submitted-0123abcde"),
+                        ("own-id-non-hex", "archive/task-submitted-0123abcg"),
+                        ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
+                        ("outside-archive", "task-submitted-0123abcd")):
+        results[f"refused-archive-{label}"] = ref_refused(name)
+    # The primary checkout's HEAD stays refused; a failed attempt changes nothing.
+    primary = str(Path(manifest["home"]) / "projects/project")
+    before = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
+    git("-C", primary, "symbolic-ref", "HEAD", "refs/heads/fm/pool")
+    after = git("-C", primary, "symbolic-ref", "HEAD").stdout.strip()
+    git("-C", primary, "symbolic-ref", "HEAD", before)
+    results["refused-primary-head"] = after == before
     record = subprocess.run([sys.executable, str(Path(manifest["repo"]) / "bin/fm-duration.py"), "record", "fixture.write-confinement", "1234", "0"],
                             capture_output=True, text=True)
     ledger = data / "command-durations.jsonl"
@@ -683,6 +727,32 @@ def fresh_container(repo, manifest, base, mode, env):
     return {"session-folders-created": json.loads(folders.stdout), **json.loads(result.stdout)}
 
 
+def remove_archive_folders(manifest):
+    git_dir = Path(manifest["home"]) / "projects/project/.git"
+    for folder in (git_dir / "refs/heads/archive", git_dir / "logs/refs/heads/archive"):
+        if folder.is_dir():
+            folder.rmdir()
+
+
+# A project branch named archive fills the archive parent names with files.
+# The builder must still succeed and grant no archive name: once that branch
+# is gone, the confined create of this task's own archive stays refused.
+def archive_branch_file(repo, manifest, base, harness, mode, env):
+    worktree = manifest["worktree"]
+    remove_archive_folders(manifest)
+    assert git("-C", worktree, "branch", "archive").returncode == 0
+    profile = base / "archive-file-profile.sb"
+    build_profile(repo, manifest, harness, profile, env)
+    kept = git("-C", worktree, "rev-parse", "--verify", "-q", "refs/heads/archive").returncode == 0
+    assert git("-C", worktree, "branch", "-D", "archive").returncode == 0
+    sandbox = [] if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)]
+    name = "archive/task-submitted-0123abcd"
+    created = subprocess.run(sandbox + ["git", "-C", worktree, "branch", name], capture_output=True, text=True, env=dict(env, **GIT_ENV))
+    exists = git("-C", worktree, "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
+    git("-C", worktree, "update-ref", "-d", "refs/heads/" + name)
+    return {"archive-branch-kept": kept, "own-archive-created": created.returncode == 0 and exists}
+
+
 if sys.argv[1] == "--child":
     results = child(json.loads(sys.argv[2]))
     sys.exit(0 if all(results.values()) else 1)
@@ -711,6 +781,9 @@ for harness in ("claude", "omp"):
             manifest["identity_pid"] = unusual.pid
             for path in manifest["late"]:
                 write(path, "window=fmtest:fm-late\nkind=ship\n")
+            # Git removes an empty archive folder with its last ref while the
+            # worker runs; the child must still create its own archives.
+            remove_archive_folders(manifest)
             command = [sys.executable, __file__, "--child", json.dumps(manifest)]
             invocation = command if mode == "baseline" else ["/usr/bin/sandbox-exec", "-f", str(profile)] + command
             result = subprocess.run(invocation, capture_output=True, text=True, env=env)
@@ -732,6 +805,9 @@ for harness in ("claude", "omp"):
             assert fresh == {"session-folders-created": [] if confined else ["projects", "session-env", "file-history", "tasks"],
                              "symlink": not confined, "file": not confined, "create-and-append": True,
                              "renamed": not confined, "deleted": not confined}, (harness, mode, fresh)
+        archive_file = archive_branch_file(repo, manifest, base, harness, mode, env)
+        print(f"{harness} {mode} archive branch file: " + json.dumps(archive_file, sort_keys=True))
+        assert archive_file == {"archive-branch-kept": True, "own-archive-created": mode == "baseline"}, (harness, mode, archive_file)
         if mode == "baseline":
             for name in actual:
                 if name in CONTROL_KEYS or name.startswith("refused-"):

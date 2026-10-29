@@ -972,9 +972,9 @@ run_freshness_slot_case() { # <introduced|present|absent|missing-scope|removed> 
       assert_grep 'jev_guard_policy=FIRSTMATE_JEV_GUARD_V1' "$home/state/$id.meta" 'governed refusal lost guard policy'
       case "$shape" in
         missing-scope)
-          assert_contains "$out" '--owned-path must be a nonempty single-line tracked path' 'freshly governed copy did not require explicit scope'
+          assert_contains "$out" 'governed slot provisioning requires --owned-path' 'freshly governed copy did not require explicit scope'
           [ ! -e "$case_dir/provisioner.called" ] || fail 'missing scope invoked the owner'
-          assert_no_grep '^slot_owned_path=' "$home/state/$id.meta" 'missing scope was silently widened'
+          assert_no_grep 'slot_owned_path=' "$home/state/$id.meta" 'missing scope was silently widened'
           ;;
         removed)
           assert_contains "$out" 'slot provisioner is missing' 'removed owner silently downgraded governance'
@@ -1280,11 +1280,271 @@ PY
 test_local_only_source_binding() { run_local_only_binding_case prepared; }
 test_local_only_unprepared_retry() { run_local_only_binding_case unprepared; }
 
+make_stopped_tmux() { # <dir>; an agent-free retained shell for the relaunch fixture
+  mkdir "$1"
+  {
+    cat <<'SH'
+#!/usr/bin/env bash
+case "$*" in *'#{pane_current_command}'*) printf 'zsh\n'; exit 0 ;; esac
+SH
+    printf 'exec %q "$@"\n' "$FAKEBIN_DIR/tmux"
+  } > "$1/tmux"
+  chmod +x "$1/tmux"
+}
+
+run_relaunch() { # <id> [<arg>...]
+  local id=$1
+  shift
+  FM_FAKE_DUPLICATE_WINDOW="fm-$id" fm_test_run_spawn "$HOME_DIR" "$POOL_DIR" "$CASE_DIR/stopped:$FAKEBIN_DIR" "$id" --relaunch "$@"
+}
+
+preflight_task_temp() { # <id>
+  local token
+  token=$(printf '%s' "$HOME_DIR" | shasum -a 256 | awk '{print $1}')
+  [ ! -e "/tmp/fm-$1" ] && [ ! -L "/tmp/fm-$1" ] || fail "task temp already exists: /tmp/fm-$1"
+  [ ! -e "/tmp/fm-$1+$token" ] && [ ! -L "/tmp/fm-$1+$token" ] || fail "staging temp already exists: /tmp/fm-$1+$token"
+}
+
+# An origin-equal attempt records no local plan. When its retry finishes first
+# admission after accepted local-only A advanced main, it must select A afresh.
+run_local_only_equal_retry_case() { # <advanced|adopted-scope|diverged|invalid-ref>
+  local shape=$1 id rec remote local_a before out rc=0 publisher scope_args=()
+  id="pool-local-equal-$shape-$(date +%s)-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  write_refusing_slot_owner "$PROJECT_DIR"
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'published owner'
+  git -C "$PROJECT_DIR" push --quiet origin main
+  remote=$(git -C "$PROJECT_DIR" rev-parse origin/main)
+  [ "$(git -C "$PROJECT_DIR" rev-parse main)" = "$remote" ] || fail 'origin-equal setup was not equal'
+  preflight_task_temp "$id"
+  if [ "$shape" = adopted-scope ]; then
+    # The first attempt omits scope; its remedy supplies scope on retry.
+    out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
+      --mode local-only --yolo off 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'scope-less governed attempt admitted a worker'
+    assert_contains "$out" 'governed slot provisioning requires --owned-path' 'scope-less attempt lost its remedy'
+    assert_no_grep 'slot_owned_path=' "$HOME_DIR/state/$id.meta" 'scope-less attempt recorded inferred scope'
+    scope_args=(--owned-path README.md)
+  else
+    printf 'operator scratch\n' > "$POOL_DIR/scratch.txt"
+    out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/provisioner.called" run_spawn "$id" \
+      --mode local-only --yolo off --owned-path README.md 2>&1) || rc=$?
+    [ "$rc" -ne 0 ] || fail 'dirty origin-equal attempt admitted a worker'
+    assert_contains "$out" dirty_worktree 'origin-equal attempt did not refuse dirt'
+    rm "$POOL_DIR/scratch.txt"
+  fi
+  [ ! -e "$CASE_DIR/provisioner.called" ] || fail 'unprepared copy reached the project owner'
+  assert_grep 'recovery=slot-provision-refused' "$HOME_DIR/state/$id.meta" 'first refusal lost recovery'
+  assert_no_grep 'slot_source_ref=' "$HOME_DIR/state/$id.meta" 'origin-equal attempt recorded a local plan'
+  assert_no_grep 'slot_prepared_head=' "$HOME_DIR/state/$id.meta" 'unprepared attempt gained a prepared identity'
+  printf 'accepted local-only work\n' > "$PROJECT_DIR/accepted-a.txt"
+  git -C "$PROJECT_DIR" add accepted-a.txt
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'accepted A'
+  local_a=$(git -C "$PROJECT_DIR" rev-parse main)
+  case "$shape" in
+    diverged)
+      publisher="$CASE_DIR/divergent-publisher"
+      git clone --quiet "file://$CASE_DIR/origin.git" "$publisher"
+      printf 'unrelated upstream\n' > "$publisher/upstream.txt"
+      git -C "$publisher" add upstream.txt
+      git -C "$publisher" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'divergent upstream'
+      git -C "$publisher" push --quiet origin main
+      remote=$(git -C "$publisher" rev-parse HEAD)
+      ;;
+    invalid-ref)
+      printf 'slot_source_ref=refs/remotes/origin/main\nslot_base_sha=%s\n' "$local_a" >> "$HOME_DIR/state/$id.meta"
+      ;;
+  esac
+  before=$(git -C "$POOL_DIR" rev-parse HEAD)
+  make_stopped_tmux "$CASE_DIR/stopped"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/relaunch.called" run_relaunch "$id" ${scope_args[@]+"${scope_args[@]}"} 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "deliberately refusing project admitted a relaunched worker: $shape"
+  case "$shape" in
+    diverged|invalid-ref)
+      if [ "$shape" = diverged ]; then
+        assert_contains "$out" 'defaults diverge' 'divergent retry did not refuse source selection'
+      else
+        assert_contains "$out" 'invalid recorded local-default ref' 'tampered source ref was not refused'
+      fi
+      [ ! -e "$CASE_DIR/relaunch.called" ] || fail 'refused source selection reached the project owner'
+      [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$before" ] || fail 'refused source selection changed the assigned copy'
+      git -C "$PROJECT_DIR" rev-parse --verify --quiet "refs/heads/fm/$id" >/dev/null && fail 'refused source selection prepared a task branch'
+      assert_no_grep 'slot_prepared_head=' "$HOME_DIR/state/$id.meta" 'refused source selection recorded a prepared identity'
+      ;;
+    advanced|adopted-scope)
+      assert_contains "$out" fixture_provisioner_must_refuse 'retry did not reach the project owner'
+      python3 - "$CASE_DIR/relaunch.called" "$local_a" <<'PY'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--base-source') + 1] == 'local-default', args
+assert args[args.index('--base-sha') + 1] == sys.argv[2], args
+assert args[args.index('--owned-path') + 1] == 'README.md', args
+PY
+      [ "$(git -C "$PROJECT_DIR" rev-parse "refs/heads/fm/$id")" = "$local_a" ] || fail 'retry dropped accepted A for old origin'
+      [ "$(git -C "$PROJECT_DIR" show "refs/heads/fm/$id:accepted-a.txt")" = 'accepted local-only work' ] || fail 'prepared branch lost A bytes'
+      assert_grep "slot_prepared_head=$local_a" "$HOME_DIR/state/$id.meta" 'retry lost prepared identity'
+      assert_grep 'slot_source_ref=refs/heads/main' "$HOME_DIR/state/$id.meta" 'retry lost its selected local source'
+      assert_grep "slot_base_sha=$local_a" "$HOME_DIR/state/$id.meta" 'retry lost its selected local baseline'
+      [ "$(sed -n 's/^slot_owned_path=//p' "$HOME_DIR/state/$id.meta")" = README.md ] || fail 'refused retry lost its exact scope'
+      if [ "$shape" = adopted-scope ]; then
+        cp "$HOME_DIR/state/$id.meta" "$CASE_DIR/meta.adopted"
+        rc=0
+        out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/override.called" run_relaunch "$id" --owned-path scripts 2>&1) || rc=$?
+        [ "$rc" -ne 0 ] || fail 'retry replaced adopted scope'
+        assert_contains "$out" 'cannot override it' 'adopted-scope override refusal reason missing'
+        [ ! -e "$CASE_DIR/override.called" ] || fail 'scope override reached the project owner'
+        cmp -s "$HOME_DIR/state/$id.meta" "$CASE_DIR/meta.adopted" || fail 'scope override changed the task record'
+      fi
+      # The prepared retry resumes that exact local pin rather than an origin merge-base.
+      rc=0
+      out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/resume.called" run_relaunch "$id" 2>&1) || rc=$?
+      [ "$rc" -ne 0 ] || fail 'deliberately refusing project admitted a resumed worker'
+      assert_contains "$out" fixture_provisioner_must_refuse 'prepared resume did not reach the project owner'
+      python3 - "$CASE_DIR/resume.called" "$local_a" <<'PY'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--base-source') + 1] == 'local-default', args
+assert args[args.index('--base-sha') + 1] == sys.argv[2], args
+assert args[args.index('--owned-path') + 1] == 'README.md' and args.count('--owned-path') == 1, args
+PY
+      [ "$(sed -n 's/^slot_owned_path=//p' "$HOME_DIR/state/$id.meta")" = README.md ] || fail 'normal retry changed its exact scope'
+      ;;
+  esac
+  [ "$(git -C "$CASE_DIR/origin.git" rev-parse refs/heads/main)" = "$remote" ] || fail 'retry published or relabeled local work'
+  [ "$(git -C "$PROJECT_DIR" rev-parse main)" = "$local_a" ] || fail 'retry moved the qualified local default'
+  pass "origin-equal refused retry after local advance: $shape"
+}
+
+test_local_only_equal_retry_selects_local() { run_local_only_equal_retry_case advanced; }
+test_local_only_equal_retry_divergence() { run_local_only_equal_retry_case diverged; }
+test_local_only_adopted_scope_retry() { run_local_only_equal_retry_case adopted-scope; }
+test_local_only_equal_retry_invalid_ref() { run_local_only_equal_retry_case invalid-ref; }
+
+write_passing_slot_owner() { # <repository>
+  mkdir -p "$1/scripts/git-stability"
+  cat > "$1/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+Path(os.environ["FM_TEST_PROVISION_CALLED"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+if os.environ.get("FM_TEST_SLOT_REFUSE"):
+    print(json.dumps({"state": "BLOCKED", "reason": "fixture_owner_refused_legacy_scope"}))
+    raise SystemExit(2)
+p = argparse.ArgumentParser()
+for flag in ("repo-root", "worktree-path", "owner-id", "branch", "base-sha"):
+    p.add_argument("--" + flag, required=True)
+p.add_argument("--owned-path", action="append", required=True)
+p.add_argument("--base-source")
+a = p.parse_args()
+record = dict(worktree_path=os.path.realpath(a.worktree_path), owner_id=a.owner_id, branch=a.branch,
+              base_sha=a.base_sha, owned_paths=a.owned_path, lifecycle_state="worktree_active")
+manifest = Path(os.environ["FM_TEST_SLOT_RECORD"])
+manifest.write_text(json.dumps(record), encoding="utf-8")
+print(json.dumps(dict(state="PASS", manifest_path=str(manifest), **record)))
+PY
+}
+
+# A task admitted before its project gained an owner records no scope. It is
+# recoverable only through explicit relaunch scope, never inferred or overridden.
+test_legacy_relaunch_scope_adoption() {
+  local id rec out rc=0 meta head
+  id="pool-legacy-scope-$(date +%s)-$$"
+  rec=$(make_case "$id" "$id")
+  read_case_record "$rec"
+  fm_test_fake_no_mistakes "$FAKEBIN_DIR"
+  fm_test_fake_gh "$FAKEBIN_DIR"
+  fm_test_fake_gh_axi "$FAKEBIN_DIR"
+  git -C "$PROJECT_DIR" fetch --quiet origin
+  git -C "$PROJECT_DIR" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  git -C "$PROJECT_DIR" merge --ff-only origin/main >/dev/null
+  preflight_task_temp "$id"
+  out=$(run_spawn "$id" --mode local-only --yolo off 2>&1) || rc=$?
+  expect_code 0 "$rc" "ungoverned legacy spawn failed: $out"
+  meta="$HOME_DIR/state/$id.meta"
+  ! grep -q '^slot_' "$meta" || fail 'ungoverned spawn recorded slot state'
+  make_stopped_tmux "$CASE_DIR/stopped"
+  cp "$meta" "$CASE_DIR/meta.ungoverned"
+  rc=0
+  out=$(run_relaunch "$id" --owned-path README.md 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'ungoverned relaunch accepted unused scope'
+  assert_contains "$out" 'only to scope a governed task' 'ungoverned scope refusal reason missing'
+  cmp -s "$meta" "$CASE_DIR/meta.ungoverned" || fail 'ungoverned scope refusal changed the task record'
+
+  write_passing_slot_owner "$PROJECT_DIR"
+  git -C "$PROJECT_DIR" add scripts
+  git -C "$PROJECT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'project gains owner'
+  git -C "$PROJECT_DIR" push --quiet origin main
+  git -C "$POOL_DIR" checkout -q -b "fm/$id" main
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/unscoped.called" run_relaunch "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'governed legacy relaunch inferred scope'
+  assert_contains "$out" 'governed slot provisioning requires --owned-path' 'legacy refusal lost its remedy'
+  [ ! -e "$CASE_DIR/unscoped.called" ] || fail 'unscoped legacy relaunch reached the project owner'
+  ! grep -q '^slot_' "$meta" || fail 'unscoped legacy refusal recorded slot state'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$(git -C "$PROJECT_DIR" rev-parse main)" ] || fail 'legacy refusal moved the task'
+
+  # The owner refuses the first explicit scope: only that scope is retained.
+  head=$(git -C "$POOL_DIR" rev-parse HEAD)
+  cp "$meta" "$CASE_DIR/meta.legacy"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/refused.called" FM_TEST_SLOT_REFUSE=1 \
+    run_relaunch "$id" --owned-path README.md 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'refusing project owner admitted the legacy relaunch'
+  assert_contains "$out" fixture_owner_refused_legacy_scope 'legacy refusal lost the owner reason'
+  [ -f "$CASE_DIR/refused.called" ] || fail 'explicit legacy scope did not reach the project owner'
+  [ "$(sed -n 's/^slot_owned_path=//p' "$meta")" = README.md ] || fail 'refused legacy relaunch lost explicit scope'
+  diff <(grep -v '^slot_owned_path=' "$meta") "$CASE_DIR/meta.legacy" >/dev/null || fail 'refused legacy relaunch changed other record facts'
+  [ "$(git -C "$POOL_DIR" rev-parse HEAD)" = "$head" ] || fail 'refused legacy relaunch moved the task'
+  cp "$meta" "$CASE_DIR/meta.retained"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/drift.called" run_relaunch "$id" --owned-path scripts 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'relaunch replaced owner-refused legacy scope'
+  assert_contains "$out" 'cannot override it' 'refused-scope override reason missing'
+  [ ! -e "$CASE_DIR/drift.called" ] || fail 'refused-scope override reached the project owner'
+  cmp -s "$meta" "$CASE_DIR/meta.retained" || fail 'refused-scope override changed the task record'
+
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/adopt.called" FM_TEST_SLOT_RECORD="$CASE_DIR/manifest.json" \
+    run_relaunch "$id" 2>&1) || rc=$?
+  expect_code 0 "$rc" "retained legacy scope adoption failed: $out"
+  python3 - "$CASE_DIR/adopt.called" "$id" <<'PY'
+import json, sys
+args = json.load(open(sys.argv[1]))
+assert args[args.index('--owner-id') + 1] == sys.argv[2], args
+assert args[args.index('--branch') + 1] == 'fm/' + sys.argv[2], args
+assert args[args.index('--owned-path') + 1] == 'README.md', args
+assert args.count('--owned-path') == 1 and '--base-source' not in args, args
+PY
+  assert_grep "slot_manifest=$CASE_DIR/manifest.json" "$meta" 'adoption did not record the declaration'
+  [ "$(sed -n 's/^slot_owned_path=//p' "$meta")" = README.md ] || fail 'adoption did not record exactly the explicit scope'
+
+  cp "$meta" "$CASE_DIR/meta.scoped"
+  rc=0
+  out=$(FM_TEST_PROVISION_CALLED="$CASE_DIR/override.called" run_relaunch "$id" --owned-path scripts 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail 'relaunch replaced recorded scope'
+  assert_contains "$out" 'cannot override it' 'recorded-scope override refusal reason missing'
+  [ ! -e "$CASE_DIR/override.called" ] || fail 'scope override reached the project owner'
+  cmp -s "$meta" "$CASE_DIR/meta.scoped" || fail 'scope override changed the task record'
+  pass 'legacy relaunch refuses inferred scope, retains refused explicit scope, adopts it, and never overrides it'
+}
+
 # Explicit selection keeps focused acquisition regressions independently runnable.
 if [ "$#" -gt 0 ]; then
   for selected_test in "$@"; do
     case "$selected_test" in
-      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing) "$selected_test" ;;
+      test_freshness_introduces_slot_owner|test_freshness_introduces_scout_slot_owner|test_freshness_slot_owner_requires_scope|test_freshness_present_slot_owner_refuses|test_freshness_absent_slot_owner_launches|test_freshness_removed_slot_owner_refuses|test_local_only_source_selection|test_local_only_source_binding|test_local_only_unprepared_retry|test_local_only_origin_early|test_local_only_origin_late|test_local_only_origin_freshness|test_local_only_origin_copy_missing|test_local_only_origin_primary_missing|test_local_only_equal_retry_selects_local|test_local_only_equal_retry_divergence|test_local_only_adopted_scope_retry|test_local_only_equal_retry_invalid_ref|test_legacy_relaunch_scope_adoption) "$selected_test" ;;
       *) fail "unknown selected acquisition test: $selected_test" ;;
     esac
   done
@@ -1294,6 +1554,11 @@ fi
 test_local_only_source_selection
 test_local_only_source_binding
 test_local_only_unprepared_retry
+test_local_only_equal_retry_selects_local
+test_local_only_equal_retry_divergence
+test_local_only_adopted_scope_retry
+test_local_only_equal_retry_invalid_ref
+test_legacy_relaunch_scope_adoption
 test_local_only_origin_early
 test_local_only_origin_late
 test_local_only_origin_freshness

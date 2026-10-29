@@ -58,7 +58,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
-| [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth and, with `--memory-kib`, its memory; its header owns the budget contract |
+| [`fm-proc-budget.sh`](../bin/fm-proc-budget.sh) | Bound a command tree's process growth (`--own-procs` counts only the tree's own processes) and, with `--memory-kib`, its memory; its header owns the budget contract |
 | [`fm-copy-sweep.sh`](../bin/fm-copy-sweep.sh) | Find, size and remove provably stale nested task copies, and wake once when their bytes pass a budget or a nested copy sits inside a live task's copy ([configuration](configuration.md#nested-task-copy-sweep-configcopy-budget)); its header owns the classes and proofs |
 | `fm-load-report.sh`      | Record host load and judge it with pipeline agent durations ([recipe](cpu-pass-pool.md#judging-the-pool)) |
 | `fm-load-report.py`      | The engine behind `fm-load-report.sh`                                                |
@@ -66,7 +66,8 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-proc-guard.py`       | The engine behind `fm-proc-guard.sh`                                                 |
 | `fm-ensure-agents-md.sh` | Manually initialize project agent-memory files (see the helper's header and help) |
 | `fm-guard.sh`            | Warn on primary-checkout tangles, main-session pending wakes, and unhealthy supervision |
-| `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
+| `fm-guard-lint.sh`       | Validate the guard registry against the nine spec rules, require every refusal site to map to a guard, and enforce the shrink-only allowlist ([spec](guard-spec.md)) |
+| `fm-guard-sites.py`      | Enumerate every refusal site in the runtime code and map each to a registry entry for `fm-guard-lint.sh` ([signatures](guard-spec.md#refusal-sites)) |
 | `fm-guard-refcheck.sh`   | Prove every wired hook path resolves, every registry path exists, and no retired guard is referenced live |
 | `fm-guard-event.sh`      | Append one guard decision event per call, never influencing the decision it records |
 | `fm-guard-metrics.sh`    | Compute per-guard opportunities, fires, override rate, clear cost, and the retirement verdict |

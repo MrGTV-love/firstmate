@@ -19,14 +19,52 @@ test_local_only_force_overrides_unpushed() {
   write_meta "$case_dir" local-only ship
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
-  set +e
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"
+}
+
+# A teardown starts a detached home-summary refresh, which outlives the teardown
+# and, once the fixture that owned the home is cleaned up, can never be stopped
+# by anything that looks at the fixture: its command line names only the shared
+# code. The child runs a real teardown case with its refresh worker held at the
+# fence until the home is gone, then exits so its own fixture cleanup removes the
+# home under the waiting worker; no worker may remain.
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
+  local child out stub worker identity
+  child="$TMP_ROOT/fixture-cleanup-child.sh"
+  out="$TMP_ROOT/fixture-cleanup-worker"
+  stub="$TMP_ROOT/fixture-cleanup-stub"
+  fm_test_refresh_fence_stub "$stub" || fail "could not write the fence stub"
+  cat > "$child" <<'CHILD'
+#!/usr/bin/env bash
+set -u
+# shellcheck source=tests/fm-teardown-helpers.sh
+. "$1/tests/fm-teardown-helpers.sh"
+case_dir=$(make_case leak-child)
+write_meta "$case_dir" local-only ship
+wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
+export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
+FM_TEARDOWN_TEST_PATH="$2:$PATH" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+  > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "the child teardown failed: $(cat "$case_dir/stderr")"
+fm_test_wait_until 30 test -s "$case_dir/state/.test-fence-waiting" \
+  || fail "the refresh worker never reached the fence"
+worker=$(cat "$case_dir/state/.test-fence-waiting") || fail "the fence stub did not record the worker pid"
+printf '%s\t%s\n' "$worker" "$(fm_test_pid_identity "$worker")" > "$3"
+CHILD
+  bash "$child" "$ROOT" "$stub" "$out" || fail "the fixture child failed"
+  IFS=$'\t' read -r worker identity < "$out" || fail "the child recorded no worker"
+  [ -n "$worker" ] && [ -n "$identity" ] || fail "the child recorded no worker identity"
+  # shellcheck disable=SC2329 # Invoked through fm_test_wait_until.
+  worker_gone() { [ "$(fm_test_pid_identity "$worker" 2>/dev/null || true)" != "$identity" ]; }
+  if ! fm_test_wait_until 20 worker_gone; then
+    kill -KILL "$worker" 2>/dev/null || true
+    fail "the home-summary refresh worker $worker outlived its fixture's cleanup"
+  fi
+  pass "fixture cleanup after a teardown leaves no home-summary refresh worker"
 }
 
 # Registering a PR inside a secondmate home publishes the child's ready line
@@ -88,10 +126,8 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
   printf 'working: shipping\ndone: PR https://github.com/example/repo/pull/9 checks green\n' \
     > "$case_dir/state/task-x1.status"
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "mate-teardown-delivers: teardown should succeed: $(cat "$case_dir/stderr")"
   sed -E 's/ \[at=[0-9]+\]//' "$channel" | grep -Eq '^done \[key=child-outcome-task-x1-done-[0-9a-f]{8}\]: child task-x1 done: PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=local-only$' \
     || fail "mate-teardown-delivers: the final ledger line did not reach the parent: $(cat "$channel" 2>/dev/null)"
@@ -111,10 +147,8 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
   printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "mate-teardown-refuses: teardown proceeded with an undelivered final line"
   grep -q 'has not reached the parent channel' "$case_dir/stderr" \
     || fail "mate-teardown-refuses: refusal did not name the parent channel: $(cat "$case_dir/stderr")"
@@ -131,10 +165,8 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   generation=$(printf '%s\n' "$err" | sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p')
   [ -z "$seq" ] || FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-wake-drain.sh" --ack-through "$seq" --recovery-generation "$generation" >/dev/null
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
   expect_code 0 "$rc" "mate-teardown-refuses: rerun after repair should succeed: $(cat "$case_dir/stderr2")"
   sed -E 's/ \[at=[0-9]+\]//' "$channel" | grep -Eq '^done \[key=child-outcome-task-x1-done-[0-9a-f]{8}\]: child task-x1 done: PR https://github.com/example/repo/pull/9 checks green' \
     || fail "mate-teardown-refuses: the rerun did not deliver the final line"
@@ -150,10 +182,8 @@ test_teardown_missing_busy_sidecar_completes() {
   printf 'busy_gen=%s\n' "$gen" >> "$case_dir/state/task-x1.meta"
   rm -f "$case_dir/state/task-x1.busy-gen"
 
-  set +e
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "missing-busy-sidecar: teardown should treat the incarnation as already retired"
   assert_absent "$case_dir/state/task-x1.busy-state" \
@@ -6037,6 +6067,7 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 }
 
 teardown_test_cases=(
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker
@@ -6230,40 +6261,15 @@ test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 test_teardown_retires_the_dsh_launch_state
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${teardown_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
 # In the combined tests/fm-teardown.test.sh run,
 # test_local_only_fork_remote_allows left set -e in force for every case
 # registered after it. test_local_only_force_overrides_unpushed
 # is the first such case here, so restore that errexit state once before it.
 errexit_restored=false
-for test_case in "${teardown_test_cases[@]}"; do
-  if [ "$errexit_restored" = false ] && [ "$test_case" = test_local_only_force_overrides_unpushed ]; then
+fm_test_before_case() {
+  if [ "$errexit_restored" = false ] && [ "$1" = test_local_only_force_overrides_unpushed ]; then
     set -e
     errexit_restored=true
   fi
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+}
+fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"

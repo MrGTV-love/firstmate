@@ -44,7 +44,8 @@
 # the refusal of a forge on local-only.
 # A governed assigned copy is attested by bin/fm-slot-provision-lib.sh before
 # ship instructions or kind=ship are published, using the spawn-recorded scope
-# or repeatable --owned-path <tracked-path> flags for a legacy scout. The installed
+# or repeatable --owned-path <tracked-path> flags for a legacy scout with no recorded
+# scope; flags never override a recorded scope. The installed
 # provisioner owns repeat/reuse compatibility; dirty scratch, branch/scope changes,
 # foreign active manifests, and create-only refusals stop promotion without a
 # manifest-force path. Governed scouts keep their already-provisioned task branch.
@@ -304,11 +305,15 @@ fi
 # scouts retain the same owner, branch, and explicit scope; any incompatible
 # declaration is the provisioner's refusal, not permission to replace a record.
 PROMOTE_WORKTREE=$(sed -n 's/^worktree=//p' "$META" | head -n 1)
+if [ "${#SLOT_OWNED_PATHS[@]}" -gt 0 ] && grep -q '^slot_owned_path=' "$META"; then
+  echo "error: task $ID already records slot scope; --owned-path cannot override it" >&2
+  exit 1
+fi
 if fm_slot_required "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" || grep -q '^slot_manifest=' "$META"; then
   if [ "${#SLOT_OWNED_PATHS[@]}" -eq 0 ]; then
     while IFS= read -r owned_path; do SLOT_OWNED_PATHS+=("$owned_path"); done < <(sed -n 's/^slot_owned_path=//p' "$META")
   fi
-  fm_slot_require_scope "${SLOT_OWNED_PATHS[@]:-}" || exit 1
+  fm_slot_require_scope ${SLOT_OWNED_PATHS[@]+"${SLOT_OWNED_PATHS[@]}"} || exit 1
   fm_slot_provision fm_slot_run_local "$PROMOTE_PROJECT" "$PROMOTE_WORKTREE" "$ID" "$BRANCH" \
     "$DATA/$ID/slot-provision-promote.${BASHPID:-$$}.json" '' '' "${SLOT_OWNED_PATHS[@]}" || exit 1
 fi

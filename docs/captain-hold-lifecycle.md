@@ -38,6 +38,8 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `complete` | Records the reviewed captain-held task ids in the originating task's metadata. | [Recording a reviewed inventory](#recording-a-reviewed-inventory-complete) |
 | `verify` | Read-only check that scout teardown runs before removing source state. | [Checking before scout teardown](#checking-before-scout-teardown-verify) |
 | `open` | Read-only check of whether a row is still an open captain call. | [Cleanup never closes a captain call](#cleanup-never-closes-a-captain-call) |
+| `freeze` | Declares the one project an open hold freezes. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
+| `frozen` | Read-only check of whether an open hold in this home or a local home above it freezes a task's project. | [A hold can freeze a project](#a-hold-can-freeze-a-project) |
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
@@ -194,6 +196,49 @@ The refusal names the record and the validation reason, so the captain can repai
 `--force` does not lift the deferral, because it authorizes discarding unlanded work, never the captain's question.
 Only `answer` with the captain's words or evidence-backed `reconcile close` resolves the call, by either closing the question or releasing the gated work.
 `bin/fm-backlog-transition-lib.sh` owns the transition and its record, and `bin/fm-captain-hold.sh --help` owns the predicate's contract.
+
+## A hold can freeze a project
+
+A captain who stops a whole project, not one task, files one hold that declares the project, so no automatic cleanup touches that project's finished work until the captain answers.
+The scope is declared, never inferred: it is a `Captain hold freezes project: <project>` line in the hold's header block, the lines under the hold-set stamp up to the first blank line.
+The hold's repo and the task-name prefix are never read.
+
+Declare it on a hold that is already open:
+
+```bash
+bin/fm-captain-hold.sh freeze <hold-task-id> --project <project>
+```
+
+A second `freeze` replaces the project.
+Rewriting the hold's origin keeps the line.
+An open hold is any captain-kind row that is not done, as `open` reads it.
+A freeze therefore outlives the hold's `--until` revisit date: a revisit date is not a release, `freeze` accepts that still-open call, and re-holding it keeps the line.
+The lapse of `--until` for ordinary holds is unchanged.
+An answer moves the old header under its resolution record, so re-holding released work starts a new lifecycle with no freeze.
+
+The read-only `frozen <task-id>` subcommand is the one owner of the question "is this task frozen by an open captain hold".
+It compares the project named by the task's `project=` metadata with the declaration on every open captain hold in this home's own backlog and, in a local secondmate home, in the backlog of every local home above it.
+
+| `frozen` exit | Meaning | What the idle reaper does |
+| --- | --- | --- |
+| 0 | An open captain hold declares the task's project; the hold's id is printed. | Parks the task with that reason and never offers it to teardown. |
+| 1 | No open hold declares it, or the task records no project. | Applies its other gates unchanged. |
+| 2 | The answer could not be established. | Parks the task, never reaps it. |
+
+[`bin/fm-idle-reap-lib.sh`](../bin/fm-idle-reap-lib.sh) asks `frozen` as the last gate before a reap verdict, for a finished task and for a task whose interrupted teardown left a return-pending record, so a task that another gate already keeps from teardown pays no backlog read.
+The scan, the locked teardown admission, and the merge-prune check share that classifier, so all three refuse a frozen task.
+A parked row carries the reason in the scan output and in `state/idle-sessions.report`.
+No refusal memo is written, because a memo would outlive the release; the first sweep after the answer finds the task eligible again.
+Only the automatic paths honor a freeze; a teardown the captain or firstmate runs by hand is unchanged.
+
+A local secondmate home also reads, read-only, the backlog of every local home above it.
+It walks the `.fm-secondmate-parent` bindings its [parent channel](secondmate-parent-channel.md) uses, with the same walk, bound, and cycle check that `fm_firstmate_root_home` in [`bin/fm-secondmate-parent-lib.sh`](../bin/fm-secondmate-parent-lib.sh) uses.
+So the captain's home declares a freeze once, for example on Main's `vernant-freeze-20261023`, and no mate or grandchild mate needs a mirror step.
+A binding, a parent home, or a backlog that cannot be read, a home on the walk that carries the secondmate marker but no binding, a cycle, or a chain past the bound is exit 2, and the parked row names the link that failed.
+
+Known limit, not covered: the walk stops at a remote binding, because a remote parent's records cannot be read from this host.
+A remote mate, and every local home below it, sees only the freezes of the local homes it reached; a freeze filed above the remote binding does not stop its reaper.
+That case is a follow-up.
 
 ## Answer-time resolution
 
@@ -547,6 +592,14 @@ The suites do not test the accepted merge-to-cleanup re-hold window or asynchron
   The Gerrit answer-before-replay case uses ordinary cleanup of already-landed Git work, preserving the change URL rather than recording a forced ship discard as `dropped`.
 - A pending-close record that cannot be validated refuses the answer while naming the record and the reason.
 - A relocated data directory keeps the retention in its one configured backlog.
+
+### Project freeze
+
+- A hold that declares a project freezes only the tasks whose recorded project it names; a plain hold of the same repo, a same-prefix task of another project, a task with no recorded project, and a declaration quoted below the header block freeze nothing.
+- Rewriting the origin keeps the declaration, a second `freeze` replaces it, and an answer ends it even when the same task is held again.
+- A hold whose `--until` date has passed still freezes, accepts `freeze`, and keeps the declaration when it is held again.
+- An unreadable backlog is exit 2, never exit 1.
+- `tests/fm-idle-session-reap.test.sh` covers the reaper side: the scan and the sweep skip a frozen task, the teardown admission refuses it, an interrupted teardown of it is not retried, release restores eligibility, a secondmate home honors its parent's freeze and parks the task when the parent cannot be read, and a grandchild mate honors a freeze at the root, parks on an unreadable or missing middle link or a cycle, and is eligible again after the root releases it.
 
 ### Merges, releases, and unreadable holds
 

@@ -3108,11 +3108,7 @@ EOF
   pass ".omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
-  "$FM_TEST_ONLY"
-  exit $?
-fi
+fm_test_only
 
 test_task_session_proof_tracks_active_session
 test_spawn_refuses_unsupported_omp_before_launch

@@ -3036,10 +3036,7 @@ test_lock_wait_breadcrumb() {
   pass "waiter warns after 60s once per owner and continues to acquire"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+fm_test_only
 
 test_lock_alarm_crosses_threshold_during_capture
 test_watcher_skips_own_singleton_locks

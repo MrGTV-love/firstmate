@@ -222,10 +222,8 @@ test_sweep_retires_only_finished_board_listeners() {
   assert_contains "$out" "retired: $unreadable_id" "the same board was not retired once its session was readable"
   assert_contains "$out" "retired: $gone_id" "a missing-file board was not retired once the store was readable"
 
-  set +e
-  out=$(FM_BOARD_LISTENER_IDLE_HOURS=0 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(FM_BOARD_LISTENER_IDLE_HOURS=0 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an unusable idle window was accepted"
   assert_contains "$out" "FM_BOARD_LISTENER_IDLE_HOURS" "the refusal did not name the setting"
   pass "the sweep retires finished boards and keeps every board that could still carry an answer"

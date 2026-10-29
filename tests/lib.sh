@@ -160,6 +160,111 @@ pass() {
   printf 'ok - %s\n' "$1"
 }
 
+# --- single-case selection --------------------------------------------------
+#
+# Every test file that can run one named case goes through this section, so one
+# rule decides which names are cases and what the file's exit status is. A bare
+# `"$FM_TEST_ONLY"; exit 0` ran an unknown name as a command, printed "command
+# not found", and exited 0, and it exited 0 for a case that returned nonzero, so
+# a renamed case left CI's stock-Bash lane green with nothing tested.
+#
+# fm_test_run_cases [registered-case...] -- [requested-case...]
+#   Refuses an unknown requested name before running anything: "Unknown test
+#   case: <name>" on stderr, exit 2. With registered cases, a requested name must
+#   be one of them and the requested cases run in registration order, or every
+#   registered case runs when none is requested. Without them, a requested name
+#   must be a defined test_ function and runs in the order given. The first case
+#   to return nonzero ends the file with that status, and a case that turns
+#   errexit (set -e) on or off fails the file, so a case sees the same errexit
+#   state in a full run as when it runs alone. A file that must prepare
+#   state at a particular point in its registry defines fm_test_before_case,
+#   which receives each registered case name in order, selected or not, so a
+#   selected case runs in the same shell state as in the full run.
+# fm_test_only [short-name=test_function...]
+#   For a file that selects one case by FM_TEST_ONLY: does nothing when the
+#   variable is empty, otherwise runs that case, or the case a given short name
+#   stands for, and exits with its status. No other file reads FM_TEST_ONLY.
+# fm_test_case_known <name> [registered-case...]
+#   The membership test both use.
+
+fm_test_case_known() {
+  local name=$1 registered
+  shift
+  if [ "$#" -gt 0 ]; then
+    for registered in "$@"; do
+      if [ "$name" = "$registered" ]; then
+        return 0
+      fi
+    done
+    return 1
+  fi
+  case "$name" in
+    test_*[!A-Za-z0-9_]*) return 1 ;;
+    test_?*) declare -F "$name" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+fm_test_run_one() {
+  local rc errexit=${-//[!e]/}
+  "$1"
+  rc=$?
+  [ "$rc" -eq 0 ] || exit "$rc"
+  [ "${-//[!e]/}" = "$errexit" ] || fail "$1 changed errexit (set -e); a case must leave it as it found it"
+}
+
+fm_test_run_cases() {
+  local -a registered=()
+  local name case_name selected
+  while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+    registered+=("$1")
+    shift
+  done
+  [ "$#" -gt 0 ] || fail "fm_test_run_cases: put -- between the registered cases and the requested ones"
+  shift
+
+  for name in "$@"; do
+    if [ "${#registered[@]}" -gt 0 ]; then
+      if fm_test_case_known "$name" "${registered[@]}"; then continue; fi
+    elif fm_test_case_known "$name"; then
+      continue
+    fi
+    printf 'Unknown test case: %s (not defined by %s)\n' "$name" "$(basename "$0")" >&2
+    exit 2
+  done
+
+  if [ "${#registered[@]}" -eq 0 ]; then
+    for case_name in "$@"; do
+      fm_test_run_one "$case_name"
+    done
+    return 0
+  fi
+
+  for case_name in "${registered[@]}"; do
+    if declare -F fm_test_before_case >/dev/null 2>&1; then fm_test_before_case "$case_name"; fi
+    if [ "$#" -gt 0 ]; then
+      selected=false
+      for name in "$@"; do
+        if [ "$name" = "$case_name" ]; then selected=true; fi
+      done
+      [ "$selected" = true ] || continue
+    fi
+    fm_test_run_one "$case_name"
+  done
+  return 0
+}
+
+# shellcheck disable=SC2120 # Most callers pass no short names.
+fm_test_only() {
+  local requested=${FM_TEST_ONLY:-} short_name
+  [ -n "$requested" ] || return 0
+  for short_name in "$@"; do
+    if [ "${short_name%%=*}" = "$requested" ]; then requested=${short_name#*=}; fi
+  done
+  fm_test_run_cases -- "$requested"
+  exit 0
+}
+
 # --- self-cleaning temp root ------------------------------------------------
 #
 # fm_test_tmproot <prefix> echoes a fresh temp dir and registers it for removal
@@ -1321,6 +1426,61 @@ fm_test_base_path_sans() {
     done
   done
   printf '%s\n' "$dir"
+}
+
+# fm_test_refresh_fence_stub <dir>
+# Writes a stub ln into <dir> (put it first on PATH) that pins the instant a
+# home-summary refresh worker, which already owns the refresh lock, first reaches
+# for its fence (the lock's steal mutex). FM_TEST_FENCE_ACTION picks what happens
+# there: remove deletes FM_TEST_FENCE_HOME; refuse writes
+# FM_TEST_FENCE_HOME/state/.test-fence-refused and refuses the mutex while nothing
+# holds it; await-removal records the worker's pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-waiting, then blocks until
+# FM_TEST_FENCE_HOME is gone and refuses the mutex; hold starts a live process
+# that takes the mutex first, records its pid in
+# FM_TEST_FENCE_HOME/state/.test-fence-holder, and keeps it until
+# FM_TEST_FENCE_HOME/state/.test-fence-release exists or its state directory is
+# gone (or it is killed). Any other
+# case, or any other target, runs the real ln. A refresh waiting on a fence is
+# reproduced this way without timing luck.
+fm_test_refresh_fence_stub() {
+  mkdir -p "$1" || return 1
+  FM_TEST_REAL_LN=$(command -v ln)
+  FM_TEST_FENCE_LIB="$ROOT/bin/fm-wake-lib.sh"
+  export FM_TEST_REAL_LN FM_TEST_FENCE_LIB
+  cat > "$1/ln" <<'SH'
+#!/usr/bin/env bash
+case "${*: -1}" in
+  */.home-summary-refresh.lock.steal)
+    state=${FM_TEST_FENCE_HOME:-}/state
+    case "${FM_TEST_FENCE_ACTION:-}" in
+      remove) rm -rf -- "${FM_TEST_FENCE_HOME:?}" ;;
+      refuse) : > "$state/.test-fence-refused"; exit 1 ;;
+      await-removal)
+        printf '%s\n' "$PPID" > "$state/.test-fence-waiting"
+        while [ -d "${FM_TEST_FENCE_HOME:?}" ]; do sleep 0.1; done
+        exit 1
+        ;;
+      hold)
+        if [ ! -e "$state/.test-fence-holder" ]; then
+          env -u FM_TEST_FENCE_ACTION nohup bash -c '
+            . "$1"
+            fm_lock_acquire_wait "$2"
+            printf "%s\n" "$$" > "$3"
+            while [ ! -e "$4" ] && [ -d "${4%/*}" ]; do sleep 0.1; done
+            fm_lock_release "$2"
+          ' _ "$FM_TEST_FENCE_LIB" "${*: -1}" "$state/.test-fence-holder" "$state/.test-fence-release" \
+            >/dev/null 2>&1 </dev/null &
+          i=0
+          while [ ! -s "$state/.test-fence-holder" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+        fi
+        ;;
+    esac
+    ;;
+esac
+exec "${FM_TEST_REAL_LN:?}" "$@"
+SH
+  chmod +x "$1/ln"
 }
 
 # fm_test_wait_until <seconds> <command> [args...]
