@@ -2138,7 +2138,7 @@ print(json.dumps({"state": "BLOCKED", "reason": "manifest_live_owner", "blocked_
 sys.exit(2)
 PY
   git -C "$proj" add scripts
-  git -C "$proj" commit -qm 'fixture governed provisioner'
+  git -C "$proj" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$proj" push -q origin main
   git -C "$slot" merge --ff-only main >/dev/null
   meta="$home/state/$id.meta"

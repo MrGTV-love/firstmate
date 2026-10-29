@@ -606,7 +606,7 @@ manifest.write_text(json.dumps(record))
 print(json.dumps(dict(state='PASS', manifest_path=str(manifest), **record)))
 PY
   git -C "$SLOT_PROJECT" add scripts
-  git -C "$SLOT_PROJECT" commit -qm 'fixture ancestry-governed provisioner'
+  git -C "$SLOT_PROJECT" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture ancestry-governed provisioner'
   git -C "$SLOT_PROJECT" push -q origin main
   printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
     "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
@@ -645,7 +645,7 @@ SH
   git -C "$SLOT_COPY" checkout -qb retained-ahead
   printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
   git -C "$SLOT_COPY" add README.md
-  git -C "$SLOT_COPY" commit -qm 'fixture retained ahead work'
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture retained ahead work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
   cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
@@ -666,7 +666,7 @@ SH
   # Preserve the dirty work by committing it on its original branch, then let
   # the public retry finish first-admission preparation but refuse provision.
   git -C "$SLOT_COPY" add README.md
-  git -C "$SLOT_COPY" commit -qm 'fixture preserve initially dirty prior work'
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture preserve initially dirty prior work'
   prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
   cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
@@ -679,7 +679,7 @@ SH
   # branch must remain at A rather than being freshened to this new B.
   printf 'later upstream work\n' > "$SLOT_PROJECT/upstream-change"
   git -C "$SLOT_PROJECT" add upstream-change
-  git -C "$SLOT_PROJECT" commit -qm 'fixture upstream advances after prepared refusal'
+  git -C "$SLOT_PROJECT" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture upstream advances after prepared refusal'
   git -C "$SLOT_PROJECT" push -q origin main
   [ "$(git -C "$SLOT_COPY" rev-parse origin/main)" != "$slot_base" ] || fail 'upstream advancement setup was vacuous'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
@@ -697,7 +697,7 @@ SH
   git -C "$SLOT_COPY" checkout -q "fm/$RETRY_ID"
   printf 'independent prepared-branch work\n' > "$SLOT_COPY/prepared-change"
   git -C "$SLOT_COPY" add prepared-change
-  git -C "$SLOT_COPY" commit -qm 'fixture changed prepared branch'
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture changed prepared branch'
   changed_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
   git -C "$SLOT_COPY" checkout -q retained-ahead
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \

@@ -2754,11 +2754,11 @@ print(json.dumps({"state": "BLOCKED", "reason": "manifest_exists", "blocked_reas
 sys.exit(2)
 PY
   git -C "$PROJ_DIR" add scripts
-  git -C "$PROJ_DIR" commit -qm 'fixture governed provisioner'
+  git -C "$PROJ_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture governed provisioner'
   git -C "$PROJ_DIR" push -q origin main
   printf 'retained work\n' > "$WT_DIR/retained.txt"
   git -C "$WT_DIR" add retained.txt
-  git -C "$WT_DIR" commit -qm 'unrelated previous task work'
+  git -C "$WT_DIR" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'unrelated previous task work'
   retained_head=$(git -C "$WT_DIR" rev-parse HEAD)
   common=$(git -C "$WT_DIR" rev-parse --path-format=absolute --git-common-dir)
   printf 'foreign manifest bytes\n' > "$common/foreign-manifest"

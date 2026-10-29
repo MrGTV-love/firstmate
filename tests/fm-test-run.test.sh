@@ -3223,7 +3223,8 @@ test_aggregate_json
 # The three control-relaunch groups partition one former suite. The union of
 # their registered case lists must be its 157 cases plus the omp adoption and
 # unconfined omp retirement cases that joined the backends group and
-# test_relocation_refuses_a_non_lease_copy that joined the recovery group, 160
+# test_relocation_refuses_a_non_lease_copy that joined the recovery group and
+# test_owned_path_relaunch_refuses_before_stop that joined the main group, 161
 # in all, each registered by the one file that also defines it, with no case
 # twice. A dropped or duplicated case
 # is exactly what a partition loses while every remaining assertion still passes.
@@ -3258,9 +3259,9 @@ test_control_relaunch_groups_partition_one_inventory() {
   dup=$(printf '%s\n' "$union" | uniq -d)
   [ -z "$dup" ] || fail "a control-relaunch case is registered in more than one group: $dup"
   total=$(printf '%s\n' "$union" | wc -l | tr -d ' ')
-  [ "$total" = 160 ] \
-    || fail "the control-relaunch groups register $total cases, not the 160-case inventory they partition"
-  pass "the control-relaunch groups are a duplicate-free 160-case cover, each case registered by the file that defines it"
+  [ "$total" = 161 ] \
+    || fail "the control-relaunch groups register $total cases, not the 161-case inventory they partition"
+  pass "the control-relaunch groups are a duplicate-free 161-case cover, each case registered by the file that defines it"
 }
 
 # The fm-watch-triage-waits selector called 67 shared-helper cases as one list.

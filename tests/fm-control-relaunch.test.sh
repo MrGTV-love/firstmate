@@ -2258,6 +2258,7 @@ test_owned_path_relaunch_refuses_before_stop() {
     if [ "$shape" = secondmate ]; then
       note_args=()
       mkdir -p "$dir/home/config" "$dir/home/data/$id"
+      printf 'claude\n' > "$dir/home/config/secondmate-harness"
       printf '# secondmate brief\n' > "$dir/home/data/$id/brief.md"
       fm_git_worktree "$dir/proj" "$dir/smhome" sm-branch
       mkdir -p "$dir/smhome/state" "$dir/smhome/data" "$dir/smhome/bin" "$dir/smhome/scripts/git-stability"
