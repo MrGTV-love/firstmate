@@ -1528,9 +1528,11 @@ class WaitVerifier:
                     stream=[stat.st_dev, stat.st_ino])
 
     def task_pr(self, path, fields, verdict):
-        """A task's PR: its recorded pr=, the PR its done note names, or its no-mistakes run's ready PR."""
+        """A task's PR: its recorded pr=, or for a ship the PR its done note names or its no-mistakes run's ready PR."""
         if fields.get("pr"):
             return fields["pr"]
+        if fields.get("kind") != "ship":
+            return ""
         named = self.collector.bash('. "$1/fm-classify-lib.sh"; . "$1/fm-dod-lib.sh"; '
                                     'line=$(last_status_line "$2") || exit 0; case "$line" in done*) ;; *) exit 0 ;; '
                                     'esac; status_line_note "$line" note; fm_dod_pr_url_from_done_note "$note" || :',
