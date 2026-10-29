@@ -1,0 +1,161 @@
+
+===== Setup =====
+T0=086b589097dcc04f23e76de30225b9113528671b (7 cases)  #287 head=8dd8433d9decc24c49e9162e52ba92e03c9717c5  #188 head=1677dc62aacd81ed308b97ccc6322dc5498c40de  limit=10
+#287 alone: SUCCESS 9   #188 alone: SUCCESS 9
+
+===== S1 (fixed script) #287 head contains the live tip T0 -> merges with no extra step =====
+head=8dd8433d9decc24c49e9162e52ba92e03c9717c5  head-check(ci)=SUCCESS 9  main=086b589097dcc04f23e76de30225b9113528671b
+--- fm-pr-merge.sh exit code: 0
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | verified: https://github.com/example/repo/pull/287 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 8dd8433d9decc24c49e9162e52ba92e03c9717c5, which contains the current main tip 086b589097dcc04f23e76de30225b9113528671b
+  | review: PASS
+--- stdout:
+  | armed: state/task-x1.check.sh
+  | verified: https://github.com/example/repo/pull/287 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- gh pr merge calls: 1; compare reads: 2
+--- origin main now f727253580ddde7c962e82ba315be9aafb7b2bba; whole-tree check on main: SUCCESS 9
+
+===== S0 BEFORE THE FIX (base commit 3ea6d935c7718abb0a8cf62c0eb145c89a55757e script): #188, built on T0, merges onto T1 =====
+head=1677dc62aacd81ed308b97ccc6322dc5498c40de  head-check(ci)=SUCCESS 9  main=f727253580ddde7c962e82ba315be9aafb7b2bba
+--- fm-pr-merge.sh exit code: 0
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/tmp/fm-pr-merge-tests.rM09D0/old-tree/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 1677dc62aacd81ed308b97ccc6322dc5498c40de
+  | review: PASS
+--- stdout:
+  | armed: state/task-x1.check.sh
+  | verified: https://github.com/example/repo/pull/188 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- gh pr merge calls: 1; compare reads: 0
+--- origin main now 7b184f3918509f1df9903b0a044e880db547a74a; whole-tree check on main: FAILURE 11
+RESULT: combined tree landed with whole-tree check FAILURE 11 - no check ran on it before it landed
+(reset origin main back to T1=f727253580ddde7c962e82ba315be9aafb7b2bba for the fixed-script runs)
+
+===== S2 (fixed script) same #188 head, same green check, main at T1 -> refused, naming both bases =====
+head=1677dc62aacd81ed308b97ccc6322dc5498c40de  head-check(ci)=SUCCESS 9  main=f727253580ddde7c962e82ba315be9aafb7b2bba
+--- fm-pr-merge.sh exit code: 1
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | error: refusing to merge https://github.com/example/repo/pull/188
+  |   - head 1677dc62aacd81ed308b97ccc6322dc5498c40de lacks the current tip f727253580ddde7c962e82ba315be9aafb7b2bba of base branch main (1 commits behind): it was built on main at 086b589097dcc04f23e76de30225b9113528671b, so no check ran on the tree this merge would land
+  | Update the branch so its head contains main at f727253580ddde7c962e82ba315be9aafb7b2bba (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+--- stdout:
+  | armed: state/task-x1.check.sh
+--- gh pr merge calls: 0; compare reads: 1
+--- origin main now f727253580ddde7c962e82ba315be9aafb7b2bba; whole-tree check on main: SUCCESS 9
+RESULT: main unchanged at T1; the untested combined tree did not land
+
+===== S3 (fixed script, adversarial) attended waivers on the stale head: --attended-override --allow-red ci --allow-missing ci =====
+head=1677dc62aacd81ed308b97ccc6322dc5498c40de  head-check(ci)=SUCCESS 9  main=f727253580ddde7c962e82ba315be9aafb7b2bba
+--- fm-pr-merge.sh exit code: 1
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | error: refusing to merge https://github.com/example/repo/pull/188
+  |   - head 1677dc62aacd81ed308b97ccc6322dc5498c40de lacks the current tip f727253580ddde7c962e82ba315be9aafb7b2bba of base branch main (1 commits behind): it was built on main at 086b589097dcc04f23e76de30225b9113528671b, so no check ran on the tree this merge would land
+  | Update the branch so its head contains main at f727253580ddde7c962e82ba315be9aafb7b2bba (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+--- stdout:
+  | armed: state/task-x1.check.sh
+--- gh pr merge calls: 0; compare reads: 1
+--- origin main now f727253580ddde7c962e82ba315be9aafb7b2bba; whole-tree check on main: SUCCESS 9
+
+===== S4 (fixed script) author updates #188 by merging main: CI now runs on the combined tree =====
+head=4ca4d97637d3354823ccf3377fd5967fbd4a4a14  head-check(ci)=FAILURE 11  main=f727253580ddde7c962e82ba315be9aafb7b2bba
+--- fm-pr-merge.sh exit code: 1
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | error: refusing to merge https://github.com/example/repo/pull/188
+  |   - check 'ci' is not green: it failed, and it is required by base branch main
+  | error: these checks are not green: ci
+  | A failed check clears only when the same check passes on a later run, then re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188
+  | Attended only, waive one named check with: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/188 --allow-red ci
+--- stdout:
+  | armed: state/task-x1.check.sh
+--- gh pr merge calls: 0; compare reads: 1
+--- origin main now f727253580ddde7c962e82ba315be9aafb7b2bba; whole-tree check on main: SUCCESS 9
+
+===== S5 (fixed script) author rebalances so the combined tree fits; check green on the combined tree -> merges =====
+head=f9bf00c1444155375e0428838b91138987b29a9f  head-check(ci)=SUCCESS 10  main=f727253580ddde7c962e82ba315be9aafb7b2bba
+--- fm-pr-merge.sh exit code: 0
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | verified: https://github.com/example/repo/pull/188 is open and mergeable, with every unwaived required check reported and every unwaived check green at head f9bf00c1444155375e0428838b91138987b29a9f, which contains the current main tip f727253580ddde7c962e82ba315be9aafb7b2bba
+  | review: PASS
+--- stdout:
+  | armed: state/task-x1.check.sh
+  | verified: https://github.com/example/repo/pull/188 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+--- gh pr merge calls: 1; compare reads: 2
+--- origin main now 40c30b604ba532c1dd3c3a03fca80aa27243ca82; whole-tree check on main: SUCCESS 10
+
+===== S6 (fixed script, adversarial) a head that contains the tip, but another PR lands right after the verify read =====
+head=70bed19f1faf84a6cd00851e6886ba8d3e26cdcc  head-check(ci)=SUCCESS 10  main=40c30b604ba532c1dd3c3a03fca80aa27243ca82
+--- fm-pr-merge.sh exit code: 1
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | verified: https://github.com/example/repo/pull/300 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 70bed19f1faf84a6cd00851e6886ba8d3e26cdcc, which contains the current main tip 40c30b604ba532c1dd3c3a03fca80aa27243ca82
+  | review: PASS
+  | error: refusing to merge https://github.com/example/repo/pull/300: base branch main is at 7e480378d48d370f28957fae636b04015396c58e, not the tip 40c30b604ba532c1dd3c3a03fca80aa27243ca82 that head 70bed19f1faf84a6cd00851e6886ba8d3e26cdcc was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-pr-merge.sh task-x1 https://github.com/example/repo/pull/300
+--- stdout:
+  | armed: state/task-x1.check.sh
+--- gh pr merge calls: 0; compare reads: 2
+--- origin main now 7e480378d48d370f28957fae636b04015396c58e; whole-tree check on main: SUCCESS 10
+
+===== S7 (fixed script) --auto into a base with a proven merge queue and required check ci: containment skipped, queue checks the combined tree =====
+head=70bed19f1faf84a6cd00851e6886ba8d3e26cdcc  head-check(ci)=SUCCESS 10  main=7e480378d48d370f28957fae636b04015396c58e
+--- fm-pr-merge.sh exit code: 0
+--- stderr:
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | ●  WATCHER DOWN - SUPERVISION IS OFF
+  | ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  | ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  | ●  This is a supervision warning only; the guarded operation WILL still run.
+  | ●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63GDCY5MFNECGV03MJ4G1PA/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  | ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  | verified: https://github.com/example/repo/pull/300 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 70bed19f1faf84a6cd00851e6886ba8d3e26cdcc, which enters the merge queue of base branch main
+  | review: PASS
+--- stdout:
+  | armed: state/task-x1.check.sh
+  | verified: https://github.com/example/repo/pull/300 is queued (state=OPEN, merged=false, isInMergeQueue=true)
+--- gh pr merge calls: 1; compare reads: 0
+--- origin main now 7e480378d48d370f28957fae636b04015396c58e; whole-tree check on main: SUCCESS 10
