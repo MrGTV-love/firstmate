@@ -2,3 +2,4 @@
 # bin/fm-duration.py check-literals grandfathers each row once; see its header.
 bin/fm-model-catalog-lib.sh	30	bound=$(fm_duration_limit "model-catalog.$h" 30) || return $?
 bin/fm-crew-state.sh	5	record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+bin/fm-crew-state.sh	5	record=$(fm_run_timed "$(fm_duration_limit crew-state.forge-read 5 2>/dev/null)" bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?

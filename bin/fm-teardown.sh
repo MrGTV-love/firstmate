@@ -341,7 +341,9 @@
 # FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
 # prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed,
 # except under --force, where the captain's authorized discard goes on and prints
-# and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown.
+# and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
+# from then on every daemon read of that teardown and its children (FM_NM_READ_STALLED)
+# is unknown at once instead of waiting out the stall again.
 # The sweeps retry FM_PROJECT_LOCK_BUSY_EXIT and record no refusal for it.
 # As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
@@ -2257,7 +2259,7 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   # A read-only query against the daemon's database, stopped only by silence: a
   # reader blocked on a lock burns no CPU and prints nothing, a slow one on a busy
   # host does, so how long it takes says nothing about whether it is hung.
-  teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
+  FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
 import re
 import sqlite3
 import sys
@@ -3167,6 +3169,8 @@ teardown_nm_run_unknown() {  # <what is unknown>
     exit "$FM_PROJECT_LOCK_BUSY_EXIT"
   fi
   echo "warning: $why; --force goes on with the no-mistakes run state unknown." >&2
+  FM_NM_READ_STALLED=1
+  export FM_NM_READ_STALLED
   if [ ! -L "$DATA/$ID" ] && mkdir -p "$DATA/$ID" 2>/dev/null \
       && printf '%s forced teardown went on with the no-mistakes run state unknown: %s\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$why" >> "$DATA/$ID/no-mistakes-unknown.log" 2>/dev/null; then

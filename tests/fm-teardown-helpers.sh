@@ -236,8 +236,11 @@ case "${1:-}" in
         run_id=""
         if [ "${1:-}" = --run ]; then run_id=${2:-}; fi
         # A daemon that goes quiet: silent for the plain status read, or for the
-        # read that confirms an abort.
-        if [ "${FM_FAKE_NM_STATUS_HANG:-0}" = 1 ] && [ -z "$run_id" ]; then exec sleep 60; fi
+        # read that confirms an abort. FM_FAKE_NM_HANG_LOG counts the silent reads.
+        if [ "${FM_FAKE_NM_STATUS_HANG:-0}" = 1 ] && [ -z "$run_id" ]; then
+          [ -z "${FM_FAKE_NM_HANG_LOG:-}" ] || printf 'status\n' >> "$FM_FAKE_NM_HANG_LOG"
+          exec sleep 60
+        fi
         if [ "${FM_FAKE_NM_VERIFY_HANG:-0}" = 1 ] && [ -n "$run_id" ]; then exec sleep 60; fi
         # A daemon on a loaded host: the first plain status read burns CPU for this
         # many seconds before it answers (once per FM_FAKE_NM_BURN_MARK).

@@ -20,7 +20,9 @@
 # receipt is local merged evidence; otherwise one forge read is tried. Its bound
 # comes from this host's measured forge-read durations (fm_duration_timed, key
 # crew-state.forge-read, with a cold-start fallback of 5s), so a loaded host
-# stretches it instead of cutting a healthy read.
+# stretches it instead of cutting a healthy read. fm_duration_timed reads its clock
+# with perl, so a host without perl runs the read under the same measured bound
+# (fm_duration_limit) through fm_run_timed and records no sample.
 # FM_CREW_STATE_NO_FORGE=1 keeps the receipt read but skips the forge fallback.
 # An absent or unreadable PR identity yields an honest unknown, never an
 # optimistic merged claim, and so does a forge read that hit its bound: the PR
@@ -514,7 +516,11 @@ forge_read_record_bounded() {  # <inner-script> <args...>
   local script=$1 record state merged rc=0
   shift
   FORGE_READ_TIMED_OUT=0
-  record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  if command -v perl >/dev/null 2>&1; then
+    record=$(fm_duration_timed crew-state.forge-read 5 bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  else
+    record=$(fm_run_timed "$(fm_duration_limit crew-state.forge-read 5 2>/dev/null)" bash -c "$script" _ "$SCRIPT_DIR/fm-pr-lib.sh" "$@" 2>/dev/null) || rc=$?
+  fi
   if [ "$rc" -ne 0 ]; then
     ! fm_timed_out "$rc" || FORGE_READ_TIMED_OUT=1
     return 1

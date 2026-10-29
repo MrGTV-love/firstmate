@@ -1828,6 +1828,38 @@ test_forge_read_bound_follows_the_measured_ledger() {
   pass "a forge read gets its host's measured bound: slow names the state, silent is unknown and retryable"
 }
 
+# A host without perl still reads the PR state: the forge read keeps its measured
+# bound through fm_run_timed instead of failing before it starts.
+test_forge_read_without_perl_names_the_pr_state() {
+  reset_fakes
+  local d out nopath dir tool name
+  local -a dirs
+  d=$(new_case passed-forge-read-no-perl)
+  make_repo_on_branch "$d/wt" fm/feat-dnoperl
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-dnoperl.meta" "window=fm:fm-feat-dnoperl" \
+    "worktree=$d/wt" "kind=ship" "pr=https://gitlab.com/group/repo/-/merge_requests/15"
+  nopath="$d/nopath"
+  mkdir -p "$nopath"
+  IFS=: read -r -a dirs <<< "$PATH"
+  for dir in "${dirs[@]}"; do
+    [ -d "$dir" ] || continue
+    for tool in "$dir"/*; do
+      name=${tool##*/}
+      case "$name" in perl*) continue ;; esac
+      [ -x "$tool" ] && [ ! -d "$tool" ] && [ ! -e "$nopath/$name" ] || continue
+      ln -s "$tool" "$nopath/$name"
+    done
+  done
+  ! PATH="$nopath" command -v perl >/dev/null 2>&1 || fail "the perl-less fixture still finds perl"
+  FM_FAKE_GLAB_STATE=opened
+  FM_FAKE_AXI_STATUS="$(run_passed_with_pr fm/feat-dnoperl https://gitlab.com/group/repo/-/merge_requests/15)"
+  out=$(PATH="$nopath" FM_DURATION_FILE=off run_crew_state "$d" feat-dnoperl)
+  assert_contains "$out" "run passed: PR open" "a host without perl did not read the PR state"
+  assert_not_contains "$out" "(unreadable)" "a host without perl reported the PR state unreadable"
+  pass "a host without perl still reads the PR state through the measured bound"
+}
+
 test_terminal_passed_with_failed_gitlab_read_reports_unknown() {
   reset_fakes
   local d out
@@ -6238,6 +6270,7 @@ test_terminal_passed_with_forgejo_pull_reports_its_state
 test_terminal_passed_with_merged_gitlab_mr_reports_merged
 test_terminal_passed_with_failed_gitlab_read_reports_unknown
 test_forge_read_bound_follows_the_measured_ledger
+test_forge_read_without_perl_names_the_pr_state
 test_terminal_passed_with_open_gerrit_change_does_not_claim_merged
 test_terminal_passed_with_merged_gerrit_change_reports_merged
 test_terminal_passed_with_unreadable_gerrit_change_reports_unknown
