@@ -157,7 +157,7 @@ Later task creation does not intentionally steal focus.
 Herdr does not enforce workspace or tab label uniqueness, so a label can never decide where a worker goes.
 
 Herdr 0.7.5 exports `HERDR_ENV`, `HERDR_PANE_ID`, `HERDR_SESSION`, `HERDR_SOCKET_PATH`, `HERDR_TAB_ID`, and `HERDR_WORKSPACE_ID` into every process it manages a pane for.
-A Firstmate or secondmate agent's own commands inherit them.
+A Firstmate or secondmate agent's own commands inherit them, except that a Firstmate-launched Claude child loses `HERDR_ENV` as described in [ownership after native restoration](#ownership-after-native-restoration).
 Older injection shapes are unverified, so a claimed launcher pane without the injected socket identity cannot be trusted.
 
 With presentation spaces disabled, a crewmate or scout is created in the exact workspace that identity currently resolves to.
