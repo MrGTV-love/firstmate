@@ -1,0 +1,28 @@
+### backlog before
+state: queued
+
+### S1: $ FM_HOME=<lab> FM_MEMORY_FIXTURE_DIR=<pressure-2 fixture> bin/fm-spawn.sh memtask <project> --mode no-mistakes --yolo off
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.nFeqzi
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+deferred: host memory admission refused new task memtask (exit 75); no worker was launched and its backlog item stays queued; inspect state/memory-readings.jsonl
+exit=75
+
+### after: task record?
+ls: /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/memtask.meta: No such file or directory
+### after: launch brief?
+ls: /Users/charlesabrooker/tmp/fm-lab.nFeqzi/data/memtask/launch-brief.md: No such file or directory
+### after: worktrees unchanged?
+unchanged
+### after: backlog item
+state: queued
+### after: running worker PID 1928 alive?
+alive
+### after: new reading rows (source/pressure/admission/reasons)
+{"source":"admit","fixture":"/Users/charlesabrooker/tmp/fm-lab.nFeqzi/spawn-work/native","pressure_level":2,"admission":"defer","reasons":["native memory pressure level 2 (2 or higher defers)"]}

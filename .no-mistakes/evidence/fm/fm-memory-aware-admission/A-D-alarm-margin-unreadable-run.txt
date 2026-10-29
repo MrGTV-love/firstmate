@@ -1,0 +1,60 @@
+=== precondition: two REAL host probes (fixture=null) in this fresh lab root home; they must not enter the fixture baseline
+{"source":"probe","fixture":null,"pressure_level":1,"non_fleet_max_bytes":2816393216}
+{"source":"probe","fixture":null,"pressure_level":1,"non_fleet_max_bytes":2816393216}
+
+=== A1 (R5-1 adversarial): probe rows give the envelope; confined admit/sample rows with lower maxima must not widen it
+probe xprotectd=1GiB      exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":1073741824,"alarms":[],"alarm_hold":[]}
+probe xprotectd=0.5GiB    exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":536870912,"alarms":[],"alarm_hold":[]}
+admit xprotectd=0.125GiB  exit=0 {"source":"admit","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":134217728,"alarms":[],"alarm_hold":[]}
+sample xprotectd=0.0625GiB exit=0 {"source":"sample","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":67108864,"alarms":[],"alarm_hold":[]}
+$ fm-mem-guard.sh baseline
+exit=0
+{
+  "non_fleet_max_bytes": 1073741824,
+  "smallest_reading_max_bytes": 536870912,
+  "samples": 2,
+  "non_fleet_max_share": 0.03125,
+  "incomplete_samples": 0,
+  "derivation": "largest non-fleet RSS observed across recorded healthy root probe readings; incomplete samples are lower bounds"
+}
+(real-host probe rows in this lab log have fixture=null and must also be excluded; expect samples=2, smallest=536870912 not 134217728/67108864)
+
+=== A2: below/at boundary and fleet-owned giants never alarm
+probe xprotectd=1GiB(=boundary), fleet node 20GiB, fleet child 12GiB  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":1073741824,"alarms":[],"alarm_hold":["xprotectd"]}
+memory-health alarm rows added: 0
+
+=== A3: one non-fleet outlier above the boundary raises one identifying alarm wake
+probe xprotectd=11GiB  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":11811160064,"alarms":[{"comm":"xprotectd","pid":101,"rss_bytes":11811160064,"boundary_bytes":1073741824}],"alarm_hold":["xprotectd"]}
+memory-health alarm rows added: 1
+check: memory-health: non-fleet process xprotectd PID 101 RSS 11811160064 bytes exceeds the largest non-fleet RSS observed across 2 healthy readings (1073741824 bytes); see /Users/charlesabrooker/tmp/fm-lab.3dmQqN/state/memory-readings.jsonl. This is an observation, not a leak diagnosis; restarting any system daemon requires the captain's decision.
+repeat probe xprotectd=11GiB  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":11811160064,"alarms":[{"comm":"xprotectd","pid":101,"rss_bytes":11811160064,"boundary_bytes":1073741824}],"alarm_hold":["xprotectd"]}
+probe xprotectd=0.75GiB (between floor and boundary: episode holds)  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":805306368,"alarms":[],"alarm_hold":["xprotectd"]}
+probe xprotectd=11GiB again  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":11811160064,"alarms":[{"comm":"xprotectd","pid":101,"rss_bytes":11811160064,"boundary_bytes":1073741824}],"alarm_hold":["xprotectd"]}
+memory-health alarm rows added after repeats: 1  (expect 1)
+probe xprotectd=0.5GiB (at floor: episode ends)  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":536870912,"alarms":[],"alarm_hold":[]}
+state/.memory-alarmed after floor: 
+probe xprotectd=11GiB (new episode)  exit=0 {"source":"probe","pressure_level":1,"admission":"admit","reasons":[],"non_fleet_max_bytes":11811160064,"alarms":[{"comm":"xprotectd","pid":101,"rss_bytes":11811160064,"boundary_bytes":1073741824}],"alarm_hold":["xprotectd"]}
+memory-health alarm rows added: 2  (expect 2)
+state/.memory-alarmed: alarm:xprotectd 
+
+=== B: headroom margin is recorded and shown but never refuses normal-pressure work (Main186 Option A)
+probe at pressure 2, available 6GiB  exit=0 {"source":"probe","pressure_level":2,"admission":"defer","reasons":["native memory pressure level 2 (2 or higher defers)"]}
+admit at pressure 1, available 1GiB  exit=0 {"admission":"admit","reasons":[],"available_bytes":1073741824,"headroom":{"run_peak_bytes":34359738368,"run":"task:lab","run_samples":10,"run_incomplete_samples":0,"runs_measured":14,"headroom_bytes":6442450944,"pressured_samples":1}}
+calibration pressured record: {"max_available_bytes":6442450944,"samples":1,"highest_level":2,"first_seen":"2026-10-29T01:56:08.037728+00:00","last_seen":"2026-10-29T01:56:08.037728+00:00"}
+
+=== C: unreadable facts defer honestly (exit 75) and never fabricate values
+admit with vm_stat missing  exit=75 {"admission":"defer","reasons":["memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.3dmQqN/alarm-native/vm_stat'"],"has_available":false,"has_unused":false,"calibration":"not judged: this reading has errors"}
+probe with vm_stat missing  exit=0 {"admission":"defer","errors":["memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.3dmQqN/alarm-native/vm_stat'"]}
+check: memory-health: admission measurements are unavailable (memory: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.3dmQqN/alarm-native/vm_stat'); new work is deferred, existing work is unchanged. Read /Users/charlesabrooker/tmp/fm-lab.3dmQqN/state/memory-readings.jsonl.
+admit with pressure level 0  exit=75 {"admission":"defer","errors":["memory: unexpected native pressure level 0"]}
+admit with malformed process census  exit=75 {"admission":"defer","errors":["processes: invalid process census"]}
+
+=== D: run-start wrapper refuses a NEW run under pressure and never stops running work
+pressure 2: exit=75 new-run-started=no running-PID-44349=alive
+stderr reading: {"admission":"defer","reasons":["native memory pressure level 2 (2 or higher defers)"]}
+pressure 4: exit=75 new-run-started=no running=alive
+pressure 1: exit=0 new-run-started=yes running=alive
+
+=== every reading is one parseable JSONL row; fixture rows are marked
+23 rows parse; {('probe', 'real'): 2, ('probe', 'fixture'): 11, ('admit', 'fixture'): 8, ('sample', 'fixture'): 1, ('baseline', 'fixture'): 1}
+/Users/charlesabrooker/.no-mistakes/evidence/01M5ZXMAD5W9SM4DC85WJ38ZQ5/drive-A-D-fixture.sh: line 82: 44349 Terminated: 15          sleep 600

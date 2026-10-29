@@ -1,0 +1,10 @@
+Before starting a new no-mistakes run, build the separate verification plan from the current durable task brief:
+`bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5/bin/fm-dod-lib.sh --verification-plan /Users/charlesabrooker/tmp/fm-lab.3dmQqN/data/memtask/brief.md > /Users/charlesabrooker/tmp/fm-lab.3dmQqN/data/memtask/verification-plan.md`
+If plan construction fails, stop and report the error to firstmate; do not start a run with a partial plan.
+Pass `--verification-plan /Users/charlesabrooker/tmp/fm-lab.3dmQqN/data/memtask/verification-plan.md` when starting the run, alongside the unchanged `--intent` input described below.
+The installed no-mistakes input reads a nonempty UTF-8 file as separate run evidence, not user intent; omit that flag when reattaching to an existing run.
+Start each NEW run through `FM_HOME=/Users/charlesabrooker/tmp/fm-lab.3dmQqN /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5/bin/fm-mem-guard.sh run -- no-mistakes axi run`, appending the unchanged intent and verification-plan arguments, not the bare run command.
+That path records a fresh host memory reading immediately before exec and refuses the new run with exit 75 while native memory pressure is high or its readings are unavailable; it never stops existing work.
+If it exits 75, do not retry it on your own: keep your branch and commits, append one `paused:` status line that quotes the printed reading's `pressure_level`, `available_bytes`, `unused_bytes`, `compressor_bytes`, `swap_used_bytes` and `reasons` as an external host-memory wait for firstmate to re-admit, then end your turn and start the run again only when firstmate tells you to.
+Reattach to existing runs and answer gates directly with no-mistakes; those calls must remain usable under pressure.
+

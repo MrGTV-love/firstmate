@@ -1,0 +1,124 @@
+### L4: three real probes from the lab root home ($ FM_HOME=<lab> bin/fm-mem-guard.sh probe)
+probe 1 exit=0
+{"source":"probe","pressure_level":1,"admission":"admit","errors":[],"non_fleet_max_bytes":2816032768,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-baseline.json","headroom":null,"headroom_calibration":"calibration /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-calibration.json: no run has been recorded in at least two readings; no reading at native pressure 2 or higher has been recorded","alarms":0}
+probe 2 exit=0
+{"source":"probe","pressure_level":1,"admission":"admit","errors":[],"non_fleet_max_bytes":2816032768,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-baseline.json","headroom":null,"headroom_calibration":"calibration /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-calibration.json: no reading at native pressure 2 or higher has been recorded","alarms":0}
+probe 3 exit=0
+{"source":"probe","pressure_level":1,"admission":"admit","errors":[],"non_fleet_max_bytes":2816032768,"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-baseline.json","headroom":null,"headroom_calibration":"calibration /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-calibration.json: no reading at native pressure 2 or higher has been recorded","alarms":0}
+
+### lab state/.memory-calibration.json (run records from real runs on this host)
+{
+  "schema": "fm-memory-calibration.v1",
+  "host": "GTT-CB.local",
+  "total_bytes": 34359738368,
+  "pressured": null,
+  "runs": {
+    "no-mistakes:eded895c05cf/01M5ZXMAD5W9SM4DC85WJ38ZQ5": {
+      "peak_bytes": 548110336,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-dod-reaches-reviewer": {
+      "peak_bytes": 628244480,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-memory-aware-admission": {
+      "peak_bytes": 732561408,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-dod-machine-checked": {
+      "peak_bytes": 536444928,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-flaky-claude-contexts-stdin-file": {
+      "peak_bytes": 558825472,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-restored-claude-worker-no-recovery-path": {
+      "peak_bytes": 497254400,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:fm-merge-prune-test-pane-pid-stub": {
+      "peak_bytes": 470319104,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vdc-crit-gate-2g": {
+      "peak_bytes": 270319616,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vdc-crit-gate-2e": {
+      "peak_bytes": 237273088,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vernant-engine0-post-test-hang": {
+      "peak_bytes": 483885056,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vernant-sprint-status-lock-race": {
+      "peak_bytes": 492339200,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vernant-coverage-bucket-web-fallback": {
+      "peak_bytes": 516849664,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    },
+    "task:vernant-b12-design-first": {
+      "peak_bytes": 470220800,
+      "samples": 3,
+      "incomplete_samples": 0,
+      "max_gap_seconds": 3.82272
+    }
+  }
+}
+
+### lab state/.wake-queue (uncalibrated check wake, queued once)
+1793238834	1	check	memory-health-uncalibrated	check: memory-health: the non-fleet RSS alarm is uncalibrated (no baseline at /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-baseline.json); admission is unaffected. Record healthy readings, then read fm-mem-guard.sh --help before running its baseline command in /Users/charlesabrooker/tmp/fm-lab.nFeqzi.
+
+### lab state/.memory-alarmed
+uncalibrated
+
+### L5: $ FM_HOME=<lab> bin/fm-mem-guard.sh baseline  (derives only from root probe rows; sample/admit rows exist in the log)
+   2 admit
+   3 probe
+   1 sample
+{"checked_at":"2026-10-29T01:53:54.688800+00:00","non_fleet_max_bytes":2816032768}
+{"checked_at":"2026-10-29T01:53:58.511520+00:00","non_fleet_max_bytes":2816032768}
+{"checked_at":"2026-10-29T01:54:02.171492+00:00","non_fleet_max_bytes":2816032768}
+baseline exit=75
+{
+  "admission": "defer",
+  "reasons": [
+    "baseline needs healthy probe readings whose largest non-fleet RSS varies; all 3 in /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/memory-readings.jsonl show 2816032768 bytes"
+  ],
+  "baseline": null
+}
+
+### baseline file on disk
+(none written)
+
+### admit after baseline (real host) shows baseline, alarm list, headroom fields
+exit=0
+{"admission":"admit","reasons":[],"calibration":"no baseline at /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-baseline.json","alarms":[],"alarm_hold":[],"headroom":null,"headroom_calibration":"calibration /Users/charlesabrooker/tmp/fm-lab.nFeqzi/state/.memory-calibration.json: no reading at native pressure 2 or higher has been recorded"}
