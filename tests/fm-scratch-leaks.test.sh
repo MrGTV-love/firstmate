@@ -471,6 +471,32 @@ SH
   assert_clean "$tmp" "parallel scratch entries of one prefix"
   pass "fm_scratch_new survives a container removed and remade by peers under it"
 
+  # Another user swaps the container for a symlink between the ownership check
+  # and mktemp; the entry made through it is removed and never returned.
+  tmp=$(new_tmp)
+  outside=$(new_tmp)
+  mkdir -p "$TMP_ROOT/swap-bin"
+  cat > "$TMP_ROOT/swap-bin/mktemp" <<'SH'
+#!/usr/bin/env bash
+n=$(cat "$RACE_COUNT" 2>/dev/null || echo 0)
+printf '%s\n' "$((n + 1))" > "$RACE_COUNT"
+if [ "$n" -eq 0 ]; then
+  for last; do :; done
+  rmdir "${last%/*}"
+  ln -s "$SWAP_TARGET" "${last%/*}"
+fi
+exec "$RACE_REAL_MKTEMP" "$@"
+SH
+  chmod +x "$TMP_ROOT/swap-bin/mktemp"
+  rm -f "$TMP_ROOT/swap-count"
+  path=$(scratch_new "$tmp" f fm-timeout-status PATH="$TMP_ROOT/swap-bin:$PATH" SWAP_TARGET="$outside" \
+    RACE_COUNT="$TMP_ROOT/swap-count" RACE_REAL_MKTEMP="$(command -v mktemp)") \
+    || fail "fm_scratch_new failed when its container was swapped for a symlink under it"
+  [ -z "$(entries "$outside")" ] || fail "fm_scratch_new left an entry in the target of a container swapped under it: $(entries "$outside")"
+  case "$path" in "$tmp/fm-timeout-status."??????) ;; *) fail "fm_scratch_new returned a path through a container swapped under it: $path" ;; esac
+  [ -f "$path" ] && [ ! -L "$path" ] || fail "fm_scratch_new after a swapped container made no file: $path"
+  pass "fm_scratch_new never returns an entry made through a container swapped under it"
+
   # Another user plants the container as a symlink between the check and mkdir.
   tmp=$(new_tmp)
   outside=$(new_tmp)

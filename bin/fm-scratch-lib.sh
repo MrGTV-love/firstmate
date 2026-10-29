@@ -51,8 +51,9 @@ fm_scratch_new() {  # <f|d> <prefix>
   container=${base%/}/$2.scratch
   fm_scratch_reap "$2"
   # A concurrent release removes the container once it is empty, and another
-  # caller may make it again, anywhere between mkdir and mktemp; so the whole
-  # make-container-then-mktemp sequence gets a few tries.
+  # caller, or another user, may put something else there, anywhere between
+  # mkdir and mktemp; so the whole make-container-then-mktemp sequence gets a
+  # few tries, and an entry is kept only while its container is still ours.
   for _ in 1 2 3 4 5; do
     [ -d "$container" ] || mkdir -m 700 -- "$container" 2>/dev/null \
       || [ -e "$container" ] || [ -L "$container" ] || continue
@@ -61,8 +62,11 @@ fm_scratch_new() {  # <f|d> <prefix>
       return
     fi
     if fm_scratch_path=$(umask 077; mktemp ${fm_scratch_dir:+"-d"} "$container/$$.XXXXXX" 2>/dev/null); then
-      printf '%s\n' "$fm_scratch_path"
-      return 0
+      if fm_scratch_owned "$container"; then
+        printf '%s\n' "$fm_scratch_path"
+        return 0
+      fi
+      rm -rf -- "$fm_scratch_path"
     fi
   done
   return 1
