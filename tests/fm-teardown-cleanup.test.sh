@@ -3798,7 +3798,7 @@ SH
     FM_TEST_TMUX_LOG="$case_dir/tmux.log" \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
   teardown_pid=$!
-  fm_test_wait_until 60 test -e "$case_dir/kill-ready" \
+  fm_test_wait_until --while-alive "$teardown_pid" --progress-file "$case_dir/stdout" --progress-file "$case_dir/stderr" -- test -e "$case_dir/kill-ready" \
     || { : > "$case_dir/kill-release"; wait "$teardown_pid" 2>/dev/null; fail "guard-scope: teardown never reached its endpoint close: $(cat "$case_dir/stderr")"; }
   compgen -G "$case_dir/state/.fm-lease-command*.lock" >/dev/null \
     || { : > "$case_dir/kill-release"; wait "$teardown_pid" 2>/dev/null; fail "guard-scope: the cleanup held no lease-command lock, so the case proves nothing"; }

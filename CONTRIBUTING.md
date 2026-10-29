@@ -149,6 +149,7 @@ Shared test helpers live in `tests/lib.sh` (reporters, temp roots, git fixtures,
 Source those instead of copying a fake toolchain into a new suite.
 A test file that can run one case by name (`FM_TEST_ONLY=<test_function>` or positional test names) selects it through `fm_test_only` or `fm_test_run_cases` in `tests/lib.sh`, never a bare `"$FM_TEST_ONLY"` call.
 Those helpers refuse an unknown name with `Unknown test case: <name>` and exit 2 before running anything, and the file exits with the selected case's own status.
+For asynchronous assertions, use the progress-aware `fm_test_wait_until` interface documented beside its definition in `tests/lib.sh`; `tests/fm-test-wait-until.test.sh` exercises slow publishers and real stalls.
 A `BASH_ENV` fixture that wraps `[` must forward the complete argument list with `builtin [ "$@"`, including the closing `]`: Bash 3.2 can collapse a quoted argument slice under `IFS=:`, corrupting interpreter selection in shell launchers such as pyenv (regression: `tests/fm-spawn-dispatch-profile.test.sh`).
 For focused inheritance fixtures, use the test-only item selection owned by `bin/fm-config-inherit-lib.sh` to avoid repeatedly transferring unrelated absent configuration while retaining every item needed by the behavioral assertions.
 Keep fixture edits portable across GNU and BSD tools: write transformed metadata to a temporary file, replace it only on success, and fail the case if preparation fails rather than testing the wrong recorded harness.

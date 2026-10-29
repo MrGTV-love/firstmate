@@ -127,7 +127,7 @@ pass "threshold and retention customization are refused, as are invalid remainin
 export NESTSLEEP="$LAB/nestsleep" BURSTSLEEP="$LAB/burstsleep"
 "$LAB/bash" "$LAB/nest.sh" 60 --user alice:secret >/dev/null 2>&1 &
 ROOT_PID=$!
-fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
+fm_test_wait_until --while-alive "$ROOT_PID" -- pgrep -f "$LAB/nestsleep 120" || fail "the recursive tree never reached its leaf"
 
 path=$("$GUARD" census --state-dir "$STATE/census" --limit 1000000) || fail "census exited nonzero"
 [ -f "$path" ] || fail "census did not print an existing file: $path"
@@ -245,8 +245,9 @@ if [ "$room" = 1 ]; then
   # burst, and dropping the burst returns well below it, however busy the host is.
   limit=$(python3 -I -c 'import sys; print(int((int(sys.argv[1]) + int(sys.argv[2]) // 2) / 0.6) + 1)' "$base" "$burst")
   D="$STATE/dip"
-  "$LAB/bash" "$LAB/burst.sh" "$burst"
-  fm_test_wait_until 60 burst_ready || fail "the first burst never started"
+  "$LAB/bash" "$LAB/burst.sh" "$burst" &
+  burst_pid=$!
+  fm_test_wait_until --while-alive "$burst_pid" -- burst_ready || fail "the first burst never started"
   first=$(now)
   "$GUARD" watch --state-dir "$D" --limit "$limit" --hold 4 --interval 0.2 --source-id t-dip > "$LAB/dip.out" &
   WATCH_PID=$!
@@ -271,7 +272,7 @@ fi
 # --- never kills -------------------------------------------------------------
 
 "$LAB/bash" "$LAB/nest.sh" 5 >/dev/null 2>&1 &
-fm_test_wait_until 20 pgrep -f "$LAB/nestsleep 120" || fail "the survivor tree never reached its leaf"
+fm_test_wait_until --while-alive "$!" -- pgrep -f "$LAB/nestsleep 120" || fail "the survivor tree never reached its leaf"
 "$GUARD" watch --state-dir "$STATE/survivors" --limit 1 --hold 1 --interval 0.2 >/dev/null || fail "watch exited nonzero over the survivor tree"
 pgrep -f "$LAB/nestsleep 120" >/dev/null || fail "watch killed a process of the tree it reported"
 pass "a reported pile-up is never killed"

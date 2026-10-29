@@ -1656,11 +1656,11 @@ test_verified_merge_arms_the_pool_copy_prune() {
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "github-merge-prune: the merge itself must still succeed"
-  fm_test_wait_until 100 test -s "$case_dir/teardown-calls" \
+  fm_test_wait_until --progress-file "$case_dir/home/data/task-x1/merge-prune.log" --progress-file "$case_dir/teardown-calls" -- test -s "$case_dir/teardown-calls" \
     || fail "github-merge-prune: the verified merge never started a teardown attempt: $(cat "$case_dir/stderr")"
   [ "$(cat "$case_dir/teardown-calls")" = "task-x1|admission=1" ] \
     || fail "github-merge-prune: teardown was not asked plainly for the task: $(cat "$case_dir/teardown-calls")"
-  fm_test_wait_until 100 grep -q reaped "$case_dir/home/data/task-x1/merge-prune.log" \
+  fm_test_wait_until --progress-file "$case_dir/home/data/task-x1/merge-prune.log" --progress-file "$case_dir/teardown-calls" -- grep -q reaped "$case_dir/home/data/task-x1/merge-prune.log" \
     || fail "github-merge-prune: the prune log does not say reaped"
   pass "fm-pr-merge arms the pool-copy prune after a verified merge and the detached attempt reaps it, unforced"
 }

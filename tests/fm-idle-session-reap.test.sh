@@ -592,7 +592,7 @@ test_single_flight_lock() {
   scout_report "$home" scout-lock
   run_reap "$home" reap >/dev/null 2>&1 &
   pid=$!
-  fm_test_wait_until 10 calls_at_least 1 || fail "first sweep never reached teardown"
+  fm_test_wait_until --while-alive "$pid" -- calls_at_least 1 || fail "first sweep never reached teardown"
   hung=$(cut -d'|' -f1 "$STUB_LOG" | head -n 1)
   out=$(run_reap "$home" reap) || fail "overlapping sweep failed: $out"
   [ "$(calls)" = 1 ] || fail "an overlapping sweep must not start another teardown (calls=$(calls))"
@@ -938,7 +938,7 @@ test_admission_reads_after_metadata_lock() {
     trap 'fm_lock_release "$lock"' EXIT
     FM_HOME="$home" FM_IDLE_REAP_ADMISSION=1 "$ROOT/bin/fm-teardown.sh" worker > "$home/teardown.out" 2>&1 &
     pid=$!
-    fm_test_wait_until 10 test -e "$home/state/.control-worker.lock" || { kill "$pid"; exit 1; }
+    fm_test_wait_until --while-alive "$pid" -- test -e "$home/state/.control-worker.lock" || { kill "$pid"; exit 1; }
     mkdir -p "$home/state/worker.inbox"
     printf 'instruction delivered while admission waits\n' > "$home/state/worker.inbox/007.msg"
     fm_lock_release "$lock"

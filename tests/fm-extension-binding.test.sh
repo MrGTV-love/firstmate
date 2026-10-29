@@ -1420,11 +1420,11 @@ proc_shadow_owner=$(printf '%s\n' "$proc_shadow_registration" | sed -n 's/^owner
 FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
   "$PROCEVENT" reconcile | grep -q ' started=1 ' || fail "the shadow extension runner did not launch"
 wait_for_file "$proc_shadow_marker" || fail "the shadow extension runner never entered its poll"
-fm_test_wait_until 30 test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
+fm_test_wait_until --progress-file "$H_PROC_SHADOW/state/procevent/proc-guard.runner" -- test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
   || fail "the shadow extension runner recorded no listener"
 proc_shadow_runner=$(cat "$H_PROC_SHADOW/state/procevent/proc-guard.runner")
 # shellcheck disable=SC2016 # $1 expands in the child shell.
-fm_test_wait_until 30 bash -c '! kill -0 "$1" 2>/dev/null' _ "$proc_shadow_runner" \
+fm_test_wait_until --while-alive "$proc_shadow_runner" -- bash -c '! kill -0 "$1" 2>/dev/null' _ "$proc_shadow_runner" \
   || fail "a stale home lease left an extension named proc listening"
 touch "$proc_shadow_release"
 proc_shadow_release=

@@ -68,16 +68,16 @@ alive() {
   [ "$current" = "$identity" ]
 }
 
-# Both waits poll through fm_test_wait_until, which tests its condition before it
-# reads any clock, so a short window can never end without one real look.
+# Both waits probe the outcome before inspecting producer liveness/progress,
+# so an already-published result or completed disappearance wins over exit.
 gone() { ! alive "$@"; }
 
-wait_gone() { # <pid> <seconds> [identity]
-  fm_test_wait_until "$2" gone "$1" "${3:-}"
+wait_gone() { # <pid> [identity]
+  fm_test_wait_until --while-alive "$1" -- gone "$1" "${2:-}"
 }
 
-wait_file() { # <file> <seconds>
-  fm_test_wait_until "$2" test -s "$1"
+wait_file() { # <file>
+  fm_test_wait_until --progress-file "$1" -- test -s "$1"
 }
 
 # A stub that waits for a release file, bounded as every polling stub must be.
@@ -114,7 +114,7 @@ orphan() {
     initialized_identity "$pid" "$@" > "$pidfile.identity" || exit 1
     printf '%s\n' "$pid" > "$pidfile"
   ) || fail "could not record the orphan fixture's original identity"
-  wait_file "$pidfile" 5 || fail "the orphan fixture did not start"
+  wait_file "$pidfile" || fail "the orphan fixture did not start"
   track "$(cat "$pidfile")" "$(cat "$pidfile.identity")"
 }
 
@@ -140,9 +140,9 @@ printf 'exec\n' > "$TMP_ROOT/identity-exec"
 wait "$IDENTITY_CAPTURE" || fail "could not identify the initialized identity fixture"
 IDENTITY_FIXTURE_ORIGINAL=$(cat "$TMP_ROOT/identity-captured")
 track "$IDENTITY_FIXTURE" "$IDENTITY_FIXTURE_ORIGINAL"
-wait_gone "$IDENTITY_FIXTURE" 1 "different original identity" || fail "a replaced original identity must count as gone"
+wait_gone "$IDENTITY_FIXTURE" "different original identity" || fail "a replaced original identity must count as gone"
 alive "$IDENTITY_FIXTURE" || fail "the newest registered identity must identify the live replacement"
-if wait_gone "$IDENTITY_FIXTURE" 1; then
+if fm_test_wait_until --while-alive "$IDENTITY_FIXTURE" --inactivity 1 -- gone "$IDENTITY_FIXTURE"; then
   fail "a still-live original identity must not count as gone"
 fi
 kill -KILL "$IDENTITY_FIXTURE" 2>/dev/null || true
@@ -176,11 +176,11 @@ pass "a stub is left alone while the run that made it is alive"
 
 kill -KILL "$OWNER" 2>/dev/null || true
 wait "$OWNER" 2>/dev/null || true
-wait_gone "$OWNER" 5 || fail "the stand-in owner did not exit"
+wait_gone "$OWNER" || fail "the stand-in owner did not exit"
 
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the reaper failed: $out"
 assert_contains "$out" "reaped pid=$DEAD_STUB " "the reaper did not report the orphaned stub"
-wait_gone "$DEAD_STUB" 10 || fail "the orphaned stub of an ended run survived the reaper"
+wait_gone "$DEAD_STUB" || fail "the orphaned stub of an ended run survived the reaper"
 pass "the reaper stops a stub whose owning run has ended"
 
 alive "$LIVE_PARENT_STUB" || fail "the reaper stopped a process that still has a live parent"
@@ -206,7 +206,7 @@ SH
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 LAB_OWNER=$!
 track "$LAB_OWNER" "$(initialized_identity "$LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
-wait_file "$LAB_ROOT/ready" 5 || fail "the lab creator did not finish"
+wait_file "$LAB_ROOT/ready" || fail "the lab creator did not finish"
 mkdir -p "$LAB_ROOT/bin"
 write_stub "$LAB_ROOT/bin/fm-watch.sh"
 orphan "$TMP_ROOT/lab-watch.pid" bash "$LAB_ROOT/bin/fm-watch.sh" "$LAB_ROOT/release"
@@ -221,7 +221,7 @@ env FM_TEST_GATE_LIB="$ROOT/bin/fm-gate-refuse-lib.sh" FM_TEST_LAB_ROOT="$LAB_RO
 kill -KILL "$LAB_OWNER" 2>/dev/null || true
 wait "$LAB_OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the ended lab scan failed: $out"
-wait_gone "$LAB_WATCH" 10 || fail "the ended lab's scratch-copy watcher survived"
+wait_gone "$LAB_WATCH" || fail "the ended lab's scratch-copy watcher survived"
 pass "lab creation records its caller and ended scratch-copy watchers are reaped"
 
 mkdir -p "$TMP_ROOT/go-build-cwd"
@@ -253,7 +253,7 @@ track "$GO_LIVE_PARENT" "$(initialized_identity "$GO_LIVE_PARENT" "$TMP_ROOT/go-
 kill -KILL "$OWNER" 2>/dev/null || true
 wait "$OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the cwd scan failed: $out"
-wait_gone "$GO_STUB" 10 || fail "the detached go-build test executable survived with cwd under the ended run"
+wait_gone "$GO_STUB" || fail "the detached go-build test executable survived with cwd under the ended run"
 alive "$GO_SIBLING" || fail "cwd attribution crossed a root prefix boundary"
 alive "$GO_LIVE_PARENT" || fail "cwd attribution reaped a test executable with a live parent"
 pass "go-build-only argv is attributed by cwd without crossing ownership boundaries"
@@ -283,7 +283,7 @@ alive "$LIVE_LAB_WATCH" || fail "a live lab ended merely because up's creator ex
 kill -KILL "$LIVE_LAB_PANE" 2>/dev/null || true
 wait "$LIVE_LAB_PANE" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the stopped live lab scan failed: $out"
-wait_gone "$LIVE_LAB_WATCH" 10 || fail "the stopped live lab watcher survived"
+wait_gone "$LIVE_LAB_WATCH" || fail "the stopped live lab watcher survived"
 pass "live labs persist after up exits until their recorded runtime ends"
 
 start_owner
@@ -295,7 +295,7 @@ FAILED_LAB_WATCH=$(cat "$TMP_ROOT/failed-lab.pid")
 kill -KILL "$OWNER" 2>/dev/null || true
 wait "$OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the failed creation scan failed: $out"
-wait_gone "$FAILED_LAB_WATCH" 10 || fail "a failed pre-launch lab creation retained its watcher"
+wait_gone "$FAILED_LAB_WATCH" || fail "a failed pre-launch lab creation retained its watcher"
 pass "failed lab creation without a runtime is ended when its creator exits"
 
 start_owner
@@ -331,7 +331,7 @@ mkdir -p "$SERVER_DIR/tmux-$(id -u)"
 : > "$SERVER_DIR/tmux-$(id -u)/default"
 printf 'stopped\n' > "$TMP_ROOT/tmux-status"
 out=$(FM_TEST_TMUX_STATUS="$TMP_ROOT/tmux-status" PATH="$TMP_ROOT/lab-tmux-bin:$PATH" "$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the stopped server scan failed: $out"
-wait_gone "$SERVER_WATCH" 10 || fail "a confirmed stopped private server retained its orphan watcher"
+wait_gone "$SERVER_WATCH" || fail "a confirmed stopped private server retained its orphan watcher"
 pass "active and indeterminate private lab servers prevent reaping until stopped"
 
 # The owner-exit sweep: the caller owns the root and reaps what it left, including
@@ -351,8 +351,8 @@ done
 SH
 chmod +x "$OWNED/forking.sh"
 ( bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid" >/dev/null 2>&1 & echo $! > "$OWNED/stub.pid" )
-wait_file "$OWNED/stub.pid" 5 || fail "the owned stub did not start"
-wait_file "$OWNED/child.pid" 5 || fail "the owned stub's child did not start"
+wait_file "$OWNED/stub.pid" || fail "the owned stub did not start"
+wait_file "$OWNED/child.pid" || fail "the owned stub's child did not start"
 OWNED_STUB=$(cat "$OWNED/stub.pid")
 OWNED_CHILD=$(cat "$OWNED/child.pid")
 track "$OWNED_STUB" "$(initialized_identity "$OWNED_STUB" bash "$OWNED/forking.sh" "$OWNED/release" "$OWNED/child.pid")"
@@ -381,9 +381,9 @@ printf '%s\n' "$OWNED_MARKER" > "$OWNED/.fm-test-fixture"
 pass "owner-exit authority requires the original owner identity as well as its PID"
 
 out=$("$REAPER" --owner-pid "$$" --root "$OWNED" 2>&1) || fail "the owner-exit sweep failed: $out"
-wait_gone "$OWNED_STUB" 10 || fail "the owner-exit sweep left the stub running"
-wait_gone "$OWNED_CHILD" 10 || fail "the owner-exit sweep left the stub's child running"
-wait_gone "$OWNED_JOB" 10 || fail "the owner-exit sweep left the owner's own job running"
+wait_gone "$OWNED_STUB" || fail "the owner-exit sweep left the stub running"
+wait_gone "$OWNED_CHILD" || fail "the owner-exit sweep left the stub's child running"
+wait_gone "$OWNED_JOB" || fail "the owner-exit sweep left the owner's own job running"
 wait "$OWNED_JOB" 2>/dev/null || true
 pass "the owner-exit sweep stops a hidden stub and everything below it"
 
@@ -427,19 +427,19 @@ child_env() { # <mode> <pidfile>
 }
 
 child_env normal "$TMP_ROOT/normal.pid" >/dev/null 2>&1
-wait_file "$TMP_ROOT/normal.pid" 5 || fail "the normal-exit test did not start its stub"
+wait_file "$TMP_ROOT/normal.pid" || fail "the normal-exit test did not start its stub"
 NORMAL_STUB=$(cat "$TMP_ROOT/normal.pid")
-wait_gone "$NORMAL_STUB" 10 "$(cat "$TMP_ROOT/normal.pid.identity")" || fail "a test that exited normally left its subshell-started stub running"
+wait_gone "$NORMAL_STUB" "$(cat "$TMP_ROOT/normal.pid.identity")" || fail "a test that exited normally left its subshell-started stub running"
 pass "a test that exits normally leaves no stub of its own behind"
 
 child_env killed "$TMP_ROOT/killed.pid" >/dev/null 2>&1
-wait_file "$TMP_ROOT/killed.pid" 5 || fail "the killed test did not start its stub"
+wait_file "$TMP_ROOT/killed.pid" || fail "the killed test did not start its stub"
 KILLED_STUB=$(cat "$TMP_ROOT/killed.pid")
 track "$KILLED_STUB" "$(cat "$TMP_ROOT/killed.pid.identity")"
 alive "$KILLED_STUB" || fail "the killed test's stub did not outlive its owner, so this case proves nothing"
 # shellcheck disable=SC2016 # The child shell, not this one, expands $FM_TEST_LIB.
 env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
-wait_gone "$KILLED_STUB" 10 || fail "sourcing the test library did not reap the stub of a killed test"
+wait_gone "$KILLED_STUB" || fail "sourcing the test library did not reap the stub of a killed test"
 pass "sourcing the test library reaps the stub a killed test left behind"
 
 NESTED_RUN=$(mktemp -d "$CHILD_TMP/fm-test-run.XXXXXX") || fail "could not make a parallel run container"
@@ -456,25 +456,25 @@ orphan "$TMP_ROOT/nested-unmarked.pid" bash "$NESTED_UNMARKED_ROOT/poll-publish-
 NESTED_UNMARKED_STUB=$(cat "$TMP_ROOT/nested-unmarked.pid")
 env TMPDIR="$NESTED_WORKER_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_MODE=killed \
   FM_TEST_PIDFILE="$TMP_ROOT/nested-killed.pid" FM_TEST_SKIP_ORPHAN_REAP=1 bash "$TMP_ROOT/child.sh" >/dev/null 2>&1
-wait_file "$TMP_ROOT/nested-killed.pid" 5 || fail "the killed parallel test did not start its stub"
+wait_file "$TMP_ROOT/nested-killed.pid" || fail "the killed parallel test did not start its stub"
 NESTED_KILLED_STUB=$(cat "$TMP_ROOT/nested-killed.pid")
 track "$NESTED_KILLED_STUB" "$(cat "$TMP_ROOT/nested-killed.pid.identity")"
 alive "$NESTED_KILLED_STUB" || fail "the parallel test's stub did not outlive its owner"
 # shellcheck disable=SC2016 # The child shell, not this one, expands $FM_TEST_LIB.
 env TMPDIR="$CHILD_TMP" FM_TEST_LIB="$ROOT/tests/lib.sh" FM_TEST_SKIP_ORPHAN_REAP=0 bash -c '. "$FM_TEST_LIB"' >/dev/null 2>&1
-wait_gone "$NESTED_KILLED_STUB" 10 || fail "startup recovery left the killed parallel test's nested stub running"
+wait_gone "$NESTED_KILLED_STUB" || fail "startup recovery left the killed parallel test's nested stub running"
 alive "$NESTED_LIVE_STUB" || fail "startup recovery stopped a live test's nested stub"
 alive "$NESTED_UNMARKED_STUB" || fail "startup recovery stopped an unmarked nested stub"
 touch "$NESTED_LIVE_ROOT/release" "$NESTED_UNMARKED_ROOT/release"
-wait_gone "$NESTED_LIVE_STUB" 5 || fail "the live test's nested stub did not accept its release"
-wait_gone "$NESTED_UNMARKED_STUB" 5 || fail "the unmarked nested stub did not accept its release"
+wait_gone "$NESTED_LIVE_STUB" || fail "the live test's nested stub did not accept its release"
+wait_gone "$NESTED_UNMARKED_STUB" || fail "the unmarked nested stub did not accept its release"
 pass "startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries"
 
 NESTED_LAB_ROOT="$SCAN/fm-test-run.lab-nested/home"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 NESTED_LAB_OWNER=$!
 track "$NESTED_LAB_OWNER" "$(initialized_identity "$NESTED_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
-wait_file "$NESTED_LAB_ROOT/ready" 5 || fail "the nested lab creator did not finish"
+wait_file "$NESTED_LAB_ROOT/ready" || fail "the nested lab creator did not finish"
 mkdir -p "$NESTED_LAB_ROOT/bin" "$NESTED_LAB_ROOT-unmarked/bin"
 write_stub "$NESTED_LAB_ROOT/bin/fm-watch.sh"
 orphan "$TMP_ROOT/nested-lab-watch.pid" bash "$NESTED_LAB_ROOT/bin/fm-watch.sh" "$NESTED_LAB_ROOT/release"
@@ -489,10 +489,10 @@ kill -KILL "$NESTED_LAB_OWNER" 2>/dev/null || true
 wait "$NESTED_LAB_OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the ended nested lab scan failed: $out"
 assert_contains "$out" "reaped pid=$NESTED_LAB_WATCH root=$NESTED_LAB_ROOT " "the scan did not attribute the watcher to its marked nested lab home"
-wait_gone "$NESTED_LAB_WATCH" 10 || fail "the ended nested lab's watcher survived"
+wait_gone "$NESTED_LAB_WATCH" || fail "the ended nested lab's watcher survived"
 alive "$NESTED_LAB_UNMARKED_WATCH" || fail "the ended lab scan stopped an unmarked nested lab watcher"
 touch "$NESTED_LAB_ROOT-unmarked/release"
-wait_gone "$NESTED_LAB_UNMARKED_WATCH" 5 || fail "the unmarked nested lab watcher did not accept its release"
+wait_gone "$NESTED_LAB_UNMARKED_WATCH" || fail "the unmarked nested lab watcher did not accept its release"
 pass "nested marked lab watchers are reaped while unmarked nested homes are left alone"
 
 # tests/fm-backend-herdr-recovery-lock-e2e.test.sh makes a marked
@@ -502,7 +502,7 @@ HERDR_LAB_ROOT="$SCAN/fmlab.herdr-recovery-lock.AbC123/home-forced/nested"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$HERDR_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 HERDR_LAB_OWNER=$!
 track "$HERDR_LAB_OWNER" "$(initialized_identity "$HERDR_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$HERDR_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
-wait_file "$HERDR_LAB_ROOT/ready" 5 || fail "the herdr-layout lab creator did not finish"
+wait_file "$HERDR_LAB_ROOT/ready" || fail "the herdr-layout lab creator did not finish"
 mkdir -p "$HERDR_LAB_ROOT/bin"
 write_stub "$HERDR_LAB_ROOT/bin/fm-watch.sh"
 orphan "$TMP_ROOT/herdr-lab-watch.pid" bash "$HERDR_LAB_ROOT/bin/fm-watch.sh" "$HERDR_LAB_ROOT/release"
@@ -513,7 +513,7 @@ kill -KILL "$HERDR_LAB_OWNER" 2>/dev/null || true
 wait "$HERDR_LAB_OWNER" 2>/dev/null || true
 out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the ended herdr-layout scan failed: $out"
 assert_contains "$out" "reaped pid=$HERDR_LAB_WATCH root=$HERDR_LAB_ROOT " "the scan missed a lab home two levels below a marked herdr-layout root"
-wait_gone "$HERDR_LAB_WATCH" 10 || fail "the ended herdr-layout lab's watcher survived"
+wait_gone "$HERDR_LAB_WATCH" || fail "the ended herdr-layout lab's watcher survived"
 pass "a lab home two levels below a marked herdr-layout root is found and reaped"
 
 # Host clutter must not set the sweep's cost. Other tools leave tens of thousands

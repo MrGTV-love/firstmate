@@ -1483,16 +1483,66 @@ SH
   chmod +x "$1/ln"
 }
 
-# fm_test_wait_until <seconds> <command> [args...]
-# Polls until the command succeeds or the ceiling passes. For a result that a
-# detached background job publishes, such as bin/fm-home-summary-refresh.sh
-# --detach, where the foreground command under test returns before it exists.
-fm_test_wait_until() {
-  local limit=$1 ticks=0
-  shift
-  while ! "$@" >/dev/null 2>&1; do
-    ticks=$((ticks + 1))
-    [ "$ticks" -le $((limit * 10)) ] || return 1
-    sleep 0.1
+# fm_test_wait_until [--while-alive PID] [--progress-file PATH]...
+#                    [--inactivity SECONDS] -- COMMAND [ARGS...]
+# Wait for an outcome, not a total duration. Supply the awaited producer's PID
+# (also for a disappearance predicate), or a file its detached publisher changes.
+# CPU growth, runnable work, or changes to watched files reset inactivity through
+# fm-duration.py progress-check. Never pass the waiting test's own PID: its polls
+# would manufacture progress. File-only mode observes publication, not our CPU.
+# The default inactivity interval comes from the ledger with the operational
+# 15-quiet-minute cold-start policy; --inactivity is a failure-fixture override.
+# A missing CPU sample is unknown and retried, never a stall. Death or proven
+# inactivity returns 1 only after one final predicate probe, so completion at
+# peer exit wins. Invalid arguments/observer errors return 2. No peer is killed;
+# its owner retains cleanup. Predicates must be quick, nonblocking probes and
+# may be shell functions; each probe runs in a subshell with output suppressed.
+fm_test_wait_until() (
+  local pid=0 inactivity='' record rc
+  local paths=() observer=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --while-alive)
+        [ "$#" -ge 2 ] || return 2
+        pid=$2
+        case "$pid" in ''|*[!0-9]*|0) return 2 ;; esac
+        [ "$pid" != "$$" ] || return 2
+        shift 2 ;;
+      --progress-file)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        paths+=("$2")
+        shift 2 ;;
+      --inactivity)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || return 2
+        inactivity=$2
+        shift 2 ;;
+      --) shift; break ;;
+      *) printf 'fm_test_wait_until: expected observation options then -- COMMAND\n' >&2; return 2 ;;
+    esac
   done
-}
+  [ "$#" -gt 0 ] || return 2
+  [ "$pid" -gt 0 ] || [ "${#paths[@]}" -gt 0 ] || return 2
+  if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+  if [ -z "$inactivity" ]; then
+    inactivity=$(python3 "$ROOT/bin/fm-duration.py" limit test.wait-until --fallback 900) || return 2
+  fi
+  record=$(mktemp "$FM_TEST_TMPDIR/.fm-test-wait.XXXXXX") || return 2
+  trap 'rm -f "$record"' EXIT
+  observer=(python3 "$ROOT/bin/fm-duration.py" progress-check "$record" "$pid" "$inactivity")
+  [ "${#paths[@]}" -eq 0 ] || observer+=("${paths[@]}")
+  [ "$pid" -eq 0 ] || observer+=(--while-alive)
+  while :; do
+    if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+    rc=0
+    "${observer[@]}" || rc=$?
+    case "$rc" in
+      0) ;;
+      3|124)
+        if ( "$@" ) >/dev/null 2>&1; then return 0; fi
+        printf 'fm_test_wait_until: condition unmet (%s, pid=%s)\n' "$rc" "$pid" >&2
+        return 1 ;;
+      *) return 2 ;;
+    esac
+    sleep 0.1  # Observation cadence, not a failure deadline.
+  done
+)

@@ -1144,7 +1144,7 @@ test_bootstrap_opt_out_reports_cleanup_failure() {
   # A source lock whose owner died must not strand bootstrap when cleanup
   # cannot remove it.
   if [ -f "$home/state/procevent/proc-guard.source" ]; then
-    fm_test_wait_until 60 test -s "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim" \
+    fm_test_wait_until --progress-file "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim" -- test -s "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim" \
       || fail "the detector armed by the first bootstrap was never claimed"
     # shellcheck disable=SC2016 # The child shell owns these expansions.
     FM_STATE_OVERRIDE="$home/state" bash -c '. "$1"; fm_lock_acquire_wait "$2"' \
@@ -1163,7 +1163,7 @@ SH
     printf '%s\n' "$?" > "$home/bootstrap.done"
   ) &
   bootstrap_pid=$!
-  fm_test_wait_until 10 test -e "$home/bootstrap.done" \
+  fm_test_wait_until --while-alive "$bootstrap_pid" --progress-file "$home/bootstrap.out" -- test -e "$home/bootstrap.done" \
     || fail "bootstrap stalled after X artifact cleanup failed"
   wait "$bootstrap_pid" || fail "cleanup-failure bootstrap fixture failed"
   [ "$(cat "$home/bootstrap.done")" = 0 ] || fail "cleanup-failure bootstrap did not complete"

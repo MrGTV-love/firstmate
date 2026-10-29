@@ -115,7 +115,7 @@ test_local_only_fork_remote_allows() {
     || fail "fork-allow: post-teardown branch report recreated the retired task index"
   [ "$(cat "$case_dir/state/.branch-outcome-index-ready")" = 1 ] \
     || fail "fork-allow: post-teardown branch report did not publish its ready sequence"
-  fm_test_wait_until 60 jq -e --arg id task-x1 "
+  fm_test_wait_until --progress-file "$case_dir/state/home-summary.json" -- jq -e --arg id task-x1 "
     .schema == \"fm-secondmate-home-summary.v1\"
     and all(.endpoints[]; .id != \$id)
   " "$case_dir/state/home-summary.json" \
@@ -141,11 +141,11 @@ test_teardown_does_not_wait_for_the_home_summary_refresh() {
     sleep 120
   ' _ "$ROOT" "$case_dir" "$marker" &
   holder=$!
-  fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
+  fm_test_wait_until --while-alive "$holder" -- test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
   rc=0
   FM_HOME_SUMMARY_TIMEOUT=20 run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "teardown should succeed with a refresh in flight"
-  fm_test_wait_until 60 test -e "$case_dir/state/.home-summary-refresh.pending" \
+  fm_test_wait_until --progress-file "$case_dir/state/.home-summary-refresh.pending" -- test -e "$case_dir/state/.home-summary-refresh.pending" \
     || { kill "$holder" 2>/dev/null; fail "the teardown trigger left no marker for the refresh in flight"; }
   sleep 2
   kill "$holder" 2>/dev/null || true
@@ -2211,8 +2211,8 @@ test_idle_cwd_does_not_block_stale_index_lock_cleanup() {
   exec 9<> "$case_dir/idle-input"
   (cd "$case_dir/wt" && exec bash -c 'read -r _ <&9') &
   idle=$!
-  # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
-  fm_test_wait_until 20 "$REAL_LSOF_FOR_TEST" -a -p "$idle" -d cwd -- "$case_dir/wt" \
+  # Observe the real cwd owner rather than cap how long scheduling takes.
+  fm_test_wait_until --while-alive "$idle" -- "$REAL_LSOF_FOR_TEST" -a -p "$idle" -d cwd -- "$case_dir/wt" \
     || fail "idle-index-lock: process did not enter worktree cwd"
   rc=0
   FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=30 \

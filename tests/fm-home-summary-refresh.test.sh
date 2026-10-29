@@ -522,7 +522,7 @@ PATH="$MKBIN:$FAKEBIN:$PATH" FM_TEST_REAL_MKDIR="$REAL_MKDIR" \
 [ -s "$INIT_ENTERED" ] || fail "the refresh never attempted state initialization"
 [ ! -e "$INIT_DONE" ] || fail "the stalled initializer completed instead of being interrupted"
 init_pid=$(cat "$INIT_ENTERED")
-fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
+fm_test_wait_until --while-alive "$init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$init_pid" \
   || fail "the refresh left its stalled initializer alive"
 cmp -s "$TMP_ROOT/before-state-init-ledger.json" "$HOME_DIR/state/home-summary.json" \
   || fail "interrupted initialization changed the prior published ledger"
@@ -558,10 +558,10 @@ if result != 0:
 if time.monotonic() - started >= 2:
     raise SystemExit("the detached foreground caller waited for state initialization")
 PY
-fm_test_wait_until 60 test -e "$DETACH_INIT_MARKER" \
+fm_test_wait_until --progress-file "$DETACH_INIT_MARKER" -- test -e "$DETACH_INIT_MARKER" \
   || fail "the detached worker never attempted its bounded state initialization"
 detach_init_pid=$(cat "$DETACH_INIT_MARKER")
-fm_test_wait_until 80 bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
+fm_test_wait_until --while-alive "$detach_init_pid" -- bash -c "! kill -0 \"\$1\" 2>/dev/null" _ "$detach_init_pid" \
   || fail "the detached worker left its stalled initialization running past the bound"
 pass "detached foreground returns before stalled bounded state initialization"
 
@@ -1178,7 +1178,7 @@ hold_refresh_lock() {  # <home> <seconds>
     sleep "$4"
   ' _ "$ROOT" "$home" "$marker" "$2" &
   LOCK_HOLDER_PID=$!
-  fm_test_wait_until 20 test -e "$marker" || fail "could not hold the refresh lock for $home"
+  fm_test_wait_until --while-alive "$LOCK_HOLDER_PID" -- test -e "$marker" || fail "could not hold the refresh lock for $home"
 }
 
 release_refresh_lock() {
@@ -1206,7 +1206,7 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
   || fail "a detached trigger changed its caller's result"
 elapsed=$(( $(date +%s) - started ))
 [ "$elapsed" -lt 10 ] || fail "a detached trigger waited $elapsed seconds on an in-flight refresh"
-fm_test_wait_until 60 test -e "$DETACH_HOME/state/.home-summary-refresh.pending" \
+fm_test_wait_until --progress-file "$DETACH_HOME/state/.home-summary-refresh.pending" -- test -e "$DETACH_HOME/state/.home-summary-refresh.pending" \
   || fail "a trigger that found a refresh in flight left no marker for it"
 sleep 2
 [ ! -s "$DETACH_HOME/state/.home-summary-refresh.log" ] \
@@ -1217,7 +1217,7 @@ pass "a detached trigger returns at once and records no failure while a refresh 
 # With the lock free, the same detached trigger publishes and clears its marker.
 PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DETACH_HOME" \
   "$WRITER" --detach || fail "a detached trigger on an idle home failed"
-fm_test_wait_until 120 jq -e '.schema == "fm-secondmate-home-summary.v1"' \
+fm_test_wait_until --progress-file "$DETACH_HOME/state/home-summary.json" -- jq -e '.schema == "fm-secondmate-home-summary.v1"' \
   "$DETACH_HOME/state/home-summary.json" \
   || fail "a detached trigger on an idle home never published"
 [ ! -e "$DETACH_HOME/state/.home-summary-refresh.pending" ] \
@@ -1251,13 +1251,13 @@ PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
   FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
   "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
-fm_test_wait_until 60 test -e "$CO_HOLD.entered" || fail "the in-flight refresh never reached its held read"
+fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$CO_COUNT" -- test -e "$CO_HOLD.entered" || fail "the in-flight refresh never reached its held read"
 for _ in 1 2 3; do
   PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$COALESCE_HOME" \
     FM_TEST_NM_COUNT="$CO_COUNT" FM_TEST_NM_HOLD="$CO_HOLD" \
     "$WRITER" --detach || fail "a trigger during a refresh failed"
 done
-fm_test_wait_until 60 test -e "$COALESCE_HOME/state/.home-summary-refresh.pending" \
+fm_test_wait_until --progress-file "$COALESCE_HOME/state/.home-summary-refresh.pending" -- test -e "$COALESCE_HOME/state/.home-summary-refresh.pending" \
   || fail "triggers during a refresh left no marker"
 sleep 2
 rm -f "$CO_HOLD"
@@ -1309,14 +1309,14 @@ PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
 for run in 1 2 3 4 5 6; do
-  fm_test_wait_until 120 test -e "$VALIDATE_DIR/entered.$run" \
+  fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$VALIDATE_DIR/count" -- test -e "$VALIDATE_DIR/entered.$run" \
     || fail "pending triggers stopped draining before successful refresh $run"
   if [ "$run" -lt 6 ]; then
     printf '## In flight\n\n## Queued\n- [ ] pending-%s - Latest pending trigger (repo: firstmate) (kind: ship)\n\n## Done\n' "$run" \
       > "$DRAIN_HOME/data/backlog.md"
     PATH="$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$DRAIN_HOME" \
       "$WRITER" --detach || fail "pending trigger $run changed its caller result"
-    fm_test_wait_until 60 test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
+    fm_test_wait_until --progress-file "$DRAIN_HOME/state/.home-summary-refresh.pending" -- test -e "$DRAIN_HOME/state/.home-summary-refresh.pending" \
       || fail "pending trigger $run left no marker"
   fi
   : > "$VALIDATE_DIR/release.$run"
@@ -1347,13 +1347,13 @@ FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" bash -c '
   sleep 120
 ' _ "$ROOT" "$SERIAL_HOME" "$SERIAL_WAKE_MARKER" &
 LOCK_HOLDER_PID=$!
-fm_test_wait_until 60 test -e "$SERIAL_WAKE_MARKER" \
+fm_test_wait_until --while-alive "$LOCK_HOLDER_PID" -- test -e "$SERIAL_WAKE_MARKER" \
   || fail "could not hold the wake lock for serialized timeout accounting"
 PATH="$HANGBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" FM_HOME_SUMMARY_TIMEOUT=1 \
   "$WRITER" --best-effort &
 SLOW_WRITER_PID=$!
-fm_test_wait_until 100 grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
+fm_test_wait_until --while-alive "$SLOW_WRITER_PID" --progress-file "$SERIAL_HOME/state/.home-summary-refresh.streak" -- grep -Fx count=3 "$SERIAL_HOME/state/.home-summary-refresh.streak" \
   || fail "the timed-out attempt did not reach serialized wake accounting"
 SUCCESS_ENTERED="$TMP_ROOT/serial-success-entered"
 PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
@@ -1361,7 +1361,7 @@ PATH="$SERIALBIN:$FAKEBIN:$PATH" FM_TEST_REAL_JQ="$REAL_JQ" \
   FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$SERIAL_HOME" \
   FM_SNAPSHOT_NOW="$NOW_TWO" FM_SNAPSHOT_NOW_EPOCH="$EPOCH_TWO" "$WRITER" &
 SUCCESS_WRITER_PID=$!
-fm_test_wait_until 60 test -e "$SUCCESS_ENTERED" \
+fm_test_wait_until --while-alive "$SUCCESS_WRITER_PID" -- test -e "$SUCCESS_ENTERED" \
   || fail "the succeeding refresh never started during timeout accounting"
 sleep 1
 jq -e --arg now "$NOW_ONE" '.generated == $now' "$SERIAL_HOME/state/home-summary.json" >/dev/null \

@@ -2,11 +2,8 @@
 # Real Git lock owners for fleet-sync and teardown behavior tests.
 # Source after tests/lib.sh. One fixture at a time uses fd9 for its stdin FIFO;
 # the background Git stays in the test shell's job table for failure cleanup.
-# On 2026-10-12 with Git 2.54.0 on a loaded macOS host, complete real-Git
-# lifecycle probes (including repo setup, readiness and lsof scans) took 17.97s
-# and 16.15s. The existing fm_test_wait_until 20 ceiling permits 200 intervals:
-# 20s of nominal polling gives 11% margin over even the slower WHOLE probe,
-# not just its readiness wait, and stretches further with subprocess cost.
+# Readiness follows the Git owner's CPU and transaction output through the
+# shared progress-aware wait; a slow lock preparation is not a failed fixture.
 
 # The optional owner cwd lets a linked worktree own the repository's common lock.
 fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index> [owner-cwd]
@@ -49,12 +46,12 @@ fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index> [ow
   FM_TEST_GIT_LOCK_FIXTURE=$fixture
   if [ "$kind" = packed ]; then
     printf 'start\ndelete refs/heads/fm-lock-held\nprepare\n' >&9
-    fm_test_wait_until 20 grep -q 'prepare: ok' "$fixture/output" \
+    fm_test_wait_until --while-alive "$FM_TEST_GIT_LOCK_PID" --progress-file "$FM_TEST_GIT_LOCK_FIXTURE/output" -- grep -q 'prepare: ok' "$fixture/output" \
       || fail "Git ref transaction did not prepare"
   else
     # Subshell: Bash hashes lsof's path, and a parent-shell hash survives later
     # PATH= prefixes (Bash 3.2), so missing-lsof cases would still find it.
-    (fm_test_wait_until 20 lsof -a -p "$FM_TEST_GIT_LOCK_PID" -- "$FM_TEST_GIT_LOCK_PATH") \
+    (fm_test_wait_until --while-alive "$FM_TEST_GIT_LOCK_PID" --progress-file "$FM_TEST_GIT_LOCK_FIXTURE/output" -- lsof -a -p "$FM_TEST_GIT_LOCK_PID" -- "$FM_TEST_GIT_LOCK_PATH") \
       || fail "Git did not open the fixture lock"
   fi
   touch -t 200001010000 "$FM_TEST_GIT_LOCK_PATH"
@@ -63,7 +60,7 @@ fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index> [ow
 fm_test_git_lock_finish() {
   if [ "$FM_TEST_GIT_LOCK_KIND" = packed ]; then
     printf 'abort\n' >&9
-    fm_test_wait_until 20 grep -q 'abort: ok' "$FM_TEST_GIT_LOCK_FIXTURE/output" \
+    fm_test_wait_until --while-alive "$FM_TEST_GIT_LOCK_PID" --progress-file "$FM_TEST_GIT_LOCK_FIXTURE/output" -- grep -q 'abort: ok' "$FM_TEST_GIT_LOCK_FIXTURE/output" \
       || fail "Git ref transaction did not abort"
   fi
   # Terminate our still-live direct child, not any repository-wide process.
