@@ -1,0 +1,21 @@
+
+===== S2a: heartbeat republishes the SAME rows (ages grow; stalled_worker retry counter ticks 45s -> 1m 12s); a change wake queues =====
+$ enqueue open-loop-ledger check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9602,"needs-decision [key=deploy]: deploy to prod now?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261144	2	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 91894.1793261144.EJdx9N
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+[exit 0]
+
+===== S2b: ack (alpha and gamma unchanged must NOT block; beta's unverified escalation answered only its own turn, so beta must block) =====
+$ fm-wake-drain.sh --ack-through 2 --recovery-generation 91894.1793261144.EJdx9N
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9607,"needs-decision [key=deploy]: deploy to prod now?",false
+[exit 1]

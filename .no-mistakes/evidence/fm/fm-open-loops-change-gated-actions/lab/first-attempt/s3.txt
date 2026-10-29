@@ -1,0 +1,17 @@
+
+===== S3a: rubber stamp attempt - escalate with --hold naming a task NOT held for the captain (must refuse) =====
+$ ol action unanswered_question:beta:deploy escalated --evidence escalated --hold beta-deploy
+error: "--hold must name a task still held for the captain: captain prerequisite was answered, released, or is no longer actionable"
+[exit 1]
+
+===== S3b: make a real captain hold for the beta deploy call =====
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AKW2M2FYTG5FKEZ8T6BB7/bin/fm-captain-hold.sh hold beta-deploy --reason captain decides whether beta deploys to prod --title Beta deploy call
+beta-deploy
+[exit 0]
+
+===== S3c: escalate bound to that captain hold (accepted) =====
+$ ol action unanswered_question:beta:deploy escalated --evidence captain asked: deploy beta to prod? --hold beta-deploy
+action: "unanswered_question:beta:deploy"
+kind: escalated
+standing: captain hold beta-deploy; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]

@@ -1,0 +1,30 @@
+
+===== S4a: ack the S2 change wake now that beta has a hold-bound escalation (succeeds) =====
+$ fm-wake-drain.sh --ack-through 2 --recovery-generation 91894.1793261144.EJdx9N
+[exit 0]
+
+===== S4b: 6 hours later the periodic resurface wake queues; rows still unchanged =====
+$ enqueue open-loop-ledger-resurface check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+[exit 0]
+$ fm-wake-drain.sh 
+1793261176	3	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",29401,"pane: paused by captain order; retry in 1m 12s","steered",{"kind": "steered", "evidence": "001.msg", "at_epoch": 1793261131}
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",31201,"needs-decision [key=deploy]: deploy to prod now?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain asked: deploy beta to prod?", "at_epoch": 1793261161}
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",27201,"no report since dispatch","deferred",{"kind": "deferred", "evidence": "captain ordered fleet pause; gamma paused", "at_epoch": 1793261131}
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 71775.1793261176.Wb4LTK
+[exit 0]
+
+===== S4c: ack the resurface wake with no new actions (succeeds) =====
+$ fm-wake-drain.sh --ack-through 3 --recovery-generation 71775.1793261176.Wb4LTK
+[exit 0]
+
+===== S4d: digest command directly (same list) =====
+$ ol --digest
+WAITING OPEN WORK (periodic list for the captain):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",29403,"pane: paused by captain order; retry in 1m 12s","steered",{"kind": "steered", "evidence": "001.msg", "at_epoch": 1793261131}
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",31203,"needs-decision [key=deploy]: deploy to prod now?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain asked: deploy beta to prod?", "at_epoch": 1793261161}
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",27203,"no report since dispatch","deferred",{"kind": "deferred", "evidence": "captain ordered fleet pause; gamma paused", "at_epoch": 1793261131}
+[exit 0]

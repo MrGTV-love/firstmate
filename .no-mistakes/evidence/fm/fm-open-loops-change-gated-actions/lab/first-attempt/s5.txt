@@ -1,0 +1,34 @@
+
+===== S5a: captain unpauses alpha: alpha posts a new status line (evidence changes); a NEW row epsilon appears; change wake =====
+$ enqueue open-loop-ledger check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3701,"status: resumed after pause; no progress since",false
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon's PR review",4001,"checks pending",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261190	4	check	open-loop-ledger	check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 6303.1793261190.k9VGoj
+[exit 0]
+
+===== S5b: ack without actions (must refuse; only alpha and epsilon listed) =====
+$ fm-wake-drain.sh --ack-through 4 --recovery-generation 6303.1793261190.k9VGoj
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3702,"status: resumed after pause; no progress since",false
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon's PR review",4002,"checks pending",false
+[exit 1]
+
+===== S5c: new steer for alpha; worker-owned escalation (no hold possible) for epsilon; ack succeeds =====
+$ ol action stalled_worker:alpha steered --evidence 002.msg
+action: "stalled_worker:alpha"
+kind: steered
+[exit 0]
+$ ol action open_pr:epsilon escalated --evidence told captain about epsilon PR
+action: "open_pr:epsilon"
+kind: escalated
+[exit 0]
+$ fm-wake-drain.sh --ack-through 4 --recovery-generation 6303.1793261190.k9VGoj
+[exit 0]

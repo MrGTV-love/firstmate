@@ -1,0 +1,57 @@
+
+===== S1a: change wake with 3 new overdue rows =====
+$ enqueue open-loop-ledger check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",7201,"pane: paused by captain order; retry in 45s",false
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9001,"needs-decision [key=deploy]: deploy to prod now?",false
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5001,"no report since dispatch",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261128	1	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 38639.1793261129.ALmrFe
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AKW2M2FYTG5FKEZ8T6BB7/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+===== S1b: ack before any action (must refuse) =====
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 38639.1793261129.ALmrFe
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",7203,"pane: paused by captain order; retry in 45s",false
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9003,"needs-decision [key=deploy]: deploy to prod now?",false
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5003,"no report since dispatch",false
+[exit 1]
+
+===== S1c: record actions on 2 of 3 rows, ack again (must refuse, naming only the 3rd) =====
+$ ol action stalled_worker:alpha steered --evidence 001.msg
+action: "stalled_worker:alpha"
+kind: steered
+[exit 0]
+$ ol action silent_report:gamma deferred --evidence captain ordered fleet pause; gamma paused --recheck 2026-10-29T14:05:31Z
+action: "silent_report:gamma"
+kind: deferred
+[exit 0]
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 38639.1793261129.ALmrFe
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9004,"needs-decision [key=deploy]: deploy to prod now?",false
+[exit 1]
+
+===== S1d: action on the last row, ack succeeds =====
+$ ol action unanswered_question:beta:deploy escalated --evidence asked captain in chat about beta deploy
+action: "unanswered_question:beta:deploy"
+kind: escalated
+standing: no; the captain hold could not be verified (prerequisite backlog is unavailable), so this receipt answers only the turn it followed (record it again once the backlog is readable)
+[exit 0]
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 38639.1793261129.ALmrFe
+[exit 0]

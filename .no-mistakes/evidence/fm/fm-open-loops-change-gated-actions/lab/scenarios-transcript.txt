@@ -1,0 +1,298 @@
+
+===== S1a: change wake with 3 NEW overdue rows -> all 3 presented =====
+$ enqueue open-loop-ledger check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",7202,"pane: paused by captain order; retry in 45s",false
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9002,"needs-decision [key=deploy]: deploy to prod now?",false
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5002,"no report since dispatch",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261277	1	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 8526.1793261277.MNNt8x
+[exit 0]
+
+===== S1b: ack before any action -> refused, lists all 3 =====
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 8526.1793261277.MNNt8x
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",7204,"pane: paused by captain order; retry in 45s",false
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9004,"needs-decision [key=deploy]: deploy to prod now?",false
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5004,"no report since dispatch",false
+[exit 1]
+
+===== S1c: actions on 2 of 3 rows -> ack refused, lists only the 3rd =====
+$ ol action stalled_worker:alpha steered --evidence 001.msg
+action: "stalled_worker:alpha"
+kind: steered
+[exit 0]
+$ ol action silent_report:gamma deferred --evidence captain ordered fleet pause; gamma paused --recheck 2026-10-29T14:08:00Z
+action: "silent_report:gamma"
+kind: deferred
+[exit 0]
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 8526.1793261277.MNNt8x
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9005,"needs-decision [key=deploy]: deploy to prod now?",false
+[exit 1]
+
+===== S1d: free-text escalation on firstmate-owned beta while backlog is unreadable -> recorded as answering only this turn; ack succeeds =====
+$ ol action unanswered_question:beta:deploy escalated --evidence asked captain in chat about beta deploy
+action: "unanswered_question:beta:deploy"
+kind: escalated
+standing: no; the captain hold could not be verified (prerequisite backlog is unavailable), so this receipt answers only the turn it followed (record it again once the backlog is readable)
+[exit 0]
+$ fm-wake-drain.sh --ack-through 1 --recovery-generation 8526.1793261277.MNNt8x
+[exit 0]
+
+===== S2a: heartbeat republishes SAME rows (ages grow; alpha pane retry counter ticks 45s -> 1m 12s); change wake =====
+$ enqueue open-loop-ledger check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9010,"needs-decision [key=deploy]: deploy to prod now?",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261285	2	check	open-loop-ledger	check: open-loop-ledger (3 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 34729.1793261285.fvq3a3
+[exit 0]
+
+===== S2b: ack -> unchanged alpha/gamma do not block; beta's turn-only escalation does block =====
+$ fm-wake-drain.sh --ack-through 2 --recovery-generation 34729.1793261285.fvq3a3
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9011,"needs-decision [key=deploy]: deploy to prod now?",false
+[exit 1]
+
+===== S3a: rubber stamp: --hold naming a task NOT held for the captain -> refused =====
+$ ol action unanswered_question:beta:deploy escalated --evidence escalated --hold beta-deploy
+error: "--hold must name a task still held for the captain: captain prerequisite was answered, released, or is no longer actionable"
+[exit 1]
+
+===== S3b: create a real captain hold, escalate bound to it -> accepted =====
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AKW2M2FYTG5FKEZ8T6BB7/bin/fm-captain-hold.sh hold beta-deploy --reason captain decides whether beta deploys to prod --title Beta deploy call
+beta-deploy
+[exit 0]
+$ ol action unanswered_question:beta:deploy escalated --evidence captain asked: deploy beta to prod? --hold beta-deploy
+action: "unanswered_question:beta:deploy"
+kind: escalated
+standing: captain hold beta-deploy; covers this row until it changes or that hold is answered, released, blocked or held again
+[exit 0]
+
+===== S3c: ack the S2 wake -> succeeds =====
+$ fm-wake-drain.sh --ack-through 2 --recovery-generation 34729.1793261285.fvq3a3
+[exit 0]
+
+===== S4a: periodic resurface wake, rows unchanged -> WAITING OPEN WORK list, no OVERDUE, no STANDING =====
+$ enqueue open-loop-ledger-resurface check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+[exit 0]
+$ fm-wake-drain.sh 
+1793261294	3	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (3 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",7221,"pane: paused by captain order; retry in 1m 12s","steered",{"kind": "steered", "evidence": "001.msg", "at_epoch": 1793261280}
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9021,"needs-decision [key=deploy]: deploy to prod now?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain asked: deploy beta to prod?", "at_epoch": 1793261290}
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5021,"no report since dispatch","deferred",{"kind": "deferred", "evidence": "captain ordered fleet pause; gamma paused", "at_epoch": 1793261280}
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 60349.1793261294.OaqlmE
+[exit 0]
+
+===== S4b: ack with no new actions -> succeeds =====
+$ fm-wake-drain.sh --ack-through 3 --recovery-generation 60349.1793261294.OaqlmE
+[exit 0]
+
+===== S5a: captain unpauses alpha: new status line (evidence + clock restart); new row epsilon; change wake =====
+$ enqueue open-loop-ledger check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3701,"status: resumed after pause; no progress since",false
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon PR review",4001,"checks pending",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261302	4	check	open-loop-ledger	check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 86553.1793261302.cL5z8q
+[exit 0]
+
+===== S5b: ack -> refused, lists only alpha and epsilon =====
+$ fm-wake-drain.sh --ack-through 4 --recovery-generation 86553.1793261302.cL5z8q
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3702,"status: resumed after pause; no progress since",false
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon PR review",4002,"checks pending",false
+[exit 1]
+
+===== S5c: new steer for alpha; worker-owned escalation (no hold possible) on epsilon; ack -> succeeds =====
+$ ol action stalled_worker:alpha steered --evidence 002.msg
+action: "stalled_worker:alpha"
+kind: steered
+[exit 0]
+$ ol action open_pr:epsilon escalated --evidence told captain about epsilon PR
+action: "open_pr:epsilon"
+kind: escalated
+[exit 0]
+$ fm-wake-drain.sh --ack-through 4 --recovery-generation 86553.1793261302.cL5z8q
+[exit 0]
+
+===== S6a: SAME status text again, but alpha posts a fresh status line (clock restarts) -> alpha gated again =====
+$ enqueue open-loop-ledger check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3651,"status: resumed after pause; no progress since",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261309	5	check	open-loop-ledger	check: open-loop-ledger (4 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 9345.1793261309.5ezu9y
+[exit 0]
+
+===== S6b: ack -> refused on alpha only; steer; ack -> succeeds =====
+$ fm-wake-drain.sh --ack-through 5 --recovery-generation 9345.1793261309.5ezu9y
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3653,"status: resumed after pause; no progress since",false
+[exit 1]
+$ ol action stalled_worker:alpha steered --evidence 003.msg
+action: "stalled_worker:alpha"
+kind: steered
+[exit 0]
+$ fm-wake-drain.sh --ack-through 5 --recovery-generation 9345.1793261309.5ezu9y
+[exit 0]
+
+===== S7a: resurface wake + change wake (new row zeta) together -> OVERDUE zeta, STANDING covered rows, WAITING list incl. epsilon 'no proof' =====
+$ enqueue open-loop-ledger check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ enqueue open-loop-ledger-resurface check: open-loop-ledger-resurface (5 overdue assigned obligations; periodic waiting list)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unlanded_commit:zeta","worker:zeta","zeta","land zeta commits",90002,"2 commits absent from main",false
+STANDING (unchanged since its last action; no action needed):
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3659,"status: resumed after pause; no progress since",false
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9041,"needs-decision [key=deploy]: deploy to prod now?",false
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5041,"no report since dispatch",false
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon PR review",4015,"checks pending",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261316	6	check	open-loop-ledger	check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+1793261316	7	check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (5 overdue assigned obligations; periodic waiting list)
+WAITING OPEN WORK (periodic list for the captain):
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+  "stalled_worker:alpha","worker:alpha","alpha","steer alpha or record why it waits",3660,"status: resumed after pause; no progress since","steered",{"kind": "steered", "evidence": "003.msg", "at_epoch": 1793261311}
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9042,"needs-decision [key=deploy]: deploy to prod now?","escalated, waiting on the captain",{"kind": "escalated", "evidence": "captain asked: deploy beta to prod?", "at_epoch": 1793261290}
+  "silent_report:gamma","worker:gamma","gamma","check in with gamma",5042,"no report since dispatch","deferred",{"kind": "deferred", "evidence": "captain ordered fleet pause; gamma paused", "at_epoch": 1793261280}
+  "open_pr:epsilon","worker:epsilon","https://github.com/o/r/pull/9","route epsilon PR review",4016,"checks pending","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "told captain about epsilon PR", "at_epoch": 1793261305}
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 35322.1793261316.CsphPf
+[exit 0]
+
+===== S7b: ack refused on zeta; defer zeta; ack -> succeeds =====
+$ fm-wake-drain.sh --ack-through 7 --recovery-generation 35322.1793261316.CsphPf
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unlanded_commit:zeta","worker:zeta","zeta","land zeta commits",90004,"2 commits absent from main",false
+[exit 1]
+$ ol action unlanded_commit:zeta deferred --evidence zeta lane paused by captain --recheck 2026-10-29T14:08:40Z
+action: "unlanded_commit:zeta"
+kind: deferred
+[exit 0]
+$ fm-wake-drain.sh --ack-through 7 --recovery-generation 35322.1793261316.CsphPf
+[exit 0]
+
+===== S7c: one-deferral limit: second deferral on unchanged zeta -> refused, row becomes captain_visible =====
+$ ol action unlanded_commit:zeta deferred --evidence still paused --recheck 2026-10-29T16:08:41Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+
+===== S8a: captain answers beta-deploy hold -> next change wake re-presents beta (and captain_visible zeta) =====
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63AKW2M2FYTG5FKEZ8T6BB7/bin/fm-captain-hold.sh answer beta-deploy --decision-file /Users/charlesabrooker/tmp/fm-lab.Ifehcr/lab-decision.txt --release
+released: beta-deploy
+[exit 0]
+$ enqueue open-loop-ledger check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9048,"needs-decision [key=deploy]: deploy to prod now?",false
+  "unlanded_commit:zeta","worker:zeta","zeta","land zeta commits",90009,"2 commits absent from main",true
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261324	8	check	open-loop-ledger	check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 66688.1793261324.xTSARP
+[exit 0]
+
+===== S8b: ack -> refused on beta and zeta only =====
+$ fm-wake-drain.sh --ack-through 8 --recovery-generation 66688.1793261324.xTSARP
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "unanswered_question:beta:deploy","firstmate","beta:deploy","answer or escalate beta's deploy question",9050,"needs-decision [key=deploy]: deploy to prod now?",false
+  "unlanded_commit:zeta","worker:zeta","zeta","land zeta commits",90011,"2 commits absent from main",true
+[exit 1]
+
+===== S8c: zeta evidence changes (new commit) -> fresh deferral allowance; beta steered via firstmate note =====
+$ ol action unlanded_commit:zeta deferred --evidence zeta still paused after new commit --recheck 2026-10-29T14:08:47Z
+action: "unlanded_commit:zeta"
+kind: deferred
+[exit 0]
+$ ol action unanswered_question:beta:deploy escalated --evidence relayed captain answer to beta
+action: "unanswered_question:beta:deploy"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+[exit 0]
+
+===== S8d: next drain + ack (beta's unbound escalation answers this turn only) =====
+$ enqueue open-loop-ledger check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+1793261328	9	check	open-loop-ledger	check: open-loop-ledger (5 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 66688.1793261324.xTSARP
+[exit 0]
+$ fm-wake-drain.sh --ack-through 9 --recovery-generation 66688.1793261324.xTSARP
+[exit 0]
+
+===== S9a: away daemon: FM_WAKE_ACK_AWAY_DAEMON=1 WITHOUT state/.afk -> still gated (new row eta) =====
+$ enqueue open-loop-ledger check: open-loop-ledger (6 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "silent_report:eta","worker:eta","eta","check in with eta",2001,"no report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261331	10	check	open-loop-ledger	check: open-loop-ledger (6 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 84079.1793261331.KDLhje
+[exit 0]
+$ FM_WAKE_ACK_AWAY_DAEMON=1 fm-wake-drain.sh --ack-through 10 --recovery-generation 84079.1793261331.KDLhje
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "silent_report:eta","worker:eta","eta","check in with eta",2002,"no report",false
+[exit 1]
+
+===== S9b: with state/.afk present (captain away) -> daemon acks the handled wake without recording an action =====
+$ FM_WAKE_ACK_AWAY_DAEMON=1 fm-wake-drain.sh --ack-through 10 --recovery-generation 84079.1793261331.KDLhje
+[exit 0]
+eta action recorded by daemon ack: False
+
+===== S9c: firstmate's own next drain still presents and gates eta =====
+$ enqueue open-loop-ledger check: open-loop-ledger (6 overdue assigned obligations; read state/open-loops.json)
+[exit 0]
+$ fm-wake-drain.sh 
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "silent_report:eta","worker:eta","eta","check in with eta",2007,"no report",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+1793261336	11	check	open-loop-ledger	check: open-loop-ledger (6 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 99410.1793261336.Mrnvwf
+[exit 0]
+$ fm-wake-drain.sh --ack-through 11 --recovery-generation 99410.1793261336.Mrnvwf
+error: overdue rows have no action recorded that still covers current evidence; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "silent_report:eta","worker:eta","eta","check in with eta",2009,"no report",false
+[exit 1]
