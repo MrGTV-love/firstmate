@@ -6,7 +6,7 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
-## Claude launch native-hook suppression
+## Claude launch HERDR_ENV suppression
 
 Portable verification on 2026-10-28 executed the real `fm-spawn.sh` staged launch through the TeamClaude wrapper with model-free recording binaries:
 

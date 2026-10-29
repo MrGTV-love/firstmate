@@ -7292,8 +7292,9 @@ elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ] && [ "$WRITE_CONFINEMENT" 
   # still runs under the pane's own shell instead of this host's /bin/sh.
   LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
 fi
-# Herdr's Claude SessionStart integration otherwise registers a native bare
-# `claude --resume`, bypassing the TeamClaude launch boundary after a reboot.
+# Herdr's native restore has typed a bare `claude --resume` into Firstmate
+# Claude panes after a reboot, bypassing the TeamClaude launch boundary; the
+# registration path, possibly Herdr's Claude integration, is not yet proven.
 # Unset HERDR_ENV only in this child, intended to stop that registration (not
 # yet proven on installed Herdr); keep the pane identity and
 # Firstmate's own busy hooks, and do not alter other panes or session settings.

@@ -223,8 +223,8 @@ test_backend_detect_precedence() {
   [ "$out" = herdr ] || fail "fm_backend_detect should report herdr for HERDR_ENV=1 alone, got '$out'"
 
   out=$(unset TMUX HERDR_ENV CMUX_WORKSPACE_ID; FM_HERDR_RUNTIME=1 fm_backend_detect) \
-    || fail 'runtime-only Herdr marker must survive native hook suppression'
-  assert_equals herdr "$out" 'runtime-only marker selects Herdr without native hook activation'
+    || fail 'runtime-only Herdr marker must survive HERDR_ENV removal'
+  assert_equals herdr "$out" 'runtime-only marker selects Herdr'
   out=$(unset HERDR_ENV CMUX_WORKSPACE_ID; TMUX='fake,1,0' FM_HERDR_RUNTIME=1 fm_backend_detect)
   assert_equals tmux "$out" 'nested tmux still outranks inherited runtime-only Herdr marker'
   out=$(unset TMUX HERDR_ENV; FM_BACKEND=tmux FM_HERDR_RUNTIME=1 fm_backend_name)
