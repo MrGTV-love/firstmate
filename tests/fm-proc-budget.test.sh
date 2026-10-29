@@ -735,27 +735,42 @@ test_own_procs_passes_status_and_arguments_through() {
   pass "own-procs passes the exit status and arguments through"
 }
 
-# The leash: a recursive tree is stopped by its own count, before the kernel
-# limit (left at its default here) is anywhere near.
+# A tree that grows to HOLD_LEVELS members and then holds: every level waits on
+# the next, the last blocks for good, so the tree has no end of its own. HOLD_LEVELS
+# sits above the own-tree limit and far below the kernel limit's headroom, so
+# only the leash can end it, however fast or slow this host forks.
+make_held_tree() {  # <dir>
+  mkdir -p "$1"
+  cat >"$1/member.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$$" >> "$HOLD_PIDS"
+HOLD_DEPTH=$(( ${HOLD_DEPTH:-0} + 1 )); export HOLD_DEPTH
+if [ "$HOLD_DEPTH" -lt "$HOLD_LEVELS" ]; then "$0"; else exec sleep 5003; fi
+SH
+  chmod +x "$1/member.sh"
+}
+
+# The leash: a runaway tree is stopped by its own count, before the kernel limit
+# (left at its default here) is anywhere near. The verdict is the outcome - exit,
+# reason, nothing left alive - never how far the tree got before the sampler
+# looked, which is the host's fork speed and not the leash's behavior.
 test_own_procs_stops_a_runaway_tree() {
-  local bomb="$TMP_ROOT/own-bomb" log="$TMP_ROOT/own-bomb.log" pids="$TMP_ROOT/own-bomb.pids"
-  local err="$TMP_ROOT/own-bomb.err" depth rc
-  make_bomb "$bomb"
-  : >"$log"
+  local tree="$TMP_ROOT/own-held" pids="$TMP_ROOT/own-held.pids" err="$TMP_ROOT/own-held.err" rc levels
+  make_held_tree "$tree"
   : >"$pids"
-  "$WRAP" --own-procs 100 -- env PATH="$bomb:$PATH" SHIM_LOG="$log" SHIM_PIDS="$pids" SHIM_MAX_DEPTH=1500 \
-    date +%s >"$TMP_ROOT/own-bomb.out" 2>"$err"
+  "$WRAP" --own-procs 100 -- env HOLD_PIDS="$pids" HOLD_LEVELS=160 "$tree/member.sh" \
+    >"$TMP_ROOT/own-held.out" 2>"$err"
   rc=$?
   expect_code 98 "$rc" "a tree past its own limit"
-  depth=$(tail -1 "$log")
-  [ -n "$depth" ] || fail "the bomb never started: $(cat "$err")"
-  [ "$depth" -gt 20 ] || fail "the bomb did not recurse (depth $depth): the case would be vacuous"
-  [ "$depth" -lt 1500 ] || fail "the own-tree stop did not stop the runaway tree (depth $depth)"
+  levels=$(wc -l <"$pids")
+  # Each member records itself before it forks the next, so a stop above 100
+  # members leaves at least 100 lines even if the newest was frozen unrecorded.
+  [ "$levels" -ge 100 ] || fail "the tree never outgrew the limit (${levels} members recorded): the case would be vacuous: $(cat "$err")"
   assert_contains "$(grep 'fm-proc-budget:' "$err")" "over the own-tree limit of 100" "the reason names the limit"
   assert_not_contains "$(cat "$err")" "Resource temporarily unavailable" "the tree was stopped by its own count, not the kernel"
   [ "$(grep -c 'fm-proc-budget:' "$err")" -eq 1 ] || fail "an own-tree stop must emit exactly one reason"
   wait_pids_ended "$pids"
-  pass "a runaway tree is stopped at its own limit (depth $depth) and leaves no process behind"
+  pass "a runaway tree is stopped at its own limit and leaves no process behind"
 }
 
 test_own_procs_nested_wrapper() {
