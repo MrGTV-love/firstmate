@@ -1,0 +1,19 @@
+ok - a secondmate home must declare each captain hold's owner, never holds the parent's call, and a main home cannot name a parent
+ok - a parent-owned call resolves on the parent's decision, never on captain words: a work item stays open and a question row closes
+ok - a captain-owned call is not closed by the parent's decision
+ok - the open predicates tell the parent's call from the captain's
+ok - withdraw releases a moot call on a recorded captain ruling, keeps a work item open, and closes a question row
+ok - withdraw refuses a captain call with no captain ruling, whatever the channel carried, and a non-captain ruling
+ok - withdraw refuses an unrelated ruling and releases a legacy mate hold on a ruling that names it, keeping the work open
+ok - the divergence guard stops reporting a call once it is withdrawn
+ok - the decision-hold shim refuses an ownerless or parent-owned secondmate hold, keeps the captain owner, and leaves a main home alone
+ok - Main classifies a legacy hold with parent provenance once, with evidence, and the parent decision releases it with the work still open; a hold without provenance stays the captain's
+ok - a hold whose owner was recorded, a main-home hold, and a non-captain hold are never classified
+ok - a classified hold reads as Main's classification in every list, and the captain can take it back
+ok - the lifecycle readers and the completion gate know parent decisions and withdrawals, and a withdrawal retires its reconcile request
+ok - a decide or withdraw retried after a failed release finishes it without a second record or key
+ok - the completion gate accepts an archived parent decision and never lists it as an answer
+ok - decide closes finished work teardown retained, with its deliverable, and only releases unfinished work
+ok - an expired dated hold is still decided or withdrawn, and a parent hold blocks a plain completion
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+bash tests/fm-captain-hold-owner.test.sh  134.31s user 115.79s system 45% cpu 9:10.36 total

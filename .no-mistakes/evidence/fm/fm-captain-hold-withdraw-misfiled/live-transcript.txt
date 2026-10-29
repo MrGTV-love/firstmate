@@ -1,0 +1,140 @@
+parent lab home: /Users/charlesabrooker/tmp/fm-lab.PLNnHr
+mate lab home:   /Users/charlesabrooker/tmp/fm-lab.eZsuU1
+
+=== S1 root cause: a mate home never holds Main's call; it must name the owner
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 hold pr290-ship --reason retry or fix one red CI check
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: <none>); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+PASS: ownerless mate hold refused
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 hold pr290-ship --reason retry or fix one red CI check --owner parent
+fm-captain-hold: --owner is required in a secondmate home and must be captain, because hold files only calls that need the captain's own words (got: parent); a call the main firstmate owns is never held: route it to Main as a needs-decision status line and keep working where you can
+[exit 1]
+PASS: parent-owned hold refused with routing
+  held: no
+PASS: task stayed unheld
+
+=== S2 PR 290 replay: legacy captain-kind hold on a ship task, Main relayed the question
+parent pending-reply record: /Users/charlesabrooker/tmp/fm-lab.PLNnHr/state/pending-replies/9fb98b7df5fc3461
+  held: yes
+  hold_kind: captain
+open (captain predicate) exit=0
+PASS: legacy hold reads as an open captain call (the stuck state)
+
+=== S2a captain answer path cannot be used for Main's call after classify; classify with provenance
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify pr290-ship --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason the retry call was Main's
+classified: pr290-ship as parent
+[exit 0]
+PASS: classify accepted the hold with matching parent provenance
+  held: yes
+  hold_kind: external
+  body: "Captain hold set: 2026-10-29T22:59:44Z\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry call was Main's\nClassification provenance: parent request corr=9fb98b7df5fc3461\nClassification evidence digest: fb6ee0e66ca0540adb7500ac7897f8e04594513f99934dd72f4e14fcbd07d07e\nOriginal hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461\n\nClassification evidence:\nMain decided one unchanged-head retry; this was Main's call."
+PASS: no longer a captain call
+PASS: open parent decision (merge gate still blocks)
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 answer pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/fake-captain.txt --release
+fm-captain-hold: task pr290-ship is not held for the captain; hold it first or name the right task
+[exit 1]
+PASS: answer (captain words) refused for Main's call
+
+=== S2b Main records its decision with decide
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 decide pr290-ship --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
+decided: pr290-ship
+[exit 0]
+task:
+  id: pr290-ship
+  title: Successor watcher race (PR 290 shape)
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: sample
+  priority: "-"
+  created: 2026-10-29
+  closed: "-"
+  deps: none
+  links: none
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 962a9397537cab753159507de042259a8db0a9bdb5c0e8f4521aa53f9a3c7d80\nResolution mode: decided\nResolves hold set: 2026-10-29T22:59:44Z\nResolved at: 2026-10-29T23:00:03Z\nDecided by: parent firstmate\nNot a captain answer.\n\nParent decision:\nRetry the failing check once on the unchanged head.\n\nDecision owner: parent\nOwner classified: parent, a parent classification, run from secondmate home. Not a captain answer.\nClassification reason: the retry call was Main's\nClassification provenance: parent request corr=9fb98b7df5fc3461\nClassification evidence digest: fb6ee0e66ca0540adb7500ac7897f8e04594513f99934dd72f4e14fcbd07d07e\nOriginal hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461\n\nClassification evidence:\nMain decided one unchanged-head retry; this was Main's call."
+PASS: hold lifted
+PASS: work item left open
+PASS: record says not a captain answer
+PASS: no captain words written
+PASS: merge gate predicates both clear
+--- parent channel /Users/charlesabrooker/tmp/fm-lab.PLNnHr/state/fm-lab-mate.status
+needs-decision [key=captain-hold-pr290-ship-1] [at=1793314796]: parent decision pr290-ship: Parent classification as the parent's call, not the captain's words: the retry call was Main's. Original hold reason: Main180/181 reserve ask-user decisions to Main; retry or fix one red CI check corr=9fb98b7df5fc3461
+resolved [key=captain-hold-pr290-ship-1] [at=1793314804]: parent decision pr290-ship: decided by the parent firstmate
+
+=== S3 adversarial: classify refuses a legacy hold without provenance; decide refuses a captain call
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify genuine-call --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason say it was Main's
+fm-captain-hold: task genuine-call carries no parent provenance: its hold reason names no corr=<id> token of a request the parent firstmate relayed to this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+PASS: no-token refusal names the missing fact
+PASS: genuine call stays captain-kind
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify stray-corr --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason say it was Main's
+fm-captain-hold: task stray-corr carries no parent provenance: its hold reason names corr=aabbccddeeff0011, but the parent home holds no pending-reply record of that request for this home; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+PASS: unmatched-corr refusal names the missing record
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 decide genuine-call --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
+fm-captain-hold: task genuine-call is not waiting on the parent firstmate (recorded owner: unrecorded); only the captain's own words release a captain call, so use answer for that
+[exit 1]
+PASS: decide cannot release the captain's call
+$ ch /Users/charlesabrooker/tmp/fm-lab.eZsuU1 classify owned-call --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason x
+fm-captain-hold: task owned-call records its owner (captain) from when it was filed or classified; a recorded owner is never reclassified
+[exit 1]
+PASS: recorded captain owner never reclassified
+
+=== S4 withdraw: moot-by-ruling (vernant-d5 shape) in a main home
+$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN answer ruling-a --decision-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/ruling.txt
+answered: ruling-a
+[exit 0]
+$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt
+fm-captain-hold: a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a legacy hold classified as the parent's is released with decide, and nothing else releases a captain call without the captain's words
+[exit 1]
+PASS: withdraw with no ruling refused
+$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling unrelated-ruling
+fm-captain-hold: unrelated-ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw d5-mechanism
+[exit 1]
+PASS: withdraw on an open non-ruling refused
+$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-mechanism --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling ruling-a
+withdrawn: d5-mechanism
+[exit 0]
+  state: queued
+  held: no
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 50393e21b16733e0f1bb8464d3232c6463bcc361bd151f4cfffd1af9b2555895\nResolution mode: withdrawn\nResolves hold set: 2026-10-29T23:00:28Z\nResolved at: 2026-10-29T23:00:54Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: captain\nRun from: main home\nNot a captain answer.\n\nWithdrawal evidence:\nMoot under ruling A."
+PASS: scout work item queued and unheld
+PASS: no captain answer label
+$ ch /Users/charlesabrooker/tmp/fm-lab.Qyj9RN withdraw d5-error-bound --evidence-file /Users/charlesabrooker/tmp/fm-lab.Qyj9RN/evidence.txt --ruling ruling-a
+withdrawn: d5-error-bound
+[exit 0]
+  state: done
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 50393e21b16733e0f1bb8464d3232c6463bcc361bd151f4cfffd1af9b2555895\nResolution mode: withdrawn\nResolves hold set: 2026-10-29T23:00:35Z\nResolved at: 2026-10-29T23:00:57Z\nWithdrawn by: moot under the recorded captain ruling ruling-a\nFiled owner: captain\nRun from: main home\nNot a captain answer.\n\nWithdrawal evidence:\nMoot under ruling A."
+PASS: moot question row closed
+--- tasks-axi ready:
+count: 2
+ready[2]{id,state,kind,repo,title}:
+  d5-mechanism,queued,scout,sample,Demand-map mechanism
+  unrelated-ruling,queued,captain,sample,Unrelated
+ready_public_followups: 0 delivery-ready obligations
+help[1]:
+  - Run `tasks-axi start <id> --file=data/backlog.md` to dispatch one of these
+PASS: moot question absent from ready
+PASS: work item is dispatchable again
+
+=== S5 remote mate: provenance from the relayed request in the parent-route steering inbox
+$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC classify unrelayed --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason Main's
+fm-captain-hold: task unrelayed carries no parent provenance: its hold reason names corr=aabbccddeeff0011, but this home's parent-route steering inbox holds no relayed request with that correlation; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)
+[exit 1]
+PASS: remote unmatched refusal accurate
+$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC classify relayed --owner parent --evidence-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/classify-evidence.txt --reason Main's
+classified: relayed as parent
+[exit 0]
+PASS: remote classify matched inbox record
+$ ch /Users/charlesabrooker/tmp/fm-lab.dbEKvC decide relayed --decision-file /Users/charlesabrooker/tmp/fm-lab.eZsuU1/parent-decision.txt
+decided: relayed
+[exit 0]
+PASS: remote parent decision released the work
+
+=== SUMMARY
+failures: 0
