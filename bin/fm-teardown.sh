@@ -972,10 +972,10 @@ teardown_release_misdirected_leases() {  # <project> <task-id>
 # Sets TEARDOWN_SLOT_CUSTODY to lease when the slot is durably held, or to
 # project when its state can be neither proved held nor leased: the caller
 # then keeps project custody through the return, which names the slot by path.
-# Sets TEARDOWN_SLOT_SUPERSEDED to 1 when the slot is unleased in a superseded
-# pool folder, or, for a held close, when it is held there by this task's own
-# lease, which only an earlier held close's lease by path takes; a held close
-# leases an unleased one by path
+# Sets TEARDOWN_SLOT_SUPERSEDED to 1 when the slot is in a superseded pool
+# folder, unleased or held there by this task's own lease (an earlier held
+# close's lease by path, whatever route this close takes); a held close leases
+# an unleased one by path
 # (teardown_lease_slot_by_path), and the caller releases this task's
 # misdirected leases (teardown_release_misdirected_leases) after the
 # reservation and the held-copy record checks.
@@ -990,7 +990,7 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   if fm_task_copy_pool_slot_held "$slot"; then
     TEARDOWN_SLOT_CUSTODY=lease
-    if [ -n "${TEARDOWN_HELD_SLOT:-}" ] && [ "${FM_TASK_COPY_SLOT_HOLDER:-}" = "$task_id" ] \
+    if [ "${FM_TASK_COPY_SLOT_HOLDER:-}" = "$task_id" ] \
         && ! fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
         && [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
       TEARDOWN_SLOT_SUPERSEDED=1

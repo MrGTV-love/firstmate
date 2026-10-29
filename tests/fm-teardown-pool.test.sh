@@ -2114,6 +2114,7 @@ esac
 SH
     cat > "$case_dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+case "${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "$*" >> "$FM_LATE_CASE/treehouse.log"
 SH
     chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
@@ -3137,6 +3138,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 if [ ! -e "$case_dir/attempted" ]; then
   touch "$case_dir/attempted"
