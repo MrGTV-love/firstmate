@@ -9,8 +9,9 @@
 # --own-procs stops a runaway tree by counting only the tree's own processes,
 # never the user's whole count, so neighbour lanes cannot spend its budget.
 # Harm: a tree that forks without end starves every other process of the user.
-# Observable: the number of members of the command's tree, sampled five times a
-# second by bin/fm-proc-budget-tree.py (its header owns the tree definition).
+# Observable: the number of members of the command's tree, sampled at most five
+# times a second by bin/fm-proc-budget-tree.py (its header owns the tree
+# definition); a slow host or a big process table is sampled less often.
 # Past <N> members the tree is frozen, then killed, and the wrapper exits 98
 # with one stderr line naming the count and the limit. An unreadable sample is
 # skipped and tried again next sample; it never ends the command. Only the
@@ -22,6 +23,9 @@
 # link: the command starts only after a reader has joined its group, and if the
 # supervisor dies (for example SIGKILL from a kill of the caller's group), that
 # reader ends every member of the command's group. It works on Linux and Darwin.
+# Unlike the plain form, when the command itself exits, its remaining tree gets
+# TERM, then KILL after at most one second, and successful cleanup preserves the
+# command's status. A command meant to leave a daemon running must not use it.
 # Pass it instead of a small <extra>: a small positive <extra> below counts the
 # whole user and is the form that neighbour lanes starve.
 #

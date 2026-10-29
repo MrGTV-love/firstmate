@@ -154,7 +154,6 @@ def run(limit, command):
     skip = {os.getpid()}
     guardian = None
     known = {}
-    seen = {}
     caught = 0
     unreadable = 0
     errors = []
@@ -164,9 +163,7 @@ def run(limit, command):
         caught = number
 
     def snapshot(root):
-        selected = members_of(table.read(), root, known, skip)
-        seen.update(known)
-        return selected
+        return members_of(table.read(), root, known, skip)
 
     def signal_member(pid, identity, number):
         try:
@@ -209,7 +206,7 @@ def run(limit, command):
             for pid, identity in members.items():
                 signal_member(pid, identity, signal.SIGKILL)
             time.sleep(RESCAN_INTERVAL)
-        for pid, identity in list(seen.items()):
+        for pid, identity in list(known.items()):
             signal_member(pid, identity, signal.SIGKILL)
 
     def end_leftovers(root):
@@ -238,7 +235,8 @@ def run(limit, command):
         try:
             guardian = memory.Reader(child.pid, child.pid)
             skip.add(guardian.process.pid)
-            os.write(release, b"\n")
+            if not caught:
+                os.write(release, b"\n")
         finally:
             os.close(release)
     except (OSError, subprocess.SubprocessError) as error:
@@ -248,6 +246,10 @@ def run(limit, command):
             child.wait()
         reason(f"cannot start the command under its dead-man guardian ({error}); command not started")
         return 125
+    if caught:
+        guardian.close()
+        child.wait()
+        return 128 + caught
     try:
         while True:
             if caught:
