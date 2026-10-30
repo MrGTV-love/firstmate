@@ -1,0 +1,27 @@
+== host: 18 cpus; uptime:  7:06  up 1 day, 21:06, 4 users, load averages: 29.49 28.42 21.11
+== started 36 CPU-burning neighbours; load now: { 29.49 28.42 21.11 }
+== S1 dilation 1x: RED check with main's capped helper (cap 5s)
+main old_wait 5 -> rc=0 after 4.0s; result present at verdict: yes; producer alive at verdict: no
+producer finished anyway: published work=3.8s
+== S1 dilation 1x: branch helper on the same producer
+branch fm_test_wait_until -> rc=0 after 5.3s; result: published work=4.5s
+== S1 dilation 5x: RED check with main's capped helper (cap 5s)
+main old_wait 5 -> rc=1 after 11.4s; result present at verdict: no; producer alive at verdict: yes
+producer finished anyway: published work=12.5s
+== S1 dilation 5x: branch helper on the same producer
+branch fm_test_wait_until -> rc=0 after 12.6s; result: published work=12.4s
+== S2 dead peer (SIGKILL mid-work) under load, DEFAULT 15-minute inactivity
+rc=1 after 3.4s; stderr: fm_test_wait_until: condition unmet (3, pid=87964)
+tests/lib.sh: line 1606: 87964 Killed: 9               producer "$TMP/jd" "$TMP/rd" 5
+== S3 hung peer (SIGSTOP: alive, no CPU, no journal change) under load, --inactivity 3
+rc=1 after 3.4s; stderr: no_progress: "pid=93246 no CPU or watched-file progress for 3.2s"
+fm_test_wait_until: condition unmet (124, pid=93246); peer still alive (not killed by helper): yes
+== S4 busy-but-pointless peer (burns CPU, never touches its outcome) --inactivity 3
+rc=1 after 4.6s; stderr: no_progress: "pid=96410 no CPU or watched-file progress for 4.5s"
+fm_test_wait_until: condition unmet (124, pid=96410)
+== S5 slow, failing process-table reads are unknown, not death (ps shim: sleeps 2s then fails)
+rc=0 after 9.8s; result: published work=7.9s; stderr: cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled" 
+== S6 peer exits, child it left finishes the work (descendant)
+rc=0 after 4.2s; result: done; stderr: 
+== load at end: { 43.63 32.94 23.32 }
+exit=0

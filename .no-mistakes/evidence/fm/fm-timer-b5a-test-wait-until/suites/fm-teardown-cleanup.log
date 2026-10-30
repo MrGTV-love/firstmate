@@ -1,0 +1,49 @@
+ok - fixture cleanup after a teardown leaves no home-summary refresh worker
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it
+ok - task teardown completes without reaping another home's abandoned worker
+ok - a missing teardown startup source refuses before cleanup
+ok - an unreadable teardown startup source refuses before cleanup
+ok - a missing adapter sibling refuses before cleanup
+ok - a forced descendant with a missing adapter sibling refuses before cleanup
+ok - a forced secondmate with a missing own adapter sibling refuses before child cleanup
+ok - present required sources still reach the ordinary teardown refusal
+ok - process-gate refusals preserve task metadata, backlog, endpoint and process identities across close replay
+ok - manual and missing-backlog retries revoke old close authority before process refusal and restored replay
+ok - local-only worktree with unpushed work is torn down under --force (escape hatch)
+ok - fm-pr-check publishes the PR-ready line on a secondmate's parent channel once
+ok - a secondmate home's teardown delivers the child's final line or refuses until it can
+ok - teardown completes when an exact busy-state sidecar is already absent
+ok - herdr teardown removes pane-owned escalation dedupe state
+ok - herdr flat teardown refuses before returning the isolated copy under lock contention and the retry completes cleanly
+ok - herdr flat teardown never erases records when pane presence is unparseable
+ok - herdr flat teardown preflight refuses before every destructive change
+ok - herdr teardown refuses a foreign-owned per-account namespace (owner-shim arms need the non-Darwin stat branch; skipped on Darwin)
+ok - forced secondmate teardown preflights every Herdr child before cleanup mutation
+ok - forced secondmate teardown holds every descendant lifecycle and metadata lock
+ok - forced secondmate teardown retains Herdr child identity until exact pane disappearance
+ok - forced teardown retains a nested secondmate home and its grandchild's Herdr identity when the grandchild close is unconfirmed
+ok - herdr projection teardown retires its journal only after confirming the exact recorded pane is gone
+ok - herdr projection teardown retains every record when post-close presence is unknown
+ok - herdr projection teardown surfaces failed focus restoration without turning confirmed cleanup into a hard failure
+ok - teardown retires the task's own watcher markers and orphaned presentation journal, leaving other tasks' markers alone
+ok - teardown retains a presentation journal bound to a pane other than the closed endpoint
+ok - teardown retires a v1 presentation journal once its token workspace is confirmed gone
+ok - teardown retains a v1 presentation journal while its token workspace is still present
+ok - teardown retains a v1 presentation journal when the workspace query is ambiguous
+ok - teardown records the task's pipeline spend before removing its branch and record
+ok - teardown skips all pipeline-spend recording when the home has not opted in
+ok - teardown records unavailable pipeline spend for an owned ship task whose copy is gone
+ok - a task's own parked no-mistakes run is aborted, not orphaned, before the worker is removed
+ok - a run that lands on passed-with-override after abort is still recognized as terminal
+ok - a run that lands on passed-with-skips after abort is still recognized as terminal
+ok - a parked run the pipeline advanced past the task copy is still concluded from the runs ledger, not orphaned
+ok - a ledger row for a different head never authorizes a parked-run abort
+ok - a malformed ledger row never authorizes a parked-run abort
+ok - an impossible ledger date never authorizes a parked-run abort
+ok - a terminal status with a stale gate never reaches ledger cleanup
+ok - an advanced head present locally aborts through the strict rule alone - the ledger fallback stays dormant
+ok - an unresolvable active row with no same-branch anchor is never concluded (conservative refusal)
+ok - an ancestor-only anchor never binds an advanced parked run to this task
+ok - a terminal unfetched-head row is stale history and never concludes a run
+ok - a terminal newest row anchored at this worktree's head never authorizes an abort

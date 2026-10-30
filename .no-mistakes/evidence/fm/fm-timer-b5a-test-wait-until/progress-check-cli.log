@@ -1,30 +1,14 @@
-$ fm-duration.py progress-check rec 0 1            # PID 0, no files
-error: "progress-check needs a positive PID, or PID 0 with watched files only"
-help: "python3 bin/fm-duration.py --help"
-rc=2
-$ fm-duration.py progress-check rec 0 1 f --while-alive
-error: "progress-check needs a positive PID, or PID 0 with watched files only"
-help: "python3 bin/fm-duration.py --help"
-rc=2
-$ fm-duration.py progress-check rec -5 1
-error: "progress-check needs a positive PID, or PID 0 with watched files only"
-help: "python3 bin/fm-duration.py --help"
-rc=2
-$ fm-duration.py progress-check rec <dead pid> default --while-alive
-rc=3
-$ fm-duration.py progress-check rec <live sleep> default  (x2, no --while-alive: legacy CPU observer path)
-rc=0
-rc=0
-record pid 7422 since<=sampled True
-$ legacy path, live sleep, inactivity 0.3, three samples 0.5s apart (genuine stall must still give 124)
-rc=0
-no_progress: "pid=9380 no CPU or watched-file progress for 0.9s"
-rc=124
-no_progress: "pid=9380 no CPU or watched-file progress for 1.8s"
-rc=124
-$ file-only PID 0 observer, file unchanged, inactivity 0.3
-rc=0
-no_progress: "pid=0 no CPU or watched-file progress for 0.8s"
-rc=124
-no_progress: "pid=0 no CPU or watched-file progress for 1.7s"
-rc=124
+== interpreter: /Users/charlesabrooker/.pyenv/shims/python3 (Python 3.13.6)
+foreign-clock record -> rc=0 (expect 0: fresh window, not a stall)
+record: {"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-clock.hfZ3ui/absent", null]], "cpu": [], "clock": "uptime_raw", "since": 162479.4496545, "sampled": 162479.4496545}
+no_progress: "pid=0 no CPU or watched-file progress for 1.6s"
+same file still absent after 1.3s in a NEW process -> rc=124 (expect 124)
+file appeared since old same-clock record -> rc=0 (expect 0: progress)
+CLOCK_UPTIME_RAW now: 162482.080403125  monotonic now: 162482.080404
+== interpreter: /usr/bin/python3 (Python 3.9.6)
+foreign-clock record -> rc=0 (expect 0: fresh window, not a stall)
+record: {"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-clock.hfZ3ui/absent", null]], "cpu": [], "clock": "uptime_raw", "since": 162482.324737666, "sampled": 162482.324737666}
+no_progress: "pid=0 no CPU or watched-file progress for 1.5s"
+same file still absent after 1.3s in a NEW process -> rc=124 (expect 124)
+file appeared since old same-clock record -> rc=0 (expect 0: progress)
+CLOCK_UPTIME_RAW now: 162483.959690625  monotonic now: 0.005633791

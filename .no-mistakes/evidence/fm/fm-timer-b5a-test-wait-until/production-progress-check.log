@@ -1,0 +1,7 @@
+== fm_progress_check via Python 3.13.6
+idle pid=86253: rc sequence every 0.5s with 3s inactivity bound: 0 0 0 0 124 124 124 124
+busy pid=86254: rc sequence every 0.5s with 3s inactivity bound: 0 0 0 0 0 0 0 0
+== fm_progress_check via Python 3.9.6
+idle pid=15948: rc sequence every 0.5s with 3s inactivity bound: 0 0 0 0 0 124 124 124
+busy pid=15952: rc sequence every 0.5s with 3s inactivity bound: 0 0 0 0 0 0 0 0
+stderr: no_progress: "pid=86253 no CPU or watched-file progress for 3.4s" no_progress: "pid=86253 no CPU or watched-file progress for 4.3s" no_progress: "pid=86253 no CPU or watched-file progress for 5.1s" no_progress: "pid=86253 no CPU or watched-file progress for 6.0s" no_progress: "pid=15948 no CPU or watched-file progress for 3.7s" no_progress: "pid=15948 no CPU or watched-file progress for 4.4s" no_progress: "pid=15948 no CPU or watched-file progress for 5.2s" 

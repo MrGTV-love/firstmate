@@ -1,0 +1,21 @@
+ok - bootstrap distinguishes installed off-PATH tools without executing them or weakening compatibility
+ok - bootstrap preserves missing-tool advice for absent and unusable user-local candidates
+ok - crew dispatch reports an off-PATH jq without executing it until PATH lookup succeeds
+OMP_API_BILLING: retry.fallbackChains target[0][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains key[1] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+OMP_API_BILLING: retry.fallbackChains target[1][0] uses openrouter/* (API billing); use openai-codex/<gpt-model> instead
+bootstrap approval present: no OMP_API_BILLING lines
+ok - bootstrap reports API-billed omp roles and fallback keys/targets locally and honors only recorded fallback approvals without writes
+ok - remote guarded pairs preserve routing while notifying unrelated writes and retrying pending delivery
+ok - bootstrap resolves model roles offline and warns on literal profile ids beside an index
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+ok - bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable
+ok - a suite that does not test the detector starts no runner, owner guard, or sampler
+Terminated: 15

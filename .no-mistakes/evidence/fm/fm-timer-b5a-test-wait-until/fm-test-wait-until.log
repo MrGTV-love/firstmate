@@ -1,9 +1,8 @@
-FM_TEST_BEGIN 2026-10-30T05:25:55Z tests/fm-test-wait-until.test.sh family=pure-contract-unit expected_gate_skip=none
-cross-process silence: python=3.13.6 rc=0 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.PmnzUf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 138352.970241791, "sampled": 138352.970241791}
-cross-process silence: python=3.13.6 rc=124 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.PmnzUf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 138352.970241791, "sampled": 138353.45142625}
+cross-process silence: python=3.13.6 rc=0 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.2lALyf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 161917.538262916, "sampled": 161917.538262916}
+cross-process silence: python=3.13.6 rc=124 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.2lALyf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 161917.538262916, "sampled": 161918.040115083}
 ok - separate observer processes detect an unchanged absent publication
-cross-process silence: python=3.9.6 rc=0 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.PmnzUf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 138354.007976083, "sampled": 138354.007976083}
-cross-process silence: python=3.9.6 rc=124 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.PmnzUf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 138354.007976083, "sampled": 138354.447008666}
+cross-process silence: python=3.9.6 rc=0 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.2lALyf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 161918.547362625, "sampled": 161918.547362625}
+cross-process silence: python=3.9.6 rc=124 record={"pid": 0, "identity": [], "files": [["/Users/charlesabrooker/tmp/fm-test-wait-until.2lALyf/absent-publication", null]], "cpu": [], "clock": "uptime_raw", "since": 161918.547362625, "sampled": 161919.039983291}
 ok - separate observer processes detect an unchanged absent publication
 ok - 1x publisher reaches the awaited outcome
 ok - 5x publisher reaches the awaited outcome
@@ -23,10 +22,5 @@ ok - a dead peer fails only once its recorded descendants are gone too
 ok - unavailable CPU telemetry is unknown and retried
 ok - waits require a producer observable and reject the old capped interface
 ok - unknown samples keep the window, genuine inactivity and reused peers are caught, corrupt evidence is retried
-FM_TEST_END 2026-10-30T05:26:45Z tests/fm-test-wait-until.test.sh exit=0 duration_ms=49631 gate_skip=false
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65KF1WSYX2EDXTRZATZRHGR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=49801
-FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=49631 failed=0
-FM_TEST_SLOWEST rank=1 script=tests/fm-test-wait-until.test.sh duration_ms=49631
-ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65KF1WSYX2EDXTRZATZRHGR/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
-bin/fm-proc-budget.sh --own-procs 256 -- bin/fm-test-run.sh   5.55s user 7.81s system 26% cpu 50.151 total
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-test-wait-until.test.s  3.94s user 5.31s system 21% cpu 43.903 total
+exit=0

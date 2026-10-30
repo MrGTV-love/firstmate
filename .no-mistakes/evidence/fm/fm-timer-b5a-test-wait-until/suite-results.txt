@@ -1,0 +1,7 @@
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-test-reap-orphans.test.sh -> exit 0 (29s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-procevent-proc.test.sh -> exit 0 (37s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-proc-guard.test.sh -> exit 0 (25s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-home-summary-refresh.test.sh -> exit 0 (170s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-watch-idle-reap.test.sh -> exit 0 (183s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-extension-binding.test.sh -> exit 0 (28s)
+bin/fm-proc-budget.sh --own-procs 128 -- bash tests/fm-idle-session-reap.test.sh -> exit 0 (115s)
