@@ -4108,6 +4108,36 @@ crossed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evide
                      '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 3620))
 assert crossed.returncode == 1 and 'stalled, missing or failed' in crossed.stdout, ('no new wait on a stalled task', crossed)
 fx['env']['FM_OPEN_LOOPS_NOW'] = str(now)
+# A prerequisite's PR on any provider the PR parser accepts ends the wait when its canonical merge record exists.
+def gitlab_done(fx, url):
+    (fx['home'] / 'state/repair-owner.meta').write_text(fx['meta'] + 'pr=' + url + '\n')
+    (fx['home'] / 'state/repair-owner.status').write_text(fx['working'] + f'done [at={now}]: MR opened; awaiting review\n')
+    fx['activity']('idle')
+fx = waiting_fixture('merged-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'an unmerged GitLab MR carries the wait'
+renewed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                     '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert renewed.returncode == 0, ('an unmerged GitLab MR accepts a renewed wait', renewed.stdout)
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 290',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'the GitLab MR merged'
+landed = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                    '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert landed.returncode == 1 and 'merged' in landed.stdout, ('no renewal after the MR merged', landed)
+# A merge record for another MR of the same project does not end it.
+fx = waiting_fixture('merged-other-gitlab')
+gitlab_done(fx, 'https://gitlab.com/test/project/-/merge_requests/290')
+fx['ok']('bash', '-c', '. "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner gitlab gitlab.com test/project 291',
+         '_', code / 'bin/fm-pr-lib.sh', fx['home'] / 'state')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 0, 'a merge record for another MR leaves the wait'
+# A prerequisite whose PR identity the landing check cannot read never keeps or admits a wait.
+fx = waiting_fixture('unreadable-pr-identity')
+gitlab_done(fx, 'https://gitlab.com/test/project/merge_requests/290')
+assert fx['call'](fx['loops'], '--check-actions').returncode == 1, 'an unreadable PR identity does not keep the wait'
+unreadable = fx['call'](fx['loops'], 'action', fx['red']['id'], 'waiting', '--evidence', reason,
+                        '--prerequisite-task', 'repair-owner', '--recheck', iso(now + 7200))
+assert unreadable.returncode == 1 and 'identity' in unreadable.stdout, ('no wait on an unreadable PR identity', unreadable)
 # A done note naming an open PR keeps the prerequisite live before pr= is registered, until that PR's merge is recorded.
 fx = waiting_fixture('done-note')
 (fx['home'] / 'state/repair-owner.status').write_text(

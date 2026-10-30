@@ -1529,7 +1529,7 @@ class WaitVerifier:
             if state == "done" and not pr:
                 raise ValueError("prerequisite task is done with no PR; its report is its delivery;"
                                  " follow up on its result")
-            if merge_marker(c.state, pr):
+            if pr and self.pr_merged(pr):
                 raise ValueError("prerequisite task's PR has merged; follow up on its result")
         if any(row.get("subject") == task and row.get("category") in PREREQUISITE_TROUBLE
                and row["id"] in self.overdue and not row.get("informational") and not row.get("stale")
@@ -1538,6 +1538,27 @@ class WaitVerifier:
         stat = path.stat()
         return dict(c.task_source(task), generation=fingerprint(fields["spawn_gen"]), kind="task-live",
                     stream=[stat.st_dev, stat.st_ino])
+
+    def pr_merged(self, pr):
+        """This prerequisite PR has a merge recorded, on any provider bin/fm-pr-lib.sh's fm_pr_url_parse accepts.
+
+        A GitHub PR keeps the ledger's own marker read. Any other PR is read through the canonical marker
+        reader fm_pr_poll_merge_marker_matches, and a PR identity or marker area it cannot read fails closed:
+        it raises, so the wait is never admitted, kept or renewed on a PR whose landing cannot be checked.
+        """
+        if GITHUB_PR.fullmatch(pr):
+            return merge_marker(self.collector.state, pr)
+        try:
+            verdict = self.collector.bash(
+                '. "$1/fm-pr-lib.sh"; fm_pr_url_parse "$3" || { echo "prerequisite PR identity is unreadable" >&2; exit 3; }; '
+                'device=$(fm_pr_file_device "$2") || { echo "prerequisite merge records are unreadable" >&2; exit 3; }; '
+                'for marker in "$2"/*.pr-poll-merge-notified; do [ -e "$marker" ] || continue; '
+                'fm_pr_poll_merge_marker_matches "$marker" "$device" "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" '
+                '"$FM_PR_NUMBER" && { echo merged; exit 0; }; done; echo open',
+                BIN, self.collector.state, pr).strip()
+        except SOURCE_ERRORS as error:
+            raise ValueError("prerequisite PR landing cannot be read; " + str(error)[:120]) from error
+        return verdict == "merged"
 
     def task_pr(self, path, fields):
         """A task's PR: its recorded pr=, or for a ship the PR its done note names or its no-mistakes run records.
