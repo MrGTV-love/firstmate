@@ -1,0 +1,145 @@
+##### A. Activation order: bind, arm, one typed answer, disarm
+
+===== home: <scratch>/home.TMke4o (scenario fixture typed-reply) =====
+
+$ <wt>/bin/fm-captain-hold.sh open typed-call
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh binding slack-dm
+[rc=1]
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+slack: refused: source_not_bound
+[rc=1]
+
+$ check registration after refused arm:
+(none)
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+slack: refused: source_not_bound
+[rc=1]
+
+$ <wt>/bin/fm-captain-hold.sh bind slack-dm
+bound: slack-dm -> (any)
+[rc=0]
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ <wt>/bin/fm-slack-check.sh check --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+closed: typed-call
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh open typed-call
+[rc=1]
+
+$ outbound DM posts (method, channel, thread)
+chat.postMessage recipient=U0TESTOWNER channel=D0123456789 thread=900.000001
+chat.postMessage recipient=U0TESTOWNER channel=D0123456789 thread=900.000001
+
+$ <wt>/bin/fm-slack-check.sh check --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+[rc=0]
+
+$ env SLACK_BOT_TOKEN= <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+
+##### B. Allowlist is the lock: only the owner id answers
+
+===== home: <scratch>/home.sHjQNB (scenario fixture allowlist) =====
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/allowlist/transcript.json
+closed: allow-a
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh open allow-a
+[rc=1]
+
+$ <wt>/bin/fm-captain-hold.sh open allow-b
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh open allow-c
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh open allow-d
+[rc=0]
+
+##### C. Unbound source feeds nothing
+
+===== home: <scratch>/home.BttVdN (scenario fixture typed-reply) =====
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh unbind slack-dm
+unbound: slack-dm
+[rc=0]
+
+$ <wt>/bin/fm-slack-check.sh check --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+[rc=0]
+
+$ <wt>/bin/fm-captain-hold.sh open typed-call
+[rc=0]
+
+##### D. Changed owner DM: refused everywhere except retarget
+
+===== home: <scratch>/home.p2uqJf (scenario fixture mirror) =====
+
+$ <wt>/bin/fm-slack-check.sh retarget --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-poll.sh --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+slack: transport failure: dm_user_changed
+[rc=1]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh arm --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+slack: refused: dm_user_changed
+[rc=1]
+
+$ pending rows in journal (old value restored)
+1
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh retarget --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+slack: refused: dm_user_changed_with_pending_work
+[rc=1]
+
+$ drain: poll with the OLD value until the journal is empty
+check: slack 900.000001 - oversized notice
+poll 1 -> pending=0
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh retarget --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh arm --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-mirror.sh --replay /tmp/fm-slack-walk.QVaZi7/moved.json
+[rc=0]
+
+$ post targets (user@channel) for every chat.postMessage
+4 U0OTHEROWNER1@D0NEWOWNER01
+5 U0TESTOWNER@D0123456789
+
+##### E. Disarm is the hard off switch even with broken config
+
+===== home: <scratch>/home.u5LBfZ (scenario fixture arming) =====
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/arming/arm.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_ALLOWED_AUTHORS=oops <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+
+$ check registration left behind:
+(none)
