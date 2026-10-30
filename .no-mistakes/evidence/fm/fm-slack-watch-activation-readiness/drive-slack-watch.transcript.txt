@@ -1,0 +1,244 @@
+===== SC1: --help names the retarget order and the last resort =====
+
+----- fresh disposable home (fixture arming) -----
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh --help
+Usage: fm-slack-check.sh [arm|check|disarm|retarget] [--replay transcript.json]
+Bind slack-dm with fm-captain-hold.sh before arm; arm proves the DM is readable.
+Retarget stops tracking the old DM after FM_SLACK_DM_USER changed; arm then opens the new one.
+Retarget refuses while the old DM has pending work and the poll refuses a changed owner, so: restore the old
+FM_SLACK_DM_USER, run fm-slack-poll.sh until the pending journal is empty, set the new value, then disarm,
+retarget, arm. A poll can print nothing while work is still pending. The journal is empty when, in the home
+with the old value restored, this prints 0:
+  python3 -c 'import json; print(len(json.load(open("state/slack-watch/state.json"))["pending"]))'
+A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.
+Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the
+pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were
+already answered, so do it only after that check. The same last resort covers an old thread retarget can never
+read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted
+card): first read that thread in Slack by hand and record any answer with fm-captain-hold.sh answer, then
+disarm and remove state/slack-watch/. The reset abandons that thread's unread reply.
+Disarm is the hard off switch. Unconfigured is silent/off; an explicit arm names the refusal.
+See docs/configuration.md "Slack decision plane".
+[exit 0]
+
+===== SC2: arm refuses before the source is bound (binding order) =====
+
+----- fresh disposable home (fixture arming) -----
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-captain-hold.sh binding slack-dm
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/arming/arm.json
+slack: refused: source_not_bound
+[exit 1]
+  observed: check files registered: 0
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-captain-hold.sh bind slack-dm
+bound: slack-dm -> (any)
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/arming/arm.json
+armed: state/slack.check.sh
+[exit 0]
+  observed: check files registered: 2
+
+===== SC3: bind, arm, mirror, owner types an option, poll records one answer =====
+
+----- fresh disposable home (fixture mirror) -----
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-captain-hold.sh bind slack-dm
+bound: slack-dm -> (any)
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-mirror.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+
+[exit 0]
+  observed: threads tracked: 4
+
+$ owner U0TESTOWNER replies 'ship it' in the open-a thread
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+closed: open-a
+[exit 0]
+  observed: open-a open? rc=1 (1 = closed)
+  observed: thread texts: ship it|Answer recorded.|Resolved: open-a|The decision is no longer open. Full resolution remains in the local backlog.|
+
+===== SC4 (adversarial): a reply from a non-allowlisted author is never an answer =====
+
+$ stranger U0STRANGER9 replies '1' in the open-b thread
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+
+[exit 0]
+  observed: open-b open? rc=0 (0 = still open)
+
+===== SC5: retarget with an unread owner reply refuses, keeps all threads, then drains and succeeds =====
+
+----- fresh disposable home (fixture mirror) -----
+
+$ owner replies in open-a, then FM_SLACK_DM_USER changes
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+slack: refused: dm_user_changed_with_pending_work
+[exit 1]
+  observed: owner now: U0TESTOWNER; threads: 4; pending: 1; open-a open rc=0
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+slack: transport failure: dm_user_changed
+[exit 1]
+
+$ restore the old value and poll
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+closed: open-a
+[exit 0]
+  observed: pending: 0; open-a open rc=1
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/moved.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-mirror.sh --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/moved.json
+
+[exit 0]
+  observed: new-owner threads: 3; posts to old DM D0123456789 before/after retarget mirror: 6/6; posts to new DM D0NEWOWNER01: 3
+
+===== SC6 (adversarial): owner reply on a card whose call state can never be probed (bad$id) =====
+
+----- fresh disposable home (fixture mirror) -----
+
+$ owner replies '1' on the uncertain bad$id card
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+
+[exit 0]
+  observed: pending after poll: 0 (poll stages nothing it cannot verify)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+slack: refused: hold_state_unreadable
+[exit 1]
+  observed: owner now: U0TESTOWNER; threads: 4
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/mirror/transcript.json
+slack: refused: hold_state_unreadable
+[exit 1]
+  observed: second retarget: still the same named refusal (no silent clear)
+
+$ documented last resort: read the thread by hand, disarm, remove state/slack-watch/
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/moved.json
+unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/moved.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-mirror.sh --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/moved.json
+
+[exit 0]
+  observed: after reset: threads 4; posts to new DM D0NEWOWNER01: 4; posts to old DM D0123456789: 0
+
+===== SC7 (adversarial): retarget when a tapper users.info lookup fails refuses and keeps the tap =====
+
+----- fresh disposable home (fixture reaction-answer) -----
+
+$ replay double: users.info now fails with HTTP 400
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh retarget --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/reaction-answer/transcript.json
+slack: refused: api_error
+[exit 1]
+  observed: reaction-call threads: 1; reaction-call open rc=0
+
+$ users.info recovers; old owner polls
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/reaction-answer/transcript.json
+closed: reaction-call
+[exit 0]
+  observed: reaction-call open rc=1
+
+===== SC10: the plain poll (not retarget) still skips a tap whose users.info lookup fails, unchanged =====
+
+----- fresh disposable home (fixture reaction-answer) -----
+
+$ replay double: users.info now fails with HTTP 400
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/reaction-answer/transcript.json
+
+[exit 0]
+  observed: reaction-call open rc=0 (0 = still open); pending: 0
+
+$ users.info recovers
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-poll.sh --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/reaction-answer/transcript.json
+closed: reaction-call
+[exit 0]
+  observed: reaction-call open rc=1
+
+===== SC11: the standing check delivers only while armed; after disarm it is silent =====
+
+----- fresh disposable home (fixture typed-reply) -----
+
+$ disarmed (never armed): standing check with an owner reply waiting
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/typed-reply/transcript.json
+
+[exit 0]
+  observed: typed-call open rc=0 (0 = still open)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/typed-reply/transcript.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh check --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/typed-reply/transcript.json
+closed: typed-call
+[exit 0]
+  observed: typed-call open rc=1 (1 = closed)
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[exit 0]
+
+===== SC8: disarm works with a broken config =====
+
+----- fresh disposable home (fixture arming) -----
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh arm --replay /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/tests/fixtures/slack/arming/arm.json
+armed: state/slack.check.sh
+[exit 0]
+
+$ env SLACK_BOT_TOKEN= FM_SLACK_ALLOWED_AUTHORS=oops /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[exit 0]
+  observed: check files left: 0
+
+===== SC9 (adversarial): nothing is posted to a DM that is not the owner DM =====
+
+----- fresh disposable home (fixture mirror) -----
+
+$ stored channel tampered to D0OTHERDM01; a new call is held
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66HTP1VGK97XPJ9ZGCWEFMW/bin/fm-slack-mirror.sh --replay /Users/charlesabrooker/tmp/fm-slack-drive.bNFHVB/other-dm.json
+slack: transport failure: stored_channel_not_owner_dm
+[exit 1]
+  observed: writes to D0OTHERDM01: 0
+
+===== done =====
