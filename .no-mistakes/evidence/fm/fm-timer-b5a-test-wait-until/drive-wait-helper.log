@@ -1,0 +1,26 @@
+== load: 21:27  up 1 day, 11:27, 4 users, load averages: 21.50 25.43 27.93
+== S1 slow host: publisher slowed 6x (0.1s -> 0.6s per step, 12 steps) with 8 CPU burners
+-- main helper, ceiling sized on quiet machine (3s; quiet run takes ~1.2s)
+main rc=0 after 9.2s result=published
+-- branch helper, same work
+cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CPU cannot be sampled"
+branch rc=0 after 9.3s result=published
+== S2 dead peer: producer exits without publishing
+fm_test_wait_until: condition unmet (3, pid=83697)
+rc=1 after 1.5s (default inactivity is 900s)
+== S3 silent live peer: alive, no observable change, --inactivity 2
+no_progress: "pid=89834 no CPU or watched-file progress for 2.6s"
+fm_test_wait_until: condition unmet (124, pid=89834)
+rc=1 after 2.9s; peer still alive: yes
+== S4 live poller with no outcome, --cycles 3 (poll every 0.5s, counts to file)
+fm_test_wait_until: condition unmet after 3 peer cycles (0 -> 3 in /Users/charlesabrooker/tmp/drive-wait.fKBmbQ/count)
+rc=1 after 1.9s
+== S5 peer exits, its child publishes 1s later
+rc=0 after 1.2s result=done
+== S6 old capped call shape is refused, no fallback
+fm_test_wait_until: expected observation options then -- COMMAND
+old-shape rc=2
+no-observable rc=2
+own-pid rc=2
+== S7 outcome already true returns at once
+rc=0

@@ -1,0 +1,20 @@
+== host with burners: 20:51  up 1 day, 10:51, 4 users, load averages: 30.98 24.43 18.07
+ok - 1x publisher reaches the awaited outcome
+ok - 5x publisher reaches the awaited outcome
+ok - file-only observation follows a detached publisher beyond the inactivity interval
+ok - CPU-only activity is not progress toward the outcome
+ok - 1x poller reaches the awaited outcome within its cycles
+ok - 1x live poller without the outcome fails after its stated cycles
+ok - 5x poller reaches the awaited outcome within its cycles
+ok - 5x live poller without the outcome fails after its stated cycles
+ok - 1x silent peer is detected without killing it
+ok - 5x silent peer is detected without killing it
+ok - missing detached publication is a file-progress stall, not waiter CPU progress
+ok - dead producers fail only when the requested outcome is absent
+ok - peer death during a wait is detected
+ok - an outcome a live descendant publishes after the peer exits still wins
+ok - a dead peer fails only once its recorded descendants are gone too
+not ok - CPU read failure was not exercised
+== host after: 20:53  up 1 day, 10:53, 4 users, load averages: 45.93 32.61 22.07
+suite rc=1
+bin/fm-proc-budget.sh --own-procs 256 -- bash $E/burn-neighbour.sh "$PWD"  195.03s user 13.40s system 189% cpu 1:50.10 total

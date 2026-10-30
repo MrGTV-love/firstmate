@@ -1,0 +1,7 @@
+21:05  up 1 day, 11:05, 4 users, load averages: 19.42 37.10 35.49
+ok - all registration owner transitions wait for the prior extension runner
+ok - an extension named proc keeps lease-bound lifetime and counts toward supervision
+
+all extension-binding tests passed
+FM_EXTENSION_BINDING_SEGMENT=lifecycle-runner bin/fm-proc-budget.sh  512 --    16.84s user 36.17s system 16% cpu 5:30.08 total
+rc=0

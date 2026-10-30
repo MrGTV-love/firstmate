@@ -1,0 +1,19 @@
+ok - 1x publisher reaches the awaited outcome
+ok - 5x publisher reaches the awaited outcome
+ok - file-only observation follows a detached publisher beyond the inactivity interval
+ok - CPU-only activity is not progress toward the outcome
+ok - 1x poller reaches the awaited outcome within its cycles
+ok - 1x live poller without the outcome fails after its stated cycles
+ok - 5x poller reaches the awaited outcome within its cycles
+ok - 5x live poller without the outcome fails after its stated cycles
+ok - 1x silent peer is detected without killing it
+ok - 5x silent peer is detected without killing it
+ok - missing detached publication is a file-progress stall, not waiter CPU progress
+ok - dead producers fail only when the requested outcome is absent
+ok - peer death during a wait is detected
+ok - an outcome a live descendant publishes after the peer exits still wins
+ok - a dead peer fails only once its recorded descendants are gone too
+ok - unavailable CPU telemetry is unknown and retried
+ok - waits require a producer observable and reject the old capped interface
+ok - unknown samples keep the window, genuine inactivity and reused peers are caught, corrupt evidence is retried
+bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-test-wait-until.test.s  4.86s user 7.21s system 25% cpu 46.679 total

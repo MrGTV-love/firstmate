@@ -1,0 +1,9 @@
+== run 1 host: 20:55  up 1 day, 10:55, 4 users, load averages: 32.97 32.85 23.86
+ok lines: 18
+run 1 suite rc=0
+== run 2 host: 20:57  up 1 day, 10:57, 4 users, load averages: 69.76 44.99 29.43
+ok lines: 18
+run 2 suite rc=0
+== run 3 host: 20:58  up 1 day, 10:58, 4 users, load averages: 76.83 53.30 34.01
+ok lines: 18
+run 3 suite rc=0

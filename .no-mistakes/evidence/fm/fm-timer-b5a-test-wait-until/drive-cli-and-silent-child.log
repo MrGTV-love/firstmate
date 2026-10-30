@@ -1,0 +1,11 @@
+== progress-check CLI guards
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+pid 0 without files rc=2
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+pid 0 with --while-alive rc=2
+dead pid --while-alive first sample rc=3 (3 = dead peer)
+== dead peer with a silent child: fail only after child is gone
+fm_test_wait_until: condition unmet (3, pid=88660)
+rc=1 after 2.5s; child  alive at verdict: no

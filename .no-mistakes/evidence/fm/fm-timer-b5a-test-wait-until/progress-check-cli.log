@@ -1,0 +1,30 @@
+$ fm-duration.py progress-check rec 0 1            # PID 0, no files
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+rc=2
+$ fm-duration.py progress-check rec 0 1 f --while-alive
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+rc=2
+$ fm-duration.py progress-check rec -5 1
+error: "progress-check needs a positive PID, or PID 0 with watched files only"
+help: "python3 bin/fm-duration.py --help"
+rc=2
+$ fm-duration.py progress-check rec <dead pid> default --while-alive
+rc=3
+$ fm-duration.py progress-check rec <live sleep> default  (x2, no --while-alive: legacy CPU observer path)
+rc=0
+rc=0
+record pid 7422 since<=sampled True
+$ legacy path, live sleep, inactivity 0.3, three samples 0.5s apart (genuine stall must still give 124)
+rc=0
+no_progress: "pid=9380 no CPU or watched-file progress for 0.9s"
+rc=124
+no_progress: "pid=9380 no CPU or watched-file progress for 1.8s"
+rc=124
+$ file-only PID 0 observer, file unchanged, inactivity 0.3
+rc=0
+no_progress: "pid=0 no CPU or watched-file progress for 0.8s"
+rc=124
+no_progress: "pid=0 no CPU or watched-file progress for 1.7s"
+rc=124

@@ -1,0 +1,22 @@
+== host: 20:49  up 1 day, 10:50, 4 users, load averages: 28.72 22.78 16.95
+== S1 slow-host healthy publisher. Quiet run takes ~2.4s; main's caller picks a 6s ceiling (2.5x margin).
+main helper   1x slow: rc=0 after 5.6s
+branch helper 1x slow: rc=0 after 5.8s
+main helper   5x slow: rc=1 after 13.9s
+branch helper 5x slow: rc=0 after 15.5s
+== S2 dead peer, outcome never written (default 900s inactivity in force)
+fm_test_wait_until: condition unmet (3, pid=31562)
+dead peer: rc=1 after 3.5s
+== S3 live but silent peer (no observable change), --inactivity 2
+no_progress: "pid=43198 no CPU or watched-file progress for 4.1s"
+fm_test_wait_until: condition unmet (124, pid=43198)
+silent peer: rc=1 after 6.0s; peer still alive (not killed by helper)=yes
+== S4 live poller that never publishes, slowed 5x (0.5s per cycle), --cycles 4
+fm_test_wait_until: condition unmet after 4 peer cycles (0 -> 4 in /Users/charlesabrooker/tmp/fm-wait-scenarios.6qlY8X/count)
+idle poller: rc=1 after 2.9s count=4
+== S5 adversarial: old capped API and missing observable are refused, not silently capped
+fm_test_wait_until: expected observation options then -- COMMAND
+old API 'fm_test_wait_until 5 true': rc=2
+no observable '-- true': rc=2
+== S6 adversarial: peer dies while its forked child is still working; child publishes 1.5s later
+child-published after parent exit: rc=0 after 2.0s

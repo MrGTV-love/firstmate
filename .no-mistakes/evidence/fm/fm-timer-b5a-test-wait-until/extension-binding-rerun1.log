@@ -1,0 +1,45 @@
+21:03  up 1 day, 11:04, 4 users, load averages: 15.50 42.01 36.91
+FM_TEST_BEGIN 2026-10-30T02:03:59Z tests/fm-extension-binding.test.sh family=standalone expected_gate_skip=none
+ok - unknown extension conformance section selectors fail before setup
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 253: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-task-inbox-lib.sh: No such file or directory
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 255: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-backend.sh: No such file or directory
+not-autohandled: example-file (left for the handler; still unacknowledged)
+not-autohandled: flow-source (left for the handler; still unacknowledged)
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 253: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-task-inbox-lib.sh: No such file or directory
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 255: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-backend.sh: No such file or directory
+ok - the shipped file-signal package is a runnable end-to-end external adapter
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 253: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-task-inbox-lib.sh: No such file or directory
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 255: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-backend.sh: No such file or directory
+ok - one external adapter registers, invokes, captures unhandled evidence, classifies, and terminally retires end to end
+not-autohandled: remote-source (left for the handler; still unacknowledged)
+not-autohandled: example-symlinked (left for the handler; still unacknowledged)
+ok - register-extension and reconcile of an unhandled extension result take their locks in one order
+
+all extension-binding tests passed
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 253: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-task-inbox-lib.sh: No such file or directory
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 255: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-backend.sh: No such file or directory
+ok - a home reached through a symlinked ancestor captures external evidence normally
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 253: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-task-inbox-lib.sh: No such file or directory
+/Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-procevent.sh: line 255: /Users/charlesabrooker/tmp/fm-extension-binding.A1qjAW/remote-root/bin/fm-backend.sh: No such file or directory
+ok - the section coordinator propagates ordered failures and bounded cleanup
+ok - serialized remote binding crosses fm-on through addressed-home capture and retirement
+
+all extension-binding tests passed
+ok - handshake execution rejects and reaps foreground descendants
+
+all extension-binding tests passed
+ok - inherited descriptors preserve silent acknowledgement and terminal retirement
+ok - inner result.silent host crash releases the parent lifecycle lock before terminal retry
+ok - local binding retirement requires its exact identity and disables invocation
+
+all extension-binding tests passed
+ok - independent extension conformance sections complete through isolated public homes
+
+all extension-binding tests passed
+FM_TEST_END 2026-10-30T02:04:44Z tests/fm-extension-binding.test.sh exit=0 duration_ms=44527 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M657JMK02YAJFK81PN247DB4/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=44737
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=44527 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-extension-binding.test.sh duration_ms=44527
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M657JMK02YAJFK81PN247DB4/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+rc=0

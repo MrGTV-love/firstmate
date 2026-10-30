@@ -1,0 +1,7 @@
+load: 21:28  up 1 day, 11:28, 4 users, load averages: 26.96 26.52 28.20
+== publisher step 0.1s (12 steps)
+  main   (fm_test_wait_until 3 ...): rc=0 after 3.2s result=published
+  branch (--while-alive --progress-file --inactivity 3): rc=0 after 3.6s result=published
+== publisher step 1.0s (12 steps)
+  main   (fm_test_wait_until 3 ...): rc=1 after 7.0s result=ABSENT
+  branch (--while-alive --progress-file --inactivity 3): rc=0 after 13.6s result=published

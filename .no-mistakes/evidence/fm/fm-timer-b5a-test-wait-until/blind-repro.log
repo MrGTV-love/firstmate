@@ -1,0 +1,6 @@
+run 1 rc=0 load=36.41 31.86 22.33 elapsed=1s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
+run 2 rc=0 load=36.41 31.86 22.33 elapsed=2s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
+run 3 rc=0 load=36.41 31.86 22.33 elapsed=1s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
+run 4 rc=0 load=36.62 31.98 22.43 elapsed=2s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
+run 5 rc=0 load=36.62 31.98 22.43 elapsed=1s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
+run 6 rc=0 load=36.62 31.98 22.43 elapsed=1s stderr=[cpu_telemetry_unavailable: "cannot sample complete process-tree CPU on darwin; hung work cannot be recovered here, so nothing is stopped for inactivity while CP]
