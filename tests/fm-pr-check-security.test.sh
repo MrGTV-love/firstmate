@@ -195,6 +195,9 @@ case " $* " in
   *" api --paginate repos/"*"/rules/branches/"*)
     printf '%s\n' '[]'
     ;;
+  *" api repos/"*"/compare/"*)
+    printf '%s\n' '{"behind_by":0,"base_commit":{"sha":"0000000000000000000000000000000000000000"},"merge_base_commit":{"sha":"0000000000000000000000000000000000000000"}}'
+    ;;
   *" api repos/"*"/branches/"*)
     printf '%s\n' '{"name":"main","protected":false}'
     ;;
