@@ -647,17 +647,33 @@ trap 'fm_test_cleanup; exit 131' QUIT
 # runner containers there (bin/fm-test-reap-orphans.sh --owners). Its cost
 # therefore does not grow with the other fm-* entries that tools leave in a
 # shared temp dir, which the shared per-prefix scratch containers
-# (bin/fm-scratch-lib.sh) keep out of the way as well. FM_TEST_SWEEP_ALL=1
-# widens it to every top-level fm-* directory and to dead shells' legacy
+# (bin/fm-scratch-lib.sh) keep out of the way as well. Once per age floor it
+# also looks at every top-level fm-* directory, for marked roots that predate
+# the records (a stamp in the owners dir says when it last did).
+# FM_TEST_SWEEP_ALL=1 always looks and also reaps dead shells' legacy
 # registries; bin/fm-test-run.sh does that once per run.
 FM_TEST_ORPHAN_MAX_AGE_SECONDS=${FM_TEST_ORPHAN_MAX_AGE_SECONDS:-3600}
 
 fm_test_reap_orphans() {
   local marker dir mtime now owner_pid owner_identity current_identity shell root entry
-  local pattern='fm-test-*'
+  local pattern='fm-test-*' stamp="$FM_TEST_OWNERS_DIR/.legacy-discovery" stamp_mtime
   local seen=$'\n'
   local -a markers=() fm_test_sweep_candidates=() reaper_args=()
-  [ "${FM_TEST_SWEEP_ALL:-0}" != 1 ] || pattern='fm-*'
+  if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
+    pattern='fm-*'
+  else
+    # Roots from before the records (any fm-* name) sit in no record, so finding
+    # them takes a look at every fm-* entry. That look is the one part of the
+    # sweep whose cost follows the temp dir, so it runs once per age floor: a
+    # root younger than the floor cannot be removed anyway, and the floor is the
+    # longest a dead owner's root waits. The stamp is this shell's own business.
+    stamp_mtime=$(stat -c %Y "$stamp" 2>/dev/null || stat -f %m "$stamp" 2>/dev/null) || stamp_mtime=
+    if [ -L "$stamp" ] || [ -z "$stamp_mtime" ] || [ $(( $(date +%s) - stamp_mtime )) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ]; then
+      pattern='fm-*'
+      rm -f "$stamp" 2>/dev/null
+      : > "$stamp" 2>/dev/null || true
+    fi
+  fi
   for shell in "$FM_TEST_OWNERS_DIR"/*; do
     [ -d "$shell" ] && [ ! -L "$shell" ] && [ -O "$shell" ] || continue
     # A shell's fixture roots go before its record, which is removed last.

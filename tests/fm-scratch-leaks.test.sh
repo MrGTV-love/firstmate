@@ -71,7 +71,18 @@ stall_signal() {
   # Retirement signals the whole process group, helper included; a shell that
   # holds a trap runs it only once its foreground helper has ended.
   kill -KILL "$helper_pid" 2>/dev/null || true
-  wait "$cmd_pid" 2>/dev/null || true
+  wait "$cmd_pid" 2>/dev/null
+  STALL_STATUS=$?
+  # The command must have ended because of the signal: not as a success, not by
+  # a KILL (137: it never ran its trap), and for TERM and HUP with the exit status
+  # every command here gives them. INT ends some of them with their own error
+  # status once the helper is gone, so it is only held to the first two.
+  [ "$STALL_STATUS" -ne 0 ] && [ "$STALL_STATUS" -ne 137 ] \
+    || fail "a command sent $sig ended with wait status $STALL_STATUS instead of by its signal handling"
+  case "$sig" in
+    TERM) [ "$STALL_STATUS" -eq 143 ] || fail "a command sent TERM ended with wait status $STALL_STATUS, not 143" ;;
+    HUP) [ "$STALL_STATUS" -eq 129 ] || fail "a command sent HUP ended with wait status $STALL_STATUS, not 129" ;;
+  esac
   # Let a surviving subshell of the command notice that its helper is gone.
   sleep 0.3
 }
@@ -252,16 +263,26 @@ run_session_start() {  # <tmpdir> [timeout-seconds]
     bash "$ROOT/bin/fm-session-start.sh"
 }
 
+# The stage file proof stands alone: bootstrap's deferred network helpers
+# (fm-startup-network*, outside this change) make and remove their own entries
+# on their own schedule, and the whole-TMPDIR checks below see those too.
+assert_no_stage_file() {  # <tmpdir> <what>
+  [ -z "$(find "$1" -name 'fm-session-start-stage*' 2>/dev/null)" ] \
+    || fail "$2 left a session start stage entry: $(find "$1" -name 'fm-session-start-stage*' | tr '\n' ' ')"
+}
+
 test_session_start() {
   local tmp sig started=0 pid bound_out
   tmp=$(new_tmp)
   run_session_start "$tmp" 60 >/dev/null 2>&1 || fail "a session start failed on an empty home"
+  assert_no_stage_file "$tmp" "a normal session start"
   # Bootstrap's deferred network checks run on after the digest is out and make
   # their own entries; they finish by themselves.
   while [ -n "$(entries "$tmp")" ] && [ "$started" -lt 200 ]; do started=$((started + 1)); sleep 0.1; done
   assert_clean "$tmp" "a normal session start"
   bound_out=$(run_session_start "$tmp" 1 2>&1)
   assert_contains "$bound_out" 'STARTUP TRUNCATED' "a one-second bound did not truncate the digest"
+  assert_no_stage_file "$tmp" "a session start whose runtime bound fired"
   assert_clean "$tmp" "a session start whose runtime bound fired"
   for sig in $SIGNALS; do
     TMPDIR="$tmp" FM_HOME="$HOME_DIR" FM_ROOT_OVERRIDE="$ROOT" FM_SESSION_START_TIMEOUT=60 \
@@ -358,8 +379,22 @@ test_reaper() {
   # directory must be gone either way.
   run_reaper "$tmp" >/dev/null 2>&1 || true
   assert_clean "$tmp" "a normal reaper sweep"
-  env TMPDIR="$tmp" bash "$ROOT/bin/fm-test-reap-orphans.sh" --no-such-option >/dev/null 2>&1 && fail "the reaper accepted an unknown option"
-  assert_clean "$tmp" "a reaper run that exited on a usage error"
+  # An error exit after the working directory exists: a process list that cannot
+  # be read. The fake ps records what the reaper had made by the time it ran, so
+  # the case proves the allocation happened before the error.
+  cat > "$FAKEBIN/ps" <<'SH'
+#!/usr/bin/env bash
+find "$TMPDIR" -mindepth 2 -maxdepth 2 > "$FAKE_PS_SEEN"
+exit 1
+SH
+  chmod +x "$FAKEBIN/ps"
+  rm -f "$TMP_ROOT/ps.seen"
+  env TMPDIR="$tmp" FAKE_PS_SEEN="$TMP_ROOT/ps.seen" PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$TMP_ROOT/reaper-scan" >/dev/null 2>&1 \
+    && fail "the reaper reported success when the process list could not be read"
+  [ -s "$TMP_ROOT/ps.seen" ] || fail "the reaper never made its working directory before the process list failed"
+  assert_clean "$tmp" "a reaper run that exited on an error after making its working directory"
+  rm -f "$FAKEBIN/ps"
   cat > "$FAKEBIN/ps" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$$" > "$FAKE_STALL_PIDFILE"

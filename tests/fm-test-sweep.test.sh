@@ -43,7 +43,7 @@ test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it() {
   killed_shell "$tmp" "$TMP_ROOT/killed-root"
   root=$(cat "$TMP_ROOT/killed-root")
   assert_present "$root" "the killed shell's fixture root was not made"
-  records=$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')
+  records=$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
   assert_equals 1 "$records" "a killed shell must leave exactly one record (registries and helper roots live inside it)"
   [ -f "$(find "$tmp/fm-test-owners" -mindepth 2 -maxdepth 2 -name .fm-test-fixture | head -1)" ] \
     || fail "the killed shell's record carries no ownership marker"
@@ -55,11 +55,11 @@ test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it() {
   touch -t 202001010000 "$tmp"/fm-test-owners/*/.fm-test-fixture
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=3600
   assert_present "$root" "the sweep removed a fixture root younger than the age floor"
-  assert_equals 1 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" \
+  assert_equals 1 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" \
     "the sweep removed an old record while a fixture root it names was still kept"
   sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0
   assert_absent "$root" "the sweep left the fixture root of a dead shell"
-  assert_equals 0 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" \
+  assert_equals 0 "$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')" \
     "the sweep left the record of a dead shell"
   pass "a KILLed shell leaves one marked record and the next sweep removes the record and its roots"
 }
@@ -105,6 +105,51 @@ test_sweep_keeps_live_owner_and_unmarked_entries() {
   pass "the sweep keeps a live owner's roots and registries and every unmarked entry, narrow or wide"
 }
 
+# Roots a test shell made before the per-shell records existed carry the marker
+# but appear in no record, and are not named fm-test-*. Ordinary sourcing must
+# still find and remove the ones whose owner is dead, and keep the rest.
+test_sweep_finds_legacy_marked_roots() {
+  local tmp="$TMP_ROOT/legacy" dead pid tries=0 dead_root young_root unmarked live_root
+  mkdir -p "$tmp"
+  dead=$(bash -c 'printf "%s" "$$"')
+  dead_root="$tmp/fm-drop-words.AAAAAA"
+  young_root="$tmp/fm-slots-young.CCCCCC"
+  unmarked="$tmp/fm-drop-words.BBBBBB"
+  mkdir -p "$dead_root/inner" "$young_root" "$unmarked/inner"
+  printf '%s\n' "$dead" > "$dead_root/.fm-test-fixture"
+  printf '%s\n' "$dead" > "$young_root/.fm-test-fixture"
+  touch -t 202001010000 "$dead_root/.fm-test-fixture" "$dead_root" "$unmarked" "$unmarked/inner"
+  # A live owner's root, made the way a test shell makes it and then taken out
+  # of its record, which is how a root from before the records looks.
+  env TMPDIR="$tmp" bash -c '
+    . "$1"
+    d=$(fm_test_tmproot fm-drop-words)
+    printf "%s\n" "$d" > "$2"
+    : > "$FM_TEST_CLEANUP_REGISTRY"
+    while :; do sleep 0.1; done
+  ' _ "$LIB" "$TMP_ROOT/legacy-live-root" >/dev/null 2>&1 &
+  pid=$!
+  while [ ! -s "$TMP_ROOT/legacy-live-root" ] && [ "$tries" -lt 200 ]; do tries=$((tries + 1)); sleep 0.05; done
+  [ -s "$TMP_ROOT/legacy-live-root" ] || fail "the live shell never made its legacy-shaped root"
+  live_root=$(cat "$TMP_ROOT/legacy-live-root")
+  touch -t 202001010000 "$live_root/.fm-test-fixture"
+  # Ordinary sourcing: no FM_TEST_SWEEP_ALL, the default age floor. The live
+  # shell's own sourcing stamped the discovery look; clear it so this sweep is due.
+  rm -f "$tmp/fm-test-owners/.legacy-discovery"
+  sourcing_shell "$tmp"
+  assert_absent "$dead_root" "ordinary sourcing left a marked non-fm-test-* root whose owner is dead"
+  assert_present "$young_root" "ordinary sourcing removed a dead owner's root younger than the age floor"
+  assert_present "$unmarked" "ordinary sourcing removed an unmarked fm-* entry"
+  assert_present "$live_root" "ordinary sourcing removed a legacy-shaped root whose owner is still running"
+  sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0
+  assert_absent "$young_root" "ordinary sourcing left a dead owner's root past a zero age floor"
+  assert_present "$unmarked" "ordinary sourcing at a zero age floor removed an unmarked fm-* entry"
+  assert_present "$live_root" "ordinary sourcing at a zero age floor removed a live owner's legacy-shaped root"
+  kill -TERM "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  pass "ordinary sourcing removes a dead owner's marked root of any fm-* name and keeps live, young and unmarked ones"
+}
+
 test_sweep_cost_does_not_follow_unrelated_entries() {
   local tmp_few="$TMP_ROOT/cost-few" tmp_many="$TMP_ROOT/cost-many" i dir few many
   mkdir -p "$tmp_few" "$tmp_many"
@@ -114,20 +159,29 @@ test_sweep_cost_does_not_follow_unrelated_entries() {
     dir="$tmp_many/fm-gh-rest.U$i"
     if [ $((i % 2)) -eq 0 ]; then : > "$dir"; else mkdir "$dir"; fi
   done
-  few=$(sweep_seconds "$tmp_few")
-  many=$(sweep_seconds "$tmp_many")
   # Before the per-shell record the sweep cost about 0.0000643 s per entry here
   # (0.77 s for 12000); a margin of 0.35 s keeps a loaded host from failing it
-  # while still rejecting any per-entry loop.
+  # while still rejecting any per-entry loop. The sweep that looks at every fm-*
+  # entry (stamp cleared) and the sweep that does not (stamp fresh) both stay inside it.
+  few=$(sweep_seconds "$tmp_few" clear)
+  many=$(sweep_seconds "$tmp_many" clear)
   perl -e 'exit(($ARGV[1] - $ARGV[0]) < 0.35 ? 0 : 1)' "$few" "$many" \
-    || fail "the sweep slowed from ${few}s to ${many}s with 12000 unrelated fm-* entries"
-  pass "the sweep takes ${few}s with no unrelated entries and ${many}s with 12000"
+    || fail "the sweep that looks at every fm-* entry slowed from ${few}s to ${many}s with 12000 unrelated fm-* entries"
+  pass "the sweep that looks at every fm-* entry takes ${few}s with no unrelated entries and ${many}s with 12000"
+  few=$(sweep_seconds "$tmp_few" keep)
+  many=$(sweep_seconds "$tmp_many" keep)
+  perl -e 'exit(($ARGV[1] - $ARGV[0]) < 0.35 ? 0 : 1)' "$few" "$many" \
+    || fail "the stamped sweep slowed from ${few}s to ${many}s with 12000 unrelated fm-* entries"
+  pass "the stamped sweep takes ${few}s with no unrelated entries and ${many}s with 12000"
 }
 
-# sweep_seconds <tmpdir>: the best of three timings of fm_test_reap_orphans alone.
+# sweep_seconds <tmpdir> <clear|keep>: the best of three timings of
+# fm_test_reap_orphans alone; "clear" removes the discovery stamp first, so the
+# sweep has to look at every fm-* entry, and "keep" leaves a fresh one.
 sweep_seconds() {
-  local tmp=$1 best='' t
+  local tmp=$1 stamp=$2 best='' t
   for _ in 1 2 3; do
+    [ "$stamp" = clear ] && rm -f "$tmp/fm-test-owners/.legacy-discovery"
     t=$(env TMPDIR="$tmp" FM_TEST_SKIP_ORPHAN_REAP=1 bash -c '
       . "$1"
       s=$(perl -MTime::HiRes=time -e "printf q(%.3f), time")
@@ -160,4 +214,5 @@ test_owners_dir_must_be_ours() {
 test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it
 test_owners_dir_must_be_ours
 test_sweep_keeps_live_owner_and_unmarked_entries
+test_sweep_finds_legacy_marked_roots
 test_sweep_cost_does_not_follow_unrelated_entries

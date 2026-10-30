@@ -88,3 +88,31 @@ assert_equals 2 "$status" "the legacy reaper ran without --tmpdir"
 assert_contains "$out" "--tmpdir DIR is required" "the legacy reaper did not name the missing --tmpdir"
 assert_present "$DIR/fm-gh-rest.LLLLLL" "the legacy reaper removed an entry of TMPDIR without --tmpdir"
 pass "the legacy reaper refuses to run without an explicit --tmpdir, even with --apply"
+
+# A failed age inspection proves nothing about age: the entry stays. Two ways
+# the probe fails: `find` exits nonzero with no output at all, and `find` meets a
+# directory it cannot read inside an old entry (it lists nothing for it).
+FRESH="$TMP_ROOT/fresh"
+mkdir -p "$FRESH" "$TMP_ROOT/failing-find-bin"
+mkdir "$FRESH/fm-gh-rest.JJJJJJ"; : > "$FRESH/fm-gh-rest.JJJJJJ/fresh-payload"       # young contents
+mkdir "$FRESH/fm-gh-rest.KKKKKK"; : > "$FRESH/fm-gh-rest.KKKKKK/payload"; old "$FRESH/fm-gh-rest.KKKKKK/payload" "$FRESH/fm-gh-rest.KKKKKK"
+printf '#!/bin/sh\nexit 1\n' > "$TMP_ROOT/failing-find-bin/find"
+chmod +x "$TMP_ROOT/failing-find-bin/find"
+out=$(PATH="$TMP_ROOT/failing-find-bin:$PATH" bash "$REAPER" --tmpdir "$FRESH" --apply 2>&1)
+status=$?
+case "$out" in *removed*|*"would remove"*) fail "an age probe that failed let an entry be listed for removal: $out" ;; esac
+assert_present "$FRESH/fm-gh-rest.JJJJJJ/fresh-payload" "an age probe that exited nonzero with no output deleted fresh contents"
+assert_present "$FRESH/fm-gh-rest.KKKKKK/payload" "an age probe that exited nonzero with no output deleted an old entry it could not inspect"
+[ "$status" -eq 0 ] || fail "a failed age probe made the reaper exit $status instead of keeping the entries: $out"
+pass "the legacy reaper keeps every entry whose age it could not inspect, even with fresh contents"
+
+mkdir -p "$FRESH/unreadable"
+mkdir "$FRESH/unreadable/fm-gh-rest.LLLLLL" "$FRESH/unreadable/fm-gh-rest.LLLLLL/locked"
+: > "$FRESH/unreadable/fm-gh-rest.LLLLLL/locked/fresh-payload"
+old "$FRESH/unreadable/fm-gh-rest.LLLLLL"
+chmod 000 "$FRESH/unreadable/fm-gh-rest.LLLLLL/locked"
+out=$(bash "$REAPER" --tmpdir "$FRESH/unreadable" --apply 2>&1)
+chmod 755 "$FRESH/unreadable/fm-gh-rest.LLLLLL/locked"
+case "$out" in *removed*) fail "an entry with an unreadable directory was removed: $out" ;; esac
+assert_present "$FRESH/unreadable/fm-gh-rest.LLLLLL/locked/fresh-payload" "fresh contents behind an unreadable directory were deleted"
+pass "the legacy reaper keeps an entry whose traversal was incomplete"

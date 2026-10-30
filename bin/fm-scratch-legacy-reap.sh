@@ -17,7 +17,9 @@
 #      container, and every other fm-* entry are never candidates);
 #   2. it is not a symlink and this user owns it;
 #   3. nothing under it was modified for --min-age-days days (default 2; the
-#      longest bounded command is 6 hours), judged by the newest file in it;
+#      longest bounded command is 6 hours), judged by the newest file in it,
+#      and the inspection that says so ran to completion (a find that failed or
+#      could not read part of the entry keeps it);
 #   4. no process has it, or anything under it, open or as its working
 #      directory, read from one lsof listing of every open file.
 # lsof must run and answer; if it cannot, nothing is removed.
@@ -66,18 +68,15 @@ done
 [ "${#candidates[@]}" -gt 0 ] || exit 0
 
 # Old enough: no file at or under the entry is newer than the cutoff. One find
-# per candidate that stops at its first young file, so the cost is the
-# candidates' own size.
+# per entry, so the cost is the entries' own size. Empty output proves age only
+# when find also exited 0: a failed or incomplete traversal (find missing, killed,
+# or stopped at a directory it cannot read) proves nothing, so that entry stays.
 aged=()
-while IFS= read -r -d '' entry; do
+for entry in "${candidates[@]}"; do
+  fresh=$(find "$entry" -mtime -"$MIN_AGE_DAYS" -print -quit 2>/dev/null) || continue
+  [ -z "$fresh" ] || continue
   aged+=("$entry")
-done < <(
-  for entry in "${candidates[@]}"; do
-    if [ -z "$(find "$entry" -mtime -"$MIN_AGE_DAYS" -print -quit 2>/dev/null)" ]; then
-      printf '%s\0' "$entry"
-    fi
-  done
-)
+done
 [ "${#aged[@]}" -gt 0 ] || exit 0
 
 # Not in use: one lsof listing of every open file and working directory. Each
