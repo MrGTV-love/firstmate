@@ -1630,7 +1630,10 @@ test_rss_shim_that_resolves_to_itself_is_refused() {
   for name in ps python3; do
     : > "$tmp/trace"
     rc=0
-    err=$("$ROOT/bin/fm-proc-budget.sh" 50 -- env -u FM_TEST_RSS_SHIM_DEPTH FM_TEST_SHIM_TRACE="$tmp/trace" \
+    # Harm: a runaway tree, here a shim that recurses into itself. Observable:
+    # the tree's own member count. Expiry: the tree is stopped and the wrapper
+    # exits 98. The ceiling of 50 is unchanged.
+    err=$("$ROOT/bin/fm-proc-budget.sh" --own-procs 50 -- env -u FM_TEST_RSS_SHIM_DEPTH FM_TEST_SHIM_TRACE="$tmp/trace" \
       FM_TEST_REAL_PS="$shims/ps" FM_TEST_REAL_PYTHON="$shims/python3" \
       FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" "$shims/$name" -c 0 2>&1 >/dev/null) || rc=$?
     [ "$rc" -eq 99 ] || fail "a $name shim that resolves to itself was not refused (exit $rc)"$'\n'"$err"
@@ -1676,7 +1679,7 @@ SH
     : > "$tmp/py.log"
     rm -f "$tmp/rss" "$tmp/decoy.pid"
     rc=0
-    "$ROOT/bin/fm-proc-budget.sh" 200 -- env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
+    fm_test_tree_leash env -u FM_TEST_RSS_SHIM_DEPTH PATH="$shims:$PATH" \
       FM_TEST_PY_REFUSE="$refuse" FM_TEST_REAL_PS="$real_ps" FM_TEST_REAL_PYTHON="$real_python" \
       FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" \
       perl "$ROOT/bin/fm-lint-cache.pl" rsswatch 102400 "$tmp/rss" -- \
@@ -1729,7 +1732,7 @@ fm_lint_footprint_lint() {  # <tmp> [<env>...]
   fm_lint_write_growing_shellcheck "$fakebin"
   : > "$tmp/flags.log"
   : > "$tmp/py.log"
-  "$ROOT/bin/fm-proc-budget.sh" 300 -- env -u FM_TEST_RSS_SHIM_DEPTH PATH="$fakebin:$shims:$PATH" \
+  fm_test_tree_leash env -u FM_TEST_RSS_SHIM_DEPTH PATH="$fakebin:$shims:$PATH" \
     FM_TEST_REAL_PS=/bin/ps FM_TEST_REAL_PYTHON="$real_python" \
     FM_TEST_PS_LOG="$tmp/ps.log" FM_TEST_PY_LOG="$tmp/py.log" FM_TEST_PY_MEMORY="1024 204800" \
     FM_LINT_JOBS=1 FM_LINT_REQUIRE_BOUNDS=0 FM_LINT_ROOT_RSS_KIB=102400 \

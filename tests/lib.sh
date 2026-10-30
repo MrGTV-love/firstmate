@@ -1496,3 +1496,19 @@ fm_test_wait_until() {
     sleep 0.1
   done
 }
+
+# fm_test_tree_leash <command...>
+# Runs a test's command tree under a stop on the tree's OWN process count.
+# Harm: a tree that forks without end starves every other process of the user.
+# Observable: the number of members of the command's tree, which neighbour lanes
+# and a slow host leave alone (bin/fm-proc-budget.sh --own-procs). Expiry: the
+# tree is frozen and killed and the wrapper exits 98. The leash has no clock and
+# does not count the whole user, so neighbour lanes and a slow host cannot spend
+# it. The kernel limit stays as a wide whole-user safety net, 1500 over the
+# user's count at launch.
+# 128 is far over any tree these suites start and far under the kernel limit this
+# mode keeps.
+readonly FM_TEST_TREE_PROCS=128
+fm_test_tree_leash() {
+  "$ROOT/bin/fm-proc-budget.sh" --own-procs "$FM_TEST_TREE_PROCS" -- "$@"
+}
