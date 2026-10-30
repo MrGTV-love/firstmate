@@ -2411,22 +2411,12 @@ for kind in ('steered', 'merged', 'escalated', 'deferred'):
     assert ack(boundary).returncode == 0
     assert not (home / 'state/.wake-queue').read_text(), 'recorded action must permit consumption'
     if kind == 'deferred':
-        # A repeat while the first deferral still stands refuses for that reason and marks nothing.
-        standing = call(*args)
-        assert standing.returncode == 1 and 'already stands' in standing.stdout, standing
-        assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0
-        # Once it lapses, the row prints captain-visible and a second deferral is refused.
-        clock['now'] = now + 700
-        ok('bash', '-c', '. "$1"; fm_wake_append check report "check: deferral lapsed"', '_', code / 'bin/fm-wake-lib.sh')
-        lapsed, boundary = drain()
-        assert [l for l in lapsed.stdout.splitlines() if row['id'] in l][0].endswith(',true'), lapsed.stdout
         refused = call(*args)
         assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
         assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
         assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1
         ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
         ok(code / 'bin/fm-open-loops.sh', '--check-actions')
-        clock['now'] = now
 
 # The actual supervision-host actor and secondmate home use the same executable gate.
 for name, actor in (('host', 'branch'), ('secondmate', 'main')):
@@ -2712,22 +2702,15 @@ fresh = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--
              '--recheck', recheck)
 assert fresh.returncode == 0, ('a changed row inherited the old deferral', fresh.stdout)
 assert ack(boundary).returncode == 0
-repeat = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
-              '--recheck', recheck)
-assert repeat.returncode == 1 and 'already stands' in repeat.stdout, repeat
-clock['now'] = now + 700
 second = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still waiting',
-              '--recheck', dt.datetime.fromtimestamp(now + 1300, dt.timezone.utc).isoformat())
+              '--recheck', recheck)
 assert second.returncode == 1 and 'second deferral refused' in second.stdout, second
-clock['now'] = now
 
 # A row once made captain-visible by a refused second deferral gets a working fresh deferral after it changes.
 home, ledger, row, call, ok, drain, ack = case('deferral-visible-change')
 _, boundary = drain()
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
-clock['now'] = now + 700
-later = dt.datetime.fromtimestamp(now + 1300, dt.timezone.utc).isoformat()
-refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', later)
+refused = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'still lint', '--recheck', recheck)
 assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
 assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain about the paused lint')
@@ -2736,12 +2719,11 @@ record = json.loads(ledger.read_text())
 record['rows'][0]['evidence'] = 'working [at=200]: resumed the paused lane'
 ledger.write_text(json.dumps(record))
 _, boundary = drain()
-ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', later)
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting on the new CI run', '--recheck', recheck)
 stored = json.loads(ledger.read_text())
 assert stored['handling']['actions'][row['id']]['captain_visible'] is False, stored['handling']['actions'][row['id']]
 assert not stored['rows'][0].get('captain_visible'), stored['rows'][0]
 assert ack(boundary).returncode == 0, 'a fresh deferral on changed work did not cover the row'
-clock['now'] = now
 
 # An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
 home, ledger, row, call, ok, drain, ack = case('retention')
@@ -4250,16 +4232,20 @@ assert shown == 'true', ('a row whose deferral check refuses must print captain_
 assert stored()['handling']['actions'][row['id']]['captain_visible'] is True
 assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
 clock['now'] = now
-# A deferral that still stands refuses a repeat for its own reason and marks nothing.
+# A second deferral is refused even while the first still stands; the refusal marks the row and it prints captain-visible.
 home, ledger, row, call, ok, wake, drain, ack, act, stored = case('standing-deferral')
 _, boundary = drain()
 assert act('deferred', 'lint running', '--recheck', iso(now + 600)).returncode == 0
 assert ack(boundary).returncode == 0
 repeat = act('deferred', 'lint still running', '--recheck', iso(now + 900))
-assert repeat.returncode == 1 and 'already stands' in repeat.stdout and 'captain-visible' not in repeat.stdout, repeat
+assert repeat.returncode == 1 and 'second deferral refused' in repeat.stdout, repeat
 action = stored()['handling']['actions'][row['id']]
-assert not action['captain_visible'] and 'requires_followup' not in action, action
-assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0, 'a refused repeat must not void the standing deferral'
+assert action['captain_visible'] is True and action['requires_followup'] is True, action
+assert [r for r in stored()['rows'] if r['id'] == row['id']][0]['captain_visible'] is True
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'the refusal voids the standing deferral'
+wake('refused')
+result, boundary = drain()
+assert printed_visibility(result, row['id']) == 'true', ('the refused row must print captain_visible true', result.stdout)
 # The refusal names a wait only for a row that can take one.
 for category, named in (('red_check', 'wait on a named live task'),
                         ('unanswered_question', 'wait on a task through a delivery naming the row')):

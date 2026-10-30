@@ -97,10 +97,6 @@ def epoch(value):
     return int((parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)).timestamp())
 
 
-def iso_utc(stamp):
-    return dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def mtime(path):
     try:
         return int(Path(path).stat().st_mtime)
@@ -1314,11 +1310,12 @@ def deferral_stands(action, row, now):
 
 
 def captain_visible(action, row, now):
-    """The one owner of a row's captain visibility, read by the printed row, the stored row and the deferral check.
+    """The one owner of a row's captain visibility, read by the printed row and the stored row.
 
     A row is captain-visible once a deferral mark was made, or once its one deferral has been used and no
-    longer stands: that is the same state in which a further deferral is refused. Both count only on the
-    unchanged work the action observed (same_work), so a changed row is new work with a fresh allowance.
+    longer stands. A further deferral on the unchanged row is refused even while the first stands, and that
+    refusal makes the mark, so a refused row never prints false. Both count only on the unchanged work the
+    action observed (same_work), so a changed row is new work with a fresh allowance.
     """
     return same_work(action, row, now) and (bool(action.get("captain_visible")) or (
         action.get("deferrals", 0) >= 1 and not deferral_stands(action, row, now)))
@@ -2021,10 +2018,7 @@ def record_action(args, state, now, report, waits, waits_error):
     prior_deferrals = old.get("deferrals", 0) if same else 0
     visible = bool(old.get("captain_visible")) and same
     if args.kind == "deferred":
-        if deferral_stands(old, by_id[ident], now):
-            raise ValueError("a deferral already stands until " + iso_utc(old["recheck_epoch"])
-                             + "; one deferral per row, so follow up when it lapses")
-        if captain_visible(old, by_id[ident], now):
+        if prior_deferrals:
             old["captain_visible"] = True
             old["requires_followup"] = True
             actions[ident] = old
