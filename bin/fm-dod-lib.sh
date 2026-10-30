@@ -328,6 +328,9 @@ FM_DOD_ITEM_LEAD='Source'
 FM_DOD_AUTHORITY_FIELD='Authority'
 FM_DOD_ITEM_FIELDS="Expected|Verify|Edge/negative|Evidence place|$FM_DOD_AUTHORITY_FIELD"
 FM_DOD_AUTHORITIES='agent|gate|grader'
+# Optional for other authorities, required for gate: one exact bash command on
+# its own `  - Check: ...` sub-bullet, after the item fields.
+FM_DOD_CHECK_FIELD='Check'
 
 # Render the item shape: `template` is the one-line item form, `authorities`
 # the allowed Authority values in prose, `rule` the sentence the scaffold and
@@ -358,12 +361,14 @@ fm_dod_item_shape() {  # <template|authorities|rule|shape>
     authorities) printf '%s\n' "$words" ;;
     rule)
       # shellcheck disable=SC2016 # Backticks are literal Markdown in the printed rule.
-      printf 'Each mandatory item starts its own line as `%s`, with an id matching `%s` that is unique within the section and every field nonempty; %s is exactly %s.\n' \
-        "$template" "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_AUTHORITY_FIELD" "$words" ;;
+      printf 'Each mandatory item starts its own line as `%s`, with an id matching `%s` that is unique within the section and every field nonempty; %s is exactly %s; ' \
+        "$template" "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_AUTHORITY_FIELD" "$words"
+      printf "an item with Authority gate also requires a single-line \`  - %s: <exact bash command>\` sub-bullet; other authorities may omit it.\n" "$FM_DOD_CHECK_FIELD" ;;
     shape)
       printf 'id=%s\nlead=%s\nfields=%s\nauthority_field=%s\nauthorities=%s\nitem=%s\nrule=%s\n' \
         "$FM_DOD_ITEM_ID_PATTERN" "$FM_DOD_ITEM_LEAD" "$FM_DOD_ITEM_FIELDS" "$FM_DOD_AUTHORITY_FIELD" \
-        "$FM_DOD_AUTHORITIES" "$template" "$(fm_dod_item_shape rule)" ;;
+        "$FM_DOD_AUTHORITIES" "$template" "$(fm_dod_item_shape rule)"
+      printf 'check_field=%s\ncheck_required_authority=gate\n' "$FM_DOD_CHECK_FIELD" ;;
     *) echo "error: fm_dod_item_shape: unknown rendering '$1'" >&2; return 2 ;;
   esac
 }
@@ -491,14 +496,15 @@ fm_dod_mandatory_body() {  # <text> <inline|file>
 # such as the scaffold's own instruction line, is not itself a criterion and is
 # ignored; a label-led line with no item id is reported instead of silently
 # accepted.
-fm_dod_criteria_problem() {  # <mandatory-items-body>
-  local body=$1 out
-  out=$(printf '%s\n' "$body" | awk -v idre="^($FM_DOD_ITEM_ID_PATTERN)\$" -v lead="$FM_DOD_ITEM_LEAD" \
+fm_dod_criteria_problem() {  # <mandatory-items-body> [items]
+  local body=$1 mode=${2:-problems} out
+  out=$(printf '%s\n' "$body" | awk -v mode="$mode" -v check_field="$FM_DOD_CHECK_FIELD" \
+    -v idre="^($FM_DOD_ITEM_ID_PATTERN)\$" -v lead="$FM_DOD_ITEM_LEAD" \
     -v fields="$FM_DOD_ITEM_FIELDS" -v authority_field="$FM_DOD_AUTHORITY_FIELD" \
     -v authorities="$FM_DOD_AUTHORITIES" -v authority_words="$(fm_dod_item_shape authorities)" \
     -v template="$(fm_dod_item_shape template)" '
     BEGIN {
-      labelre = lead "|" fields
+      labelre = lead "|" fields "|" check_field
       gsub(/ /, "[ \t]+", labelre)
       labelre = "^(" labelre "):"
       n_auth = split(authorities, allowed, "|")
@@ -513,10 +519,25 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
       for (k in seen) delete seen[k]
       for (k in value) delete value[k]
     }
+    function quote(s,   result, j, c) {
+      result = "\""
+      for (j = 1; j <= length(s); j++) {
+        c = substr(s, j, 1)
+        if (c == "\\" || c == "\"") result = result "\\" c
+        else if (c == "\t") result = result "\\t"
+        else if (c == "\r") result = result "\\r"
+        else result = result c
+      }
+      return result "\""
+    }
     # Split inline `Label: value` fields out of <text>, appending the untagged
     # leading segment to the current field. The field labels are fixed, so a
     # newline inserted after each recognized label is an unambiguous separator.
     function consume(text,   work, parts, m, j, part, q, label, val, n) {
+      if (field == check_field) {
+        value[field] = text
+        return
+      }
       n = split(fields, fn, "|")
       work = text
       for (j = 1; j <= n; j++) gsub("([ \t])" fn[j] ":", "\n&", work)
@@ -563,6 +584,21 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         print "mandatory item " id " has " authority_field " " auth ", not " authority_words
         bad = 1
       }
+      check = trim(value[check_field])
+      if (length(check) >= 2 && substr(check, 1, 1) == "`" && substr(check, length(check), 1) == "`") check = trim(substr(check, 2, length(check) - 2))
+      if (tolower(auth) == "gate" && check == "") {
+        print "mandatory item " id " with Authority gate requires an exact Check command"
+        bad = 1
+      }
+      value[authority_field] = tolower(auth)
+      encoded = "{\"id\":" quote(id) ",\"mandatory\":true,\"fields\":{"
+      n = split(lead "|" fields "|" check_field, req, "|")
+      for (i = 1; i <= n; i++) {
+        f = req[i]
+        encoded = encoded (i > 1 ? "," : "") quote(f) ":" quote(trim(value[f]))
+      }
+      encoded = encoded "}}"
+      items[count] = encoded
       id = ""
       field = ""
       clear()
@@ -599,29 +635,14 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         next
       }
       if (in_fence) {
-        if (id != "" && field != "" && field != authority_field) value[field] = value[field] " " s
+        if (id != "" && field != "" && field != authority_field && field != check_field) value[field] = value[field] " " s
         next
       }
 
       if (s ~ /^#{1,6}([ \t]|$)/) { finish(); next }
-      # An item header carries its id and the lead field on one line.
-      p = index(s, lead ":")
-      if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/) {
-        prefix = trim(substr(s, 1, p - 1))
-        sub(/^[-*+][ \t]+/, "", prefix)
-        candidate = trim(prefix)
-        sub(/[.:)]+$/, "", candidate)
-        # The scaffold instruction line mentions the lead field too; only a
-        # lone id token starts an item, and other prose is ignored.
-        if (candidate !~ idre) next
-        finish()
-        id = candidate
-        field = lead
-        seen[field] = 1
-        value[field] = ""
-        consume(substr(s, p + length(lead) + 1))
-        next
-      }
+      # Recognize a labeled field before looking for item headers: Check
+      # commands can contain literal Source labels and must remain opaque.
+      sub(/^[-*+][ \t]+/, "", s)
       if (s ~ labelre) {
         if (id == "") {
           print "mandatory item has no id: " s
@@ -641,7 +662,26 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         consume(substr(s, q + 1))
         next
       }
-      if (id != "" && field != "" && field != authority_field) value[field] = value[field] " " s
+      # An item header carries its id and the lead field on one line.
+      p = index(s, lead ":")
+      if (p > 1 && substr(s, p - 1, 1) ~ /[ \t]/) {
+        candidate = trim(substr(s, 1, p - 1))
+        sub(/[.:)]+$/, "", candidate)
+        # The scaffold instruction line mentions the lead field too; only a
+        # lone id token starts an item, and other prose is ignored.
+        if (candidate !~ idre) next
+        finish()
+        id = candidate
+        field = lead
+        seen[field] = 1
+        value[field] = ""
+        consume(substr(s, p + length(lead) + 1))
+        next
+      }
+      if (id != "" && field == check_field) {
+        print "mandatory item " id " Check must be a single-line command"
+        bad = 1
+      } else if (id != "" && field != "" && field != authority_field) value[field] = value[field] " " s
     }
     END {
       finish()
@@ -649,9 +689,20 @@ fm_dod_criteria_problem() {  # <mandatory-items-body>
         print "no mandatory item in the shape " template
         bad = 1
       }
+      if (mode == "items" && !bad) {
+        printf "["
+        for (i = 1; i <= count; i++) printf "%s%s", (i > 1 ? "," : ""), items[i]
+        print "]"
+      }
       exit !bad
     }
   ')
+  if [ "$mode" = items ]; then
+    case "$out" in
+      '['*) printf '%s\n' "$out"; return 0 ;;
+      *) printf '%s\n' "$out" >&2; return 1 ;;
+    esac
+  fi
   [ -z "$out" ] && return 1
   printf '%s\n' "$out"
   return 0
@@ -697,9 +748,8 @@ fm_dod_criteria_text_problem_list() {  # <text> <inline|file>
 # and an unfenced `DoD file:` line naming a missing, unreadable, or empty file,
 # or one that still holds a token. Each file problem names the path to edit.
 # A DoD file line replaces the section-body check exactly as it does in
-# fm_brief_task_dod_problem. A brief with no Definition Of Done section reports
-# nothing here: bin/fm-spawn.sh warns once for a legacy brief and still
-# dispatches it.
+# fm_brief_task_dod_problem. A fresh ship/scout dispatch requires the section;
+# absence is reported here rather than dispatching an ungraded task.
 # The optional second argument `task-only` stops after the two Task bodies,
 # which is the scope a relaunch and scout promotion re-check: the Definition of
 # Done and its exclusion list were accepted at the fresh spawn, exactly as
@@ -729,7 +779,10 @@ $(fm_brief_task_heading_body "$brief" "## Firstmate spec")")
     printf '%s\n' "### Out of scope is empty: name the work this task does not do, or write None"
     problems=0
   fi
-  fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return "$problems"
+  if ! fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE"; then
+    printf '%s is missing\n' "$FM_TASK_DOD_SECTION_TITLE"
+    return 0
+  fi
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
   # Keep examples in span for criteria checks, but never activate a fenced
   # DoD-file directive. The heading reader owns the fence boundaries.
@@ -1655,6 +1708,32 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       [ "$#" -eq 2 ] || { echo 'error: use bash bin/fm-dod-lib.sh --verification-plan <brief>' >&2; exit 2; }
       fm_brief_verification_plan "$2"
       ;;
+    --criteria)
+      [ "$#" -eq 2 ] || exit 2
+      if problem=$(fm_brief_dispatch_problems "$2"); then
+        printf '%s\n' "$problem" >&2
+        exit 1
+      fi
+      dod_file=$(fm_brief_task_dod_file "$2")
+      if [ -n "$dod_file" ]; then
+        cat "$dod_file"
+      else
+        fm_brief_heading_span "$2" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE"
+      fi
+      ;;
+    --items)
+      [ "$#" -eq 2 ] || exit 2
+      if problem=$(fm_brief_file_problem "$2"); then
+        printf '%s\n' "$problem" >&2
+        exit 1
+      fi
+      text=$(cat "$2") || exit 1
+      if problem=$(fm_dod_text_problem_list "$text"); then
+        printf '%s\n' "$problem" >&2
+        exit 1
+      fi
+      fm_dod_criteria_problem "$(fm_dod_mandatory_body "$text" file)" items
+      ;;
     --shape)
       [ "$#" -eq 1 ] || { echo 'error: use bash bin/fm-dod-lib.sh --shape' >&2; exit 2; }
       fm_dod_item_shape shape
@@ -1662,6 +1741,9 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     -h|--help)
       printf '%s\n' 'Usage: bash bin/fm-dod-lib.sh --verification-plan <brief>' \
         '       bash bin/fm-dod-lib.sh --shape' \
+        '       bash bin/fm-dod-lib.sh --criteria BRIEF' \
+        '       bash bin/fm-dod-lib.sh --items CRITERIA_FILE' \
+        '--criteria validates a dispatch brief and exports the selected criteria bytes; --items validates criteria and prints mandatory items as JSON using the same parser.' \
         'Render task DoD, exclusions and the shared review rubric for no-mistakes --verification-plan FILE.' \
         'CRLF input is accepted; unreadable or NUL-bearing input stops construction with an error; a present DoD must carry mandatory items in the shape --shape prints; legacy briefs with no DoD state absent criteria and unrecognized exclusions.' \
         '--shape prints the mandatory item shape as key=value lines: id, lead, fields, authority_field, authorities, item, rule.'

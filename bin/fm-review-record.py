@@ -6,11 +6,17 @@ Usage (FM_HOME must name the absolute home holding the PR task record):
     --reader-model MODEL --author-groups '{"commit-group":["model",...]}'
     --loosens-deny-allow-list yes|no --widens-guard yes|no
     --customer-data-billing-spend yes|no --report PATH
-    [--covered-groups '["ship"]']
+    [--covered-groups '["ship"]'] [--dod-evidence CLAIMS.json]
   fm-review-record.py captain-word --pr URL --head SHA --words 'Exact captain merge instruction'
   fm-review-record.py latest --pr URL
-  fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--json]
+  fm-review-record.py verify --pr URL --head SHA --task TASK --base BASE_SHA [--review-only] [--machine-checked] [--json]
 
+--dod-evidence copies per-item pointers and explicit weakened-test rulings into
+this append-only review record, never just the mutable input file's path.
+The JSON format and resolver are owned by bin/fm-dod-check.py --help.
+--machine-checked additionally requires an exact-head PASS whose pointers all
+resolve; fm-pr-merge.sh always supplies it, including with captain merge words.
+Without it verify reports review authority only, not machine-checked DoD success.
 The relay lane stages the reader report on the receiving host before recording
 into the receiving home by setting FM_HOME explicitly.
 FM_STATE_OVERRIDE selects its state directory, as in the PR merge/poll helpers.
@@ -235,6 +241,8 @@ def validate(row):
         if row.get(trigger) not in ("yes", "no"):
             raise RecordError(f"{trigger} must be yes or no")
     nonempty(row.get("report"), "report")
+    if "dod_evidence" in row and not isinstance(row["dod_evidence"], dict):
+        raise RecordError("dod_evidence must be a JSON object")
 
 
 def report_digest(path, verdict, head):
@@ -564,12 +572,14 @@ def main():
             command.add_argument("--task", required=True)
             command.add_argument("--base", required=True)
         if name == "review":
+            command.add_argument("--dod-evidence", type=Path, help="JSON items pointers and explicit weakened-test rulings, copied into this immutable review record")
             command.add_argument("--covered-groups", help='JSON list of groups read, or ["all"]; defaults to author-groups keys')
             for flag in ("verdict", "reader-model", "author-groups", "report", *(t.replace("_", "-") for t in TRIGGERS)):
                 command.add_argument("--" + flag, required=True)
         if name == "captain-word":
             command.add_argument("--words", required=True)
         if name == "verify":
+            command.add_argument("--machine-checked", action="store_true", help="merge: additionally resolve all frozen DoD evidence pointers")
             command.add_argument("--review-only", action="store_true", help="require the recorded independent PASS itself; a captain-word is not a substitute")
             command.add_argument("--json", action="store_true", help="print one fm-review-verification.v1 object built from the same locked read")
     args = parser.parse_args()
@@ -590,6 +600,13 @@ def main():
                           for group, authors in groups.items()}
             row.update(head=args.head, verdict=args.verdict, reader_model=args.reader_model,
                        reader_family=model(args.reader_model, "reader_model"), author_groups=groups, report=args.report, **{t: getattr(args, t) for t in TRIGGERS})
+            if args.dod_evidence:
+                try:
+                    row["dod_evidence"] = json.loads(args.dod_evidence.read_text())
+                except (OSError, UnicodeError, ValueError) as exc:
+                    raise RecordError("dod-evidence must name a readable JSON evidence document") from exc
+                if not isinstance(row["dod_evidence"], dict):
+                    raise RecordError("dod-evidence must be a JSON object")
             if args.covered_groups:
                 try:
                     row["covered_groups"] = json.loads(args.covered_groups)
@@ -626,6 +643,24 @@ def main():
                 print(json.dumps(records, separators=(",", ":")))
             else:
                 basis, evidence = verify(records, rows, args.head, home, pr, args.task, args.base, args.review_only)
+                if args.machine_checked:
+                    # Captain words affect review authority, never machine proof.
+                    proof = records["review"]
+                    if proof is None or proof["head"] != args.head or proof["verdict"] != "PASS":
+                        raise VerificationError("machine-checked DoD requires an exact-head PASS with per-item evidence")
+                    if proof.get("dod_evidence", {}).get("rulings"):
+                        _, authors = derived_authors(home, pr, args.head, args.task, args.base)
+                        reader = model(proof["reader_model"], "reader_model")
+                        families = {a["family"] for values in authors.values() for a in values}
+                        if reader == "unknown" or "unknown" in families or not families - {reader}:
+                            raise VerificationError("weakened-test rulings require an independently qualified reviewer, not the implementation author")
+                    resolved = subprocess.run([sys.executable, str(BIN / "fm-dod-check.py"), "verify",
+                                               "--meta", str(state_dir(home) / f"{args.task}.meta"),
+                                               "--pr", pr, "--head", args.head, "--base", args.base],
+                                              input=json.dumps(proof.get("dod_evidence", {})),
+                                              capture_output=True, text=True, check=False)
+                    if resolved.returncode:
+                        raise VerificationError(f"machine-checked DoD unresolved: {resolved.stdout.strip()} {resolved.stderr.strip()}")
                 if emit_json:
                     print(json.dumps(verification_json(pr, args.head, basis, evidence), separators=(",", ":")))
                 else:

@@ -16,6 +16,7 @@ stdout lists actionable file:line flags. Exit 1 means review rulings are needed,
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -129,7 +130,8 @@ def main():
             if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", sha):
                 raise ValueError("base and head must be exact full commit shas")
         result = subprocess.run(["git", "-C", str(args.repo), "-c", "core.quotePath=false", "diff", "--no-ext-diff", "--no-textconv", "--no-renames",
-                                 "--unified=3", args.base, args.head, "--"], capture_output=True, text=True, check=False)
+                                 "--unified=3", args.base, args.head, "--"], capture_output=True, text=True, check=False,
+                                env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
         if result.returncode:
             raise ValueError(result.stderr.strip())
         flags = flags_from(result.stdout)

@@ -9,13 +9,12 @@
 # spawns carry no delivery posture at all. The registry keeps only the captain's
 # standing posture, for the mechanical consumers and for one advisory notice.
 #
-# Every spawn case here stops before any endpoint exists: the delivery checks run
-# ahead of backend creation, and a fake `tmux` that exits non-zero backstops the
-# cases that are meant to get past them, so no window or worktree is ever created.
+# Admission-only cases stop at a refusing fake tmux; snapshot cases use the
+# shared successful spawn fixture with a temporary git copy and fake endpoint.
 set -u
 
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 SPAWN="$ROOT/bin/fm-spawn.sh"
 BRIEF="$ROOT/bin/fm-brief.sh"
@@ -49,7 +48,12 @@ write_brief() {  # <home> <id> [<recorded-mode>]
   {
     printf 'You are a crewmate.\n\n# Task\n## Captain'\''s intent\nExercise the delivery contract.\n\n## Firstmate spec\nVerify the selected delivery behavior.\n\n# Definition of done\n'
     [ -z "$mode" ] || printf 'Delivery contract: mode=%s\n' "$mode"
+    printf '## Definition Of Done (task)\n### Mandatory items\n%s\n## How You'\''re Graded\n' "$(fm_test_dod_item M1)"
   } > "$home/data/$id/brief.md"
+}
+
+append_fixture_dod() {  # <brief>
+  printf '\n# Definition of done\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You'\''re Graded\n' "$(fm_test_dod_item M1)" >> "$1"
 }
 
 fill_task_subsections() {  # <file> <intent> <spec>
@@ -143,18 +147,56 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
   assert_not_contains "$out" "$refusal" "a filled scout Definition of Done was refused"
 
-  # Briefs scaffolded before the sections existed carry none: a fresh spawn
-  # warns once, naming the section and the task, and still goes ahead.
+  # Absence is not a legacy dispatch exemption.
   id=dod-legacy
-  write_brief "$home" "$id" direct-PR
+  mkdir -p "$home/data/$id"
+  printf '# Task\n## Captain'\''s intent\nRepair behavior.\n## Firstmate spec\nKeep it small.\n# Definition of done\nDelivery contract: mode=direct-PR\n' > "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
-  assert_not_contains "$out" "$refusal" "a brief with no task Definition of Done section was refused"
-  assert_contains "$out" "warning: task $id:" "a brief with no task Definition of Done section drew no warning naming the task"
-  assert_contains "$out" "has no ## Definition Of Done (task) section" "the warning did not name the missing section"
-  [ "$(printf '%s\n' "$out" | grep -c 'has no ## Definition Of Done (task) section')" -eq 1 ] \
-    || fail "the missing-section warning must print exactly once: $out"
-  assert_present "$home/data/$id/launch-brief.md" "a brief with no task Definition of Done section did not get past the check"
+  assert_contains "$out" '## Definition Of Done (task) is missing' 'missing criteria must refuse dispatch'
+  assert_absent "$home/state/$id.meta" 'missing criteria published a task record'
+  assert_absent "$home/data/$id/launch-brief.md" 'missing criteria reached launch preparation'
   pass "fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds"
+}
+
+test_spawn_requires_verify_and_publishes_frozen_external_criteria() {
+  local kind dir home proj wt fakebin id criteria brief out rc snapshot digest
+  local args=()
+  for kind in ship scout; do
+    dir="$TMP_ROOT/dod-record-$kind"
+    home="$dir/home"; proj="$dir/project"; wt="$dir/wt"
+    id="dod-record-$kind"
+    fm_test_spawn_home "$home" omp
+    fakebin=$(fm_test_make_spawn_fakebin "$dir/bin" omp)
+    fm_git_worktree "$proj" "$wt" "fixture-$kind"
+    write_brief "$home" "$id" direct-PR
+    brief="$home/data/$id/brief.md"
+    criteria="$home/data/$id/criteria.md"
+    add_dod_file_line "$brief" "$criteria"
+    fm_test_dod_item C1 -Verify > "$criteria"
+    if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
+    out=$(FM_BACKEND=tmux fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" "${args[@]}")
+    rc=$?
+    [ "$rc" -ne 0 ] || fail "$kind admitted a mandatory item without Verify"
+    assert_contains "$out" 'Verify' "$kind refusal did not identify missing verification"
+    assert_absent "$home/state/$id.meta" "$kind refusal published metadata"
+    assert_absent "$home/data/$id/launch-brief.md" "$kind refusal reached a worker"
+
+    fm_test_dod_item C1 > "$criteria"
+    out=$(FM_BACKEND=tmux fm_test_run_spawn "$home" "$wt" "$fakebin" "$id" "$proj" "${args[@]}")
+    rc=$?
+    [ "$rc" -eq 0 ] || fail "$kind with filled verification did not spawn"$'\n'"$out"
+    assert_present "$home/state/$id.meta" "$kind accepted spawn did not publish metadata"
+    snapshot=$(sed -n 's/^dod_file=//p' "$home/state/$id.meta")
+    digest=$(sed -n 's/^dod_sha256=//p' "$home/state/$id.meta")
+    [ "$(dirname "$snapshot")" = "$home/state" ] || fail "$kind snapshot is not outside the branch"
+    cmp -s "$criteria" "$snapshot" || fail "$kind snapshot changed the dispatched criteria bytes"
+    [ "$digest" = "$(shasum -a 256 "$criteria" | cut -d ' ' -f 1)" ] || fail "$kind published the wrong digest"
+    fm_test_dod_item C2 > "$criteria"
+    [ "$(sed -n 's/^dod_sha256=//p' "$home/state/$id.meta")" = "$digest" ] || fail "$kind mutable DoD rewrote the published digest"
+    [ "$(shasum -a 256 "$snapshot" | cut -d ' ' -f 1)" = "$digest" ] || fail "$kind mutable DoD rewrote frozen evidence"
+    ! cmp -s "$criteria" "$snapshot" || fail "$kind mutation did not exercise distinct criteria"
+  done
+  pass 'fm-spawn: ship/scout require Verify, accept complete criteria, and publish immutable external DoD bytes and digest'
 }
 
 # The check reads the whole span from the section title to the grading line, so
@@ -827,6 +869,7 @@ Example specification
 # Definition of done
 Delivery contract: mode=direct-PR
 EOF
+  append_fixture_dod "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "must contain nonempty" \
     "fenced example headings made a filled legacy Task fail validation"
@@ -844,6 +887,7 @@ Do not copy this Firstmate-authored constraint into intent.
 Delivery contract: mode=no-mistakes
 Pass the entire Task as --intent.
 EOF
+  append_fixture_dod "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   assert_not_contains "$out" "has no provenance-marked captain words" \
     "legacy no-mistakes spawn rejected explicitly marked captain words"
@@ -875,6 +919,7 @@ Preserve the existing compatibility path.
 Delivery contract: mode=no-mistakes
 Pass the entire Task and every Firstmate requirement as --intent.
 EOF
+  append_fixture_dod "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   assert_present "$home/data/$id/launch-brief.md" \
     "migrated subsection brief did not receive the current launch contract"
@@ -909,6 +954,7 @@ Unrelated notes must not become task intent.
 ## Firstmate spec
 Unrelated notes must not satisfy task validation.
 EOF
+  append_fixture_dod "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
   status=$?
   [ "$status" -ne 0 ] || fail "unmarked legacy no-mistakes spawn should require provenance"
@@ -1125,6 +1171,7 @@ $body
 ## Firstmate spec
 Keep the investigation bounded.
 EOF
+      append_fixture_dod "$home/data/$id/brief.md"
       if [ "$kind" = ship ]; then args=(--mode direct-PR --yolo off); else args=(--scout); fi
       out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}"); rc=$?
       [ "$rc" -ne 0 ] || fail "$kind: empty/pointer-only intent was admitted"
@@ -1146,6 +1193,7 @@ See report.md.
 ## Firstmate spec
 Keep unrelated redesign out of scope.
 EOF
+    append_fixture_dod "$home/data/$id/brief.md"
     out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude "${args[@]}")
     assert_not_contains "$out" 'has no concrete ask' 'substantive ask plus reference was refused'
     assert_present "$home/data/$id/launch-brief.md" 'substantive ask never reached launch rendering'
@@ -1160,6 +1208,7 @@ EOF
 [captain] See report.md.
 Firstmate build instructions are not a substitute for the captain's ask.
 EOF
+  append_fixture_dod "$home/data/$id/brief.md"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_contains "$out" 'has no concrete ask' 'legacy build prose rescued a pointer-only ask'
   assert_absent "$home/data/$id/launch-brief.md" 'legacy pointer-only ask reached a worker'
@@ -1316,6 +1365,7 @@ EOF
     "Stop composing Captain:, Captain's words:, Captain's ask:, and Captain's intent: into PR bodies.")
   write_brief "$home" intent-literal no-mistakes
   printf '# Task\n## Captain'"'"'s intent\n%s\n\n## Firstmate spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' "$words" > "$home/data/intent-literal/brief.md"
+  append_fixture_dod "$home/data/intent-literal/brief.md"
   out=$(run_spawn "$home" "$fakebin" intent-literal "$proj" claude --mode no-mistakes --yolo off)
   assert_not_contains "$out" "operator-address line" "labels mentioned mid-line were refused as address"
   authorized=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/intent-literal/launch-brief.md")
@@ -1328,6 +1378,7 @@ EOF
     write_brief "$home" "$id" no-mistakes
     printf '# Task\n## Captain'"'"'s intent\nKeep the original request intact.\n  %s preserve its provenance.\n\n## Firstmate spec\nDo not paraphrase.\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' \
       "$marker" > "$home/data/$id/brief.md"
+    append_fixture_dod "$home/data/$id/brief.md"
     out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
     status=$?
     [ "$status" -ne 0 ] || fail "$marker: addressed intent should be refused"
@@ -1360,6 +1411,7 @@ EOF
     write_brief "$home" "$id" no-mistakes
     printf '# Task\n%s %s\nDo not include this build constraint.\n%s %s\n\n# Definition of done\nDelivery contract: mode=no-mistakes\n' \
       "$marker" 'Keep the original request intact.' "$marker" 'Preserve its provenance.' > "$home/data/$id/brief.md"
+    append_fixture_dod "$home/data/$id/brief.md"
     out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode no-mistakes --yolo off)
     assert_present "$home/data/$id/launch-brief.md" "$marker: provenance was not accepted"
     authorized=$(awk '$0 == "## Captain intent authorized for --intent" { emit=1; next } emit { print }' "$home/data/$id/launch-brief.md")
@@ -2117,6 +2169,7 @@ test_promotion_carries_the_forge_binding
 test_forge_forgejo_rides_the_same_binding
 test_spawn_and_promote_require_filled_task_subsections
 test_spawn_requires_a_finished_task_definition_of_done
+test_spawn_requires_verify_and_publishes_frozen_external_criteria
 test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_positions
 test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check

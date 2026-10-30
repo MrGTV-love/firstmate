@@ -11,8 +11,8 @@
 # parse below owns why.
 #
 # Every supported forge verifies recorded review evidence inside the away-record
-# hold immediately before its merge command. bin/fm-review-record.py's header owns
-# the review/captain-word rule and recording CLI; neither --attended-override nor
+# hold immediately before its merge command, always with --machine-checked.
+# bin/fm-review-record.py's header owns the proof, review/captain-word rule and recording CLI; neither --attended-override nor
 # away authority substitutes for this evidence, and captain words waive no guard.
 #
 # Merge method on GitHub defaults to --squash when the caller passes none of
@@ -542,9 +542,13 @@ if [ "$PROVIDER" = gitlab ] || [ "$PROVIDER" = forgejo ]; then
 fi
 
 require_recorded_review() {
+  # Machine evidence currently has a GitHub owner; other forges retain their
+  # existing independent-review contract rather than an unsupported new gate.
+  set --
+  [ "$PROVIDER" != github ] || set -- --machine-checked
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     python3 "$SCRIPT_DIR/fm-review-record.py" verify --pr "$URL" --head "$FM_PR_MERGE_HEAD" \
-      --task "$ID" --base "$FM_PR_MERGE_BASE" >&2
+      --task "$ID" --base "$FM_PR_MERGE_BASE" "$@" >&2
 }
 
 # Pre-merge conditions for a GitLab merge request, read from one live view of

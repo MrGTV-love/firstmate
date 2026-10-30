@@ -707,6 +707,93 @@ glab_merge_line() {
   grep -F ' mr merge ' "$1" || true
 }
 
+# Builds real command logs, commits and detector results; only the hosted forge
+# envelope is stubbed, just like the merge outcome APIs in this module.
+make_machine_proof() {
+  local case_dir=$1 existing=${2:-} url=${3:-https://github.com/example/repo/pull/9}
+  python3 - "$ROOT" "$case_dir" "$existing" "$url" <<'PY'
+import hashlib, json, os, subprocess, sys
+from pathlib import Path
+root, case = map(Path, sys.argv[1:3])
+existing = sys.argv[3]
+forge_repo = '/'.join(sys.argv[4].split('/')[3:5])
+repo = case / 'wt'
+def call(*args, allowed=(0,), **kw):
+    result = subprocess.run(list(map(str, args)), text=True, capture_output=True, **kw)
+    assert result.returncode in allowed, (args, result.stdout, result.stderr)
+    return result.stdout.strip()
+def git(*args):
+    return call('git', '-C', repo, *args)
+if existing:
+    base = (case / 'github-base').read_text().strip()
+    head = existing
+    expected = git('show', f'{head}:README.md')
+    import shlex
+    check = 'test "$(cat README.md)" = ' + shlex.quote(expected)
+else:
+    (repo / 'value').write_text('broken\n')
+    (repo / 'fixtures').mkdir(exist_ok=True)
+    (repo / 'fixtures/rows.txt').write_text('retained\nobsolete\n')
+    git('add', '.'); git('commit', '-qm', 'base behavior and fixture rows')
+    base = git('rev-parse', 'HEAD')
+    git('update-ref', 'refs/remotes/origin/main', base)
+    (repo / 'value').write_text('fixed\n')
+    (repo / 'fixtures/rows.txt').write_text('retained\n')
+    git('add', '.'); git('commit', '-qm', 'fix behavior and remove obsolete fixture row')
+    head = git('rev-parse', 'HEAD')
+    git('update-ref', 'refs/remotes/origin/fm/fixture', head)
+    check = 'test "$(cat value)" = fixed'
+criteria = ("### Mandatory items\nC1 Source: preserve fixture behavior Expected: exact committed value "
+            "Verify: inspect exact-head command Edge/negative: changed value refuses "
+            "Evidence place: CI command log Authority: gate\n"
+            f"  - Check: {check}\n")
+raw = criteria.encode(); sha = hashlib.sha256(raw).hexdigest()
+frozen = case / 'state' / f'task-x1.dod.{sha}.md'
+frozen.write_bytes(raw)
+with (case / 'state/task-x1.meta').open('a') as out:
+    out.write(f'dod_file={frozen}\ndod_sha256={sha}\n')
+artifact = case / 'machine-artifact'
+env = dict(os.environ, GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1')
+call(sys.executable, root / 'bin/fm-dod-check.py', 'run', '--dod', frozen,
+     '--repo', repo, '--base', base, '--head', head, '--output', artifact, env=env)
+call(sys.executable, root / 'bin/fm-test-weakening.py', '--repo', repo,
+     '--base', base, '--head', head, '--output', artifact / 'weakening.json', allowed=(0, 1))
+flags = json.loads((artifact / 'weakening.json').read_text())['flags']
+if not existing:
+    assert flags and flags[0]['file'] == 'fixtures/rows.txt'
+claims = {'items': [{'id': 'C1', 'run_id': '123', 'commit': head}],
+          'rulings': [{'id': f['id'], 'decision': 'accept', 'reason': 'Obsolete row removed; retained behavior reviewed.'} for f in flags]}
+(case / 'machine-claims.json').write_text(json.dumps(claims))
+(case / 'machine-run.json').write_text(json.dumps({'id': 123, 'event': 'workflow_dispatch',
+    'path': '.github/workflows/dod-evidence.yml', 'head_sha': head, 'run_attempt': 1,
+    'status': 'completed', 'conclusion': 'success', 'repository': {'full_name': forge_repo}}))
+(case / 'machine-artifacts.json').write_text(json.dumps({'total_count': 1, 'artifacts': [
+    {'name': f'fm-dod-evidence-{head}', 'expired': False}]}))
+(case / 'github-base').write_text(base + '\n')
+(case / 'machine-head').write_text(head + '\n')
+PY
+}
+
+install_machine_forge_mock() {
+  local case_dir=$1
+  mv "$case_dir/fakebin/gh-axi" "$case_dir/fakebin/gh-axi-merge"
+  cat > "$case_dir/fakebin/gh-axi" <<'PY'
+#!/usr/bin/env python3
+import base64, os, shutil, sys
+from pathlib import Path
+case = Path(__file__).resolve().parent.parent
+args = sys.argv[1:]
+if args[:1] == ['api'] and '/actions/runs/123' in args[1]:
+    name = 'machine-artifacts.json' if '/artifacts?' in args[1] else 'machine-run.json'
+    print('api_response:\n  body: ' + base64.b64encode((case / name).read_bytes()).decode() + '\n  truncated: false')
+elif args[:3] == ['run', 'download', '123']:
+    shutil.copytree(case / 'machine-artifact', args[args.index('--dir') + 1])
+else:
+    os.execv(str(case / 'fakebin/gh-axi-merge'), [str(case / 'fakebin/gh-axi-merge'), *args])
+PY
+  chmod +x "$case_dir/fakebin/gh-axi"
+}
+
 record_review() {
   local case_dir=$1 url=$2 head=$3 verdict=PASS arg next_verdict=false
   shift 3
@@ -718,13 +805,28 @@ record_review() {
       next_verdict=true
     fi
   done
+  local proof_args=() supplied=false
+  for arg in "$@"; do [ "$arg" != --dod-evidence ] || supplied=true; done
+  if [ "$supplied" = false ] && [[ "$url" == https://github.com/*/pull/* ]] \
+    && [ -f "$case_dir/github-head" ] && git -C "$case_dir/wt" cat-file -e "$head^{commit}" 2>/dev/null; then
+    # The old author-only adapter cannot supply object identity for proof.
+    rm -f "$case_dir/fakebin/git"
+    if [ "$(cat "$case_dir/machine-head" 2>/dev/null || true)" != "$head" ]; then
+      rm -rf "$case_dir/machine-artifact"
+      make_machine_proof "$case_dir" "$head" "$url" || return 1
+    fi
+    if [ -f "$case_dir/fakebin/gh-axi" ] && [ ! -f "$case_dir/fakebin/gh-axi-merge" ]; then
+      install_machine_forge_mock "$case_dir"
+    fi
+    proof_args=(--dod-evidence "$case_dir/machine-claims.json")
+  fi
   printf 'VERDICT: %s head=%s\n' "$verdict" "$head" > "$case_dir/review.md"
   PATH="$case_dir/fakebin:$PATH" HOME="${FM_TEST_USER_HOME:-$case_dir/user-home}" \
   FM_HOME="${FM_TEST_HOME:-$case_dir/home}" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-review-record.py" review --pr "$url" --head "$head" \
       --verdict PASS --reader-model claude-opus-5-5 --author-groups '{"all":["gpt-5.1-codex"]}' \
       --loosens-deny-allow-list no --widens-guard no --customer-data-billing-spend no \
-      --report "$case_dir/review.md" "$@"
+      --report "$case_dir/review.md" ${proof_args[@]+"${proof_args[@]}"} "$@"
 }
 
 run_pr_merge() {

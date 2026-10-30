@@ -19,6 +19,7 @@
 test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head() {
   local case_dir forge_head=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
   case_dir=$(make_direct_pr_local_tip_case multi-pr-merged-sibling)
+  forge_head=$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/fm/fixture)
   add_gh_mocks "$case_dir" "$forge_head"
   printf 'pr=%s\n' https://github.com/example/repo/pull/3202 >> "$case_dir/state/task-x1.meta"
   printf '%s\n' fm-pr-poll-merge-notified-v1 github github.com example/repo 3202 \
@@ -86,6 +87,7 @@ test_multi_pr_task_without_a_reported_forge_head_is_still_refused() {
 test_multi_pr_task_with_a_red_head_is_still_refused() {
   local case_dir rc head=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
   case_dir=$(make_direct_pr_local_tip_case multi-pr-red-head)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_ready_reports "$case_dir" \
@@ -113,6 +115,7 @@ test_github_draft_or_unreadable_draft_state_refuses() {
   for label in draft unreadable; do
     case_dir=$(make_case "github-$label")
     mkdir -p "$case_dir/wt"
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     case "$label" in
       draft) filter='.isDraft = true' ;;
@@ -148,6 +151,7 @@ test_superseded_failed_check_run_no_longer_refuses() {
   head=cccccccccccccccccccccccccccccccccccccccc
   case_dir=$(make_case github-superseded-red)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED CANCELLED 2026-01-01T00:00:01Z)" \
@@ -167,6 +171,7 @@ test_check_runs_never_supersede_status_contexts() {
   head=cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd
   case_dir=$(make_case github-cross-check-kind)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(status_context ci FAILURE)" \
@@ -192,6 +197,7 @@ test_current_failed_check_run_still_refuses() {
   head=dddddddddddddddddddddddddddddddddddddddd
   case_dir=$(make_case github-current-red)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:01Z)" \
@@ -216,6 +222,7 @@ test_late_finishing_old_success_does_not_hide_current_failure() {
   head=dededededededededededededededededededede
   case_dir=$(make_case github-old-success-finishes-last)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED SUCCESS 2026-01-01T00:00:01Z 2026-01-01T00:00:10Z)" \
@@ -240,6 +247,7 @@ test_late_finishing_old_cancellation_is_superseded() {
   head=dfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdfdf
   case_dir=$(make_case github-old-cancellation-finishes-last)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED CANCELLED 2026-01-01T00:00:01Z 2026-01-01T00:00:10Z)" \
@@ -260,6 +268,7 @@ test_unfinished_rerun_keeps_a_check_red() {
   for prior in FAILURE SUCCESS; do
     case_dir=$(make_case "github-pending-rerun-$prior")
     mkdir -p "$case_dir/wt"
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_rollup_json "$case_dir" "$head" \
       "$(check_run ci COMPLETED "$prior" 2026-01-01T00:00:01Z)" \
@@ -286,6 +295,7 @@ test_supersession_never_crosses_check_names() {
   head=ffffffffffffffffffffffffffffffffffffffff
   case_dir=$(make_case github-cross-name)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run lint COMPLETED FAILURE 2026-01-01T00:00:01Z)" \
@@ -321,6 +331,7 @@ test_undated_runs_never_supersede() {
     newer=${spec##*|}
     case_dir=$(make_case "github-undated-$label")
     mkdir -p "$case_dir/wt"
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_rollup_json "$case_dir" "$head" \
       "$(check_run ci COMPLETED FAILURE "$older")" \
@@ -348,6 +359,7 @@ test_allow_red_still_waives_only_the_current_failure() {
   head=0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
   case_dir=$(make_case github-superseded-allow-red-wrong-name)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:01Z)" \
@@ -367,6 +379,7 @@ test_allow_red_still_waives_only_the_current_failure() {
 
   case_dir=$(make_case github-superseded-allow-red-named)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED FAILURE 2026-01-01T00:00:01Z)" \
@@ -384,6 +397,7 @@ test_allow_red_is_refused_while_away() {
   head=abababababababababababababababababababab
   case_dir=$(make_case github-allow-red-away)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -401,6 +415,7 @@ test_allow_red_is_refused_while_away() {
 
   case_dir=$(make_case github-allow-red-away-after-view)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -427,6 +442,7 @@ test_quiet_record_keeps_merges_attended() {
   url=https://github.com/example/repo/pull/84
   case_dir=$(make_case quiet-allow-red)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   FM_AFK_MODE=quiet write_away_record "$case_dir"
@@ -447,6 +463,7 @@ test_allow_red_requires_one_separate_name() {
 
   case_dir=$(make_case github-allow-red-equals)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   set +e
@@ -460,6 +477,7 @@ test_allow_red_requires_one_separate_name() {
 
   case_dir=$(make_case github-allow-red-duplicate)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   set +e
@@ -482,6 +500,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   # fact, so a green merge proceeds and the ledger tags it away.
   case_dir=$(make_case away-green)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge the windows fix when green'
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
@@ -498,6 +517,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   # task's standing autonomy, is what the ledger records while away.
   case_dir=$(make_case away-yolo)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
   write_away_record "$case_dir"
@@ -510,6 +530,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   # never skips the record read, and the merge still lands under away authority.
   case_dir=$(make_case away-attended-override)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge it when green'
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" --attended-override \
@@ -520,6 +541,7 @@ test_away_record_permits_any_green_merge_under_away_authority() {
   # Without the record the merge is attended and the ledger row stays untagged.
   case_dir=$(make_case attended-untagged)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "attended-untagged: an attended green merge should succeed"
@@ -543,6 +565,7 @@ test_away_branch_actor_merges_green_under_the_record() {
 
   case_dir=$(make_case away-branch-attended)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   set +e
   FM_SUPERVISION_ACTOR=branch run_pr_merge "$case_dir" task-x1 "$url" \
@@ -558,6 +581,7 @@ test_away_branch_actor_merges_green_under_the_record() {
   # No yolo and no grant list: the record alone relocates the green merge.
   case_dir=$(make_case away-branch-green)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge the windows fix when green'
   FM_SUPERVISION_ACTOR=branch FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
@@ -573,6 +597,7 @@ test_away_branch_actor_merges_green_under_the_record() {
   # red check refuses on its own, and the attended waiver is refused too.
   case_dir=$(make_case away-branch-red)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     '{"__typename":"CheckRun","name":"lint","status":"COMPLETED","conclusion":"FAILURE","startedAt":"2026-09-01T00:00:00Z"}'
@@ -612,6 +637,7 @@ test_away_branch_refuses_when_record_archived_during_preflight() {
 
   case_dir=$(make_case away-branch-archived-during-preflight)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   : > "$case_dir/away-record-after-view"
@@ -639,6 +665,7 @@ test_away_posture_refuses_asynchronous_merge_paths() {
 
   case_dir=$(make_case away-auto-refused)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   set +e
@@ -654,6 +681,7 @@ test_away_posture_refuses_asynchronous_merge_paths() {
 
   case_dir=$(make_case away-queue-refused)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -714,6 +742,7 @@ test_away_plan_gated_403_does_not_block_the_merge() {
   url=https://github.com/example/repo/pull/91
   case_dir=$(make_case away-plan-gated-403)
   mkdir -p "$case_dir/wt" "$case_dir/home"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   printf 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature (HTTP 403)\n' \
     > "$case_dir/github-rules-fail-body"
@@ -731,6 +760,7 @@ test_away_record_does_not_bypass_red_or_identity() {
   head=adadadadadadadadadadadadadadadadadadadad
   case_dir=$(make_case away-record-red)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -747,6 +777,7 @@ test_away_record_does_not_bypass_red_or_identity() {
 
   case_dir=$(make_case pr-identity-mismatch)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   printf '\npr=https://github.com/example/repo/pull/99\n' >> "$case_dir/state/task-x1.meta"
   set +e
@@ -764,7 +795,7 @@ test_unreadable_away_record_refuses_merge() {
   local case_dir rc
   case_dir=$(make_case away-unreadable)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   printf 'not-a-contract\n' > "$case_dir/state/.afk-contract"
   set +e
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/86 \
@@ -787,7 +818,7 @@ test_away_record_cannot_change_between_the_authority_read_and_the_merge() {
   local case_dir rc mutate
   case_dir=$(make_case away-archive-at-merge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   mutate=$(away_change_script "$case_dir" archive-at-merge <<'SH'
 "$CONTRACT" archive
@@ -822,7 +853,7 @@ SH
 
   case_dir=$(make_case away-replace-at-merge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
   mutate=$(away_change_script "$case_dir" replace-at-merge <<'SH'
 "$CONTRACT" enter --words 'hold everything for my return'
@@ -853,7 +884,7 @@ test_a_record_made_unreadable_before_the_merge_refuses_it() {
   local case_dir rc
   case_dir=$(make_case away-unreadable-before-merge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   printf 'not-a-contract\n' > "$case_dir/away-record-after-view"
   write_away_record "$case_dir" --words 'merge task-x1 when green'
 
@@ -879,7 +910,7 @@ test_merge_refuses_when_the_away_record_cannot_be_locked() {
   local case_dir rc holder_pid i lock
   case_dir=$(make_case away-lock-unavailable)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   lock="$case_dir/state/.afk-contract.lock"
 
   FM_STATE_OVERRIDE="$case_dir/state" bash -c '
@@ -936,6 +967,7 @@ test_required_check_that_never_reported_refuses() {
   head=a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
   for kind in classic ruleset; do
     case_dir=$(make_case "github-required-absent-$kind")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_required "$case_dir" "$kind:ci" "$kind:validate"
     run_required_case "$case_dir" 90
@@ -958,6 +990,7 @@ test_required_checks_reported_and_green_merge() {
   local case_dir head
   head=a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2
   case_dir=$(make_case github-required-present)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED SUCCESS)" \
@@ -979,6 +1012,7 @@ test_red_and_unreported_checks_are_reported_together() {
   local case_dir head
   head=a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3
   case_dir=$(make_case github-red-and-unreported)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run lint COMPLETED FAILURE)"
@@ -1007,6 +1041,7 @@ test_unreadable_required_set_refuses() {
   head=a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4
   for label in branch-read-fails branch-shape rules-read-fails rules-forbidden rules-shape; do
     case_dir=$(make_case "github-required-unreadable-$label")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     case "$label" in
       branch-read-fails)
@@ -1048,6 +1083,7 @@ test_unreadable_required_set_refuses() {
   # GitHub's plan-gated refusal means the repository cannot have branch rules
   # at all, which is a readable answer, so the classic set alone decides.
   case_dir=$(make_case github-required-plan-gated)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   printf 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)\n' \
     > "$case_dir/github-required-rules-fail"
@@ -1056,6 +1092,7 @@ test_unreadable_required_set_refuses() {
   assert_logged_gh_merge "$case_dir" 94 example/repo --squash
 
   case_dir=$(make_case github-required-plan-gated-classic-absent)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" classic:validate
   printf 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)\n' \
@@ -1072,6 +1109,7 @@ test_allow_missing_waives_only_the_named_unreported_check() {
   head=a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5
 
   case_dir=$(make_case github-allow-missing-named)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" classic:ci ruleset:validate
   run_required_case "$case_dir" 96 --allow-missing validate
@@ -1079,6 +1117,7 @@ test_allow_missing_waives_only_the_named_unreported_check() {
   assert_logged_gh_merge "$case_dir" 96 example/repo --squash
 
   case_dir=$(make_case github-allow-missing-other-missing)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate ruleset:e2e
   run_required_case "$case_dir" 97 --allow-missing validate
@@ -1091,6 +1130,7 @@ test_allow_missing_waives_only_the_named_unreported_check() {
     "allow-missing-other-missing: gh pr merge ran with an unwaived unreported check"
 
   case_dir=$(make_case github-allow-missing-other-red)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_github_required "$case_dir" ruleset:validate
@@ -1104,6 +1144,7 @@ test_allow_missing_waives_only_the_named_unreported_check() {
   # The waiver covers absence only: a required check that did report red is
   # not missing, and waiving it takes --allow-red.
   case_dir=$(make_case github-allow-missing-names-red)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_github_required "$case_dir" classic:lint
@@ -1121,6 +1162,7 @@ test_allow_missing_follows_the_allow_red_rules() {
   head=a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6
 
   case_dir=$(make_case github-allow-missing-equals)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate
   run_required_case "$case_dir" 100 --allow-missing=validate
@@ -1129,6 +1171,7 @@ test_allow_missing_follows_the_allow_red_rules() {
     "allow-missing-equals: gh pr merge ran for the equals form"
 
   case_dir=$(make_case github-allow-missing-duplicate)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate ruleset:e2e
   run_required_case "$case_dir" 101 --allow-missing validate --allow-missing e2e
@@ -1139,6 +1182,7 @@ test_allow_missing_follows_the_allow_red_rules() {
     "allow-missing-duplicate: gh pr merge ran for two waivers"
 
   case_dir=$(make_case github-allow-missing-away)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -1150,6 +1194,7 @@ test_allow_missing_follows_the_allow_red_rules() {
     "allow-missing-away: gh pr merge ran despite an away waiver"
 
   case_dir=$(make_case github-allow-missing-away-after-view)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -1162,6 +1207,7 @@ test_allow_missing_follows_the_allow_red_rules() {
     "allow-missing-away-after-view: gh pr merge ran after late away publication"
 
   case_dir=$(make_case github-unreported-away)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" ruleset:validate
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -1188,6 +1234,7 @@ test_rollup_read_retries_and_rechecks_complete_verdict() {
   head=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
   for variant in partial pending-page empty missing-context http-503 rate-limit graphql-error turns-red; do
     case_dir=$(make_case "rollup-retry-$variant")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_rollup_json "$case_dir" "$head" \
       "$(check_run ci COMPLETED SUCCESS)" "$(check_run validate COMPLETED SUCCESS)"
@@ -1240,6 +1287,7 @@ test_unreadable_rollup_never_becomes_missing_or_waivable() {
   head=b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3
   for variant in partial duplicate stale error no-source changing-count; do
     case_dir=$(make_case "rollup-unreadable-$variant")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_required "$case_dir" classic:ci ruleset:validate
     mkdir "$case_dir/rollup-responses"
@@ -1270,6 +1318,7 @@ test_rollup_later_pages_enforce_missing_and_red_checks() {
   head=b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4
   for variant in green red; do
     case_dir=$(make_case "rollup-pages-$variant")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_rollup_json "$case_dir" "$head" \
       "$(check_run ci COMPLETED SUCCESS)" "$(check_run validate COMPLETED SUCCESS)"
@@ -1301,6 +1350,7 @@ test_partial_producer_read_retries_before_merging() {
   local case_dir head
   head=b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1
   case_dir=$(make_case partial-producers-then-complete)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" classic:ci
   jq '.protection.required_status_checks.checks[0].app_id = 15368' \
@@ -1326,6 +1376,7 @@ test_required_sources_retry_transient_failures() {
   head=b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5
   for source in branch required-rules; do
     case_dir=$(make_case "required-transient-$source")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_required "$case_dir" classic:ci ruleset:ci
     failure="$case_dir/github-$source-fail"
@@ -1344,6 +1395,7 @@ test_incomplete_producer_source_cannot_be_waived() {
   local case_dir head
   head=b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6
   case_dir=$(make_case incomplete-producers-waived)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_required "$case_dir" classic:ci
   jq '.protection.required_status_checks.checks[0].app_id = 15368' \
@@ -1365,6 +1417,7 @@ test_required_producer_identity() {
   for kind in classic ruleset; do
     for variant in wrong correct unreadable malformed stale waived; do
       case_dir=$(make_case "required-producer-$kind-$variant")
+      head=$(git -C "$case_dir/wt" rev-parse HEAD)
       add_gh_mocks "$case_dir" "$head"
       write_github_required "$case_dir" "$kind:ci"
       if [ "$kind" = classic ]; then
@@ -1423,6 +1476,7 @@ test_app_bound_required_status_context_matches_by_name() {
   for kind in classic ruleset; do
     for variant in reported absent; do
       case_dir=$(make_case "required-app-status-$kind-$variant")
+      head=$(git -C "$case_dir/wt" rev-parse HEAD)
       add_gh_mocks "$case_dir" "$head"
       if [ "$variant" = reported ]; then
         write_github_rollup_json "$case_dir" "$head" \
@@ -1462,6 +1516,7 @@ test_required_partial_reads_report_all_failures() {
   head=a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
   for variant in branch rules both; do
     case_dir=$(make_case "required-partial-$variant")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     add_gh_mocks "$case_dir" "$head"
     write_github_required "$case_dir" classic:validate ruleset:lint
     case "$variant" in
@@ -1527,6 +1582,7 @@ test_green_head_refusal_names_each_check_and_its_repair() {
   head=a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4a4
   url=https://github.com/example/repo/pull/191
   case_dir=$(make_case github-green-head-message)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_rollup_json "$case_dir" "$head" \
     "$(check_run ci COMPLETED FAILURE)" \
@@ -1577,6 +1633,7 @@ test_away_waiver_refusal_names_the_posture_and_the_attended_path() {
   head=acacacacacacacacacacacacacacacacacacacac
   url=https://github.com/example/repo/pull/192
   case_dir=$(make_case github-away-waiver-message)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -1600,6 +1657,7 @@ test_away_waiver_refusal_names_the_posture_and_the_attended_path() {
   # The green-check refusal tells the same truth from the other side: while
   # away, the failed check is named with no waiver offer at all.
   case_dir=$(make_case github-away-green-head-message)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   write_away_record "$case_dir" --words 'merge task-x1 when green'
@@ -1629,6 +1687,7 @@ test_held_task_refusal_prints_the_exact_release_command() {
   head=aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae
   url=https://github.com/example/repo/pull/193
   case_dir=$(make_case github-held-task-message)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   hold_fixture_task "$case_dir"
 
@@ -1672,6 +1731,7 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
   head=afafafafafafafafafafafafafafafafafafafaf
   url=https://github.com/example/repo/pull/194
   case_dir=$(make_case github-guard-events-refused)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
 
@@ -1708,6 +1768,7 @@ test_guard_events_record_the_merge_decisions_without_changing_them() {
 
   url=https://github.com/example/repo/pull/195
   case_dir=$(make_case github-guard-events-allowed)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   FM_GUARD_EVENT_LOG="$case_dir/allowed-guard-events.jsonl" \
     run_pr_merge "$case_dir" task-x1 "$url" \
@@ -1728,6 +1789,7 @@ test_github_review_required_refuses() {
   head=5555555555555555555555555555555555555555
   case_dir=$(make_case github-review-required)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   jq -c '.reviewDecision = "REVIEW_REQUIRED"' "$case_dir/github-view.json" > "$case_dir/github-view.tmp"
   mv "$case_dir/github-view.tmp" "$case_dir/github-view.json"

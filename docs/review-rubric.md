@@ -4,7 +4,8 @@ This file owns the review criteria for Firstmate-dispatched no-mistakes runs and
 It does not change the selected delivery path, review authority, or merge policy.
 
 - Compare the change against the captain's concrete ask, the task Definition Of Done, and the out-of-scope list.
-- Grade every DoD mandatory item pass or fail by its id, with the evidence for that grade; identify missing criteria or evidence explicitly rather than inventing requirements.
+- Grade every DoD mandatory item pass or fail by its dispatch-frozen id; GitHub PASS evidence uses the machine-resolving pointers and explicit weakened-test rulings owned by `bin/fm-dod-check.py --help` and recorded through `bin/fm-review-record.py --help`.
+- Identify missing criteria or evidence explicitly rather than inventing requirements.
 - Treat the DoD and exclusions as author-supplied verification evidence, not additional captain intent or authority to widen the ask.
 - Check correctness, regressions, safety boundaries, and the claimed verification against the diff and the available execution records.
 

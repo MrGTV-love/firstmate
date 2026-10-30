@@ -13,6 +13,41 @@
 # shellcheck source=tests/fm-pr-merge-helpers.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fm-pr-merge-helpers.sh"
 
+test_machine_checked_merge_evidence() {
+  local scenario case_dir head url rc expected flag
+  url=https://github.com/example/repo/pull/9
+  for scenario in unresolved-id unruled-line wrong-line resolved; do
+    case_dir=$(make_case "machine-$scenario")
+    rm "$case_dir/fakebin/git"
+    : > "$case_dir/explicit-review"
+    make_machine_proof "$case_dir" || fail "could not build real proof for $scenario"
+    head=$(cat "$case_dir/machine-head")
+    add_gh_mocks "$case_dir" "$head"
+    install_machine_forge_mock "$case_dir"
+    : > "$case_dir/gh-axi.log"
+    flag=$("$JQ_BIN" -r '.flags[0] | .file + ":" + (.line | tostring)' "$case_dir/machine-artifact/weakening.json")
+    case "$scenario" in
+      unresolved-id) expected=C1; "$JQ_BIN" '.items=[]' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
+      unruled-line) expected=$flag; "$JQ_BIN" '.rulings=[]' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
+      wrong-line) expected=$flag; "$JQ_BIN" '.rulings[0].id="different-line"' "$case_dir/machine-claims.json" > "$case_dir/changed-claims.json" ;;
+      resolved) cp "$case_dir/machine-claims.json" "$case_dir/changed-claims.json" ;;
+    esac
+    record_review "$case_dir" "$url" "$head" --dod-evidence "$case_dir/changed-claims.json" >/dev/null || fail "$scenario PASS record failed"
+    rc=0
+    run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$scenario" = resolved ]; then
+      expect_code 0 "$rc" "resolved proof and line ruling must merge: $(cat "$case_dir/stderr")"
+      assert_logged_gh_merge "$case_dir" 9 example/repo --squash
+      assert_grep "pr_head=$head" "$case_dir/state/task-x1.meta" 'resolved proof did not record exact-head landing'
+    else
+      [ "$rc" -ne 0 ] || fail "$scenario merged without resolving its evidence"
+      assert_grep "$expected" "$case_dir/stderr" "$scenario did not name the unresolved item or exact flagged line"
+      assert_no_grep 'pr merge' "$case_dir/gh-axi.log" "$scenario reached the forge merge"
+    fi
+    pass "fm-pr-merge: machine evidence $scenario"
+  done
+}
+
 test_derived_author_coverage() {
   local scenario case_dir head base url rc before after groups expected command rewritten
   url=https://github.com/example/repo/pull/9
@@ -193,6 +228,7 @@ PY
       printf 'VERDICT: PASS head=%s\nOpenAI read of the Claude pipeline commits.\n' "$head" > "$case_dir/alias-report.md"
       command=${command//OUTSIDE_FAMILY_MODEL/gpt-5.1-codex}
       command=${command//LOCAL_READER_REPORT/$case_dir/alias-report.md}
+      command+=" --dod-evidence $(printf '%q' "$case_dir/machine-claims.json")"
       eval "$command" > "$case_dir/alias-record.out" 2>&1 || fail "the printed recording command failed: $(cat "$case_dir/alias-record.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -224,6 +260,7 @@ PY
       printf 'VERDICT: PASS head=%s\nClaude read of the FAIL-typed group.\n' "$head" > "$case_dir/typed-report.md"
       command=${command//OUTSIDE_FAMILY_MODEL/claude-opus-5-5}
       command=${command//LOCAL_READER_REPORT/$case_dir/typed-report.md}
+      command+=" --dod-evidence $(printf '%q' "$case_dir/machine-claims.json")"
       eval "$command" > "$case_dir/typed-record.out" 2>&1 || fail "the printed FAIL recording command failed: $(cat "$case_dir/typed-record.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -238,6 +275,7 @@ PY
       printf 'VERDICT: PASS head=%s\nKnown-family reread.\n' "$head" > "$case_dir/reread.md"
       command=${command//KNOWN_FAMILY_MODEL/claude-opus-5-5}
       command=${command//LOCAL_READER_REPORT/$case_dir/reread.md}
+      command+=" --dod-evidence $(printf '%q' "$case_dir/machine-claims.json")"
       eval "$command" > "$case_dir/reread.out" 2>&1 || fail "the printed reread command failed: $(cat "$case_dir/reread.out")"
       rc=0
       run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -431,6 +469,7 @@ test_captain_fail_triggered_independent_pass_merges() {
   url=https://github.com/example/repo/pull/9
   for trigger in loosens-deny-allow-list widens-guard customer-data-billing-spend; do
     case_dir=$(make_case "captain-fail-pass-$trigger")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
     review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge this PR.' >/dev/null \
@@ -549,7 +588,7 @@ test_attended_override_without_review_refuses() {
       github)
         case_dir=$(make_case override-no-review-github)
         url=https://github.com/example/repo/pull/9
-        add_gh_mocks "$case_dir" 1111111111111111111111111111111111111111 ;;
+        add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)" ;;
       gitlab) case_dir=$(make_gitlab_case override-no-review-gitlab); url=$MR_URL ;;
       forgejo) case_dir=$(make_forgejo_case override-no-review-forgejo); url=$FJ_URL ;;
     esac
@@ -573,7 +612,7 @@ test_missing_review_record_refuses() {
   local case_dir rc
   case_dir=$(make_case missing-review-record)
   : > "$case_dir/explicit-review"
-  add_gh_mocks "$case_dir" 1111111111111111111111111111111111111111
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   rc=0
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/9 \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -630,9 +669,11 @@ test_captain_word_refused_while_away() {
     fi
   done
   case_dir=$(make_case captain-word-before-away)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   : > "$case_dir/explicit-review"
   add_gh_mocks "$case_dir" "$head"
   printf '\nyolo=on\n' >> "$case_dir/state/task-x1.meta"
+  record_review "$case_dir" "$url" "$head" >/dev/null || fail 'record pre-away machine evidence'
   review_record_command "$case_dir" captain-word --pr "$url" --head "$head" --words 'Merge PR 9.' >/dev/null \
     || fail "captain-word before /afk must record"
   write_away_record "$case_dir" --words 'merge PR 9 when green'
@@ -723,7 +764,7 @@ test_review_record_survives_a_later_family_change() {
   local case_dir head url rc
   case_dir=$(make_case review-family-added-later)
   : > "$case_dir/explicit-review"
-  head=1111111111111111111111111111111111111111
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   url=https://github.com/example/repo/pull/9
   add_gh_mocks "$case_dir" "$head"
   printf '\nmodel=kimi-k2\n' >> "$case_dir/state/task-x1.meta"
@@ -750,6 +791,7 @@ test_recorded_review_merge_conditions() {
   url=https://github.com/example/repo/pull/9
   for scenario in stale same-family same-family-model cross-family-model unknown-reader unknown-author-captain fail trigger-list trigger-guard trigger-data other-pr stale-captain-word captain-word captain-only stale-captain-only valid newest-fail captain-then-fail captain-fail-stale-pass captain-fail-stale-fail captain-fail-unknown-pass captain-fail-same-family-pass fail-then-captain captain-fail-pass; do
     case_dir=$(make_case "review-$scenario")
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
     : > "$case_dir/explicit-review"
     add_gh_mocks "$case_dir" "$head"
     case "$scenario" in
@@ -810,9 +852,16 @@ test_recorded_review_merge_conditions() {
     rc=0
     run_pr_merge "$case_dir" task-x1 "$url" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     case "$scenario" in
-      valid|trigger-list|trigger-guard|trigger-data|captain-word|captain-only|cross-family-model|unknown-author-captain|fail-then-captain|captain-fail-pass)
+      valid|trigger-list|trigger-guard|trigger-data|captain-word|cross-family-model|unknown-author-captain|captain-fail-pass)
         expect_code 0 "$rc" "$scenario must merge"
         assert_logged_gh_merge "$case_dir" 9 example/repo --squash ;;
+      captain-only|fail-then-captain)
+        review_record_command "$case_dir" verify --pr "$url" --head "$head" --task task-x1 --base "$(cat "$case_dir/github-base")" \
+          > "$case_dir/authority" || fail "$scenario captain authority must remain valid"
+        assert_grep 'review: captain-word' "$case_dir/authority" 'machine proof must not change captain authority'
+        expect_code 1 "$rc" "$scenario cannot substitute captain authority for per-item PASS evidence"
+        assert_grep 'machine-checked DoD requires an exact-head PASS' "$case_dir/stderr" 'missing PASS proof was not identified'
+        assert_no_grep '^pr merge ' "$case_dir/gh.log" "$scenario must not bypass proof" ;;
       *)
         expect_code 1 "$rc" "$scenario must refuse"
         assert_grep "$expected" "$case_dir/stderr" "$scenario refusal names field"
@@ -827,7 +876,7 @@ test_github_zero_exit_queue_required_refuses_with_exact_retry() {
   local case_dir rc
   case_dir=$(make_case github-zero-exit-queue-required)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2121212121212121212121212121212121212121
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false 'release/2026'
   printf 'merge_method=REBASE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -864,7 +913,7 @@ test_github_closed_unqueued_outcome_omits_retry_flags() {
   local case_dir rc
   case_dir=$(make_case github-closed-unqueued)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2323232323232323232323232323232323232323
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" CLOSED false false master
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -894,7 +943,7 @@ test_github_agreeing_queue_rules_keep_retry_guidance() {
   local case_dir rc
   case_dir=$(make_case github-agreeing-queue-rules)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2424242424242424242424242424242424242424
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=REBASE\nmerge_method=REBASE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -920,7 +969,7 @@ test_github_conflicting_queue_rules_report_ambiguity() {
   local case_dir rc
   case_dir=$(make_case github-conflicting-queue-rules)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2525252525252525252525252525252525252525
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=MERGE\nmerge_method=SQUASH\nmerge_method=SQUASH\n' \
     > "$case_dir/github-rules"
@@ -950,7 +999,7 @@ test_verified_merge_records_pr_and_head() {
   local case_dir rc
   case_dir=$(make_case records-before-merge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" deadbeefcafefeed0000000000000000deadbeef
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -962,7 +1011,7 @@ test_verified_merge_records_pr_and_head() {
   expect_code 0 "$rc" "records-before-merge: fm-pr-merge should succeed"
   assert_grep 'pr=https://github.com/example/repo/pull/9' "$case_dir/state/task-x1.meta" \
     "records-before-merge: pr= was not recorded"
-  assert_grep 'pr_head=deadbeefcafefeed0000000000000000deadbeef' "$case_dir/state/task-x1.meta" \
+  assert_grep "pr_head=$(git -C "$case_dir/wt" rev-parse HEAD)" "$case_dir/state/task-x1.meta" \
     "records-before-merge: pr_head= was not recorded"
   assert_logged_gh_merge "$case_dir" 9 example/repo --squash
   pass "fm-pr-merge records pr= and pr_head= for a verified GitHub merge"
@@ -975,7 +1024,7 @@ test_pr_metadata_is_recorded_before_the_forge_call() {
   local case_dir rc
   case_dir=$(make_case records-ahead-of-forge-call)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 5151515151515151515151515151515151515151
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/meta-at-merge"
 
@@ -996,7 +1045,7 @@ test_merge_failure_propagates_after_recording() {
   local case_dir rc
   case_dir=$(make_case merge-fails)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -1015,7 +1064,7 @@ test_github_open_unqueued_outcome_refuses() {
   local case_dir rc
   case_dir=$(make_case github-open-unqueued)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2020202020202020202020202020202020202020
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false master
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/gh.log"
@@ -1042,8 +1091,8 @@ test_github_open_unqueued_outcome_refuses() {
 # a bounded retry instead of refusing a pull request that is simply pending.
 test_github_mergeable_unknown_retries_then_succeeds() {
   local case_dir rc head
-  head=4242424242424242424242424242424242424242
   case_dir=$(make_case github-mergeable-unknown-then-mergeable)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   printf '%s\n' UNKNOWN MERGEABLE > "$case_dir/mergeable-sequence"
@@ -1074,8 +1123,8 @@ test_github_mergeable_unknown_retries_then_succeeds() {
 # unmergeable, never attempting a merge on an unresolved read.
 test_github_mergeable_unknown_exhausts_bound_and_reports_pending() {
   local case_dir rc head
-  head=4343434343434343434343434343434343434343
   case_dir=$(make_case github-mergeable-unknown-exhausted)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   printf '%s\n' UNKNOWN > "$case_dir/mergeable-sequence"
@@ -1105,8 +1154,8 @@ test_github_mergeable_unknown_exhausts_bound_and_reports_pending() {
 # the retry re-reads every live condition, not only mergeable.
 test_github_mergeable_unknown_retry_rechecks_checks() {
   local case_dir rc head
-  head=4545454545454545454545454545454545454545
   case_dir=$(make_case github-mergeable-unknown-check-turns-red)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   printf '%s\n' UNKNOWN 'UNKNOWN FAILURE' > "$case_dir/mergeable-sequence"
@@ -1138,8 +1187,8 @@ test_github_mergeable_unknown_retry_rechecks_checks() {
 # refusal, never retried.
 test_github_mergeable_conflicting_is_not_retried() {
   local case_dir rc head
-  head=4444444444444444444444444444444444444444
   case_dir=$(make_case github-mergeable-conflicting)
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   mkdir -p "$case_dir/wt"
   add_gh_mocks "$case_dir" "$head"
   jq -c '.mergeable = "CONFLICTING"' "$case_dir/github-view.json" > "$case_dir/github-view.tmp"
@@ -1169,7 +1218,7 @@ test_github_unreadable_outcome_keeps_pr_bookkeeping() {
   local case_dir rc
   case_dir=$(make_case github-outcome-read-fails)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 3131313131313131313131313131313131313131
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_gh_mock_outcome_read_fails "$case_dir" 3131313131313131313131313131313131313131
   add_gh_axi_mock_view_fails "$case_dir"
   : > "$case_dir/gh-axi.log"
@@ -1202,7 +1251,7 @@ test_github_refusal_quotes_the_forge_output() {
   local case_dir rc
   case_dir=$(make_case github-refusal-quotes-forge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 6161616161616161616161616161616161616161
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   printf '%s\n' 'will be added to the merge queue when all requirements are met' \
     > "$case_dir/github-merge-output"
   write_github_outcome "$case_dir" OPEN false false main
@@ -1239,7 +1288,7 @@ test_github_unreadable_outcome_refusal_quotes_the_forge_output() {
   local case_dir rc
   case_dir=$(make_case github-unreadable-outcome-quotes-forge)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8787878787878787878787878787878787878787
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   printf '%s\n' 'will be added to the merge queue when all requirements are met' \
     > "$case_dir/github-merge-output"
   add_gh_axi_mock_view_fails "$case_dir"
@@ -1274,7 +1323,7 @@ test_github_accepted_queue_flags_do_not_echo_back_the_same_command() {
   local case_dir rc
   case_dir=$(make_case github-accepted-queue-flags)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8181818181818181818181818181818181818181
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1305,7 +1354,7 @@ test_github_mismatched_queue_flags_still_name_the_retry() {
   local case_dir rc
   case_dir=$(make_case github-mismatched-queue-flags)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8282828282828282828282828282828282828282
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=REBASE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1329,7 +1378,7 @@ test_github_unrecognised_queue_method_still_names_the_queue() {
   local case_dir rc
   case_dir=$(make_case github-unrecognised-queue-method)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8383838383838383838383838383838383838383
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=FASTFORWARD\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1356,7 +1405,7 @@ test_github_unreadable_queue_rules_are_not_reported_as_no_queue() {
   local case_dir rc
   case_dir=$(make_case github-unreadable-queue-rules)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8484848484848484848484848484848484848484
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   : > "$case_dir/github-rules-fail"
   : > "$case_dir/gh-axi.log"
@@ -1388,7 +1437,7 @@ test_github_plan_gated_403_reads_as_no_queue() {
   local case_dir rc
   case_dir=$(make_case github-plan-gated-403)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8989898989898989898989898989898989898989
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'gh: Upgrade to GitHub Pro or make this repository public to enable this feature (HTTP 403)\n' \
     > "$case_dir/github-rules-fail-body"
@@ -1413,7 +1462,7 @@ test_github_no_queue_rule_says_nothing_about_a_queue() {
   local case_dir rc
   case_dir=$(make_case github-no-queue-rule)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8585858585858585858585858585858585858585
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   : > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1437,7 +1486,7 @@ test_github_unmerged_fallback_cannot_replace_queue_aware_read() {
   local case_dir rc
   case_dir=$(make_case github-unmerged-fallback)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 8686868686868686868686868686868686868686
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_gh_mock_outcome_read_fails "$case_dir"
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
@@ -1474,7 +1523,7 @@ test_github_auto_merge_without_queue_refuses_legibly() {
   for spelling in --auto --auto=true; do
     case_dir=$(make_case "github-auto-no-queue${spelling#--auto}")
     mkdir -p "$case_dir/wt"
-    add_gh_mocks "$case_dir" 7171717171717171717171717171717171717171
+    add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
     write_github_outcome "$case_dir" OPEN false false main
     : > "$case_dir/github-rules"
     : > "$case_dir/gh-axi.log"
@@ -1509,7 +1558,7 @@ test_github_failed_merge_never_claims_armed_auto_merge() {
   local case_dir rc
   case_dir=$(make_case github-auto-merge-command-fails)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   : > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1540,7 +1589,7 @@ test_github_failed_merge_with_queue_flags_never_claims_acceptance() {
   local case_dir rc
   case_dir=$(make_case github-failed-merge-queue-flags)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false main
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1574,7 +1623,7 @@ test_github_failed_gh_read_falls_back_to_gh_axi() {
   local case_dir rc
   case_dir=$(make_case github-gh-read-falls-back)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 5151515151515151515151515151515151515151
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_gh_mock_outcome_read_fails "$case_dir" 5151515151515151515151515151515151515151
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/gh.log"
@@ -1599,7 +1648,7 @@ test_github_failed_merge_names_an_observed_landed_state() {
   local case_dir rc
   case_dir=$(make_case github-failed-merge-actually-landed)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" MERGED true false main
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/gh.log"
@@ -1626,7 +1675,7 @@ test_github_without_gh_still_uses_gh_axi_merge() {
   local case_dir ghless_path rc
   case_dir=$(make_case github-without-gh)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 4141414141414141414141414141414141414141
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   rm "$case_dir/fakebin/gh"
   ghless_path="$case_dir/path-without-gh"
   mirror_path_without "$ghless_path" gh "$case_dir/fakebin"
@@ -1653,7 +1702,7 @@ test_github_without_gh_failed_read_keeps_bookkeeping() {
   local case_dir ghless_path rc
   case_dir=$(make_case github-without-gh-read-fails)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 4141414141414141414141414141414141414141
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   rm "$case_dir/fakebin/gh"
   ghless_path="$case_dir/path-without-gh"
   mirror_path_without "$ghless_path" gh "$case_dir/fakebin"
@@ -1680,7 +1729,7 @@ test_github_merged_outcome_is_verified() {
   local case_dir rc
   case_dir=$(make_case github-verified-merged)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 1010101010101010101010101010101010101010
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -1704,7 +1753,7 @@ test_verified_merge_arms_the_pool_copy_prune() {
   local case_dir rc stub
   case_dir=$(make_case github-merge-prunes-the-copy)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 1212121212121212121212121212121212121212
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   stub="$case_dir/teardown-stub"
   # shellcheck disable=SC2016 # The stub's own text is single-quoted on purpose: it expands when the stub runs.
@@ -1731,7 +1780,7 @@ test_unverified_merge_never_arms_the_pool_copy_prune() {
   local case_dir rc
   case_dir=$(make_case github-unverified-merge-no-prune)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 1313131313131313131313131313131313131313
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   printf '%s\n' 'state=OPEN' 'merged=false' 'queued=false' 'base=main' > "$case_dir/github-outcome"
   : > "$case_dir/gh-axi.log"
 
@@ -1749,7 +1798,7 @@ test_unverified_merge_never_arms_the_pool_copy_prune() {
 test_github_verified_merge_requires_poll_recording() {
   local case_dir rc
   case_dir=$(make_case github-poll-recording-fails)
-  add_gh_mocks "$case_dir" 1111111111111111111111111111111111111111
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   add_failing_poll_publish_mv "$case_dir"
   : > "$case_dir/gh-axi.log"
 
@@ -1775,7 +1824,7 @@ test_github_queued_outcome_is_verified() {
   local case_dir rc
   case_dir=$(make_case github-verified-queued)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 3030303030303030303030303030303030303030
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false true master
   : > "$case_dir/gh-axi.log"
   : > "$case_dir/gh.log"
@@ -1800,7 +1849,7 @@ test_github_queue_required_refusal_names_retry_flags() {
   local case_dir rc
   case_dir=$(make_case github-queue-required)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false false master
   printf 'merge_method=MERGE\n' > "$case_dir/github-rules"
   : > "$case_dir/gh-axi.log"
@@ -1829,7 +1878,7 @@ test_extra_merge_args_forwarded() {
   local case_dir rc
   case_dir=$(make_case extra-args)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2222222222222222222222222222222222222222
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -1845,7 +1894,7 @@ test_extra_merge_args_forwarded() {
 
   case_dir=$(make_case extra-args-attended)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 2222222222222222222222222222222222222222
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/15 \
     --attended-override -- --squash --delete-branch \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "extra-args-attended: attended override should merge"
@@ -1958,6 +2007,7 @@ test_repo_override_args_refuse_before_recording() {
 }
 
 pr_merge_test_cases=(
+test_machine_checked_merge_evidence
 test_derived_author_coverage
 test_author_evidence_accepts_path_safe_legacy_task_ids
 test_author_verification_requires_exact_identity

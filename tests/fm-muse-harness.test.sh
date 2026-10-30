@@ -141,6 +141,7 @@ Exercise Muse dispatch.
 ## Firstmate spec
 Verify the Muse harness behavior under test.
 EOF
+  printf "\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You're Graded\n" "$(fm_test_dod_item M1)" >> "$home/data/$id/brief.md"
   fm_git_worktree "$proj" "$wt" "fm/$id"
   touch "$home/state/.last-watcher-beat"
   printf '%s\n' "$case_dir|$home|$proj|$wt|$fakebin|$id"

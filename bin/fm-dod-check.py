@@ -4,9 +4,35 @@
 Usage:
   fm-dod-check.py validate --dod FILE
   fm-dod-check.py run --dod FILE --repo DIR --base SHA --head SHA --output DIR
+  fm-dod-check.py freeze --brief FILE --state DIR --task ID
+  fm-dod-check.py dispatch --meta FILE --pr URL
+  fm-dod-check.py verify --meta FILE --pr URL --base SHA --head SHA < CLAIMS.json
 
-The item format is owned by fm_task_dod_block in bin/fm-dod-lib.sh.
+The item format and parser are owned by fm_dod_item_shape in bin/fm-dod-lib.sh.
 Check is a single-line bash command, optionally enclosed in one pair of backticks.
+freeze records exact selected criteria bytes at state/<task>.dod.<sha256>.md;
+spawn records dod_file and dod_sha256 before launching the worker and preserves
+both on relaunch. Existing tasks without a dispatch snapshot cannot claim one
+retroactively. dispatch submits only those frozen bytes to dod-evidence.yml on
+the PR branch through gh-axi. GitHub must already recognize that workflow;
+registration or unavailable hosted evidence is reported, never bootstrapped.
+The run's workflow commit must equal the exact reviewed PR head.
+verify accepts JSON copied into the independent PASS record by --dod-evidence:
+  {"items":[{"id":"C1","run_id":"123","commit":"<exact head>",
+    "file":"bin/example.sh","line":7,"log":"gate-C1.log",
+    "log_sha256":"<sha256>"}],
+   "rulings":[{"id":"<flag digest>","decision":"accept","reason":"<reviewer ruling>"}]}
+Every mandatory id needs exactly one pointer. The minimal pointer is id/run_id;
+a shared top-level run_id can supply run context for commit, file/line or log
+digest pointers. Supplied refinements must all resolve; omitted commit and log
+are derived from the exact-head manifest, never from mutable branch refs.
+Gate pointers name their exact command log; other authorities may point at a passing test log or summary.log,
+which proves automated execution, not design quality. The reviewer still grades
+semantic adequacy. Each weakened-test flag needs an explicit accept with a reason.
+CI's exact-head artifact, run attempt, successful run, matching workflow commit,
+DoD digest, all gate commands, fail-first results, logs and file:line must resolve.
+Local runs are smoke evidence only; the resolver requires GitHub's successful
+exact-head run record and its artifact, not a model's statement of success.
 Test paths named anywhere in an item's fields use tests/<name>.test.sh.
 For changed named tests, the HEAD test is overlaid onto an exported base tree:
 absence of a new test on base is not fail-first proof. Other files stay at base.
@@ -37,75 +63,62 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+BIN = Path(__file__).resolve().parent
+
+
+def owner(*args):
+    result = subprocess.run(["bash", str(BIN / "fm-dod-lib.sh"), *map(str, args)],
+                            capture_output=True, check=False)
+    if result.returncode:
+        raise CheckError(result.stderr.decode(errors="replace").strip() or "criteria owner refused input")
+    return result.stdout
+
+
 def items_from(text):
-    items = []
-    current = None
-    mandatory = False
-    fence = None
-    for line in text.splitlines():
-        marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-        if marker:
-            token = marker[1]
-            if fence is None:
-                fence = token
-            elif token[0] == fence[0] and len(token) >= len(fence):
-                fence = None
-            continue
-        if fence:
-            continue
-        if re.search(r"\{DOD_[A-Z_]+\}", line):
-            raise CheckError("task DoD still holds scaffold placeholders")
-        heading = re.match(r"^(#{1,6})\s+(.*)", line)
-        if heading:
-            current = None
-            if len(heading[1]) <= 3:
-                mandatory = heading[2].strip().casefold() == "mandatory items"
-            continue
-        item = re.match(r"^- \*\*([A-Za-z][A-Za-z0-9_.-]*)\*\*\s+(.+)", line)
-        if item:
-            current = {"id": item[1], "mandatory": mandatory or "*(mandatory)*" in item[2], "fields": {}, "text": line}
-            items.append(current)
-            continue
-        if current is not None:
-            current["text"] += "\n" + line
-            field = re.match(r"^\s+- (Verify|Authority|Check):\s*(.*)$", line)
-            if field:
-                name, value = field.groups()
-                if name in current["fields"]:
-                    raise CheckError(f"{current['id']}: duplicate {name}")
-                current["fields"][name] = value.strip()
-    seen = set()
-    required = []
+    # The dispatch/plan format owner is also the sole parser for CI and merge.
+    with tempfile.TemporaryDirectory(prefix="fm-dod-parse-") as directory:
+        path = Path(directory) / "dod.md"
+        path.write_bytes(text.encode())
+        items = json.loads(owner("--items", path))
     for item in items:
-        if item["id"] in seen:
-            raise CheckError(f"duplicate DoD id: {item['id']}")
-        seen.add(item["id"])
-        item["tests"] = sorted(set(re.findall(r"(?<![\w/.-])(tests/[A-Za-z0-9_./-]+\.test\.sh)(?![\w/.-])", item["text"])))
-        for path in item["tests"]:
-            if ".." in PurePosixPath(path).parts:
-                raise CheckError(f"{item['id']}: unsafe test path {path}")
-        if not item["mandatory"]:
-            continue
         fields = item["fields"]
-        if not fields.get("Verify"):
-            raise CheckError(f"{item['id']}: mandatory item requires Verify")
-        authority = fields.get("Authority")
-        if authority not in ("agent", "gate", "grader"):
-            raise CheckError(f"{item['id']}: Authority must be agent, gate, or grader")
+        item["tests"] = named_tests("\n".join(fields.values()))
         command = fields.get("Check", "")
         if command.startswith("`") and command.endswith("`"):
             command = command[1:-1]
-        if authority == "gate" and not command.strip():
-            raise CheckError(f"{item['id']}: Authority gate requires an exact Check command")
         item["command"] = command
-        required.append(item)
-    if not required:
-        raise CheckError("task DoD requires at least one mandatory item with Verify")
     return items
 
 
+def named_tests(text):
+    paths = sorted(set(re.findall(r"(?<![\w/.-])(tests/[A-Za-z0-9_./-]+\.test\.sh)(?![\w/.-])", text)))
+    if any(".." in PurePosixPath(path).parts for path in paths):
+        raise CheckError("unsafe named test path")
+    return paths
+
+
+def freeze(args):
+    if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}", args.task):
+        raise CheckError("invalid task id")
+    raw = owner("--criteria", args.brief)
+    items_from(raw.decode())
+    sha = digest(raw)
+    state = args.state.resolve(strict=True)
+    path = state / f"{args.task}.dod.{sha}.md"
+    try:
+        with path.open("xb") as stream:
+            stream.write(raw)
+        path.chmod(0o444)
+    except FileExistsError:
+        if path.is_symlink() or not path.is_file() or path.read_bytes() != raw:
+            raise CheckError("dispatch DoD snapshot collision")
+    print(json.dumps({"dod_file": str(path), "dod_sha256": sha}))
+    return 0
+
+
 def git(repo, *args):
-    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=False)
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, check=False,
+                            env=dict(os.environ, GIT_NO_REPLACE_OBJECTS="1"))
     if result.returncode:
         raise CheckError(f"git {args[0]} failed: {result.stderr.decode(errors='replace').strip()}")
     return result.stdout
@@ -138,8 +151,9 @@ def execute(command, cwd, output, name, context):
     with log.open("wb") as stream:
         stream.write(f"command: {command}\ncommit: {context['commit']}\n".encode())
         stream.flush()
-        result = subprocess.run(["bash", "-o", "pipefail", "-c", command], cwd=cwd,
-                                env=environment, stdout=stream, stderr=subprocess.STDOUT, check=False)
+        invocation = ["bash", "-o", "pipefail", "-c", command]
+        result = subprocess.run(invocation, cwd=cwd, env=environment,
+                                stdout=stream, stderr=subprocess.STDOUT, check=False)
         stream.write(f"\nexit: {result.returncode}\n".encode())
     print(f"exit: {result.returncode}\nlog: {json.dumps(log.name)}", flush=True)
     return {"command": command, "commit": context["commit"], "exit": result.returncode,
@@ -154,7 +168,8 @@ def run(args, raw, items):
     changed = set(git(repo, "diff", "--name-only", "-z", base, head, "--", "tests").decode().split("\0"))
     manifest = {"schema": "fm-dod-evidence.v1", "head": head, "base": base,
                 "dod_sha256": digest(raw), "run_id": os.environ.get("GITHUB_RUN_ID", ""),
-                "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""), "items": [], "tests": []}
+                "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+                "items": [], "tests": []}
     passed = True
     print(f"head: {head}\nbase: {base}\ndod_sha256: {manifest['dod_sha256']}", flush=True)
     with tempfile.TemporaryDirectory(prefix="fm-dod-") as scratch:
@@ -172,7 +187,7 @@ def run(args, raw, items):
                 result["id"] = item["id"]
                 manifest["items"].append(result)
                 passed = result["exit"] == 0 and passed
-        named = sorted({path for item in items for path in item["tests"] if path in changed})
+        named = sorted(set(named_tests(raw.decode())) & changed)
         for index, path in enumerate(named):
             source = head_tree / path
             if source.is_symlink() or not source.is_file():
@@ -194,8 +209,181 @@ def run(args, raw, items):
             print(f"test: {json.dumps(path)}\nfail_first: {'pass' if result['passed'] else 'fail'}", flush=True)
     manifest["passed"] = passed
     (output / "results.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (output / "summary.log").write_text(f"head: {head}\nbase: {base}\ndod_sha256: {digest(raw)}\nresult: {'pass' if passed else 'fail'}\n")
+    (output / "dod.md").write_bytes(raw)
     print(f"result: {'pass' if passed else 'fail'}", flush=True)
     return 0 if passed else 1
+
+
+def forge_api(endpoint):
+    # gh-axi formats JSON as TOON; base64 preserves the complete JSON document
+    # in its scalar body without depending on a parallel JSON CLI.
+    import base64
+    result = subprocess.run(["gh-axi", "api", endpoint, "--jq", "tojson | @base64", "--full"],
+                            capture_output=True, text=True, check=False)
+    match = re.search(r"^  body: ([A-Za-z0-9+/=]+)$", result.stdout, re.M)
+    if result.returncode or not match or "  truncated: false" not in result.stdout:
+        raise CheckError(f"cannot resolve GitHub evidence: {endpoint}: {result.stderr.strip()}")
+    return json.loads(base64.b64decode(match[1], validate=True))
+
+
+def github_pr(url):
+    match = re.fullmatch(r"https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([1-9][0-9]*)", url)
+    if not match:
+        raise CheckError("machine-checked DoD evidence currently requires a github.com pull request")
+    return match.groups()
+
+
+def frozen(meta_path):
+    fields = dict(line.split("=", 1) for line in meta_path.read_text().splitlines() if "=" in line)
+    sha = fields.get("dod_sha256", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", sha):
+        raise CheckError("task has no dispatch-time DoD digest; do not adopt mutable worker criteria")
+    path = meta_path.parent / f"{meta_path.stem}.dod.{sha}.md"
+    if fields.get("dod_file") != str(path) or path.is_symlink():
+        raise CheckError("frozen DoD path does not match the task's protected state record")
+    raw = path.read_bytes()
+    if digest(raw) != sha:
+        raise CheckError("frozen DoD digest changed")
+    return fields, raw, items_from(raw.decode())
+
+
+def dispatch(args):
+    _, raw, _ = frozen(args.meta.resolve(strict=True))
+    repo, number = github_pr(args.pr)
+    pr = forge_api(f"/repos/{repo}/pulls/{number}")
+    if pr.get("state") != "open":
+        raise CheckError("PR must be open")
+    branch = pr["head"]["ref"]
+    result = subprocess.run(["gh-axi", "workflow", "run", "dod-evidence.yml", "--repo", repo,
+                             "--ref", branch, "--field", f"pr={number}",
+                             "--field", f"head={pr['head']['sha']}", "--field", f"dod={raw.decode()}"],
+                            capture_output=True, text=True, check=False)
+    if result.returncode:
+        raise CheckError(f"DoD CI dispatch refused: {result.stdout} {result.stderr}")
+    print(result.stdout, end="")
+    print(f"head: {pr['head']['sha']}\ndod_sha256: {digest(raw)}")
+    return 0
+
+
+def safe_artifact(directory, name):
+    if not isinstance(name, str) or not name or PurePosixPath(name).name != name:
+        raise CheckError("evidence log must name an artifact file, not a path")
+    path = directory / name
+    if path.is_symlink() or not path.is_file():
+        raise CheckError(f"missing ordinary artifact file: {name}")
+    return path.read_bytes()
+
+
+def verify_evidence(args, claims):
+    meta, raw, items = frozen(args.meta.resolve(strict=True))
+    repo, number = github_pr(args.pr)
+    worktree = Path(meta["worktree"])
+    base, head = commit(worktree, args.base), commit(worktree, args.head)
+    pointers = claims.get("items") if isinstance(claims, dict) else None
+    if not isinstance(pointers, list) or {p.get("id") for p in pointers if isinstance(p, dict)} != {i['id'] for i in items} or len(pointers) != len(items):
+        raise CheckError("PASS must carry exactly one resolving pointer for mandatory ids: " + ",".join(item['id'] for item in items))
+    by_id = {item['id']: item for item in items}
+    runs = {}
+    with tempfile.TemporaryDirectory(prefix="fm-dod-resolve-") as scratch:
+        for pointer in pointers:
+            item = by_id[pointer['id']]
+            run_id = str(pointer.get("run_id", claims.get("run_id", "")))
+            if not re.fullmatch(r"[1-9][0-9]*", run_id) or pointer.get("commit", head) != head:
+                raise CheckError(f"{item['id']}: evidence needs a CI run id at the exact PR head")
+            if run_id not in runs:
+                run = forge_api(f"/repos/{repo}/actions/runs/{run_id}")
+                if (str(run.get("id")) != run_id or run.get("event") != "workflow_dispatch"
+                        or run.get("path") != ".github/workflows/dod-evidence.yml"
+                        or run.get("status") != "completed" or run.get("conclusion") != "success"
+                        or run.get("repository", {}).get("full_name") != repo):
+                    raise CheckError(f"{item['id']}: CI run is missing, unfinished, failed, or not the DoD workflow")
+                if run.get("head_sha") != head:
+                    raise CheckError(f"{item['id']}: CI workflow did not run at the exact PR head")
+                artifacts = forge_api(f"/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100")
+                name = f"fm-dod-evidence-{head}"
+                matches = [a for a in artifacts.get("artifacts", []) if a.get("name") == name and not a.get("expired")]
+                if len(matches) != 1 or artifacts.get("total_count", 0) > 100:
+                    raise CheckError("exact-head CI evidence artifact missing, expired, or ambiguous")
+                directory = Path(scratch) / run_id
+                downloaded = subprocess.run(["gh-axi", "run", "download", run_id, "--repo", repo,
+                                             "--name", name, "--dir", str(directory)], capture_output=True, text=True, check=False)
+                if downloaded.returncode:
+                    raise CheckError("cannot download recorded CI evidence artifact")
+                manifest = json.loads(safe_artifact(directory, "results.json"))
+                if (manifest.get("schema") != "fm-dod-evidence.v1" or manifest.get("head") != head
+                        or manifest.get("base") != base or manifest.get("dod_sha256") != digest(raw)
+                        or str(manifest.get("run_id")) != run_id
+                        or str(manifest.get("run_attempt")) != str(run.get("run_attempt"))
+                        or manifest.get("passed") is not True
+                        or safe_artifact(directory, "dod.md") != raw):
+                    raise CheckError("CI artifact does not prove this frozen DoD at this base/head/run attempt")
+                gates = {row.get('id'): row for row in manifest.get('items', [])}
+                required_gates = {i['id'] for i in items if i['fields']['Authority'] == 'gate'}
+                if set(gates) != required_gates:
+                    raise CheckError("CI did not run every mandatory gate command")
+                logs = {}
+                for gate_id, row in gates.items():
+                    if row.get('command') != by_id[gate_id]['command'] or row.get('commit') != head or row.get('exit') != 0:
+                        raise CheckError("CI gate command/result does not match frozen criteria")
+                    logs[row['log']] = row['sha256']
+                expected_tests = set(named_tests(raw.decode())) & set(git(worktree, 'diff', '--name-only', base, head, '--', 'tests').decode().splitlines())
+                tests = manifest.get('tests', [])
+                if {row.get('path') for row in tests} != expected_tests or len(tests) != len(expected_tests):
+                    raise CheckError("CI fail-first evidence omits a changed named test")
+                for test in tests:
+                    if (test.get('passed') is not True or test['base'].get('exit') == 0
+                            or test['base'].get('commit') != base or test['head'].get('exit') != 0
+                            or test['head'].get('commit') != head):
+                        raise CheckError("CI fail-first proof did not fail on base and pass on head")
+                    for phase in ('base', 'head'):
+                        row = test[phase]
+                        if digest(safe_artifact(directory, row['log'])) != row['sha256']:
+                            raise CheckError("CI fail-first log digest does not resolve")
+                    logs[test['head']['log']] = test['head']['sha256']
+                for name, sha in logs.items():
+                    if digest(safe_artifact(directory, name)) != sha:
+                        raise CheckError("CI log digest does not resolve")
+                summary = safe_artifact(directory, 'summary.log')
+                logs['summary.log'] = digest(summary)
+                weakening = json.loads(safe_artifact(directory, 'weakening.json'))
+                if weakening.get('schema') != 'fm-test-weakening.v1' or weakening.get('head') != head or weakening.get('base') != base:
+                    raise CheckError("weakened-test evidence does not match this PR diff")
+                # Recompute flags with trusted local detector too: the reviewer
+                # must explicitly accept each exact removed/raised line.
+                detected = subprocess.run([sys.executable, str(BIN / 'fm-test-weakening.py'), '--repo', str(worktree),
+                                           '--base', base, '--head', head, '--output', str(Path(scratch) / 'weakening.json')],
+                                          capture_output=True, check=False)
+                if detected.returncode not in (0, 1) or json.loads((Path(scratch) / 'weakening.json').read_text()) != weakening:
+                    raise CheckError("CI weakened-test flags do not resolve against the exact diff")
+                rulings = claims.get('rulings', [])
+                if not isinstance(rulings, list) or any(not isinstance(r, dict) for r in rulings):
+                    raise CheckError("reviewer rulings must be a list")
+                ruling_ids = [r.get('id') for r in rulings]
+                if any(not isinstance(value, str) for value in ruling_ids) or len(set(ruling_ids)) != len(ruling_ids):
+                    raise CheckError("each flagged line needs one unambiguous reviewer ruling")
+                accepted = {r.get('id') for r in rulings if r.get('decision') == 'accept' and isinstance(r.get('reason'), str) and r['reason'].strip()}
+                for flag in weakening['flags']:
+                    if flag['id'] not in accepted:
+                        raise CheckError(f"{flag['file']}:{flag['line']} ({flag['id']}): weakened-test line needs an explicit accept ruling and reason in the independent PASS record")
+                runs[run_id] = (gates, logs)
+            gates, logs = runs[run_id]
+            default_log = gates[item['id']]['log'] if item['fields']['Authority'] == 'gate' else 'summary.log'
+            log = pointer.get('log', default_log)
+            if log not in logs or pointer.get('log_sha256', logs[log]) != logs[log]:
+                raise CheckError(f"{item['id']}: PASS log pointer does not resolve")
+            if item['fields']['Authority'] == 'gate' and log != default_log:
+                raise CheckError(f"{item['id']}: gate pointer does not name its exact command log")
+            if 'file' in pointer or 'line' in pointer:
+                file, line = pointer.get('file'), pointer.get('line')
+                if (not isinstance(file, str) or not file or PurePosixPath(file).is_absolute()
+                        or '..' in PurePosixPath(file).parts or type(line) is not int or line < 1):
+                    raise CheckError(f"{item['id']}: invalid commit file:line pointer")
+                mode = git(worktree, 'ls-tree', head, '--', file).decode().split(' ', 1)[0]
+                if mode not in ('100644', '100755') or line > len(git(worktree, 'show', f'{head}:{file}').splitlines()):
+                    raise CheckError(f"{item['id']}: file:line does not exist at the exact PR head")
+    print(f"evidence: resolved head={head} items={len(items)}")
+    return 0
 
 
 def main():
@@ -209,15 +397,32 @@ def main():
             command.add_argument("--base", required=True)
             command.add_argument("--head", required=True)
             command.add_argument("--output", type=Path, required=True)
+    for action in ("dispatch", "verify"):
+        command = sub.add_parser(action)
+        command.add_argument("--meta", type=Path, required=True)
+        command.add_argument("--pr", required=True)
+        if action == "verify":
+            command.add_argument("--base", required=True)
+            command.add_argument("--head", required=True)
+    command = sub.add_parser("freeze")
+    command.add_argument("--brief", type=Path, required=True)
+    command.add_argument("--state", type=Path, required=True)
+    command.add_argument("--task", required=True)
     args = parser.parse_args()
     try:
+        if args.action == "freeze":
+            return freeze(args)
+        if args.action == "dispatch":
+            return dispatch(args)
+        if args.action == "verify":
+            return verify_evidence(args, json.load(sys.stdin))
         raw = args.dod.read_bytes()
         items = items_from(raw.decode())
         if args.action == "run":
             return run(args, raw, items)
         print(f"result: valid\nmandatory_items: {sum(item['mandatory'] for item in items)}\ndod_sha256: {digest(raw)}")
         return 0
-    except (CheckError, OSError, ValueError, tarfile.TarError) as exc:
+    except (CheckError, OSError, ValueError, KeyError, TypeError, tarfile.TarError) as exc:
         print(f"error: {json.dumps(str(exc))}\nhelp: Supply filled criteria with Verify and an exact Check for each gate item.")
         return 1
 

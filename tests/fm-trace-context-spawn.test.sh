@@ -20,6 +20,11 @@ Exercise trace propagation for $2.
 
 ## Firstmate spec
 Verify the spawned process receives the expected trace context.
+
+## Definition Of Done (task)
+### Mandatory items
+$(fm_test_dod_item M1)
+## How You're Graded
 EOF
 }
 

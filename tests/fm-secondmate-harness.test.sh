@@ -1080,6 +1080,7 @@ Exercise an ordinary crew launch.
 ## Firstmate spec
 Verify secondmate harness settings do not affect it.
 EOF
+  printf "\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You're Graded\n" "$(fm_test_dod_item M1)" >> "$home/data/$id/brief.md"
   : > "$launchlog"
   PATH="$fakebin:$BASE_PATH" TMUX="fake,1,0" CLAUDECODE=1 \
     FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \

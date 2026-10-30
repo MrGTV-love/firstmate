@@ -36,9 +36,10 @@
 #   blank exclusion list in a single pass,
 #   then prints the repair, including the unfenced `DoD file: <absolute path>`
 #   line inside that section naming a finished criteria file, which is the only
-#   escape. A
-#   fresh spawn of a brief with no such section warns once on stderr and
-#   proceeds. A relaunch re-checks only the Task bodies, because the Definition
+#   escape. A fresh ship/scout requires that section and usable mandatory items.
+#   bin/fm-dod-check.py's header owns the dispatch snapshot and digest contract;
+#   bin/fm-dod-lib.sh --shape owns mandatory fields and gate commands.
+#   A relaunch re-checks only the Task bodies, because the Definition
 #   of Done and its exclusion list were accepted at the fresh spawn; a secondmate
 #   charter never reaches
 #   the check (bin/fm-dod-lib.sh owns it).
@@ -4467,9 +4468,11 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     if fm_brief_task_heading_present "$BRIEF" "### Out of scope"; then
       "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-out-of-scope allow --cleared-by proceed 2>/dev/null || true
     fi
-    if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
-      echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
-    fi
+    # State records are outside the PR branch and protected from worker writes.
+    # Capture the exact selected bytes before launching any worker process.
+    DOD_SNAPSHOT=$(python3 "$SCRIPT_DIR/fm-dod-check.py" freeze --brief "$BRIEF" --state "$STATE" --task "$ID") || exit 1
+    DOD_FROZEN_FILE=$(printf '%s\n' "$DOD_SNAPSHOT" | jq -er '.dod_file') || exit 1
+    DOD_FROZEN_SHA256=$(printf '%s\n' "$DOD_SNAPSHOT" | jq -er '.dod_sha256') || exit 1
   elif DISPATCH_PROBLEMS=$(fm_brief_dispatch_problems "$BRIEF" task-only); then
     print_brief_dispatch_refusal "$BRIEF" "$DISPATCH_PROBLEMS"
     "$SCRIPT_DIR/fm-guard-event.sh" spawn-brief-dod-placeholders deny --source-ok true 2>/dev/null || true
@@ -6990,6 +6993,10 @@ preserve_relaunch_meta() {
   echo "project=$PROJ_ABS"
   echo "harness=$HARNESS"
   echo "kind=$KIND"
+  if [ "$RELAUNCH" -eq 0 ] && { [ "$KIND" = ship ] || [ "$KIND" = scout ]; }; then
+    echo "dod_file=$DOD_FROZEN_FILE"
+    echo "dod_sha256=$DOD_FROZEN_SHA256"
+  fi
   [ "$RECONCILE_ONLY" = 0 ] || echo "recovery=reconcile-only"
   [ -z "$MODE" ] || echo "mode=$MODE"
   [ -z "$YOLO" ] || echo "yolo=$YOLO"

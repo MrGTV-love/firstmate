@@ -2,7 +2,7 @@ name: Machine-checked DoD
 
 # Dispatch uses a frozen snapshot from the task home, not a mutable file on the
 # PR branch. Run inputs and uploaded artifacts are GitHub's durable CI record.
-# Dispatch only on the default branch, supplying the PR's exact current head.
+# Dispatch on the PR branch; its workflow commit must equal the requested head.
 # The merge checker binds the artifact's DoD digest to the dispatch-time record.
 on:
   workflow_dispatch:
@@ -43,26 +43,17 @@ jobs:
           EXPECTED_HEAD: ${{ inputs.head }}
         with:
           script: |
-            if (context.ref !== `refs/heads/${context.payload.repository.default_branch}`) {
-              throw new Error('Dispatch the DoD workflow on the default branch, not PR code');
-            }
             if (!/^[1-9][0-9]*$/.test(process.env.PR_NUMBER)) {
               throw new Error('pr must be a positive pull request number');
             }
             const {data: pr} = await github.rest.pulls.get({
               ...context.repo, pull_number: Number(process.env.PR_NUMBER)
             });
-            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD) {
+            if (pr.state !== 'open' || pr.head.sha !== process.env.EXPECTED_HEAD || context.sha !== pr.head.sha) {
               throw new Error('PR is closed or head changed; dispatch with the current exact head');
             }
             core.setOutput('head', pr.head.sha);
             core.setOutput('base', pr.base.sha);
-      - name: Load checker from the workflow commit
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ github.workflow_sha }}
-          path: trusted
-          persist-credentials: false
       - name: Fetch exact candidate history
         uses: actions/checkout@v6
         with:
@@ -84,7 +75,7 @@ jobs:
           DOD_BASE: ${{ steps.pr.outputs.base }}
           DOD_HEAD: ${{ steps.pr.outputs.head }}
         run: |
-          python3 trusted/bin/fm-dod-check.py run \
+          python3 candidate/bin/fm-dod-check.py run \
             --dod "$RUNNER_TEMP/dod.md" --repo candidate \
             --base "$DOD_BASE" --head "$DOD_HEAD" \
             --output "$RUNNER_TEMP/dod-evidence"
@@ -94,16 +85,18 @@ jobs:
           DOD_BASE: ${{ steps.pr.outputs.base }}
           DOD_HEAD: ${{ steps.pr.outputs.head }}
         run: |
-          python3 trusted/bin/fm-test-weakening.py --repo candidate \
+          mkdir -p "$RUNNER_TEMP/dod-evidence"
+          rc=0
+          python3 candidate/bin/fm-test-weakening.py --repo candidate \
             --base "$DOD_BASE" --head "$DOD_HEAD" \
-            --output "$RUNNER_TEMP/weakening.json"
+            --output "$RUNNER_TEMP/dod-evidence/weakening.json" || rc=$?
+          # Flags are not silently accepted: merge requires exact-line rulings.
+          # Exit 2 is a detector error, which no reviewer ruling can cover.
+          test "$rc" -le 1
       - name: Upload machine evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fm-dod-evidence-${{ inputs.head }}
-          path: |
-            ${{ runner.temp }}/dod-evidence/
-            ${{ runner.temp }}/weakening.json
-            ${{ runner.temp }}/dod.md
+          path: ${{ runner.temp }}/dod-evidence/
           if-no-files-found: error

@@ -585,6 +585,7 @@ Exercise Antigravity dispatch.
 ## Firstmate spec
 Verify launch and delivery behavior.
 EOF
+  printf "\n## Definition Of Done (task)\n### Mandatory items\n%s\n## How You're Graded\n" "$(fm_test_dod_item M1)" >> "$home/data/$id/brief.md"
   printf 'agy\n' > "$home/config/crew-harness"
   mkdir -p "$home/.gemini/antigravity-cli"
   printf '%s\n' '{"model":"Gemini 3.8 Flash (High)","trustedWorkspaces":["/home/someone/elsewhere"]}' \

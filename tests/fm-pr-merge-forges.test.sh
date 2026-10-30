@@ -22,7 +22,7 @@ test_bundled_repo_override_args_refuse_before_recording() {
   local case_dir rc
   case_dir=$(make_case bundled-repo-override)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" abababababababababababababababababababab
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -63,7 +63,7 @@ test_bundled_repo_override_args_refuse_before_recording() {
   # cluster is still the caller's business and still reaches the forge.
   case_dir=$(make_case bundled-non-repo-cluster)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -77,7 +77,7 @@ test_bundled_repo_override_args_refuse_before_recording() {
 
   case_dir=$(make_case bundled-delete-attended)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/8 --attended-override -- -d \
     > "$case_dir/stdout" 2> "$case_dir/stderr" \
     || fail "bundled-delete-attended: attended override should merge"
@@ -89,7 +89,7 @@ test_explicit_merge_method_not_overridden() {
   local case_dir
   case_dir=$(make_case explicit-merge-method)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 5555555555555555555555555555555555555555
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/22 -- --merge \
@@ -103,7 +103,7 @@ test_method_equals_merge_method_not_overridden() {
   local case_dir
   case_dir=$(make_case method-equals-merge-method)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 7777777777777777777777777777777777777777
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/23 -- --method=merge \
@@ -117,7 +117,7 @@ test_parses_pr_url_for_gh_axi() {
   local case_dir
   case_dir=$(make_case url-parsing)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 6666666666666666666666666666666666666666
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   run_pr_merge "$case_dir" task-x1 https://github.com/my-org/my-repo/pull/126 \
@@ -131,7 +131,7 @@ test_github_still_forwards_sha_arg() {
   local case_dir rc
   case_dir=$(make_case github-sha-arg)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" dddddddddddddddddddddddddddddddddddddddd
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
 
   set +e
@@ -814,7 +814,7 @@ test_secondmate_merge_reports_upward_once() {
   local case_dir replies url
   url=https://github.com/example/repo/pull/61
   case_dir=$(make_home_case secondmate-merge-reports remote)
-  add_gh_mocks "$case_dir" 5555555555555555555555555555555555555555
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
   replies="$case_dir/state/parent-replies.status"
 
@@ -846,7 +846,7 @@ test_secondmate_merge_reports_on_the_local_route() {
   url=https://github.com/example/repo/pull/62
   case_dir=$(make_home_case secondmate-merge-local local "$TMP_ROOT/secondmate-merge-local/parent")
   mkdir -p "$TMP_ROOT/secondmate-merge-local/parent/state"
-  add_gh_mocks "$case_dir" 6666666666666666666666666666666666666666
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
   parent_status="$TMP_ROOT/secondmate-merge-local/parent/state/mate-x.status"
 
@@ -899,7 +899,7 @@ test_queued_gitlab_merge_leaves_the_poll_armed() {
 test_failed_merge_reports_nothing() {
   local case_dir rc
   case_dir=$(make_home_case failed-merge-silent remote)
-  add_gh_mocks_merge_fails "$case_dir"
+  add_gh_mocks_merge_fails "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
 
   set +e
@@ -941,7 +941,7 @@ test_main_home_merge_leaves_a_durable_wake() {
   local case_dir url
   url=https://github.com/example/repo/pull/64
   case_dir=$(make_home_case main-merge-wake)
-  add_gh_mocks "$case_dir" 7777777777777777777777777777777777777777
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
 
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$url" \
@@ -960,7 +960,7 @@ test_queued_github_merge_leaves_the_poll_armed() {
   local case_dir url
   url=https://github.com/example/repo/pull/66
   case_dir=$(make_home_case queued-github-merge)
-  add_gh_mocks "$case_dir" 9999999999999999999999999999999999999999
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   write_github_outcome "$case_dir" OPEN false true main
   : >"$case_dir/gh-axi.log"
 
@@ -983,7 +983,7 @@ test_distinct_merged_prs_keep_distinct_wakes() {
   first_url=https://github.com/example/repo/pull/68
   second_url=https://github.com/example/repo/pull/69
   case_dir=$(make_home_case distinct-merge-wakes)
-  add_gh_mocks "$case_dir" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
 
   FM_TEST_HOME="$case_dir/home" run_pr_merge "$case_dir" task-x1 "$first_url" \
@@ -1017,7 +1017,7 @@ test_uncommitted_marker_retry_is_never_silent() {
   local case_dir url count
   url=https://github.com/example/repo/pull/67
   case_dir=$(make_home_case uncommitted-wake-retry)
-  add_gh_mocks "$case_dir" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
   cat >"$case_dir/fakebin/mv" <<'SH'
 #!/usr/bin/env bash
@@ -1064,7 +1064,7 @@ test_secondmate_without_parent_binding_is_loud() {
   local case_dir rc url
   url=https://github.com/example/repo/pull/65
   case_dir=$(make_home_case unbound-secondmate)
-  add_gh_mocks "$case_dir" 8888888888888888888888888888888888888888
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : >"$case_dir/gh-axi.log"
   # A secondmate identity with no parent binding: exactly the seeding gap that
   # let three real merges land in silence.
@@ -1093,7 +1093,7 @@ test_absent_backlog_still_merges() {
   local case_dir rc
   case_dir=$(make_case absent-backlog-merges)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 6161616161616161616161616161616161616161
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/data/backlog.md"
 
@@ -1114,7 +1114,7 @@ test_unreadable_backlog_refuses_the_merge() {
   local case_dir rc
   case_dir=$(make_case unreadable-backlog-refuses)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 6262626262626262626262626262626262626262
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   chmod 000 "$case_dir/home/data/backlog.md"
 
@@ -1137,7 +1137,7 @@ test_unreadable_backend_config_refuses_the_merge() {
   local case_dir rc
   case_dir=$(make_case unreadable-backend-config-refuses)
   mkdir -p "$case_dir/wt"
-  add_gh_mocks "$case_dir" 6363636363636363636363636363636363636363
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/data/backlog.md"
   chmod 000 "$case_dir/home/.tasks.toml"
@@ -1162,7 +1162,7 @@ test_unreadable_user_backend_config_refuses_the_merge() {
   case_dir=$(make_case unreadable-user-backend-config-refuses)
   user_config="$case_dir/user-home/.tasks-axi/config.toml"
   mkdir -p "$case_dir/wt" "${user_config%/*}"
-  add_gh_mocks "$case_dir" 6464646464646464646464646464646464646464
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
   printf '%s\n' 'backend = "beads"' > "$user_config"
@@ -1189,7 +1189,7 @@ test_untraversable_user_backend_config_directory_refuses_the_merge() {
   case_dir=$(make_case untraversable-user-backend-config-directory-refuses)
   user_config="$case_dir/user-home/.tasks-axi/config.toml"
   mkdir -p "$case_dir/wt" "${user_config%/*}"
-  add_gh_mocks "$case_dir" 6666666666666666666666666666666666666666
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
   printf '%s\n' 'backend = "beads"' > "$user_config"
@@ -1215,7 +1215,7 @@ test_absent_user_backend_config_directory_and_backlog_still_merge() {
   local case_dir rc
   case_dir=$(make_case absent-user-backend-config-directory-and-backlog-merges)
   mkdir -p "$case_dir/wt" "$case_dir/user-home"
-  add_gh_mocks "$case_dir" 6767676767676767676767676767676767676767
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
 
@@ -1238,7 +1238,7 @@ test_backend_override_bypasses_unreadable_user_config() {
   case_dir=$(make_case backend-override-bypasses-unreadable-user-config)
   user_config="$case_dir/user-home/.tasks-axi/config.toml"
   mkdir -p "$case_dir/wt" "${user_config%/*}"
-  add_gh_mocks "$case_dir" 6565656565656565656565656565656565656565
+  add_gh_mocks "$case_dir" "$(git -C "$case_dir/wt" rev-parse HEAD)"
   : > "$case_dir/gh-axi.log"
   rm -f "$case_dir/home/.tasks.toml" "$case_dir/home/data/backlog.md"
   printf '%s\n' 'backend = "beads"' > "$user_config"
@@ -1262,6 +1262,7 @@ test_github_red_checks_refuse_and_allow_red_waives_named() {
   head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   case_dir=$(make_case github-red-checks)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
 
@@ -1278,6 +1279,7 @@ test_github_red_checks_refuse_and_allow_red_waives_named() {
 
   case_dir=$(make_case github-allow-red)
   mkdir -p "$case_dir/wt"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
   add_gh_mocks "$case_dir" "$head"
   write_github_red_json "$case_dir" "$head" lint
   run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/81 \
@@ -1295,6 +1297,7 @@ test_multi_pr_task_merges_named_pr_when_copy_head_is_a_local_tip() {
   local case_dir tip forge_head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   case_dir=$(make_direct_pr_local_tip_case multi-pr-local-tip)
   tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  forge_head=$(git -C "$case_dir/wt" rev-parse refs/remotes/origin/fm/fixture)
   add_gh_mocks "$case_dir" "$forge_head"
   write_ready_reports "$case_dir" \
     https://github.com/example/repo/pull/3196 \

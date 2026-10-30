@@ -323,6 +323,11 @@ $intent
 
 ## Firstmate spec
 Exercise the spawn behavior under test.
+
+## Definition Of Done (task)
+### Mandatory items
+$(fm_test_dod_item M1)
+## How You're Graded
 EOF
 }
 
