@@ -3105,6 +3105,13 @@ make_superseded_pool_case() {  # <name> <current-state-json>
   printf '%s\n' "$pool_json" > "$SUPER_NEW_STATE"
 }
 
+# Every file of a copy with its content hash, then its HEAD, branch and status,
+# so two snapshots compare equal only when no byte of the work changed.
+superseded_copy_snapshot() {  # <copy>
+  (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 \
+    && git rev-parse HEAD && git symbolic-ref -q HEAD && git status --porcelain=v1 -uall)
+}
+
 # A finished, idle scout in a pool slot that the idle reaper selects, with an
 # endpoint whose close waits until the test holds the project lock.
 make_idle_reap_pool_case() {  # <name>

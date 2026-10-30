@@ -2392,6 +2392,60 @@ test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks
   pass 'a lease this task took on a same-named slot of the current pool is released by the conditional return, and no other holder is touched'
 }
 
+# The misdirected lease is the one an earlier teardown took with the recorded
+# slot's NAME. Another reservation of the current pool that this task also
+# holds, under a different name, is not that lease: it stays exactly as it was.
+test_wrong_lease_repair_releases_only_the_same_named_slot() {
+  local case_dir rc
+  make_superseded_pool_case pool-wrong-lease-two-own \
+    '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":true,"lease_holder":"task-x1"}]}'
+  case_dir=$SUPER_CASE
+  jq -c '.worktrees[1]' "$SUPER_NEW_STATE" > "$case_dir/slot2.before"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "teardown must finish: $(cat "$case_dir/stderr")"
+  assert_equals 1 "$(grep -c "^return $SUPER_NEW1 --if-lease-holder task-x1\$" "$case_dir/treehouse.log" || true)" \
+    'the same-named misdirected lease was not released through the conditional return'
+  assert_no_grep "$SUPER_NEW2" "$case_dir/treehouse.log" 'teardown acted on a reservation that does not share the recorded slot name'
+  jq -e '.worktrees[0].leased == false' "$SUPER_NEW_STATE" >/dev/null \
+    || fail "the same-named misdirected lease is still held: $(cat "$SUPER_NEW_STATE")"
+  jq -c '.worktrees[1]' "$SUPER_NEW_STATE" | cmp -s "$case_dir/slot2.before" - \
+    || fail "teardown changed the other reservation this task holds: $(cat "$SUPER_NEW_STATE")"
+  assert_absent "$case_dir/state/task-x1.meta" 'teardown kept the task record'
+  pass 'only the current-pool slot that shares the recorded slot name is released; another lease this task holds stays byte-identical'
+}
+
+# The route for a copy in an older pool folder is ordinary teardown: the
+# landed-work test runs first, unchanged, and only a copy it proves landed
+# reaches a return or a lease release. A copy holding unique unlanded work is
+# refused before either, so the copy, both pool folders' state and this task's
+# misdirected lease stay byte-identical.
+test_unlanded_work_in_an_older_pool_folder_is_refused_before_any_return() {
+  local case_dir rc
+  make_superseded_pool_case pool-superseded-unique-work \
+    '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":false}]}'
+  case_dir=$SUPER_CASE
+  printf 'unique work\n' > "$SUPER_SLOT/unique.txt"
+  git -C "$SUPER_SLOT" add unique.txt
+  git -C "$SUPER_SLOT" -c user.email=t@t -c user.name=t commit -q -m 'unique unlanded work'
+  printf 'unsaved edit\n' > "$SUPER_SLOT/unsaved.txt"
+  superseded_copy_snapshot "$SUPER_SLOT" > "$case_dir/copy.before"
+  cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/old.before"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail 'ordinary teardown accepted unique unlanded work in an older pool folder'
+  assert_no_log_line '^(lease|return) ' "$case_dir/treehouse.log" 'the refusal leased, returned or released a slot'
+  superseded_copy_snapshot "$SUPER_SLOT" | cmp -s "$case_dir/copy.before" - \
+    || fail 'the refusal changed the copy holding unlanded work'
+  cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail "the refusal changed the current pool: $(cat "$SUPER_NEW_STATE")"
+  cmp -s "$case_dir/old.before" "$case_dir/pool/treehouse-state.json" || fail 'the refusal changed the older pool folder state'
+  assert_present "$case_dir/state/task-x1.meta" 'the refusal removed the task record'
+  pass 'unique unlanded work in an older pool folder is refused before any return or lease release, and every byte stays as it was'
+}
+
 # The landed-work test is unchanged for a copy in a superseded pool folder:
 # dirt or an unlanded commit refuses with nothing leased, returned or removed,
 # and the clean retry then finishes through the same path-exact return.
@@ -3178,7 +3232,9 @@ test_unprovable_pool_state_keeps_project_custody_through_return
 test_teardown_follows_the_installed_treehouse_lease_support
 test_superseded_pool_copy_tears_down_without_touching_the_current_pool
 test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks
+test_wrong_lease_repair_releases_only_the_same_named_slot
 test_unlanded_superseded_pool_copy_is_refused_and_the_landed_retry_finishes
+test_unlanded_work_in_an_older_pool_folder_is_refused_before_any_return
 test_unreadable_pool_status_never_leases_by_name
 test_current_pool_copy_tears_down_without_a_status_listing
 test_current_pool_proof_asks_treehouse
