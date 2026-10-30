@@ -1,0 +1,12 @@
+HEAD=0986fe33da246e4fe710b08f2337617df3ccd187 2026-10-30T02:07:23Z python=Python 3.13.6 caller soft/hard nproc=10666/16000
+$ bin/fm-proc-budget.sh --memory-kib 131072 -- python3 -c "<allocate 200 MiB, sleep 30>"
+fm-proc-budget: command tree exceeded 131072 KiB memory limit at 218608 KiB; ended
+[exit 99]
+$ bin/fm-proc-budget.sh --memory-kib 262144 -- python3 -c "<allocate 32 MiB, exit 7>"
+[exit 7]
+$ bin/fm-proc-budget.sh --memory-kib 262144 -- bash -c "ulimit -S -u; ulimit -H -u"   (real default UID budget, no stub)
+soft=2780 hard=2780
+[exit 0]
+$ bin/fm-proc-budget.sh --memory-kib 0 -- true
+fm-proc-budget: memory limit must be a positive decimal integer in KiB
+[exit 2]
