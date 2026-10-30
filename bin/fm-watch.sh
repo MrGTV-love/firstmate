@@ -2378,12 +2378,13 @@ fm_check_group_wait() {  # <pgid> <polls>
 # Wait longer than its own worst-case cleanup, so a responsive launcher always
 # exits only after its guardian has cleaned the check; only an unresponsive one
 # reaches the caller's KILL, after which its guardian still sees owner EOF.
-# The bound is wall-clock hundredths: a loaded host stretches each poll's sleep.
+# The bound counts 0.01 s polls, never fewer than its nominal hundredths: a
+# loaded host stretches each poll's sleep, so load only lengthens the wait.
 fm_check_pid_wait() {  # <pid> <hundredths>
   local hundredths=$(($2 % 100))
   kill -0 "$1" 2>/dev/null || return 0
   if command -v perl >/dev/null 2>&1; then
-    perl -MTime::HiRes=time -e 'my ($pid, $hundredths) = @ARGV; my $end = time + $hundredths / 100; while (kill(0, $pid) && time < $end) { select undef, undef, undef, 0.01 }' "$1" "$2"
+    perl -e 'my ($pid, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, $pid); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
   else
     [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
     sleep "$(($2 / 100)).$hundredths"

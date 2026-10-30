@@ -1541,6 +1541,8 @@ custom_snapshot_signal_case() {  # <responsive|stopped>
   # a stopped launcher; the guardian then gives TERM-resistant work
   # TERM_SECONDS. The 2 s test margin covers interpreter starts and scheduling.
   # This is a bound on requested shutdown, never on normally progressing work.
+  # Each tenth is ten 0.01 s polls, the unit the watcher's launcher wait
+  # counts, so host load stretches this wait as much as the watcher's.
   allowances=$(python3 -c 'import math, runpy, sys
 proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
 print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 10), math.ceil(proc["TERM_SECONDS"] * 10))' \
@@ -1606,7 +1608,7 @@ SH
   i=0
   while { process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
       || process_is_live_non_zombie "$child_pid"; } && [ "$i" -lt "$stop_polls" ]; do
-    sleep 0.1
+    perl -e 'select undef, undef, undef, 0.01 for 1 .. 10'
     i=$((i + 1))
   done
   if process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
