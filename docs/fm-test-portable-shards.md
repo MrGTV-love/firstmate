@@ -358,7 +358,7 @@ A `tests/` helper that at least half of the tests load (today `tests/lib.sh` and
 A push to `main`, a manual run that names no `base`, a pull request labeled `ci-full`, a checkout that is not a pull request merge commit, a change to `tests/lib.sh`, `bin/fm-test-run.sh`, `bin/fm-test-select.py` or anything under `.github/`, a change that reaches nine tenths of the tests (a library sourced almost everywhere), a changed path in neither the base nor the head tree, any error reading the tree or the diff, and a selected test that no lane owns.
 The selector prints its reason on every decision and never exits nonzero for a bad guess; the `plan` job also falls back to the full suite when the selector prints nothing.
 To force a full run on a pull request, add the `ci-full` label and push, or run the workflow by hand on the branch.
-A manual run that gives `base` (and optionally `head`) replays the selection for that diff on the checked-out tree instead of running everything.
+A manual run that gives `base` replays the selection for the diff from `base` to the checked-out commit instead of running everything; the diff, the dependency graph and the selected jobs all use that one commit.
 
 **How the plan maps to jobs.**
 `Behavior portable parallel 1`, `Behavior portable parallel 2` and `Behavior tests (Herdr)` run when a selected test belongs to their lane and are skipped otherwise, and each narrows its lane with `--select-file`.

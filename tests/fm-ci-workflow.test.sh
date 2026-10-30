@@ -331,24 +331,60 @@ puts steps.find { |s| s["id"] == "plan" }.fetch("run")
   assert_equals full "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a pull request checkout that is not a merge commit must run the full suite"
   # A manual run that names a base replays the selection for that diff instead:
   # HEAD..HEAD changes nothing, so the replay selects nothing and plans no job.
-  out=$(run_plan_step "$script" workflow_dispatch false HEAD HEAD) || fail "the plan step failed for a replay"
+  out=$(run_plan_step "$script" workflow_dispatch false HEAD) || fail "the plan step failed for a replay"
   assert_equals selected "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a manual run with a base replays the selection"
   assert_equals false "$(printf '%s\n' "$out" | sed -n 's/^any_lane=//p' | head -n 1)" "an empty diff plans no behavior job"
   assert_equals 0 "$(printf '%s\n' "$out" | sed -n 's/^serial_count=//p' | head -n 1)" "and no serial shard"
   pass "pushes, manual runs, the ci-full label and an unmergeable checkout plan the full suite, and a manual replay plans the diff it is given"
 }
 
+# A replay diffs the given base against the checked-out HEAD, builds the graph
+# from that same tree and plans the jobs that tree's runner owns. The checkout
+# here is a copy of this tree with one more commit that edits a file a few tests
+# read and deletes one of those tests: the deleted test must not be selected and
+# every other reader must be, whatever stale head value the environment holds.
+test_a_replay_diffs_graphs_and_plans_the_checked_out_head() {
+  local script checkout probe=.tasks.toml readers victim expected out
+  script=$(ruby -ryaml -e '
+steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch("plan").fetch("steps")
+puts steps.find { |s| s["id"] == "plan" }.fetch("run")
+' "$CI_WORKFLOW") || fail "could not read the plan step"
+  checkout="$(fm_test_tmproot fm-ci-replay)/checkout"
+  mkdir -p "$checkout"
+  git -C "$ROOT" ls-files -z | tar -C "$ROOT" --null -T - -cf - 2>/dev/null | tar -C "$checkout" -xf -
+  assert_present "$checkout/bin/fm-test-select.py" "the checkout copy is missing the selector"
+  fm_git_identity
+  git -C "$checkout" init -q -b main
+  git -C "$checkout" add -A
+  git -C "$checkout" commit -q -m base || fail "could not commit the checkout's base"
+  readers=$(printf '%s\n' "$probe" | (cd "$checkout" && python3 bin/fm-test-select.py --paths-from -) | sed -n 's/^test=//p')
+  victim=$(printf '%s\n' "$readers" | grep -vx tests/fm-ci-workflow.test.sh | head -n 1)
+  [ -n "$victim" ] && [ "$(printf '%s\n' "$readers" | grep -c .)" -ge 2 ] \
+    || fail "$probe must be read by at least two tests for this check, got: $readers"
+  expected=$(printf '%s\n' "$readers" | grep -vx "$victim")
+  printf '\n' >>"$checkout/$probe"
+  git -C "$checkout" rm -q "$victim"
+  git -C "$checkout" commit -q -a -m head || fail "could not commit the checkout's head"
+  out=$(FM_REPLAY_HEAD=$(git -C "$checkout" rev-parse HEAD~1) \
+    run_plan_step "$script" workflow_dispatch false HEAD~1 "$checkout") || fail "the plan step failed for a replay"
+  assert_equals selected "$(printf '%s\n' "$out" | sed -n 's/^mode=//p' | head -n 1)" "a replay of a one-file change is a partial selection"
+  assert_equals "$expected" "$(printf '%s\n' "$out" | sed -n '/^selection<</,/^FM_SELECTION_END$/p' | sed '1d;$d')" \
+    "the replay selects every remaining reader of $probe and not the test HEAD deleted"
+  assert_equals true "$(printf '%s\n' "$out" | sed -n 's/^any_lane=//p' | head -n 1)" "the checkout's runner plans the selected tests"
+  pass "a manual replay diffs, graphs and plans the checked-out HEAD"
+}
+
 # Run the plan step's script in a scratch output directory and print what it
-# would write to $GITHUB_OUTPUT. It runs from the repository root, as CI does.
-run_plan_step() {  # <script> <event> <label> [<replay-base> <replay-head>]
+# would write to $GITHUB_OUTPUT. It runs from the repository root, as CI does,
+# or from the given checkout.
+run_plan_step() {  # <script> <event> <label> [<replay-base> [<checkout>]]
   local scratch
   scratch=$(fm_test_tmproot fm-ci-plan)
   : >"$scratch/output"
   : >"$scratch/summary"
   (
-    cd "$ROOT" || exit 1
-    RUNNER_TEMP="$scratch" FM_EVENT_NAME=$2 FM_FULL_LABEL=$3 \
-      FM_REPLAY_BASE=${4:-} FM_REPLAY_HEAD=${5:-} \
+    cd "${5:-$ROOT}" || exit 1
+    RUNNER_TEMP="$scratch" FM_EVENT_NAME=$2 FM_FULL_LABEL=$3 FM_REPLAY_BASE=${4:-} \
       GITHUB_OUTPUT="$scratch/output" GITHUB_STEP_SUMMARY="$scratch/summary" \
       bash -c "$1" >/dev/null 2>&1
   ) || return 1
@@ -398,6 +434,7 @@ RUBY
 test_ci_matrices_match_executable_partitions
 test_every_behavior_test_job_is_planned
 test_the_full_suite_runs_for_pushes_manual_runs_and_the_force_label
+test_a_replay_diffs_graphs_and_plans_the_checked_out_head
 test_pr_pushes_supersede_within_one_pr
 test_separate_prs_do_not_cancel_each_other
 test_main_pushes_coalesce_without_cancelling

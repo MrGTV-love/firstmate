@@ -82,7 +82,7 @@ exit 0'
 decide() {
   local repo=$1 base=$2
   shift 2
-  python3 -I "$SELECT" --repo "$repo" --base "$base" --head HEAD "$@"
+  python3 -I "$SELECT" --repo "$repo" --base "$base" "$@"
 }
 
 field() {  # <decision> <key>
@@ -194,7 +194,7 @@ test_an_unknown_path_selects_the_full_suite() {
 test_a_selector_error_selects_the_full_suite_and_still_exits_zero() {
   local repo out rc
   repo=$(new_repo broken)
-  out=$(python3 -I "$SELECT" --repo "$repo" --base no-such-revision --head HEAD)
+  out=$(python3 -I "$SELECT" --repo "$repo" --base no-such-revision)
   rc=$?
   assert_equals 0 "$rc" "a failure to read the diff must not look like a crash"
   assert_equals full "$(field "$out" mode)" "an unreadable base must select the full suite"

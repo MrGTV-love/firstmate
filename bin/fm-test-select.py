@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Select the behavior tests a change can affect, from real file dependencies.
 
-Usage: fm-test-select.py [--repo DIR] [--base REV] [--head REV]
-                         [--paths-from FILE] [--explain] [--full REASON]
+Usage: fm-test-select.py [--repo DIR] [--base REV] [--paths-from FILE]
+                         [--explain] [--full REASON]
 
 Prints one decision on stdout, as "key=value" lines a shell can read:
   mode=full|selected
@@ -18,8 +18,8 @@ mistake a crash for "run nothing": any error while reading the tree or the diff
 prints mode=full with the error as the reason (fail closed). Exit 2 is for bad
 usage only.
 
-The changed paths come from "git diff --name-status --no-renames BASE HEAD"
-(HEAD defaults to the checked-out commit), or one path per line from
+The changed paths come from "git diff --name-status --no-renames BASE HEAD",
+where HEAD is the checked-out commit whose tree is read, or one path per line from
 --paths-from (- reads stdin). A rename therefore counts as a deletion plus an
 addition.
 
@@ -822,10 +822,9 @@ def changed_paths(args):
         return sorted({line.strip() for line in raw.splitlines() if line.strip()}), set()
     if not args.base:
         raise Fail("no --base and no --paths-from")
-    head = args.head or "HEAD"
-    for rev in (args.base, head):
+    for rev in (args.base, "HEAD"):
         git(args.repo, "rev-parse", "--verify", "--quiet", rev + "^{commit}")
-    out = git(args.repo, "diff", "--name-status", "--no-renames", "-z", args.base, head)
+    out = git(args.repo, "diff", "--name-status", "--no-renames", "-z", args.base, "HEAD")
     fields = out.decode("utf-8", "replace").split("\0")
     paths, deleted = set(), set()
     for i in range(0, len(fields) - 1, 2):
@@ -885,7 +884,6 @@ def main(argv):
     parser = argparse.ArgumentParser(prog="fm-test-select.py")
     parser.add_argument("--repo", default=".")
     parser.add_argument("--base")
-    parser.add_argument("--head")
     parser.add_argument("--paths-from")
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--full", metavar="REASON")

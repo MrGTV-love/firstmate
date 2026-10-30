@@ -6,16 +6,12 @@ on:
   pull_request:
     branches: [main]
   # A manual run runs the full suite on any ref. Giving a base replays the test
-  # selection for the diff from that revision instead, which previews what a pull
-  # request of that diff would run.
+  # selection for the diff from that revision to the commit being run instead,
+  # which previews what a pull request of that diff would run.
   workflow_dispatch:
     inputs:
       base:
         description: Replay the selection for the diff from this revision (empty runs the full suite)
-        required: false
-        default: ''
-      head:
-        description: The end of the replayed diff (default is the commit being run)
         required: false
         default: ''
 
@@ -74,18 +70,15 @@ jobs:
           FM_EVENT_NAME: ${{ github.event_name }}
           FM_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'ci-full') }}
           FM_REPLAY_BASE: ${{ inputs.base }}
-          FM_REPLAY_HEAD: ${{ inputs.head }}
         run: |
           set -eu
           dir="$RUNNER_TEMP/fm-plan"
           mkdir -p "$dir"
           force=
           base=
-          head=HEAD
           if [ "$FM_EVENT_NAME" = workflow_dispatch ] && [ -n "$FM_REPLAY_BASE" ]; then
             # A manual replay of the selection for a chosen diff.
             base=$FM_REPLAY_BASE
-            head=${FM_REPLAY_HEAD:-HEAD}
           elif [ "$FM_EVENT_NAME" != pull_request ]; then
             force="a $FM_EVENT_NAME run always runs the full suite"
           elif [ "$FM_FULL_LABEL" = true ]; then
@@ -100,7 +93,7 @@ jobs:
           if [ -n "$force" ]; then
             python3 bin/fm-test-select.py --full "$force" >"$dir/decision" || true
           else
-            python3 bin/fm-test-select.py --base "$base" --head "$head" >"$dir/decision" || true
+            python3 bin/fm-test-select.py --base "$base" >"$dir/decision" || true
           fi
           mode=$(sed -n 's/^mode=//p' "$dir/decision" | head -n 1)
           reason=$(sed -n 's/^reason=//p' "$dir/decision" | head -n 1)
