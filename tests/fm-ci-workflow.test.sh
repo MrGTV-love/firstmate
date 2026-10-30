@@ -284,8 +284,10 @@ RUBY
 # check rather than a pending one, so no required result is left waiting. Each
 # job's `if` and each serial shard's planned total are evaluated against what
 # the runner plans for the full suite, an empty selection and a selection of one
-# portable parallel 1 script and one serial script; a condition this evaluator
-# does not understand fails the check rather than passing it.
+# portable parallel 1 script and one serial script, and the serial shards
+# against the full plan with every shard count from none to all of them; a
+# condition this evaluator does not understand fails the check rather than
+# passing it.
 test_every_behavior_test_job_is_planned() {
   local scratch parallel serial
   scratch=$(fm_test_tmproot fm-ci-planned)
@@ -335,11 +337,24 @@ plans.each do |label, plan|
     raise "#{name} gets total #{total} under the #{label} plan, expected #{plan["serial_count"]}" unless total == plan.fetch("serial_count")
   end
 end
+serial = behavior.grep(/\Atests-portable-serial-/)
+full = plans.to_h.fetch("full")
+(0..serial.length).each do |count|
+  plan = full.merge("serial_count" => count.to_s)
+  running = serial.select { |name| holds(jobs.fetch(name)["if"], plan) }
+  want = (1..count).map { |n| "tests-portable-serial-#{n}" }
+  raise "serial_count=#{count} runs #{running.inspect}, expected #{want.inspect}" unless running.sort == want.sort
+  running.each do |name|
+    shard = jobs.fetch(name).fetch("steps").find { |s| s["uses"] == "./.github/actions/portable-serial-shard" }
+    total = template(shard.fetch("with").fetch("total"), plan)
+    raise "#{name} gets total #{total} when the plan has #{count} shards" unless total == count.to_s
+  end
+end
 %w[lint test-coverage invariants macos-stock-bash].each do |name|
   raise "#{name} runs on every change and must not depend on the plan" if Array(jobs.fetch(name)["needs"]).include?("plan")
 end
 RUBY
-  pass "every behavior-test job runs exactly when the plan asks for it, each shard gets the planned total, and the always-on jobs do not wait for the plan"
+  pass "every behavior-test job runs exactly when the plan asks for it, shards 1..k run with total k for every planned count, and the always-on jobs do not wait for the plan"
 }
 
 # The plan step is the shell that decides full or selected. Run it as written

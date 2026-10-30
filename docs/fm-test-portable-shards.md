@@ -349,7 +349,9 @@ In shell code that means the command word, the file given to `source` or `.`, th
 A name with a variable inside it (`backends/$name.sh`) counts as the files it could mean, up to sixteen.
 The default word of `${NAME:-word}`, `${NAME-word}`, `${NAME:=word}` and `${NAME=word}` counts as a word of its own.
 A path spelled under some other directory (`$dir/code-root/bin/x.sh`, where `code-root/bin` links to `bin/`) names the tracked file with the longest suffix of it that keeps a directory and a name.
-A glob given to `git ls-files`, `git grep` or `git archive`, or a glob literal in Python or JavaScript code that runs `git ls-files`, is a git pathspec: `*` crosses `/` and a bare pattern such as `*.md` matches anywhere in the tree.
+A glob given to `git ls-files`, `git grep` or `git archive` in shell, or a literal in the argument list of a Python or JavaScript `git ls-files` call, is a git pathspec: `*` crosses `/` and a bare pattern such as `*.md` matches anywhere in the tree.
+A glob literal elsewhere in that code (a comment marker such as `'*'`) is not a pathspec.
+A pathspec in such an argument list that is not a literal (a variable or a spread such as `*patterns`) could match anything, so the code depends on every tracked file, unless the call lists only untracked files (`--others` without `--cached`).
 A here-document given to an interpreter as its script (`python3 - <<PY`) is read as code in that language.
 A root-level file such as `AGENTS.md`, or a whole directory, counts only when it is named through a repository-root variable (`$ROOT`, `$FM_ROOT`) or a command substitution, because the same name under `$home` or `$repo` belongs to a fixture.
 A `bash -c` argument counts only where the inline code runs it.
@@ -374,7 +376,7 @@ A skipped job is reported by the forge as skipped under its own name, which sati
 Lint, the coverage guard, the invariants and the stock macOS Bash job do not depend on the plan and always run.
 
 **What it cannot see.**
-A path built at run time from pieces the code does not spell out, a file named only inside a longer string that a program later parses, a file reached through a program's own search path or an environment variable, a directory listed from a bare name with no path around it, a here-document piped into an interpreter rather than given to it as its script, a pathspec a program builds from data it reads, a call whose script is passed to a shell function that runs it, and behavior that depends on a file's content but not on its name.
+A path built at run time from pieces the code does not spell out, a file named only inside a longer string that a program later parses, a file reached through a program's own search path or an environment variable, a directory listed from a bare name with no path around it, a here-document piped into an interpreter rather than given to it as its script, a pathspec a shell script holds in a variable, a call whose script is passed to a shell function that runs it, and behavior that depends on a file's content but not on its name.
 It also follows only source and library edges past a shared test helper, so a test that reaches a script only through that helper's teardown is not selected for a change to that script.
 The full run on every push to `main` is the backstop for all of these: a regression the selection missed is caught there, not shipped silently.
 

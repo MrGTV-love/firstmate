@@ -361,7 +361,8 @@ echo deep'
 echo deeper')
   out=$(decide "$repo" "$base" --explain)
   assert_equals tests/k.test.sh "$(picked "$out")" "the test that runs fm-cleanup.sh through its own chain reaches what it starts; the tests that only load the library do not"
-  assert_contains "$out" 'why=bin/fm-deep.sh <- bin/fm-cleanup.sh <- ' "the chain names the script that starts the changed file"
+  assert_contains "$out" 'why=bin/fm-deep.sh <- bin/fm-cleanup.sh <- bin/fm-k2.sh <- bin/fm-k1.sh <- tests/k.test.sh' \
+    "the chain is the test's own run chain, not the library's, past which fm-cleanup.sh starts nothing"
   pass "a script first reached through the shared library is still followed in full from the test's own chain"
 }
 
@@ -418,10 +419,13 @@ echo swept # touched')
 }
 
 # A here-document given to python3 as its script is Python: its string literals
-# name files, and a bare pattern it hands to git ls-files matches anywhere in
-# the tree. A shell command that runs git ls-files with a bare pattern does too.
+# name files, and a pathspec in its git ls-files call matches as git matches
+# it, where a bare pattern matches anywhere in the tree. A glob literal that git
+# never receives (a comment marker) names nothing. A "*" pathspec, and one that
+# is not a literal, name every tracked file, unless the call lists only
+# untracked files. A shell git ls-files with a bare pattern matches the tree too.
 test_an_interpreter_here_document_and_a_git_pathspec_name_files() {
-  local repo base out
+  local repo base out n script
   repo=$(new_repo pathspec)
   put "$repo" data/inventory.json '{}'
   put "$repo" docs/guide.md '# guide'
@@ -432,33 +436,52 @@ cd "$ROOT"
 exec python3 - "$@" <<'"'"'PY'"'"'
 import json
 import subprocess
-PATTERNS = ["*.md"]
 inventory = json.load(open("data/inventory.json"))
-listed = subprocess.run(["git", "ls-files", "-z", "--", *PATTERNS], stdout=subprocess.PIPE, check=True)
+listed = subprocess.run(["git", "ls-files", "-z", "--", "*.md"], stdout=subprocess.PIPE, check=True)
+for line in listed.stdout.decode().split("\0"):
+    if line.startswith(("*", "/*")):
+        continue
 PY'
   put "$repo" bin/fm-conflist.sh '#!/usr/bin/env bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 git -C "$ROOT" ls-files -- '"'"'*.cfg'"'"''
-  put "$repo" tests/p1.test.sh '#!/usr/bin/env bash
+  put "$repo" bin/fm-everything.py 'import subprocess
+subprocess.run(["git", "ls-files", "--", "*"], check=True)'
+  put "$repo" bin/fm-listing.py 'import subprocess
+import sys
+def listed(patterns):
+    return subprocess.run(["git", "ls-files", "-z", "--", *patterns], check=True)
+listed(sys.argv[1:])'
+  put "$repo" bin/fm-untracked.py 'import subprocess
+import sys
+subprocess.run(["git", "ls-files", "--others", "--exclude-standard", "--", *sys.argv[1:]], check=True)'
+  for n in 1 2 3 4 5; do
+    case "$n" in
+      1) script=fm-doccheck.sh ;; 2) script=fm-conflist.sh ;; 3) script=fm-everything.py ;;
+      4) script=fm-listing.py ;; 5) script=fm-untracked.py ;;
+    esac
+    put "$repo" "tests/p$n.test.sh" '#!/usr/bin/env bash
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-"$ROOT/bin/fm-doccheck.sh"'
-  put "$repo" tests/p2.test.sh '#!/usr/bin/env bash
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-"$ROOT/bin/fm-conflist.sh"'
+"$ROOT/bin/'"$script"'"'
+  done
   commit_all "$repo" pathspec
   base=$(change "$repo" data/inventory.json '{"changed": true}')
   out=$(decide "$repo" "$base")
-  assert_equals tests/p1.test.sh "$(picked "$out")" "the Python here-document reads data/inventory.json"
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+    "the Python here-document reads data/inventory.json, and the * and non-literal pathspecs list it"
   base=$(change "$repo" docs/guide.md '# changed guide')
   out=$(decide "$repo" "$base")
-  assert_equals tests/p1.test.sh "$(picked "$out")" "the bare *.md handed to git ls-files lists docs/guide.md"
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+    "the bare *.md handed to git ls-files lists docs/guide.md"
   base=$(change "$repo" README.md '# changed fixture')
   out=$(decide "$repo" "$base")
-  assert_equals tests/p1.test.sh "$(picked "$out")" "and the root-level README.md"
+  assert_equals "tests/p1.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+    "and the root-level README.md"
   base=$(change "$repo" conf/z.cfg 'changed')
   out=$(decide "$repo" "$base")
-  assert_equals tests/p2.test.sh "$(picked "$out")" "git ls-files '*.cfg' in shell lists conf/z.cfg"
-  pass "an interpreter's here-document is read as its language, and a bare git pathspec matches the whole tree"
+  assert_equals "tests/p2.test.sh tests/p3.test.sh tests/p4.test.sh" "$(picked "$out" | tr '\n' ' ' | sed 's/ $//')" \
+    "git ls-files '*.cfg' in shell lists conf/z.cfg; the '*' and '/*' markers git never receives and the untracked-only listing do not"
+  pass "an interpreter's here-document is read as its language, git ls-files pathspecs match as git matches them, and a glob git never receives names nothing"
 }
 
 test_explain_prints_the_chain_from_the_change_to_the_test() {

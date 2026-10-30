@@ -49,7 +49,10 @@ on file B when A runs, sources, copies, reads or lists B:
   - tests/*.test.sh also depend on every file their text mentions, because a
     test may assert on a file it never runs;
   - Python, JavaScript and TypeScript depend on every whole string literal that
-    names a file; in code that runs git ls-files a glob literal is a pathspec.
+    names a file. In the argument list of a git ls-files call a literal
+    pathspec matches as git matches it, and one that is not a literal (a
+    variable, a spread) names every tracked file, unless the call lists only
+    untracked files.
 A test is affected by a changed file when that file is reachable from the test
 through code files. Documents, data and other non-code files are leaves,
 because mentioning a script inside a document never runs it. Tests are
@@ -80,7 +83,7 @@ only inside a longer string that a program later parses, a script passed to a
 shell function that runs it, a file reached only through a program's own search
 path or an environment variable's value, a directory listed from a bare name
 with no path around it, a here-document piped into an interpreter rather than
-given to it as its script, a pathspec a program builds from data, what a shared test helper's teardown starts beyond the
+given to it as its script, a pathspec a shell script holds in a variable, what a shared test helper's teardown starts beyond the
 libraries it loads, and behavior that depends on a file's content but not on
 its name or location. A full suite runs on every push to main, so a miss is
 caught there; docs/fm-test-portable-shards.md "Change-based test selection"
@@ -752,7 +755,7 @@ def mention_references(tree, text):
 STRING_LITERAL = re.compile(r"\"([^\"\\\n]*)\"|'([^'\\\n]*)'|`([^`]*)`")
 
 
-def literal_references(tree, text, pathspec=False):
+def literal_references(tree, text):
     """Files named by a whole string literal (Python, JavaScript, TypeScript).
 
     A literal that is a path or a file name names it; a sentence that mentions
@@ -760,19 +763,76 @@ def literal_references(tree, text, pathspec=False):
     """
     found = set()
     for match in STRING_LITERAL.finditer(text):
-        found |= word_references(tree, next(g for g in match.groups() if g is not None), False, pathspec)
+        found |= word_references(tree, next(g for g in match.groups() if g is not None), False)
+    return found
+
+
+ARGUMENT_TOKEN = re.compile(r"\"((?:[^\"\\\n]|\\.)*)\"|'((?:[^'\\\n]|\\.)*)'|`([^`]*)`|([\[\](),])|[^\"'`\[\](),]+")
+
+
+def ls_files_arguments(code):
+    """The argument lists that hold a "ls-files" literal, as git receives them.
+
+    Each list is the items of one bracketed or parenthesized group: a literal's
+    value, or None for anything else (a variable, a spread, a call).
+    """
+    groups, found = [[[]]], []
+    for match in ARGUMENT_TOKEN.finditer(code):
+        literal = next((g for g in match.groups()[:3] if g is not None), None)
+        mark = match.group(4)
+        if mark in ("[", "("):
+            groups.append([[]])
+        elif mark in ("]", ")") and len(groups) > 1:
+            group = groups.pop()
+            items = [item[0] if len(item) == 1 and isinstance(item[0], str) else None
+                     for item in group if item]
+            if "ls-files" in items:
+                found.append(items)
+            groups[-1][-1].append(None)
+        elif mark == ",":
+            groups[-1].append([])
+        elif literal is not None:
+            groups[-1][-1].append(literal)
+        elif match.group(0).strip():
+            groups[-1][-1].append(None)
+    return found
+
+
+def pathspec_references(tree, items):
+    """Files the pathspecs of one git ls-files argument list match.
+
+    A literal pathspec matches as git matches it. A pathspec that is not a
+    literal could be anything, so it names every tracked file, unless the call
+    lists only untracked files (--others without --cached).
+    """
+    after = items[items.index("ls-files") + 1:]
+    flags = {item for item in after if item and item.startswith("-")}
+    if flags & {"--others", "-o"} and not flags & {"--cached", "-c"}:
+        return set()
+    found, separated = set(), False
+    for item in after:
+        if item == "--" and not separated:
+            separated = True
+        elif item is None:
+            if separated:
+                return set(tree.files)
+        elif separated or not item.startswith("-"):
+            found |= word_references(tree, item, False, True)
     return found
 
 
 def code_references(tree, path, text):
     """Files the string literals of Python, JavaScript or TypeScript code name.
 
-    Code that lists tracked files hands its glob literals to git, where a bare
-    pattern ("*.md") matches anywhere in the tree.
+    The pathspecs of a git ls-files call match as git matches them, where a
+    bare pattern ("*.md") matches anywhere in the tree.
     """
     lines = [l for l in strip_foreign_comments(path, text).split("\n") if not MESSAGE_LINE.match(l)]
     code = "\n".join(lines)
-    return literal_references(tree, code, "ls-files" in code)
+    found = literal_references(tree, code)
+    for items in ls_files_arguments(code):
+        found |= pathspec_references(tree, items)
+    return found
 
 
 VARIABLE_NAME = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
@@ -871,10 +931,11 @@ class Graph:
         files load, but the other scripts they start are not followed, so every
         test does not inherit the whole tree through it.
         """
-        parent = {test: None}
         # A file first reached past an ambient file, where only its loaded
         # libraries are followed, is followed again in full when the test's own
-        # chain reaches it too, whichever path the walk finds first.
+        # chain reaches it too, whichever path the walk finds first. Each
+        # (file, loaded only) state keeps the state that reached it.
+        parent = {(test, False): None}
         full, loaded = set(), set()
         queue = [(test, False)]
         while queue:
@@ -884,12 +945,18 @@ class Graph:
             (loaded if loaded_only else full).add(node)
             edges = self.source_edges if loaded_only else self.edges
             for nxt in sorted(edges.get(node, ())):
-                parent.setdefault(nxt, node)
                 # Past an ambient file only loaded libraries are followed.
                 nxt_loaded = loaded_only or node in ambient
+                parent.setdefault((nxt, nxt_loaded), (node, loaded_only))
                 if nxt not in full and not (nxt_loaded and nxt in loaded):
                     queue.append((nxt, nxt_loaded))
-        return parent
+        # The chain a file is shown through comes from its state with every
+        # edge followed when it has one, so it is a path the rules allow.
+        witness = {}
+        for (node, loaded_only), before in parent.items():
+            if node not in witness or not loaded_only:
+                witness[node] = before[0] if before else None
+        return witness
 
     def find_ambient(self):
         """Shared tests/ helpers that at least half of the tests load."""
