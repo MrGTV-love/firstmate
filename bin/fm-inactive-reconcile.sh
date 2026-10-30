@@ -55,13 +55,15 @@
 # scan that makes no output or process-tree CPU progress for that long, never
 # one that is slow but working, and the gate read's own interval fires first,
 # so the stall is judged, and remembered, inside the live scan. A lock wait
-# looks like work to that backstop, so no lock wait in a scan is unbounded: a
-# scan that finds the scan lock held does nothing this poll, a due child whose
-# metadata lock is held (its teardown, which reports the outcome itself) is
-# skipped until the next scan, and the first wake-queue lock wait that outlasts
+# looks like work to that backstop, so no lock wait in a watcher-poll scan is
+# unbounded: it does nothing this poll when it finds the scan lock held, a due
+# child whose metadata lock is held (its teardown, which reports the outcome
+# itself) is skipped until the next scan without taking the first visit or
+# moving the cursor past it, and the first wake-queue lock wait that outlasts
 # the scan budget gives up every later wake append of that scan, whose durable
-# records are retried by the next one. `report`, `acknowledge`, and teardown
-# keep their waits.
+# records are retried by the next one. A --startup scan waits for the scan lock
+# within the session start's own stage budget, so the forced pass still runs
+# after a watcher scan. `report`, `acknowledge`, and teardown keep their waits.
 #
 # It considers only a direct ordinary crewmate whose newest meta, status, or
 # turn-ended mtime is older than that interval and whose last status is not
@@ -587,22 +589,16 @@ reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeou
   queue_presentation "$RECORD_PENDING" "$fingerprint" "$payload" || true
 }
 
-reconcile_direct_child() { # <id> <meta> <secondmate-id-or-empty> <timeout>
-  local id=$1 meta=$2 self=${3:-} timeout=$4 lock rc=0
-  lock=$(fm_meta_lock_path "$meta") || return 1
-  fm_lock_try_acquire "$lock" || return 0
-  reconcile_direct_child_locked "$id" "$meta" "$self" "$timeout" || rc=$?
-  fm_lock_release "$lock"
-  return "$rc"
-}
-
 # SCAN_FIRST_VISIT_PENDING is armed by scan() before its passes. The deadline
 # below is whole-second arithmetic, so a small budget can quantize to zero
 # between the deadline computation and these checks; without the guaranteed
 # first visit, such a scan would return 3 having examined no child at all while
 # write_scan_marker had already advanced the cursor past the skipped child.
+# A child whose metadata lock is held is skipped before either: it takes no
+# first visit, and once one is skipped (SCAN_CHILD_SKIPPED) the cursor stays
+# before it for the rest of the scan, so a deadline cut resumes at that child.
 scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
-  local cursor=$1 range=$2 deadline=$3 self=${4:-} meta id remaining rc first
+  local cursor=$1 range=$2 deadline=$3 self=${4:-} meta id remaining rc first lock
   for meta in "$STATE"/*.meta; do
     [ -f "$meta" ] || continue
     id=$(basename "$meta" .meta)
@@ -611,25 +607,36 @@ scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
       after) [ -z "$cursor" ] || [[ "$id" > "$cursor" ]] || continue ;;
       through) [ -n "$cursor" ] && [[ "$id" > "$cursor" ]] && continue ;;
     esac
+    lock=$(fm_meta_lock_path "$meta") || return 1
+    if ! fm_lock_try_acquire "$lock"; then
+      SCAN_CHILD_SKIPPED=1
+      continue
+    fi
     first=0
     if [ "${SCAN_FIRST_VISIT_PENDING:-0}" -eq 1 ]; then
       first=1
       SCAN_FIRST_VISIT_PENDING=0
     fi
-    if [ "$first" -eq 0 ]; then
-      [ "$(date +%s)" -lt "$deadline" ] || return 3
+    if [ "$first" -eq 0 ] && [ "$(date +%s)" -ge "$deadline" ]; then
+      fm_lock_release "$lock"
+      return 3
     fi
-    write_scan_marker "$id" || return 1
+    if [ "${SCAN_CHILD_SKIPPED:-0}" -eq 0 ] && ! write_scan_marker "$id"; then
+      fm_lock_release "$lock"
+      return 1
+    fi
     remaining=$((deadline - $(date +%s)))
     if [ "$first" -eq 1 ] && [ "$remaining" -lt 1 ]; then
       remaining=1
     fi
-    [ "$remaining" -gt 0 ] || return 3
-    reconcile_direct_child "$id" "$meta" "$self" "$remaining" || {
-      rc=$?
-      [ "$rc" -eq 3 ] && return 3
-      return "$rc"
-    }
+    if [ "$remaining" -le 0 ]; then
+      fm_lock_release "$lock"
+      return 3
+    fi
+    rc=0
+    reconcile_direct_child_locked "$id" "$meta" "$self" "$remaining" || rc=$?
+    fm_lock_release "$lock"
+    [ "$rc" -eq 0 ] || return "$rc"
   done
 }
 
@@ -658,6 +665,7 @@ scan() {
   fi
   deadline=$(( $(date +%s) + FM_INACTIVE_RECONCILE_BUDGET_SECS ))
   SCAN_FIRST_VISIT_PENDING=1
+  SCAN_CHILD_SKIPPED=0
   scan_pass "$cursor" after "$deadline" "$self" || rc=$?
   if [ "$rc" -eq 0 ] && [ -n "$cursor" ]; then
     scan_pass "$cursor" through "$deadline" "$self" || rc=$?
@@ -714,7 +722,9 @@ case "$mode" in
     ;;
   _scan-locked)
     [ "$#" -eq 2 ] || exit 2
-    if ! fm_lock_try_acquire "$SCAN_LOCK"; then
+    if [ "$2" = 1 ]; then
+      fm_lock_acquire_wait "$SCAN_LOCK" || exit 1
+    elif ! fm_lock_try_acquire "$SCAN_LOCK"; then
       [ "$FM_LOCK_BUSY" = 1 ] && exit 0
       exit 1
     fi

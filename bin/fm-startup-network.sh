@@ -566,7 +566,8 @@ EOF
     fi
   fi
   # One aggregate deadline covers both deferred operations. The inactive scan
-  # retains its own tighter per-scan bound inside this outer bound. Findings
+  # checks its own per-scan budget between children inside this outer bound,
+  # which also bounds its wait for a watcher scan's lock. Findings
   # need no report translation: the scan writes its ordinary durable
   # inactive-outcome wakes directly. A child shell composes the two executable
   # owners only so fm_run_timed can govern them as one process group.
