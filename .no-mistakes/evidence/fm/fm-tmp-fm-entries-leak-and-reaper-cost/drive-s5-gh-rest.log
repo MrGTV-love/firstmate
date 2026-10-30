@@ -1,0 +1,17 @@
+--- normal read: get repos/cli/cli
+full_name=cli/cli
+rc=0
+entries in TMPDIR: 0  []
+--- forge error: get repos/cli/no-such-repo-fmnm-zz
+rc=1 stderr: gh: Not Found (HTTP 404)
+entries in TMPDIR: 0  []
+--- a KILLed owner's entry, then a real read
+/tmp/fmnm-s5.yYiduR/t/fm-gh-rest.scratch/82511.H37Pkh
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s5-gh-rest.sh: line 10: 82511 Killed: 9               bash -c ". $WT/bin/fm-scratch-lib.sh; fm_scratch_new d fm-gh-rest; kill -KILL \$\$"
+entries in TMPDIR: 2  [./fm-gh-rest.scratch ./fm-gh-rest.scratch/82511.H37Pkh ]
+rc=0
+entries in TMPDIR: 0  []
+--- TERM while a paginated read runs
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s5-gh-rest.sh: line 13: 83540 Terminated: 15          "$WT/bin/fm-gh-rest.sh" get repos/cli/cli/releases?per_page=1 --paginate > /dev/null 2>&1
+rc=143
+entries in TMPDIR: 0  []

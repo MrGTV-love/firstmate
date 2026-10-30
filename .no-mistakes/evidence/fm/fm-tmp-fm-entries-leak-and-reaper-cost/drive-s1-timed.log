@@ -1,0 +1,54 @@
+===== mechanism: timeout
+--- normal run (true)
+rc=0
+entries in TMPDIR: 0  []
+--- error exit (exit 3)
+rc=3
+entries in TMPDIR: 0  []
+--- bound fires (sleep 5 with 1s bound)
+rc=124
+entries in TMPDIR: 0  []
+--- caller gets TERM while waiting
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s1-timed.sh: line 21: 91118 Terminated: 15          perl -e '$SIG{INT}=$SIG{HUP}=$SIG{TERM}="DEFAULT"; exec @ARGV or die' bash -c ". $WT/bin/fm-timeout-lib.sh; fm_run_timed 30 sleep 30"
+rc=143
+entries in TMPDIR: 0  []
+--- caller gets INT while waiting
+rc=129
+entries in TMPDIR: 0  []
+--- caller gets HUP while waiting
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s1-timed.sh: line 21:  4402 Hangup: 1               perl -e '$SIG{INT}=$SIG{HUP}=$SIG{TERM}="DEFAULT"; exec @ARGV or die' bash -c ". $WT/bin/fm-timeout-lib.sh; fm_run_timed 30 sleep 30"
+rc=129
+entries in TMPDIR: 0  []
+===== mechanism: bash
+--- normal run (true)
+rc=0
+entries in TMPDIR: 0  []
+--- error exit (exit 3)
+rc=3
+entries in TMPDIR: 0  []
+--- bound fires (sleep 5 with 1s bound)
+rc=124
+entries in TMPDIR: 0  []
+--- caller gets TERM while waiting
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s1-timed.sh: line 21: 17105 Terminated: 15          perl -e '$SIG{INT}=$SIG{HUP}=$SIG{TERM}="DEFAULT"; exec @ARGV or die' bash -c ". $WT/bin/fm-timeout-lib.sh; fm_run_timed 30 sleep 30"
+rc=143
+entries in TMPDIR: 0  []
+--- caller gets INT while waiting
+rc=129
+entries in TMPDIR: 0  []
+--- caller gets HUP while waiting
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s1-timed.sh: line 21: 28118 Hangup: 1               perl -e '$SIG{INT}=$SIG{HUP}=$SIG{TERM}="DEFAULT"; exec @ARGV or die' bash -c ". $WT/bin/fm-timeout-lib.sh; fm_run_timed 30 sleep 30"
+rc=129
+entries in TMPDIR: 0  []
+===== KILL between the status file's creation and its unlink (the lib's own pieces hold the entry)
+held /tmp/fmnm-s1.gaPaFD/t/fm-timeout-status.scratch/32357.EzpIOk
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s1-timed.sh: line 26: 32357 Killed: 9               bash -c ". $WT/bin/fm-timeout-lib.sh; f=\$(fm_scratch_new f fm-timeout-status); echo held \$f; kill -KILL \$\$"
+rc=137
+entries in TMPDIR: 2  [./fm-timeout-status.scratch ./fm-timeout-status.scratch/32357.EzpIOk ]
+--- next fm_run_timed reaps what the killed owner left
+rc=0
+entries in TMPDIR: 0  []
+--- a live owner's entry is kept
+held /tmp/fmnm-s1.gaPaFD/t/fm-timeout-status.scratch/32437.FyCDwP
+rc=0
+entries in TMPDIR: 2  [./fm-timeout-status.scratch ./fm-timeout-status.scratch/32437.FyCDwP ]

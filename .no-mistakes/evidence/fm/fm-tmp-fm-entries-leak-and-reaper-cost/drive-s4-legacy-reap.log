@@ -1,0 +1,66 @@
+--- no --tmpdir (must refuse, even with --apply)
+fm-scratch-legacy-reap: --tmpdir DIR is required
+fm-scratch-legacy-reap.sh - one-time removal of scratch entries that commands made before bin/fm-scratch-lib.sh.
+
+Usage:
+  fm-scratch-legacy-reap.sh --tmpdir DIR [--min-age-days N] [--apply]
+  fm-scratch-legacy-reap.sh --help
+
+Before the scratch library, these commands made `<prefix>.XXXXXX` directly in
+the shared temp dir and nothing ever removed an entry whose command was killed:
+fm-timeout-status, fm-bash-timeout-command, fm-fleet-tasks, fm-gh-rest,
+fm-remote-reply-ingest, fm-contributions, fm-session-start-stage,
+fm-lavish-poll and fm-test-reap. Those entries name no owner, so ownership
+cannot prove them dead. This script proves it differently: an entry goes only
+when ALL of these hold.
+  1. its name is exactly <one of the prefixes above>.<6 letters or digits>
+     (so a fm-fleet-tasks directory that carries an owner token, a scratch
+     container, and every other fm-* entry are never candidates);
+  2. it is not a symlink and this user owns it;
+  3. nothing under it was modified for --min-age-days days (default 2; the
+     longest bounded command is 6 hours), judged by the newest file in it,
+     and the inspection that says so ran to completion (a find that failed or
+     could not read part of the entry keeps it);
+  4. no process has it, or anything under it, open or as its working
+     directory, read from one lsof listing of every open file.
+lsof must run and answer; if it cannot, nothing is removed.
+
+Without --apply it only prints each entry it would remove and why. With
+--apply it removes them and prints one `removed` line each. DIR is required,
+so no run ever falls back to the live temp dir. It never touches anything
+outside DIR and never recurses into a candidate that is a symlink.
+
+Regression coverage: tests/fm-scratch-legacy-reap.test.sh.
+rc=2
+--- dry run
+would remove <SB>/t/fm-timeout-status.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-timeout-status.OLDF12: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-bash-timeout-command.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-fleet-tasks.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-gh-rest.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-remote-reply-ingest.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-contributions.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-session-start-stage.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-lavish-poll.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+would remove <SB>/t/fm-test-reap.OLD123: legacy scratch entry of this user, nothing under it changed for 2 days, open in no process
+rc=0
+entries now: 16 (dry run removes nothing)
+--- apply
+removed <SB>/t/fm-timeout-status.OLD123
+removed <SB>/t/fm-timeout-status.OLDF12
+removed <SB>/t/fm-bash-timeout-command.OLD123
+removed <SB>/t/fm-fleet-tasks.OLD123
+removed <SB>/t/fm-gh-rest.OLD123
+removed <SB>/t/fm-remote-reply-ingest.OLD123
+removed <SB>/t/fm-contributions.OLD123
+removed <SB>/t/fm-session-start-stage.OLD123
+removed <SB>/t/fm-lavish-poll.OLD123
+removed <SB>/t/fm-test-reap.OLD123
+rc=0
+--- left in the temp dir:
+fm-contributions.LINK12
+fm-fleet-tasks.tok123.ABCDEF
+fm-gh-rest.FRESH1
+fm-gh-rest.INUSE1
+fm-gh-rest.scratch
+fm-unrelated.OLD123

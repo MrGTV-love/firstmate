@@ -1,0 +1,31 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s6-runner.sh: line 11: 33597 Killed: 9               env TMPDIR="$T" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-killed); printf "%s\n" "$d" > "$2"; (cd "$d" && exec sleep 300) >/dev/null 2>&1 & printf "%s\n" "$!" > "$3"; kill -KILL $$' _ "$LIB" "$SB/root" "$SB/stray" > /dev/null 2>&1
+before: stray pid 33861 alive=yes cwd=<SB>/t/fm-test-killed.2QLKb2
+before: top of TMPDIR:
+  .fm-test-cleanup.99999.AbCdEf
+  fm-gh-rest.UNREL1
+  fm-gh-rest.UNREL2
+  fm-gh-rest.UNREL3
+  fm-gh-rest.scratch
+  fm-test-killed.2QLKb2
+  fm-test-owners
+  fm-timeout-status.UNREL1
+  fm-timeout-status.UNREL2
+  fm-timeout-status.UNREL3
+--- runner: bin/fm-test-run.sh tests/fm-scratch-legacy-reap.test.sh
+runner rc=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=3680 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-scratch-legacy-reap.test.sh duration_ms=3680
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M65TFDR99MAJY4HD63W8WWAG/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+after: stray process alive=no (expect no)
+after: killed shell's root=removed record=removed old-layout registry=removed (expect removed x3)
+after: top of TMPDIR:
+  fm-gh-rest.UNREL1
+  fm-gh-rest.UNREL2
+  fm-gh-rest.UNREL3
+  fm-gh-rest.scratch
+  fm-test-owners
+  fm-timeout-status.UNREL1
+  fm-timeout-status.UNREL2
+  fm-timeout-status.UNREL3
+after: inside fm-test-owners:
+  .legacy-discovery

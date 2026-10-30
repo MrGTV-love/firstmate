@@ -1,0 +1,26 @@
+--- normal session start
+rc=0
+lock acquired: harness pid 58285
+at exit: entries in TMPDIR: 4  [./fm-startup-network-timings.XXXXXX ./fm-bootstrap-fleet.XXXXXX ./fm-fleet-sync.XXXXXX ./fm-startup-network.XXXXXX ]
+background processes naming the sandbox ended after 2s
+after settle: entries in TMPDIR: 0  []
+--- session start whose bound fires (FM_SESSION_START_BUDGET=1)
+rc=0
+at exit: entries in TMPDIR: 2  [./fm-startup-network.XXXXXX ./fm-startup-network-timings.XXXXXX ]
+background processes naming the sandbox ended after 1s
+after settle: entries in TMPDIR: 2  [./fm-startup-network.XXXXXX ./fm-startup-network-timings.XXXXXX ]
+--- the script itself gets TERM after 1s
+stage entry while running: fm-session-start-stage.scratch/41443.TexnNf
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s7-session-start.sh: line 22: 41443 Terminated: 15          "${E[@]}" "$WT/bin/fm-session-start.sh" > "$SB/ss3.out" 2>&1
+rc=143
+at exit: entries in TMPDIR: 0  []
+background processes naming the sandbox ended after 4s
+after settle: entries in TMPDIR: 0  []
+--- the script itself gets HUP after 1s
+stage entry while running: fm-session-start-stage.scratch/56201.VWpwC7
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s7-session-start.sh: line 22: 56201 Hangup: 1               "${E[@]}" "$WT/bin/fm-session-start.sh" > "$SB/ss3.out" 2>&1
+rc=129
+at exit: entries in TMPDIR: 0  []
+background processes naming the sandbox ended after 3s
+after settle: entries in TMPDIR: 0  []
+torn down: yes

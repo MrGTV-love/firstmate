@@ -1,0 +1,8 @@
+target rc=0
+  target after 0s: fm-bootstrap-fleet.XXXXXX fm-fleet-sync.XXXXXX fm-startup-network-timings.XXXXXX fm-startup-network.XXXXXX  | open by: bash gtimeout sleep 
+  target after 30s:  | open by: 
+  target after 60s:  | open by: 
+base rc=0
+  base after 0s: fm-bootstrap-fleet.XXXXXX fm-fleet-sync.XXXXXX fm-startup-network-timings.XXXXXX fm-startup-network.XXXXXX  | open by: bash gtimeout sleep 
+  base after 30s:  | open by: 
+  base after 60s:  | open by: 

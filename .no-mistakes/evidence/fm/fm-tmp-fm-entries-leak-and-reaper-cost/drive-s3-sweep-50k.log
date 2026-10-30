@@ -1,0 +1,15 @@
+base   unrelated=0      ordinary=0.607s
+base   unrelated=50000  ordinary=2.235s
+target unrelated=0      ordinary(stamped)=0.451s  discovery(stamp cleared)=0.463s  wide(FM_TEST_SWEEP_ALL=1)=0.445s
+target unrelated=50000  ordinary(stamped)=0.609s  discovery(stamp cleared)=0.788s  wide(FM_TEST_SWEEP_ALL=1)=2.438s
+unrelated entries still present after all target sweeps: 50000 of 50000
+=== safety at 50000 entries (target)
+/Users/charlesabrooker/.no-mistakes/evidence/01M65TFDR99MAJY4HD63W8WWAG/drive-s3-sweep-50k.sh: line 51: 68271 Killed: 9               env TMPDIR="$tmp" bash -c '. "$1"; d=$(fm_test_tmproot fm-test-killed); printf "%s\n" "$d" > "$2"; kill -KILL $$' _ "$LIB" "$SB/killed-root" > /dev/null 2>&1
+before: dead-owner legacy root=present live-owner root=present unmarked=present killed-shell root=present killed-shell record=present
+one ordinary sourcing at 50000 entries took 1.201s
+after:  dead-owner legacy root=removed (expect removed)
+        live-owner old root=kept (expect kept)
+        unmarked old fm-* entry=kept (expect kept)
+        KILLed shell's fixture root=removed (expect removed)
+        KILLed shell's record=removed (expect removed)
+        unrelated entries=50000 of 50000 (expect 50000)

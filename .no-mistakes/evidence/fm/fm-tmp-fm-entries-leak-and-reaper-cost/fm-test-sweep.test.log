@@ -1,0 +1,10 @@
+ok - a KILLed shell leaves one marked record and the next sweep removes the record and its roots
+ok - the wide sweep stops a process inside a dead shell's record before it removes the record
+ok - the sweep keeps a live owner's root and record when it cannot prove the owner gone
+ok - tests/lib.sh refuses an owners directory it does not own and touches nothing behind it
+ok - the sweep keeps a live owner's roots and registries and every unmarked entry, narrow or wide
+ok - ordinary sourcing removes a dead owner's marked root of any fm-* name and keeps live, young and unmarked ones
+ok - a legacy root kept while its owner lived goes at the next ordinary sourcing after the owner dies, stamp untouched
+ok - the kept-roots list drops paths that are gone or outside the temp dir and ends with its last root
+ok - the sweep that looks at every fm-* entry takes 0.052s with no unrelated entries and 0.114s with 12000
+ok - the stamped sweep takes 0.049s with no unrelated entries and 0.086s with 12000
