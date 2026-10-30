@@ -1461,7 +1461,7 @@ test_tracked_claude_entries_inert_under_grok() {
 
 test_claude_large_payload_grok_exclusions() {
   claude_config_hook_behavior large-exclusions
-  pass "tracked Claude hooks: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions"
+  pass "tracked Claude fm-turnend-guard.sh Stop hook: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions"
 }
 
 test_claude_helper_tools_are_not_intercepted() {
