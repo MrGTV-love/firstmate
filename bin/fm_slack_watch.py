@@ -34,7 +34,6 @@ USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
 # A failure of one thread's own read must not stop the other threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
-OUTBOX_LIMIT = 100
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
 QUEUE_RESERVE = 16
@@ -277,7 +276,7 @@ class Watch:
         line = flat(line)
         if line and (not self.output or self.output[-1] != line):
             self.output.append(line)
-            self.state['outbox'] = self.output[-OUTBOX_LIMIT:]
+            self.state['outbox'] = list(self.output)
 
     def printed(self, count):
         """Drop the first count wake lines from the journal once they have been printed."""
@@ -555,14 +554,19 @@ class Watch:
             fault('after-cursor')
 
     def resume(self):
-        remaining = self.cap
+        remaining, deferred = self.cap, None
         for pending in list(self.state['pending']):
             if remaining <= 0:
-                return
-            self.publish(pending)
+                break
+            try:
+                self.publish(pending)
+            except SlackError as error:
+                if str(error) not in THREAD_ERRORS:
+                    raise
+                deferred = deferred or error
             if pending.get('kind') != 'notice':
                 remaining -= 1
-        return remaining
+        return remaining, deferred
 
     def mirror(self):
         if not self.bound():
@@ -614,23 +618,31 @@ class Watch:
                 if not record.get('retired')]
 
     def resolve(self):
+        deferred = None
         for occurrence, record in self.tracked():
             if record['ts'] in self.noticed_threads or record['ts'] not in self.read_threads:
                 continue
             standing = self.hold(record)
             if standing in ('live', 'unknown'):
                 continue
-            if standing == 'replaced':
-                self.post('superseded:' + occurrence,
-                          'Superseded: ' + slack_escape(record['key']) + ' was held again. Answer in its newer thread.',
-                          record['ts'])
-            else:
-                self.post('resolved:' + occurrence,
-                          'Resolved: ' + slack_escape(record['key'])
-                          + '\nThe decision is no longer open. Full resolution remains in the local backlog.',
-                          record['ts'])
+            try:
+                if standing == 'replaced':
+                    self.post('superseded:' + occurrence,
+                              'Superseded: ' + slack_escape(record['key']) + ' was held again. Answer in its newer thread.',
+                              record['ts'])
+                else:
+                    self.post('resolved:' + occurrence,
+                              'Resolved: ' + slack_escape(record['key'])
+                              + '\nThe decision is no longer open. Full resolution remains in the local backlog.',
+                              record['ts'])
+            except SlackError as error:
+                if str(error) not in THREAD_ERRORS:
+                    raise
+                deferred = deferred or error
+                continue
             record['retired'] = True
             self.commit()
+        return deferred
 
     def reactions_for(self, ts):
         data = self.api.call('reactions.get', channel=self.state['channel'], timestamp=ts)
@@ -697,21 +709,20 @@ class Watch:
     def poll(self):
         if not self.bound():
             return
-        remaining = self.resume()
-        if remaining is None:
-            remaining = 0
+        remaining, deferred = self.resume()
         if remaining <= 0:
+            if deferred:
+                raise deferred
             return
         if self.state['threads'] and not self.state.get('channel'):
             self.prepare()
         # Mirroring new cards must never keep the replies on existing threads unread:
         # a mirror failure is held back and reported after the replies are handled.
-        deferred = None
         if not (self.replay and self.replay.transcript.get('skip_mirror')):
             try:
                 self.mirror()
             except SlackError as error:
-                deferred = error
+                deferred = deferred or error
         if self.state['threads']:
             self.scope_notice()
         for occurrence, record in self.tracked():
@@ -725,9 +736,11 @@ class Watch:
                 if str(error) not in THREAD_ERRORS:
                     raise
                 self.read_threads.discard(record['ts'])
-                remaining -= 1
+                if any(p.get('kind') == 'answer' and p.get('thread') == record['ts']
+                       for p in self.state['pending']):
+                    remaining -= 1
                 deferred = deferred or error
-        self.resolve()
+        deferred = self.resolve() or deferred
         if deferred:
             raise deferred
 

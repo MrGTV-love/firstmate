@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X34.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X37.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -1371,5 +1371,60 @@ assert_eq "$(closed_count "$out")" 1 "X34 one poll delivered more answers than t
 assert_contains "$out" 'transport failure: api_error' "X34 the failed acknowledgement was not reported"
 assert_open dup-b 0 "X34 the call past the cap was answered"
 printf 'ok - X34\n'
+
+# X35: an unreadable card never uses up the answer cap of the threads after it
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/cap-read-fail.json" conversations.replies:900.000001 400
+set +e
+out=$(env FM_SLACK_POLL_MAX_ANSWERS=1 "$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/cap-read-fail.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X35 the unreadable card reported success"
+assert_contains "$out" 'closed: dup-b' "X35 an unreadable card used up the answer cap"
+assert_open dup-a 0 "X35 the unreadable card's call was answered"
+printf 'ok - X35\n'
+
+# X36: a journaled row whose thread is gone never keeps the other threads unread on later polls
+new_home duplicate
+bind
+python3 "$HELPER" add-failure "$FIX/duplicate/transcript.json" "$TMP/resume-fail.json" chat.postMessage 400
+python3 "$HELPER" add-failure "$TMP/resume-fail.json" "$TMP/resume-fail.json" conversations.replies:900.000101 400
+set +e
+out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/resume-fail.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X36 the failed acknowledgement reported success"
+assert_contains "$out" 'closed: dup-a' "X36 the first thread was not answered"
+assert_open dup-b 0 "X36 the unreadable thread was answered"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X36 the unacknowledged answer left the journal"
+python3 "$HELPER" clear-fail "$(replay_file)" chat.postMessage
+python3 "$HELPER" clear-fail "$(replay_file)" conversations.replies:900.000101
+python3 "$HELPER" fail-call "$(replay_file)" conversations.replies:900.000001 400
+set +e
+out=$("$ROOT/bin/fm-slack-poll.sh" --replay "$TMP/resume-fail.json"); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X36 the gone thread reported success"
+assert_contains "$out" 'closed: dup-b' "X36 a journaled row whose thread is gone kept another thread's reply unread"
+assert_eq "$(python3 "$HELPER" pending-count "$(state_file)")" 1 "X36 the row for the gone thread left the journal"
+printf 'ok - X36\n'
+
+# X37: more than 100 unprinted wake lines all survive a run that dies before printing
+new_home typed-reply
+"$ROOT/bin/fm-slack-check.sh" arm --replay "$FIX/typed-reply/transcript.json" >/dev/null
+for n in $(seq 101 205); do python3 "$HELPER" journal-line "$(state_file)" "check: slack held-$n"; done
+set +e
+FM_SLACK_FAULT=before-emit "$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/typed-reply/transcript.json" >/dev/null 2>&1; rc=$?
+set -e
+assert_eq "$rc" 75 "X37 the check fault did not fire"
+printed=''
+for _ in $(seq 1 20); do
+  out=$("$ROOT/bin/fm-slack-check.sh" check --replay "$FIX/typed-reply/transcript.json")
+  [ -n "$out" ] || break
+  printed="$printed; $out"
+done
+assert_eq "$(printf '%s' "$printed" | tr ';' '\n' | grep -c '^ check: slack held-' || true)" 105 "X37 an unprinted wake line was lost"
+assert_contains "$printed" 'check: slack held-101; ' "X37 the oldest unprinted wake line was lost"
+assert_contains "$printed" 'closed: typed-call' "X37 the line the dying run earned was lost"
+assert_closed typed-call 1 "X37 the answer was not delivered"
+printf 'ok - X37\n'
 
 printf 'ok - all Slack watch checks\n'
