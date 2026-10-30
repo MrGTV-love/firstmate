@@ -3468,6 +3468,9 @@ The journal is empty when `python3 -c 'import json; print(len(json.load(open("st
 A `retarget` with the new value set that still refuses with `dm_user_changed_with_pending_work` means the old DM is not drained yet: restore the old value and poll again.
 If a pending row can never drain because its thread or channel is gone, the last resort is to run `bin/fm-slack-check.sh disarm`, check the pending rows in `state/slack-watch/state.json` by hand, and then remove `state/slack-watch/` to start a fresh DM.
 That reset can re-read replies that were already answered, so do it only after that check.
+The same last resort covers an old thread that `retarget` can never read or judge, so that it refuses every time with an empty journal: a hold id whose call state can never be probed, an allowlisted tapper whose `users.info` lookup keeps failing, or a card the owner deleted.
+First read that thread in Slack by hand and record any answer it holds with `bin/fm-captain-hold.sh answer`; only then run `bin/fm-slack-check.sh disarm` and remove `state/slack-watch/`.
+The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
@@ -3508,6 +3511,7 @@ A crash after notification publication may duplicate a notification but cannot d
 Every wake line is journaled in `state.json` by the same commit that earns it and is dropped from the journal only after it has been printed, so a run that dies between its last commit and its print has its lines printed by the next run; the worst case is a repeated line, never a lost one.
 A mirror failure, or the failure of one thread's own read, is reported once and held back until the other threads' replies have been read, so one card Slack will not accept, or one card the owner deleted, never keeps the other answers unread.
 A thread whose own read failed stays tracked and is not retired until a later poll reads it.
+A deleted card can therefore make `retarget` refuse every time; the last resort above, after reading that thread by hand, is the way out.
 The per-poll answer cap counts only progress made in that poll: a newly staged answer or notice, or an older journaled answer that the poll delivers to the intake.
 A journaled row that is only retried or acknowledged again, and a thread read that fails before it delivers an answer, do not count, so a card that can no longer be read, or a row stuck before its acknowledgement, never uses up the cap of the threads after it.
 A journaled row whose thread can no longer be posted to, and a resolution post that fails, are held back the same way: the row stays journaled, the thread stays tracked, and every other thread is still read.

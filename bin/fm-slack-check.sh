@@ -13,7 +13,10 @@
 # A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.
 # Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the
 # pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were
-# already answered, so do it only after that check.
+# already answered, so do it only after that check. The same last resort covers an old thread retarget can never
+# read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted card):
+# first read that thread in Slack by hand and record any answer with fm-captain-hold.sh answer, then disarm and
+# remove state/slack-watch/. The reset abandons that thread's unread reply.
 #   fm-slack-check.sh --help
 set -euo pipefail
 # shellcheck source=bin/fm-slack-lib.sh
@@ -33,7 +36,10 @@ case "${1:-}" in
       'A retarget that still refuses with dm_user_changed_with_pending_work means: restore the old value, poll again.' \
       'Last resort, when a pending row can never drain because its thread or channel is gone: run disarm, check the' \
       'pending rows by hand, then remove state/slack-watch/ to start a fresh DM. This can re-read replies that were' \
-      'already answered, so do it only after that check.' \
+      'already answered, so do it only after that check. The same last resort covers an old thread retarget can never' \
+      'read or judge (a hold id that can never be probed, a tapper whose users.info lookup keeps failing, a deleted' \
+      'card): first read that thread in Slack by hand and record any answer with fm-captain-hold.sh answer, then' \
+      'disarm and remove state/slack-watch/. The reset abandons that thread'"'"'s unread reply.' \
       'Disarm is the hard off switch. Unconfigured is silent/off; an explicit arm names the refusal.' \
       'See docs/configuration.md "Slack decision plane".'
     exit 0
