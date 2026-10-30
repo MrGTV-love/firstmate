@@ -346,9 +346,27 @@
 # reaper's return stage and every forced child return wait in that FIFO queue
 # instead, each waited admission follows the progress-based idle allowance and
 # 30-minute telemetry-uncertainty extreme owned by bin/fm-project-lock-lib.sh.
-# Independently, the reaper's 600s teardown limit ends an overlong teardown,
-# which keeps its durable record and is retried by the next sweep without a
-# refusal memo.
+# Independently, the reaper and bin/fm-merge-prune.sh stop a teardown that has gone
+# silent (no output and no process-tree CPU progress for their stall interval); it
+# keeps its durable record and is retried by the next sweep without a refusal memo.
+# While a read-only no-mistakes query waits, teardown prints a progress line every
+# tenth of the repo-wide quiet interval, so that outer stop never mistakes a live
+# wait for silence; the query's own stall interval (FM_TEARDOWN_NM_STALL_SECS) is
+# the one judge of a silent daemon. A query that goes silent leaves the answer
+# unknown, never "no run is parked", "still parked" or "not landed". A run-record
+# read the landing proof needed prints "unknown: the no-mistakes run record did not
+# answer; retry teardown", fires no unlanded-work guard event and exits
+# FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
+# prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing more closed,
+# except under --force, where the captain's authorized discard goes on and prints
+# and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
+# from then on every daemon read of that teardown and its children (FM_NM_READ_STALLED)
+# is unknown at once instead of waiting out the stall again. A final-outcome
+# delivery whose ship acceptance is unknown (`fm-inactive-reconcile.sh report`
+# exits 75) also prints an UNKNOWN line, keeps every record and exits
+# FM_PROJECT_LOCK_BUSY_EXIT; under --force that report instead delivers the line
+# marked acceptance unknown (bin/fm-inactive-reconcile.sh's header owns it).
+# The sweeps retry FM_PROJECT_LOCK_BUSY_EXIT and record no refusal for it.
 # As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
 # that can fail and before the pending backlog close is published, teardown
@@ -2367,7 +2385,8 @@ TEARDOWN_PIPELINE_INPUT_REASON=
 # times never count.
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
-  local timeout=${NM_TEARDOWN_TIMEOUT:-10} runs=0 tied=0 reasons=
+  local stall=${NM_TEARDOWN_STALL_SECS:-} runs=0 tied=0 reasons='' read_rc=0
+  case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   TEARDOWN_PIPELINE_INPUT_REASON=
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || current=
@@ -2388,7 +2407,12 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
     TEARDOWN_PIPELINE_INPUT_REASON="python3 is not available, so the no-mistakes run record for $pr_url cannot be read"
     return 1
   fi
-  if ! rows=$(fm_nm_bounded "$dir" "$timeout" python3 -I - "$db" "$pr_url" 2>/dev/null <<'PY'
+  # A read-only query against the daemon's database, stopped only by silence: a
+  # reader blocked on a lock burns no CPU and prints nothing, a slow one on a busy
+  # host does, so how long it takes says nothing about whether it is hung. The
+  # 30 s is SQLite's busy wait for a writer's lock, the one wait this reader cannot
+  # watch; running out of it is answered as busy, an unknown like silence.
+  FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
 import re
 import sqlite3
 import sys
@@ -2412,10 +2436,14 @@ try:
                 values = ["" if value is None else str(value) for value in row]
                 if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
                     print("run|" + "|".join(values))
+except sqlite3.OperationalError as error:
+    print("busy|" if "locked" in str(error) else "unreadable|")
 except (OSError, ValueError, sqlite3.Error):
     print("unreadable|")
 PY
-  ); then
+  if [ "$read_rc" -ne 0 ]; then
+    # Silence is not an answer: work_is_landed reports the proof unknown.
+    [ "$read_rc" -ne 124 ] || TEARDOWN_NM_RECORD_SILENT=1
     TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
     return 1
   fi
@@ -2426,6 +2454,11 @@ PY
         return 1
         ;;
       unreadable)
+        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      busy)
+        TEARDOWN_NM_RECORD_SILENT=1
         TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
         return 1
         ;;
@@ -2538,6 +2571,10 @@ TEARDOWN_LANDED_HEADS=()
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
+# 1 when the run-record read the pipeline-input proof needed went silent. A copy
+# no other proof could place is then neither landed nor unlanded but unknown, and
+# work_is_landed exits for a retry instead of letting any caller refuse it.
+TEARDOWN_NM_RECORD_SILENT=0
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
   TEARDOWN_LANDED_UNASKED=
@@ -2558,7 +2595,12 @@ work_is_landed() {
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
-  work_is_landed_proof "$branch" || return 1
+  TEARDOWN_NM_RECORD_SILENT=0
+  if ! work_is_landed_proof "$branch"; then
+    [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ] || return 1
+    echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  fi
   TEARDOWN_LANDED_DIRS+=("$dir")
   TEARDOWN_LANDED_HEADS+=("$head")
 }
@@ -3230,8 +3272,85 @@ teardown_reprove_reassigned_slot() {
 # binds through the strict object-local head rule, with bin/fm-nm-run-lib.sh's
 # shared ledger-anchored continuation rule as the only recognition for a head
 # this copy cannot resolve at all.
+# Wall-clock seconds the one MUTATION below (axi abort) may wait for its
+# acknowledgement. Harm: a hung client holding teardown. Expiry is not a verdict:
+# the daemon takes the abort when it receives it, so the status read that follows
+# is what decides, and that read is stopped by silence only (NM_TEARDOWN_STALL_SECS).
 NM_TEARDOWN_TIMEOUT=${FM_TEARDOWN_NM_TIMEOUT:-10}
 case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
+# Seconds a read-only no-mistakes query may go without output or process-tree CPU
+# progress before teardown stops it and treats the answer as unknown (the repo-wide
+# quiet interval unless FM_TEARDOWN_NM_STALL_SECS names another).
+NM_TEARDOWN_STALL_SECS=${FM_TEARDOWN_NM_STALL_SECS:-}
+case "$NM_TEARDOWN_STALL_SECS" in ''|*[!0-9]*|0*) NM_TEARDOWN_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
+# 1 when the last parked-run lookup went silent: whether a run is parked is then
+# unknown, which is not the same as "no run is parked".
+TASK_NM_READ_UNKNOWN=0
+
+# One read-only no-mistakes query into <variable>, stopped by its own stall
+# interval (FM_NM_READ_PROGRESS) with its stderr discarded, returning its status.
+# While it waits, a progress line goes to teardown's stderr every tenth of the
+# repo-wide quiet interval, so a sweep that stops a silent teardown never stops
+# one that is only waiting on a live read.
+teardown_nm_read() {  # <variable> <command> [args...]
+  local _var=$1 _out _rc=0
+  shift
+  teardown_nm_beat_start
+  _out=$(FM_NM_READ_PROGRESS=1 "$@" 2>/dev/null) || _rc=$?
+  teardown_nm_beat_stop
+  printf -v "$_var" '%s' "$_out"
+  return "$_rc"
+}
+
+# The progress line above, around a call that keeps its own output.
+TEARDOWN_NM_BEAT=
+teardown_nm_beat_start() {
+  local _every
+  _every=$(( $(fm_progress_quiet_secs) / 10 ))
+  [ "$_every" -gt 0 ] || _every=1
+  (
+    s=
+    trap 'kill "$s" 2>/dev/null; exit 0' TERM
+    while kill -0 "$$" 2>/dev/null; do
+      sleep "$_every" 2>/dev/null & s=$!
+      wait "$s"
+      echo "teardown: $ID is still waiting on a no-mistakes read" >&2
+    done
+  ) >/dev/null &
+  TEARDOWN_NM_BEAT=$!
+}
+
+teardown_nm_beat_stop() {
+  kill "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  wait "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  TEARDOWN_NM_BEAT=
+}
+
+# The status of one run with its error text, which names a run that is gone.
+teardown_nm_run_status_merged() {  # <worktree> <stall-secs> <args...>
+  fm_nm_run_bounded "$@" 2>&1
+}
+
+# A silent read about this task's own run: without --force nothing is closed and
+# teardown exits for a retry; the captain's --force discard goes on, and says and
+# records that the run state is unknown.
+teardown_nm_run_unknown() {  # <what is unknown>
+  local why="the no-mistakes daemon went silent (no output or CPU progress for ${NM_TEARDOWN_STALL_SECS}s), so $1"
+  if [ "$FORCE" != "--force" ]; then
+    echo "UNKNOWN: $why; nothing more was closed, retry teardown." >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  fi
+  echo "warning: $why; --force goes on with the no-mistakes run state unknown." >&2
+  FM_NM_READ_STALLED=1
+  export FM_NM_READ_STALLED
+  if [ ! -L "$DATA/$ID" ] && mkdir -p "$DATA/$ID" 2>/dev/null \
+      && printf '%s forced teardown went on with the no-mistakes run state unknown: %s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$why" >> "$DATA/$ID/no-mistakes-unknown.log" 2>/dev/null; then
+    echo "teardown: recorded the unknown no-mistakes run state in $DATA/$ID/no-mistakes-unknown.log" >&2
+  else
+    echo "warning: could not record the unknown no-mistakes run state in $DATA/$ID/no-mistakes-unknown.log" >&2
+  fi
+}
 # How many of the most recent `no-mistakes runs` rows the parked-run
 # continuation proof may scan, mirroring bin/fm-crew-state.sh's limit posture
 # (generous: rows of other branches interleave freely in the real ledger).
@@ -3239,7 +3358,7 @@ NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
 case "$NM_TEARDOWN_RUNS_LIMIT" in ''|*[!0-9]*) NM_TEARDOWN_RUNS_LIMIT=200 ;; esac
 TASK_RUN_ID=
 task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
-  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger
+  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger ledger_rc
   TASK_RUN_ID=
   branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
   [ -n "$branch" ] || return 1
@@ -3271,7 +3390,12 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
     # abort here must never fire for a run that already ended).
     [ -n "$run_head" ] || return 1
     [ -z "$(fm_nm_resolve_commit "$wt" "$run_head")" ] || return 1
-    ledger=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT")
+    ledger_rc=0
+    teardown_nm_read ledger fm_nm_run_checked "$wt" "$NM_TEARDOWN_STALL_SECS" runs --limit "$NM_TEARDOWN_RUNS_LIMIT" || ledger_rc=$?
+    if [ "$ledger_rc" -eq 124 ]; then
+      TASK_NM_READ_UNKNOWN=1
+      return 1
+    fi
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
   awaiting=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*awaiting_agent:' | head -1 || true)
@@ -3287,10 +3411,19 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
 }
 
 task_run_is_own_parked_run() {  # <worktree>
-  local wt=$1 out
-  # Accepted best-effort residual: query failures stay fail-open because making
-  # no-mistakes availability a prerequisite would block ship tasks with no run.
-  out=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" axi status)
+  local wt=$1 out rc=0
+  TASK_NM_READ_UNKNOWN=0
+  # Accepted best-effort residual: a query that fails outright stays fail-open,
+  # because making no-mistakes availability a prerequisite would block ship tasks
+  # with no run. A daemon that goes silent has not answered "no run is parked": it
+  # leaves that unknown, and conclude_task_no_mistakes_run exits for a retry,
+  # except under --force, where the captain's authorized discard goes on and the
+  # unknown run state is printed and recorded (teardown_nm_run_unknown).
+  teardown_nm_read out fm_nm_run_checked "$wt" "$NM_TEARDOWN_STALL_SECS" axi status || rc=$?
+  if [ "$rc" -eq 124 ]; then
+    TASK_NM_READ_UNKNOWN=1
+    return 1
+  fi
   task_status_is_own_parked_run "$wt" "$out"
 }
 
@@ -3318,18 +3451,29 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
 # worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
 # a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
-  local wt=$1 out run_id
+  local wt=$1 out run_id verify_rc
   [ "$KIND" = ship ] || return 0
   [ -d "$wt" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
-  task_run_is_own_parked_run "$wt" || return 0
+  if ! task_run_is_own_parked_run "$wt"; then
+    [ "$TASK_NM_READ_UNKNOWN" = 1 ] || return 0
+    teardown_nm_run_unknown "whether a run for $ID is parked at a gate is unknown"
+    return 0
+  fi
   run_id=$TASK_RUN_ID
   echo "teardown: no-mistakes run for $ID is parked at a gate; aborting before the worker is removed" >&2
   # Accepted best-effort residual: abort supports run-id targeting but no atomic
   # live-state condition; fully closing the resume race needs upstream compare-and-cancel.
   fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi abort --run "$run_id" >/dev/null 2>&1 || true
-  if out=$(fm_nm_run_bounded "$wt" "$NM_TEARDOWN_TIMEOUT" axi status --run "$run_id" 2>&1); then
+  verify_rc=0
+  teardown_nm_read out teardown_nm_run_status_merged "$wt" "$NM_TEARDOWN_STALL_SECS" axi status --run "$run_id" || verify_rc=$?
+  if [ "$verify_rc" -eq 0 ]; then
     task_status_is_terminal_run "$out" "$run_id" && return 0
+  elif [ "$verify_rc" -eq 124 ]; then
+    # The abort was sent; only the confirming read went silent. That is not "still
+    # parked", so it is unknown and a later teardown confirms it.
+    teardown_nm_run_unknown "whether run $run_id for $ID stopped after the abort is unknown"
+    return 0
   elif task_status_is_run_not_found "$out" "$run_id"; then
     return 0
   fi
@@ -6283,8 +6427,15 @@ if [ "$BACKEND" = herdr ]; then
   fi
 fi
 if [ "$KIND" != secondmate ]; then
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-      "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID"; then
+  REPORT_RC=0
+  teardown_nm_beat_start
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID" ${FORCE:+"$FORCE"} || REPORT_RC=$?
+  teardown_nm_beat_stop
+  if [ "$REPORT_RC" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
+    echo "UNKNOWN: the no-mistakes daemon went silent, so whether $ID's final outcome is accepted is unknown; every durable task record is kept, retry teardown." >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  elif [ "$REPORT_RC" -ne 0 ]; then
     echo "error: $ID's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery" >&2
     exit 1
   fi

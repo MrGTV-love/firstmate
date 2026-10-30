@@ -33,7 +33,9 @@ case "$mode" in
   ok) rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
+  nm-unknown) echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2; exit 75 ;;
   hang) exec sleep 30 ;;
+  slow) for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo "teardown step $i"; sleep 1; done; rm -f "$FM_STATE_OVERRIDE/$1".*; exit 0 ;;
   real) exec "$ROOT/bin/fm-teardown.sh" "$@" ;;
   steer-race)
     if [ "$1" = a-first ]; then
@@ -404,6 +406,25 @@ test_lease_refusal_is_transient() {
   out=$(run_reap "$home" reap) || fail "second reap failed: $out"
   [ "$(calls)" = 2 ] || fail "a leased task is offered again on the next pass (calls=$(calls))"
   pass "a lease refusal is skipped without a memo and retried next pass"
+}
+
+# Teardown whose no-mistakes read went silent knows nothing yet and exits 75. That
+# is a retry, never a refusal: no memo, so the task is not parked for the retry
+# interval, and the next sweep offers it again.
+test_unknown_no_mistakes_read_is_retried_not_parked() {
+  local home out
+  home=$(make_home nmunknown)
+  : > "$STUB_LOG"
+  printf 'nm-unknown\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-nm scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-nm
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-nm lock-skipped "an unknown no-mistakes read is a retry"
+  assert_absent "$home/state/.idle-reap/scout-nm.refused" "an unknown no-mistakes read records no refusal memo"
+  assert_present "$home/state/scout-nm.meta" "an unknown no-mistakes read preserves the task record"
+  out=$(run_reap "$home" reap) || fail "second reap failed: $out"
+  [ "$(calls)" = 2 ] || fail "a task whose no-mistakes read was unknown is offered again on the next pass (calls=$(calls))"
+  pass "an unknown no-mistakes read is retried on the next pass, with no memo and no park"
 }
 
 
@@ -996,32 +1017,53 @@ test_admission_rechecks_every_gate() {
   pass "automatic admission rechecks all selection gates for ships and scouts"
 }
 
-test_teardown_timeout_is_bounded() {
-  local home out start end fakebin
+# A teardown is stopped by silence, never by how long it takes. The silent one
+# below prints nothing and burns no CPU for far longer than its stall interval.
+test_silent_teardown_is_stopped_after_its_stall_interval() {
+  local home out pid
   home=$(make_home timeout)
+  : > "$STUB_LOG"
+  printf 'hang\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-slow scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-slow
+  out=$(FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-slow teardown-timeout "a silent teardown is stopped"
+  pid=$(sed -n '1s/|.*//p' "$STUB_LOG")
+  [ -n "$pid" ] || fail "the silent teardown never started"
+  ! kill -0 "$pid" 2>/dev/null || { kill -KILL "$pid" 2>/dev/null || true; fail "the silent teardown was left running"; }
+  assert_present "$home/state/.idle-reap/scout-slow.refused" "a proven hang is remembered"
+  assert_present "$home/state/scout-slow.meta" "a stopped teardown does not retire the task"
+  pass "a teardown that goes silent is stopped, reported, and remembered"
+}
+
+# The same sweep on a slow host. The stand-in teardown works for twelve seconds,
+# six times the stall interval, saying something every second; the cap this used
+# to run under is accelerated so it would have fired long before the end (the
+# `sleep 600` that the bash fallback of the old cap waited on becomes two seconds).
+# A teardown that is slow but working must complete and retire its task.
+test_slow_working_teardown_is_not_cut() {
+  local home out fakebin
+  home=$(make_home slow-working)
   fakebin=$(fm_fakebin "$home")
   cat > "$fakebin/sleep" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = 600 ]; then
-  exec /bin/sleep 1
+  exec /bin/sleep 2
 fi
 exec /bin/sleep "$@"
 SH
   chmod +x "$fakebin/sleep"
   : > "$STUB_LOG"
-  printf 'hang\n' > "$STUB_MODE_FILE"
-  mk_task "$home" scout-slow scout idle "done [at=$OLD]: report written"
-  scout_report "$home" scout-slow
-  start=$(date +%s)
-  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) || fail "reap failed: $out"
-  end=$(date +%s)
-  [ $((end - start)) -lt 20 ] || fail "a hung teardown was not cut at the accelerated bound"
-  expect_class "$out" scout-slow teardown-timeout "the real timeout runner cuts a hung teardown"
-  assert_present "$home/state/.idle-reap/scout-slow.refused" "a timeout is remembered"
-  assert_present "$home/state/scout-slow.meta" "a timeout does not retire the task"
-  pass "the fixed teardown timeout cuts a hung command and records its refusal"
+  printf 'slow\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-busy scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-busy
+  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) \
+    || fail "reap failed: $out"
+  expect_class "$out" scout-busy reaped "a slow, working teardown completes"
+  assert_absent "$home/state/.idle-reap/scout-busy.refused" "a working teardown is not remembered as refused"
+  assert_absent "$home/state/scout-busy.meta" "the completed teardown retired the task"
+  pass "a teardown that is slow but working is never cut and retires its task"
 }
-
 test_selection_matrix
 test_paused_reasons_survive_busy_and_steering_gates
 test_reap_asks_teardown_without_force
@@ -1029,6 +1071,7 @@ test_budget_bounds_teardowns_per_pass
 test_refusal_is_remembered_and_retried_on_change
 test_real_teardown_refusal_preserves_the_task
 test_lease_refusal_is_transient
+test_unknown_no_mistakes_read_is_retried_not_parked
 test_project_lock_contention_is_skipped_and_retried
 test_project_lock_fresh_publication_is_skipped_not_refused
 test_project_lock_acquisition_error_is_not_skipped
@@ -1042,37 +1085,29 @@ test_grandchild_mate_root_freeze
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
-# A teardown that outlasts the sweep's limit after it reserved its slot keeps
-# its return-pending record. The timeout must then record no refusal memo, so
-# the very next sweep selects the closed task again instead of parking it.
+# A teardown that goes silent after it reserved its slot keeps its return-pending
+# record. The stop must then record no refusal memo, so the very next sweep selects
+# the closed task again instead of parking it.
 test_timeout_with_a_pending_return_is_retried_by_the_next_sweep() {
-  local home out fakebin
+  local home out
   home=$(make_home timeout-pending)
-  fakebin=$(fm_fakebin "$home")
-  cat > "$fakebin/sleep" <<'SH'
-#!/usr/bin/env bash
-if [ "${1:-}" = 600 ]; then
-  exec /bin/sleep 1
-fi
-exec /bin/sleep "$@"
-SH
-  chmod +x "$fakebin/sleep"
   : > "$STUB_LOG"
   printf 'hang\n' > "$STUB_MODE_FILE"
   mk_task "$home" scout-pending scout idle "done [at=$OLD]: report written"
   scout_report "$home" scout-pending
   printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/scout-pending.teardown-return-pending"
-  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) \
+  out=$(FM_IDLE_REAP_TEARDOWN_STALL_SECS=2 run_reap "$home" reap) \
     || fail "reap failed: $out"
-  expect_class "$out" scout-pending teardown-timeout "the real timeout runner cuts the hung teardown"
-  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a timeout with a pending return records no refusal memo"
-  assert_present "$home/state/scout-pending.meta" "the timeout retired the task"
-  assert_present "$home/state/scout-pending.teardown-return-pending" "the timeout dropped the pending-return record"
+  expect_class "$out" scout-pending teardown-timeout "a silent teardown is stopped"
+  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a stop with a pending return records no refusal memo"
+  assert_present "$home/state/scout-pending.meta" "the stop retired the task"
+  assert_present "$home/state/scout-pending.teardown-return-pending" "the stop dropped the pending-return record"
   out=$(run_reap "$home" scan) || fail "scan failed: $out"
   expect_class "$out" scout-pending reap "the next sweep selects the closed task again"
-  pass "a timeout with a pending pool return leaves the task selectable by the next sweep"
+  pass "a stopped teardown with a pending pool return leaves the task selectable by the next sweep"
 }
-test_teardown_timeout_is_bounded
+test_silent_teardown_is_stopped_after_its_stall_interval
+test_slow_working_teardown_is_not_cut
 test_timeout_with_a_pending_return_is_retried_by_the_next_sweep
 test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock

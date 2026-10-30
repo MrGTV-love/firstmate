@@ -17,7 +17,8 @@
     "spawn-confinement-coverage",
     "spawn-write-confinement",
     "status-log-size-cap",
-    "teardown-superseded-slot-lease"
+    "teardown-superseded-slot-lease",
+    "captain-hold-withdraw-ruling"
   ],
   "guards": [
     {
@@ -1120,6 +1121,34 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by PR #188 after a status-append loop filled the disk; deny without a guard event: an append past the cap exits 75 and a refused read returns status 2, each naming the file on stderr, and nothing is written or read; the symbolic-link refusal keeps the capped append on the status log itself; bin/fm-status-cap-guard.sh raises the over-cap wake for a raw writer; docs/configuration.md \"Status log size bounds\" describes the bounds for operators; the test proves the cap and both read refusals, and the symbolic-link refusal has no fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "captain-hold-withdraw-ruling",
+      "owner": "bin/fm-captain-hold.sh",
+      "sites": [
+        {"file": "bin/fm-captain-hold.sh", "match": "refusing to withdraw $id", "count": 4}
+      ],
+      "invariant": "a captain hold is withdrawn as moot only under a recorded captain ruling that names it and was recorded after the hold was set",
+      "layer": "runtime-block",
+      "source": "the ruling task's closed captain answer record, its title, hold reason and answer text, its Resolved at stamp, and the withdrawn task's Captain hold set stamp",
+      "trigger": "bin/fm-captain-hold.sh withdraw names a ruling that is not a closed captain call carrying the captain's words, does not name the task, or was recorded before the hold was set, or the task carries no hold-set stamp",
+      "remedy": "bin/fm-captain-hold.sh withdraw <task> --evidence-file <file> --ruling <captain-ruling-task> naming a captain ruling that names the task and postdates the hold, or bin/fm-captain-hold.sh answer <task> --decision-file <captain-answer-file> --release with the captain's own words",
+      "budget": 1,
+      "test": "tests/fm-captain-hold-owner.test.sh",
+      "tier": "C",
+      "harm": "reversible",
+      "remedy_verified": "fixture",
+      "layer_note": "deny without a guard event: each refusal exits 1 with the reason on stderr and writes no record, so the hold stays open and the merge gate keeps refusing"
     }
   ],
   "excluded": [
