@@ -1,0 +1,6 @@
+### S3: lanes resume - loose-1 posts a new status line; captain answers decide-3 hold
+answered: decide-3
+answer rc=0
+- [x] decide-3 - Decision lane 3 (repo: firstmate) (kind: ship) (done 2026-10-29) (hold: approve lane 3) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 426c080a7a025bdd9203b3091230193a641611cc0c9522de7084aef6232c5a4d

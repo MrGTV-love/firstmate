@@ -1,0 +1,15 @@
+### S7: away-mode ack. Make paused-12 change (needs action), queue a wake
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+drain rc=0 ack=[--ack-through 19 --recovery-generation 14208.1793330225.YL1JGP]
+S7a: FM_WAKE_ACK_AWAY_DAEMON=1 but no state/.afk (not away) -> gate must still apply
+ack rc=1 (1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+S7b: FM_WAKE_ACK_AWAY_DAEMON=1 with state/.afk -> daemon ack, no ledger gate
+ack rc=0 (0s)
+queue rows left:        0
+S7c: obligation still owed by firstmate after daemon ack:
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+paused-12 last action kind: ['escalated']

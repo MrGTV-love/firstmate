@@ -1,0 +1,9 @@
+### watcher cycle after actions (first ledger surfacing)
+check: open-loop-ledger (49 overdue assigned obligations; read state/open-loops.json)
+watch rc=0
+13	check	open-loop-ledger	check: open-loop-ledger (49 overdue assigned obligations; read state/open-loops.json)
+-rw-r--r--  1 charlesabrooker  staff  11 Oct 29 22:13 /Users/charlesabrooker/tmp/fm-lab.zoj9AC/state/.open-loops-resurfa
+-rw-r--r--  1 charlesabrooker  staff  16 Oct 29 22:13 /Users/charlesabrooker/tmp/fm-lab.zoj9AC/state/.open-loops-surface
+OVERDUE rows presented: 0
+drain rc=0 ack=[--ack-through 13 --recovery-generation 79701.1793330033.tp34uu]
+ack rc=0 (2s)

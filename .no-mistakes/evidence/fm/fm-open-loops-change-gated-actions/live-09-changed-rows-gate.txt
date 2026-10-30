@@ -1,0 +1,20 @@
+### S3 cont: heartbeat, watcher cycle, drain, ack
+signal: /Users/charlesabrooker/tmp/fm-lab.zoj9AC/state/loose-1.status
+watch rc=0
+signal	loose-1.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.zoj9AC/state/loose-1.status
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "3ea548b52aee555bc0de012d","firstmate","decide-3:scope","answer or close this question, or record why it no longer applies",530072,"needs-decision: which scope for lane
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequ
+drain rc=0 ack=[--ack-through 14 --recovery-generation 26378.1793330071.CRoAIf]
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ack rc=1 (1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+### S3 cont: record one action on the one changed row, ack again with same boundary
+action: "3ea548b52aee555bc0de012d"
+kind: deferred
+action rc=0
+ack rc=0 (1s)
+queue rows left:        0

@@ -1,0 +1,16 @@
+### S6a: second deferral on unchanged loose-2 (one deferral per unchanged row)
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+rc=1
+### S6b: escalation on captain-owned paused-07 with --hold paused-07 (row cannot take a binding)
+error: "only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold"
+rc=1
+### S6c: firstmate-owned loose-3 with --hold naming a task not held for the captain
+error: "--hold must name a task still held for the captain: captain prerequisite was answered, released, or is no longer actionable"
+rc=1
+### S6d: hold task ids written in evidence text never bind
+action: "3d846e788e16686e10c7cf23"
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+rc=0
+### S6e: digest status for loose-3 after S6d
+  "3d846e788e16686e10c7cf23","firstmate","loose-3:plan","answer or close this question, or record why it no longer applies",555370,"needs-decision: pick plan for loose 3","escalated, no proof it reached the captain",{"kind": "escalated", "evidence": "escalated

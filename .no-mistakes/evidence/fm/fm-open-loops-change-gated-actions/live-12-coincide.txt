@@ -1,0 +1,22 @@
+### S5: clock +7h; paused-07 hold reason edited (evidence change, same clock); deferrals lapsed; periodic deadline also due
+- [ ] paused-07 - Paused lane 07 (repo: firstmate) (kind: ship) (hold: fleet pause extended to Nov 3) (hold-kind: captain)
+check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting list)
+watch rc=0
+check	open-loop-ledger	check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting li
+OVERDUE:
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+STANDING (unchanged since its last action; no action needed):
+rows[44]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+WAITING OPEN WORK (periodic list for the captain):
+rows[44]{id,owner,subject,next_action,age_seconds,evidence,status,last_action}:
+drain rc=0 ack=[--ack-through 18 --recovery-generation 43308.1793330154.zDOXeT]
+--- OVERDUE rows:
+rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "3ea548b52aee555bc0de012d","firstmate","decide-3:scope","answer or close this question, or record why it no longer applies",555349,"needs-decision: 
+  "fc11afbc1c25d4e0985695ef","firstmate","loose-2:plan","answer or close this question, or record why it no longer applies",555349,"needs-decision: pi
+  "3d846e788e16686e10c7cf23","firstmate","loose-3:plan","answer or close this question, or record why it no longer applies",555349,"needs-decision: pi
+  "e20e63ef9608415c790a1f01","captain","paused-07:captain-hold","resolve the captain hold or record its next decision date",900949,"fleet pause extend
+ack rc=1 (1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:

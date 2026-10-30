@@ -65,4 +65,4 @@ PASS: a hold ending or becoming unreadable restores the same-turn action require
 PASS: a home without a ledger acknowledges without the receipt command
 PASS: a slow batch producer holds no ledger lock and unactioned rows stay gated
 ok - open-work reconciliation reports owned obligations from live records
-exit=0
+bash tests/fm-open-loops.test.sh  429.11s user 624.39s system 49% cpu 35:23.28 total

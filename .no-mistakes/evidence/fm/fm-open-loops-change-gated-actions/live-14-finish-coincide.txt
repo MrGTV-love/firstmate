@@ -1,0 +1,17 @@
+### S6f: after refused 2nd deferral, check-actions still lists remaining rows; loose-2 is captain_visible
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "3ea548b52aee555bc0de012d","firstmate","decide-3:scope","answer or close this question, or record why it no longer applies",555381,"needs-decision: which scope for lane 3",false
+  "fc11afbc1c25d4e0985695ef","firstmate","loose-2:plan","answer or close this question, or record why it no longer applies",555381,"needs-decision: pick plan for loose 2",true
+  "e20e63ef9608415c790a1f01","captain","paused-07:captain-hold","resolve the captain hold or record its next decision date",900981,"fleet pause extended to Nov 3",false
+rc=0
+action: "fc11afbc1c25d4e0985695ef"
+kind: escalated
+action: "e20e63ef9608415c790a1f01"
+kind: escalated
+action: "3ea548b52aee555bc0de012d"
+kind: escalated
+drain rc=0 ack=[--ack-through 18 --recovery-generation 43308.1793330154.zDOXeT]
+ack rc=0 (1s)
+queue rows left:        0

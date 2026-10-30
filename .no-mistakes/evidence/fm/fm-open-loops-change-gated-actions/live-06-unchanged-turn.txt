@@ -1,0 +1,6 @@
+### S2: next turn, all 49 rows unchanged (ages grew), unrelated wake queued
+overdue rows in ledger: 49
+OVERDUE rows presented: 0
+drain rc=0 ack=[--ack-through 12 --recovery-generation 26374.1793330011.BYvUzr]
+check-actions rc=0
+ack rc=0 (1s)

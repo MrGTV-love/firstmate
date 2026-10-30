@@ -1,0 +1,16 @@
+### S3b: clock +2000s (FM_OPEN_LOOPS_NOW=1793332105): the re-asked loose-1 question is overdue again with new evidence
+check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+watch rc=0
+check	open-loop-ledger	check: open-loop-ledger (48 overdue assigned obligations; read state/open-loops.json)
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "3454aee848ca6ef449050607","firstmate","loose-1:plan","answer or close this question, or record why it no longer applies",2051,"needs-decision: lane resumed; pick plan 
+drain rc=0 ack=[--ack-through 15 --recovery-generation 70381.1793330107.pnhBUD]
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ack rc=1 (1s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+kind: escalated
+standing: no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the row is unchanged it needs no new action and stays in the periodic waiting list (name the hold with --hold TASK_ID)
+ack rc=0 (2s)

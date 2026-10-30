@@ -1,0 +1,37 @@
+### BASELINE (base commit 28bb500b2) same paused-fleet fixture
+drain: OVERDUE rows presented=47
+turn 1: recorded       47 actions
+turn 1 ack rc=0
+drain: OVERDUE rows presented=0
+turn 2 ack rc=0 (no row changed)
+1284:resurface_scope() {
+1303:resurface_absorbed() {  # <window> <throttle-marker> <age> <reason> [scope] [min-age]
+1305:  scope=$(resurface_scope "$throttle" "$scope")
+1324:# resurface_absorbed above - literally the same bounded cadence a declared pause
+1325:# uses, throttled by its own .writing-resurfaced-<key> marker - and a crew whose
+1337:  resurface_absorbed "$win" "$STATE/.writing-resurfaced-$key" "$wage" \
+1482:# resurface_absorbed owns initial aging and the last-surface gate for repeats.
+1554:  resurface_absorbed "$win" "$STATE/.waiting-resurfaced-$key" "$wage" \
+1350:    def hold_stands(self, action, row):
+1351:        """An escalation bound to a captain hold stands until the row changes or that hold ends.
+1462:    def stands(self, action, row, now):
+1491:def receipt_stands(action, row, now, waits):
+1498:        return waits is not None and waits.stands(action, row, now)
+1502:        return True  # only the captain can move it; stands until the row changes
+1505:        return waits is not None and waits.hold_stands(action, row)
+1520:        return receipt_stands(action, row, now, waits)
+1615:                    or receipt_stands(action, row, now, waits):
+1626:                print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
+### BASELINE turn 3: watcher's ledger wake (key open-loop-ledger), nothing changed
+drain: OVERDUE rows presented=0
+turn 3 ack rc=0
+### BASELINE turn 4: clock +7h, nothing changed (same as new-code S5 clock)
+drain: OVERDUE rows presented=48
+   1 "firstmate","decide-3:scope"
+   1 "firstmate","loose-1:plan"
+   1 "firstmate","loose-2:plan"
+   1 "firstmate","loose-3:plan"
+   1 owner,subject
+turn 4 ack rc=1
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+NOTE: the "OVERDUE rows presented" counter above counts every row id line in the drain output, STANDING included. Turn 4 OVERDUE block (uniq list) holds 4 unchanged firstmate rows (decide-3:scope, loose-1..3:plan) re-gated only because the base 4-hour receipt expired; base turn-4 ack is refused. New code at the same +7h clock (live-12-coincide.txt) gates only the changed paused-07 row and the 3 lapsed deferrals; the unchanged, escalated loose-1 row needs no new action.

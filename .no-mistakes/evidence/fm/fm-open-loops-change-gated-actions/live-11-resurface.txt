@@ -1,0 +1,6 @@
+### S4: periodic resurface wake (FM_OPEN_LOOPS_RESURFACE=1 for this watcher cycle), no row changed
+check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting list)
+watch rc=0
+check	open-loop-ledger-resurface	check: open-loop-ledger-resurface (48 overdue assigned obligations; periodic waiting li
+drain rc=0 ack=[--ack-through 16 --recovery-generation 36195.1793330126.nb56sk]
+ack rc=0 (1s)

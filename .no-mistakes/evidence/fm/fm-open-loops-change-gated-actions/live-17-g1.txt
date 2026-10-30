@@ -1,0 +1,2 @@
+### G1 check at final lab state: overdue ids == gate ids + digest ids
+overdue 48 gate 0 digest 48 missing from both 0 in both 0

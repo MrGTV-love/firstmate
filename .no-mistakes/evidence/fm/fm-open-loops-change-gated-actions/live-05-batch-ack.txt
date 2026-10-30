@@ -1,0 +1,18 @@
+### S1b: record one batch of actions for all 49 rows, then ack
+bin/fm-open-loops.sh action --batch $E/live-04-batch.jsonl >  2>&1  0.27s user 0.21s system 39% cpu 1.229 total
+batch rc=0
+results[49]{line,id,kind,result,message}:
+  1,"f2685b7783cde96b10e849d6","escalated","recorded",""
+  2,"833b842e578c5269ed5a5d19","escalated","recorded","captain hold decide-1; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   10,"8e19a822a0473c6f20c56cd1","escalated","recorded","captain hold decide-5; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   12,"5315a27b030e073d1732c19e","escalated","recorded","captain hold decide-6; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   14,"fab18e09c1c656b9a99171a7","escalated","recorded","captain hold decide-7; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   16,"c639bae6c2ffe4ab6b1af614","escalated","recorded","captain hold decide-8; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   17,"3454aee848ca6ef449050607","escalated","recorded","no; no task held for the captain was named, so this escalation has no hold binding: it is never listed as waiting on the captain, and while the 
+   1   2,"833b842e578c5269ed5a5d19","escalated","recorded","captain hold decide-1; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   4,"0d82c6e4a2fd4d4cbe0eed84","escalated","recorded","captain hold decide-2; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   6,"3ea548b52aee555bc0de012d","escalated","recorded","captain hold decide-3; covers this row until it changes or that hold is answered, released, blocked or held again"
+   1   8,"6c1fcfeb5efa1a525767e2a2","escalated","recorded","captain hold decide-4; covers this row until it changes or that hold is answered, released, blocked or held again"
+drain rc=0 ack=[--ack-through 11 --recovery-generation 13798.1793329894.TunNXp]
+ack rc=0 (2s)
+queue rows left:        0

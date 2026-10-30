@@ -1,0 +1,8 @@
+### S1: drain with 49 new overdue rows and no actions, then try ack
+rows presented in OVERDUE: 49
+drain rc=0 ack=[--ack-through 11 --recovery-generation 13798.1793329894.TunNXp]
+ack rc=1 (0s)
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[49]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+queue rows left:       11
