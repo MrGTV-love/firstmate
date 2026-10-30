@@ -1033,7 +1033,7 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   fi
   if ! fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
     if [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
-      echo "warning: pool slot $slot is in a superseded Treehouse pool folder (treehouse status from $project does not list it), so a lease by slot name would hold a different copy; keeping project custody through its return by path instead of reserving it" >&2
+      echo "warning: pool slot $slot is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy" >&2
       TEARDOWN_SLOT_SUPERSEDED=1
       TEARDOWN_SLOT_SUPERSEDED_NAME=$FM_TASK_COPY_SLOT_NAME
     else
