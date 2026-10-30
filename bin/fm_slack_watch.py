@@ -32,7 +32,8 @@ STATE_KEY = 'slack-watch'
 REACTIONS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
 USER_ID = re.compile(r'[UW][A-Z0-9]{8,}')
 DM_CHANNEL = re.compile(r'D[A-Z0-9]{8,}')
-# A failure of one thread's own read must not stop the other threads' replies from being read.
+# A failure of one thread's own read, journaled-row post, or resolution post must not stop the other
+# threads' replies from being read.
 THREAD_ERRORS = ('api_error', 'channel_not_found')
 OPTION_LINE = re.compile(r'^\s*Option\s*([1-9][0-9]*)\s*[.):]\s*(.*)$')
 WAKE_LIMIT = 480
