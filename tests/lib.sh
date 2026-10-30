@@ -74,6 +74,9 @@ unset FM_DURATION_HOME
 # into the next scenario that reuses the same task id and state directory. The
 # suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
 export FM_CREW_STATE_NM_CACHE=off
+# A snapshot caller may carry paths for one captured task. Fixtures must resolve
+# their own task metadata/status instead of inheriting that unrelated capture.
+unset FM_CREW_STATE_META_OVERRIDE FM_CREW_STATE_STATUS_OVERRIDE
 
 # bin/fm-merge-prune.sh arms and starts a pool-copy prune after every verified
 # merge, which would run the real teardown against a fixture home. The suite
