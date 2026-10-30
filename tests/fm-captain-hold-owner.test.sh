@@ -533,6 +533,38 @@ test_a_retried_withdraw_finishes_without_a_second_record() {
   pass "a withdraw retried after a failed release finishes it without a second record"
 }
 
+# A withdrawal retried with an edited evidence file after its release failed is
+# the same withdrawal of the same hold: it writes no second record and resolves
+# the parent key the hold opened, never a new one.
+test_a_withdraw_retried_with_edited_evidence_resolves_the_original_key() {
+  local mate channel show
+  mate=$(make_mate_home retry-drift)
+  channel=$(mate_channel "$mate")
+  tasks_in "$mate" add drift-work "Drift work" --kind ship --repo sample >/dev/null
+  FM_CAPTAIN_HOLD_NOW=$PAST_HOLD_SET run_captain "$mate" hold drift-work --reason "pick one" >/dev/null || fail "hold failed"
+  grep -q 'needs-decision \[key=captain-hold-drift-work-1\]' "$channel" || fail "the hold did not open key 1: $(cat "$channel")"
+  printf 'drift-work is moot.\n' > "$mate/ruling.txt"
+  run_captain "$mate" hold ruling-d --title "Ruling D" --reason "choose" --repo sample >/dev/null
+  run_captain "$mate" answer ruling-d --decision-file "$mate/ruling.txt" >/dev/null || fail "could not record the ruling"
+  printf 'Moot under the ruling.\n' > "$mate/evidence.txt"
+  fail_tasks_axi_once "$mate" unhold
+  if run_captain "$mate" withdraw drift-work --evidence-file "$mate/evidence.txt" --ruling ruling-d >/dev/null 2>&1; then
+    fail "the injected unhold failure did not stop withdraw"
+  fi
+  assert_contains "$(tasks_in "$mate" show drift-work --full)" "held: yes" "the failed withdraw released the hold"
+  printf 'Moot under the ruling; the mechanism call no longer applies.\n' > "$mate/evidence.txt"
+  run_captain "$mate" withdraw drift-work --evidence-file "$mate/evidence.txt" --ruling ruling-d >/dev/null \
+    || fail "the retried withdraw with edited evidence failed"
+  show=$(tasks_in "$mate" show drift-work --full)
+  assert_contains "$show" "held: no" "the retried withdraw did not release the hold"
+  [ "$(printf '%s' "$show" | grep -o 'Resolution mode: withdrawn' | wc -l | tr -d ' ')" = 1 ] \
+    || fail "the retried withdraw wrote a second record for the same hold"
+  [ "$(grep -c 'resolved \[key=captain-hold-drift-work-1\]' "$channel")" = 1 ] \
+    || fail "the retried withdraw did not resolve the original key once: $(cat "$channel")"
+  ! grep -q 'captain-hold-drift-work-2' "$channel" || fail "the retried withdraw published a new key: $(cat "$channel")"
+  pass "a withdraw retried with edited evidence writes one record and resolves the key its hold opened"
+}
+
 # Retention archives a question row a withdrawal closed; the gate still accepts
 # it and lists it apart from the captain's answered calls.
 test_the_gate_accepts_an_archived_withdrawal() {
@@ -677,6 +709,7 @@ test_a_legacy_mate_hold_stays_the_captains_without_a_ruling
 test_recording_the_owner_keeps_a_freeze_in_force
 test_lifecycle_readers_and_the_gate_know_withdrawn_records
 test_a_retried_withdraw_finishes_without_a_second_record
+test_a_withdraw_retried_with_edited_evidence_resolves_the_original_key
 test_the_gate_accepts_an_archived_withdrawal
 test_withdraw_closes_finished_work_teardown_retained
 test_an_expired_dated_hold_is_still_withdrawn

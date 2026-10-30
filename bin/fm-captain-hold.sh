@@ -2151,19 +2151,21 @@ command_withdraw() {
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
   owner=$(effective_decision_owner "$(decode_shown_value "$body")")
-  occurrence=$(( $(resolution_record_count "$body") + 1 ))
-  if [ "$(recorded_resolution_mode "$body" || true)" = withdrawn ] \
-    && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+  hold_set=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
+  if [ "$(recorded_resolution_mode "$body" || true)" = withdrawn ]; then
     if [ -z "$hold_kind" ] || [ "$state" = "done" ]; then
-      remove_interrupted_answer_stamp "$id"
-      reconcile_request_retire "$id"
-      publish_parent_hold "$id" $((occurrence - 1)) resolved \
-        "withdrawn, not a captain answer: $(decode_shown_value "$body" | sed -n 's/^Withdrawn by: //p' | head -1)"
-      printf 'withdrawn: %s\n' "$id"
-      return 0
+      if [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+        occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$(recorded_resolved_hold_set "$body")") || exit 1
+        remove_interrupted_answer_stamp "$id"
+        reconcile_request_retire "$id"
+        publish_parent_hold "$id" "$occurrence" resolved \
+          "withdrawn, not a captain answer: $(decode_shown_value "$body" | sed -n 's/^Withdrawn by: //p' | head -1)"
+        printf 'withdrawn: %s\n' "$id"
+        return 0
+      fi
+    elif [ -n "$hold_set" ] && [ "$(recorded_resolved_hold_set "$body")" = "$hold_set" ]; then
+      replay=1
     fi
-    hold_set=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
-    [ -z "$hold_set" ] || [ "$(recorded_resolved_hold_set "$body")" != "$hold_set" ] || replay=1
   fi
   [ "$state" != "done" ] || fail "task $id is already closed; a withdrawal releases an open hold"
   if [ "$hold_kind" != captain ]; then
@@ -2174,9 +2176,9 @@ command_withdraw() {
     || fail "$ruling is not a recorded captain ruling in this home (a closed captain call carrying the captain's words); refusing to withdraw $id"
   text_names_task "$RULING_RECORDS" "$id" \
     || fail "ruling $ruling does not name $id in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw $id"
-  hold_set=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
   [ -n "$hold_set" ] \
     || fail "task $id carries no hold-set stamp, so no ruling can be shown to postdate this hold; refusing to withdraw $id"
+  occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$hold_set") || exit 1
   case "$hold_set" in
     *T*) ruling_at=$RULING_RESOLVED_AT ;;
     *) ruling_at=${RULING_RESOLVED_AT%%T*} ;;
@@ -2186,11 +2188,7 @@ command_withdraw() {
   WITHDRAW_BASIS="moot under the recorded captain ruling $ruling"
   WITHDRAW_OWNER=$owner
   WITHDRAW_RUN_ROLE=$(fm_answered_by_home_role "$FM_HOME" "$STATE")
-  if [ "$replay" = 1 ]; then
-    occurrence=$((occurrence - 1))
-  else
-    write_resolution_record "$id" withdrawn "$body"
-  fi
+  [ "$replay" = 1 ] || write_resolution_record "$id" withdrawn "$body"
   if closes_on_decision "$id" "$state" "$(show_field_value "$show" kind)" "$body"; then
     apply_pending_retained_artifact "$id" || fail "could not apply the retained artifact for withdrawn task $id"
     tasks_axi "done" "$id" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null \
