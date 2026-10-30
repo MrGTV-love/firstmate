@@ -1312,6 +1312,30 @@ test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   pass "returning the enclosing slot aborts its parked run and retires its launch agent before the return"
 }
 
+# A forced teardown whose daemon is silent concludes two roots here, the nested copy
+# and the enclosing slot. The first read that goes silent makes the run state
+# unknown for the whole teardown, so the second root is not made to wait out the
+# stall again: one silent read in all, and both roots are recorded as unknown.
+test_forced_nested_teardown_waits_one_stall_for_a_silent_daemon() {
+  local case_dir rc slot_head
+  make_nested_slot_case forced-nested-silent-daemon enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  slot_head=$(git -C "$NESTED_SLOT" rev-parse HEAD)
+  rc=0
+  FM_HOME="$case_dir/home" \
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_FAKE_NM_HANG_LOG="$case_dir/nm-hang.log" FM_TEARDOWN_NM_STALL_SECS=3 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "forced-nested-silent-daemon: --force should go on past the unknown run state: $(cat "$case_dir/stderr")"
+  [ "$(wc -l < "$case_dir/nm-hang.log" | tr -d ' ')" = 1 ] \
+    || fail "forced-nested-silent-daemon: the silent daemon was waited on $(wc -l < "$case_dir/nm-hang.log" | tr -d ' ') times, want once"
+  [ "$(grep -c 'run state unknown' "$case_dir/data/task-x1/no-mistakes-unknown.log")" = 2 ] \
+    || fail "forced-nested-silent-daemon: both roots were not recorded as unknown: $(cat "$case_dir/data/task-x1/no-mistakes-unknown.log" 2>/dev/null)"
+  assert_absent "$NESTED_COPY" "forced-nested-silent-daemon: the nested copy was not removed"
+  pass "a forced teardown over a silent daemon waits one stall interval, not one per root"
+}
+
 test_shared_nested_copy_concludes_only_its_own_runtime() {
   local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived late
   for ownership in duplicate own foreign late; do
@@ -3258,6 +3282,7 @@ test_slot_named_as_another_prior_copy_refuses
 test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
+test_forced_nested_teardown_waits_one_stall_for_a_silent_daemon
 test_shared_nested_copy_concludes_only_its_own_runtime
 test_nested_slot_stale_lock_cleanup_reproves_the_slot
 test_nested_slot_reproof_refusal_is_rerunnable

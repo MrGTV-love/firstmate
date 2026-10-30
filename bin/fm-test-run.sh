@@ -3034,6 +3034,11 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# One wide sweep per run: it also removes roots and registries an older layout
+# left behind. Each script's own sweep afterwards is the narrow one; the comment
+# above fm_test_reap_orphans in tests/lib.sh owns what it reads and what it costs.
+FM_TEST_SWEEP_ALL=1 bash -c '. "$1/tests/lib.sh"' _ "$ROOT" >/dev/null 2>&1 || true
+
 RUN_ID="fm-test-run-${RUN_STARTED_MS}-$$"
 TOTAL=0
 FAILED=0
@@ -3135,11 +3140,15 @@ record_script_result() {
 
 # Run the header's leftovers sweep before this worker moves to its next script.
 reap_script_leftovers() {  # <script>
-  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line
+  local reaper="$ROOT/bin/fm-test-reap-orphans.sh" line base=${TMPDIR:-/tmp}
+  local -a owners=()
   [ -x "$reaper" ] || return 0
+  [ ! -e "${base%/}/.git" ] || base=/tmp
+  owners=(--owners "${base%/}/fm-test-owners")
+  [ "${base%/}" = /tmp ] || owners+=(--owners /tmp/fm-test-owners)
   while IFS= read -r line; do
     [ -z "$line" ] || log "reaped after $1: $line"
-  done < <("$reaper" 2>/dev/null || true)
+  done < <("$reaper" "${owners[@]}" 2>/dev/null || true)
   return 0
 }
 

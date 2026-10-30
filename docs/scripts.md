@@ -33,7 +33,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-remote-doctor.sh`    | Check, and with `--fix` repair, one remote account's second-mate readiness (remote job worker, Herdr, Aqua launch agents, PATH, and required tools) |
 | [`fm-backlog-handoff.sh`](../bin/fm-backlog-handoff.sh) | Move queued backlog items into a secondmate home; its header owns route-specific wake outcomes and retries |
 | `fm-backlog-receive.sh`  | Idempotently ingest one confined remote handoff outbox through tasks-axi             |
-| `fm-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
+| `fm-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, withdraw a hold a recorded captain ruling made moot, gate investigation completion, and report record divergence between the status log and the backlog |
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
 | [`fm-brief.sh`](../bin/fm-brief.sh) | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout; emitted ship/scout briefs own the private-service cleanup rule |
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the [task Definition of Done](configuration.md#task-definition-of-done-ship-and-scout-briefs) scaffold and its fresh-spawn placeholder check, the named-head reachability gate on ship `done:` acceptance, the no-mistakes `--intent` contract, and the separate no-mistakes verification plan (`--verification-plan <brief>`) |
@@ -55,6 +55,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-herdr-ci-cleanup.sh` | Snapshot and tear down only job-owned `fm-lab-*` sessions in the Herdr CI lane       |
 | `fm-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `FM_TASK_ID` marks a task worker |
 | [`fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) | Reap processes provably owned by an ended lab or test run; its header owns the safety contract |
+| [`fm-scratch-legacy-reap.sh`](../bin/fm-scratch-legacy-reap.sh) | One-time removal of old unowned scratch entries from before `fm-scratch-lib.sh` in the directory named by the required `--tmpdir`; dry run unless `--apply` |
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
@@ -137,6 +138,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pipeline-spend.sh`   | Attribute a task's no-mistakes pipeline spend to the task and keep it in the private spend ledger |
 | `fm-tangle-lib.sh`       | Shared default-branch resolution and primary-checkout tangle classification          |
 | `fm-timeout-lib.sh`      | Single owner of hard-bounded command execution and its fallback watchdog |
+| `fm-scratch-lib.sh`      | Single owner of per-command scratch entries in the shared temp dir: owner-named, released by the command, reaped after a KILL |
 | `fm-task-docker-lib.sh`  | Single owner of which Docker containers, networks, and volumes belong to a task, and of their removal at teardown |
 | `fm-timing-lib.sh`       | Single owner of the deferred network stage's per-step elapsed-time records, inert unless a run asks for them |
 | `fm-supervision-lib.sh`  | Shared supervision-need and watcher-beacon freshness predicates |
@@ -176,7 +178,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pr-poll.sh`          | Provide the byte-static watcher program for validated pull-request, merge-request, and Gerrit-change poll sidecars |
 | `fm-contributions.sh`    | Observe owned publications, retain exact-head judgments, measure required actors, and wake on maintainer signals |
 | `fm-pr-check.sh`         | Record validated task `pr=` and `pr_head=` values, then atomically arm a static merge poll; refuses GitHub drafts and persistent secondmate records (see [architecture.md](architecture.md)) |
-| `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a ten-second full ci log reading skipped for that pass when slower, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
+| `fm-pr-ready-reconcile.sh` | Watcher-run: register each ship's declared `PR <url>` ready signal, or its checks-green `fm-crew-state.sh` PR from a full ci log reading skipped for that pass as unknown when it goes silent, through `fm-pr-check.sh` so a missed supervisor step cannot hold a project-capacity place; a refusal raises a check wake and is retried after ten minutes |
 | `fm-pr-merge.sh`         | Record PR metadata, enforce the header's review and live-forge preconditions for GitHub, GitLab, or Forgejo, refuse Gerrit submission, refuse a GitHub head that lacks the base branch's live tip unless the merge enters that branch's merge queue with at least one required check, then refuse an outcome it cannot prove landed or queued |
 | `fm-review-record.py`    | Record reviews and captain merge words, derive author evidence and verify named independent coverage; its header and `--help` own the record and relay interface |
 | `fm-pr-state.sh`         | Read-only: print one line per GitHub pull-request blocker it can see, reporting on checks that have reported rather than verdicting merge-readiness |

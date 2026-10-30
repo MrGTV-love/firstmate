@@ -351,6 +351,8 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
+# shellcheck source=bin/fm-scratch-lib.sh
+. "$SCRIPT_DIR/fm-scratch-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-procevent-lib.sh
@@ -934,10 +936,10 @@ cmd_poll() {
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   delay=$(poll_retry_delay) || exit 1
   cap=$(start_retry_cap) || exit 1
-  response=$(mktemp "${TMPDIR:-/tmp}/fm-lavish-poll.XXXXXX") || die "cannot stage the poll response"
+  response=$(fm_scratch_new f fm-lavish-poll) || die "cannot stage the poll response"
   ledger=$(poller_record "$artifact") || ledger=
-  printf -v cleanup_command 'rm -f -- %q' "$response"
-  [ -z "$ledger" ] || printf -v cleanup_command '%s %q' "$cleanup_command" "$ledger"
+  printf -v cleanup_command 'fm_scratch_release %q' "$response"
+  [ -z "$ledger" ] || printf -v cleanup_command '%s; rm -f -- %q' "$cleanup_command" "$ledger"
   # shellcheck disable=SC2064 # $cleanup_command must expand now, while the staged path is still set.
   trap "$cleanup_command" EXIT
   # Retirement stops this listener by signalling its process group, and bash runs

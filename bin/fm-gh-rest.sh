@@ -22,6 +22,8 @@
 #
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-scratch-lib.sh
+[ ! -f "$SCRIPT_DIR/fm-scratch-lib.sh" ] || . "$SCRIPT_DIR/fm-scratch-lib.sh"
 STATE=${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}
 CACHE="$STATE/gh-rest-cache"
 EX_TEMPFAIL=75
@@ -221,8 +223,13 @@ cmd_get() {
   command -v gh >/dev/null 2>&1 || die 'gh is required'
   endpoint=${endpoint#/}
   local pages=()
-  work=$(mktemp -d "${TMPDIR:-/tmp}/fm-gh-rest.XXXXXX") || die 'cannot create a temporary directory'
-  trap '[ -z "$work" ] || rm -rf -- "$work"' EXIT
+  if declare -F fm_scratch_new >/dev/null; then
+    work=$(fm_scratch_new d fm-gh-rest) || die 'cannot create a temporary directory'
+    trap 'fm_scratch_release "$work"' EXIT
+  else
+    work=$(mktemp -d "${TMPDIR:-/tmp}/fm-gh-rest.XXXXXX") || die 'cannot create a temporary directory'
+    trap 'rm -rf -- "$work"' EXIT
+  fi
   while [ -n "$endpoint" ]; do
     if reason=$(quota_low core); then
       printf '%s\n' "$reason" >&2
