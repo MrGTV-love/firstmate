@@ -252,10 +252,7 @@ SH
   done
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+fm_test_only
 test_claude_staged_native_hook_suppression
 
 if [ -n "$ZSH_BIN" ]; then
