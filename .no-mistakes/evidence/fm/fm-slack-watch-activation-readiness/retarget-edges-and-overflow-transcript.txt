@@ -1,0 +1,95 @@
+### A. retarget with the owner UNCHANGED (armed home)
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+state: 'U0TESTOWNER' 'D0123456789' threads=1
+
+$ $ROOT/bin/fm-slack-check.sh retarget --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER
+[rc=0]
+state: 'U0TESTOWNER' 'D0123456789' threads=1
+
+### B. retarget in a home that was never armed
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh retarget --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER
+[rc=0]
+state: (no state.json)
+
+### C. arm with a changed owner still refuses (no implicit retarget)
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+slack: refused: dm_user_changed
+[rc=1]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 $ROOT/bin/fm-slack-mirror.sh --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+slack: transport failure: dm_user_changed
+[rc=1]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 $ROOT/bin/fm-slack-check.sh check --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+[rc=1]
+state: 'U0TESTOWNER' 'D0123456789' threads=1
+
+### D. disarm works while config is broken (invalid allowlist, no token)
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+state/slack.check-trust
+state/slack.check.sh
+
+$ $ROOT/bin/fm-slack-check.sh check --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+[rc=0]
+
+$ $ROOT/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+ls: state/slack.check-trust: No such file or directory
+ls: state/slack.check.sh: No such file or directory
+
+### E. retarget against an invalid allowlist is refused, not applied
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 FM_SLACK_ALLOWED_AUTHORS=owner-name $ROOT/bin/fm-slack-check.sh retarget --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+slack: refused: allowlist_unparseable
+[rc=1]
+state: 'U0TESTOWNER' 'D0123456789' threads=1
+
+### F. wake-line overflow: a held line is not cut and prints next run
+
+## new home (unmatched)
+
+$ $ROOT/bin/fm-slack-check.sh arm --replay $ROOT/tests/fixtures/slack/unmatched/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+# journaled two 300-char lines from a crashed run
+
+$ fm-slack-check.sh check --replay unmatched (run 1) [rc=0 len=311]
+check: slack held-a aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; +2 queued
+# outbox left: 1
+
+$ fm-slack-check.sh check --replay unmatched (run 2) [rc=0 len=354]
+check: slack held-b bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; check: slack 900.000001 - unmatched reply 900.000002
+# outbox left: 0
+
+$ fm-slack-check.sh check --replay unmatched (run 3) [rc=0 len=0]
+
+# outbox left: 0
