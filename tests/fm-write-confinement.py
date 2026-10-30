@@ -260,12 +260,13 @@ def child(manifest):
     other_branch = git("-C", str(worktree), "rev-parse", "fm/other").stdout
     git("-C", str(worktree), "update-ref", "refs/heads/fm/other", "HEAD")
     results["refused-other-branch"] = git("-C", str(worktree), "rev-parse", "fm/other").stdout == other_branch
-    # The custody-return route creates this task's own archive branches. They
-    # must work with the route's own git commands, while no other ref name
-    # does: another task's archive, ids that contain or extend this task's id,
-    # and names outside the two documented shapes. No case-only variant of an
-    # own name is tried: the default macOS volume is case-insensitive, so that
-    # path is the very same file and the kernel treats it as one.
+    # The custody-return route creates this task's own archive branches, the
+    # one-level names archive/task-<name>. They must work with the route's own
+    # git commands, while no other ref name does: another task's archive, ids
+    # that contain, are part of or extend this task's id, a name one folder
+    # deeper and a name outside archive/. No case-only variant of an own name
+    # is tried: the default macOS volume is case-insensitive, so that path is
+    # the very same file and the kernel treats it as one.
     def ref_exists(name):
         return git("-C", str(worktree), "rev-parse", "--verify", "-q", "refs/heads/" + name).returncode == 0
 
@@ -275,28 +276,71 @@ def child(manifest):
         return failed
 
     head, base = (git("-C", str(worktree), "rev-parse", ref).stdout.strip() for ref in ("HEAD", "HEAD~1"))
-    for kind, hex8 in (("submitted", "0123abcd"), ("pipeline", "89abcdef")):
-        name = f"archive/task-{kind}-{hex8}"
+    for label, name in (("submitted", "archive/task-submitted"), ("pipeline", "archive/task-pipeline"),
+                        ("submitted-hex", "archive/task-submitted-0123abcd"), ("pipeline-hex", "archive/task-pipeline-89abcdef"),
+                        ("other-shape", "archive/task-other-0123abcd")):
         created = git("-C", str(worktree), "branch", name, head)
         again = git("-C", str(worktree), "branch", name, head)
         moved = git("-C", str(worktree), "update-ref", "refs/heads/" + name, base, head)
         reflog = git("-C", str(worktree), "reflog", "show", "--format=%H", "refs/heads/" + name).stdout.split()
-        results[f"archive-own-{kind}-create"] = (created.returncode == 0 and again.returncode != 0
-                                                  and git("-C", str(worktree), "rev-parse", "refs/heads/" + name).stdout.strip() == base)
-        results[f"archive-own-{kind}-update"] = moved.returncode == 0 and bool(reflog)
+        results[f"archive-own-{label}-create"] = (created.returncode == 0 and again.returncode != 0
+                                                   and git("-C", str(worktree), "rev-parse", "refs/heads/" + name).stdout.strip() == base)
+        results[f"archive-own-{label}-update"] = moved.returncode == 0 and reflog[:2] == [base, head]
         deleted = git("-C", str(worktree), "branch", "-D", name)
-        results[f"archive-own-{kind}-delete"] = deleted.returncode == 0 and not ref_exists(name)
+        results[f"archive-own-{label}-delete"] = deleted.returncode == 0 and not ref_exists(name)
     for label, name in (("other-task", "archive/other-submitted-0123abcd"),
                         ("extending-id", "archive/task-2-submitted-0123abcd"),
                         ("contained-id", "archive/tas-submitted-0123abcd"),
                         ("containing-id", "archive/xtask-submitted-0123abcd"),
-                        ("own-id-other-shape", "archive/task-other-0123abcd"),
-                        ("own-id-short-hex", "archive/task-submitted-0123abc"),
-                        ("own-id-long-hex", "archive/task-submitted-0123abcde"),
-                        ("own-id-non-hex", "archive/task-submitted-0123abcg"),
-                        ("own-id-suffix", "archive/task-submitted-0123abcd-extra"),
+                        ("own-id-alone", "archive/task"),
+                        ("own-id-no-hyphen", "archive/tasksubmitted"),
+                        ("own-id-nested", "archive/task-nested/submitted"),
                         ("outside-archive", "task-submitted-0123abcd")):
         results[f"refused-archive-{label}"] = ref_refused(name)
+    common = Path(manifest["packed_refs"]).parent
+    for folder in ("refs/heads", "logs/refs/heads"):
+        shutil.rmtree(common / folder / "archive/task-nested", ignore_errors=True)  # the deeper name's folder Git leaves behind
+        (common / folder / "archive").mkdir(exist_ok=True)  # unconfined Git removes it with its last ref
+    for label, name in (("other-task", "other-submitted-0123abcd"), ("extending-id", "task-2-submitted-0123abcd")):
+        reflog_path = common / "logs/refs/heads/archive" / name
+        results[f"refused-archive-reflog-{label}"] = refused(reflog_path)
+        reflog_path.unlink(missing_ok=True)  # leave the unconfined control clean
+    # An own archive name must not become a second name for another task's
+    # branch: a hard link to it, a symbolic link to it or to its folder, or a
+    # rename of it into the archive namespace.
+    other_ref, archive = common / "refs/heads/fm/other", common / "refs/heads/archive"
+    other_bytes = other_ref.read_bytes()
+
+    def other_ref_kept(attempt, alias):
+        # True only when the attempt was refused and the branch kept its
+        # bytes; the unconfined control is put back as it was found.
+        try:
+            attempt()
+        except PermissionError:
+            held = other_ref.read_bytes() == other_bytes
+        else:
+            held = False
+        if not other_ref.exists():
+            alias.rename(other_ref)
+        elif alias.is_symlink() or alias.exists():
+            alias.unlink()
+        if other_ref.read_bytes() != other_bytes:
+            other_ref.write_bytes(other_bytes)
+        return held
+
+    def through_symlink(target, alias, path):
+        def run():
+            alias.symlink_to(target)
+            with path.open("a") as stream:
+                stream.write("replaced")
+        return run
+
+    results["refused-archive-hard-link-other-branch"] = other_ref_kept(lambda: os.link(other_ref, archive / "task-alias"), archive / "task-alias")
+    results["refused-archive-symlink-other-branch"] = other_ref_kept(
+        through_symlink(other_ref, archive / "task-link", archive / "task-link"), archive / "task-link")
+    results["refused-archive-symlink-folder-other-branch"] = other_ref_kept(
+        through_symlink(other_ref.parent, archive / "task-folder", archive / "task-folder/other"), archive / "task-folder")
+    results["refused-archive-rename-other-branch"] = other_ref_kept(lambda: other_ref.rename(archive / "task-moved"), archive / "task-moved")
     deleted = git("-C", str(worktree), "branch", "-d", OWN_PACKED_ARCHIVE)
     results["refused-packed-own-archive-delete"] = (
         deleted.returncode == 1 and f"error: could not delete reference refs/heads/{OWN_PACKED_ARCHIVE}: {refusal}" in deleted.stderr

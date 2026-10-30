@@ -12,7 +12,7 @@ assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
 from this task's directory and the duration ledger, other tasks' branches, loose
 or packed (this task keeps its declared branch and its
-archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
+archive/<task>-<name> recovery branches), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
@@ -328,11 +328,14 @@ def build(args):
             path.parent.mkdir(parents=True, exist_ok=True)
             for suffix in ("", ".lock"):
                 lines.append(f"(allow file-write* (literal {quoted(str(path) + suffix)}))")
-    # The custody-return route makes this task's own recovery archives:
-    # archive/<task>-{submitted,pipeline}-<8 lowercase hex>, the names
-    # bin/fm-teardown.sh reaps. Both names are anchored on the whole id, so a
-    # task id that contains or extends this one never matches. Git may create
-    # each parent only as that exact folder, never rename or delete it.
+    # The custody-return route makes this task's own recovery archives, such as
+    # archive/<task>-{submitted,pipeline}-<8 lowercase hex>. The task owns the
+    # one-level names archive/<task>-<name>, with their locks and reflogs; a
+    # task id that is part of this one or merely starts with it never matches.
+    # A known task whose id extends this one with "-" owns the names under
+    # archive/<that id>- instead, so those stay refused. Git may create each
+    # parent only as that exact folder, never rename or delete it.
+    extending = [task for task in others if task.startswith(args.task + "-")]
     for parent in ("refs/heads/archive", "logs/refs/heads/archive"):
         folder = Path(common) / parent
         try:
@@ -340,8 +343,8 @@ def build(args):
         except FileExistsError:
             continue
         created.append(f"(require-all (literal {quoted(folder)}) (vnode-type DIRECTORY))")
-        lines.append("(allow file-write* " + under(
-            common, re.escape(parent) + "/" + re.escape(args.task) + "-(submitted|pipeline)-" + "[0-9a-f]" * 8 + r"(\.lock)?") + ")")
+        lines.append("(allow file-write* " + under(common, re.escape(parent) + "/" + re.escape(args.task) + "-[^/]+") + ")")
+        lines += ["(deny file-write* " + under(common, re.escape(parent) + "/" + re.escape(task) + "-[^/]+") + ")" for task in extending]
     lines += [f"(allow file-write* {item})" for item in runtime]
     lines += [f"(allow file-write-create {item})" for item in created]
     lines += [f"(deny file-write* {item})" for item in harness_protected]
