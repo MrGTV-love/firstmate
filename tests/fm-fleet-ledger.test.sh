@@ -11,6 +11,226 @@ set -u
 
 TMP_ROOT=$(fm_test_tmproot fm-fleet-ledger)
 
+# TEMPORARY pending-registration diagnostic for portable serial shard 8; remove
+# before acceptance. FM_PENDING_DIAG_OUT is the request: this suite alone turns
+# it into an active scope bound to its own registry and owner shell, writes an
+# unfinalized receipt there, and lets bin/fm-timeout-lib.sh and
+# bin/fm-duration.py write fixed receipts beside fm_run_progress records in the
+# registry's first 128 rows. tests/lib.sh calls fm_fleet_ledger_pending_diag
+# once when its owned-writer wait passes or fails.
+PENDING_DIAG_OUT=${FM_PENDING_DIAG_OUT:-}
+PENDING_DIAG_DONE=0
+unset FM_PENDING_DIAG_OUT FM_PENDING_DIAG_REGISTRY FM_PENDING_DIAG_FIXTURE FM_PENDING_DIAG_SIDECAR
+if [ -n "$PENDING_DIAG_OUT" ] \
+  && printf '{"schema":1,"suite":"tests/fm-fleet-ledger.test.sh","shard":"portable-serial-8","state":"initialized","finalized":false}\n' \
+    2>/dev/null > "$PENDING_DIAG_OUT"; then
+  FM_PENDING_DIAG_REGISTRY=$FM_TEST_PROCESS_REGISTRY
+  FM_PENDING_DIAG_OWNER=$$
+  FM_PENDING_DIAG_FIXTURE=0
+  export FM_PENDING_DIAG_REGISTRY FM_PENDING_DIAG_FIXTURE
+fi
+
+fm_fleet_ledger_pending_diag() {  # <pass|fail> <final records> <overflow 0|1>
+  local status=collection_error
+  [ "$PENDING_DIAG_DONE" = 0 ] || return 0
+  PENDING_DIAG_DONE=1
+  # Only fixed enums, numbers and booleans reach the output; paths, row text
+  # and record bytes stay inside this process.
+  if python3 -I - "$PENDING_DIAG_OUT" "$FM_PENDING_DIAG_REGISTRY" "$1" "$2" "$3" >/dev/null 2>&1 <<'PY'; then
+import json, os, re, sys
+
+out, registry, drain, final_text, overflow = sys.argv[1:6]
+ROWS, SIDECARS, EVENTS, EVENT_BYTES, PENDING, HEALTHY, RECORD_BYTES, OUTPUT_BYTES = 128, 128, 6, 256, 32, 4, 64, 65536
+header = {
+    'schema': 1, 'suite': 'tests/fm-fleet-ledger.test.sh', 'shard': 'portable-serial-8',
+    'state': 'finalized', 'finalized': True,
+    'drain': drain if drain in ('pass', 'fail') else 'unknown', 'collection': 'ok',
+    'limits': {'registry_rows': ROWS, 'sidecars': SIDECARS, 'events_per_sidecar': EVENTS,
+               'event_bytes': EVENT_BYTES, 'pending_records': PENDING, 'healthy_comparisons': HEALTHY,
+               'record_bytes': RECORD_BYTES, 'output_bytes': OUTPUT_BYTES},
+    'flags': {'prefix_has_more_rows': False, 'prefix_partial_row': False, 'pending_overflow': overflow == '1',
+              'pending_outside_selection': False, 'truncated': False, 'parse_error': False,
+              'correlation_invalid': False},
+}
+flags = header['flags']
+NUM = re.compile(r'[0-9]+\Z')
+PY_EVENTS = ('python_entry', 'popen_begin', 'popen_ok', 'popen_error', 'publish_ok', 'publish_error')
+ERRORS = ('FileNotFoundError', 'PermissionError', 'OSError', 'other_oserror')
+
+
+def num(text):
+    return int(text) if NUM.match(text) else None
+
+
+def sidecar_events(path):
+    """Return (state, shell receipt, python receipts) for one sidecar."""
+    try:
+        with open(path, 'rb') as handle:
+            data = handle.read(EVENTS * EVENT_BYTES + 1)
+    except FileNotFoundError:
+        return 'absent', None, []
+    except OSError:
+        return 'open_error', None, []
+    if len(data) > EVENTS * EVENT_BYTES:
+        return 'over_limit', None, []
+    lines = data.split(b'\n')
+    if lines[-1] != b'' or len(lines) - 1 > EVENTS:
+        return 'malformed', None, []
+    shell, python = None, []
+    for index, raw in enumerate(lines[:-1]):
+        fields = raw.decode('ascii', 'replace').split('\t')
+        if len(raw) > EVENT_BYTES:
+            return 'malformed', None, []
+        if index == 0 and len(fields) == 5 and fields[:2] == ['1', 'reserved'] and num(fields[3]) \
+                and (num(fields[4]) is not None or fields[4] == 'unknown') \
+                and (num(fields[2]) or fields[2] == 'unknown'):
+            shell = {'pid': num(fields[2]), 'row': num(fields[3]), 'fixture': num(fields[4])}
+        elif index > 0 and len(fields) == 6 and num(fields[0]) and fields[1] in PY_EVENTS and num(fields[2]) \
+                and (fields[3] == '-' or num(fields[3])) \
+                and (fields[4] == '-' or fields[4] in ERRORS) \
+                and (fields[5] in ('-', 'unknown') or num(fields[5]) is not None):
+            python.append({'seq': num(fields[0]), 'event': fields[1], 'pid': num(fields[2]),
+                           'child': num(fields[3]), 'class': None if fields[4] == '-' else fields[4],
+                           'errno': None if fields[5] in ('-', 'unknown') else num(fields[5]),
+                           'errno_known': fields[5] != 'unknown'})
+        else:
+            return 'malformed', None, []
+    return ('ok' if shell else 'malformed'), shell, python
+
+
+def later_snapshot(path, child):
+    try:
+        with open(path, 'rb') as handle:
+            data = handle.read(RECORD_BYTES + 1)
+    except FileNotFoundError:
+        return {'class': 'absent', 'numeric_matches_child': None}
+    except OSError:
+        return {'class': 'open_error', 'numeric_matches_child': None}
+    line, newline, _ = data.partition(b'\n')
+    if len(data) > RECORD_BYTES:
+        kind = 'over_limit'
+    elif not data:
+        kind = 'empty'
+    elif not line.isdigit():
+        kind = 'other_redacted'
+    else:
+        kind = 'numeric_line' if newline else 'numeric_unterminated'
+    matches = None
+    if kind in ('numeric_line', 'numeric_unterminated') and child is not None:
+        matches = int(line) == child
+    return {'class': kind, 'numeric_matches_child': matches}
+
+
+def build(row, sidecar_state, shell, python, role, cleanup_read):
+    correlation = 'unknown'
+    child = None
+    if sidecar_state == 'ok':
+        seqs = [e['seq'] for e in python]
+        names = [e['event'] for e in python]
+        pids = {e['pid'] for e in python}
+        correlation = 'ok' if shell['row'] == row and seqs == list(range(1, len(python) + 1)) \
+            and len(set(names)) == len(names) and len(pids) <= 1 else 'invalid'
+        if correlation == 'invalid':
+            flags['correlation_invalid'] = True
+        children = {e['child'] for e in python if e['child'] is not None}
+        child = children.pop() if len(children) == 1 else None
+    events = []
+    if shell:
+        events.append({'producer': 'shell', 'seq': 1, 'event': 'reserved'})
+    for e in python:
+        item = {'producer': 'python', 'seq': e['seq'], 'event': e['event']}
+        if e['class']:
+            item['error_class'] = e['class']
+            item['errno'] = e['errno'] if e['errno_known'] else 'unknown'
+        events.append(item)
+    return {
+        'role': role,
+        'fixture_ordinal': shell['fixture'] if shell and shell['fixture'] is not None else 'unknown',
+        'producer': 'python_nested_progress',
+        'sidecar': sidecar_state, 'correlation': correlation,
+        'shell_pid': shell['pid'] if shell else None,
+        'python_pid': python[0]['pid'] if python else None,
+        'child_pid': child, 'events': events,
+        'cleanup_read': cleanup_read,
+        'later_snapshot': later_snapshot(selected_path[row], child),
+    }
+
+
+try:
+    final = {}
+    for line in final_text.split('\n'):
+        if not line:
+            continue
+        fields = line.split('\t')
+        if len(fields) == 3 and num(fields[1]) is not None and fields[2] in (
+                'failed_nothing_read', 'failed_partial_numeric', 'failed_partial_other'):
+            final[fields[0]] = {'rc': num(fields[1]), 'class': fields[2]}
+        else:
+            flags['parse_error'] = True
+    selected_path, records, pending_rows, seen = {}, [], set(), {}
+    with open(registry, 'rb') as handle:
+        for row in range(1, ROWS + 1):
+            raw = handle.readline(4096)
+            if not raw.endswith(b'\n'):
+                flags['prefix_partial_row'] = bool(raw)
+                break
+            fields = raw[:-1].decode('utf-8', 'surrogateescape').split('\t')
+            if len(fields) == 3 and fields[0] in seen:
+                flags['correlation_invalid'] = True
+                selected_path.pop(seen[fields[0]], None)
+            elif len(fields) == 3 and fields[1:] == ['fm_run_progress', 'wait'] \
+                    and fields[0].startswith(registry + '.'):
+                selected_path[row] = fields[0]
+            if len(fields) == 3:
+                seen.setdefault(fields[0], row)
+        else:
+            flags['prefix_has_more_rows'] = bool(handle.readline(1))
+    sidecars = {row: sidecar_events(path + '.diag') for row, path in selected_path.items()}
+    for row, path in selected_path.items():
+        if path in final:
+            pending_rows.add(row)
+            state, shell, python = sidecars[row]
+            flags['parse_error'] |= state == 'malformed'
+            records.append(build(row, state, shell, python, 'pending', final[path]))
+    flags['pending_outside_selection'] = len(final) > len(pending_rows)
+    healthy = 0
+    for row in selected_path:
+        state, shell, python = sidecars[row]
+        names = [e['event'] for e in python]
+        if healthy < HEALTHY and row not in pending_rows and state == 'ok' \
+                and names == ['python_entry', 'popen_begin', 'popen_ok', 'publish_ok']:
+            records.append(build(row, state, shell, python, 'healthy_comparison', 'not_observed'))
+            healthy += 1
+    for ordinal, item in enumerate(records, 1):
+        item['ordinal'] = ordinal
+    report = dict(header, records=records)
+    text = json.dumps(report, sort_keys=True)
+    while len(text.encode()) > OUTPUT_BYTES and report['records']:
+        report['records'].pop()
+        flags['truncated'] = True
+        text = json.dumps(report, sort_keys=True)
+    if len(text.encode()) > OUTPUT_BYTES:
+        raise ValueError
+    with open(out + '.tmp', 'w', encoding='ascii') as handle:
+        handle.write(text + '\n')
+    os.replace(out + '.tmp', out)
+    if drain == 'pass':
+        for path in selected_path.values():
+            try:
+                os.unlink(path + '.diag')
+            except OSError:
+                pass
+except Exception:
+    sys.exit(1)
+PY
+    status=finalized
+  else
+    printf '{"schema":1,"suite":"tests/fm-fleet-ledger.test.sh","shard":"portable-serial-8","state":"collection_error","finalized":false}\n' \
+      2>/dev/null > "$PENDING_DIAG_OUT" || true
+  fi
+  printf 'pending-registration-diag: %s\n' "$status" >&2
+}
+
 make_fakebin() {  # <dir>
   local fakebin
   fakebin=$(fm_fakebin "$1")
@@ -32,6 +252,8 @@ SH
 # Sets HOME_DIR PROJ_DIR WT_DIR FAKEBIN TASK for one isolated case.
 make_case() {  # <name> <on|off>
   local dir="$TMP_ROOT/$1"
+  # TEMPORARY diagnostic: the fixture ordinal the case's launches inherit.
+  [ -z "${FM_PENDING_DIAG_REGISTRY:-}" ] || FM_PENDING_DIAG_FIXTURE=$((FM_PENDING_DIAG_FIXTURE + 1))
   HOME_DIR="$dir/home"
   PROJ_DIR="$dir/sample"
   TASK="$1-t1"

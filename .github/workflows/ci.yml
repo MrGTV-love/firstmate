@@ -256,6 +256,9 @@ jobs:
           # leaving a shard of the required lane unrun.
           FM_SERIAL_LANE: portable-serial-${{ matrix.shard }}of${{ strategy.job-total }}
           FM_SERIAL_SHARD: ${{ matrix.shard }}
+          # TEMPORARY pending-registration diagnostic, shard 8 only; remove
+          # before acceptance. Only tests/fm-fleet-ledger.test.sh acts on it.
+          FM_PENDING_DIAG_OUT: ${{ matrix.shard == 8 && format('{0}/fm-test/pending-registration-serial8.json', runner.temp) || '' }}
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
@@ -274,6 +277,7 @@ jobs:
           path: |
             ${{ runner.temp }}/fm-test/fm-test-timing-portable-serial-${{ matrix.shard }}.json
             ${{ runner.temp }}/fm-test/guard-phase-durations.jsonl
+            ${{ matrix.shard == 8 && format('{0}/fm-test/pending-registration-serial8.json', runner.temp) || '' }}
           if-no-files-found: warn
 
   # Required real-Herdr lane: pinned install, serial real-herdr-gated family,

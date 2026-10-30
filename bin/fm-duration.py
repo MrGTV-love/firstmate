@@ -1068,7 +1068,43 @@ def gate(key, command, log_fd, wait_file=None, cpu_file=None):
         release_slot(fd)
 
 
+def pending_diag(launch_record):
+    """TEMPORARY pending-registration diagnostic for portable serial shard 8;
+    remove before acceptance. Return an event writer that appends one fixed
+    receipt line to the sidecar fm_run_progress selected, only when that sidecar
+    belongs to launch_record inside the registry the fleet-ledger suite
+    activated; otherwise a writer that does nothing. A failed receipt is
+    dropped: it never raises or changes the launch."""
+    sidecar = os.environ.get('FM_PENDING_DIAG_SIDECAR', '')
+    registry = os.environ.get('FM_PENDING_DIAG_REGISTRY', '')
+    if not (sidecar and launch_record and registry
+            and registry == os.environ.get('FM_TEST_PROCESS_REGISTRY')
+            and launch_record.startswith(registry + '.')
+            and sidecar == launch_record + '.diag'):
+        return lambda *_args, **_kwargs: None
+    sequence = [0]
+
+    def event(name, child=None, error=None):
+        sequence[0] += 1
+        kind = code = '-'
+        if error is not None:
+            kind = type(error).__name__ if type(error) in (FileNotFoundError, PermissionError, OSError) else 'other_oserror'
+            code = error.errno if isinstance(error.errno, int) else 'unknown'
+        line = f'{sequence[0]}\t{name}\t{os.getpid()}\t{"-" if child is None else child}\t{kind}\t{code}\n'
+        try:
+            fd = os.open(sidecar, os.O_WRONLY | os.O_APPEND)
+            try:
+                os.write(fd, line.encode('ascii'))
+            finally:
+                os.close(fd)
+        except Exception:
+            pass
+    return event
+
+
 def run(key, command, calibration_file, *, inactivity=None, launch_record=None):
+    diag = pending_diag(launch_record)
+    diag('python_entry')
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
@@ -1088,10 +1124,22 @@ def run(key, command, calibration_file, *, inactivity=None, launch_record=None):
     owner = os.getppid()
     if calibration_file is not None:
         child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
-    child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    diag('popen_begin')
+    try:
+        child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError as error:
+        diag('popen_error', error=error)
+        raise
+    diag('popen_ok', child=child.pid)
     if launch_record:
-        with contextlib.suppress(OSError), open(launch_record, 'a', encoding='ascii') as fill:
-            fill.write(f'{child.pid}\n')
+        # A failed fill stays suppressed, as before the diagnostic.
+        try:
+            with open(launch_record, 'a', encoding='ascii') as fill:
+                fill.write(f'{child.pid}\n')
+        except OSError as error:
+            diag('publish_error', child=child.pid, error=error)
+        else:
+            diag('publish_ok', child=child.pid)
     streams = selectors.DefaultSelector()
     streams.register(child.stdout, selectors.EVENT_READ, sys.stdout.buffer)
     streams.register(child.stderr, selectors.EVENT_READ, sys.stderr.buffer)

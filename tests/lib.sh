@@ -531,12 +531,39 @@ FM_TEST_PROCESS_WAIT_SECONDS=${FM_TEST_PROCESS_WAIT_SECONDS:-150}
 
 fm_test_wait_processes() {  # [registry]
   local registry=${1:-$FM_TEST_PROCESS_REGISTRY} record label mode pid live ticks=0
+  # TEMPORARY serial-8 pending-registration diagnostic; remove before
+  # acceptance. Active only in the owner shell of the registry that
+  # tests/fm-fleet-ledger.test.sh activated. On the final-bound pass it keeps
+  # each failed record's own read status and what that read left in pid.
+  local diag='' diag_final='' diag_kept=0 diag_overflow=0 read_rc diag_class
   [ -f "$registry" ] || return 0
+  if [ -n "${FM_PENDING_DIAG_REGISTRY:-}" ] && [ "$registry" = "$FM_PENDING_DIAG_REGISTRY" ] \
+    && [ "$$" = "${FM_PENDING_DIAG_OWNER:-}" ] && [ "$BASH_SUBSHELL" = 0 ] \
+    && declare -F fm_fleet_ledger_pending_diag >/dev/null; then
+    diag=1
+  fi
   while :; do
     live=
     while IFS=$'\t' read -r record label mode; do
       [ "$mode" = wait ] && [ -e "$record" ] || continue
-      if ! IFS= read -r pid < "$record" 2>/dev/null; then
+      pid=
+      read_rc=0
+      IFS= read -r pid < "$record" 2>/dev/null || read_rc=$?
+      if [ -n "$diag" ] && [ "$ticks" -ge $((FM_TEST_PROCESS_WAIT_SECONDS * 10)) ]; then
+        case "$read_rc:$pid" in
+          0:*) diag_class= ;;
+          *:) diag_class=failed_nothing_read ;;
+          *:*[!0-9]*) diag_class=failed_partial_other ;;
+          *) diag_class=failed_partial_numeric ;;
+        esac
+        if [ -n "$diag_class" ] && [ "$diag_kept" -lt 32 ]; then
+          diag_final="$diag_final$record"$'\t'"$read_rc"$'\t'"$diag_class"$'\n'
+          diag_kept=$((diag_kept + 1))
+        elif [ -n "$diag_class" ]; then
+          diag_overflow=1
+        fi
+      fi
+      if [ "$read_rc" -ne 0 ]; then
         live="$live pending:$record ($label)"
         continue
       fi
@@ -555,11 +582,13 @@ fm_test_wait_processes() {  # [registry]
     if [ "$ticks" -ge $((FM_TEST_PROCESS_WAIT_SECONDS * 10)) ]; then
       printf 'fm_test_wait_processes: owned writers still running after %ss:%s; kept %s\n' \
         "$FM_TEST_PROCESS_WAIT_SECONDS" "$live" "$registry" >&2
+      [ -z "$diag" ] || fm_fleet_ledger_pending_diag fail "$diag_final" "$diag_overflow" || true
       return 1
     fi
     ticks=$((ticks + 1))
     sleep 0.1
   done
+  [ -z "$diag" ] || fm_fleet_ledger_pending_diag pass "" 0 || true
   rm -f "$registry"
 }
 
