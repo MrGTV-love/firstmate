@@ -1,0 +1,75 @@
+# Train 3 ancestry + merge-tree audit at HEAD b25efaefc193c16da0a73106e457cc3dae25aaae
+ancestor OK: ab848a4d47c6ae8fcbf8e71ead68a58943506afb
+ancestor OK: 5ba1d965cda5a5eb5bc2020a790c6d09b2b8201a
+ancestor OK: d82f855c1636b1d84fcb811c09b4a649be9700e9
+ancestor OK: 49a90f67e0f48c8487d194711ad01be5737f6424
+
+# Each merge commit vs fresh automatic merge of its parents
+merge 4d9ff3624 parents ab848a4d47c6ae8fcbf8e71ead68a58943506afb 5ba1d965cda5a5eb5bc2020a790c6d09b2b8201a merge-tree rc=1
+  100644 c9a9679a27beaa812da11248d4de42acc83a325f 1	docs/guards/registry.json
+  100644 75104ff53bb6fb4fba227e869fe4c9b07fccc45d 2	docs/guards/registry.json
+  100644 cec6b3ccdd750df73bda0e612d99b524414fe98c 3	docs/guards/registry.json
+  
+  Auto-merging .agents/skills/backlog-maintenance/SKILL.md
+  Auto-merging docs/guards/registry.json
+  CONFLICT (content): Merge conflict in docs/guards/registry.json
+  tree DIFFERS; diff vs auto:
+    diff --git a/docs/guards/registry.json b/docs/guards/registry.json
+    index e730a40dc..159233581 100644
+    --- a/docs/guards/registry.json
+    +++ b/docs/guards/registry.json
+    @@ -15,11 +15,8 @@
+         "spawn-confinement-coverage",
+         "spawn-write-confinement",
+         "status-log-size-cap",
+    -<<<<<<< ab848a4d47c6ae8fcbf8e71ead68a58943506afb
+    -    "teardown-superseded-slot-lease"
+    -=======
+    +    "teardown-superseded-slot-lease",
+         "captain-hold-withdraw-ruling"
+    ->>>>>>> 5ba1d965cda5a5eb5bc2020a790c6d09b2b8201a
+       ],
+       "guards": [
+         {
+merge 76c60bc1f parents 4d9ff362488b86439fd5dfb7d4813cd6f0132562 d82f855c1636b1d84fcb811c09b4a649be9700e9 merge-tree rc=0
+  tree IDENTICAL to automatic merge
+merge 4080ce31a parents 76c60bc1fa5f8b365360caf573e1bb3f48f92c7f 49a90f67e0f48c8487d194711ad01be5737f6424 merge-tree rc=0
+  tree IDENTICAL to automatic merge
+
+# Commit after merges: b25efaefc diff
+b25efaefc193c16da0a73106e457cc3dae25aaae train 3: update guard-audit pinned counts for the combined registry (main plus PR 297)
+
+ tests/fm-guard-audit-closure.test.sh | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+diff --git a/tests/fm-guard-audit-closure.test.sh b/tests/fm-guard-audit-closure.test.sh
+index a2810a981..b4949969a 100755
+--- a/tests/fm-guard-audit-closure.test.sh
++++ b/tests/fm-guard-audit-closure.test.sh
+@@ -20,13 +20,13 @@ REGISTRY="$ROOT/docs/guards/registry.json"
+ # --- G-10: the registry carries the population and its arithmetic -----------
+ out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
+ printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
+-printf '%s\n' "$out" | grep -q 'active=39 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=12' \
+-  || fail "registry arithmetic drifted from (39-12)+(14-12)+1=30: $out"
++printf '%s\n' "$out" | grep -q 'active=40 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=13' \
++  || fail "registry arithmetic drifted from (40-13)+(14-12)+1=30: $out"
+ pass "G-10 the registry accounts for all 30 audited Firstmate guards"
+ 
+ [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
+-jq -e '.guards | length == 39' "$REGISTRY" >/dev/null || fail "registry does not hold 39 live guards"
+-jq -e '.beyond_audit_active | length == 12' "$REGISTRY" >/dev/null || fail "the twelve post-audit guards are not recorded"
++jq -e '.guards | length == 40' "$REGISTRY" >/dev/null || fail "registry does not hold 40 live guards"
++jq -e '.beyond_audit_active | length == 13' "$REGISTRY" >/dev/null || fail "the thirteen post-audit guards are not recorded"
+ jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
+ pass "G-10b the spec and the registry are checked in and agree"
+ 
+
+# Live PR heads (gh pr view) vs merged second parents
+PR 297 state=OPEN draft=false head=5ba1d965cda5a5eb5bc2020a790c6d09b2b8201a
+PR 311 state=OPEN draft=false head=d82f855c1636b1d84fcb811c09b4a649be9700e9
+PR 313 state=OPEN draft=false head=49a90f67e0f48c8487d194711ad01be5737f6424
+merge 4d9ff3624 second parent 5ba1d965cda5a5eb5bc2020a790c6d09b2b8201a
+merge 76c60bc1f second parent d82f855c1636b1d84fcb811c09b4a649be9700e9
+merge 4080ce31a second parent 49a90f67e0f48c8487d194711ad01be5737f6424
+origin/main now (GitHub API): ab848a4d47c6ae8fcbf8e71ead68a58943506afb
+train base: ab848a4d47c6ae8fcbf8e71ead68a58943506afb

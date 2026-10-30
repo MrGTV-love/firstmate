@@ -1,0 +1,50 @@
+# Live lab: bin/fm-captain-hold.sh (PR 297 surface) on train head b25efaefc, FM_HOME=<lab>
+$ tasks-axi add work-a "Gated work A" --kind ship --repo sample
+rc=0
+$ fm-captain-hold.sh hold work-a --reason "Should work-a ship now?"
+work-a
+rc=0
+$ fm-captain-hold.sh hold work-a --reason x --owner firstmate   (adversarial: non-captain owner)
+fm-captain-hold: this home has no parent firstmate and hold files captain calls only; omit --owner or pass --owner captain: firstmate
+rc=1
+$ fm-captain-hold.sh hold rule-other --title "Unrelated ruling" --reason "Pick a colour?"
+rule-other
+rc=0
+$ fm-captain-hold.sh answer rule-other --decision-file dec-other.txt
+answered: rule-other
+rc=0
+$ fm-captain-hold.sh hold rule-a --title "Ruling on work-a" --reason "Is the work-a hold needed?"
+rule-a
+rc=0
+$ fm-captain-hold.sh answer rule-a --decision-file dec-a.txt
+answered: rule-a
+rc=0
+$ fm-captain-hold.sh withdraw work-a --evidence-file ev.txt --ruling rule-other   (adversarial: ruling does not name work-a)
+fm-captain-hold: ruling rule-other does not name work-a in its title, its hold reason, or its recorded captain answer, so nothing shows the captain ruled on this hold; origin and owner lines, and a name written only at withdraw time, never count; refusing to withdraw work-a
+rc=1
+$ fm-captain-hold.sh open work-a
+rc=0
+$ fm-captain-hold.sh withdraw work-a --evidence-file ev.txt --ruling rule-a
+withdrawn: work-a
+rc=0
+$ fm-captain-hold.sh open work-a
+rc=1
+$ tasks-axi show work-a
+task:
+  id: work-a
+  title: Gated work A
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: sample
+  priority: "-"
+  created: 2026-10-30
+  closed: "-"
+  deps: none
+  links: none
+  body: "Resolution recorded by fm-captain-hold.\nDecision digest: 4a70ca486a5e1a7e38cc93fd4e8803015f7d4bc2f5678347ebe4107f6d0db56d\nResolution mode: withdrawn\nResolves hold set: 2026-10-30T11:50:48Z\nResolved at: 2026-10-30T11:51:04Z\nWithdrawn by: moot under the recorded captain ruling rule-a\nFiled owner: captain\nRun from: main home\nNot a captain answer.\n\nWithdrawal evidence:\nCaptain ruled in rule-a.\n\nplan"
