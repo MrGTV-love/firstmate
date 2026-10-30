@@ -272,15 +272,16 @@ def build(args):
     # refs/heads rules above never see. Git rewrites the file through
     # packed-refs.new and a rename onto packed-refs, so refusing both paths
     # refuses a write by name, a rename-over and the creation of a new link to
-    # the file. A hard link or symbolic link that already exists in this
-    # repository's shared Git directory reaches the file by another name, so
-    # the build refuses while one does (extra_links above). An unconfined actor
-    # can still add one after the build, though that actor could write the file
-    # directly, and other projects' and gate repositories' Git directories are
-    # not scanned for one. packed-refs.lock stays writable: Git takes it to delete
-    # any ref, the task's own archives included, and holding it changes no ref. Deleting a packed ref, pruning one and gc's
-    # pack-refs step rewrite the file, so they fail here; fm-spawn.sh sets
-    # fetch.prune=false for the confined launch so a plain fetch prunes nothing.
+    # the file. An existing second hard link to the file, or a symbolic link at
+    # it, reaches the file by another name, so the build refuses while one
+    # exists (extra_links above). An unconfined actor can still add one after
+    # the build, though that actor could write the file directly, and other
+    # projects' and gate repositories' Git directories are not scanned for one.
+    # packed-refs.lock stays writable: Git takes it to delete any ref, the
+    # task's own archives included, and holding it changes no ref. Deleting a
+    # packed ref, pruning one and gc's pack-refs step rewrite the file, so they
+    # fail here; fm-spawn.sh sets fetch.prune=false for the confined launch so a
+    # plain fetch prunes nothing.
     for name in ("packed-refs", "packed-refs.new"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # A commondir file makes the primary checkout read every ref from the Git
