@@ -18,7 +18,11 @@ harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
 every folder above it also refuses rename and deletion. --data is this task's
-directory below the home data root. Task ids come from the state/<id>.meta
+directory below the home data root. The build refuses while a protected shared
+ref file (packed-refs, HEAD, index, commondir, other tasks' branch refs and
+reflogs, replace refs) has a second hard link, naming the file and its link
+count, because a write through such an alias would be judged by the alias's
+path. Task ids come from the state/<id>.meta
 records of this home and every --protect home. The caller wraps its final
 launch with sandbox-exec -f FILE. Linux launch selection belongs to
 fm-spawn.sh and deliberately does not invoke this builder. No credentials are
@@ -30,6 +34,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 
@@ -98,6 +103,32 @@ def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
 
+def extra_links(common, own_branch):
+    """Protected shared ref files that a second hard link reaches.
+
+    The profile denies these files by their path, but a write opened through
+    another name for the same file is judged by that other name. An alias that
+    already exists when the profile is built can sit at any path the worker may
+    write, so the build refuses while one exists. The task's own branch and its
+    reflog are writable by design and are not checked.
+    """
+    root = Path(common)
+    own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
+    paths = [root / name for name in ("packed-refs", "HEAD", "index", "commondir")]
+    for folder in ("refs/heads", "logs/refs/heads", "refs/replace"):
+        for where, _, names in os.walk(root / folder):
+            paths += [Path(where) / name for name in names]
+    found = []
+    for path in paths:
+        try:
+            info = path.lstat()
+        except OSError:
+            continue
+        if stat.S_ISREG(info.st_mode) and info.st_nlink > 1 and path not in own:
+            found.append((path, info.st_nlink))
+    return found
+
+
 def build(args):
     if not re.fullmatch(TASK_ID, args.task):
         raise ValueError("invalid task id")
@@ -113,6 +144,12 @@ def build(args):
         # Reftable keeps every branch in files this profile cannot tell apart
         # from the task's own, so a launch over it would confine nothing.
         raise ValueError("a repository with reftable ref storage cannot be confined")
+    linked = extra_links(common, args.branch)
+    if linked:
+        shown = ", ".join(f"{path} ({count} links)" for path, count in linked[:5])
+        raise ValueError(
+            f"protected Git file has another hard link, so a confined write through that link would bypass the profile: {shown}"
+            + (f" and {len(linked) - 5} more" if len(linked) > 5 else "") + "; remove the extra link and launch again")
     data = canonical(args.data)
     data_root = str(Path(data).parent)
     state = canonical(args.state)
@@ -210,11 +247,11 @@ def build(args):
     # refs/heads rules above never see. Git rewrites the file through
     # packed-refs.new and a rename onto packed-refs, so refusing both paths
     # refuses a write by name, a rename-over and the creation of a new link to
-    # the file. A hard link to packed-refs already present in the writable
-    # worktree before launch still reaches the file and stays open (tracked as
-    # follow-up). packed-refs.lock stays writable:
-    # Git takes it to delete any ref, the task's own archives included, and
-    # holding it changes no ref. Deleting a packed ref, pruning one and gc's
+    # the file. A link that already exists reaches the file by another name, so
+    # the build refuses while one does (extra_links above); the only residual
+    # is a link an unconfined actor adds after the build, who could write the
+    # file directly. packed-refs.lock stays writable: Git takes it to delete
+    # any ref, the task's own archives included, and holding it changes no ref. Deleting a packed ref, pruning one and gc's
     # pack-refs step rewrite the file, so they fail here; fm-spawn.sh sets
     # fetch.prune=false for the confined launch so a plain fetch prunes nothing.
     for name in ("packed-refs", "packed-refs.new"):

@@ -604,6 +604,16 @@ def packed_refs_results(manifest, primary, worktree):
     shutil.rmtree(reftable, ignore_errors=True)
     results["refused-reftable-switch"] = (switched and not planted and switched_sha != manifest["forged_sha"]
                                           and resolved() == manifest["packed_sha"])
+    # A new hard link to packed-refs would be a second name for the file. The
+    # worktree and a task-owned ~/tmp entry are both places the worker writes.
+    for key, link in (("refused-packed-refs-link-create", Path(manifest["worktree"]) / "packed-refs-alias"),
+                      ("refused-packed-refs-link-create-outside", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias")):
+        try:
+            os.link(packed, link)
+            results[key] = False
+        except PermissionError:
+            results[key] = not link.exists()
+        link.unlink(missing_ok=True)  # leave the unconfined control without an alias
     # A replace ref makes every Git command in the primary checkout show other
     # objects for a commit, so it changes what a branch holds.
     head = git("-C", str(worktree), "rev-parse", "HEAD").stdout.strip()
@@ -819,6 +829,37 @@ def invalid_project_source(repo, manifest, base, env):
     print("invalid project source: refused with project and failed command; no profile published")
 
 
+def hardlink_alias(repo, manifest, base, harness, env):
+    # The lane review's E4: an alias to a protected shared ref file made before
+    # the profile is built lets a confined write through the alias bypass the
+    # path rules. The build must refuse, say which file and how many links,
+    # and publish no profile, whatever path the alias sits at.
+    common = Path(manifest["home"]) / "projects/project/.git"
+    aliases = {"worktree": (common / "packed-refs", Path(manifest["worktree"]) / "packed-refs-alias"),
+               "outside-worktree": (common / "packed-refs", Path(manifest["user_tmp"]) / "fm-task-packed-refs-alias"),
+               "task-data": (common / "packed-refs", Path(manifest["home"]) / "data/task/packed-refs-alias"),
+               "loose-ref": (common / "refs/heads/fm/other", Path(manifest["worktree"]) / "loose-ref-alias"),
+               "head": (common / "HEAD", Path(manifest["user_tmp"]) / "fm-task-head-alias")}
+    for name, (target, alias) in aliases.items():
+        profile = base / f"alias-{name}-{harness}.sb"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        os.link(target, alias)
+        try:
+            build_profile(repo, manifest, harness, profile, env)
+        except subprocess.CalledProcessError as error:
+            assert error.returncode == 1 and "another hard link" in error.stderr, (name, error.stderr)
+            assert str(target) in error.stderr and "(2 links)" in error.stderr, (name, error.stderr)
+            assert not profile.exists(), f"{name}: a refused build published a profile"
+        else:
+            raise AssertionError(f"{harness}: a profile was built while {target} had a second link at {alias}")
+        finally:
+            alias.unlink()
+    clean = base / f"alias-clean-{harness}.sb"
+    build_profile(repo, manifest, harness, clean, env)
+    assert clean.exists(), "the build still refuses after every alias was removed"
+    print(f"{harness} hard-link aliases: " + ", ".join(aliases) + " refused naming file and link count; clean build still works")
+
+
 def reftable_source(repo, manifest, base, env):
     # Reftable keeps every ref, the task's own and every other task's, in files
     # no packed-refs or refs/heads rule names, so the builder must refuse it.
@@ -999,5 +1040,6 @@ for harness in ("claude", "omp"):
                     assert actual[name] is False, (harness, mode, name, actual)
         else:
             assert result.returncode == 0 and all(actual.values()), (harness, mode, result.stderr, actual)
+            hardlink_alias(repo, manifest, base, harness, env)
             if harness == "claude":
                 reftable_source(repo, manifest, base, env)
