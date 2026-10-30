@@ -27,8 +27,8 @@ FM_SUPERVISOR_BACKEND_DEFAULT="tmux"
 #      to know which).
 #   2. $TMUX_PANE - tmux sets this in every pane's environment; inherited by a
 #      process launched from firstmate's own pane.
-#   3. $HERDR_ENV=1 + $HERDR_PANE_ID - herdr injects both into every process it
-#      manages a pane for; compose the "<session>:<pane-id>" target from
+#   3. Herdr runtime marker (bin/fm-backend.sh) + $HERDR_PANE_ID; compose the
+#      "<session>:<pane-id>" target from
 #      $HERDR_SESSION (defaulting to "default", mirroring bin/backends/herdr.sh's
 #      fm_backend_herdr_session) and $HERDR_PANE_ID. Checked after $TMUX_PANE so a
 #      tmux pane nested inside herdr still resolves to tmux, matching
@@ -44,7 +44,7 @@ discover_supervisor_target() {
     printf '%s' "$TMUX_PANE"
     return 0
   fi
-  if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
+  if { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
     printf '%s:%s' "${HERDR_SESSION:-default}" "$HERDR_PANE_ID"
     return 0
   fi
@@ -58,7 +58,7 @@ discover_supervisor_target() {
 # discover_supervisor_target and bin/fm-backend.sh's fm_backend_detect:
 #   1. FM_SUPERVISOR_BACKEND env (explicit override).
 #   2. $TMUX_PANE set - tmux.
-#   3. $HERDR_ENV=1 (with $HERDR_PANE_ID present) - herdr.
+#   3. Herdr runtime marker (with $HERDR_PANE_ID present) - herdr.
 #   4. FM_SUPERVISOR_BACKEND_DEFAULT (tmux) - matches the target fallback. Returns 1.
 discover_supervisor_backend() {
   if [ -n "${FM_SUPERVISOR_BACKEND:-}" ]; then
@@ -69,7 +69,7 @@ discover_supervisor_backend() {
     printf 'tmux'
     return 0
   fi
-  if [ "${HERDR_ENV:-}" = "1" ] && [ -n "${HERDR_PANE_ID:-}" ]; then
+  if { [ "${HERDR_ENV:-}" = "1" ] || [ "${FM_HERDR_RUNTIME:-}" = "1" ]; } && [ -n "${HERDR_PANE_ID:-}" ]; then
     printf 'herdr'
     return 0
   fi

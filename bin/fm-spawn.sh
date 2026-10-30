@@ -162,7 +162,7 @@
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
 #   config/backend, then runtime auto-detection from the runtime firstmate's
-#   environment: $TMUX, HERDR_ENV=1, or cmux runtime signals (via
+#   environment: $TMUX, HERDR_ENV=1 or FM_HERDR_RUNTIME=1, or cmux signals (via
 #   bin/fm-backend.sh's fm_backend_detect, with cmux fallback details in
 #   docs/cmux-backend.md),
 #   then tmux.
@@ -7820,6 +7820,19 @@ elif [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ] && [ "$WRITE_CONFINEMENT" 
   # command its caller wrote, so Bash-only text such as a process substitution
   # still runs under the pane's own shell instead of this host's /bin/sh.
   LAUNCH="/bin/sh -c $(shell_quote "$LAUNCH")"
+fi
+# Herdr's native restore has typed a bare `claude --resume` into Firstmate
+# Claude panes after a reboot, bypassing the TeamClaude launch boundary; the
+# registration path, possibly Herdr's Claude integration, is not yet proven.
+# Unset HERDR_ENV only in this child, intended to stop that registration (not
+# yet proven on installed Herdr); keep the pane identity and
+# Firstmate's own busy hooks, and do not alter other panes or session settings.
+if [ "$HARNESS" = claude ]; then
+  if [ "$BACKEND" = herdr ]; then
+    LAUNCH="env -u HERDR_ENV FM_HERDR_RUNTIME=1 $LAUNCH"
+  else
+    LAUNCH="env -u HERDR_ENV -u FM_HERDR_RUNTIME $LAUNCH"
+  fi
 fi
 case "$HARNESS" in
 claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy | devin)
