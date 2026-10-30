@@ -10,15 +10,23 @@ Usage: fm-write-confinement.py --worktree DIR --home DIR --config DIR
 Writes are allowed by default; the profile denies writes to named protected
 assets: project primary checkouts, other task worktrees, other tasks' state
 records, every task's metadata and relaunch records, the home data root apart
-from this task's directory and the duration ledger, other tasks' branches (this
-task keeps its declared branch and its archive/<task>-{submitted,pipeline}-<hex8>
-recovery branches), temp roots, Main-owned
+from this task's directory and the duration ledger, other tasks' branches, loose
+or packed (this task keeps its declared branch and its
+archive/<task>-{submitted,pipeline}-<hex8> recovery branches), temp roots, Main-owned
 records of this task, the shared legacy Jev audit, this home's config and .env,
 harness config homes apart from
 the running harness's measured runtime state, other Firstmate homes (--protect)
 and other projects' no-mistakes gate repositories. Each protected folder and
 every folder above it also refuses rename and deletion. --data is this task's
-directory below the home data root. Task ids come from the state/<id>.meta
+directory below the home data root. The build refuses while a protected ref
+path in this repository's shared Git directory (packed-refs, HEAD, index,
+commondir, other tasks' branch refs and reflogs, replace refs, other
+worktrees' HEAD, index and commondir) has a second hard link or is a symbolic
+link, or a folder above one is a symbolic link, naming the path and the link
+count or target, because a write through such an alias would be judged by the
+alias's path. A HEAD symbolic link to a refs/heads name stays allowed. Other
+projects' and gate repositories' Git directories are not scanned. Task ids
+come from the state/<id>.meta
 records of this home and every --protect home. The caller wraps its final
 launch with sandbox-exec -f FILE. Linux launch selection belongs to
 fm-spawn.sh and deliberately does not invoke this builder. No credentials are
@@ -30,6 +38,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import sys
 
@@ -98,6 +107,53 @@ def child_dirs(root, keep):
     return [canonical(path) for path in Path(root).iterdir() if path.is_dir() and canonical(path) not in keep] if Path(root).is_dir() else []
 
 
+def extra_links(common, gitdir, own_branch):
+    """Protected shared ref paths that another name reaches.
+
+    The profile denies these paths by their own name, but a write opened
+    through another name for the same file is judged by that other name: a
+    second hard link, or a symbolic link at the protected path or at a folder
+    above it, which also makes Git read the ref from wherever it points. An
+    alias that already exists when the profile is built can sit at any path the
+    worker may write, so the build refuses while one exists. A HEAD that is a
+    symbolic link to a refs/heads name is Git's core.preferSymlinkRefs form,
+    which Git reads as the name and never follows. The task's own branch, its
+    reflog and its own worktree Git directory are writable by design and are
+    not checked.
+    """
+    root = Path(common)
+    own = {root / "refs/heads" / own_branch, root / "logs/refs/heads" / own_branch} if own_branch else set()
+    heads = {root / "HEAD"}
+    paths = [root / name for name in ("packed-refs", "HEAD", "index", "commondir", "refs", "logs", "logs/refs", "worktrees")]
+    for folder in ("refs/heads", "logs/refs/heads", "refs/replace"):
+        paths.append(root / folder)
+        if os.path.realpath(root / folder) == str(root / folder):
+            for where, folders, names in os.walk(root / folder):
+                paths += [Path(where) / name for name in folders + names]
+    if os.path.realpath(root / "worktrees") == str(root / "worktrees"):
+        for linked in sorted((root / "worktrees").glob("*")):
+            if str(linked) != gitdir:
+                heads.add(linked / "HEAD")
+                paths += [linked] + [linked / name for name in ("HEAD", "index", "commondir")]
+    found = []
+    for path in paths:
+        try:
+            info = path.lstat()
+        except OSError:
+            continue
+        if path in own:
+            continue
+        if stat.S_ISLNK(info.st_mode):
+            target = os.readlink(path)
+            if path in heads and target.startswith("refs/heads/") and not subprocess.run(
+                    ["git", "check-ref-format", target], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+                continue
+            found.append((path, f"symbolic link to {target}"))
+        elif stat.S_ISREG(info.st_mode) and info.st_nlink > 1:
+            found.append((path, f"{info.st_nlink} links"))
+    return found
+
+
 def build(args):
     if not re.fullmatch(TASK_ID, args.task):
         raise ValueError("invalid task id")
@@ -109,6 +165,16 @@ def build(args):
         ["git", "-C", worktree, "rev-parse", "--path-format=absolute", "--git-common-dir"], text=True).strip())
     if gitdir == common:
         raise ValueError("worker must use an isolated linked worktree")
+    if (Path(common) / "reftable").exists():
+        # Reftable keeps every branch in files this profile cannot tell apart
+        # from the task's own, so a launch over it would confine nothing.
+        raise ValueError("a repository with reftable ref storage cannot be confined")
+    linked = extra_links(common, gitdir, args.branch)
+    if linked:
+        shown = ", ".join(f"{path} ({why})" for path, why in linked[:5])
+        raise ValueError(
+            f"protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: {shown}"
+            + (f" and {len(linked) - 5} more" if len(linked) > 5 else "") + "; remove the extra link or symbolic link and launch again")
     data = canonical(args.data)
     data_root = str(Path(data).parent)
     state = canonical(args.state)
@@ -195,11 +261,36 @@ def build(args):
     lines.append("(deny file-write* " + under(state, r"[^/]+\.(meta|control-relaunch)(\.[^/]*)?(/.*)?") + ")")
     lines.append("(deny file-write* " + under(state, re.escape(args.task) + r"\..*") + ")")
     lines.append(f"(deny file-write* (literal {quoted(state + '/jev-guard.jsonl')}))")
-    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads")]
+    # No task operation writes a replace ref, and one changes what a commit
+    # holds for every Git command in the primary checkout.
+    git_shared = [str(Path(common) / name) for name in ("worktrees", "refs/heads", "logs/refs/heads", "refs/replace")]
     lines += [f"(deny file-write* (subpath {quoted(path)}))" for path in git_shared]
     # The primary checkout's own HEAD and index live in the shared Git directory.
     for name in ("HEAD", "HEAD.lock", "index", "index.lock"):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
+    # A branch Git has packed exists only as a line in packed-refs, which the
+    # refs/heads rules above never see. Git rewrites the file through
+    # packed-refs.new and a rename onto packed-refs, so refusing both paths
+    # refuses a write by name, a rename-over and the creation of a new link to
+    # the file. An existing second hard link to the file, or a symbolic link at
+    # it, reaches the file by another name, so the build refuses while one
+    # exists (extra_links above). An unconfined actor can still add one after
+    # the build, though that actor could write the file directly, and other
+    # projects' and gate repositories' Git directories are not scanned for one.
+    # packed-refs.lock stays writable: Git takes it to delete any ref, the
+    # task's own archives included, and holding it changes no ref. Deleting a
+    # packed ref, pruning one and gc's pack-refs step rewrite the file, so they
+    # fail here; fm-spawn.sh sets fetch.prune=false for the confined launch so a
+    # plain fetch prunes nothing.
+    for name in ("packed-refs", "packed-refs.new"):
+        lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
+    # A commondir file makes the primary checkout read every ref from the Git
+    # directory it names, and a reftable folder holds every ref once the
+    # writable config selects reftable storage. Both denies cover only these
+    # default locations: an extensions.refStorage path in the writable config
+    # still sends ref reads to a folder this profile does not name.
+    lines.append(f"(deny file-write* (literal {quoted(Path(common) / 'commondir')}))")
+    lines.append(f"(deny file-write* (subpath {quoted(Path(common) / 'reftable')}))")
     # Other tasks' state records and temp roots: /tmp/fm-<id>, its launch
     # sibling /tmp/fm-<id>+<token>, and ~/tmp entries whose name carries the id.
     tmp = canonical("/tmp")

@@ -100,7 +100,13 @@ fm_pid_alive() {
   if [ -r "$proc_root/$pid/stat" ]; then
     # comm may contain newlines and closing parentheses. Read through EOF,
     # not just its first physical line, and split after the final closing one.
-    IFS= read -r -d '' state 2>/dev/null < "$proc_root/$pid/stat" || :
+    # The process can exit between the readability test and the read; the stat
+    # then cannot be opened or read, and bash 5 leaves a declared-only variable
+    # unset, which aborts a caller under set -u. Start empty, and let an empty
+    # read ask kill -0 again, which says whether the process is still there.
+    state=''
+    { IFS= read -r -d '' state || :; } 2>/dev/null < "$proc_root/$pid/stat" || state=''
+    [ -n "$state" ] || { kill -0 "$pid" 2>/dev/null; return; }
     case "$state" in *') '*) ;; *) return 0 ;; esac
     state=${state##*)}
     state=${state# }

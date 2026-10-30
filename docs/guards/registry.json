@@ -16,7 +16,8 @@
     "git-push-credential-shapes",
     "spawn-confinement-coverage",
     "spawn-write-confinement",
-    "status-log-size-cap"
+    "status-log-size-cap",
+    "teardown-superseded-slot-lease"
   ],
   "guards": [
     {
@@ -477,13 +478,16 @@
       "id": "merge-green-head",
       "owner": "bin/fm-pr-merge.sh",
       "sites": [
-        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny"}
+        {"file": "bin/fm-pr-merge.sh", "match": "merge-green-head deny", "count": 5},
+        {"file": "bin/fm-pr-merge.sh", "match": "could not be re-read immediately before the merge", "count": 2},
+        {"file": "bin/fm-pr-merge.sh", "match": "that head %s was verified to contain"},
+        {"file": "bin/fm-pr-merge.sh", "match": "where GitHub merges at once"}
       ],
-      "invariant": "a PR is never merged while a required check is red or has not reported at that head",
+      "invariant": "a PR is never merged while a required check is red or has not reported at that head; a GitHub PR is also never merged while that head lacks the base branch's live tip, so the landed tree is one no check ran on, nor does an off-queue --auto request leave auto-merge armed to land later on a moved tip; GitLab and Forgejo merges have no base-tip containment yet, a known gap that refuses nothing, owned by backlog task fm-pr-merge-tip-containment-gitlab-forgejo, which must land before any such project is registered",
       "layer": "runtime-block",
-      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch",
-      "trigger": "any unwaived required check at the current head is not green",
-      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports",
+      "source": "live forge PR state, check rollup at the exact head, required-check set for the base branch, base branch tip compared with that head, base branch merge_queue rule",
+      "trigger": "any unwaived required check at the current head is not green, or a GitHub head does not contain the base branch's live tip, read before verifying and again immediately before the merge; an attended --auto merge into a base with exactly one recognised merge_queue rule, proven live at both reads, and a required check set the verify read found complete and non-empty skips only the tip containment, because the queue runs those required checks on its own combined tree before landing, while a queue with no required check keeps the containment and an unreadable queue rule or required set is retried at verify, and refused at the last read when verify relied on the queue, as an unreadable source, never judged as a head that lacks the tip; off a proven queue, --auto also refuses unless the live mergeStateStatus at that last read is CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once instead of arming auto-merge, and a request that does not read back merged or queued, whether its merge command succeeded or failed, is disarmed and confirmed by a fresh read, or reported loudly as possibly still armed",
+      "remedy": "bin/fm-pr-merge.sh <task-id> <pr-url> --allow-red <check-name> for a non-green check, or --allow-missing <check-name> for a required check that never reported (both attended only); a pending check clears by re-running bin/fm-pr-merge.sh <task-id> <pr-url> once it reports; a head that lacks the base tip clears only by updating the branch so CI runs on the combined tree, and no waiver applies",
       "budget": 1,
       "test": "tests/fm-pr-merge-checks.test.sh",
       "tier": "C",
@@ -595,6 +599,34 @@
       "tier": "C",
       "harm": "irreversible",
       "remedy_verified": "fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "teardown-superseded-slot-lease",
+      "owner": "bin/fm-teardown.sh",
+      "sites": [
+        {"file": "bin/fm-teardown.sh", "match": "is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path", "count": 2}
+      ],
+      "invariant": "a teardown never leases a slot in a superseded Treehouse pool folder by its slot name",
+      "layer": "runtime-block",
+      "source": "treehouse pool-dir from the project, or, when it is missing or its output is not one absolute path, treehouse status --json from the project, which lists only the current pool folder; and treehouse lease --help for --path",
+      "trigger": "a slot that must stay held is not in the project's current Treehouse pool, and the installed treehouse has no lease --path or its lease by path cannot be proved",
+      "remedy": "install treehouse v3.1.7-fm or later, which has treehouse lease --path, or, when its lease by path cannot be proved, run the printed treehouse lease --path <slot> --lease-holder <task> from the project, and rerun bin/fm-teardown.sh <task>",
+      "budget": 1,
+      "test": "tests/fm-teardown-cleanup.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "remedy_verified": "fixture",
+      "layer_note": "deny without a guard event: the refusal prints the REFUSED: line, exits 1, and changes no lease; a lease by slot name would hold a same-named copy of the current pool instead"
     },
     {
       "decision": "deny",

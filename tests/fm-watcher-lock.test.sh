@@ -1863,7 +1863,7 @@ test_lock_alarm_crosses_threshold_during_capture() {
   dir=$(make_case lock-alarm-during-capture)
   mkdir -p "$dir/config"
   : > "$dir/config/fleet-ledger"
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "capture contention starved a crossing-threshold lock alarm"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "capture contention starved a crossing-threshold lock alarm"
 import json, os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -1939,7 +1939,7 @@ PY
 test_watcher_skips_own_singleton_locks() {
   local dir
   dir=$(make_case lock-alarm-singletons)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "watcher alarmed on a healthy singleton lock"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "watcher alarmed on a healthy singleton lock"
 import os, pathlib, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -1994,7 +1994,7 @@ PY
 test_lock_alarm_while_queue_append_waits() {
   local dir
   dir=$(make_case lock-alarm-queue-wait)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "a blocked queue append starved the long-held lock alarm"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a blocked queue append starved the long-held lock alarm"
 import os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2059,7 +2059,7 @@ PY
 test_alarm_spills_consumed_append_for_next_watcher() {
   local dir
   dir=$(make_case lock-alarm-spill)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm exit lost a consumed source's wake"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm exit lost a consumed source's wake"
 import os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2112,7 +2112,7 @@ PY
 test_alarm_after_queue_frees_appends_before_after_output() {
   local dir
   dir=$(make_case lock-alarm-freed-queue)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm wake ran after-output work before the pending append landed"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm wake ran after-output work before the pending append landed"
 import os, pathlib, select, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2166,7 +2166,7 @@ PY
 }
 
 test_wake_spill_replay_waits_for_held_queue() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "spill replay under a held queue lock lost or reordered rows"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "spill replay under a held queue lock lost or reordered rows"
 import os, pathlib, select, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 with tempfile.TemporaryDirectory(prefix="fm-wake-spill-") as d:
@@ -2209,7 +2209,7 @@ PY
 test_alarm_freed_queue_keeps_producer_order() {
   local dir
   dir=$(make_case lock-alarm-freed-order)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm row overtook the pending append it interrupted"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an alarm row overtook the pending append it interrupted"
 import os, pathlib, select, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2257,7 +2257,7 @@ PY
 test_alarm_observation_failure_keeps_waiting_append() {
   local dir
   dir=$(make_case lock-alarm-observation-failure)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an observation failure inside a queue wait lost the pending append"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an observation failure inside a queue wait lost the pending append"
 import os, pathlib, select, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2300,7 +2300,7 @@ PY
 test_startup_queue_wait_alarm_releases_with_downtime() {
   local dir
   dir=$(make_case lock-alarm-startup-wait)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "a delivered startup alarm left the watcher lock without downtime"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a delivered startup alarm left the watcher lock without downtime"
 import os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2350,7 +2350,7 @@ PY
 }
 
 test_lock_alarm_project_and_control_limits() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "project or control lock alarm limits failed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "project or control lock alarm limits failed"
 import os, pathlib, signal, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 dead = subprocess.Popen(["true"]); dead.wait()
@@ -2440,7 +2440,7 @@ test_pid_alive_reads_multiline_proc_comm() {
 }
 
 test_dead_owner_alarm_names_its_trigger() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not name its proven verdict"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not name its proven verdict"
 import os, pathlib, signal, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 reaped = subprocess.Popen(["true"]); reaped.wait()
@@ -2481,7 +2481,7 @@ PY
 }
 
 test_dead_owner_alarm_requires_blocked_waiter() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not follow its blocked-waiter rule"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not follow its blocked-waiter rule"
 import os, pathlib, signal, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 dead = subprocess.Popen(["true"]); dead.wait()
@@ -2513,7 +2513,7 @@ PY
 }
 
 test_dead_owner_alarm_needs_two_checks() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not require two consecutive blocked checks"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "dead-owner alarm did not require two consecutive blocked checks"
 import os, pathlib, select, signal, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 exec(open(pathlib.Path(lib).resolve().parents[1] / "tests" / "lock-waiter-fixture.py").read())
@@ -2624,7 +2624,7 @@ PY
 test_alarm_runs_during_watcher_down_waits() {
   local dir
   dir=$(make_case lock-alarm-watcher-down-wait)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "a stuck recovery-marker holder starved the long-held lock alarm"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "a stuck recovery-marker holder starved the long-held lock alarm"
 import os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2706,7 +2706,7 @@ PY
 test_exit_cleanup_wait_never_delivers_second_wake() {
   local dir
   dir=$(make_case lock-alarm-exit-cleanup)
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$ROOT" "$dir" <<'PY' || fail "an exit-cleanup lock wait delivered a second wake"
+  fm_test_tree_leash python3 - "$ROOT" "$dir" <<'PY' || fail "an exit-cleanup lock wait delivered a second wake"
 import os, pathlib, select, signal, subprocess, sys, time
 root, home = map(pathlib.Path, sys.argv[1:])
 state = home / "state"
@@ -2768,7 +2768,7 @@ PY
 }
 
 test_long_held_lock_alarm() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "long-held lock alarm behavior failed"
 import os, pathlib, shutil, signal, subprocess, sys, tempfile, time
 with tempfile.TemporaryDirectory(prefix="fm-lock-alarm-") as d:
     lib = sys.argv[1]
@@ -2831,7 +2831,7 @@ PY
 }
 
 test_lock_alarm_discovers_foreign_owners() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "foreign-owner alarm discovery failed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "foreign-owner alarm discovery failed"
 import os, pathlib, select, subprocess, sys, tempfile, time
 lib = sys.argv[1]
 for scenario in ("foreign-index", "external-waiter"):
@@ -2881,7 +2881,7 @@ PY
 }
 
 test_lock_monitor_prunes_finished_waiters() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "finished waiter diagnostic cleanup failed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "finished waiter diagnostic cleanup failed"
 import os, pathlib, select, subprocess, sys, tempfile
 lib = sys.argv[1]
 with tempfile.TemporaryDirectory(prefix="fm-finished-waiter-") as d:
@@ -2910,7 +2910,7 @@ PY
 }
 
 test_lock_receipts_retire_with_release() {
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "lock receipt retirement failed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "lock receipt retirement failed"
 import os, pathlib, subprocess, sys, tempfile
 with tempfile.TemporaryDirectory(prefix="fm-lock-receipts-") as d:
     lib = sys.argv[1]
@@ -2949,7 +2949,7 @@ test_zombie_owner_is_reclaimed() {
   # Keep the parent alive without waitpid until the second process finishes.
   # This proves SIGKILL bypasses EXIT cleanup and kill -0 still sees the zombie;
   # it does not identify the source of the historical incident's signal.
-  "$ROOT/bin/fm-proc-budget.sh" 128 -- python3 - "$LIB" <<'PY' || fail "zombie lock owner was not reclaimed"
+  fm_test_tree_leash python3 - "$LIB" <<'PY' || fail "zombie lock owner was not reclaimed"
 import os, pathlib, signal, subprocess, sys, tempfile, time
 with tempfile.TemporaryDirectory(prefix="fm-zombie-lock-") as d:
     lib = sys.argv[1]
