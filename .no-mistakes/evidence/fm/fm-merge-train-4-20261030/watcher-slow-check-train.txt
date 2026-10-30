@@ -1,0 +1,13 @@
+== train head f61daf406: slow check, FM_CHECK_TIMEOUT=3 (run under bin/fm-proc-budget.sh --own-procs 256)
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.d2e4d5
+registered: state/slow.check.sh
+watcher rc=0 elapsed=18s FM_CHECK_TIMEOUT=3
+--- watcher stdout (wake reason)
+check: /Users/charlesabrooker/tmp/fm-lab.d2e4d5/state/slow.check.sh: slow-check-finished-after-15s
+--- watcher stderr (tail)
+--- triage log lines naming the check
+--- full triage log tail
+--- state/*.check-stopped
+(none)
+lab torn down
+budget rc=0

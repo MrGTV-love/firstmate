@@ -1,0 +1,23 @@
+== train head: f61daf406da018347bbfae0e9b51311e49eebd4a
+== base: 5df96973e02763e67d41c610c80ce874bbbd4656
+ancestor OK: 5df96973e02763e67d41c610c80ce874bbbd4656
+ancestor OK: aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc
+ancestor OK: 64f01052ec4dcbfff0d70e2fdb191e05f5129e39
+== live PR heads on GitHub
+PR316 head=aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc state=OPEN
+PR321 head=64f01052ec4dcbfff0d70e2fdb191e05f5129e39 state=OPEN
+== fresh-merge tree check per merge commit
+783149171 parents=5df96973e02763e67d41c610c80ce874bbbd4656 aa01fa913c0b09de82e81cb0ed0ae2daceec3bfc fresh_tree=9133397d46e3e958c6afed7be51c5641ccce7e72 actual_tree=9133397d46e3e958c6afed7be51c5641ccce7e72 EQUAL
+3d0b26141 parents=783149171a9ed997bc75711d56dad505dbf3106e 64f01052ec4dcbfff0d70e2fdb191e05f5129e39 fresh_tree=0a5655ea60d304d4cc397d0a7419ca7070970796 actual_tree=0a5655ea60d304d4cc397d0a7419ca7070970796 EQUAL
+== first parent of 783149171 is base?
+5df96973e02763e67d41c610c80ce874bbbd4656
+== train-only fix commit f61daf406 diff
+f61daf406da018347bbfae0e9b51311e49eebd4a no-mistakes(review): Migrate two old-form fm_test_wait_until callers to PR 316 contract
+
+ tests/fm-session-start.test.sh | 2 +-
+ tests/fm-teardown.test.sh      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+-  fm_test_wait_until 60 no_stray_herdr "$fakebin" \
++  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.log" -- no_stray_herdr "$fakebin" \
+-  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
++  fm_test_wait_until --while-alive "$holder" -- test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"

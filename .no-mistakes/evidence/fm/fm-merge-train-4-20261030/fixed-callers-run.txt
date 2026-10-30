@@ -1,0 +1,10 @@
+== tests/fm-session-start.test.sh :: test_endpoint_read_bound_follows_the_measured_ledger (definitions verbatim, only this case invoked)
+ok - an endpoint read gets its host's measured bound: slow is alive, silent is unknown
+# one-case driver: done rc=0
+bin/fm-proc-budget.sh --own-procs 256 -- bash $D  3.29s user 5.96s system 19% cpu 46.845 total
+rc=0
+
+== tests/fm-teardown.test.sh test_pipeline_input_locked_record_read_is_unknown
+ok - a run-record read that SQLite's busy wait gives up on is unknown and retried, not refused
+bin/fm-proc-budget.sh --own-procs 256 -- bash tests/fm-teardown.test.sh   1.97s user 4.97s system 80% cpu 8.619 total
+rc=0

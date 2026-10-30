@@ -1,0 +1,17 @@
+== train head f61daf406: silent check, FM_CHECK_TIMEOUT=3 (run under bin/fm-proc-budget.sh --own-procs 256)
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.OtI188
+registered: state/silent.check.sh
+watcher rc=0 elapsed=7s FM_CHECK_TIMEOUT=3
+--- watcher stdout (wake reason)
+check: /Users/charlesabrooker/tmp/fm-lab.OtI188/state/silent.check.sh: check silent stopped after 5s (no progress); result unknown, retry next pass
+--- watcher stderr (tail)
+no_progress: "pid=69908 no CPU or watched-file progress for 3.7s"
+--- triage log lines naming the check
+[2026-10-30T11:18:49-0500] check silent stopped after 5s (no progress); result unknown, retry next pass
+--- full triage log tail
+[2026-10-30T11:18:49-0500] check silent stopped after 5s (no progress); result unknown, retry next pass
+--- state/*.check-stopped
+silent.check-stopped
+silent check pid 70000 is gone (tree cleaned)
+lab torn down
+budget rc=0

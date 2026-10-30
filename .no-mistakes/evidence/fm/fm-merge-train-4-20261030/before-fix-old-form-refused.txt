@@ -1,0 +1,16 @@
+== BEFORE the train fix (tree at 3d0b26141): teardown case with old-form 'fm_test_wait_until 30 ...'
+1233:  fm_test_wait_until 30 test -e "$case_dir/locked" || fail "pipeline-input-locked-read: the lock holder never took the lock"
+fm_test_wait_until: expected observation options then -- COMMAND
+not ok - pipeline-input-locked-read: the lock holder never took the lock
+tests/lib.sh: line 493: 38970 Killed: 9               "$real_python" -I -c 'import sqlite3, sys, time
+db = sqlite3.connect(sys.argv[1], isolation_level=None)
+db.execute("BEGIN EXCLUSIVE")
+open(sys.argv[2], "w").close()
+time.sleep(120)' "$case_dir/nm/state.sqlite" "$case_dir/locked"
+rc=1
+
+== BEFORE the train fix (tree at 3d0b26141): session-start case with old-form 'fm_test_wait_until 60 ...'
+1686:  fm_test_wait_until 60 no_stray_herdr "$fakebin" \
+fm_test_wait_until: expected observation options then -- COMMAND
+not ok - the measured read bound left hung herdr process(es) behind
+rc=1
