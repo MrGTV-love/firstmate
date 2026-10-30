@@ -1,0 +1,10 @@
+packed-refs has fm/gone: 1
+-- confined fetch WITHOUT launch prefix (repo fetch.prune=true)
+   error: could not delete reference refs/remotes/no-mistakes/fm/gone: unable to create file /private/tmp/fmlv/prune.Yy14/home/projects/project/.git/packed-refs.new: Operation not permitted
+   From /private/tmp/fmlv/prune.Yy14/gate
+    - [deleted]         (none)     -> no-mistakes/fm/gone
+   fetch-exit=1
+-- confined fetch WITH the fm-spawn.sh launch prefix
+   effective-fetch.prune=false
+   fetch-exit=0
+remote-tracking fm/gone still resolves: yes

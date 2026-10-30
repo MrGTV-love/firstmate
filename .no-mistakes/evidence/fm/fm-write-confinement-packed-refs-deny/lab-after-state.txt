@@ -1,0 +1,9 @@
+after worker: fm/other -> 5b946be17d3db4e5b787df7ff93ba3aa9173f5c6 (real 5b946be17d3db4e5b787df7ff93ba3aa9173f5c6)
+status:
+blocked [at=1793326433]: report done (probe: all 3 packed-refs writes refused, fm/other unchanged); completion gate 'fm-captain-hold.sh complete lvscout --none' refused by sandbox (lvscout.meta: Operation not permitted) - firstmate must run it; also disclosed stray write /tmp/lvscout-probe-out.txt
+2
+(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/refs/replace"))
+(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs"))
+(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs.new"))
+(deny file-write* (literal "/Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/commondir"))
+(deny file-write* (subpath "/Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/reftable"))

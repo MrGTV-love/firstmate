@@ -167,4 +167,4 @@ ok - a pane stuck on the primary checkout fails loudly at the deadline
 ok - a get with changing output keeps waiting beyond ten minutes of scaled total time
 ok - output activity cannot keep an acquisition alive beyond the absolute extreme
 # all fm-spawn-worktree-settle tests passed
-bash tests/fm-spawn-worktree-settle.test.sh  36.52s user 61.57s system 39% cpu 4:11.12 total
+bin/fm-proc-budget.sh --own-procs 256 -- bash   35.35s user 61.05s system 44% cpu 3:36.64 total

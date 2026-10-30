@@ -1,0 +1,37 @@
+== target-f797a93b3 builder: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M658DA726HAZ4HZA1QXQKW1M/bin/fm-write-confinement.py
+fm/other real=64c0745a62afabc81b72137b3a21def64d79ddb3 forged-target=94438c72bf849af64409add39b84ac5569ac7a5e
+loose fm/other file present: no
+-- running worker inside: sandbox-exec -f profile.sb
+-- attack 1: overwrite packed-refs by name
+/private/tmp/fmlv/run-target-f797a93b3.vmbz/worker.sh: line 5: /private/tmp/fmlv/run-target-f797a93b3.vmbz/home/projects/project/.git/packed-refs: Operation not permitted
+write refused
+primary fm/other -> 64c0745a62afabc81b72137b3a21def64d79ddb3
+-- attack 2: write packed-refs.lock then rename it over packed-refs
+mv: rename /private/tmp/fmlv/run-target-f797a93b3.vmbz/home/projects/project/.git/packed-refs.lock to /private/tmp/fmlv/run-target-f797a93b3.vmbz/home/projects/project/.git/packed-refs: Operation not permitted
+rename refused
+primary fm/other -> 64c0745a62afabc81b72137b3a21def64d79ddb3
+-- attack 3: git branch -D fm/other
+   error: could not delete reference refs/heads/fm/other: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/fmlv/run-target-f797a93b3.vmbz/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+primary fm/other -> 64c0745a62afabc81b72137b3a21def64d79ddb3
+-- attack 4: write commondir
+/private/tmp/fmlv/run-target-f797a93b3.vmbz/worker.sh: line 15: /private/tmp/fmlv/run-target-f797a93b3.vmbz/home/projects/project/.git/commondir: Operation not permitted
+commondir refused
+-- work: commit in own worktree
+commit ok
+-- work: create own archive ref
+archive create ok
+-- work: push to gate
+push ok
+-- work: stash push + pop
+stash ok (file=change)
+-- work: gate deletes fm/other, then plain fetch (fetch.prune true in repo config)
+effective fetch.prune=false
+   From /private/tmp/fmlv/run-target-f797a93b3.vmbz/gate
+    * [new branch]      main       -> no-mistakes/main
+fetch exit=0
+== after: primary checkout view (unconfined)
+no commondir file planted
+git -C project rev-parse fm/other -> 64c0745a62afabc81b72137b3a21def64d79ddb3
+RESULT: fm/other kept its real SHA
+gate fm/task -> e9e76a4b283228ba033c145ac2565235c066ecc9
+own archive -> e9e76a4b283228ba033c145ac2565235c066ecc9

@@ -1,0 +1,34 @@
+== base-1b4677f0c builder: /tmp/fmlv/base-builder.py
+fm/other real=a978a804a8bdb845788ac7b808ef2ec8ac188de7 forged-target=887008bace2dd297f5bd45be2941726a4fc4c3e9
+loose fm/other file present: no
+-- running worker inside: sandbox-exec -f profile.sb
+-- attack 1: overwrite packed-refs by name
+write exit 0
+primary fm/other -> 887008bace2dd297f5bd45be2941726a4fc4c3e9
+-- attack 2: write packed-refs.lock then rename it over packed-refs
+rename exit 0
+primary fm/other -> 887008bace2dd297f5bd45be2941726a4fc4c3e9
+-- attack 3: git branch -D fm/other
+   error: could not delete reference refs/heads/fm/other: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/fmlv/run-base-1b4677f0c.yl7p/home/projects/project/.git/refs/heads/fm/other.lock': Operation not permitted
+primary fm/other -> 887008bace2dd297f5bd45be2941726a4fc4c3e9
+-- attack 4: write commondir
+commondir exit 0
+-- work: commit in own worktree
+commit ok
+-- work: create own archive ref
+archive create ok
+-- work: push to gate
+push ok
+-- work: stash push + pop
+stash ok (file=change)
+-- work: gate deletes fm/other, then plain fetch (fetch.prune true in repo config)
+effective fetch.prune=false
+   From /private/tmp/fmlv/run-base-1b4677f0c.yl7p/gate
+    * [new branch]      main       -> no-mistakes/main
+fetch exit=0
+== after: primary checkout view (unconfined)
+commondir file was planted by the worker: /tmp (removed now so the primary can be read)
+git -C project rev-parse fm/other -> 887008bace2dd297f5bd45be2941726a4fc4c3e9
+RESULT: fm/other FORGED
+gate fm/task -> ee3e323094c35ae8b4a799447fc99120d276bbbb
+own archive -> ee3e323094c35ae8b4a799447fc99120d276bbbb

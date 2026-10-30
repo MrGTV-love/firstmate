@@ -1,0 +1,13 @@
+FM_WRITE_CONFINEMENT=seatbelt-v1
+effective fetch.prune=false
+before: fm/other -> 5b946be17d3db4e5b787df7ff93ba3aa9173f5c6
+/Users/charlesabrooker/tmp/fm-lab.0AkHQR/data/lvscout/probe.sh: line 7: /Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs: Operation not permitted
+attack1 packed-refs write: refused
+mv: rename /Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs.lock to /Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs: Operation not permitted
+attack2 rename-over: refused
+fatal: unable to write new packed-refs: unable to create file /Users/charlesabrooker/tmp/fm-lab.0AkHQR/projects/demo/.git/packed-refs.new: Operation not permitted
+attack4 pack-refs exit=128
+after: fm/other -> 5b946be17d3db4e5b787df7ff93ba3aa9173f5c6
+own commit: ok
+stash push+pop: ok
+fetch exit=0
