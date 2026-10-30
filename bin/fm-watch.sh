@@ -2402,6 +2402,9 @@ fm_active_check_stop() {
     # watcher shutdown, forever. Bound: the grace, the launcher's own cleanup
     # allowance, and a 1 s margin for its interpreter, process-table reads and
     # signal delivery outside those timed waits. Expiry KILLs the launcher.
+    # Residual: off Darwin only the launcher's own sweep reaches a descendant
+    # in a new session, so a TERM-ignoring one can outlive an unresponsive
+    # launcher; the guardian's KILL still cleans the check group.
     fm_check_pid_wait "$pid" "$((FM_ACTIVE_CHECK_GRACE * 100 + CHECK_LAUNCHER_CLEANUP_HUNDREDTHS + 100))" || true
   else
     [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
