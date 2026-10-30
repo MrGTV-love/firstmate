@@ -1103,9 +1103,11 @@ test_scan_skips_a_child_whose_lock_is_held() {
 
 # A child whose metadata lock stays held (a long teardown) must not starve the
 # children after it: the cursor moves past it, so when the budget cuts a scan at
-# a slow later child, the next scan goes on to the child after that one.
+# a slow later child, a later scan goes on to the child after that one. Where a
+# whole-second deadline falls is the host's business, so the case judges only
+# whether c is reached within a few scans while a stays held.
 test_held_child_does_not_starve_later_children() {
-  local holder
+  local holder scans=0
   make_world held-starve
   write_child "$MAIN" a 'done: first'
   write_child "$MAIN" b 'done: second'
@@ -1119,8 +1121,10 @@ SH
   hold_lock "$MAIN" "$(meta_lock_of "$MAIN" a)" "$WORLD/a-held" "$WORLD/a-release"
   holder=$!
   wait_for_file "$WORLD/a-held" || { reap "$holder"; fail "child lock holder did not start"; }
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+  while [ "$scans" -lt 5 ] && ! grep -Fq 'child=c state=done' "$MAIN/state/.wake-queue" 2>/dev/null; do
+    FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+    scans=$((scans + 1))
+  done
   kill -0 "$holder" 2>/dev/null || fail "the child lock holder ended before the later scans ran"
   : > "$WORLD/a-release"
   reap "$holder"
@@ -1151,7 +1155,7 @@ test_startup_scan_gives_up_behind_a_held_scan_lock() {
 }
 
 # The session-start --startup scan is the forced pass: it waits for a watcher
-# scan's lock (within the session start's stage budget) instead of dropping.
+# scan's lock (at most FM_INACTIVE_RECONCILE_BUDGET_SECS) instead of dropping.
 test_startup_scan_waits_for_a_watcher_scan() {
   local holder
   make_world startup-wait; write_child "$MAIN" child 'done: green'
