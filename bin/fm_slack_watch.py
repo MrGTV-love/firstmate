@@ -691,6 +691,8 @@ class Watch:
             try:
                 user = self.api.call('users.info', user=users[0]).get('user', {})
             except SlackError:
+                if self.staging_only:
+                    raise
                 continue
             if user.get('is_bot') or user.get('is_app_user'):
                 continue
@@ -791,6 +793,8 @@ class Watch:
             return remaining
         standing = self.hold(record)
         if standing == 'unknown':
+            if self.staging_only:
+                raise SlackError('hold_state_unreadable')
             return remaining
         if standing != 'live':
             for reply in new_replies:

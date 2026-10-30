@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X40.
+# Slack decision plane regressions DOD-01..DOD-17, S1..S3, X1..X43.
 # Every Slack call is a checked-in replay transcript; no socket is opened.
 set -euo pipefail
 # shellcheck source=tests/lib.sh
@@ -554,7 +554,7 @@ printf 'ok - S3\n'
 make_shim() {
   local dir="$TMP/shim"
   mkdir -p "$dir"
-  cp "$ROOT/bin/fm-slack-lib.sh" "$ROOT/bin/fm-slack-poll.sh" "$ROOT/bin/fm-slack-mirror.sh" \
+  cp "$ROOT/bin/fm-slack-lib.sh" "$ROOT/bin/fm-slack-poll.sh" "$ROOT/bin/fm-slack-mirror.sh" "$ROOT/bin/fm-slack-check.sh" \
     "$ROOT/bin/fm-env-lib.sh" "$ROOT/bin/fm_slack.py" "$ROOT/bin/fm_slack_replay.py" \
     "$ROOT/bin/fm_slack_watch.py" "$dir/"
   cat > "$dir/fm-fleet-snapshot.sh" <<SH
@@ -1528,6 +1528,21 @@ set -e
 [ "$rc" -ne 0 ] || fail "X41 retarget cleared the old DM although one thread could not be read"
 assert_contains "$out" 'slack: refused:' "X41 an unreadable old thread was not named"
 assert_eq "$(thread_count)" 4 "X41 an unreadable old thread was dropped"
+new_home mirror
+bind
+mirror mirror >/dev/null
+reply_to "$(thread_field open-a ts)" 900.999998 'ship while the call state is unreadable'
+: > "$TMP/open-fail"
+set +e
+out=$(env FM_SLACK_DM_USER=U0OTHEROWNER1 FM_SHIM_OPEN_FAIL="$TMP/open-fail" "$SHIM/fm-slack-check.sh" retarget --replay "$FIX/mirror/transcript.json" 2>&1); rc=$?
+set -e
+rm -f "$TMP/open-fail"
+[ "$rc" -ne 0 ] || fail "X41 retarget cleared the old DM although a call state could not be read"
+assert_contains "$out" 'slack: refused: hold_state_unreadable' "X41 an unreadable call state was not named"
+assert_eq "$(thread_count)" 4 "X41 a thread whose call state could not be read was dropped"
+assert_open open-a 0 "X41 an unreadable call state closed the call"
+out=$(poll mirror)
+assert_contains "$out" 'closed: open-a' "X41 the reply kept through the refused retarget was not delivered"
 printf 'ok - X41\n'
 
 # X42: a DM-shaped channel that is not the configured owner's DM never receives a write
@@ -1565,5 +1580,22 @@ set -e
 [ "$rc" -ne 0 ] || fail "X42 the mirror wrote although the owner DM could not be confirmed"
 assert_eq "$(outbound_count chat.postMessage)" "$sent" "X42 a write happened without confirming the owner DM"
 printf 'ok - X42\n'
+
+# X43: retarget refuses when it cannot check who tapped an option, so the tap is never dropped
+new_home reaction-answer
+bind
+mirror reaction-answer >/dev/null
+python3 "$HELPER" fail-call "$(replay_file)" users.info 400
+set +e
+out=$(FM_SLACK_DM_USER=U0OTHEROWNER1 "$ROOT/bin/fm-slack-check.sh" retarget --replay "$FIX/reaction-answer/transcript.json" 2>&1); rc=$?
+set -e
+[ "$rc" -ne 0 ] || fail "X43 retarget cleared the old DM although a tapping user could not be checked"
+assert_contains "$out" 'slack: refused: api_error' "X43 the failed user lookup was not named"
+assert_eq "$(thread_count reaction-call)" 1 "X43 the tapped thread was dropped"
+assert_open reaction-call 0 "X43 a refused retarget closed the call"
+python3 "$HELPER" clear-fail "$(replay_file)" users.info
+out=$(poll reaction-answer)
+assert_contains "$out" 'closed: reaction-call' "X43 the tap kept through the refused retarget was not delivered"
+printf 'ok - X43\n'
 
 printf 'ok - all Slack watch checks\n'
