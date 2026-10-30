@@ -1,0 +1,122 @@
+=== S1 ACT-1 rehearsal: bind, arm, mirror, owner reply, poll, disarm ===
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+slack: refused: source_not_bound
+[rc=1]
+registered slack check files after refused arm: 0
+
+$ <wt>/bin/fm-captain-hold.sh bind slack-dm
+bound: slack-dm -> (any)
+[rc=0]
+
+$ <wt>/bin/fm-slack-check.sh arm --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ <wt>/bin/fm-slack-mirror.sh --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+[rc=0]
+open-a card thread ts=900.000001
+
+$ <wt>/bin/fm-slack-check.sh check --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+closed: open-a
+[rc=0]
+open-a: hold CLOSED (open rc=1)
+recorded answer on open-a: Answer: ship it
+thread posts on open-a:
+Answer recorded.
+Resolved: open-a
+The decision is no longer open. Full resolution remains in the local backlog.
+token printed anywhere in outbound/state?
+no
+
+$ <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+registered slack check files after disarm: 0
+
+=== S2 adversarial: reply from a non-allowlisted author never answers ===
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+[rc=0]
+open-b: hold OPEN
+stranger reply was read (seen-count on open-b thread): 0
+-- positive control: the allowlisted owner replies on the same thread --
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+closed: open-b
+[rc=0]
+open-b: hold CLOSED (open rc=1)
+recorded answer on open-b: Answer: wait
+
+=== S3 adversarial: unbound source feeds nothing ===
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+[rc=0]
+typed-call: hold OPEN
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/typed-reply/transcript.json
+closed: typed-call
+[rc=0]
+typed-call: hold CLOSED (open rc=1)
+
+=== S4 disarm works with broken config ===
+
+$ env SLACK_BOT_TOKEN= FM_SLACK_ALLOWED_AUTHORS=oops <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+
+=== S5 changed owner DM: poll/arm refuse, retarget refuses with pending work, unchanged no-op, drain then retarget ===
+postMessage sends to old DM before the change: 4
+
+$ <wt>/bin/fm-slack-check.sh retarget --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+unchanged: FM_SLACK_DM_USER matches the DM already in use; nothing to retarget
+[rc=0]
+pending rows: 1
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-poll.sh --replay <tmp>/moved.json
+slack: transport failure: dm_user_changed; +1 queued
+[rc=1]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh arm --replay <tmp>/moved.json
+slack: refused: dm_user_changed
+[rc=1]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh retarget --replay <tmp>/moved.json
+slack: refused: dm_user_changed_with_pending_work
+[rc=1]
+pending rows after refused retarget: 1
+-- documented drain: old value restored, poll until the journal is empty --
+
+$ <wt>/bin/fm-slack-poll.sh --replay <wt>/tests/fixtures/slack/mirror/transcript.json
+check: slack 900.000001 - oversized notice
+[rc=0]
+postMessage sends to old DM after the drain poll (old value restored): 5
+documented journal probe prints: 0
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh disarm
+disarmed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh retarget --replay <tmp>/moved.json
+retargeted: the old DM is no longer tracked; the next arm, mirror, or poll opens the DM of FM_SLACK_DM_USER
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-check.sh arm --replay <tmp>/moved.json
+armed: state/slack.check.sh
+[rc=0]
+
+$ env FM_SLACK_DM_USER=U0OTHEROWNER1 <wt>/bin/fm-slack-mirror.sh --replay <tmp>/moved.json
+[rc=0]
+postMessage sends to new DM D0NEWOWNER01: 4
+postMessage sends to old DM D0123456789 (all, incl. before the change): 5
+
+=== S6 adversarial: nothing posts outside a DM; no raw post command ===
+
+$ <wt>/bin/fm-slack-mirror.sh --replay <tmp>/public.json
+slack: transport failure: target_is_not_a_DM
+[rc=1]
+sends to C0PUBLIC0001: 0
+
+$ python3 <wt>/bin/fm_slack_watch.py post
+error: unknown command; use --help
+[rc=2]

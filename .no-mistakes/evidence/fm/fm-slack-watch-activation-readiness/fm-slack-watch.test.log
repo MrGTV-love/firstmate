@@ -21,4 +21,42 @@ ok - X1
 ok - X2
 ok - X3
 ok - X4
-Terminated: 15
+ok - X5
+ok - X6
+ok - X7
+ok - X8
+ok - X9
+ok - X10
+ok - X11
+ok - X12
+ok - X13
+ok - X14
+ok - X15
+ok - X16
+ok - X17
+ok - X18
+ok - X19
+ok - X20
+ok - X21
+ok - X22
+ok - X23
+ok - X24
+ok - X25
+ok - X26
+ok - X27
+ok - X28
+ok - X29
+ok - X30
+ok - X31
+ok - X32
+ok - X33
+ok - X34
+ok - X35
+ok - X36
+ok - X37
+ok - X38
+ok - X39
+ok - X40
+ok - all Slack watch checks
+bash tests/fm-slack-watch.test.sh  570.43s user 442.00s system 72% cpu 23:16.20 total
+rc=0
