@@ -209,14 +209,25 @@ pass "a dead peer fails only once its recorded descendants are gone too"
 
 # A failed CPU read is unknown, not inactivity. Hide both process-table sources
 # while a real publisher stays alive, then prove its result is still accepted.
+# The publisher starts its quiet second only after the third probe, by which
+# point the observer has taken a blind sample, so a loaded host cannot publish
+# before the read failure is exercised.
 fakebin=$(fm_fakebin "$TMP_ROOT/blind")
 printf '#!/bin/sh\nexit 1\n' > "$fakebin/ps"
 chmod +x "$fakebin/ps"
+observed="$TMP_ROOT/blind.observed"
 result="$TMP_ROOT/blind.result"
-python3 -c 'import pathlib, sys, time; time.sleep(1); pathlib.Path(sys.argv[1]).write_text("observed")' "$result" &
+python3 -c '
+import pathlib, sys, time
+observed, result = map(pathlib.Path, sys.argv[1:])
+while not observed.exists():
+    time.sleep(0.05)
+time.sleep(1)
+result.write_text("observed")
+' "$observed" "$result" &
 publisher=$!
 PATH="$fakebin:$PATH" FM_PROC_ROOT_OVERRIDE="$TMP_ROOT/absent-proc" \
-  fm_test_wait_until --while-alive "$publisher" --inactivity 0.1 -- test -s "$result" \
+  fm_test_wait_until --while-alive "$publisher" --inactivity 0.1 -- note_probe "$observed" "$result" \
   2> "$TMP_ROOT/blind.err" || fail "missing CPU telemetry became a stall verdict"
 wait "$publisher" || fail "blind publisher failed"
 assert_grep 'cpu_telemetry_unavailable:' "$TMP_ROOT/blind.err" "CPU read failure was not exercised"
