@@ -277,7 +277,7 @@ done
 SESSION_START_STAGES='lock role bootstrap wake-queue supervision-instructions read-once fleet-state network-checks context next-step'
 
 stage() {  # <stage-name>: breadcrumb for the parent's truncation banner
-  [ -n "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
+  [ -f "${FM_SESSION_START_STAGE_FILE:-}" ] || return 0
   printf '%s\n' "$1" > "$FM_SESSION_START_STAGE_FILE" 2>/dev/null || true
 }
 
@@ -295,11 +295,13 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
   [ "$SESSION_START_BUDGET" -gt 0 ] 2>/dev/null || SESSION_START_BUDGET=120
   # The child sizes its bounded backlog reads from what is left of this bound.
   SESSION_START_DEADLINE=$(( $(date +%s) + SESSION_START_BUDGET ))
-  SESSION_START_STAGE_FILE=$(mktemp "${TMPDIR:-/tmp}/fm-session-start-stage.XXXXXX" 2>/dev/null) || SESSION_START_STAGE_FILE=
+  SESSION_START_STAGE_FILE=$(fm_scratch_new f fm-session-start-stage 2>/dev/null) || SESSION_START_STAGE_FILE=
   if [ -z "$SESSION_START_STAGE_FILE" ]; then
     # Without a breadcrumb the bound still holds; only the banner's precision
     # is lost, so the child still runs bounded.
     SESSION_START_STAGE_FILE=/dev/null
+  else
+    trap 'fm_scratch_release "$SESSION_START_STAGE_FILE"' EXIT
   fi
   if [ "$REEMIT" -eq 1 ]; then
     if [ -n "$SESSION_SOURCE" ]; then
@@ -354,7 +356,6 @@ if [ -z "${FM_SESSION_START_STAGE_FILE:-}" ]; then
     fi
     printf '%s\n' "$BAR"
   fi
-  rm -f "$SESSION_START_STAGE_FILE" 2>/dev/null || true
   exit 0
 fi
 
