@@ -3497,7 +3497,7 @@ Anything the intake writes to its error stream, such as a parent-channel deliver
 A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
 A closed tracked call receives one resolution notice naming the task and pointing to its local resolution record, without copying the task body, and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
 
-`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, and the last reported failure class.
+`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, the wake lines not yet printed, and the last reported failure class.
 It is transport state, not a second decision store; `fm-captain-hold.sh answers` still owns record creation and answer replay detection.
 Recovery repeats an unfinished intake row through that same intake before committing its cursor; the intake accepts an exact replay of a row it already applied, in both close modes, so the acknowledgement says the answer was recorded.
 The test-only `after-delivery` fault fires after the intake has applied the row and before that is journaled; `after-answer` fires after it is journaled and before the acknowledgement.
