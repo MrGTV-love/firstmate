@@ -47,10 +47,10 @@
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_duration_progress under a stable
 # contributions.read.<read> key, and each read's sample is recorded in one
-# batch when the poll ends. Only 5 seconds of output and process-tree CPU
-# silence stops a read: main's existing 5-second per-read cap, now applied to
-# silence rather than to elapsed time, so a read that keeps progressing is never
-# cut. There is no sweep deadline or observation reservation. A stopped read is unknown: keep that URL's saved observation
+# batch when the poll ends. Harm: a silent, CPU-idle read holds the whole pass.
+# Only 5 seconds with no output and no process-tree CPU stops a read, so a read
+# that keeps progressing is never cut. There is no sweep deadline or observation
+# reservation. A stopped read is unknown: keep that URL's saved observation
 # untouched, and dial no further URL this pass, because the next read would
 # most likely wait on the same unreachable forge; every remaining URL is
 # unknown for this pass and keeps its row, and the next pass retries. The URL
