@@ -239,15 +239,29 @@ assert_memory_pid_ended() {
   fail "memory stop left descendant $pid alive ($state)"
 }
 
+test_memory_fixture_retains_inherited_process_limit() {
+  local soft output rc
+  soft=$(ulimit -S -u)
+  output=$(run_memory_case "$WRAP" --memory-kib 262144 -- bash -c 'printf "%s %s\n" "$(ulimit -S -u)" "$(ulimit -H -u)"')
+  rc=$?
+  expect_code 0 "$rc" "memory-only fixture starts under the inherited process ceiling"
+  assert_equals "$soft $soft" "$output" "both memory layers retain the inherited soft process limit and only seal the hard limit"
+  pass "memory-only fixtures retain inherited process headroom without raising either limit"
+}
+
 test_memory_tree_over_limit() {
-  local rc pid
+  local rc pid soft
+  soft=$(ulimit -S -u)
   cat >"$TMP_ROOT/memory-tree.py" <<'PY'
 import os
+import resource
 import subprocess
 import sys
 import time
 
 if len(sys.argv) == 1:
+    with open(os.environ["FM_MEMORY_NPROC"], "w") as handle:
+        handle.write("%d %d\n" % resource.getrlimit(resource.RLIMIT_NPROC))
     subprocess.Popen([sys.executable, __file__, "child"])
     time.sleep(60)
 else:
@@ -259,10 +273,11 @@ else:
     allocation = bytearray(80 * 1024 * 1024)
     time.sleep(60)
 PY
-  FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" run_memory_case \
+  FM_MEMORY_PIDS="$TMP_ROOT/memory.pids" FM_MEMORY_NPROC="$TMP_ROOT/memory.nproc" run_memory_case \
     "$WRAP" --memory-kib 131072 -- python3 "$TMP_ROOT/memory-tree.py" 2>"$TMP_ROOT/memory.err"
   rc=$?
-  expect_code 99 "$rc" "over-limit command tree"
+  expect_code 99 "$rc" "over-limit command tree: $(<"$TMP_ROOT/memory.err")"
+  assert_equals "$soft $soft" "$(cat "$TMP_ROOT/memory.nproc")" "the memory payload keeps the inherited soft process limit, with no extra user-count cap"
   assert_contains "$(cat "$TMP_ROOT/memory.err")" "exceeded 131072 KiB" "over-limit reason names the bound"
   [ "$(wc -l <"$TMP_ROOT/memory.err" | tr -d ' ')" -eq 1 ] || fail "memory stop must emit exactly one reason"
   [ "$(wc -l <"$TMP_ROOT/memory.pids" | tr -d ' ')" -eq 2 ] || fail "child and grandchild must both have started"
@@ -273,15 +288,18 @@ PY
 }
 
 test_memory_nested_wrapper() {
-  local rc pid
+  local rc pid soft
+  soft=$(ulimit -S -u)
   # The inner wrapper runs its own supervisor with a higher bound. The outer
   # stop must still count and end the inner 192 MiB payload.
-  FM_MEMORY_NESTED_PID="$TMP_ROOT/nested-memory.pid" run_memory_case "$WRAP" --memory-kib 131072 -- \
+  FM_MEMORY_NESTED_PID="$TMP_ROOT/nested-memory.pid" FM_MEMORY_NPROC="$TMP_ROOT/nested-memory.nproc" \
+    run_memory_case "$WRAP" --memory-kib 131072 -- \
     "$WRAP" --memory-kib 524288 -- python3 -c \
-    'import os, time; open(os.environ["FM_MEMORY_NESTED_PID"], "w").write(str(os.getpid())); allocation = bytearray(192 * 1024 * 1024); time.sleep(4); raise SystemExit(7)' \
+    'import os, resource, time; open(os.environ["FM_MEMORY_NESTED_PID"], "w").write(str(os.getpid())); open(os.environ["FM_MEMORY_NPROC"], "w").write("%d %d" % resource.getrlimit(resource.RLIMIT_NPROC)); allocation = bytearray(192 * 1024 * 1024); time.sleep(4); raise SystemExit(7)' \
     2>"$TMP_ROOT/nested-memory.err"
   rc=$?
-  expect_code 99 "$rc" "lower outer memory stop covers nested wrapper sessions"
+  expect_code 99 "$rc" "lower outer memory stop covers nested wrapper sessions: $(<"$TMP_ROOT/nested-memory.err")"
+  assert_equals "$soft $soft" "$(cat "$TMP_ROOT/nested-memory.nproc")" "all three memory layers keep the inherited process ceiling"
   assert_contains "$(cat "$TMP_ROOT/nested-memory.err")" "exceeded 131072 KiB" "the outer bound, not the higher inner bound, must stop the payload"
   read -r pid <"$TMP_ROOT/nested-memory.pid"
   assert_memory_pid_ended "$pid"
@@ -600,8 +618,7 @@ else:
 PY
   for mode in unreadable malformed exit hang; do
     marker="$TMP_ROOT/reader-$mode.pid"
-    PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
-      FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE="$mode" run_memory_case \
+    FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE="$mode" run_memory_case \
       "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- \
       "$WRAP" --memory-kib 524288 -- \
       bash -c 'echo "$$" >"$FM_MEMORY_MARKER"; exec sleep 20' 2>"$TMP_ROOT/reader.err"
@@ -613,8 +630,7 @@ PY
     assert_memory_pid_ended "$pid"
   done
 
-  PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
-    FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE=unreadable run_memory_case \
+  FM_MEMORY_MARKER="$marker" FM_MEMORY_FAILURE=unreadable run_memory_case \
     "$fixture/fm-proc-budget.sh" --memory-kib 262144 -- touch "$TMP_ROOT/reader-started" 2>"$TMP_ROOT/reader-start.err"
   expect_code 125 $? "unavailable reader at preflight"
   assert_absent "$TMP_ROOT/reader-started" "unavailable reader must refuse before launch"
@@ -640,9 +656,21 @@ test_memory_invalid_limits() {
   pass "invalid memory bounds refuse before launch"
 }
 
-test_memory_invalid_limits
-test_no_memory_option_never_starts_reader
-if memory_supported; then
+# Memory-specific cases share one scoped count fixture, not a user-count + 1500
+# cap that unrelated same-user processes can spend before a payload starts.
+# Reporting the actual inherited soft limit keeps that ceiling at every wrapper
+# layer; the normal hard-limit seal can lower the hard limit but never raise it.
+# Dynamic local scope also reaches Python-launched wrappers and copied readers.
+# Process-budget arithmetic, real-UID refusal, sealing and runaway cases remain
+# outside this owner, with their original counts and production guard coverage.
+run_memory_cases() {
+  local FM_TEST_PS_COUNT PATH="$TMP_ROOT/stub-ps:$PATH"
+  FM_TEST_PS_COUNT=$(ulimit -S -u)
+  case "$FM_TEST_PS_COUNT" in
+    ''|*[!0-9]*) fail "the memory fixtures need a finite inherited process limit, got '$FM_TEST_PS_COUNT'" ;;
+  esac
+  export FM_TEST_PS_COUNT PATH
+  test_memory_fixture_retains_inherited_process_limit
   test_memory_tree_over_limit
   test_memory_nested_wrapper
   test_memory_normal_command
@@ -658,6 +686,12 @@ if memory_supported; then
   test_memory_inherited_fd_reaches_command
   test_memory_command_start_matches_exec
   test_memory_reader_failure
+}
+
+test_memory_invalid_limits
+test_no_memory_option_never_starts_reader
+if memory_supported; then
+  run_memory_cases
 fi
 
 test_default_extra_is_added_to_the_count

@@ -20,13 +20,13 @@ REGISTRY="$ROOT/docs/guards/registry.json"
 # --- G-10: the registry carries the population and its arithmetic -----------
 out=$("$LINT" --mode enforce --counts 2>&1) || fail "registry lint is not clean in enforce mode: $out"
 printf '%s\n' "$out" | grep -q '^VIOLATION' && fail "enforce mode reported a violation: $out"
-printf '%s\n' "$out" | grep -q 'active=41 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=14' \
-  || fail "registry arithmetic drifted from (41-14)+(14-12)+1=30: $out"
+printf '%s\n' "$out" | grep -q 'active=43 retired=14 beyond_audit=12 excluded=1 unregistered=[0-9]* audited=30 beyond_audit_active=16' \
+  || fail "registry arithmetic drifted from (43-16)+(14-12)+1=30: $out"
 pass "G-10 the registry accounts for all 30 audited Firstmate guards"
 
 [ -f "$ROOT/docs/guard-spec.md" ] || fail "the guard spec is missing"
-jq -e '.guards | length == 41' "$REGISTRY" >/dev/null || fail "registry does not hold 41 live guards"
-jq -e '.beyond_audit_active | length == 14' "$REGISTRY" >/dev/null || fail "the fourteen post-audit guards are not recorded"
+jq -e '.guards | length == 43' "$REGISTRY" >/dev/null || fail "registry does not hold 43 live guards"
+jq -e '.beyond_audit_active | length == 16' "$REGISTRY" >/dev/null || fail "the sixteen post-audit guards are not recorded"
 jq -e '.excluded | length == 1' "$REGISTRY" >/dev/null || fail "the prose exclusion is not recorded"
 pass "G-10b the spec and the registry are checked in and agree"
 
