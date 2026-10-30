@@ -145,6 +145,19 @@ check_run() {
     "$name" "$status" "$conclusion_json" "$started_json" "$completed_json"
 }
 
+# The compare API's answer for the base branch's live tip against the head:
+# the tip itself, the newest base commit the head contains, and how many base
+# commits the head lacks. With no call number it answers every read; with one it
+# answers only that read, so a case can move the tip between two reads. Args:
+# case_dir tip built_on behind_by [call_number]
+write_github_compare() {
+  local case_dir=$1 tip=$2 built_on=$3 behind=$4 call=${5:-final}
+  mkdir -p "$case_dir/compare-responses"
+  printf '{"status":"%s","ahead_by":1,"behind_by":%s,"base_commit":{"sha":"%s"},"merge_base_commit":{"sha":"%s"}}\n' \
+    "$([ "$behind" -eq 0 ] && echo ahead || echo diverged)" "$behind" "$tip" "$built_on" \
+    > "$case_dir/compare-responses/$call"
+}
+
 status_context() {
   local name=$1 state=$2
   printf '{"__typename":"StatusContext","context":"%s","state":"%s"}' "$name" "$state"
@@ -231,6 +244,14 @@ case "${1:-} ${2:-}" in
     esac
     ;;
   "pr merge")
+    # Disarming auto-merge is its own call: it changes no merge state here,
+    # and the auto-merge read below answers what a case says is still armed.
+    case " $* " in
+      *" --disable-auto "*)
+        [ ! -e "$FM_TEST_GH_DISABLE_AUTO_FAIL" ] || exit 1
+        exit 0
+        ;;
+    esac
     if [ -n "${FM_TEST_META_AT_MERGE:-}" ] && [ -f "${FM_STATE_OVERRIDE:-}/task-x1.meta" ]; then
       cat "$FM_STATE_OVERRIDE/task-x1.meta" > "$FM_TEST_META_AT_MERGE"
     fi
@@ -279,6 +300,14 @@ case "${1:-} ${2:-}" in
           }} end)}}}}' "$FM_TEST_GH_VIEW_CURRENT"
         exit $?
         ;;
+      *autoMergeRequest*)
+        if [ -f "$FM_TEST_GH_AUTO_MERGE_STATE" ]; then
+          cat "$FM_TEST_GH_AUTO_MERGE_STATE"
+        else
+          echo disarmed
+        fi
+        exit 0
+        ;;
     esac
     if [ -f "${FM_TEST_GH_GRAPHQL_FAIL:-}" ]; then
       echo 'error: could not reach the GitHub API' >&2
@@ -291,6 +320,24 @@ case "${1:-} ${2:-}" in
     # The required-check reads: the branch itself, and its rules read without
     # the merge-queue filter the queue reader below applies.
     case " $* " in
+      *" repos/"*"/compare/"*)
+        case "$*" in
+          *"...$(cat "$FM_TEST_GH_HEAD")?"*) ;;
+          *) exit 1 ;;
+        esac
+        calls=$(( $(cat "$FM_TEST_GH_COMPARE_CALLS" 2>/dev/null || echo 0) + 1 ))
+        printf '%s\n' "$calls" > "$FM_TEST_GH_COMPARE_CALLS"
+        for reply in "$FM_TEST_GH_COMPARE_RESPONSES/$calls" "$FM_TEST_GH_COMPARE_RESPONSES/final"; do
+          if [ -f "$reply" ]; then
+            cat "$reply"
+            exit 0
+          fi
+        done
+        # By default the head already contains the base tip the view reports.
+        base=$(cat "$FM_TEST_GH_BASE") || exit 1
+        printf '{"status":"ahead","ahead_by":1,"behind_by":0,"base_commit":{"sha":"%s"},"merge_base_commit":{"sha":"%s"}}\n' "$base" "$base"
+        exit 0
+        ;;
       *" repos/"*"/commits/"*"/check-runs"*)
         case "$*" in
           *"/commits/$(cat "$FM_TEST_GH_HEAD")/check-runs"*) ;;
@@ -332,7 +379,20 @@ case "${1:-} ${2:-}" in
       exit 1
     fi
     if [ -f "${FM_TEST_GH_RULES_FAIL:-}" ]; then
+      [ ! -f "$FM_TEST_GH_RULES_FAIL.once" ] || rm "$FM_TEST_GH_RULES_FAIL"
       exit 1
+    fi
+    # A case can fail the merge-queue read from a given call number on, so a
+    # read that verify passed can fail when it is repeated before the merge.
+    calls=$(( $(cat "$FM_TEST_GH_RULES_CALLS" 2>/dev/null || echo 0) + 1 ))
+    printf '%s\n' "$calls" > "$FM_TEST_GH_RULES_CALLS"
+    if [ -f "${FM_TEST_GH_RULES_FAIL_FROM:-}" ] && [ "$calls" -ge "$(cat "$FM_TEST_GH_RULES_FAIL_FROM")" ]; then
+      exit 1
+    fi
+    # Or drop every rule from a given call number on, so a queue verify saw is
+    # gone when the read is repeated before the merge.
+    if [ -f "${FM_TEST_GH_RULES_EMPTY_FROM:-}" ] && [ "$calls" -ge "$(cat "$FM_TEST_GH_RULES_EMPTY_FROM")" ]; then
+      exit 0
     fi
     cat "$FM_TEST_GH_RULES"
     exit 0
@@ -758,11 +818,19 @@ run_pr_merge() {
   FM_TEST_GH_HEAD="$case_dir/github-head" \
   FM_TEST_GH_RUNS="$case_dir/github-runs.json" \
   FM_TEST_GH_RUNS_FIRST="$case_dir/github-runs-first.json" \
+  FM_TEST_GH_BASE="$case_dir/github-base" \
+  FM_TEST_GH_COMPARE_RESPONSES="$case_dir/compare-responses" \
+  FM_TEST_GH_COMPARE_CALLS="$case_dir/compare-calls" \
   FM_TEST_GH_RUNS_CALLS="$case_dir/github-runs-calls" \
   FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
+  FM_TEST_GH_DISABLE_AUTO_FAIL="$case_dir/github-disable-auto-fails" \
+  FM_TEST_GH_AUTO_MERGE_STATE="$case_dir/github-auto-merge-state" \
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
   FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
   FM_TEST_GH_RULES_FAIL="$case_dir/github-rules-fail" \
+  FM_TEST_GH_RULES_FAIL_FROM="$case_dir/github-rules-fail-from" \
+  FM_TEST_GH_RULES_EMPTY_FROM="$case_dir/github-rules-empty-from" \
+  FM_TEST_GH_RULES_CALLS="$case_dir/github-rules-calls" \
   FM_TEST_GH_RULES_FAIL_BODY="$case_dir/github-rules-fail-body" \
   FM_TEST_GH_BRANCH="$case_dir/github-branch.json" \
   FM_TEST_GH_BRANCH_FAIL="$case_dir/github-branch-fail" \

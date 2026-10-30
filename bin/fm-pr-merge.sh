@@ -33,6 +33,28 @@
 # Only the final attempt is reported: incomplete sources remain unreadable,
 # never evidence that a required check is missing, and exhausted UNKNOWN alone
 # reports mergeability still pending rather than unmergeable.
+# The head also has to contain the base branch's live tip, so the tree the
+# merge lands is the head's own tree, the one its checks ran on;
+# github_read_base_containment below owns that tree rule, why run timing is
+# never trusted instead, and why no waiver applies. The tip is read again
+# immediately before the forge command and a moved tip refuses, because the
+# head binding below does not extend to the base; a tip that lands in the
+# seconds between that last read and GitHub applying the merge is a residual
+# this script cannot close. Only a merge that enters the base's merge queue,
+# proven live at both reads, into a base whose required set the verify read
+# found complete and non-empty, skips that containment rule and never the check
+# reads, because the queue runs those required checks on the combined tree
+# itself; an unreadable queue rule or required set is retried as unreadable at
+# verify, and when verify relied on the queue, a last read that cannot prove
+# the queue again, whether unreadable or not, refuses as unreadable, never
+# judged as a head that lacks the tip;
+# github_merge_enters_queue below owns that proof. Off a proven queue, an
+# attended --auto merge also needs a live mergeStateStatus at that last read
+# where GitHub merges at once (CLEAN, HAS_HOOKS or UNSTABLE), because in any
+# other state GitHub arms auto-merge, which can land later on a tip no check
+# ran with; and when such a request, whether or not gh succeeded, does not
+# read back merged or queued, github_disarm_auto_merge below disarms it and
+# confirms that with a fresh read.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -93,8 +115,8 @@
 # A caller-requested --auto that leaves the pull request neither merged nor
 # queued is refused the same way and says auto-merge was armed with nothing
 # landed or queued yet, or, when the merge command itself failed, that auto-merge
-# was only requested; both are read from the caller's own arguments rather than
-# from the forge's prose.
+# was requested with nothing proven merged or queued; both are read from the
+# caller's own arguments rather than from the forge's prose.
 # Every refusal that follows a merge command which returned success quotes that
 # command's own output, marked as the forge's text and kept apart from this
 # script's verdict, including the refusal for an outcome that cannot be read;
@@ -552,6 +574,7 @@ require_recorded_review() {
 # returns non-zero after reporting every condition that failed.
 FM_PR_MERGE_HEAD=
 FM_PR_MERGE_BASE=
+FM_PR_MERGE_BASE_TIP=
 FM_PR_GITLAB_ASYNC_CONFIGURED=false
 gitlab_verify_mergeable() {
   local json fields line
@@ -1044,6 +1067,42 @@ github_required_checks_missing() {
   ' 2>/dev/null || return 1
 }
 
+# Whether the head contains the base branch's live tip. Every check that ran on
+# the head tested the head's own tree, and a squash or merge of a head that
+# already contains the tip onto that tip lands that same tree, so green head
+# checks then cover the landed tree with no timing evidence at all. A head that
+# lacks the tip lands a tree combined with base commits no check ran beside it.
+# Run timing cannot stand in for this: a GitHub Actions pull_request run tests
+# the merge GitHub built from the base it saw, a re-run keeps that merge (CI run
+# 40719661158 attempt 2), and PR 254 was closed and reopened after its base
+# moved and its new run still tested the old merge. No waiver applies, because
+# there is no verdict to waive: the checks passed, on a different tree.
+# The tip is read from the base branch itself through the compare API, never
+# from the pull request's baseRefOid, which GitHub leaves at the base of the
+# last head push. Sets FM_PR_BASE_TIP (the live tip), FM_PR_BASE_BUILT_ON (the
+# newest base commit the head contains), and FM_PR_BASE_BEHIND (the number of
+# base commits the head lacks). Returns 1 when the comparison cannot be read.
+FM_PR_BASE_TIP=
+FM_PR_BASE_BUILT_ON=
+FM_PR_BASE_BEHIND=
+github_read_base_containment() {
+  local head=$1 base=$2 comparison fields
+  FM_PR_BASE_TIP=
+  FM_PR_BASE_BUILT_ON=
+  FM_PR_BASE_BEHIND=
+  comparison=$(gh api "repos/$PR_OWNER/$PR_REPO/compare/$(github_urlencode_path_segment "$base")...$head?per_page=1" 2>/dev/null) \
+    || return 1
+  fields=$(printf '%s' "$comparison" | jq -r '
+    if (.base_commit.sha | type) == "string" and (.base_commit.sha | test("^[0-9a-f]{40}$"))
+       and (.merge_base_commit.sha | type) == "string" and (.merge_base_commit.sha | test("^[0-9a-f]{40}$"))
+       and (.behind_by | type) == "number" and .behind_by >= 0 and .behind_by == (.behind_by | floor)
+    then "\(.base_commit.sha) \(.merge_base_commit.sha) \(.behind_by)"
+    else error("unreadable comparison") end' 2>/dev/null) || return 1
+  read -r FM_PR_BASE_TIP FM_PR_BASE_BUILT_ON FM_PR_BASE_BEHIND <<FIELDS
+$fields
+FIELDS
+}
+
 # Pre-merge conditions from a live PR view, complete head rollup, base
 # requirements, and head producers. Sets FM_PR_MERGE_HEAD on success. Returns 3
 # for UNKNOWN alone, or 4 for an unreadable source or missing-check visibility
@@ -1055,6 +1114,7 @@ github_verify_mergeable() {
   local state='' draft='' review_decision='' mergeable='' merge_state='' live_head='' base=''
   local kind action req_text required_known=true
   local any_pending=false any_failed=false
+  local lacks_tip='' queued=false queue_status
   local -a unwaived_red=() unwaived_missing=()
   FM_PR_GREEN_HEAD_BLOCKED=false
 
@@ -1227,6 +1287,27 @@ $missing
 EOF
   fi
 
+  # The head must contain the base branch's live tip, so the landed tree is the
+  # one its checks ran on, unless this merge enters the base's merge queue;
+  # github_read_base_containment and github_merge_enters_queue own the rule.
+  queue_status=0
+  github_merge_enters_queue "$base" || queue_status=$?
+  if [ "$queue_status" -eq 0 ]; then
+    queued=true
+  elif [ "$queue_status" -eq 2 ]; then
+    source_unreadable=true
+    refusals="$refusals  - whether this --auto merge enters the merge queue of base branch $base, and so whether head $live_head must contain its tip, could not be read
+"
+  elif ! github_read_base_containment "$live_head" "$base"; then
+    source_unreadable=true
+    refusals="$refusals  - whether head $live_head contains the current tip of base branch $base could not be read
+"
+  elif [ "$FM_PR_BASE_BEHIND" -ne 0 ]; then
+    lacks_tip=$FM_PR_BASE_TIP
+    refusals="$refusals  - head $live_head lacks the current tip $FM_PR_BASE_TIP of base branch $base ($FM_PR_BASE_BEHIND commits behind): it was built on $base at $FM_PR_BASE_BUILT_ON, so no check ran on the tree this merge would land
+"
+  fi
+
   if [ -n "$mergeable_refusal" ]; then
     if [ -z "$refusals" ] && [ "$mergeable" = UNKNOWN ]; then
       return 3
@@ -1238,13 +1319,17 @@ EOF
     # One event per green-check decision: a denial needs a definite check it
     # read, while a refusal whose source could not be read carries no verdict
     # to report.
-    if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
+    if [ -n "$uncovered" ] || [ -n "$unreported" ] || [ -n "$lacks_tip" ]; then
       FM_PR_GREEN_HEAD_BLOCKED=true
     fi
     printf 'error: refusing to merge %s\n' "$URL" >&2
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
+    if [ -n "$lacks_tip" ]; then
+      printf 'Update the branch so its head contains %s at %s (rebase onto it or merge it into the branch, then push), so CI runs on the combined tree. Re-running the jobs or reopening the pull request does not change the tree, and no waiver applies. When the new checks pass, re-run this merge: %s %s %s\n' \
+        "$base" "$lacks_tip" "$0" "$ID" "$URL" >&2
+    fi
     if [ -n "$uncovered" ] || [ -n "$unreported" ]; then
       if [ "$any_pending" = true ]; then
         printf 'Wait for the pending or unreported check to report, then re-run this merge: %s %s %s\n' \
@@ -1267,6 +1352,7 @@ EOF
         done
       fi
     fi
+    [ -z "$lacks_tip" ] || return 1
     [ "$source_unreadable" = false ] || return 4
     if [ -z "$other_refusals" ] && [ -n "$unreported" ] \
       && { [ "$mergeable" = MERGEABLE ] || [ "$mergeable" = UNKNOWN ]; }; then
@@ -1274,8 +1360,15 @@ EOF
     fi
     return 1
   fi
-  printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
-    "$URL" "$live_head" >&2
+  if [ "$queued" = true ]; then
+    printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which enters the merge queue of base branch %s\n' \
+      "$URL" "$live_head" "$base" >&2
+    FM_PR_MERGE_BASE_TIP=
+  else
+    printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s, which contains the current %s tip %s\n' \
+      "$URL" "$live_head" "$base" "$FM_PR_BASE_TIP" >&2
+    FM_PR_MERGE_BASE_TIP=$FM_PR_BASE_TIP
+  fi
   FM_PR_MERGE_HEAD=$live_head
   FM_PR_MERGE_BASE=$(printf '%s' "$json" | jq -er '.baseRefOid') || FM_PR_MERGE_BASE=
   fm_pr_head_valid "$FM_PR_MERGE_BASE" || { echo 'error: could not read the GitHub PR base commit for author evidence' >&2; return 4; }
@@ -1409,6 +1502,30 @@ github_branch_rules_unavailable_on_plan() {
     *"Upgrade to GitHub Pro or make this repository public"*) return 0 ;;
   esac
   return 1
+}
+
+# Whether this merge enters the given base branch's merge queue: the caller
+# asked for --auto, the only path this script sends into a queue, the base's
+# rules, read live, name exactly one recognised merge_queue rule, and the
+# required set that github_verify_mergeable last read through
+# github_read_required_contexts is complete and names at least one check. A
+# queue builds its merge group on its own tip and runs the required checks on
+# that combined tree before anything lands, so a landed tree no check ran on
+# cannot happen there and the head need not contain the tip. Returns 0 then.
+# A direct merge, no queue rule, a conflicting or unrecognised rule, a plan
+# without branch rules, or an empty required set, where the queue would land
+# its group with no check run on it, returns 1, so the containment rule
+# applies unchanged. An unreadable queue rule or required set returns 2,
+# because whether the containment rule applies at all is then unknown. Sets
+# FM_PR_GITHUB_BASE to the base it read.
+github_merge_enters_queue() {
+  [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] || return 1
+  FM_PR_GITHUB_BASE=$1
+  github_read_queue_method
+  [ "$FM_PR_GITHUB_QUEUE_STATUS" != unreadable ] || return 2
+  [ "$FM_PR_GITHUB_QUEUE_STATUS" = single ] || return 1
+  [ -z "$FM_PR_GITHUB_REQUIRED_ERROR" ] || return 2
+  [ "$FM_PR_GITHUB_REQUIRED" != '[]' ] || return 1
 }
 
 # Read the effective merge-queue method for the observed base branch. The four
@@ -1637,9 +1754,9 @@ FM_PR_GITHUB_MERGE_ACCEPTED=false
 FM_PR_GITHUB_CALLER_METHOD=
 
 # The single gate every statement about what the forge accepted, armed, or
-# reported has to pass. A merge command that failed accepted nothing, so no
-# such statement may be made on its path, and routing them all through one
-# predicate keeps a later one from being written without the gate.
+# reported has to pass. A merge command that failed proves nothing accepted,
+# so no such statement may be made on its path, and routing them all through
+# one predicate keeps a later one from being written without the gate.
 github_merge_command_succeeded() {
   [ "$FM_PR_GITHUB_MERGE_ACCEPTED" = true ]
 }
@@ -1727,7 +1844,7 @@ github_report_unmerged_outcome() {
       printf 'error: auto-merge was requested and armed for %s, but nothing is merged or in the merge queue yet, so this run refuses instead of reporting an unproved merge\n' \
         "$URL" >&2
     else
-      printf 'error: auto-merge was requested for %s, but the merge command itself failed, so nothing was enabled, merged or queued\n' \
+      printf 'error: auto-merge was requested for %s, but the merge command itself failed, so nothing is proven merged or queued\n' \
         "$URL" >&2
     fi
   fi
@@ -1741,6 +1858,29 @@ github_report_unmerged_outcome() {
     return 0
   fi
   github_report_queue_rules
+}
+
+# Disarm any auto-merge an off-queue --auto request may have left armed with
+# nothing proven merged or queued, then confirm with a fresh read that none is
+# armed, because an armed auto-merge can land later on a base tip no check ran
+# with. The fresh read is the proof, not the disarm command's own exit status,
+# and a disarm it cannot confirm is reported loudly.
+github_disarm_auto_merge() {
+  local armed=''
+  gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" --disable-auto >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
+  if armed=$(gh api graphql \
+      -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){autoMergeRequest{enabledAt}}}}' \
+      -F "owner=$PR_OWNER" -F "repo=$PR_REPO" -F "number=$PR_NUMBER" \
+      --jq '.data.repository.pullRequest | if . == null then "unknown" elif .autoMergeRequest == null then "disarmed" else "armed" end' \
+      2>/dev/null) \
+    && [ "$armed" = disarmed ]; then
+    printf 'error: auto-merge is off for %s: gh pr merge --disable-auto ran and a fresh read shows it off, so nothing can land later on a base tip no check ran with\n' \
+      "$URL" >&2
+  else
+    printf 'error: AUTO-MERGE MAY STILL BE ARMED for %s: disarming it could not be confirmed (the fresh read shows %s), so the pull request may still merge later onto a base tip no check ran with; disarm it now with: gh pr merge %s --repo %s/%s --disable-auto\n' \
+      "$URL" "${armed:-nothing readable}" "$PR_NUMBER" "$PR_OWNER" "$PR_REPO" >&2
+  fi
 }
 
 gitlab_confirm_merged() {
@@ -1831,12 +1971,11 @@ case "$PROVIDER" in
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
-    # One event per green-check decision, after the retries settle it. The
+    # One event per green-check decision, after the retries settle it; an
+    # allow waits for the base tip re-read immediately before the merge. The
     # writer always exits 0 and never sits in a condition, so telemetry cannot
     # change what this merge does.
-    if [ "$mergeable_status" -eq 0 ]; then
-      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
-    elif [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
+    if [ "$FM_PR_GREEN_HEAD_BLOCKED" = true ]; then
       "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
     fi
     cat "$MERGE_VERIFY_LOG" >&2
@@ -1857,6 +1996,51 @@ case "$PROVIDER" in
     refuse_github_queue_while_away || exit 2
     merge_status=0
     require_recorded_review || exit 1
+    # --match-head-commit binds only the head, so unless this merge enters the
+    # base's merge queue, read live again here, the base tip is read once more
+    # and a tip that moved since the verify read refuses. A tip that lands in
+    # the seconds between this read and GitHub applying the merge is not closed.
+    merge_enters_queue=false
+    queue_status=0
+    github_merge_enters_queue "$FM_PR_GITHUB_BASE" || queue_status=$?
+    [ "$queue_status" -ne 0 ] || merge_enters_queue=true
+    if [ "$queue_status" -ne 0 ] && [ -z "$FM_PR_MERGE_BASE_TIP" ]; then
+      "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
+      printf 'error: refusing to merge %s: whether this --auto merge enters the merge queue of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
+        "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
+      exit 1
+    fi
+    if [ "$merge_enters_queue" = false ]; then
+      if ! github_read_base_containment "$FM_PR_MERGE_HEAD" "$FM_PR_GITHUB_BASE"; then
+        "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok false --elapsed-ms 0 2>/dev/null
+        printf 'error: refusing to merge %s: the tip of base branch %s could not be re-read immediately before the merge; re-run this merge: %s %s %s\n' \
+          "$URL" "$FM_PR_GITHUB_BASE" "$0" "$ID" "$URL" >&2
+        exit 1
+      fi
+      if [ "$FM_PR_BASE_TIP" != "$FM_PR_MERGE_BASE_TIP" ]; then
+        "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok true --elapsed-ms 0 2>/dev/null
+        printf 'error: refusing to merge %s: base branch %s is at %s, not the tip %s that head %s was verified to contain, so the tree this merge would land is not the one verified; re-run this merge: %s %s %s\n' \
+          "$URL" "$FM_PR_GITHUB_BASE" "$FM_PR_BASE_TIP" "${FM_PR_MERGE_BASE_TIP:-(none: the merge queue was read at verify)}" "$FM_PR_MERGE_HEAD" "$0" "$ID" "$URL" >&2
+        exit 1
+      fi
+      # Off a merge queue, --auto lands now only in a state where gh merges at
+      # once; in any other state GitHub arms auto-merge, which can land later
+      # on a base tip no check ran with.
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ]; then
+        merge_state=$(gh pr view "$URL" --json mergeStateStatus 2>/dev/null \
+          | jq -er '.mergeStateStatus | select(type == "string" and . != "")' 2>/dev/null) || merge_state=
+        case "$merge_state" in
+          CLEAN|HAS_HOOKS|UNSTABLE) ;;
+          *)
+            "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head deny --source-ok "$([ -n "$merge_state" ] && echo true || echo false)" --elapsed-ms 0 2>/dev/null
+            printf 'error: refusing to merge %s: --auto on base branch %s, which has no proven merge queue, needs mergeStateStatus CLEAN, HAS_HOOKS or UNSTABLE, where GitHub merges at once, but it is %s, so GitHub would arm auto-merge instead, and that can land later on a base tip no check ran with; clear what holds the pull request, then re-run this merge: %s %s %s\n' \
+              "$URL" "$FM_PR_GITHUB_BASE" "${merge_state:-unreadable}" "$0" "$ID" "$URL" >&2
+            exit 1
+            ;;
+        esac
+      fi
+    fi
+    "$SCRIPT_DIR/fm-guard-event.sh" merge-green-head allow --cleared-by retry 2>/dev/null
     merge_output=$(gh pr merge "$PR_NUMBER" --repo "$PR_OWNER/$PR_REPO" \
       --match-head-commit "$FM_PR_MERGE_HEAD" \
       "${merge_args[@]+"${merge_args[@]}"}" "$@" 2>&1) || merge_status=$?
@@ -1871,18 +2055,27 @@ case "$PROVIDER" in
       fm_lock_release "$MERGE_CONTROL_LOCK" || true
       MERGE_CONTROL_LOCK=
       [ -z "$merge_output" ] || printf '%s\n' "$merge_output" >&2
+      outcome_landed=false
       if github_read_outcome; then
         if [ "$FM_PR_GITHUB_MERGED" != true ] && [ "$FM_PR_GITHUB_QUEUED" != true ]; then
           github_report_unmerged_outcome
         else
+          outcome_landed=true
           printf 'actionable: the merge command for %s failed, but the pull request reads back as state=%s, merged=%s, isInMergeQueue=%s\n' \
             "$URL" "$FM_PR_GITHUB_STATE" "$FM_PR_GITHUB_MERGED" "$FM_PR_GITHUB_QUEUED" >&2
         fi
+      fi
+      if [ "$outcome_landed" = false ] && [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] \
+        && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
       fi
       exit "$merge_status"
     fi
     if ! github_read_outcome; then
       github_report_forge_output "$merge_output"
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
+      fi
       exit 1
     fi
     if [ "$FM_PR_GITHUB_MERGED" = true ]; then
@@ -1895,10 +2088,14 @@ case "$PROVIDER" in
     else
       github_report_forge_output "$merge_output"
       github_report_unmerged_outcome
+      if [ "$FM_PR_GITHUB_AUTO_REQUESTED" = true ] && [ "$merge_enters_queue" = false ]; then
+        github_disarm_auto_merge
+      fi
       exit 1
     fi
     ;;
   gitlab)
+    # Known gap: no base-tip containment here yet; backlog task fm-pr-merge-tip-containment-gitlab-forgejo owns it.
     gitlab_verify_mergeable || exit 1
     # --sha binds the merge to the head this run verified, so a push that lands
     # in between is refused by GitLab instead of merged unverified. --yes only
@@ -1933,6 +2130,7 @@ case "$PROVIDER" in
     [ "$gitlab_confirm_rc" -eq 0 ] || exit 0
     ;;
   forgejo)
+    # Known gap: no base-tip containment here yet; backlog task fm-pr-merge-tip-containment-gitlab-forgejo owns it.
     forgejo_reject_unsupported_args "$@" || exit 1
     forgejo_method=$(caller_merge_method "$@")
     [ -n "$forgejo_method" ] || forgejo_method=$(forgejo_default_merge_style) || exit 1
