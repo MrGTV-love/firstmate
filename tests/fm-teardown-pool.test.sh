@@ -2051,7 +2051,7 @@ test_unverified_pool_reservation_preserves_processes() {
     > "$case_dir/pool/treehouse-state.json"
   # This provider has the lease command and acknowledges it but never changes
   # state. A successful command is not evidence that this slot became
-  # nonallocatable.
+  # nonallocatable. Its status lists the slot in the current pool.
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
@@ -2059,6 +2059,7 @@ if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
   exit 0
 fi
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+[ "\${1:-}" != status ] || printf '[{"name":"1","path":"%s"}]\n' "$NESTED_SLOT"
 exit 0
 SH
   chmod +x "$case_dir/fakebin/treehouse"
@@ -2113,6 +2114,7 @@ esac
 SH
     cat > "$case_dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+case "${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "$*" >> "$FM_LATE_CASE/treehouse.log"
 SH
     chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
@@ -2245,7 +2247,7 @@ SH
     assert_absent "${slot%/*}/.fm-slot-owner" "$shape: teardown kept the slot claim"
     returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
     assert_equals 1 "$returns" "$shape: the slot must be returned exactly once"
-    assert_no_grep '^lease ' "$case_dir/treehouse.log" "$shape: teardown tried to lease a slot it could not prove unleased"
+    assert_no_log_line '^lease ' "$case_dir/treehouse.log" "$shape: teardown tried to lease a slot it could not prove unleased"
     [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
   done
   pass 'recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot'
@@ -2310,6 +2312,313 @@ SH
     [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
   done
   pass 'an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return'
+}
+
+# Treehouse derives a project's pool folder from its origin URL, so a repointed
+# origin leaves earlier copies in an older folder while `treehouse lease` takes
+# a slot NAME and resolves it in the current pool only. Teardown acts on the
+# slot whose PATH is the recorded copy: it never leases, returns or judges a
+# same-named slot of the current pool, and returns the old-folder copy by path.
+test_superseded_pool_copy_tears_down_without_touching_the_current_pool() {
+  local shape state case_dir rc returns
+  for shape in free held; do
+    state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":false},{"name":"2","path":"@SLOT2@","leased":false}]}'
+    [ "$shape" = free ] || state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"other-task"},{"name":"2","path":"@SLOT2@","leased":false}]}'
+    make_superseded_pool_case "pool-superseded-$shape" "$state"
+    case_dir=$SUPER_CASE
+    cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape: a landed copy in a superseded pool folder must tear down: $(cat "$case_dir/stderr")"
+    assert_no_log_line '^lease ' "$case_dir/treehouse.log" "$shape: teardown leased a slot by name"
+    cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" \
+      || fail "$shape: teardown changed the current pool's state: $(cat "$SUPER_NEW_STATE")"
+    returns=$(grep -c "^return --force $SUPER_SLOT\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$shape: the recorded copy must be returned once, by its own path"
+    assert_no_grep "current-pool" "$case_dir/treehouse.log" "$shape: teardown returned a slot of the current pool"
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
+    jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "$shape: the old folder still records the copy as leased"
+    [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
+  done
+  pass 'a copy in a superseded pool folder is returned by path and no slot of the current pool is leased, returned or changed'
+}
+
+# A reservation that an earlier teardown made by name leased a different copy
+# of the current pool for this task. The next teardown releases that lease and
+# only that lease: its holder is this task, the return is the conditional one
+# (never forced), and a slot another task holds, claims, or has working in it,
+# or that holds a registered copy or a copy a task record names, stays exactly
+# as it was.
+test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks() {
+  local shape state case_dir rc returns
+  for shape in own other claimed busy nested record; do
+    state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":false}]}'
+    [ "$shape" != other ] || state='{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"other-task"},{"name":"2","path":"@SLOT2@","leased":false}]}'
+    make_superseded_pool_case "pool-wrong-lease-$shape" "$state"
+    case_dir=$SUPER_CASE
+    [ "$shape" != claimed ] || printf 'task=other-task\nhome=%s\n' "$case_dir/primary-home" > "$case_dir/current-pool/1/.fm-slot-owner"
+    if [ "$shape" = nested ]; then
+      mkdir -p "$SUPER_NEW1/.claude/worktrees"
+      git -C "$case_dir/project" worktree add -q --detach "$SUPER_NEW1/.claude/worktrees/other" main
+    fi
+    [ "$shape" != record ] || fm_write_meta "$case_dir/state/other-task.meta" "worktree=$SUPER_NEW1" "kind=ship"
+    cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+      FM_POOL_BUSY_SLOT="$([ "$shape" = busy ] && echo "$SUPER_NEW1")" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape: teardown must finish: $(cat "$case_dir/stderr")"
+    assert_no_log_line '^lease ' "$case_dir/treehouse.log" "$shape: teardown leased a slot by name"
+    assert_no_log_line '^return --force .*current-pool' "$case_dir/treehouse.log" "$shape: teardown forced a return of a current-pool slot"
+    returns=$(grep -c "^return --force $SUPER_SLOT\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$shape: the recorded copy must be returned once, by its own path"
+    if [ "$shape" = own ]; then
+      assert_equals 1 "$(grep -c "^return $SUPER_NEW1 --if-lease-holder task-x1\$" "$case_dir/treehouse.log" || true)" \
+        "$shape: the wrong lease was not released through the conditional return"
+      jq -e '.worktrees[0].leased == false' "$SUPER_NEW_STATE" >/dev/null \
+        || fail "$shape: the wrong lease is still held: $(cat "$SUPER_NEW_STATE")"
+    else
+      cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" \
+        || fail "$shape: teardown changed a current-pool slot that is not this task's to release: $(cat "$SUPER_NEW_STATE")"
+      assert_no_grep "current-pool" "$case_dir/treehouse.log" "$shape: teardown returned a slot of the current pool"
+      case "$shape" in
+        nested|record) assert_grep "leaving $SUPER_NEW1 leased to task-x1" "$case_dir/stderr" "$shape: teardown did not report the lease it left" ;;
+      esac
+    fi
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
+  done
+  pass 'a lease this task took on a same-named slot of the current pool is released by the conditional return, and no other holder is touched'
+}
+
+# The misdirected lease is the one an earlier teardown took with the recorded
+# slot's NAME. Another reservation of the current pool that this task also
+# holds, under a different name, is not that lease: it stays exactly as it was.
+test_wrong_lease_repair_releases_only_the_same_named_slot() {
+  local case_dir rc
+  make_superseded_pool_case pool-wrong-lease-two-own \
+    '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":true,"lease_holder":"task-x1"}]}'
+  case_dir=$SUPER_CASE
+  jq -c '.worktrees[1]' "$SUPER_NEW_STATE" > "$case_dir/slot2.before"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "teardown must finish: $(cat "$case_dir/stderr")"
+  assert_equals 1 "$(grep -c "^return $SUPER_NEW1 --if-lease-holder task-x1\$" "$case_dir/treehouse.log" || true)" \
+    'the same-named misdirected lease was not released through the conditional return'
+  assert_no_grep "$SUPER_NEW2" "$case_dir/treehouse.log" 'teardown acted on a reservation that does not share the recorded slot name'
+  jq -e '.worktrees[0].leased == false' "$SUPER_NEW_STATE" >/dev/null \
+    || fail "the same-named misdirected lease is still held: $(cat "$SUPER_NEW_STATE")"
+  jq -c '.worktrees[1]' "$SUPER_NEW_STATE" | cmp -s "$case_dir/slot2.before" - \
+    || fail "teardown changed the other reservation this task holds: $(cat "$SUPER_NEW_STATE")"
+  assert_absent "$case_dir/state/task-x1.meta" 'teardown kept the task record'
+  pass 'only the current-pool slot that shares the recorded slot name is released; another lease this task holds stays byte-identical'
+}
+
+# The route for a copy in an older pool folder is ordinary teardown: the
+# landed-work test runs first, unchanged, and only a copy it proves landed
+# reaches a return or a lease release. A copy holding unique unlanded work is
+# refused before either, so the copy, both pool folders' state and this task's
+# misdirected lease stay byte-identical.
+test_unlanded_work_in_an_older_pool_folder_is_refused_before_any_return() {
+  local case_dir rc
+  make_superseded_pool_case pool-superseded-unique-work \
+    '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":true,"lease_holder":"task-x1"},{"name":"2","path":"@SLOT2@","leased":false}]}'
+  case_dir=$SUPER_CASE
+  printf 'unique work\n' > "$SUPER_SLOT/unique.txt"
+  git -C "$SUPER_SLOT" add unique.txt
+  git -C "$SUPER_SLOT" -c user.email=t@t -c user.name=t commit -q -m 'unique unlanded work'
+  printf 'unsaved edit\n' > "$SUPER_SLOT/unsaved.txt"
+  superseded_copy_snapshot "$SUPER_SLOT" > "$case_dir/copy.before"
+  cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/old.before"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail 'ordinary teardown accepted unique unlanded work in an older pool folder'
+  assert_no_log_line '^(lease|return) ' "$case_dir/treehouse.log" 'the refusal leased, returned or released a slot'
+  superseded_copy_snapshot "$SUPER_SLOT" | cmp -s "$case_dir/copy.before" - \
+    || fail 'the refusal changed the copy holding unlanded work'
+  cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail "the refusal changed the current pool: $(cat "$SUPER_NEW_STATE")"
+  cmp -s "$case_dir/old.before" "$case_dir/pool/treehouse-state.json" || fail 'the refusal changed the older pool folder state'
+  assert_present "$case_dir/state/task-x1.meta" 'the refusal removed the task record'
+  pass 'unique unlanded work in an older pool folder is refused before any return or lease release, and every byte stays as it was'
+}
+
+# The landed-work test is unchanged for a copy in a superseded pool folder:
+# dirt or an unlanded commit refuses with nothing leased, returned or removed,
+# and the clean retry then finishes through the same path-exact return.
+test_unlanded_superseded_pool_copy_is_refused_and_the_landed_retry_finishes() {
+  local shape case_dir rc returns
+  for shape in dirty commit; do
+    make_superseded_pool_case "pool-superseded-unlanded-$shape" \
+      '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":false},{"name":"2","path":"@SLOT2@","leased":false}]}'
+    case_dir=$SUPER_CASE
+    cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+    if [ "$shape" = dirty ]; then
+      printf 'unfinished\n' > "$SUPER_SLOT/unfinished.txt"
+    else
+      printf 'unlanded work\n' > "$SUPER_SLOT/unlanded.txt"
+      git -C "$SUPER_SLOT" add unlanded.txt
+      git -C "$SUPER_SLOT" -c user.email=t@t -c user.name=t commit -q -m 'unlanded work'
+    fi
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape: teardown accepted an unlanded copy in a superseded pool folder"
+    assert_present "$case_dir/state/task-x1.meta" "$shape: the refusal removed the task record"
+    assert_no_log_line '^(lease|return) ' "$case_dir/treehouse.log" "$shape: the refusal leased or returned a slot"
+    cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail "$shape: the refusal changed the current pool"
+    if [ "$shape" = dirty ]; then
+      assert_present "$SUPER_SLOT/unfinished.txt" "$shape: the refusal removed the dirt"
+      rm -f "$SUPER_SLOT/unfinished.txt"
+    else
+      git -C "$case_dir/project" merge -q --ff-only fm/pool-root
+    fi
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+      run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    expect_code 0 "$rc" "$shape: the landed retry must finish: $(cat "$case_dir/stderr2")"
+    assert_no_log_line '^lease ' "$case_dir/treehouse.log" "$shape: the retry leased a slot by name"
+    returns=$(grep -c "^return --force $SUPER_SLOT\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$shape: the recorded copy must be returned once, by its own path"
+    cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail "$shape: the retry changed the current pool"
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: the retry kept the task record"
+  done
+  pass 'an unlanded copy in a superseded pool folder is refused without touching any pool, and the landed retry returns it by path'
+}
+
+# When Treehouse's status cannot be read, whether a slot belongs to the current
+# pool is unproved, so teardown never leases by name: project custody covers the
+# path-exact return, as for any slot whose lease state cannot be proved.
+test_unreadable_pool_status_never_leases_by_name() {
+  local case_dir rc returns
+  make_superseded_pool_case pool-status-unreadable \
+    '{"worktrees":[{"name":"1","path":"@SLOT1@","leased":false},{"name":"2","path":"@SLOT2@","leased":false}]}'
+  case_dir=$SUPER_CASE
+  cp "$SUPER_NEW_STATE" "$case_dir/current.before"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_CURRENT_STATE="$SUPER_NEW_STATE" \
+    FM_POOL_STATUS_FAILS=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "an unreadable pool status must not refuse cleanup: $(cat "$case_dir/stderr")"
+  assert_grep 'because treehouse status cannot be read, so it is not leased by slot name' "$case_dir/stderr" 'teardown did not say it left the slot unleased by name'
+  assert_no_log_line '^lease ' "$case_dir/treehouse.log" 'teardown leased a slot it could not place in the current pool'
+  returns=$(grep -c "^return --force $SUPER_SLOT\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the recorded copy must be returned once, by its own path'
+  cmp -s "$case_dir/current.before" "$SUPER_NEW_STATE" || fail 'teardown changed the current pool'
+  pass 'an unreadable Treehouse status keeps project custody and never leases a slot by name'
+}
+
+# Treehouse says where the current pool is: a copy whose pool folder is the
+# directory treehouse pool-dir prints is reserved by name and returned with no
+# treehouse status listing under the project lock. The same folder name under
+# another root is not that directory, so teardown returns that copy by path and
+# never leases the same-named slot of the current pool.
+test_current_pool_copy_tears_down_without_a_status_listing() {
+  local shape case_dir rc new_pool
+  for shape in current-pool old-root; do
+    make_lease_modeling_pool_case "pool-dir-$shape" ''
+    case_dir=$POOL_CASE
+    rc=0
+    if [ "$shape" = current-pool ]; then
+      FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_DIR="${POOL_SLOT%/*/*}" \
+        run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      new_pool=$case_dir/newroot/.treehouse/${POOL_SLOT%/*/*}
+      new_pool=$case_dir/newroot/.treehouse/${new_pool##*/}
+      mkdir -p "$new_pool/1/project"
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$new_pool/1/project" > "$new_pool/treehouse-state.json"
+      cp "$new_pool/treehouse-state.json" "$case_dir/current.before"
+      FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_DIR="$new_pool" \
+        FM_POOL_CURRENT_STATE="$new_pool/treehouse-state.json" \
+        run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 0 "$rc" "$shape: a landed copy must tear down: $(cat "$case_dir/stderr")"
+    if [ "$shape" = current-pool ]; then
+      assert_no_log_line '^status' "$case_dir/treehouse.log" "$shape: the common teardown read a treehouse status listing"
+      assert_equals 1 "$(grep -c '^lease 1 --lease-holder task-x1$' "$case_dir/treehouse.log" || true)" \
+        "$shape: the current-pool slot was not reserved by its name exactly once"
+    else
+      assert_no_log_line '^lease ' "$case_dir/treehouse.log" "$shape: teardown leased a slot by name"
+      assert_equals 1 "$(grep -c '^status' "$case_dir/treehouse.log" || true)" \
+        "$shape: the listing for this task's misdirected leases was not read exactly once"
+      cmp -s "$case_dir/current.before" "$new_pool/treehouse-state.json" \
+        || fail "$shape: teardown changed the current pool's state: $(cat "$new_pool/treehouse-state.json")"
+    fi
+    assert_equals 1 "$(grep -c "^return --force $POOL_SLOT\$" "$case_dir/treehouse.log" || true)" \
+      "$shape: the recorded copy must be returned once, by its own path"
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
+    [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
+  done
+  pass 'a copy in the pool folder treehouse pool-dir names is reserved by name with no listing, and the same folder name under another root is returned by path'
+}
+
+# The current-pool proof asks Treehouse and copies none of its rules. When
+# treehouse pool-dir prints one absolute directory, that directory alone decides,
+# wherever it is and whatever TREEHOUSE_ROOT or $HOME say, with no status
+# listing. When pool-dir is missing or its output is not one absolute path, the
+# path-exact status listing decides, read once per project in one process, as
+# one forced teardown reads it across its descendants.
+test_current_pool_proof_asks_treehouse() {
+  local dir shape out expect repo other cur old fast home
+  dir="$TMP_ROOT/pool-dir-proof"
+  repo=$dir/repo other=$dir/other/repo cur=$dir/cur/.treehouse/repo-abc old=$dir/old/.treehouse/repo-abc
+  fast=$dir/Volumes/fast/.treehouse/repo-abc home=$dir/home/.treehouse/repo-abc
+  mkdir -p "$dir/fakebin" "$dir/listed/1/repo" "$cur/1/repo" "$old/1/repo" "$old/2/repo" "$fast/1/repo" "$home/1/repo"
+  git init -q "$repo"
+  git init -q "$other"
+  cat > "$dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s %s\n' "\$PWD" "\$*" >> "$dir/treehouse.log"
+case "\${1:-}" in
+  pool-dir)
+    case "\$(cat "$dir/mode")" in
+      unknown) echo 'Error: unknown command "pool-dir" for "treehouse"' >&2; exit 1 ;;
+      two-lines) printf '%s\n%s\n' "$cur" "$cur" ;;
+      relative) printf 'cur/.treehouse/repo-abc\n' ;;
+      *) cat "$dir/mode" ;;
+    esac
+    ;;
+  status) printf '[{"name":"1","path":"%s"}]\n' "$dir/listed/1/repo" ;;
+esac
+exit 0
+SH
+  chmod +x "$dir/fakebin/treehouse"
+  for shape in current-pool other-volume unknown two-lines relative; do
+    : > "$dir/treehouse.log"
+    case "$shape" in
+      current-pool) printf '%s\n' "$cur" > "$dir/mode"; set -- "$repo" "$cur/1/repo" "$repo" "$old/1/repo"; expect='current superseded' ;;
+      other-volume) printf '%s\n' "$fast" > "$dir/mode"; set -- "$repo" "$fast/1/repo" "$repo" "$home/1/repo"; expect='current superseded' ;;
+      *) printf '%s\n' "$shape" > "$dir/mode"
+        set -- "$repo" "$dir/listed/1/repo" "$repo" "$old/1/repo" "$repo" "$old/2/repo" "$other" "$old/1/repo"
+        expect='current superseded superseded superseded' ;;
+    esac
+    out=$(HOME="$dir/home" TREEHOUSE_ROOT="$dir/home" PATH="$dir/fakebin:$PATH" bash -c '
+      . "$1/bin/fm-task-copy-lib.sh"
+      shift
+      while [ "$#" -gt 0 ]; do
+        fm_task_copy_slot_in_current_pool "$1" "$2" 1 || true
+        printf "%s " "$FM_TASK_COPY_POOL_CURRENCY"
+        shift 2
+      done
+    ' _ "$ROOT" "$@")
+    assert_equals "$expect" "${out% }" "$shape: slots were placed against the wrong pool"
+    case "$shape" in
+      current-pool|other-volume)
+        assert_equals 0 "$(grep -c ' status --json$' "$dir/treehouse.log" || true)" \
+          "$shape: the proof read a status listing although pool-dir answered"
+        ;;
+      *)
+        assert_equals 1 "$(grep -c "^$repo status --json\$" "$dir/treehouse.log" || true)" \
+          "$shape: the status listing of one project was not read exactly once"
+        assert_equals 2 "$(grep -c ' status --json$' "$dir/treehouse.log" || true)" \
+          "$shape: each project did not get its own single listing"
+        ;;
+    esac
+  done
+  pass 'the current-pool proof follows the directory treehouse pool-dir prints, and otherwise reads one status listing per project'
 }
 
 # The idle reaper's teardown never waits before it has closed anything, but
@@ -2883,6 +3192,7 @@ exit 0
 SH
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 if [ ! -e "$case_dir/attempted" ]; then
   touch "$case_dir/attempted"
@@ -2920,6 +3230,14 @@ test_idle_reap_retries_a_closed_task_whose_return_stalled
 test_refusal_before_cleanup_takes_no_pool_reservation
 test_unprovable_pool_state_keeps_project_custody_through_return
 test_teardown_follows_the_installed_treehouse_lease_support
+test_superseded_pool_copy_tears_down_without_touching_the_current_pool
+test_wrong_lease_from_an_earlier_teardown_is_released_only_when_it_is_this_tasks
+test_wrong_lease_repair_releases_only_the_same_named_slot
+test_unlanded_superseded_pool_copy_is_refused_and_the_landed_retry_finishes
+test_unlanded_work_in_an_older_pool_folder_is_refused_before_any_return
+test_unreadable_pool_status_never_leases_by_name
+test_current_pool_copy_tears_down_without_a_status_listing
+test_current_pool_proof_asks_treehouse
 test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
 test_unverified_pool_reservation_preserves_processes

@@ -798,6 +798,13 @@ test_nested_replacement_blocks_slot_allocation() {
 # run_case_teardown <case-dir> <id>: the real bin/fm-teardown.sh against the
 # case home, with a treehouse that records each call and quiet endpoint and
 # forge tools.
+# assert_treehouse_unchanged <case-dir> <message>: Treehouse was at most read
+# through its pool-dir answer and status listing.
+assert_treehouse_unchanged() {
+  [ ! -e "$1/treehouse.log" ] || ! grep -Eqv '^(pool-dir|status --json)$' "$1/treehouse.log" \
+    || fail "$2: $(cat "$1/treehouse.log")"
+}
+
 run_case_teardown() {  # <case-dir> <id>
   local dir=$1 id=$2 tb="$1/teardown-bin" tool
   shift 2
@@ -813,7 +820,16 @@ SH
     chmod +x "$dir/code-root/bin/fm-fleet-sync.sh"
     cat > "$tb/treehouse" <<SH
 #!/usr/bin/env bash
+if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
+  [ ! -e "$dir/lease-path" ] || printf '      --lease-holder string   Optional label\n      --path string           Lease the worktree at this exact path\n'
+  exit 0
+fi
 printf '%s\n' "\$*" >> "$dir/treehouse.log"
+[ "\${1:-}" != status ] || [ ! -f "$dir/status.json" ] || cat "$dir/status.json"
+if [ "\${1:-} \${2:-}" = "lease --path" ] && [ -e "$dir/lease-path" ]; then
+  jq --arg path "\$3" --arg holder "\$5" '(.worktrees[] | select(.path == \$path)) |= (.leased = true | .lease_holder = \$holder)' \\
+    "$dir/pool/treehouse-state.json" > "$dir/pool/state.next" && mv "$dir/pool/state.next" "$dir/pool/treehouse-state.json"
+fi
 exit 0
 SH
     cat > "$tb/gh-axi" <<'SH'
@@ -1490,9 +1506,76 @@ test_unleased_shared_slot_gates_only_the_claimant() {
     git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
       || fail "$claimant claim: cleanup changed copy registrations"
     cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$claimant claim: cleanup changed Treehouse's lease state"
-    [ ! -e "$dir/treehouse.log" ] || fail "$claimant claim: cleanup touched Treehouse"
+    assert_treehouse_unchanged "$dir" "$claimant claim: cleanup touched Treehouse"
   done
   pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
+}
+
+# A shared slot in a superseded pool folder keeps its remaining record's copy, so
+# its claimant's record retires once the slot is leased by its exact path for
+# that record, never by name; without lease --path it refuses, naming the
+# treehouse build it needs. A claimant whose PR is not merged refuses and leaves
+# no new lease. A shared slot the current pool lists still refuses with its
+# lease remedy.
+test_superseded_shared_slot_retires_its_claimant() {
+  local id=shared-superseded shape dir slot out rc pr_state
+  for shape in current superseded superseded-unmerged superseded-no-path; do
+    dir=$(new_case "shared-superseded-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+    printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    if [ "$shape" = current ]; then
+      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$slot"
+    else
+      printf '[{"name":"42","path":"%s","lease_holder":"","processes":[]}]\n' "$dir/current-pool/42/repo"
+    fi > "$dir/status.json"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/state/parked.meta" "$dir/parked-before"
+    cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    case "$shape" in superseded|superseded-unmerged) : > "$dir/lease-path" ;; esac
+    pr_state=MERGED
+    [ "$shape" != superseded-unmerged ] || pr_state=OPEN
+    rc=0
+    out=$(FM_SHARED_PR_STATE=$pr_state run_case_teardown "$dir" "$id") || rc=$?
+    case "$shape" in
+      superseded)
+        expect_code 0 "$rc" "a shared slot in a superseded pool folder must let its claimant's record retire"$'\n'"$out"
+        [ ! -e "$dir/home/state/$id.meta" ] || fail 'superseded shared-slot cleanup left the finished record'
+        assert_equals "lease --path $slot --lease-holder parked" "$(grep -E '^lease ' "$dir/treehouse.log")" \
+          'the slot was not leased once, by its exact path, for the remaining record'
+        jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "parked"' "$dir/pool/treehouse-state.json" >/dev/null \
+          || fail "the old folder does not record the shared slot as leased: $(cat "$dir/pool/treehouse-state.json")"
+        ;;
+      superseded-unmerged)
+        expect_code 1 "$rc" "a superseded shared slot's claimant with an unmerged PR must refuse"$'\n'"$out"
+        assert_contains "$out" 'is not confirmed merged' 'the refusal did not name the unmerged PR'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+      superseded-no-path)
+        expect_code 1 "$rc" "a superseded shared slot must refuse without lease --path"$'\n'"$out"
+        assert_contains "$out" 'needs treehouse v3.1.7-fm or later (treehouse lease --path)' 'the refusal did not name the treehouse build it needs'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+      *)
+        expect_code 1 "$rc" "an unleased shared slot of the current pool must refuse its claimant"$'\n'"$out"
+        assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the refusal must name the lease remedy'
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'the refusal retired its record'
+        ;;
+    esac
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$shape: cleanup changed the parked record"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
+    ! grep -Eq '^return' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup returned a slot: $(cat "$dir/treehouse.log")"
+    if [ "$shape" != superseded ]; then
+      cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: cleanup changed Treehouse's lease state"
+      ! grep -Eq '^lease' "$dir/treehouse.log" 2>/dev/null || fail "$shape: cleanup leased a slot: $(cat "$dir/treehouse.log")"
+    fi
+  done
+  pass 'a superseded shared slot is leased by its exact path before its claimant retires, an unmerged claimant refuses with no new lease, it refuses without lease --path, and a current-pool one still refuses'
 }
 
 # The lease remedy names the remaining record that stays in the slot, never
@@ -1538,7 +1621,7 @@ test_unleased_shared_slot_names_the_remaining_lease_holder() {
     cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: refused cleanup changed its record"
     cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$shape: refused cleanup changed the claim"
     copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: refused cleanup changed slot bytes"
-    [ ! -e "$dir/treehouse.log" ] || fail "$shape: refused cleanup touched Treehouse"
+    assert_treehouse_unchanged "$dir" "$shape: refused cleanup touched Treehouse"
   done
   pass 'the unleased shared-slot remedy names the sole remaining root record and lists every candidate with its status among several'
 }
@@ -2473,6 +2556,7 @@ test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
 test_unleased_shared_slot_gates_only_the_claimant
 test_unleased_shared_slot_names_the_remaining_lease_holder
+test_superseded_shared_slot_retires_its_claimant
 test_nested_shared_ship_keeps_own_copy_proof
 test_recorded_pr_reassociation_requires_contained_head
 test_shared_slot_cleanup_then_reassociate_preserves_all_copies
