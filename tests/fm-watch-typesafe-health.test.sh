@@ -130,6 +130,45 @@ test_hung_probe_is_never_doubled() {
   pass "a probe still running is never started twice, and the poll keeps running"
 }
 
+test_memory_observation_wakes_with_the_process_identity() {
+  local dir state fakebin out pid native rc=0
+  dir=$(make_case memory-health-wake); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  native="$dir/native"; mkdir -p "$native"
+  printf '34359738368\n1\ntotal = 3072.00M used = 1565.88M free = 1506.12M\n' > "$native/sysctl"
+  printf 'Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 1000.\nPages speculative: 100.\nAnonymous pages: 1048576.\nFile-backed pages: 500000.\nPages purgeable: 1000.\nPages occupied by compressor: 32768.\n' > "$native/vm_stat"
+  # The alarm baseline record that root probes would derive (tests/fm-mem-guard.test.sh covers that).
+  mkdir -p "$state"
+  jq -n --arg host "$(python3 -c 'import socket; print(socket.gethostname())')" \
+    '{schema: "fm-memory-baseline.v1", host: $host, total_bytes: 34359738368, non_fleet_max_bytes: 1073741824,
+      smallest_reading_max_bytes: 536870912, samples: 2, derivation: "test fixture"}' > "$state/.memory-baseline.json"
+  printf '[{"pid":101,"ppid":1,"comm":"xprotectd","started":"start-101","rss_bytes":8589934592,"fleet":false,"run":null}]\n' > "$native/processes.json"
+  start_watcher "$state" "$fakebin" "$out" FM_HOME="$dir" \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  fm_test_wait_until 100 grep -q 'xprotectd PID 101' "$out" || {
+    stop_owned_watcher "$pid"
+    fail "the watcher failed to present the identifying memory alarm: $(cat "$out") $(cat "$out.err")"
+  }
+  wait "$pid" || rc=$?
+  [ "$rc" -eq 0 ] || fail "memory alarm stopped watcher with an error: $(cat "$out.err")"
+  assert_contains "$(cat "$state/.wake-queue")" 'xprotectd PID 101' 'the presented memory observation was not durable'
+  jq -es '.[-1].source == "probe" and .[-1].alarms[0].pid == 101' "$state/memory-readings.jsonl" >/dev/null \
+    || fail 'watcher did not retain the alarm reading'
+  # The row stays queued until handling acknowledges it; a handling successor
+  # must supervise instead of presenting the same row again and exiting.
+  start_watcher "$state" "$fakebin" "$out.successor" FM_HOME="$dir" FM_WATCH_HANDLING_SUCCESSOR=1 \
+    FM_MEMORY_FIXTURE_DIR="$native" FM_MEMORY_GUARD_BIN="$ROOT/bin/fm-mem-guard.sh" FM_TYPESAFE_HEALTH_INTERVAL=0
+  pid=$!
+  sleep 4
+  if ! is_live_non_zombie "$pid" || grep -q 'memory-health' "$out.successor"; then
+    stop_owned_watcher "$pid"
+    fail "a handling successor re-presented the surfaced memory row: $(cat "$out.successor") $(cat "$out.successor.err")"
+  fi
+  stop_owned_watcher "$pid"
+  pass 'the real watcher presents its named non-fleet alarm once through the existing durable wake queue'
+}
+
+test_memory_observation_wakes_with_the_process_identity
 test_probe_runs_detached_on_its_interval_with_the_home
 test_first_probe_waits_a_full_interval
 test_zero_interval_disables_the_probe

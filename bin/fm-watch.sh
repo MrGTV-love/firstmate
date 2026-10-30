@@ -419,6 +419,10 @@ case "$TYPESAFE_HEALTH_INTERVAL" in
 esac
 TYPESAFE_HEALTH_BIN=${FM_TYPESAFE_HEALTH_BIN:-$SCRIPT_DIR/fm-typesafe-health.sh}
 TYPESAFE_HEALTH_NEXT=
+# Native memory observation shares the existing check cadence; the helper owns
+# recorded readings and durable, deduplicated alarms, never interventions.
+MEMORY_HEALTH_BIN=${FM_MEMORY_GUARD_BIN:-$SCRIPT_DIR/fm-mem-guard.sh}
+MEMORY_HEALTH_PID=
 # Automatic retirement of finished Lavish listeners (the --auto mode of
 # bin/fm-procevent-lavish.sh sweep, which owns the rules and the record of why);
 # docs/configuration.md "Process-to-event sources" owns the cadence.
@@ -3248,6 +3252,55 @@ typesafe_health_tick() {
   TYPESAFE_HEALTH_PID=$!
 }
 
+# Native census is single-flight and detached just like account health. Keep
+# the due marker across watcher restarts and reuse the ordinary check cadence.
+memory_health_tick() {
+  local now next
+  fm_epoch_seconds_to now
+  next=0
+  if [ -r "$STATE/.memory-health-next" ]; then
+    IFS= read -r next < "$STATE/.memory-health-next" || next=0
+    case "$next" in ''|*[!0-9]*) next=0 ;; esac
+  fi
+  [ "$now" -ge "$next" ] || return 0
+  if [ -n "$MEMORY_HEALTH_PID" ]; then
+    kill -0 "$MEMORY_HEALTH_PID" 2>/dev/null && return 0
+    wait "$MEMORY_HEALTH_PID" 2>/dev/null || true
+  fi
+  printf '%s\n' "$((now + CHECK_INTERVAL))" > "$STATE/.memory-health-next"
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$MEMORY_HEALTH_BIN" probe </dev/null >/dev/null 2>&1 &
+  MEMORY_HEALTH_PID=$!
+}
+
+# The detached observer already appended its durable row. Present each queued
+# memory row once, without appending it a second time: like
+# procevent_surface_queued, a row whose wake was output is recorded as surfaced,
+# so a handling successor or a re-arm before acknowledgement supervises instead
+# of waking again. The marker keeps only still-queued sequence numbers.
+MEMORY_HEALTH_SURFACED=
+memory_health_surface() {
+  local rows reason
+  [ -s "$FM_WAKE_QUEUE" ] || return 0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
+  rows=$(awk -F '\t' 'NF >= 5 && $3 == "check" && $4 ~ /^memory-health/ { print $2 "\t" $5 }' "$FM_WAKE_QUEUE")
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ -n "$rows" ] || return 0
+  reason=$(awk -F '\t' -v seen="$(cat "$STATE/.seen-memory-health" 2>/dev/null || true)" '
+    BEGIN { n = split(seen, list, "\n"); for (i = 1; i <= n; i++) done[list[i]] }
+    !($1 in done) { printf "%s%s", sep, $2; sep = "; " }' <<<"$rows")
+  [ -n "$reason" ] || return 0
+  MEMORY_HEALTH_SURFACED=$(cut -f1 <<<"$rows")
+  # shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
+  FM_WAKE_POST_OUTPUT_ACTION=memory_health_after_output
+  wake "$reason"
+}
+
+memory_health_after_output() {
+  [ "$1" -eq 0 ] || return 0
+  printf '%s\n' "$MEMORY_HEALTH_SURFACED" > "$STATE/.seen-memory-health.tmp.$$" \
+    && mv -f "$STATE/.seen-memory-health.tmp.$$" "$STATE/.seen-memory-health"
+}
+
 # The Lavish sweep is detached and single-flight like the sweeps above: it reads
 # the session store and may stop listeners, and a missed tick loses nothing
 # because the next one re-reads the same facts. Only the home's own sources are
@@ -3633,6 +3686,8 @@ prelude_phase() {
   idle_reap_tick
   merge_prune_tick
   typesafe_health_tick
+  memory_health_tick
+  memory_health_surface
   lavish_auto_retire_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and

@@ -772,6 +772,9 @@
       "version": "1",
       "id": "mem-pressure-check",
       "owner": "bin/fm-mem-guard.py",
+      "sites": [
+        {"file": "bin/fm-spawn.sh", "match": "host memory admission refused new task"}
+      ],
       "invariant": "host memory or swap pressure is never mistaken for a wedged worker",
       "layer": "runtime-warn",
       "source": "macOS memory_pressure and sysctl, or /proc/meminfo",
