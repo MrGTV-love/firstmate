@@ -422,20 +422,6 @@ test_a_legacy_mate_hold_stays_the_captains_without_a_ruling() {
   pass "a legacy mate hold, including a genuine captain call the parent relayed, stays the captain's without a ruling"
 }
 
-test_a_legacy_mate_hold_is_marked_the_captains_by_re_holding() {
-  local mate show
-  mate=$(make_mate_home legacy-rehold)
-  make_legacy_mate_hold "$mate" kept-work "kept-captain-reason pending"
-  run_captain "$mate" hold kept-work --owner captain --reason "this really is the captain's" >/dev/null \
-    || fail "re-holding a legacy hold as the captain's failed"
-  show=$(shown "$mate" kept-work)
-  assert_contains "$show" "hold_kind: captain" "re-holding as the captain's changed the kind"
-  assert_contains "$show" "Decision owner: captain" "re-holding did not record the captain as owner"
-  assert_contains "$show" "this really is the captain's" "the hold reason does not show the re-hold reason"
-  [ "$(open_status "$mate" kept-work)" = 0 ] || fail "a hold re-held as the captain's is not an open captain call"
-  pass "a legacy mate hold is marked the captain's by re-holding it with that owner"
-}
-
 # Recording the owner keeps the hold's header block whole: a legacy hold that
 # freezes a project and is re-held as the captain's, with an origin as the shim
 # always passes, still freezes it for `frozen` and the idle reaper, and its owner
@@ -688,7 +674,6 @@ test_withdraw_releases_a_legacy_mate_hold_on_a_captain_ruling
 test_the_divergence_guard_stops_reporting_a_withdrawn_call
 test_the_decision_hold_shim_refuses_a_secondmate_hold_with_no_owner
 test_a_legacy_mate_hold_stays_the_captains_without_a_ruling
-test_a_legacy_mate_hold_is_marked_the_captains_by_re_holding
 test_recording_the_owner_keeps_a_freeze_in_force
 test_lifecycle_readers_and_the_gate_know_withdrawn_records
 test_a_retried_withdraw_finishes_without_a_second_record

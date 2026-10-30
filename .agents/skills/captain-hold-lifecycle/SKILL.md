@@ -65,7 +65,7 @@ Read such a line as "these two records disagree", never as "the captain ruled an
 Reconcile it with what actually happened - `answer` when the captain's own words exist to record, `withdraw` when a recorded captain ruling made it moot, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
 `withdraw` needs a ruling whose own records (title, hold reason, or recorded answer) name the withdrawn task; it records the ruling and why as a non-captain resolution, never as the captain's words, and leaves unfinished work open while it closes a question-shaped row or finished work that teardown retained.
 A call's delivery to a mate's parent channel is true of a genuine captain call too, so delivery never frees a hold.
-A hold filed before owners were recorded has no owner on record and stays the captain's: only his recorded words or a recorded captain ruling release it, and a call that is the captain's is marked so with `bin/fm-captain-hold.sh hold <id> --owner captain --reason "<why>"`.
+A hold filed before owners were recorded has no owner on record and stays the captain's: only his recorded words or a recorded captain ruling release it.
 The absence of a routed work item is not a divergence and the guard never requires one: when the decision IS the deliverable there is nothing to route.
 
 ## Operating sequence
