@@ -1,0 +1,14 @@
+# Train integrity check Fri Oct 30 06:45:05 UTC 2026
+train head: 30cc699e3fa19099d0845c274bdac96e7426094c
+30cc699e3fa19099d0845c274bdac96e7426094c parents=637e5c5ded6bb0ccda5c0e4e4ae716551c883878 537bbb874ebec1e21b6734df3e238a2819d3cf0c Merge https://github.com/MrGTV-love/firstmate/pull/310 at head 537bbb874ebec1e21b6734df3e238a2819d3cf0c
+637e5c5ded6bb0ccda5c0e4e4ae716551c883878 parents=28bb500b2888042ded45fbfdff0221fae921359a 4508d3163e300849d6a8a024641e1b2ba129cd13 Merge https://github.com/MrGTV-love/firstmate/pull/320 at head 4508d3163e300849d6a8a024641e1b2ba129cd13
+28bb500b2888042ded45fbfdff0221fae921359a parents=1b4677f0c13051d033e0a52f101b3131748b0c68 fix(bin): refuse a GitHub merge whose head lacks the base branch's live tip (#295)
+637e5c5de: git merge-tree(parents) tree=cc660657f94dad79af74759c63dee4214af115b5 committed tree=cc660657f94dad79af74759c63dee4214af115b5
+30cc699e3: git merge-tree(parents) tree=20c4a8a61661681aec94ba47a43d845aeac59eb3 committed tree=20c4a8a61661681aec94ba47a43d845aeac59eb3
+ancestor-of-train: 28bb500b2888042ded45fbfdff0221fae921359a YES
+ancestor-of-train: 4508d3163e300849d6a8a024641e1b2ba129cd13 YES
+ancestor-of-train: 537bbb874ebec1e21b6734df3e238a2819d3cf0c YES
+GitHub heads:
+{"headRefOid":"4508d3163e300849d6a8a024641e1b2ba129cd13","isDraft":false,"number":320,"state":"OPEN"}
+{"headRefOid":"537bbb874ebec1e21b6734df3e238a2819d3cf0c","isDraft":false,"number":310,"state":"OPEN"}
+origin/main: 28bb500b2888042ded45fbfdff0221fae921359a	refs/heads/main

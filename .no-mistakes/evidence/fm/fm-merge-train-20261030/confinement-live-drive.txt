@@ -1,0 +1,38 @@
+== packed-refs before ==
+# pack-refs with: peeled fully-peeled sorted 
+b8eedc6eb72ec59a6cbf5ec285762ba9271a7662 refs/heads/fm/other
+b8eedc6eb72ec59a6cbf5ec285762ba9271a7662 refs/heads/fm/task
+b8eedc6eb72ec59a6cbf5ec285762ba9271a7662 refs/heads/main
+== build profile ==
+build rc=0
+(deny file-write* (subpath "/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/refs/replace"))
+(deny file-write* (literal "/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/packed-refs"))
+(deny file-write* (literal "/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/packed-refs.new"))
+(deny file-write* (literal "/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/commondir"))
+(deny file-write* (subpath "/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/reftable"))
+== confined operations ==
+[own-branch commit (expect ok)] rc=0 ::  
+[move packed other branch via update-ref (expect refused)] rc=128 :: fatal: update_ref failed for ref 'refs/heads/fm/other': cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted 
+[delete packed other branch (expect refused)] rc=1 :: error: could not delete reference refs/heads/fm/other: cannot lock ref 'refs/heads/fm/other': Unable to create '/private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/refs/heads/fm/other.lock': Operation not permitted 
+[rewrite packed-refs directly (expect refused)] rc=1 :: sh: /tmp/fmtrain-live.6ubL/home/projects/proj/.git/packed-refs: Operation not permitted 
+[pack-refs --all (expect refused)] rc=128 :: fatal: unable to write new packed-refs: unable to create file /private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/packed-refs.new: Operation not permitted 
+[write commondir (expect refused)] rc=1 :: sh: /tmp/fmtrain-live.6ubL/home/projects/proj/.git/commondir: Operation not permitted 
+[create reftable dir (expect refused)] rc=1 :: mkdir: /tmp/fmtrain-live.6ubL/home/projects/proj/.git/reftable: Operation not permitted 
+[create replace ref (expect refused)] rc=255 :: error: cannot lock ref 'refs/replace/b8eedc6eb72ec59a6cbf5ec285762ba9271a7662': unable to create directory for /private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/refs/replace/b8eedc6eb72ec59a6cbf5ec285762ba9271a7662 
+[create own archive branch (expect ok)] rc=0 ::  
+== after ==
+fm/other before=b8eedc6eb72ec59a6cbf5ec285762ba9271a7662 after=b8eedc6eb72ec59a6cbf5ec285762ba9271a7662
+own branch fm/task=af9060d45ee1f5c323958010f0e4fc8b0cfdbd8c (commit landed if != b8eedc6eb72ec59a6cbf5ec285762ba9271a7662)
+ls: /tmp/fmtrain-live.6ubL/home/projects/proj/.git/commondir: No such file or directory
+ls: /tmp/fmtrain-live.6ubL/home/projects/proj/.git/reftable: No such file or directory
+== adversarial build: hard link to packed-refs ==
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/packed-refs (2 links); remove the extra link or symbolic link and launch again
+build rc=1 profile-exists=no
+== adversarial build: symlinked other-branch ref ==
+error: cannot prepare worker write confinement: protected Git path has another hard link or is a symbolic link, so a confined write through that other name would bypass the profile: /private/tmp/fmtrain-live.6ubL/home/projects/proj/.git/refs/heads/fm/sneaky (symbolic link to /tmp/fmtrain-live.6ubL/elsewhere); remove the extra link or symbolic link and launch again
+build rc=1 profile-exists=no
+== adversarial build: reftable storage repo ==
+error: cannot prepare worker write confinement: a repository with reftable ref storage cannot be confined
+build rc=1
+== clean build after aliases removed ==
+build rc=0

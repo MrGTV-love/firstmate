@@ -1,0 +1,16 @@
+[base-28bb500 builder] packed-refs deny lines: 0
+[base-28bb500] confined rewrite of packed-refs to rename other task's branch rc=0
+[base-28bb500] primary branches now: fm/hijack fm/task main 
+[base-28bb500] confined 'git fetch --prune' after remote deleted a packed branch rc=0
+[base-28bb500] (note: -c beats env, shown only for contrast) rc=0
+[base-28bb500] confined plain fetch, repo fetch.prune=true, fm-spawn env override fetch.prune=false rc=0
+
+[train-30cc699 builder] packed-refs deny lines: 2
+sed: rename(): Operation not permitted
+[train-30cc699] confined rewrite of packed-refs to rename other task's branch rc=1
+[train-30cc699] primary branches now: fm/other fm/task main 
+error: could not delete reference refs/remotes/origin/gone: unable to create file /private/tmp/fmtrain-live.6ubL/train-30cc699/home/projects/proj/.git/packed-refs.new: Operation not permitted
+[train-30cc699] confined 'git fetch --prune' after remote deleted a packed branch rc=1
+error: could not delete reference refs/remotes/origin/gone: unable to create file /private/tmp/fmtrain-live.6ubL/train-30cc699/home/projects/proj/.git/packed-refs.new: Operation not permitted
+[train-30cc699] (note: -c beats env, shown only for contrast) rc=1
+[train-30cc699] confined plain fetch, repo fetch.prune=true, fm-spawn env override fetch.prune=false rc=0
