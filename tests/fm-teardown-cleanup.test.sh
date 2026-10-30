@@ -19,14 +19,52 @@ test_local_only_force_overrides_unpushed() {
   write_meta "$case_dir" local-only ship
   wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
 
-  set +e
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "force-override: --force should bypass the unpushed-work check"
   ! grep -q REFUSED "$case_dir/stderr" || fail "force-override: REFUSED printed despite --force"
   pass "local-only worktree with unpushed work is torn down under --force (escape hatch)"
+}
+
+# A teardown starts a detached home-summary refresh, which outlives the teardown
+# and, once the fixture that owned the home is cleaned up, can never be stopped
+# by anything that looks at the fixture: its command line names only the shared
+# code. The child runs a real teardown case with its refresh worker held at the
+# fence until the home is gone, then exits so its own fixture cleanup removes the
+# home under the waiting worker; no worker may remain.
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker() {
+  local child out stub worker identity
+  child="$TMP_ROOT/fixture-cleanup-child.sh"
+  out="$TMP_ROOT/fixture-cleanup-worker"
+  stub="$TMP_ROOT/fixture-cleanup-stub"
+  fm_test_refresh_fence_stub "$stub" || fail "could not write the fence stub"
+  cat > "$child" <<'CHILD'
+#!/usr/bin/env bash
+set -u
+# shellcheck source=tests/fm-teardown-helpers.sh
+. "$1/tests/fm-teardown-helpers.sh"
+case_dir=$(make_case leak-child)
+write_meta "$case_dir" local-only ship
+wt_commit_file "$case_dir" unlanded.txt "unlanded work" "unpushed work"
+export FM_TEST_FENCE_ACTION=await-removal FM_TEST_FENCE_HOME="$case_dir"
+FM_TEARDOWN_TEST_PATH="$2:$PATH" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+  > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "the child teardown failed: $(cat "$case_dir/stderr")"
+fm_test_wait_until 30 test -s "$case_dir/state/.test-fence-waiting" \
+  || fail "the refresh worker never reached the fence"
+worker=$(cat "$case_dir/state/.test-fence-waiting") || fail "the fence stub did not record the worker pid"
+printf '%s\t%s\n' "$worker" "$(fm_test_pid_identity "$worker")" > "$3"
+CHILD
+  bash "$child" "$ROOT" "$stub" "$out" || fail "the fixture child failed"
+  IFS=$'\t' read -r worker identity < "$out" || fail "the child recorded no worker"
+  [ -n "$worker" ] && [ -n "$identity" ] || fail "the child recorded no worker identity"
+  # shellcheck disable=SC2329 # Invoked through fm_test_wait_until.
+  worker_gone() { [ "$(fm_test_pid_identity "$worker" 2>/dev/null || true)" != "$identity" ]; }
+  if ! fm_test_wait_until 20 worker_gone; then
+    kill -KILL "$worker" 2>/dev/null || true
+    fail "the home-summary refresh worker $worker outlived its fixture's cleanup"
+  fi
+  pass "fixture cleanup after a teardown leaves no home-summary refresh worker"
 }
 
 # Registering a PR inside a secondmate home publishes the child's ready line
@@ -88,10 +126,8 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
   printf 'working: shipping\ndone: PR https://github.com/example/repo/pull/9 checks green\n' \
     > "$case_dir/state/task-x1.status"
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 0 "$rc" "mate-teardown-delivers: teardown should succeed: $(cat "$case_dir/stderr")"
   sed -E 's/ \[at=[0-9]+\]//' "$channel" | grep -Eq '^done \[key=child-outcome-task-x1-done-[0-9a-f]{8}\]: child task-x1 done: PR https://github.com/example/repo/pull/9 checks green pr=https://github.com/example/repo/pull/9 mode=local-only$' \
     || fail "mate-teardown-delivers: the final ledger line did not reach the parent: $(cat "$channel" 2>/dev/null)"
@@ -111,10 +147,8 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
   printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   [ "$rc" -ne 0 ] || fail "mate-teardown-refuses: teardown proceeded with an undelivered final line"
   grep -q 'has not reached the parent channel' "$case_dir/stderr" \
     || fail "mate-teardown-refuses: refusal did not name the parent channel: $(cat "$case_dir/stderr")"
@@ -131,15 +165,67 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   generation=$(printf '%s\n' "$err" | sed -n 's/^WAKE_ACK_REQUIRED:.*--recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p')
   [ -z "$seq" ] || FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
     "$ROOT/bin/fm-wake-drain.sh" --ack-through "$seq" --recovery-generation "$generation" >/dev/null
-  set +e
-  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2"
-  rc=$?
-  set -e
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
   expect_code 0 "$rc" "mate-teardown-refuses: rerun after repair should succeed: $(cat "$case_dir/stderr2")"
   sed -E 's/ \[at=[0-9]+\]//' "$channel" | grep -Eq '^done \[key=child-outcome-task-x1-done-[0-9a-f]{8}\]: child task-x1 done: PR https://github.com/example/repo/pull/9 checks green' \
     || fail "mate-teardown-refuses: the rerun did not deliver the final line"
   [ ! -e "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-refuses: rerun left the task record"
   pass "a secondmate home's teardown delivers the child's final line or refuses until it can"
+}
+
+# The report step runs under teardown's progress line but keeps its own
+# diagnostics: a misconfigured reconciler names its own cause.
+test_secondmate_home_teardown_shows_report_diagnostics() {
+  local case_dir rc wt_head
+
+  case_dir=$(make_case mate-teardown-report-stderr)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_INACTIVE_RECONCILE_BUDGET_SECS=40 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "mate-teardown-report-stderr: teardown went on past a report that could not run"
+  grep -q 'FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30' "$case_dir/stderr" \
+    || fail "mate-teardown-report-stderr: the report's own diagnostic was hidden: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-report-stderr: teardown did not keep the task record"
+  pass "a secondmate home's teardown shows the report step's own diagnostics"
+}
+
+# A secondmate-home ship teardown whose completion-gate read at the report step
+# goes silent does not know whether the child's done: is accepted. That is a
+# retry (exit 75, the status the sweeps retry without a refusal memo), never the
+# undeliverable-channel refusal: every record stays and nothing is delivered.
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry() {
+  local case_dir rc channel wt_head
+
+  case_dir=$(make_case mate-teardown-unknown)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  channel="$case_dir/parent/state/mate-x.status"
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_FAKE_NM_GATE_HANG=1 FM_DOD_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 75 "$rc" "mate-teardown-unknown: an unknown acceptance should ask for a retry: $(cat "$case_dir/stderr")"
+  grep -q "^UNKNOWN: .*final outcome is accepted is unknown.*retry teardown" "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: teardown did not say the outcome is unknown: $(cat "$case_dir/stderr")"
+  ! grep -q 'has not reached the parent channel\|REFUSED' "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: an unknown acceptance was reported as a refusal: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] && [ -f "$case_dir/state/task-x1.status" ] \
+    || fail "mate-teardown-unknown: teardown did not keep the task records"
+  ! grep -q 'child-outcome-task-x1' "$channel" 2>/dev/null \
+    || fail "mate-teardown-unknown: an unknown acceptance was delivered: $(cat "$channel")"
+  pass "a secondmate home's teardown with an unknown done: acceptance keeps its records and asks for a retry"
 }
 
 test_teardown_missing_busy_sidecar_completes() {
@@ -150,10 +236,8 @@ test_teardown_missing_busy_sidecar_completes() {
   printf 'busy_gen=%s\n' "$gen" >> "$case_dir/state/task-x1.meta"
   rm -f "$case_dir/state/task-x1.busy-gen"
 
-  set +e
-  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
 
   expect_code 0 "$rc" "missing-busy-sidecar: teardown should treat the incarnation as already retired"
   assert_absent "$case_dir/state/task-x1.busy-state" \
@@ -1352,6 +1436,129 @@ EOF
   kill -0 "$pid" 2>/dev/null || fail "parked-run-abort-unconfirmed: process reap ran before refusal"
   kill -KILL "$pid" 2>/dev/null || true
   pass "teardown refuses before reap or removal when a task-owned run remains parked"
+}
+
+# A no-mistakes daemon that goes quiet is not a daemon with no run to abort.
+# Reading that silence as "nothing is parked" would remove the worker that a parked
+# gate is waiting on and orphan the run, so teardown stops with the retry status
+# (75), closes nothing, and says the answer is unknown.
+test_silent_daemon_leaves_the_parked_run_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-daemon-silent: a silent daemon should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-daemon-silent: teardown did not say the answer is unknown"
+  assert_present "$case_dir/wt" "parked-run-daemon-silent: teardown removed the worktree"
+  assert_present "$case_dir/state/task-x1.meta" "parked-run-daemon-silent: teardown removed the task record"
+  assert_absent "$case_dir/nm-abort.log" "parked-run-daemon-silent: teardown aborted a run it could not see"
+  pass "a silent daemon leaves teardown unknown and closing nothing, not fail-open"
+}
+
+# The same lookup on a loaded host: the daemon answers, but only after burning CPU
+# for longer than the ten seconds this read used to be allowed. A slow answer is an
+# answer; the parked run is found and aborted before the worker goes.
+test_slow_working_daemon_still_finds_the_parked_run() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-slow)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_BURN_SECS=13 FM_FAKE_NM_BURN_MARK="$case_dir/nm-burned" FM_TEARDOWN_NM_STALL_SECS=2 \
+  FM_DURATION_NO_PROGRESS_SECS=20 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-slow: a slow, working daemon should not block teardown"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-daemon-slow: the parked run was not found and aborted"
+  assert_grep "task-x1 is still waiting on a no-mistakes read" "$case_dir/stderr" \
+    "parked-run-daemon-slow: teardown printed no progress while it waited, so a sweep could call it silent"
+  pass "a slow, working daemon still lets teardown find and abort the parked run, with progress while it waits"
+}
+
+# The captain's --force discard is not held hostage by a quiet daemon: once the
+# parked-run lookup is unknown, teardown goes on, and says and records that the
+# run state is unknown.
+test_forced_teardown_goes_on_past_a_silent_daemon() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-silent-forced: --force should go on past an unknown run state"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "force goes on with the no-mistakes run state unknown" "$case_dir/stderr" \
+    "parked-run-daemon-silent-forced: teardown did not say the run state is unknown"
+  assert_grep "run state unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-daemon-silent-forced: teardown did not record the unknown run state"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-daemon-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent daemon and records the run state as unknown"
+}
+
+test_forced_teardown_goes_on_past_a_silent_confirmation() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-confirmation-silent-forced: --force should go on past an unknown abort"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-confirmation-silent-forced: the parked run was not aborted first"
+  assert_grep "stopped after the abort is unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-confirmation-silent-forced: teardown did not record the unknown abort outcome"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-confirmation-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent abort confirmation and records it as unknown"
+}
+
+# After the abort is sent, only the confirming read goes quiet. That is not "still
+# parked": nothing is known yet, and a later teardown confirms it.
+test_silent_confirmation_after_abort_is_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-confirmation-silent: a silent confirmation should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-confirmation-silent: teardown did not say the confirmation is unknown"
+  if grep -q 'is still parked after axi abort' "$case_dir/stderr"; then
+    fail "parked-run-confirmation-silent: a silent confirmation was reported as still parked"
+  fi
+  assert_present "$case_dir/wt" "parked-run-confirmation-silent: teardown removed the worktree"
+  pass "a silent confirmation after the abort is unknown, not a still-parked verdict"
 }
 
 test_another_branchs_parked_run_is_never_touched() {
@@ -5119,6 +5326,132 @@ test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
   pass "a held close refuses before it removes anything when the slot cannot be durably leased, and says why"
 }
 
+# A held close of a copy in a superseded pool folder: the project's current pool
+# is another folder that reuses its slot names, so the close leases the slot by
+# its exact path in the folder that holds it, never by name, and Treehouse then
+# never hands it out over the held copies, even once that folder is current
+# again. A lease an earlier teardown took by name on a same-named slot of the
+# current pool is released after the reservation and the held-copy record
+# checks, so a close those checks refuse releases no such lease, and its rerun,
+# whose own slot is by then leased by path, releases it, whether the rerun is
+# still a held close or, once the held copy is gone, an ordinary one. Without lease --path
+# the close refuses and the copies stay held.
+held_superseded_case() {  # <name> <misdirected|plain> [no-lease-path]
+  local cur
+  make_held_case "$1"
+  held_foreign_unlanded "$FOREIGN_COPY"
+  held_plain_get_slot "$FOREIGN_CASE"
+  [ "${3:-}" = no-lease-path ] || : > "$FOREIGN_CASE/lease-path"
+  cur=$FOREIGN_CASE/current-pool/1/project
+  mkdir -p "${cur%/*}"
+  git -C "$FOREIGN_CASE/project" worktree add -q --detach "$cur" main
+  HELD_CURRENT_SLOT=$(cd "$cur" && pwd -P)
+  if [ "$2" = misdirected ]; then
+    printf '[{"name":"1","path":"%s","lease_holder":"task-x1","processes":[]}]\n' "$HELD_CURRENT_SLOT"
+  else
+    printf '[{"name":"1","path":"%s","lease_holder":"","processes":[]}]\n' "$HELD_CURRENT_SLOT"
+  fi > "$FOREIGN_CASE/status.json"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+}
+
+test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path() {
+  local rc shape lock
+  for shape in plain misdirected; do
+    held_superseded_case "held-superseded-$shape" "$shape"
+    lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+      bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project")
+    mv "$FOREIGN_CASE/fakebin/docker" "$FOREIGN_CASE/fakebin/docker-store"
+    cat > "$FOREIGN_CASE/fakebin/docker" <<SH
+#!/usr/bin/env bash
+if [ -e "$lock" ]; then echo locked; else echo free; fi >> "$FOREIGN_CASE/docker-lock.log"
+exec "$FOREIGN_CASE/fakebin/docker-store" "\$@"
+SH
+    chmod +x "$FOREIGN_CASE/fakebin/docker"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "held-superseded-$shape: a landed task must close beside a held copy in a superseded pool folder: $(cat "$FOREIGN_CASE/stderr")"
+    held_assert_closed "held-superseded-$shape"
+    assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+      "held-superseded-$shape: the slot was not leased once, by its exact path"
+    jq -e --arg slot "$FOREIGN_SLOT" '.worktrees[] | select(.path == $slot) | .leased == true and .lease_holder == "task-x1"' \
+      "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+      || fail "held-superseded-$shape: the old folder does not record the slot as leased: $(cat "$FOREIGN_CASE/pool/treehouse-state.json")"
+    held_fingerprint "$FOREIGN_COPY" | cmp -s - "$FOREIGN_CASE/held-before.$(basename "$FOREIGN_COPY")" \
+      || fail "held-superseded-$shape: the held copy changed"
+    cmp -s "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" || fail "held-superseded-$shape: the slot's claim changed"
+    if [ "$shape" = misdirected ]; then
+      assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
+        "held-superseded-$shape: the misdirected lease was not released by the conditional return alone"
+    else
+      assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-$shape: a pool slot was returned"
+    fi
+    assert_grep "is reserved under a durable lease and stays claimed" "$FOREIGN_CASE/stdout" \
+      "held-superseded-$shape: the output did not say the slot is reserved"
+    assert_present "$FOREIGN_CASE/docker-lock.log" "held-superseded-$shape: the Docker cleanup did not run"
+    assert_no_grep locked "$FOREIGN_CASE/docker-lock.log" \
+      "held-superseded-$shape: the project lock was still held through Docker cleanup after the slot was leased by its path"
+  done
+  pass "a held close in a superseded pool folder leases the slot by its exact path and releases only this task's misdirected lease"
+}
+
+test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path() {
+  local rc
+  held_superseded_case held-superseded-no-path misdirected no-lease-path
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-superseded-no-path: a held close must refuse when the slot cannot be leased by its path: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "needs treehouse v3.1.7-fm or later (treehouse lease --path)" "$FOREIGN_CASE/stderr" \
+    "held-superseded-no-path: the refusal did not name the treehouse build it needs"
+  assert_grep "nothing was removed" "$FOREIGN_CASE/stderr" "held-superseded-no-path: the refusal did not say nothing was removed"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-no-path: the task record was removed"
+  assert_absent "$FOREIGN_CASE/lease.log" "held-superseded-no-path: the refusal leased a slot"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-superseded-no-path: a refused close wrote a held-copy record"
+  held_assert_untouched "held-superseded-no-path" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "a held close in a superseded pool folder refuses with the treehouse build it needs when lease --path is missing, and changes nothing"
+}
+
+test_a_refused_held_close_releases_no_misdirected_lease() {
+  local rc
+  held_superseded_case held-superseded-refused misdirected
+  mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-superseded-refused: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "could not be written" "$FOREIGN_CASE/stderr" "held-superseded-refused: the refusal did not say why"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-refused: the task record was removed"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-refused: the refusal leased anything but the exact slot it keeps held"
+  assert_absent "$FOREIGN_CASE/treehouse.log" "held-superseded-refused: the refusal returned or released a slot"
+  held_assert_copies_untouched "held-superseded-refused" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-superseded-refused: the rerun must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "return $HELD_CURRENT_SLOT --if-lease-holder task-x1" "$(cat "$FOREIGN_CASE/treehouse.log")" \
+    "held-superseded-refused: the rerun did not release the misdirected lease by the conditional return alone"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-refused: the rerun leased the slot again"
+  pass "a held close that refuses releases no misdirected lease, and its rerun, with its own slot leased by path, releases it"
+}
+
+test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease() {
+  local rc
+  held_superseded_case held-superseded-then-ordinary misdirected
+  mkdir -p "$FOREIGN_CASE/data/held-foreign-copies.log"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "held-superseded-then-ordinary: a held close must refuse when its record cannot be written: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-then-ordinary: the refused close did not lease its own slot by path"
+  rmdir "$FOREIGN_CASE/data/held-foreign-copies.log"
+  git -C "$FOREIGN_CASE/project" worktree remove --force "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-superseded-then-ordinary: the ordinary rerun must close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "held-superseded-then-ordinary: the rerun kept the task record"
+  assert_not_contains "$(cat "$FOREIGN_CASE/stdout")" "the slot return is deferred" \
+    "held-superseded-then-ordinary: the rerun was still a held close"
+  assert_equals 1 "$(grep -c "^return $HELD_CURRENT_SLOT --if-lease-holder task-x1\$" "$FOREIGN_CASE/treehouse.log" || true)" \
+    "held-superseded-then-ordinary: the ordinary rerun did not release the misdirected lease by the conditional return: $(cat "$FOREIGN_CASE/treehouse.log" 2>/dev/null)"
+  assert_equals "lease --path $FOREIGN_SLOT --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+    "held-superseded-then-ordinary: the rerun leased a slot again"
+  pass "an ordinary rerun after a refused held close releases the misdirected lease its task still holds"
+}
+
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
   local rc second copy holder copy_q holder_q slot_q proj_q
   make_held_case held-notice
@@ -6037,6 +6370,7 @@ test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
 }
 
 teardown_test_cases=(
+test_fixture_cleanup_leaves_no_home_summary_refresh_worker
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker
@@ -6051,6 +6385,8 @@ test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_force_overrides_unpushed
 test_secondmate_pr_registration_publishes_ready_line
 test_secondmate_home_teardown_delivers_final_line_or_refuses
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry
+test_secondmate_home_teardown_shows_report_diagnostics
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
@@ -6089,6 +6425,11 @@ test_parked_run_behind_diverged_newer_row_is_never_aborted
 test_parked_advanced_run_ambiguous_rows_are_never_aborted
 test_ledger_proven_continuation_never_aborts_active_run
 test_parked_own_run_refuses_when_abort_is_unconfirmed
+test_silent_daemon_leaves_the_parked_run_unknown
+test_slow_working_daemon_still_finds_the_parked_run
+test_silent_confirmation_after_abort_is_unknown
+test_forced_teardown_goes_on_past_a_silent_daemon
+test_forced_teardown_goes_on_past_a_silent_confirmation
 test_mismatched_run_after_abort_refuses_unconfirmed
 test_empty_status_after_abort_refuses_unconfirmed
 test_not_found_status_after_abort_confirms_completion
@@ -6129,6 +6470,10 @@ test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wai
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
 test_a_held_close_reserves_a_plain_get_slot_durably
 test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
+test_a_held_close_in_a_superseded_pool_folder_leases_the_slot_by_its_path
+test_a_held_close_in_a_superseded_pool_folder_refuses_without_lease_path
+test_a_refused_held_close_releases_no_misdirected_lease
+test_an_ordinary_rerun_after_a_refused_held_close_releases_the_misdirected_lease
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_leaves_one_record_line_and_a_rerun_adds_none
 test_a_held_copy_record_that_cannot_be_written_refuses_the_close
@@ -6230,40 +6575,15 @@ test_docker_container_arriving_during_resource_cleanup_blocks_retirement
 test_teardown_retires_the_dsh_launch_state
 )
 
-# Validate the complete selection before running any behavioral case.
-for requested_case in "$@"; do
-  registered_case=false
-  for test_case in "${teardown_test_cases[@]}"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      registered_case=true
-      break
-    fi
-  done
-  if [ "$registered_case" = false ]; then
-    printf 'Unknown test case: %s\n' "$requested_case" >&2
-    printf 'Usage: bash tests/fm-teardown-cleanup.test.sh [test_function_name ...]\n' >&2
-    exit 2
-  fi
-done
-
 # In the combined tests/fm-teardown.test.sh run,
 # test_local_only_fork_remote_allows left set -e in force for every case
 # registered after it. test_local_only_force_overrides_unpushed
 # is the first such case here, so restore that errexit state once before it.
 errexit_restored=false
-for test_case in "${teardown_test_cases[@]}"; do
-  if [ "$errexit_restored" = false ] && [ "$test_case" = test_local_only_force_overrides_unpushed ]; then
+fm_test_before_case() {
+  if [ "$errexit_restored" = false ] && [ "$1" = test_local_only_force_overrides_unpushed ]; then
     set -e
     errexit_restored=true
   fi
-  if [ "$#" -eq 0 ]; then
-    "$test_case"
-    continue
-  fi
-  for requested_case in "$@"; do
-    if [ "$requested_case" = "$test_case" ]; then
-      "$test_case"
-      break
-    fi
-  done
-done
+}
+fm_test_run_cases "${teardown_test_cases[@]}" -- "$@"

@@ -124,11 +124,11 @@ case "$CHECK_TIMEOUT" in ''|*[!0-9]*|0) CHECK_TIMEOUT=30 ;; esac
 BUDGET_CAP=$((CHECK_TIMEOUT - 3))
 [ "$BUDGET_CAP" -ge 1 ] || BUDGET_CAP=1
 [ "$BUDGET" -le "$BUDGET_CAP" ] || BUDGET=$BUDGET_CAP
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-contributions.XXXXXX")
+TMP=$(fm_scratch_new d fm-contributions) || fail 'cannot create a temporary directory'
 LOCK_HELD=0
 cleanup() {
   [ "$LOCK_HELD" = 0 ] || fm_lock_release "$STATE/.contributions.lock" || true
-  rm -rf -- "$TMP"
+  fm_scratch_release "$TMP"
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM

@@ -12,14 +12,17 @@ permissions:
 # Per-PR supersession: a new push to the same PR replaces that PR's in-flight
 # CI instead of letting superseded heads keep the full hosted-runner fan-out.
 # The group uses the PR number for pull_request events, so every run of one PR
-# shares a group, and falls back to the unique run id for push events, so each
-# main push gets its own group and is never cancelled. Cancellation is likewise
-# limited to pull_request events. Evidence and rationale: the September 12
-# Actions starvation report, section 3 "Workflow mechanics to ship first".
+# shares a group, and falls back to the ref for push events, so every main push
+# shares one group. A group holds one running and one pending run; a newer
+# pending push run replaces the older pending one, so a burst of merges queues
+# one full run for the newest commit instead of one run per merge. Cancellation
+# stays limited to pull_request events, so the running main run always finishes.
+# Evidence and rationale: the September 12 Actions starvation report, section 3
+# "Workflow mechanics to ship first".
 # The compliance workflow deliberately keeps its own event-specific groups; do
 # not collapse it onto this simpler shape.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Timeout policy: docs/fm-test-portable-shards.md "Timeouts" owns the three
@@ -210,7 +213,7 @@ jobs:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     steps:
       - uses: actions/checkout@v6
         with:

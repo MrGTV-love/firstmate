@@ -116,6 +116,17 @@ if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
 fi
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
 case "${1:-}" in
+  status)
+    # The pool the repository's registered worktrees live in, as the installed
+    # CLI lists it: a name and a path per slot.
+    while IFS= read -r line; do
+      case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
+      [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
+      jq -c '[.worktrees[]? | {name, path, lease_holder: (.lease_holder // ""), processes: []}]' "${wt%/*/*}/treehouse-state.json"
+      exit 0
+    done < <(git worktree list --porcelain 2>/dev/null)
+    printf '[]\n'
+    ;;
   lease)
     if [ -n "${FM_FAKE_NO_LEASE:-}" ]; then
       echo 'Error: unknown command "lease" for "treehouse"' >&2

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   fm-inactive-reconcile.sh scan [--startup]
-#   fm-inactive-reconcile.sh report <task-id>
+#   fm-inactive-reconcile.sh report <task-id> [--force]
 #   fm-inactive-reconcile.sh acknowledge <fingerprint>
 #
 # This is an adjunct to the existing watcher poll loop and session-start path,
@@ -32,6 +32,15 @@
 # does before it removes the child's record; it exits 0 when the line is
 # delivered or nothing is owed, and non-zero when the parent channel could not
 # be written, so teardown refuses instead of discarding an undelivered outcome.
+# A ship `done:` whose gate read went silent is unknown, never owed nothing: the
+# scan leaves it for the next poll and `report` exits 75 (the sweeps' retry
+# status) so teardown keeps the records and asks to be retried, except that
+# `report --force` (the captain's forced teardown) delivers it marked
+# `(acceptance unknown: no-mistakes read stalled)`, never as accepted; the mark is
+# kept in the pending receipt, so a retry after a failed parent write keeps it. Inside a
+# scan each gate read is stopped after FM_DOD_NM_STALL_SECS of silence (120 when
+# unset), and the first silent read makes every later read in that scan unknown
+# at once, so a silent daemon costs one poll one interval.
 # The cadence-gated scan below then evaluates at most once per
 # FM_INACTIVE_RECONCILE_SECS (default 900, valid 60..1800) per home, except
 # that --startup performs the same scan immediately in the locked session
@@ -42,10 +51,20 @@
 # first due child of every scan is always visited with at least a one-second
 # state-read bound: whole-second arithmetic can otherwise round a small budget
 # to zero mid-scan, and an invocation that exits having visited nothing would
-# advance the durable cursor past a child it never examined. A process-group
-# kill one second after the budget remains as a backstop for a scan wedged in
-# an unbounded wait (for example a live-held wake-queue lock), so the clean
-# deadline path is not racing its own backstop.
+# advance the durable cursor past a child it never examined. The whole scan
+# runs under a silence backstop of twice the gate-read interval: it stops a
+# scan that makes no output or process-tree CPU progress for that long, never
+# one that is slow but working, and the gate read's own interval fires first,
+# so the stall is judged, and remembered, inside the live scan. A lock wait
+# looks like work to that backstop, so no lock wait in a scan is unbounded: a
+# watcher-poll scan does nothing this poll when it finds the scan lock held, a
+# --startup scan waits for it at most FM_INACTIVE_RECONCILE_BUDGET_SECS and then
+# leaves its pass to the next cadence scan, a due child whose metadata lock is
+# held (its teardown, which reports the outcome itself) is skipped until the
+# scan wraps round to it, and the first wake-queue lock wait that outlasts the
+# scan budget gives up every later wake append of that scan, whose durable
+# records are retried by the next one. `report`, `acknowledge`, and teardown
+# keep their waits.
 #
 # It considers only a direct ordinary crewmate whose newest meta, status, or
 # turn-ended mtime is older than that interval and whose last status is not
@@ -129,6 +148,9 @@ if [ "$FM_INACTIVE_RECONCILE_BUDGET_SECS" -gt 30 ]; then
   printf 'fm-inactive-reconcile: FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30\n' >&2
   exit 2
 fi
+# Seconds a wake-queue lock wait may take; empty (unbounded) outside a scan.
+WAKE_LOCK_BOUND=
+WAKE_LOCK_GAVE_UP=0
 
 if [ "$(uname)" = Darwin ]; then
   file_mtime() { /usr/bin/stat -f %m "$1" 2>/dev/null; }
@@ -236,16 +258,20 @@ mark_reported() { # <record>
   mv -f "$record" "$reported"
 }
 
-queue_key_exists() { # <key>
-  local key=$1 queued
-  queued=$(fm_wake_queued_keys check 2>/dev/null || true)
-  printf '%s\n' "$queued" | grep -Fx -- "$key" >/dev/null 2>&1
-}
-
 publish_actionable() { # <key> <payload>
-  local key=$1 payload=$2
-  queue_key_exists "$key" && return 1
-  fm_wake_append check "$key" "$payload" || return 2
+  local key=$1 payload=$2 rc=0
+  [ "$WAKE_LOCK_GAVE_UP" = 0 ] || return 2
+  if ! fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" ${WAKE_LOCK_BOUND:+"$WAKE_LOCK_BOUND"}; then
+    [ -z "$WAKE_LOCK_BOUND" ] || WAKE_LOCK_GAVE_UP=1
+    return 2
+  fi
+  if fm_wake_queued_keys_locked check | grep -Fx -- "$key" >/dev/null 2>&1; then
+    rc=1
+  elif ! fm_wake_append_locked check "$key" "$payload"; then
+    rc=2
+  fi
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  [ "$rc" -eq 0 ] || return "$rc"
   printf 'actionable: %s\n' "$payload"
 }
 
@@ -413,9 +439,11 @@ claim_inactive_report_for_ledger() { # <task> <incarnation> <state> <ledger-fing
 # The ledger-first parent delivery for one direct child, for a caller holding
 # the child's meta lock. Returns 0 when the line is delivered, already
 # delivered, or nothing is owed, and 1 when it is owed but the parent channel
-# could not be written (the notice is queued once per record).
-report_child_ledger_locked() { # <id> <meta>
-  local id=$1 meta=$2 status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
+# could not be written (the notice is queued once per record), and 75 when its
+# acceptance is unknown without --force.
+report_child_ledger_locked() { # <id> <meta> [--force]
+  local id=$1 meta=$2 force=${3:-} status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
+  local gate_rc=0 acceptance='' unknown_label=' (acceptance unknown: no-mistakes read stalled)'
   status="$STATE/$id.status"
   last=$(child_terminal_ledger_line "$status") || return 0
   state=$(status_line_verb "$last")
@@ -423,15 +451,29 @@ report_child_ledger_locked() { # <id> <meta>
   incarnation=$(meta_incarnation "$meta")
   fingerprint=$(sha256_text "$incarnation|$id|$state|ledger|$last")
   if [ "$state" = "done" ] && [ ! -f "$(record_path "$fingerprint" reported)" ] \
-    && [ ! -f "$(record_path "$fingerprint" pending)" ] \
-    && ! fm_dod_accept_ship_done "$(meta_field "$meta" kind)" "$(meta_field "$meta" mode)" \
+    && [ ! -f "$(record_path "$fingerprint" pending)" ]; then
+    fm_dod_accept_ship_done "$(meta_field "$meta" kind)" "$(meta_field "$meta" mode)" \
       "$(meta_field "$meta" worktree)" "$(meta_field "$meta" project)" "$last" \
-      "$STATE" "$id" "$meta" >/dev/null; then
-    return 0
+      "$STATE" "$id" "$meta" >/dev/null || gate_rc=$?
+    case "$gate_rc" in
+      0) ;;
+      2)
+        [ "$force" = --force ] || return 75
+        acceptance=$unknown_label ;;
+      *) return 0 ;;
+    esac
   fi
   outcome_key="child-outcome-$id-$state-${fingerprint:0:8}"
   ensure_record "$fingerprint" "$id" "$incarnation" "$state" "$outcome_key" direct upstream "$pr" || return 1
   [ -n "$RECORD_PENDING" ] || return 0
+  # The unknown acceptance belongs to the pending receipt: a failed parent write
+  # leaves the receipt behind, and the retry skips the gate, so it must read the
+  # stored state instead of publishing the ordinary accepted form.
+  if [ -n "$acceptance" ]; then
+    record_field_set "$RECORD_PENDING" acceptance unknown || return 1
+  elif [ "$(record_value "$RECORD_PENDING" acceptance)" = unknown ]; then
+    acceptance=$unknown_label
+  fi
   if last_status_line "$status" previous >/dev/null; then
     predecessor_head=$(sha256_text "$previous")
     if claim_inactive_report_for_ledger "$id" "$incarnation" "$state" "$fingerprint" "$predecessor_head"; then
@@ -447,7 +489,7 @@ report_child_ledger_locked() { # <id> <meta>
   mode=$(clean_field "$(meta_field "$meta" mode)")
   yolo=$(clean_field "$(meta_field "$meta" yolo)")
   data="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-  line="$state [key=$outcome_key]: child $id $state: $note"
+  line="$state [key=$outcome_key]: child $id $state$acceptance: $note"
   [ -z "$pr" ] || line="$line pr=$pr"
   [ -z "$mode" ] || line="$line mode=$mode"
   [ -z "$yolo" ] || line="$line yolo=$yolo"
@@ -487,15 +529,15 @@ ledger_pass() {
 }
 
 # The `report <task-id>` entry point: the caller holds the child's meta lock.
-report_child() { # <id>
-  local id=$1 meta rc=0
+report_child() { # <id> [--force]
+  local id=$1 force=${2:-} meta rc=0
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   home_secondmate_id >/dev/null || { rc=$?; [ "$rc" -eq 1 ] && return 0; return 1; }
   meta="$STATE/$id.meta"
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
   [ "$(meta_field "$meta" kind)" != secondmate ] || return 0
-  report_child_ledger_locked "$id" "$meta"
+  report_child_ledger_locked "$id" "$meta" "$force"
 }
 
 reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeout>
@@ -559,7 +601,7 @@ reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeou
 reconcile_direct_child() { # <id> <meta> <secondmate-id-or-empty> <timeout>
   local id=$1 meta=$2 self=${3:-} timeout=$4 lock rc=0
   lock=$(fm_meta_lock_path "$meta") || return 1
-  fm_lock_acquire_wait "$lock" || return 1
+  fm_lock_try_acquire "$lock" || return 0
   reconcile_direct_child_locked "$id" "$meta" "$self" "$timeout" || rc=$?
   fm_lock_release "$lock"
   return "$rc"
@@ -604,6 +646,7 @@ scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
 
 scan() {
   local startup=${1:-0} self='' cursor deadline rc=0 marker_rc=0
+  WAKE_LOCK_BOUND=$FM_INACTIVE_RECONCILE_BUDGET_SECS
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   if self=$(home_secondmate_id); then
@@ -667,28 +710,35 @@ case "$mode" in
       --startup) startup=1 ;;
       *) printf 'usage: fm-inactive-reconcile.sh scan [--startup]\n' >&2; exit 2 ;;
     esac
-    # The scan's own whole-second deadline enforces the budget; this outer
-    # process-group kill is only the backstop for a scan wedged outside every
-    # bounded section (an unbounded lock wait), so it fires one second after
-    # the deadline instead of racing the clean bounded exit it exists to guard.
-    if fm_run_timed $((FM_INACTIVE_RECONCILE_BUDGET_SECS + 1)) "$0" _scan-locked "$startup"; then
+    # The scan's own whole-second deadline enforces the budget between
+    # children, and its lock waits are bounded or skipped; this outer stop is
+    # only for a scan that goes silent, and it waits twice the gate-read
+    # interval so that read's own stall fires first.
+    : "${FM_DOD_NM_STALL_SECS:=120}"
+    case "$FM_DOD_NM_STALL_SECS" in ''|*[!0-9]*|0*) FM_DOD_NM_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
+    export FM_DOD_NM_STALL_SECS
+    if fm_run_progress $((FM_DOD_NM_STALL_SECS * 2)) "$0" _scan-locked "$startup"; then
       :
-    elif [ "$?" -ne 124 ]; then
+    elif ! fm_timed_out "$?"; then
       exit 1
     fi
     ;;
   _scan-locked)
     [ "$#" -eq 2 ] || exit 2
-    fm_lock_acquire_wait "$SCAN_LOCK" || exit 1
+    if [ "$2" = 1 ]; then
+      fm_lock_acquire_wait "$SCAN_LOCK" "$FM_INACTIVE_RECONCILE_BUDGET_SECS"
+    else
+      fm_lock_try_acquire "$SCAN_LOCK"
+    fi || { [ "$FM_LOCK_BUSY" = 1 ] && exit 0; exit 1; }
     trap 'fm_lock_release "$SCAN_LOCK"' EXIT
     scan "$2"
     ;;
   report)
-    if [ "$#" -ne 2 ] || ! valid_id "$2"; then
-      printf 'usage: fm-inactive-reconcile.sh report <task-id>\n' >&2
+    if [ "$#" -lt 2 ] || [ "$#" -gt 3 ] || ! valid_id "$2" || { [ "$#" -eq 3 ] && [ "$3" != --force ]; }; then
+      printf 'usage: fm-inactive-reconcile.sh report <task-id> [--force]\n' >&2
       exit 2
     fi
-    report_child "$2"
+    report_child "$2" "${3:-}"
     ;;
   acknowledge)
     [ "$#" -eq 2 ] || { printf 'usage: fm-inactive-reconcile.sh acknowledge <fingerprint>\n' >&2; exit 2; }

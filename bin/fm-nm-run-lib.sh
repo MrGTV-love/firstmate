@@ -217,8 +217,10 @@ fm_nm_run_status_class() {  # <status_word>
 # The recorded spelling is matched exactly, so an overview without exactly one
 # absolute `repo:` line, or with one the inventory does not record, reads as
 # unreadable rather than guessed among candidates.
-# The reader subprocess is bounded by $4 seconds (default 10), so a contended
-# database can never outlast the caller's per-read budget.
+# The reader subprocess is a read-only query, so it is stopped by silence only: $4
+# seconds (default fm_progress_quiet_secs) without output or process-tree CPU
+# progress, never by how long a loaded host takes. A reader that goes silent is
+# unknown, exactly like one that cannot open the database.
 # If that reader or inventory is unavailable, report unknown with available
 # candidate ids rather than treating the displayed window as complete.
 # Structural completeness applies to the whole table; semantic validation
@@ -240,9 +242,9 @@ fm_nm_run_status_class() {  # <status_word>
 # same-branch candidate id. An unavailable reader still prints its unknown
 # verdict and returns the reader's own exit status, 124 when its bound cut it.
 fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
-  local selection inventory available_ids timeout_secs=${4:-10}
+  local selection inventory available_ids timeout_secs=${4:-}
   local reader_rc=0
-  case "$timeout_secs" in ''|*[!0-9]*) timeout_secs=10 ;; esac
+  case "$timeout_secs" in ''|*[!0-9]*) timeout_secs=$(fm_progress_quiet_secs) ;; esac
   selection=$(printf '%s\n' "$2" | awk -v branch="$1" '
     function scalar(s) {
       sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s)
@@ -316,7 +318,7 @@ fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
     incomplete\|*) available_ids=${selection#*|} ;;
     *) printf '%s\n' "$selection"; return ;;
   esac
-  inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
+  inventory=$(FM_NM_READ_PROGRESS=1 fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
 import json
 import os
 import re
@@ -334,6 +336,8 @@ try:
     repo_path = json.loads(repos[0]) if repos[0].startswith('"') else repos[0]
     if not isinstance(repo_path, str) or not os.path.isabs(repo_path):
         raise ValueError
+    # The 30 s is SQLite's busy wait for a writer's lock, the one wait this reader
+    # cannot watch; running out raises sqlite3.Error, answered below as unknown.
     with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
         db.execute("BEGIN")
         repo = db.execute("SELECT id FROM repos WHERE working_path = ?", (repo_path,)).fetchall()

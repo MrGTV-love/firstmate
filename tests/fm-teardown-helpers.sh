@@ -235,6 +235,32 @@ case "${1:-}" in
         [ "${FM_FAKE_NM_STATUS_FAIL:-0}" != 1 ] || exit 1
         run_id=""
         if [ "${1:-}" = --run ]; then run_id=${2:-}; fi
+        # A daemon that goes quiet: silent for the plain status read, or for the
+        # read that confirms an abort. FM_FAKE_NM_HANG_LOG counts the silent reads.
+        if [ "${FM_FAKE_NM_STATUS_HANG:-0}" = 1 ] && [ -z "$run_id" ]; then
+          [ -z "${FM_FAKE_NM_HANG_LOG:-}" ] || printf 'status\n' >> "$FM_FAKE_NM_HANG_LOG"
+          exec sleep 60
+        fi
+        if [ "${FM_FAKE_NM_VERIFY_HANG:-0}" = 1 ] && [ -n "$run_id" ]; then exec sleep 60; fi
+        # Silent only for the completion gate's read inside the parent-channel
+        # report (bin/fm-inactive-reconcile.sh), so teardown's own reads answer.
+        if [ "${FM_FAKE_NM_GATE_HANG:-0}" = 1 ] && [ -z "$run_id" ]; then
+          ancestor=$PPID
+          while [ -n "$ancestor" ] && [ "$ancestor" -gt 1 ]; do
+            case "$(ps -o args= -p "$ancestor" 2>/dev/null)" in
+              *fm-inactive-reconcile.sh*) exec sleep 60 ;;
+            esac
+            ancestor=$(ps -o ppid= -p "$ancestor" 2>/dev/null | tr -d ' ')
+          done
+        fi
+        # A daemon on a loaded host: the first plain status read burns CPU for this
+        # many seconds before it answers (once per FM_FAKE_NM_BURN_MARK).
+        if [ -n "${FM_FAKE_NM_STATUS_BURN_SECS:-}" ] && [ -z "$run_id" ] \
+           && [ -n "${FM_FAKE_NM_BURN_MARK:-}" ] && [ ! -e "$FM_FAKE_NM_BURN_MARK" ]; then
+          : > "$FM_FAKE_NM_BURN_MARK"
+          burn_end=$((SECONDS + FM_FAKE_NM_STATUS_BURN_SECS))
+          while [ "$SECONDS" -lt "$burn_end" ]; do :; done
+        fi
         if [ -n "${FM_FAKE_NM_ABORT_LOG:-}" ] \
            && grep -Fxq "abort --run $run_id" "$FM_FAKE_NM_ABORT_LOG" 2>/dev/null \
            && [ "${FM_FAKE_NM_ABORT_NOOP:-0}" != 1 ]; then
@@ -1003,10 +1029,8 @@ pipeline_input_case() {
 # Run teardown on the fixture, keep its output in the case dir, echo the exit code.
 run_teardown_status() {
   local case_dir=$1 rc
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   printf '%s\n' "$rc"
 }
 
@@ -1240,10 +1264,8 @@ write_windowless_legacy_meta() {
 assert_windowless_record_refuses() {  # <case-dir> <description> <refusal>
   local case_dir=$1 description=$2 refusal=$3 rc before
   before=$(cksum "$case_dir/state/task-x1.meta" | awk '{print $1, $2}')
-  set +e
-  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
-  rc=$?
-  set -e
+  rc=0
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
   expect_code 1 "$rc" "$description: a windowless record outside the leftover class must refuse"
   grep -Fq "$refusal" "$case_dir/stderr" \
     || fail "$description: the refusal was not '$refusal': $(cat "$case_dir/stderr")"
@@ -2412,7 +2434,8 @@ SH
 # both at the landed main. shape=enclosing records worktree=N and
 # prior_worktree=S (the task moved into N); shape=reverse records worktree=S and
 # prior_worktree=N (the task moved back). Sets NESTED_CASE, NESTED_SLOT and
-# NESTED_COPY.
+# NESTED_COPY. Its Treehouse stand-in logs every call except the read-only
+# pool-dir and status queries, which it answers with nothing.
 make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   local case_dir mode=${4:-no-mistakes}
   case_dir=$(make_case "$1")
@@ -2428,6 +2451,7 @@ make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   printf 'task=task-x1\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
   cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
+case "\${1:-}" in pool-dir|status) exit 0 ;; esac
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 exit 0
 SH
@@ -2840,6 +2864,9 @@ make_held_case() {  # <name>
 # plain treehouse get records (leased=false), with a Treehouse stand-in that
 # models lease and return. Its lease command fails while <case-dir>/lease-fails
 # exists, and reports no lease command while <case-dir>/no-lease-command exists.
+# While <case-dir>/lease-path exists its lease also takes --path <slot path>,
+# which leases the entry with that exact path. Its status lists <case-dir>/status.json while that exists, as for a project
+# whose current pool is another folder, else the case's own pool.
 # Lease calls land in lease.log and returns in treehouse.log.
 held_plain_get_slot() {
   local case_dir=$1
@@ -2850,14 +2877,28 @@ state="$case_dir/pool/treehouse-state.json"
 if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
   [ ! -e "$case_dir/no-lease-command" ] || { echo 'Error: unknown command "lease" for "treehouse"' >&2; exit 1; }
   printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  [ ! -e "$case_dir/lease-path" ] || printf '      --path string           Lease the worktree at this exact path\n'
   exit 0
 fi
 case "\${1:-}" in
+  status)
+    if [ -f "$case_dir/status.json" ]; then
+      cat "$case_dir/status.json"
+    else
+      jq -c '[.worktrees[]? | {name, path, lease_holder: (.lease_holder // ""), processes: []}]' "\$state"
+    fi
+    ;;
   lease)
     printf '%s\n' "\$*" >> "$case_dir/lease.log"
     [ ! -e "$case_dir/lease-fails" ] || { echo "Error: the lease could not be recorded" >&2; exit 1; }
-    jq --arg name "\$2" --arg holder "\$4" '(.worktrees[] | select(.name == \$name)) |= (.leased = true | .lease_holder = \$holder)' \\
-      "\$state" > "\$state.next" && mv "\$state.next" "\$state"
+    if [ "\$2" = --path ]; then
+      [ -e "$case_dir/lease-path" ] || { echo 'Error: unknown flag: --path' >&2; exit 1; }
+      jq --arg path "\$3" --arg holder "\$5" '(.worktrees[] | select(.path == \$path)) |= (.leased = true | .lease_holder = \$holder)' \\
+        "\${3%/*/*}/treehouse-state.json" > "\$state.next" && mv "\$state.next" "\${3%/*/*}/treehouse-state.json"
+    else
+      jq --arg name "\$2" --arg holder "\$4" '(.worktrees[] | select(.name == \$name)) |= (.leased = true | .lease_holder = \$holder)' \\
+        "\$state" > "\$state.next" && mv "\$state.next" "\$state"
+    fi
     ;;
   return) printf '%s\n' "\$*" >> "$case_dir/treehouse.log" ;;
 esac
@@ -2952,7 +2993,8 @@ assert_own_locked_copy_untouched() {  # <label>
 # A pool-slot ship whose only copy is the slot itself, recorded the way spawn
 # publishes it, with a Treehouse stand-in that models the installed CLI: lease
 # resolves the pool from the working directory's repository and records a
-# durable holder; return releases it.
+# durable holder; return releases it. Its pool-dir prints FM_POOL_DIR when that
+# is set, and otherwise fails as a Treehouse without that command does.
 make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind]
   local case_dir slot kind=${3:-ship}
   case_dir=$(make_case "$1")
@@ -2984,30 +3026,66 @@ if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
   printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
   exit 0
 fi
+# The pool a name resolves against is the one the project's origin selects
+# today: FM_POOL_CURRENT_STATE names that pool's state file when a case moves
+# the project to a new pool folder, else the first pool a registered copy of
+# the repository lives in.
+current_state() {
+  local line wt
+  if [ -n "${FM_POOL_CURRENT_STATE:-}" ]; then
+    printf '%s\n' "$FM_POOL_CURRENT_STATE"
+    return 0
+  fi
+  while IFS= read -r line; do
+    case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
+    [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
+    printf '%s\n' "${wt%/*/*}/treehouse-state.json"
+    return 0
+  done < <(git worktree list --porcelain 2>/dev/null)
+  return 1
+}
 printf '%s\n' "$*" >> "$FM_POOL_CASE/treehouse.log"
 case "${1:-}" in
+  pool-dir)
+    [ -n "${FM_POOL_DIR:-}" ] || { echo 'Error: unknown command "pool-dir" for "treehouse"' >&2; exit 1; }
+    printf '%s\n' "$FM_POOL_DIR"
+    ;;
+  status)
+    [ -z "${FM_POOL_STATUS_FAILS:-}" ] || { echo 'Error: cannot read the pool' >&2; exit 1; }
+    state=$(current_state) || { printf '[]\n'; exit 0; }
+    jq -c --arg busy "${FM_POOL_BUSY_SLOT:-}" '[.worktrees[]? | {name, path, status: (if .leased == true then "leased" else "available" end),
+      lease_holder: (.lease_holder // ""), processes: (if .path == $busy then [{pid: 4242}] else [] end)}]' "$state"
+    ;;
   lease)
     if [ -n "${FM_POOL_NO_LEASE:-}" ]; then
       echo 'Error: unknown command "lease" for "treehouse"' >&2
       exit 1
     fi
     [ "$#" -eq 4 ] && [ "$3" = --lease-holder ] || exit 2
-    state=
-    while IFS= read -r line; do
-      case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
-      [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
-      state="${wt%/*/*}/treehouse-state.json"
-      break
-    done < <(git worktree list --porcelain 2>/dev/null)
-    [ -n "$state" ] || { echo "Error: no worktree named \"$2\" in pool" >&2; exit 1; }
+    state=$(current_state) || { echo "Error: no worktree named \"$2\" in pool" >&2; exit 1; }
+    holder=$(jq -r --arg name "$2" '.worktrees[] | select(.name == $name and .leased == true) | .lease_holder' "$state")
+    [ -z "$holder" ] || { echo "Error: worktree $2 is already leased (holder: \"$holder\")" >&2; exit 1; }
     jq --arg name "$2" --arg holder "$4" \
       '(.worktrees[] | select(.name == $name)) |= (.leased = true | .lease_holder = $holder)' \
       "$state" > "$state.next" && mv "$state.next" "$state"
     ;;
   return)
-    slot=${@: -1}
+    shift
+    slot= want_holder=
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --force) ;;
+        --if-lease-holder) want_holder=$2; shift ;;
+        *) slot=$1 ;;
+      esac
+      shift
+    done
     state="${slot%/*/*}/treehouse-state.json"
     if jq -e . "$state" >/dev/null 2>&1; then
+      if [ -n "$want_holder" ]; then
+        have=$(jq -r --arg slot "$slot" '.worktrees[] | select(.path == $slot) | .lease_holder // ""' "$state")
+        [ "$have" = "$want_holder" ] || { echo "Error: lease holder is \"$have\", not \"$want_holder\"" >&2; exit 1; }
+      fi
       jq --arg slot "$slot" '(.worktrees[] | select(.path == $slot)) |= (.leased = false | del(.lease_holder))' \
         "$state" > "$state.next" && mv "$state.next" "$state"
     fi
@@ -3020,6 +3098,44 @@ SH
   POOL_LOCK=$(FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
     bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
     _ "$ROOT" "$case_dir/project")
+}
+
+# assert_no_log_line <extended-regex> <file> <msg>: no line of <file> matches.
+assert_no_log_line() {
+  ! grep -Eq -- "$1" "$2" || fail "$3"
+}
+
+# A pool-slot ship whose copy lives in a superseded pool folder: Treehouse
+# derives a pool folder from the project's origin URL, so repointing origin
+# leaves the recorded copy in the old folder, where its state reads unleased,
+# while the project's current pool is another folder whose slots reuse the old
+# slot names. <current-state-json> is that current pool's state, with @SLOT1@
+# and @SLOT2@ standing for its two slot paths. Sets SUPER_CASE, SUPER_SLOT (the
+# recorded copy), SUPER_NEW1 and SUPER_NEW2 (the current pool's slots) and
+# SUPER_NEW_STATE (its state file); runs need FM_POOL_CURRENT_STATE exported
+# from SUPER_NEW_STATE so the Treehouse stand-in resolves names there.
+make_superseded_pool_case() {  # <name> <current-state-json>
+  local pool_json=$2 n
+  make_lease_modeling_pool_case "$1" ''
+  SUPER_CASE=$POOL_CASE
+  SUPER_SLOT=$POOL_SLOT
+  SUPER_NEW_STATE=$SUPER_CASE/current-pool/treehouse-state.json
+  for n in 1 2; do
+    mkdir -p "$SUPER_CASE/current-pool/$n"
+    git -C "$SUPER_CASE/project" worktree add -q --detach "$SUPER_CASE/current-pool/$n/project" main
+  done
+  SUPER_NEW1=$(cd "$SUPER_CASE/current-pool/1/project" && pwd -P)
+  SUPER_NEW2=$(cd "$SUPER_CASE/current-pool/2/project" && pwd -P)
+  pool_json=${pool_json//@SLOT1@/$SUPER_NEW1}
+  pool_json=${pool_json//@SLOT2@/$SUPER_NEW2}
+  printf '%s\n' "$pool_json" > "$SUPER_NEW_STATE"
+}
+
+# Every file of a copy with its content hash, then its HEAD, branch and status,
+# so two snapshots compare equal only when no byte of the work changed.
+superseded_copy_snapshot() {  # <copy>
+  (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 \
+    && git rev-parse HEAD && git symbolic-ref -q HEAD && git status --porcelain=v1 -uall)
 }
 
 # A finished, idle scout in a pool slot that the idle reaper selects, with an

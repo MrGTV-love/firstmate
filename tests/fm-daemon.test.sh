@@ -359,14 +359,14 @@ EOF
 }
 
 test_overdue_rows_escalate_before_away_acknowledgement() {
-  local dir state fakebin buffer kind wake
+  local dir state fakebin buffer delivered cycle now
   dir=$(make_supercase overdue-away-ack); state="$dir/state"; fakebin="$dir/daemon-bin"
-  buffer="$state/.subsuper-escalations"
+  buffer="$state/.subsuper-escalations"; delivered="$dir/delivered"
   python3 - "$state/open-loops.json" "$(date +%s)" <<'PYROWS'
 import json, sys
-rows = [dict(id=f'away-row-{i}', category='stalled_worker', subject=f'slow-worker-{i}', owner=f'worker:slow-worker-{i}',
+rows = [dict(id='away-row', category='stalled_worker', subject='slow-worker', owner='worker:slow-worker',
              next_action='follow up on the recorded wait', age_seconds=7200, limit_seconds=3600, overdue=True,
-             evidence='waiting for lint.full.whole') for i in range(10)]
+             evidence='waiting for lint.full.whole')]
 json.dump(dict(schema='fm-open-loops.v1', generated_epoch=int(sys.argv[2]), complete=True, rows=rows),
           open(sys.argv[1], 'w'))
 PYROWS
@@ -376,7 +376,7 @@ PYROWS
   cat > "$fakebin/fm-wake-drain.sh" <<EOF
 #!/usr/bin/env bash
 if [ "\${1:-}" = --ack-through ]; then
-  "$ROOT/bin/fm-open-loops.sh" --check-actions || exit 1
+  [ "\${FM_WAKE_ACK_AWAY_DAEMON:-}" = 1 ] || "$ROOT/bin/fm-open-loops.sh" --check-actions || exit 1
   printf '%s\n' ack >> "$dir/acked"; exit 0
 fi
 "$ROOT/bin/fm-open-loops.sh" --present-overdue || exit 1
@@ -384,23 +384,62 @@ printf '1\t1\tcheck\treport\tcheck: board report\n'
 printf 'WAKE_ACK_REQUIRED: run --ack-through 1 --recovery-generation gen\n' >&2
 EOF
   chmod +x "$fakebin/fm-wake-drain.sh"
-  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
-    handle_durable_wakes fallback "$state" || fail "an overdue row wedged the away acknowledgement"
-  [ "$(cat "$dir/acked" 2>/dev/null)" = ack ] || fail "the away daemon did not acknowledge after escalating"
-  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "away-row-3","worker:slow-worker-3","slow-worker-3"' \
-    "the overdue row did not join the escalation digest"
-  assert_contains "$(cat "$buffer")" 'waiting for lint.full.whole' "the digest lost the overdue row's evidence"
-  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row-3"]["kind"])' \
-    "$state/open-loops.json")
-  [ "$kind" = escalated ] || fail "the away escalation was not recorded as the row's receipt: $kind"
-  for wake in 2 3 4; do
+  # Each cycle's buffer is flushed to firstmate before the next, as the batch window would.
+  for cycle in 1 2 3; do
     FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
-      handle_durable_wakes fallback "$state" || fail "wake $wake with the same overdue rows was not acknowledged"
+      handle_durable_wakes fallback "$state" || fail "an unactioned overdue row retained the unrelated check wake (cycle $cycle)"
+    cat "$buffer" >> "$delivered" 2>/dev/null || true
+    rm -f "$buffer"
   done
-  [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 4 ] || fail "a repeated wake was not acknowledged once"
-  [ "$(grep -c '^overdue open work: ' "$buffer")" = 10 ] \
-    || fail "repeated wakes buffered an overdue row more than once before the digest flushed"
-  pass "away mode escalates each overdue row once per digest, records the receipt, and acknowledges"
+  [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 3 ] || fail "each handled check wake was not acknowledged once"
+  assert_contains "$(cat "$delivered")" 'overdue open work: "away-row","worker:slow-worker","slow-worker"' \
+    "the new overdue row did not reach firstmate"
+  assert_contains "$(cat "$delivered")" 'check: board report' "the unrelated check wake did not reach firstmate"
+  [ "$(grep -c '^overdue open work: "away-row",' "$delivered")" = 1 ] \
+    || fail "the unchanged overdue row reached firstmate more than once across three cycles"
+  python3 -c 'import json, sys; actions = json.load(open(sys.argv[1]))["handling"]["actions"]; assert not actions, actions' \
+    "$state/open-loops.json" || fail "the away daemon wrote a ledger receipt"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-open-loops.sh" --check-actions > /dev/null 2>&1 \
+    && fail "the daemon acknowledgement cleared the obligation firstmate still owes"
+  python3 - "$state/open-loops.json" <<'PYCHANGE'
+import json, sys
+ledger = json.load(open(sys.argv[1]))
+ledger['rows'][0]['evidence'] = 'waiting for lint.full.whole after a new status'
+json.dump(ledger, open(sys.argv[1], 'w'))
+PYCHANGE
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the changed row retained the check wake"
+  [ "$(grep -c '^overdue open work: "away-row",' "$buffer")" = 1 ] || fail "the changed overdue row was not forwarded again"
+  rm -f "$buffer"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 FM_OPEN_LOOPS_RESURFACE=0 \
+    handle_durable_wakes fallback "$state" || fail "the zero-interval cycle retained the check wake"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" \
+    || fail "a zero resurface interval did not fall back to its default"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 FM_OPEN_LOOPS_RESURFACE=6h \
+    handle_durable_wakes fallback "$state" 2> "$dir/resurface.err" || fail "the invalid-interval cycle retained the check wake"
+  [ ! -s "$dir/resurface.err" ] || fail "an invalid resurface interval was not normalized: $(cat "$dir/resurface.err")"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" \
+    || fail "an invalid resurface interval did not fall back to its default"
+  awk -F '\t' 'BEGIN { OFS = "\t" } { $3 = $3 - 21600; print }' "$state/.subsuper-open-work-forwarded" \
+    > "$dir/forwarded" && mv -f "$dir/forwarded" "$state/.subsuper-open-work-forwarded"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the resurfaced row retained the check wake"
+  [ "$(grep -c '^overdue open work: "away-row",' "$buffer")" = 1 ] \
+    || fail "the unchanged overdue row was not forwarded again after its resurface interval"
+  rm -f "$buffer"
+  now=$(date +%s)
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$now" "$ROOT/bin/fm-open-loops.sh" action away-row deferred \
+    --evidence 'waiting on the lint run' \
+    --recheck "$(python3 -c 'import datetime as d, sys; print(d.datetime.fromtimestamp(int(sys.argv[1]) + 600, d.timezone.utc).isoformat())' "$now")" \
+    > /dev/null || fail "firstmate could not defer the overdue row"
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$now" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the covered row retained the check wake"
+  [ ! -e "$buffer" ] || ! grep -q '^overdue open work: "away-row",' "$buffer" || fail "a covered row was forwarded"
+  FM_STATE_OVERRIDE="$state" FM_OPEN_LOOPS_NOW="$((now + 700))" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "the lapsed deferral retained the check wake"
+  [ "$(grep -c '^overdue open work: "away-row",' "$buffer" 2>/dev/null)" = 1 ] \
+    || fail "a row that returned to the gate with unchanged evidence was not forwarded again"
+  pass "away mode acknowledges handled wakes past one new overdue row, forwards it once per change, return to the gate or resurface, and writes no receipt"
 }
 
 test_busy_inbox_escalation_reaches_supervision() {

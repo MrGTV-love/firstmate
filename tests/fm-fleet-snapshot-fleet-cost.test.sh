@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Behavior test for the cost of the home-summary producer at the current fleet size.
+# Behavior tests for fleet snapshot cost and progress-owned supplemental reads.
+# Also covers 5x source-work dilation, silent-reader cleanup and unknown evidence.
 #
 # The producer (fm-fleet-snapshot.sh --secondmate-home-summary) must finish well inside
 # the refresh deadline while the host is busy. On a loaded host its cost is the number of
@@ -110,3 +111,130 @@ jq -e --argjson tasks "$TASKS" --argjson records "$RECORDS" '
 [ "$STARTS" -le "$JQ_START_BOUND" ] \
   || fail "a $TASKS-task fleet started $STARTS jq processes; the bound is $JQ_START_BOUND"
 pass "the producer summarizes a $TASKS-task fleet with $STARTS jq starts (bound $JQ_START_BOUND)"
+
+# The same bounded reads must survive a 5x host delay while they report progress.
+# A silent source must still be stopped, with its evidence explicitly unknown.
+READ_HOME=$TMP_ROOT/read-home
+READ_BIN=$(fm_fakebin "$READ_HOME")
+mkdir -p "$READ_HOME/state" "$READ_HOME/data" "$READ_HOME/config" "$READ_HOME/projects"
+fm_write_meta "$READ_HOME/state/mate.meta" \
+  'kind=secondmate' 'harness=codex' 'backend=tmux' 'window=firstmate:fm-mate'
+printf 'working [key=review]: review underway\n' > "$READ_HOME/state/mate.status"
+printf -- '- mate (home: %s/missing; scope: reviews; projects: alpha; added 2026-10-01)\n' \
+  "$READ_HOME" > "$READ_HOME/data/secondmates.md"
+
+cat > "$READ_BIN/read-delay" <<'SH'
+#!/usr/bin/env bash
+source_name=$1
+if [ "${FM_TEST_HUNG_SOURCE:-}" = "$source_name" ]; then
+  printf '%s\n' "$$" > "$FM_TEST_HUNG_PID"
+  exec python3 -c 'import signal; signal.pause()'
+fi
+n=0
+while [ "$n" -lt "${FM_TEST_DILATION:-1}" ]; do
+  sleep 0.6
+  printf 'source progress\n' >&2
+  n=$((n + 1))
+done
+SH
+cat > "$READ_BIN/head" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *secondmates.md) "$READ_BIN/read-delay" registry ;;
+esac
+exec "$(command -v head)" "\$@"
+SH
+cat > "$READ_BIN/tail" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  '-c 65536 '*mate.status) "$READ_BIN/read-delay" activities ;;
+esac
+exec "$(command -v tail)" "\$@"
+SH
+cat > "$READ_BIN/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  list-windows) printf 'fm-mate\n' ;;
+  display-message) printf 'codex\n' ;;
+  capture-pane)
+    "$READ_BIN/read-delay" terminal
+    printf 'review underway\n> \n'
+    ;;
+esac
+SH
+cat > "$READ_BIN/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+READ_JQ_STARTS=$TMP_ROOT/read-jq-starts
+cat > "$READ_BIN/jq" <<SH
+#!/usr/bin/env bash
+printf 'x\\n' >> "$READ_JQ_STARTS"
+exec "$REAL_JQ" "\$@"
+SH
+READ_PY_STARTS=$TMP_ROOT/read-python-starts
+REAL_PYTHON=$(command -v python3)
+cat > "$READ_BIN/python3" <<SH
+#!/usr/bin/env bash
+case "\$*" in *'fm-duration.py keep-going '*) printf '%s\\n' "\$*" >> "$READ_PY_STARTS" ;; esac
+exec "$REAL_PYTHON" "\$@"
+SH
+chmod +x "$READ_BIN/"*
+
+run_read_snapshot() {  # <dilation> [<hung-source>]
+  : > "$READ_JQ_STARTS"
+  : > "$READ_PY_STARTS"
+  PATH="$READ_BIN:$PATH" FM_HOME="$READ_HOME" FM_DURATION_FILE=off \
+    FM_TEST_DILATION=$1 FM_TEST_HUNG_SOURCE=${2:-} FM_TEST_HUNG_PID="$TMP_ROOT/hung.pid" \
+    FM_SNAPSHOT_REGISTRY_TIMEOUT=2 FM_SNAPSHOT_PARENT_ACTIVITY_TIMEOUT=2 \
+    FM_SNAPSHOT_TERMINAL_TIMEOUT=2 \
+    "$SNAPSHOT" --json > "$TMP_ROOT/reads.json" 2> "$TMP_ROOT/reads.err" \
+    || fail "snapshot failed: $(cat "$TMP_ROOT/reads.err")"
+}
+
+for dilation in 1 5; do
+  run_read_snapshot "$dilation"
+  jq -e '
+    .secondmate_current.registry.available == true
+    and .secondmate_current.registry.records[0].id == "mate"
+    and (.secondmate_current.records[0] |
+      .parent_event.activity_scan.available == true
+      and .parent_event.open_activities[0].key == "review"
+      and .terminal_evidence.captured == true
+      and .terminal_evidence.event_note_seen == true)
+  ' "$TMP_ROOT/reads.json" >/dev/null \
+    || fail "${dilation}x source delay discarded healthy evidence: $(cat "$TMP_ROOT/reads.json")"
+  read_starts=$(wc -l < "$READ_JQ_STARTS" | tr -d ' ')
+  # Same one-secondmate snapshot: 48 starts before batching, 32 after. Leave
+  # room for independent observations, but reject a return to per-field parsing.
+  [ "$read_starts" -le 40 ] || fail "one secondmate started $read_starts jq processes (bound 40)"
+  # The supplemental reads run serially, once per secondmate. A Python start
+  # each (0.2-0.5 s on a loaded host) made the 15-mate snapshot twice as slow
+  # as base's hard caps. With Perl present they must add no Python starts.
+  py_reads=$(grep -c 'fm-secondmate-registry\|fm-parent-activities\|fm-terminal-capture' "$READ_PY_STARTS")
+  if command -v perl >/dev/null 2>&1 && [ "$py_reads" -gt 0 ]; then
+    fail "$py_reads supplemental reads each started a Python progress runner"
+  fi
+  pass "registry, parent activities and terminal evidence survive ${dilation}x source delay ($read_starts jq starts)"
+done
+
+for source_name in registry activities terminal; do
+  rm -f "$TMP_ROOT/hung.pid"
+  run_read_snapshot 1 "$source_name"
+  [ -s "$TMP_ROOT/hung.pid" ] || fail "$source_name hang was not exercised"
+  hung_pid=$(cat "$TMP_ROOT/hung.pid")
+  if kill -0 "$hung_pid" 2>/dev/null; then
+    kill "$hung_pid" 2>/dev/null || true
+    fail "$source_name left its stalled reader alive"
+  fi
+  case "$source_name" in
+    registry) predicate='.secondmate_current.registry | .available == false and .complete == false' ;;
+    activities) predicate='.secondmate_current.records[0].parent_event.activity_scan | .available == false and .records == []' ;;
+    terminal) predicate='.secondmate_current.records[0].terminal_evidence | .captured == false and .freshness == "unknown"' ;;
+  esac
+  jq -e "$predicate" "$TMP_ROOT/reads.json" >/dev/null \
+    || fail "$source_name stall was treated as known evidence"
+  jq -e '.secondmate_current.records[0].current.state == "unknown"' "$TMP_ROOT/reads.json" >/dev/null \
+    || fail "$source_name stall decided a peer was dead"
+  pass "$source_name silent reader is reaped and its evidence remains unknown"
+done

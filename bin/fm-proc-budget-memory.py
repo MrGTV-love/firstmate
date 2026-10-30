@@ -47,6 +47,30 @@ def join_group(group):
         signal.signal(number, signal.SIG_IGN)
 
 
+def start_gated(command):
+    """Start the command leading its own group, held by the bash gate.
+
+    Returns the child and the release pipe; one line on it runs the command,
+    and its end without a line exits the gate with 125 before the command.
+    Both modes start a Reader in the child's group before the release, so a
+    supervisor that dies at any point leaves no command running unguarded.
+    """
+    gate, release = os.pipe()
+    try:
+        os.set_inheritable(gate, True)
+        child = subprocess.Popen(
+            ["/bin/bash", "-c", f'read -r _ <&{gate} || exit 125; exec {gate}<&-; exec "$@"',
+             "fm-proc-budget", *command],
+            preexec_fn=os.setpgrp, close_fds=False,
+        )
+    except BaseException:
+        os.close(release)
+        raise
+    finally:
+        os.close(gate)
+    return child, release
+
+
 class Reader:
     def __init__(self, root, group=None):
         helper = Path(__file__).with_name("fm-proc-info.py")
@@ -243,16 +267,7 @@ def run(limit, command):
         reader = None
         if caught:
             return 128 + caught
-        gate, release = os.pipe()
-        try:
-            os.set_inheritable(gate, True)
-            child = subprocess.Popen(
-                ["/bin/bash", "-c", f'read -r _ <&{gate} || exit 125; exec {gate}<&-; exec "$@"',
-                 "fm-proc-budget", *command],
-                preexec_fn=os.setpgrp, close_fds=False,
-            )
-        finally:
-            os.close(gate)
+        child, release = start_gated(command)
         reader = Reader(child.pid, child.pid)
         reader.sample(known, uncounted)
         if caught:

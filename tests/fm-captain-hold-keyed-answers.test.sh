@@ -177,11 +177,9 @@ SH
 
   # Replaying the same capture is a no-op, not a rejected different decision. A
   # run that could not close every answered key still reports nonzero.
-  set +e
+  rc=0
   out=$(run_lavish "$home" answers "$result" \
-    | run_captain "$home" answers --source "the captured result fixture-src sequence 1" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" answers --source "the captured result fixture-src sequence 1" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a run that skipped a key reported success"
   assert_contains "$out" "closed: sample-membership-call" \
     "replaying an identical capture was not idempotent: $out"
@@ -266,11 +264,9 @@ test_keyed_answer_releases_a_live_work_item() {
   assert_contains "$show" "state: done" "cleanup did not complete the released work item"
   assert_contains "$show" "held: no" "the late replay fixture is still held"
   assert_absent "$home/state/sample-live-scout.meta" "cleanup left the worker record behind"
-  set +e
+  rc=0
   out=$(printf 'sample-live-scout\tgo-b\tOption B\n' \
-    | run_captain "$home" answers --source "live work fixture" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" answers --source "live work fixture" 2>&1) || rc=$?
   [ "$rc" -eq 0 ] || fail "replaying a release after the worker ended was refused: $out"
   assert_contains "$out" "closed: sample-live-scout" "the completed release replay was not reported closed"
   show=$(tasks_in "$home" show sample-live-scout --full)

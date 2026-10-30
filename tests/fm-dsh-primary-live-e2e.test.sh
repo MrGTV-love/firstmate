@@ -21,9 +21,9 @@ ORIGINAL_PATH=$PATH
 mkdir -p "$TASK/bin"
 export FM_HERDR_LAB_STATE_DIR="$TASK/primary-herdr-safety"
 SESSION=$("$HELPER" name dsh-primary)
-LAB_HOME=$(mktemp -d /tmp/fm-dsh-primary.XXXXXX)
-PARENT=$(mktemp -d /tmp/fm-dsh-parent.XXXXXX)
-SECOND=$(mktemp -d /tmp/fm-dsh-second.XXXXXX)
+LAB_HOME=$(mktemp -d /tmp/fmlab.dsh-primary.XXXXXX)
+PARENT=$(mktemp -d /tmp/fmlab.dsh-parent.XXXXXX)
+SECOND=$(mktemp -d /tmp/fmlab.dsh-second.XXXXXX)
 LAB_HOME=$(cd "$LAB_HOME" && pwd -P)
 PARENT=$(cd "$PARENT" && pwd -P)
 SECOND=$(cd "$SECOND" && pwd -P)

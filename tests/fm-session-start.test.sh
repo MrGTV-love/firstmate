@@ -1574,7 +1574,7 @@ EOF
 
   expect_code 0 "$status" "one killed endpoint read must not fail the digest"
   assert_contains "$out" \
-    "endpoint: error (backend=herdr window=sess:p-doom - the endpoint read died or hit its 10s bound; the digest continued past it)" \
+    "endpoint: error (backend=herdr window=sess:p-doom - the endpoint read died; the digest continued past it)" \
     "a killed endpoint read was not reported as that task's own error line"
   assert_contains "$out" "endpoint: alive (backend=herdr window=sess:p-live)" \
     "the digest did not continue past the killed read to the next task"
@@ -1617,8 +1617,8 @@ EOF
 
   expect_code 0 "$status" "a hung endpoint read must not fail the digest"
   assert_contains "$out" \
-    "endpoint: error (backend=herdr window=sess:p-slow - the endpoint read died or hit its 2s bound; the digest continued past it)" \
-    "a hung endpoint read was not bounded into that task's own configured bound"
+    "endpoint: unknown (backend=herdr window=sess:p-slow - the endpoint read did not answer in time; this is not a dead verdict, read it again with bin/fm-crew-state.sh task-a-slow)" \
+    "a hung endpoint read was not bounded into an unknown line for that task"
   assert_contains "$out" "endpoint: alive (backend=herdr window=sess:p-live)" \
     "the digest did not continue past the hung read to the next task"
   assert_contains "$out" "$(printf '\nCONTEXT\n')" \
@@ -1633,6 +1633,60 @@ EOF
     || fail "the per-task read bound left $(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ') hung herdr process(es) behind"
 
   pass "a hung per-task endpoint read hits its configured bound, reports the task, and leaves nothing stuck"
+}
+
+# The endpoint read is a backend CLI call that cannot show progress, so its bound is
+# this host's measured one. A host where the same read has taken four seconds (the
+# ledger below) gets twelve, however small the cold-start floor is: a read that takes
+# six seconds there is a slow answer, not a hung one, and must be reported alive. A
+# read that really hangs is still stopped, and reported unknown.
+make_fake_herdr_slow_and_hanging_read() {  # <fakebin> <slow> <hang>
+  local fakebin=$1 slow=$2 hangpane=$3
+  cat > "$fakebin/herdr" <<SH
+#!/usr/bin/env bash
+set -u
+if [ "\${1:-}" = pane ] && [ "\${2:-}" = get ]; then
+  [ "\${3:-}" = "$slow" ] && { sleep 6; exit 0; }
+  [ "\${3:-}" = "$hangpane" ] && sleep 40
+  exit 1
+fi
+exit 1
+SH
+  chmod +x "$fakebin/herdr"
+}
+
+test_endpoint_read_bound_follows_the_measured_ledger() {
+  local rec root home fakebin out status=0 ledger i
+  rec=$(new_world endpoint-measured)
+  IFS='|' read -r root home fakebin <<EOF
+$rec
+EOF
+  make_fake_toolchain "$fakebin"
+  make_fake_ps_claude "$fakebin"
+  make_fake_herdr_slow_and_hanging_read "$fakebin" "p-slow" "p-hang"
+  printf 'window=sess:p-slow\nkind=ship\nbackend=herdr\n' > "$home/state/task-a-slow.meta"
+  printf 'window=sess:p-hang\nkind=ship\nbackend=herdr\n' > "$home/state/task-b-hang.meta"
+  ledger="$home/durations.jsonl"
+  for i in 1 2 3 4 5; do
+    FM_DURATION_FILE="$ledger" python3 "$ROOT/bin/fm-duration.py" record session-start.endpoint-read 4000 0 >/dev/null 2>&1 \
+      || fail "could not seed the duration ledger"
+  done
+
+  out=$(FM_DURATION_FILE="$ledger" FM_HOME_SUMMARY_TIMEOUT=5 FM_SESSION_START_ENDPOINT_TIMEOUT=2 \
+    run_session_start "$home" "$root" "$fakebin:$BASE_PATH") || status=$?
+
+  expect_code 0 "$status" "a slow endpoint read must not fail the digest"
+  assert_contains "$out" "endpoint: alive (backend=herdr window=sess:p-slow)" \
+    "a read three times the cold-start floor but inside this host's measured bound was not reported alive"
+  assert_contains "$out" \
+    "endpoint: unknown (backend=herdr window=sess:p-hang - the endpoint read did not answer in time; this is not a dead verdict, read it again with bin/fm-crew-state.sh task-b-hang)" \
+    "a read that never answered was not stopped and reported unknown"
+  assert_not_contains "$out" "STARTUP TRUNCATED - SESSION START" \
+    "a measured endpoint bound raised the whole-digest truncation banner"
+  fm_test_wait_until 60 no_stray_herdr "$fakebin" \
+    || fail "the measured read bound left hung herdr process(es) behind"
+
+  pass "an endpoint read gets its host's measured bound: slow is alive, silent is unknown"
 }
 
 test_endpoint_bound_rejects_padded_zero() {
@@ -1655,7 +1709,7 @@ EOF
 
   expect_code 0 "$status" "a padded-zero per-read bound must not fail the digest"
   assert_contains "$out" \
-    "endpoint: error (backend=herdr window=sess:p-slow - the endpoint read died or hit its 10s bound; the digest continued past it)" \
+    "endpoint: unknown (backend=herdr window=sess:p-slow - the endpoint read did not answer in time; this is not a dead verdict, read it again with bin/fm-crew-state.sh task-a-slow)" \
     "a padded-zero bound did not fall back to the 10s default, so the hung read went unbounded"
   assert_contains "$out" "$(printf '\nCONTEXT\n')" \
     "a padded-zero bound cost the digest its context section"
@@ -3265,6 +3319,7 @@ test_endpoint_liveness_herdr
 test_endpoint_liveness_remote
 test_endpoint_read_death_is_isolated_and_reported
 test_endpoint_read_hang_is_bounded_and_reported
+test_endpoint_read_bound_follows_the_measured_ledger
 test_endpoint_bound_rejects_padded_zero
 test_perl_timeout_fallback_reports_signal_death_nonzero
 test_abnormal_digest_death_banners_and_exits_zero

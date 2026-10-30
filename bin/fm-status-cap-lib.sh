@@ -354,6 +354,7 @@ fm_status_cap_unalerted() {  # <state>
     case "$size" in ''|*[!0-9]*) continue ;; esac
     [ "$size" -gt "$cap" ] || continue
     over_paths="$over_paths$path"$'\t'"$ident"$'\n'
+    marker=
     fm_status_cap_marker_path "$state" "$path" marker
     held_ident='' held_size=''
     if [ -f "$marker" ]; then IFS=$'\t' read -r held_ident held_path held_size < "$marker" || :; fi

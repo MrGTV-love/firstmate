@@ -89,6 +89,8 @@ MAX_DOC_BYTES=${FM_REMOTE_REPLY_MAX_DOC_BYTES:-262144}
 SSH_UNAVAILABLE=255
 DOCUMENT_LOCAL_FAILURE=2
 
+# shellcheck source=bin/fm-scratch-lib.sh
+. "$SCRIPT_DIR/fm-scratch-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
@@ -553,8 +555,8 @@ cmd_ingest() {
   done
   blank=$(LC_ALL=C awk '$0 == "" { print NR; exit }' "$result")
   case "$blank" in ''|*[!0-9]*) die "result has no payload boundary" ;; esac
-  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-remote-reply-ingest.XXXXXX") || die "cannot create ingest staging directory"
-  trap 'rm -rf -- "$tmp"' EXIT
+  tmp=$(fm_scratch_new d fm-remote-reply-ingest) || die "cannot create ingest staging directory"
+  trap 'fm_scratch_release "$tmp"' EXIT
   payload="$tmp/payload"
   tail -n "+$((blank + 1))" "$result" > "$payload"
   actual_bytes=$(LC_ALL=C wc -c < "$payload" | tr -d ' ')
@@ -606,6 +608,8 @@ cmd_ingest() {
     fi
     [ "$append_rc" -ne 2 ] || { fm_lock_release "$lock"; die "cannot append continuity escalation"; }
     fm_lock_release "$lock"
+    trap - EXIT
+    fm_scratch_release "$tmp"
     printf 'continuity-broken: %s (%s)\n' "$id" "$reason"
     return 3
   fi
@@ -708,7 +712,7 @@ EOF
   fi
   fm_lock_release "$lock"
   trap - EXIT
-  rm -rf -- "$tmp"
+  fm_scratch_release "$tmp"
   printf 'ingested: %s appended=%s offset=%s\n' "$id" "$appended" "$to"
 }
 

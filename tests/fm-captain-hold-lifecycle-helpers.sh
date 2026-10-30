@@ -94,9 +94,17 @@ tasks_in() {  # <home> <tasks-axi args...>
   (cd "$home" && tasks-axi "$@")
 }
 
+# A secondmate home must declare the owner of every hold it files, because its
+# parent channel carries both the captain's calls and the parent's own. These
+# suites exercise the captain-owned lifecycle, so a `hold` run inside a mate home
+# declares that owner here unless the caller passes one itself.
 run_captain() {  # <home> <command args...>
-  local home=$1
+  local home=$1 arg owner_given=0
   shift
+  if [ "${1-}" = hold ] && [ -e "$home/.fm-secondmate-home" ]; then
+    for arg in "$@"; do [ "$arg" != --owner ] || owner_given=1; done
+    [ "$owner_given" = 1 ] || set -- "$@" --owner captain
+  fi
   PATH="$home/fakebin:$PATH" REAL_TASKS_AXI="$TASKS_AXI_BIN" \
     FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-captain-hold.sh" "$@"
@@ -173,6 +181,9 @@ case "${1:-} ${2:-}" in
       *merge_queue*) ;;
       *) printf '%s\n' '[]' ;;
     esac
+    ;;
+  "api repos/"*"/compare/"*)
+    printf '%s\n' '{"behind_by":0,"base_commit":{"sha":"0000000000000000000000000000000000000000"},"merge_base_commit":{"sha":"0000000000000000000000000000000000000000"}}'
     ;;
   "api repos/"*) printf '%s\n' '{"name":"main","protected":false}' ;;
 esac
@@ -423,20 +434,8 @@ SH
 # Runs this suite's `tests` array, or only the named cases, then proves cleanup
 # left no process-event runner or watchdog behind.
 captain_hold_run_tests() {  # [case-name...]
-  local requested candidate selected selected_test
-  if [ "$#" -gt 0 ]; then
-    for requested in "$@"; do
-      selected=0
-      for candidate in "${tests[@]}"; do
-        [ "$requested" != "$candidate" ] || selected=1
-      done
-      [ "$selected" -eq 1 ] || fail "unknown captain hold lifecycle test: $requested"
-    done
-    tests=("$@")
-  fi
-  for selected_test in "${tests[@]}"; do
-    "$selected_test" || exit "$?"
-  done
+  # shellcheck disable=SC2154 # Each suite assigns its tests array before calling this.
+  fm_test_run_cases "${tests[@]}" -- "$@"
 
   # Run the ordinary home-scoped cleanup before checking actual process state.
   # The watchdog may be asleep until its next owner check after a runner exits.

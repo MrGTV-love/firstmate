@@ -787,7 +787,12 @@ test_registered_agent_with_an_agent_descendant_outside_the_foreground_stays_aliv
   # foreground view shows only the shell (a suspended or backgrounded agent).
   sh -c "'$lab/pi' 300; :" &
   shell_pid=$!
-  sleep 0.3
+  # Wait for the agent-named child (after its exec), with no time cap: stop once it
+  # exists under the shell or the shell dies.
+  while ! pgrep -P "$shell_pid" -x pi >/dev/null 2>&1; do
+    kill -0 "$shell_pid" 2>/dev/null || fail "the shell died before its agent-named child appeared"
+    sleep 0.05
+  done
   out=$(stale_registration_case descendant idle "$(shell_only_process_info "$shell_pid")")
   pkill -P "$shell_pid" 2>/dev/null || true
   kill "$shell_pid" 2>/dev/null || true
@@ -818,7 +823,12 @@ test_agent_descendant_under_a_spaced_install_path_stays_alive() {
   ln -sf "$standin" "$lab/pi"
   sh -c "'$lab/pi' 300; :" &
   shell_pid=$!
-  sleep 0.3
+  # Wait for the agent-named child (after its exec), with no time cap: stop once it
+  # exists under the shell or the shell dies.
+  while ! pgrep -P "$shell_pid" -x pi >/dev/null 2>&1; do
+    kill -0 "$shell_pid" 2>/dev/null || fail "the shell died before its agent-named child appeared"
+    sleep 0.05
+  done
   out=$(stale_registration_case spaced-descendant idle "$(shell_only_process_info "$shell_pid")")
   pkill -P "$shell_pid" 2>/dev/null || true
   kill "$shell_pid" 2>/dev/null || true
@@ -828,7 +838,12 @@ test_agent_descendant_under_a_spaced_install_path_stays_alive() {
 }
 
 test_registered_agent_with_an_unreadable_process_view_is_unknown() {
-  local out
+  local out psbin
+  # A process table without the synthetic shell pid 4242, so the empty
+  # foreground case never depends on which pids the host happens to run.
+  psbin="$TMP_ROOT/stale-reg-unreadable-ps"
+  printf '#!/usr/bin/env bash\nprintf "9000 1 zsh\\n"\n' > "$psbin"
+  chmod +x "$psbin"
   out=$(stale_registration_case unreadable-exit idle 'Error: socket unavailable' 1)
   [ "$out" = "unknown unreadable refused" ] \
     || fail "a failed process-info read must not demote OR trust the registration: expected unknown/unreadable, got '$out'"
@@ -839,7 +854,7 @@ test_registered_agent_with_an_unreadable_process_view_is_unknown() {
     '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w9:p9","shell_pid":4242,"foreground_process_group_id":4242,"foreground_processes":[{"pid":4242,"name":"zsh","argv0":"zsh"}]}}}')
   [ "$out" = "unknown unreadable refused" ] \
     || fail "a process view for a different pane must read unknown/unreadable, got '$out'"
-  out=$(stale_registration_case unreadable-no-foreground idle \
+  out=$(FM_HERDR_PS_BIN="$psbin" stale_registration_case unreadable-no-foreground idle \
     '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":4242,"foreground_process_group_id":4242,"foreground_processes":[]}}}')
   [ "$out" = "unknown unreadable refused" ] \
     || fail "an empty foreground list must read unknown/unreadable, got '$out'"

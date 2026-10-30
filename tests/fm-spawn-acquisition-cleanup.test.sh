@@ -106,6 +106,10 @@ if [ "\$MODE" = exits ] || [ "\$MODE" = laterexit ] || [ "\$MODE" = earlyexit ];
 fi
 cd "\$DEST" || exit 1
 touch "\$ARRIVED"
+if [ "\$MODE" = busy ]; then
+  # Hold the pane in a foreground program that never reads a typed line.
+  while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
+fi
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
 SH
 chmod +x "$FAKEBIN/treehouse"
@@ -138,7 +142,12 @@ if [ "$BACKEND" = tmux ]; then
   LAB_TMUX_DIR=$("$LAB_HOME_HELPER" tmux-dir "$FM_HOME") || fail "cannot isolate tmux"
   export TMUX_TMPDIR="$LAB_TMUX_DIR"
   unset TMUX
-  "$REAL_TMUX" -f /dev/null new-session -d -s firstmate -n sentinel '/bin/sleep 300' || fail "cannot start private tmux"
+  # The unrelated sentinel lives exactly as long as this test process, so only
+  # spawn, never a wall-clock expiry, can remove it before teardown.
+  "$REAL_TMUX" -f /dev/null new-session -d -s firstmate -n sentinel \
+    "while kill -0 $$ 2>/dev/null; do /bin/sleep 1; done" || fail "cannot start private tmux"
+  SENTINEL_WINDOW=$("$REAL_TMUX" display-message -p -t firstmate:sentinel '#{window_id}') || fail 'cannot identify sentinel window'
+  SENTINEL_PID=$("$REAL_TMUX" display-message -p -t firstmate:sentinel '#{pane_pid}') || fail 'cannot identify sentinel pane'
   "$REAL_TMUX" set-option -g default-shell /bin/bash
   "$REAL_TMUX" set-option -g default-command '/bin/bash --noprofile --norc'
   "$REAL_TMUX" set-environment -g PATH "$FAKEBIN:$PATH"
@@ -297,9 +306,15 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   ! kill -0 "$pid" 2>/dev/null || fail "$MODE left get subshell $pid alive"
   [ "$MODE" != slow ] || [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
   if [ "$BACKEND" = tmux ]; then
-    tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_name}') || fail 'spawn destroyed unrelated session'
+    tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_id} #{window_name}') || fail 'spawn destroyed unrelated session'
     assert_not_contains "$tmux_windows" "fm-$ID" 'refused attempt pane remained'
-    assert_contains "$tmux_windows" sentinel 'spawn closed a pane it did not create'
+    case $'\n'"$tmux_windows"$'\n' in
+      *$'\n'"$SENTINEL_WINDOW sentinel"$'\n'*) ;;
+      *)
+        if kill -0 "$SENTINEL_PID" 2>/dev/null; then sentinel_state=alive; else sentinel_state=exited; fi
+        fail "spawn closed a pane it did not create: sentinel window $SENTINEL_WINDOW is gone while its pane process $SENTINEL_PID is $sentinel_state"
+        ;;
+    esac
   fi
   if [ "$BACKEND" = herdr ]; then
     "$HERDR_LAB_HELPER" run "$HERDR_LAB_SESSION" pane get "$sentinel" >/dev/null || fail 'spawn closed an unrelated Herdr pane'
@@ -560,4 +575,265 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
     fail 'fixture retirement retained the get process lease'
   fi
   pass 'herdr projected refusal terminates under custody and never queues later generic closure'
+fi
+
+if [ "$BACKEND" = tmux ]; then
+  # A provisioner models the actual ownership requirement with real process
+  # ancestry: the acquired get process must be an ancestor of its invocation.
+  # Supervisor-side execution fails even though the pane is a valid isolated copy.
+  SLOT_PROJECT="$TMP_ROOT/slot-project"
+  SLOT_COPY="$TMP_ROOT/slot-copy"
+  SLOT_CASE="$TMP_ROOT/case-slot-provision"
+  SLOT_ID="get-slot-provision-$$"
+  mkdir -p "$SLOT_CASE"
+  fm_git_worktree "$SLOT_PROJECT" "$SLOT_COPY" slot-before
+  mkdir -p "$SLOT_PROJECT/scripts/git-stability"
+  cat > "$SLOT_PROJECT/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import argparse
+import json
+import os
+import pathlib
+import subprocess
+import sys
+p = argparse.ArgumentParser()
+for flag in ('repo-root', 'worktree-path', 'owner-id', 'branch', 'base-sha'):
+    p.add_argument('--' + flag, required=True)
+p.add_argument('--owned-path', action='append', required=True)
+a = p.parse_args()
+holder = int(pathlib.Path(os.environ['FM_TEST_SLOT_HOLDER']).read_text())
+parents = {}
+for row in subprocess.check_output(['ps', '-A', '-o', 'pid=,ppid='], text=True).splitlines():
+    fields = row.split()
+    if len(fields) == 2:
+        parents[int(fields[0])] = int(fields[1])
+pid, seen = os.getpid(), set()
+while pid > 1 and pid not in seen:
+    seen.add(pid)
+    pid = parents.get(pid, 0)
+if holder not in seen or pathlib.Path(os.environ.get('FM_TEST_SLOT_REFUSE', '/nonexistent')).exists():
+    print(json.dumps({'state': 'BLOCKED', 'reason': 'manifest_live_owner'}))
+    sys.exit(2)
+record = dict(repo_root=a.repo_root, worktree_path=a.worktree_path, owner_id=a.owner_id,
+              branch=a.branch, base_sha=a.base_sha, owned_paths=a.owned_path,
+              lifecycle_state='worktree_active')
+manifest = pathlib.Path(os.environ['FM_TEST_SLOT_RECORD'])
+manifest.write_text(json.dumps(record))
+print(json.dumps(dict(state='PASS', manifest_path=str(manifest), **record)))
+PY
+  git -C "$SLOT_PROJECT" add scripts
+  git -C "$SLOT_PROJECT" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture ancestry-governed provisioner'
+  git -C "$SLOT_PROJECT" push -q origin main
+  printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+    "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
+  : > "$SLOT_CASE/ticks"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_HOLDER "$SLOT_CASE/get-pid"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_RECORD "$SLOT_CASE/manifest.json"
+  fm_test_spawn_brief "$FM_HOME" "$SLOT_ID" 'Provision from the actual acquired pane before admission.'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-spawn.sh" "$SLOT_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
+      --mode local-only --yolo off --owned-path scripts 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "provisioner did not run in the acquired pane's ancestry: $out"
+  assert_contains "$out" "spawned $SLOT_ID" 'real-pane provisioning did not admit the task'
+  [ -f "$SLOT_CASE/manifest.json" ] || fail 'real-pane provisioning published no declaration'
+  [ -e "$SLOT_CASE/lease" ] || fail 'real-pane provisioning released its acquisition lease'
+  [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$SLOT_ID" ] || fail 'real-pane provisioning admitted the wrong branch'
+  assert_absent "$SLOT_COPY/.claude/worktrees" 'real-pane provisioning created nested isolation'
+  pass 'tmux provisioning runs in the acquired shell ancestry before admitting its worker'
+
+  # The acquired-pane wait is bounded by the acquisition budgets, and a stop
+  # ends only this attempt's own provisioner before the checkout is restored.
+  # Each case owns its project, copy, endpoint and task id; its clock moves only
+  # once the owned gate opens, so a busy host cannot spend a budget early.
+  run_slot_wait_case() { # <busy|stalled>
+    local shape=$1 wid="get-slot-wait-$1-$$" wcase="$TMP_ROOT/case-slot-wait-$1" wproject wcopy before gate get_mode lock out rc pid
+    wproject="$wcase/project" wcopy="$wcase/copy"
+    mkdir -p "$wcase"
+    fm_git_worktree "$wproject" "$wcopy" "slot-wait-$shape-before"
+    mkdir -p "$wproject/scripts/git-stability"
+    cat > "$wproject/scripts/git-stability/provision_existing_slot.py" <<'PY'
+import os
+import signal
+import time
+from pathlib import Path
+case = Path(os.environ["FM_TEST_SLOT_WAIT_CASE"])
+(case / "provisioner.pid").write_text(str(os.getpid()))
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+while not (case / "release").exists():
+    time.sleep(0.05)
+(case / "late-pass").write_text("PASS")
+print('{"state": "PASS"}')
+PY
+    git -C "$wproject" add scripts
+    git -C "$wproject" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture stalled provisioner'
+    git -C "$wproject" push -q origin main
+    before=$(git -C "$wcopy" rev-parse HEAD)
+    get_mode=success
+    gate="$wcase/provisioner.pid"
+    if [ "$shape" = busy ]; then
+      get_mode=busy
+      gate="$wcase/arrived"
+    fi
+    : > "$wcase/ticks"
+    printf 'MODE=%s\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+      "$get_mode" "$wcase/lease" "$wcase/get-pid" "$wcase/release" "$wcase/arrived" "$wcopy" "$wcase/ticks" > "$TMP_ROOT/get-config"
+    [ ! -e "/tmp/fm-$wid" ] && [ ! -L "/tmp/fm-$wid" ] || fail "task temp already exists: /tmp/fm-$wid"
+    fm_test_spawn_brief "$FM_HOME" "$wid" 'Bound the acquired-pane provisioning wait.'
+    "$REAL_TMUX" set-environment -g FM_TEST_SLOT_WAIT_CASE "$wcase"
+    out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" BASH_ENV="$TMP_ROOT/clock.sh" \
+      FM_TEST_TICK_SECONDS=60 FM_TEST_TICK_GATE="$gate" \
+      bash "$ROOT/bin/fm-spawn.sh" "$wid" "$wproject" --backend tmux --harness codex --allow-api-key \
+        --mode local-only --yolo off --owned-path scripts 2>&1)
+    rc=$?
+    "$REAL_TMUX" set-environment -gu FM_TEST_SLOT_WAIT_CASE
+    [ "$rc" -ne 0 ] || fail "$shape provisioning wait admitted a worker: $out"
+    if [ "$shape" = busy ]; then
+      assert_contains "$out" 'did not start provisioning within 600s' 'a shell that never started the helper was not bounded'
+    else
+      assert_contains "$out" 'provisioning reached the absolute extreme 1800s' 'a stalled provisioner was not bounded'
+      pid=$(cat "$wcase/provisioner.pid") || fail 'stalled provisioner never started'
+      ! kill -0 "$pid" 2>/dev/null || fail "stalled provisioner $pid survived its cancelled attempt"
+    fi
+    assert_contains "$out" 'its helper is stopped and no worker admitted' "$shape refusal did not confirm its helper stopped"
+    assert_grep 'recovery=slot-provision-refused' "$FM_HOME/state/$wid.meta" "$shape refusal lost recovery metadata"
+    [ "$(git -C "$wcopy" rev-parse HEAD)" = "$before" ] || fail "$shape refusal did not restore the assigned checkout"
+    [ "$(git -C "$wcopy" branch --show-current)" = "slot-wait-$shape-before" ] || fail "$shape refusal changed the prior branch"
+    [ -e "$wcase/lease" ] || fail "$shape refusal released its assigned copy lease"
+    "$REAL_TMUX" list-windows -t firstmate -F '#{window_name}' | grep -qx "fm-$wid" || fail "$shape refusal closed its retained endpoint"
+    "$REAL_TMUX" list-windows -t firstmate -F '#{window_id}' | grep -qx "$SENTINEL_WINDOW" || fail "$shape refusal closed the unrelated sentinel"
+    kill -0 "$SENTINEL_PID" 2>/dev/null || fail "$shape refusal ended the unrelated sentinel process"
+    lock=$(fm_treehouse_project_lock_path "$wproject") || fail 'cannot resolve the case project lock'
+    (. "$ROOT/bin/fm-project-lock-lib.sh" && fm_project_lock_try "$lock" probe && fm_project_lock_release "$lock") \
+      || fail "$shape refusal still holds its project lock"
+    # Releasing the stalled program afterwards can neither start nor finish a helper.
+    touch "$wcase/release"
+    if [ "$shape" = busy ]; then
+      for _ in $(seq 1 200); do
+        "$REAL_TMUX" capture-pane -p -t "firstmate:fm-$wid" | grep -q 'No such file' && break
+        /bin/sleep 0.05
+      done
+      "$REAL_TMUX" capture-pane -p -t "firstmate:fm-$wid" | grep -q 'No such file' || fail 'the late shell never reached the cancelled helper line'
+      [ ! -e "$wcase/provisioner.pid" ] || fail 'a shell that started late ran the cancelled provisioner'
+    else
+      /bin/sleep 1
+    fi
+    [ ! -e "$wcase/late-pass" ] || fail "$shape cancelled provisioner wrote a late PASS"
+    [ ! -e "$FM_HOME/state/$wid.meta" ] || ! grep -q '^slot_manifest=' "$FM_HOME/state/$wid.meta" || fail "$shape refusal recorded a manifest"
+    pass "tmux $shape provisioning wait is bounded and stops only its own helper before restoring the copy"
+  }
+  run_slot_wait_case busy
+  run_slot_wait_case stalled
+  printf 'MODE=success\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+    "$SLOT_CASE/lease" "$SLOT_CASE/get-pid" "$SLOT_CASE/allow" "$SLOT_CASE/arrived" "$SLOT_COPY" "$SLOT_CASE/ticks" > "$TMP_ROOT/get-config"
+
+  # A contract fixture supplies a transient refusal. The public control path,
+  # real terminal/process liveness, prior refs and checkout are not mocked.
+  standin=$(fm_agent_standin "$SLOT_CASE/native") || {
+    echo 'skip: no native stand-in for public retained-slot relaunch'
+    exit 0
+  }
+  ln -s "$standin" "$SLOT_CASE/native/codex"
+  cat > "$FAKEBIN/codex" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in --version) echo 'codex-cli 0.153.4'; exit 0 ;; --help) exit 0 ;; esac
+printf '%s\\n' "\${FM_TASK_ID:-unset}" >> '$SLOT_CASE/admitted'
+exec '$SLOT_CASE/native/codex' "\$@"
+SH
+  chmod +x "$FAKEBIN/codex"
+  "$REAL_TMUX" kill-window -t "firstmate:fm-$SLOT_ID"
+  slot_base=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  git -C "$SLOT_COPY" checkout -qb retained-ahead
+  printf 'prior work must survive recovery\n' >> "$SLOT_COPY/README.md"
+  git -C "$SLOT_COPY" add README.md
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture retained ahead work'
+  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  cp "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before"
+  touch "$SLOT_CASE/refuse"
+  "$REAL_TMUX" set-environment -g FM_TEST_SLOT_REFUSE "$SLOT_CASE/refuse"
+  RETRY_ID="get-slot-recovery-$$"
+  fm_test_spawn_brief "$FM_HOME" "$RETRY_ID" 'Recover the same retained copy and exact declared scope.'
+  printf 'uncommitted prior work must survive\n' >> "$SLOT_COPY/README.md"
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-spawn.sh" "$RETRY_ID" "$SLOT_PROJECT" --backend tmux --harness codex --allow-api-key \
+      --mode local-only --yolo off --owned-path scripts --owned-path README.md 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'dirty pre-preparation refusal admitted the task'
+  assert_contains "$out" dirty_worktree 'initial refusal did not stop before preparation'
+  assert_absent "$SLOT_CASE/admitted" 'refused task entered the harness'
+  cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'refusal overwrote the prior declaration'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'dirty refusal moved the prior ahead checkout'
+  # Preserve the dirty work by committing it on its original branch, then let
+  # the public retry finish first-admission preparation but refuse provision.
+  git -C "$SLOT_COPY" add README.md
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture preserve initially dirty prior work'
+  prior_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  cp "$SLOT_COPY/README.md" "$SLOT_CASE/prior-readme"
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'Prior dirty work is committed; finish the original preparation without replacing its owner.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'first prepared retry bypassed the transient provisioner refusal'
+  assert_contains "$out" manifest_live_owner 'first prepared retry lost the actual provisioner refusal'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'prepared refusal did not restore the prior checkout'
+  # Upstream advances between refused relaunches. The already prepared task
+  # branch must remain at A rather than being freshened to this new B.
+  printf 'later upstream work\n' > "$SLOT_PROJECT/upstream-change"
+  git -C "$SLOT_PROJECT" add upstream-change
+  git -C "$SLOT_PROJECT" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture upstream advances after prepared refusal'
+  git -C "$SLOT_PROJECT" push -q origin main
+  [ "$(git -C "$SLOT_COPY" rev-parse origin/main)" != "$slot_base" ] || fail 'upstream advancement setup was vacuous'
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The provisioner still refuses; do not replace the prepared commit when upstream advances.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'repeat retry bypassed the provisioner refusal'
+  assert_contains "$out" manifest_live_owner "repeat retry stranded or replaced its prepared identity: $out"
+  [ "$(git -C "$SLOT_COPY" rev-parse "fm/$RETRY_ID")" = "$slot_base" ] || fail 'repeat retry moved the prepared branch'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'repeat refusal changed the restored prior checkout'
+  cmp -s "$SLOT_CASE/manifest.json" "$SLOT_CASE/manifest-before" || fail 'repeat refusal overwrote the prior declaration'
+  assert_absent "$SLOT_CASE/admitted" 'repeated refusal entered the harness'
+  # Removing the fixture's refusal is not provisioner proof; the separate real
+  # provisioner smoke must establish holder-exit adoption against its own guard.
+  rm "$SLOT_CASE/refuse"
+  git -C "$SLOT_COPY" checkout -q "fm/$RETRY_ID"
+  printf 'independent prepared-branch work\n' > "$SLOT_COPY/prepared-change"
+  git -C "$SLOT_COPY" add prepared-change
+  git -C "$SLOT_COPY" -c user.name=Tests -c user.email=tests@example.invalid commit -qm 'fixture changed prepared branch'
+  changed_head=$(git -C "$SLOT_COPY" rev-parse HEAD)
+  git -C "$SLOT_COPY" checkout -q retained-ahead
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The refusal cleared but independent prepared-branch work must not be reset.' 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || fail 'relaunch admitted a changed prepared branch'
+  assert_contains "$out" 'changed or is missing since provisioning refusal' 'changed prepared branch lost its refusal cause'
+  [ "$(git -C "$SLOT_COPY" rev-parse "fm/$RETRY_ID")" = "$changed_head" ] || fail 'relaunch reset independent prepared-branch work'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$prior_head" ] || fail 'relaunch moved the prior ahead checkout on refusal'
+  assert_absent "$SLOT_CASE/admitted" 'changed prepared branch entered the harness'
+  # Explicitly preserve the injected fixture work on its own named branch and
+  # recreate the original prepared ref; no force, reset or manifest edit.
+  git -C "$SLOT_COPY" branch -m "fm/$RETRY_ID" retained-prepared-change
+  git -C "$SLOT_COPY" branch "fm/$RETRY_ID" "$slot_base"
+  out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 PATH="$FAKEBIN:$PATH" \
+    bash "$ROOT/bin/fm-control.sh" "$RETRY_ID" relaunch --note 'The transient refusal cleared; resume the exact assigned copy.' 2>&1)
+  rc=$?
+  expect_code 0 "$rc" "public retained-copy relaunch failed: $out"
+  [ "$(cat "$SLOT_CASE/admitted")" = "$RETRY_ID" ] || fail 'relaunch did not admit the same task'
+  [ "$(git -C "$SLOT_COPY" rev-parse HEAD)" = "$slot_base" ] || fail 'relaunch selected the old ahead work instead of the prepared baseline'
+  [ "$(git -C "$SLOT_COPY" branch --show-current)" = "fm/$RETRY_ID" ] || fail 'relaunch selected the wrong task branch'
+  [ "$(git -C "$SLOT_COPY" rev-parse retained-ahead)" = "$prior_head" ] || fail 'relaunch moved the prior branch'
+  git -C "$SLOT_COPY" show retained-ahead:README.md > "$SLOT_CASE/retained-readme"
+  cmp -s "$SLOT_CASE/prior-readme" "$SLOT_CASE/retained-readme" || fail 'relaunch lost prior committed contents'
+  python3 - "$SLOT_CASE/manifest.json" "$SLOT_COPY" "$RETRY_ID" "$slot_base" <<'PY'
+import json, sys
+record = json.load(open(sys.argv[1]))
+assert record['worktree_path'] == sys.argv[2]
+assert record['owner_id'] == sys.argv[3]
+assert record['branch'] == 'fm/' + sys.argv[3]
+assert record['base_sha'] == sys.argv[4]
+assert record['owned_paths'] == ['scripts', 'README.md']
+PY
+  rc=$?
+  expect_code 0 "$rc" 'relaunch changed the retained scope, copy or task identity'
+  [ -e "$SLOT_CASE/lease" ] || fail 'relaunch released its assigned copy lease'
+  assert_absent "$SLOT_COPY/.claude/worktrees" 'relaunch created nested isolation'
+  pass 'tmux public relaunch recovers refusal with exact scope and prepared base while preserving prior ahead work'
 fi

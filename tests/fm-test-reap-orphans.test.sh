@@ -516,6 +516,28 @@ assert_contains "$out" "reaped pid=$HERDR_LAB_WATCH root=$HERDR_LAB_ROOT " "the 
 wait_gone "$HERDR_LAB_WATCH" 10 || fail "the ended herdr-layout lab's watcher survived"
 pass "a lab home two levels below a marked herdr-layout root is found and reaped"
 
+# The runner's per-script sweep reads owner records (--owners), and a script that
+# never sources tests/lib.sh leaves no record; its labs beside the records must
+# still be found, even when the owners directory itself was never made.
+OWNERS_LAB_ROOT="$SCAN/fmlab.owners-sweep.XyZ789/home"
+bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$OWNERS_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
+OWNERS_LAB_OWNER=$!
+track "$OWNERS_LAB_OWNER" "$(initialized_identity "$OWNERS_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$OWNERS_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
+wait_file "$OWNERS_LAB_ROOT/ready" 5 || fail "the owners-sweep lab creator did not finish"
+mkdir -p "$OWNERS_LAB_ROOT/bin"
+write_stub "$OWNERS_LAB_ROOT/bin/fm-watch.sh"
+orphan "$TMP_ROOT/owners-lab-watch.pid" bash "$OWNERS_LAB_ROOT/bin/fm-watch.sh" "$OWNERS_LAB_ROOT/release"
+OWNERS_LAB_WATCH=$(cat "$TMP_ROOT/owners-lab-watch.pid")
+[ ! -e "$SCAN/fm-test-owners" ] || fail "the scan directory unexpectedly holds an owners directory"
+out=$("$REAPER" --owners "$SCAN/fm-test-owners" 2>&1) || fail "the owners sweep failed: $out"
+alive "$OWNERS_LAB_WATCH" || fail "the owners sweep stopped a live creator's lab watcher"
+kill -KILL "$OWNERS_LAB_OWNER" 2>/dev/null || true
+wait "$OWNERS_LAB_OWNER" 2>/dev/null || true
+out=$("$REAPER" --owners "$SCAN/fm-test-owners" 2>&1) || fail "the ended owners sweep failed: $out"
+assert_contains "$out" "reaped pid=$OWNERS_LAB_WATCH root=$OWNERS_LAB_ROOT " "the owners sweep missed a lab beside the owner records"
+wait_gone "$OWNERS_LAB_WATCH" 10 || fail "the ended owners-sweep lab's watcher survived"
+pass "the owners sweep finds and reaps a dead creator's lab beside the owner records"
+
 # Host clutter must not set the sweep's cost. Other tools leave tens of thousands
 # of fm-* entries in a shared temp dir (observed 2026-10-10: 47000 entries made
 # this sweep 62 seconds against a 15 second case limit), so the sweep may enter

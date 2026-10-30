@@ -155,11 +155,11 @@ The six captain-hold group hints of that table were not slowest-run samples beca
 
 The former combined `tests/fm-captain-hold-lifecycle.test.sh` measured between 773304 ms and 1259266 ms in those eight runs against a 343658 ms hint.
 No lane packing could place a single 21-minute member beside the other shard-2 members inside a 30-minute job.
-Its 116 cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
+Its cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
 
 | File | Area |
 |---|---|
-| `tests/fm-captain-hold-lifecycle.test.sh` | holds, origins, inventories, the completion gate, recorded answers, deferral, and the secondmate parent channel |
+| `tests/fm-captain-hold-lifecycle.test.sh` | holds, origins, inventories, the completion gate, recorded answers, deferral, project freezes, and the secondmate parent channel |
 | `tests/fm-captain-hold-sweep.test.sh` | the finished-board sweep and bound captain keys at the sweep |
 | `tests/fm-captain-hold-keyed-answers.test.sh` | the keyed-answer intake, default and done releases, and replay after interruption |
 | `tests/fm-captain-hold-reconcile.test.sh` | reconcile requests, verified closes, operational-key closes, legacy identities, and record divergence |
@@ -197,7 +197,7 @@ Each invocation owns its temporary root, its registered cleanup, and its own pro
 Every case still builds and tears down its own sandbox through `make_case`, and selecting one case by name still works in the file that owns it.
 The three files stay serial in the CI lanes: `bin/fm-test-isolation-proof.sh` lists them beside the landing and lock-race reason, which keeps them out of the mixed PORTABLE pool.
 A local `--family pr-forge` run at an admitted job count runs them concurrently with the family, and [fm-test-isolation-proof.md](fm-test-isolation-proof.md#pr-forge-admitted) records the 2026-10-22 proof of that membership.
-`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` requires the three case lists to be a duplicate-free cover of the 340-case inventory with every case registered by the file that defines it, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
+`tests/fm-test-run.test.sh` holds the partition: `test_teardown_groups_register_each_case_once` judges the three group files by the partition rules in the comment above `partition_problems` there and pins no case total, so adding a test needs no edit there, and `test_teardown_groups_share_helper_and_stay_selectable` requires each group to be independently selectable, a change to the shared helper or to the `tests/git-lock-helpers.sh` it sources to select its pr-forge family, and that family to keep all three.
 
 On the pre-rebase 332-case inventory, the intact suite and the three groups reported the same 335 `ok -` lines and no failures in a local Ubuntu 26.04 container, which is the behavior-parity evidence for the split.
 The rebase then added upstream's `test_closeout_refusal_reports_tail_and_preserves_complete_output`, taken verbatim into `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 333; the 2026-10-22 pr-forge isolation proof ran all three group files to exit 0 on that 333-case head.
@@ -206,6 +206,7 @@ The 2026-10-23 caller-CWD landed-proof fix added `test_landed_proof_ignores_unre
 The DeepSeek harness change then added `test_teardown_retires_the_dsh_launch_state` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 337.
 The automatic PR-ready registration change then added `test_teardown_removes_pr_ready_refusal_marker` to `tests/fm-teardown.test.sh`, which makes the inventory 338.
 The graft-output scratch change then added `test_graft_output_alone_does_not_hold_a_foreign_copy` and `test_graft_output_is_not_preserved_from_a_released_own_nested_copy` to `tests/fm-teardown-cleanup.test.sh`, which makes the inventory 340.
+The own-archive confinement change then added `test_task_archives_keep_links_to_other_refs` to `tests/fm-teardown.test.sh`, which makes the inventory 341.
 
 The group hints are the groups' own measured times in the `fm-test-timing-portable-serial-*` artifacts of [run 39881107550](https://github.com/MrGTV-love/firstmate/actions/runs/39881107550): `fm-teardown` 307312 ms, `fm-teardown-pool` 333924 ms, and `fm-teardown-cleanup` 917727 ms, summing to 1558963 ms against the former combined 1587660 ms.
 That run replaced the first apportioned estimates (272355, 439235, and 876070 ms), which had divided the combined CI measurement by local container times.
@@ -236,7 +237,7 @@ Every helper and case body was compared definition by definition against the pre
 The DeepSeek harness change then added `test_relaunch_refuses_contradictory_dsh_route_before_stopping` and `test_secondmate_config_dsh_relaunch_carries_own_session_model` to `tests/fm-control-relaunch.test.sh`, which makes that group 76 and the inventory 157.
 The lease-only relocation change then added `test_relocation_refuses_a_non_lease_copy` to `tests/fm-control-relaunch-recovery.test.sh`, which, with the omp session-record `adopt` case and the unconfined omp retirement case `test_retiring_omp_for_an_unconfined_harness_removes_its_profile` in `tests/fm-control-relaunch-backends.test.sh`, makes the inventory 160.
 
-`tests/fm-test-run.test.sh` holds the partition: `test_control_relaunch_groups_partition_one_inventory` requires the three registered lists to be a duplicate-free 160-case cover (the 157-case inventory plus `test_omp_adoption`, `test_retiring_omp_for_an_unconfined_harness_removes_its_profile`, and `test_relocation_refuses_a_non_lease_copy`) with every case registered by the file that defines it, `test_watch_triage_waits_groups_partition_one_inventory` requires the four call lists to be a duplicate-free 67-case cover against the shared helper, and `test_split_suites_stay_selectable_in_their_families` requires each group to stay independently selectable and to keep its family.
+`tests/fm-test-run.test.sh` holds the partition: `test_control_relaunch_groups_partition_one_inventory` judges the three group files (in the array-nested mode, for the `test_omp_adoption` children) and `test_watch_triage_waits_groups_partition_one_inventory` judges the cases `tests/fm-watch-triage-helpers.sh` defines against the calls in `tests/fm-watch-triage.test.sh` and the four waits groups, both by the partition rules in the comment above `partition_problems` there, neither pins a case total, and `test_split_suites_stay_selectable_in_their_families` requires each group to stay independently selectable and to keep its family.
 
 The `watcher-wake-lock` and `backend-dispatch` family memberships are otherwise unchanged; `backend-dispatch` is not an admitted `--jobs` family, so the control groups add no concurrency admission, and the waits groups join the already-admitted `watcher-wake-lock` family.
 The first waits hints (351000, 712000, 148000, and 76000 ms) scaled the four local Ubuntu 26.04 container measurements (230 s, 465 s, 97 s, and 50 s) by about 1530 ms per measured second.
@@ -262,7 +263,7 @@ It is now a shared helpers module plus three groups cut as contiguous slices of 
 The first group (50 at the split) is the review and captain-word authority with the GitHub outcome cases.
 The second group (49) is the GitLab, Forgejo, reporting, and backlog cases, plus the argument/URL and multi-PR edge cases that fell in that slice.
 The third group (50) is the check-run, rollup, waiver, and away-authority matrix.
-Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` pins the exact case count of that cover.
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `pr_merge_run`, and `test_pr_merge_groups_partition_one_inventory` judges that cover by the partition rules above `partition_problems` in `tests/fm-test-run.test.sh`, without pinning a case total.
 Only `tests/fm-pr-merge.test.sh` stays in the proven-isolated parallel set, with its hint first apportioned from the former hint by case share (370000 ms) pending the first measured artifact for it; the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced that estimate with a measured 401410 ms.
 `tests/fm-pr-merge-forges.test.sh` and `tests/fm-pr-merge-checks.test.sh` stay in the `pr-forge` family but run in the portable serial remainder, because the 2026-10-24 portable-pool proof that would admit them did not pass cleanly ([isolation proof](fm-test-isolation-proof.md#fm-pr-merge-split-re-check)); their serial hints were apportioned estimates pending measurement, so the packer did not model them at the 45000 ms default, and the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced them with measured 196785 ms and 282357 ms.
 Both derive from 461903 ms, the former file's serial-era measurement in [run 39709903843](https://github.com/MrGTV-love/firstmate/actions/runs/39709903843), where the parallel jobs ran their scripts serially: `fm-pr-merge-forges` takes its 49-of-148 case share, from before the former file's 149th case landed (152927 ms, rounded to 153000), and `fm-pr-merge-checks` takes its share of the three groups' 2026-10-24 portable-proof time, 302702 of 730151 ms (191493 ms, rounded to 191000), because its cases run longer than the case count suggests.
@@ -276,7 +277,7 @@ The four lint partition hints in `bin/fm-lint.sh` for the split files (1280, 125
 The 2026-10-25 main run measured `tests/fm-lint.test.sh` at 1241630 ms, the parallel lane's longest script and above the 1200000 ms budget on its own, so no packing could bring that lane under the target while it stayed whole.
 It is now a shared helpers module plus four groups cut as contiguous slices of the former registration order, so the themes below are approximate at the slice edges.
 The groups are changed-file and cache selection (21 cases), modes and installer and policy refusals (16), host slots and scheduling with memory-limit retry (19), and memory fallback and evidence, required bounds, the sidecar, seeded parity, and CI inputs (17).
-Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` pins the case cover, which was 73 cases at the split.
+Every helper and case body is a byte-for-byte move, each group registers its cases in order and hands its arguments to `fm_lint_run`, and `test_fm_lint_groups_partition_one_inventory` judges that cover by the partition rules above `partition_problems` in `tests/fm-test-run.test.sh`, without pinning a case total; the split moved 73 cases.
 The four parallel hints were apportioned from that measured 1241630 ms by case share (357000, 272000, 323000, and 289000 ms) as estimates pending the first artifacts for the groups; the [2026-10-26 refresh](#refresh-every-hint-from-three-green-main-runs) replaced all four with measured walls, and they were poor estimates: the groups measure 26825, 203319, 264177, and 673504 ms.
 The same change rebalanced the two parallel lanes on their hint sums, 2772520 ms and 2772637 ms, after replacing only the former fm-lint hint, and re-sorts both lanes longest-hint-first; `--check-coverage` then reported `parallel_makespan_ms` 1004983 from lane 1's three-bin packing, a number the 2026-10-26 refresh supersedes.
 Every other parallel hint still came from the previous refresh at that point, and the 2026-10-25 run measured the lanes 2.1 times apart, a larger runtime gap than those hints describe, so that hint balance did not claim a runtime balance.
@@ -331,7 +332,7 @@ Against that table `--check-coverage` refuses twenty-one shards (`portable seria
 It passes twenty-three (`serial_shards=23 serial_unhinted=0 serial_max_ms=1194350 serial_budget_ms=1200000`), but twenty-three leave 135316 ms of lane slack (23 x 1200000 - 27464684), less than one 1200000 ms target, so the [shard-count rule](#portable-serial-ci-shards) refuses them.
 Twenty-four leave 1335316 ms and pass (`serial_shards=24 serial_unhinted=0 serial_max_ms=1144680 serial_budget_ms=1200000`), so twenty-four is the fewest serial shards that pass and keep one target of slack.
 The packing target, the parallel budget, and the 60-minute job timeout are unchanged, and no test was skipped, removed, or loosened.
-`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-four.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` then all named twenty-four; the [2026-10-29 refresh](#portable-serial-ci-shards) moved them to twenty-five.
 Replaying each of the three main runs' own per-script durations through the earlier twenty-three-shard assignment puts the slowest shard at 1188526, 1183517, and 1170514 ms, with 4 members filled from their hints; the model reads 7 to 9 percent high in aggregate (27464684 ms modeled against 25243431 to 25697152 ms replayed).
 The same replay through the newer pull-request runs gives a slowest shard of 1209920, 1316807, and 1834041 ms, where run 40691163806 shows a shard far above the others whose cause this refresh did not investigate; the target bounds the model, not every real shard, as the 2026-10-26 note above already states.
 The measurements are CI `duration_ms` records; the totals, replays, and the shard-count search are calculated from them with `bin/fm-test-run.sh --check-coverage` and `--list --lane portable-serial-<k>of23`; the twenty-four-shard assignment has not been replayed.
@@ -394,6 +395,15 @@ Rebasing the repair onto `8221de43a082aef5d0368cfdfb9512810b0d71e5` preserves bo
 The existing pipeline must restart validation from Review and refresh downstream checks and PR evidence for the integrated head; neither historical estimate is a new-head CI pass.
 The Jev shell-gate retirement added `tests/fm-retired-jev-shell-model-gate.test.sh`, `tests/fm-retired-jev-shell-outage-admissions.test.sh`, and `tests/fm-retired-jev-shell-outage-deny.test.sh` to the serial lane; their default weights packed serial shard 1 at 1204794 ms.
 Their hints (1853, 2347, and 2712 ms) are the successful `exit=0`, `gate_skip=false` records from the serial shards of [run 40122298914](https://github.com/MrGTV-love/firstmate/actions/runs/40122298914) on 2026-10-24.
+On 2026-10-29 seven hints were refreshed to the slowest successful sample across the serial timing artifacts of seven green runs (main runs 40759914461 and 40832695566; pull-request runs 40827497484, 40838643674, 40839568269, 40839791616, and 40845126476).
+`tests/fm-remote-secondmate-trace-context.test.sh` moved from 288623 to 969822 ms (observed 602140-969822 ms), and it had left serial shard 17 at 23.2-29.8 minutes against a 20-minute target.
+`tests/fm-status-runaway-guard.test.sh`, `tests/fm-control.test.sh`, `tests/fm-wake-drain-open-decisions-cursor.test.sh`, `tests/fm-guard-audit-closure.test.sh`, `tests/fm-guard-lint.test.sh`, and `tests/fm-test-reap-orphans.test.sh` were the other six hints more than fifteen percent below their observed maximum.
+Replaying each run's recorded script durations through the twenty-four-shard membership of these hints puts the longest serial shard at 20.1-20.9 minutes in all seven runs, against 20.9-29.8 minutes observed, with an unchanged total of 432-451 serial-script minutes.
+This is a replay of recorded durations, not a measured CI run.
+The refreshed serial hints sum to 28352649 ms, so twenty-four shards still pass `--check-coverage` (`serial_shards=24 serial_unhinted=0 serial_max_ms=1181663 serial_budget_ms=1200000`) but leave only 447351 ms of lane slack (24 x 1200000 - 28352649), less than one 1200000 ms target, and the [shard-count rule](#portable-serial-ci-shards) refuses them.
+Twenty-five leave 1647351 ms and pass (`serial_shards=25 serial_unhinted=0 serial_max_ms=1134269 serial_budget_ms=1200000`), so twenty-five is the fewest serial shards that pass and keep one target of slack.
+`PORTABLE_SERIAL_SHARDS` in `bin/fm-test-run.sh`, the `shard` matrix in `.github/workflows/ci.yml`, and the required-check list in `CONTRIBUTING.md` all name twenty-five.
+The same scripts run, so serial-script minutes do not change, but the twenty-fifth shard adds one job's setup; the twenty-five-shard assignment has not been replayed.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
@@ -488,9 +498,10 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses thirty long-lived Linux jobs (twenty-four serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses thirty-one long-lived Linux jobs (twenty-five serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
-The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
+The workflow retains per-PR supersession and coalesces main pushes into one group per branch, so a burst of merges queues one pending run for the newest commit and never cancels the running one.
+The compliance workflow keeps its own event semantics.
 
 ## Local entry points
 

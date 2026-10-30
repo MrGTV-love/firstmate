@@ -8,11 +8,11 @@ metadata:
 
 # Backlog maintenance
 
-A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it.
+A decision is simply a task held for the captain: create the task with `bin/fm-tasks-axi.sh add` when needed, then always hold it through `bin/fm-captain-hold.sh hold <id> --reason "<reason>"`, with `--until <date>` when the captain defers it and `--owner captain` in a secondmate home; a call the main firstmate owns is never held (`captain-hold-lifecycle` owns that rule).
 When a main-side thread such as a pending captain decision or relay reminder is worth durable tracking, file it as its own work item and hold it through that wrapper.
 Captain calls discovered by investigations or visual reviews follow `captain-hold-lifecycle`, which owns their completion gate and recorded-answer rules.
 
-An escalated open-work receipt that binds no captain-held task is not a standing wait on the captain; `docs/configuration.md` "Open-work ledger" owns how long it answers.
+An escalated open-work receipt marked `standing: no` because no captain-held task was named has no proof it reached the captain: its unchanged row stays in the periodic waiting list as `escalated, no proof it reached the captain`, never as waiting on the captain.
 Name the actual captain-held task with `--hold TASK_ID` rather than treating that receipt as a standing wait.
 
 `.tasks.toml`, `docs/configuration.md`, and current `tasks-axi --help` own the backlog schema, compatibility, retention, and routine command syntax.

@@ -16,6 +16,7 @@
 #                                         [--effort <level>] [--claude-debug]
 #                                         [--captain-model-pin <model-id>]
 #                                         [--reconcile-only] [--worktree <path>]
+#                                         [--owned-path <tracked-path>]...
 #                                         (--note <text> | --note-file <path>)
 #        fm-control.sh <task-id> relaunch --recover-launch
 # --recover-launch is Herdr-only inspection under the control lock.
@@ -30,6 +31,11 @@
 # the running agent stops, unless it is the model the task already records or
 # the pin names it exactly; the pin is passed through to fm-spawn, and
 # docs/configuration.md#model-freshness owns the model freshness gate.
+# --owned-path is relaunch-only and passed through to fm-spawn, which accepts
+# it only to scope a governed task that has no recorded slot scope.
+# Before stopping the running agent, a governed relaunch also refuses an invalid
+# or missing scope and an assigned copy that cannot pass slot attestation, such
+# as one with uncommitted work; fm-spawn's own checks remain the final guard.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -323,6 +329,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-slot-provision-lib.sh
+. "$SCRIPT_DIR/fm-slot-provision-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
 . "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
@@ -456,6 +464,7 @@ RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
+OWNED_PATHS=()
 ALSO_IDS=()
 ALSO_COPIES=()
 # --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
@@ -488,6 +497,7 @@ for control_arg in "$@"; do
       captain-model-pin) CAPTAIN_MODEL_PIN=$control_arg; CAPTAIN_MODEL_PIN_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
+      owned-path) OWNED_PATHS+=("$control_arg") ;;
       also) parse_also "$control_arg" ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
@@ -509,6 +519,8 @@ for control_arg in "$@"; do
     --captain-model-pin=*) CAPTAIN_MODEL_PIN=${control_arg#--captain-model-pin=}; CAPTAIN_MODEL_PIN_SET=1 ;;
     --worktree) control_want_value=worktree ;;
     --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
+    --owned-path) control_want_value="owned-path" ;;
+    --owned-path=*) OWNED_PATHS+=("${control_arg#--owned-path=}") ;;
     --also) control_want_value=also ;;
     --also=*) parse_also "${control_arg#--also=}" ;;
     --note) control_want_value=note ;;
@@ -532,6 +544,8 @@ fi
 
 [ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
   || die "--also applies to 'reassociate' only"
+[ "${#OWNED_PATHS[@]}" = 0 ] || { [ "$VERB" = relaunch ] && [ "$RECOVER_LAUNCH" = 0 ]; } \
+  || die "--owned-path applies to 'relaunch' only and cannot be combined with --recover-launch"
 if [ "$VERB" = reassociate ]; then
   # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
@@ -2624,8 +2638,9 @@ record_note() {
 }
 
 do_relaunch() {
-  local exit_result state note_line secondmate_home
+  local exit_result state note_line secondmate_home slot_copy slot_project slot_governed=0
   local -a spawn_args
+  local owned_path
 
   require_state_verified_backend relaunch
   if [ "$RECOVER_LAUNCH" = 1 ]; then
@@ -2717,6 +2732,27 @@ do_relaunch() {
   require_live_task_attribution \
     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
+  slot_copy=$WT
+  [ "$RELOCATING" = 0 ] || slot_copy=$RELOCATE_DEST
+  slot_project=$(fm_meta_get "$META" project)
+  if [ "$KIND" != secondmate ] &&
+    { grep -q '^slot_manifest=' "$META" || fm_slot_required "$slot_project" "$slot_copy"; }; then
+    slot_governed=1
+  fi
+  if [ "${#OWNED_PATHS[@]}" -gt 0 ]; then
+    ! grep -q '^slot_owned_path=' "$META" \
+      || die "task $ID already records slot scope; --owned-path cannot override it; the running agent was not stopped"
+    [ "$slot_governed" = 1 ] \
+      || die "--owned-path only scopes a governed task with no recorded slot scope, and $ID is not one; the running agent was not stopped"
+    fm_slot_require_scope "${OWNED_PATHS[@]}" \
+      || die "refused invalid --owned-path for $ID; the running agent was not stopped"
+  fi
+  if [ "$slot_governed" = 1 ]; then
+    [ "${#OWNED_PATHS[@]}" -gt 0 ] || grep -q '^slot_owned_path=' "$META" \
+      || die "refused relaunch of governed task $ID: governed slot provisioning requires --owned-path <tracked-path> (repeatable); the running agent was not stopped"
+    fm_slot_check_copy "$slot_project" "$slot_copy" \
+      || die "refused relaunch of governed task $ID: its assigned copy $slot_copy cannot pass slot attestation; preserve and reconcile it first; the running agent was not stopped"
+  fi
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
     [ -n "$secondmate_home" ] || secondmate_home=$WT
@@ -2748,6 +2784,7 @@ do_relaunch() {
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
   [ "$RELOCATING" = 0 ] || spawn_args+=(--worktree "$RELOCATE_DEST")
+  for owned_path in ${OWNED_PATHS[@]+"${OWNED_PATHS[@]}"}; do spawn_args+=(--owned-path "$owned_path"); done
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$CAPTAIN_MODEL_PIN_SET" = 0 ] || spawn_args+=(--captain-model-pin "$CAPTAIN_MODEL_PIN")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")

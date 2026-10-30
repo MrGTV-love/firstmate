@@ -2,8 +2,32 @@
 # fm-proc-budget.sh - run a command tree under a per-tree process budget.
 #
 # Usage:
-#   fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>
+#   fm-proc-budget.sh [<extra>] [--memory-kib <KiB> | --own-procs <N>] -- <command...>
 #   fm-proc-budget.sh --memory-kib 2097152 -- <command...>  2 GiB memory stop
+#   fm-proc-budget.sh --own-procs 128 -- <command...>       128-process tree stop
+#
+# --own-procs stops a runaway tree by counting only the tree's own processes,
+# never the user's whole count, so neighbour lanes cannot spend its budget.
+# Harm: a tree that forks without end starves every other process of the user.
+# Observable: the number of members of the command's tree, sampled at most five
+# times a second by bin/fm-proc-budget-tree.py (its header owns the tree
+# definition); a slow host or a big process table is sampled less often.
+# Past <N> members the tree is frozen, then killed, and the wrapper exits 98
+# with one stderr line naming the count and the limit. An unreadable sample is
+# skipped and tried again next sample; it never ends the command. Only the
+# first sample, taken before the command starts, refuses the launch (125). The
+# kernel limit below stays in force at its default as the safety net, so a
+# tree that outruns the sampling still meets it. Zombies of the tree count,
+# threads do not, and the command runs as a background job for a terminal
+# exactly as it does with --memory-kib. It shares the --memory-kib dead-man
+# link: the command starts only after a reader has joined its group, and if the
+# supervisor dies (for example SIGKILL from a kill of the caller's group), that
+# reader ends every member of the command's group. It works on Linux and Darwin.
+# Unlike the plain form, when the command itself exits, its remaining tree gets
+# TERM, then KILL after at most one second, and successful cleanup preserves the
+# command's status. A command meant to leave a daemon running must not use it.
+# Pass it instead of a small <extra>: a small positive <extra> below counts the
+# whole user and is the form that neighbour lanes starve.
 #
 # --memory-kib adds an opt-in sampled hard stop: once per second, sum the
 # command tree's resident memory and physical footprint, in KiB (1024 bytes),
@@ -48,7 +72,10 @@
 # This wrapper reads the current count and sets the limit (soft and hard) to
 # count + <extra>, then execs the command, so only the tree below it carries the
 # lowered limit and the rest of the user keeps its headroom. <extra> is a
-# positive decimal integer without leading zeros; omit it for 1500.
+# positive decimal integer without leading zeros; omit it for 1500. Because the
+# kernel counts the whole user, a small <extra> is spent by neighbours: observed
+# at 138 new processes in one 10 s window on a busy host. The limit is therefore
+# the safety net; --own-procs is the leash for a tree that must stay small.
 #
 # The budget only tightens. A limit the command already inherits that is lower
 # than count + <extra> stays as it is, and the hard limit is lowered with the
@@ -66,6 +93,9 @@
 # Exit status: the command's own, 2 for a malformed call, and 125 when no budget
 # can be set (an unreadable process count, or a limit the host refuses). The
 # command never runs unbudgeted behind the caller's back in those two cases.
+# With --own-procs, 98 is a crossed own-tree limit and 125 also covers a table
+# that cannot be read before launch, a supervisor or dead-man reader that
+# cannot start, or a failed cleanup after the command exits.
 # With --memory-kib, 99 is a crossed memory limit, 125 also covers a failed
 # memory sample or a failed cleanup after the command exits. A command that
 # cannot start gets bash's own exec status and message (127 or 126), as without
@@ -76,7 +106,9 @@
 # reported on one stderr line, never as a successful command exit.
 #
 # tests/fm-proc-budget.test.sh is the regression entry point for a leashed
-# recursive shim and an unbudgeted probe that must keep forking alongside it.
+# recursive shim and an unbudgeted probe that must keep forking alongside it,
+# for the own-tree stop with neighbours spending the shared count and its
+# dead-man link, and for the memory stop.
 set -u
 FM_PROC_BUDGET_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
@@ -85,7 +117,7 @@ fm_proc_budget_error() {
 }
 
 fm_proc_budget_usage() {
-  fm_proc_budget_error "usage: fm-proc-budget.sh [<extra>] [--memory-kib <KiB>] -- <command...>"
+  fm_proc_budget_error "usage: fm-proc-budget.sh [<extra>] [--memory-kib <KiB> | --own-procs <N>] -- <command...>"
 }
 
 fm_proc_budget_count() {
@@ -145,6 +177,7 @@ fm_proc_budget_apply() {
 
 extra=1500
 memory_kib=
+own_procs=
 extra_given=0
 while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
   if [ "$1" = --memory-kib ]; then
@@ -155,6 +188,14 @@ while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
     esac
     # Bound conversion before Python or shell arithmetic can overflow.
     [ "${#memory_kib}" -le 15 ] || { fm_proc_budget_error "memory limit is too large"; exit 2; }
+    shift 2
+  elif [ "$1" = --own-procs ]; then
+    [ "$#" -ge 2 ] && [ -z "$own_procs" ] || { fm_proc_budget_usage; exit 2; }
+    own_procs=$2
+    case "$own_procs" in
+      ''|*[!0-9]*|0|0[0-9]*) fm_proc_budget_error "own-procs limit must be a positive decimal integer"; exit 2 ;;
+    esac
+    [ "${#own_procs}" -le 9 ] || { fm_proc_budget_error "own-procs limit is too large"; exit 2; }
     shift 2
   elif [ "$extra_given" -eq 0 ]; then
     extra=$1
@@ -171,6 +212,10 @@ if [ "${1:-}" != -- ]; then
 fi
 shift
 [ "$#" -gt 0 ] || { fm_proc_budget_usage; exit 2; }
+[ -z "$memory_kib" ] || [ -z "$own_procs" ] || {
+  fm_proc_budget_error "--memory-kib and --own-procs cannot be combined"
+  exit 2
+}
 case "$extra" in
   ''|*[!0-9]*|0|0[0-9]*)
     fm_proc_budget_error "extra must be a positive decimal integer, got '$extra'"
@@ -185,5 +230,12 @@ if [ -n "$memory_kib" ]; then
     exit 125
   }
   exec python3 "$FM_PROC_BUDGET_DIR/fm-proc-budget-memory.py" "$memory_kib" -- "$@"
+fi
+if [ -n "$own_procs" ]; then
+  command -v python3 >/dev/null 2>&1 && [ -r "$FM_PROC_BUDGET_DIR/fm-proc-budget-tree.py" ] || {
+    fm_proc_budget_error "cannot start own-tree supervisor; command not started"
+    exit 125
+  }
+  exec python3 "$FM_PROC_BUDGET_DIR/fm-proc-budget-tree.py" "$own_procs" -- "$@"
 fi
 exec "$@"

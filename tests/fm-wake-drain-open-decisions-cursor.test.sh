@@ -910,9 +910,8 @@ test_checkpoint_rejects_a_previous_parsing_locale() {
   pass "locale changes invalidate incremental, read-only, wake and snapshot checkpoint reuse"
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-else
+fm_test_only
+
 test_checkpoint_rejects_a_previous_parsing_locale
 test_utf8_whitespace_uses_full_fold_locale
 test_terminal_supersession_reaches_cached_drains
@@ -930,4 +929,3 @@ test_pre_fix_cursor_refolds_corr_tagged_decision
 test_previous_fold_cache_is_refolded_under_current_semantics
 test_large_previous_fold_cache_migrates_within_startup_bound
 test_buried_decision_survives_many_growing_drains_and_resolution_clears_it
-fi

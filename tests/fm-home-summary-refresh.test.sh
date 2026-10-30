@@ -1521,3 +1521,91 @@ for big in 1 2; do
     || fail "the checkpoint-seeded summary of big-task-$big lost or added decisions: published [$published], expected [$expected]"
 done
 pass "publication on a large history reads only what was appended and retains decisions from before and after the checkpoint"
+
+# A refresh worker waits for its fence (the lock's steal mutex) only while that
+# wait can still end: a worker whose home is removed under it, as a test
+# fixture's cleanup does, or one whose mutex never frees, must end in bounded
+# time instead of polling forever. A worker waits only while a live process holds
+# the fence, and its wait is never cut by elapsed time. The stub ln of
+# fm_test_refresh_fence_stub pins the instant the worker, which already owns the
+# refresh lock, first reaches for the fence mutex, and there removes the home,
+# refuses the mutex, or lets a live process take it first.
+# The code reaches the worker through a code-root/bin symlink, as in the teardown
+# fixtures, so every process of its tree names this home in its command line and
+# the checks are scoped to this home alone.
+FENCE_BIN="$TMP_ROOT/fence-bin"
+fm_test_refresh_fence_stub "$FENCE_BIN" || fail "could not write the fence stub"
+
+refresh_workers_of() {  # <home> -> pids of its refresh processes
+  pgrep -f -- "$1/code-root/bin/fm-home-summary-refresh\\.sh" 2>/dev/null || true
+}
+
+no_refresh_workers_of() {  # <home>
+  [ -z "$(refresh_workers_of "$1")" ]
+}
+
+# Starts a detached refresh whose worker meets the stub ln's action at its fence.
+# Sets FENCE_HOME; it assigns a global because `fail` in a command substitution
+# would not end the suite.
+start_fenced_refresh() {  # <name> <action>
+  local home name=$1 action=$2
+  home=$(new_bare_home "$name")
+  FENCE_HOME=$home
+  mkdir -p "$home/code-root"
+  ln -s "$ROOT/bin" "$home/code-root/bin"
+  env FM_TEST_FENCE_ACTION="$action" FM_TEST_FENCE_HOME="$home" \
+    PATH="$FENCE_BIN:$FAKEBIN:$PATH" FM_ROOT_OVERRIDE="$home/code-root" FM_HOME="$home" \
+    "$home/code-root/bin/fm-home-summary-refresh.sh" --detach \
+    || fail "could not start the detached refresh for $name"
+}
+
+start_fenced_refresh gone-home remove
+GONE_HOME=$FENCE_HOME
+fm_test_wait_until 20 test ! -d "$GONE_HOME" || fail "the stub never removed the home at the worker's fence"
+fm_test_wait_until 20 no_refresh_workers_of "$GONE_HOME" \
+  || fail "a refresh worker for a removed home was still running 20 seconds later: $(refresh_workers_of "$GONE_HOME" | tr '\n' ' ')"
+pass "a refresh worker whose home is removed as it reaches its fence ends instead of polling forever"
+
+start_fenced_refresh uncreatable-fence-home refuse
+UNCREATABLE_HOME=$FENCE_HOME
+fm_test_wait_until 20 test -e "$UNCREATABLE_HOME/state/.test-fence-refused" \
+  || fail "the worker never reached the refused fence"
+fm_test_wait_until 20 no_refresh_workers_of "$UNCREATABLE_HOME" \
+  || fail "a refresh worker whose fence nothing holds was still running 20 seconds later: $(refresh_workers_of "$UNCREATABLE_HOME" | tr '\n' ' ')"
+fm_test_wait_until 5 grep -q 'no process holds it' "$UNCREATABLE_HOME/state/.home-summary-refresh.log" \
+  || fail "the unholdable fence was not logged: $(cat "$UNCREATABLE_HOME/state/.home-summary-refresh.log" 2>&1)"
+pass "a refresh worker whose fence cannot be created and is held by nothing fails at once and logs why"
+
+ledger_published() {  # <home>
+  jq -e '.schema == "fm-secondmate-home-summary.v1"' "$1/state/home-summary.json" >/dev/null 2>&1
+}
+
+# A live holder is waited for, however long it holds: no clock cuts the wait, and
+# the worker finishes the refresh once the holder releases.
+start_fenced_refresh held-fence-home hold
+HELD_HOME=$FENCE_HOME
+fm_test_wait_until 20 test -s "$HELD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+HELD_HOLDER=$(cat "$HELD_HOME/state/.test-fence-holder")
+sleep 3
+[ -n "$(refresh_workers_of "$HELD_HOME")" ] \
+  || fail "the worker gave up on a fence a live process still held"
+kill -0 "$HELD_HOLDER" 2>/dev/null || fail "the fence holder ended before the worker could be judged"
+: > "$HELD_HOME/state/.test-fence-release"
+fm_test_wait_until 30 ledger_published "$HELD_HOME" \
+  || fail "the worker never published once the live holder released the fence: $(cat "$HELD_HOME/state/.home-summary-refresh.log" 2>&1)"
+fm_test_wait_until 20 no_refresh_workers_of "$HELD_HOME" \
+  || fail "a refresh worker was left running after its fence holder released"
+pass "a refresh worker waits for a live fence holder and finishes once it releases"
+
+# A holder that dies leaves the fence behind; the existing stale-owner reclaim
+# takes it over, so the worker neither waits forever nor fails.
+start_fenced_refresh dead-fence-home hold
+DEAD_HOME=$FENCE_HOME
+fm_test_wait_until 20 test -s "$DEAD_HOME/state/.test-fence-holder" || fail "no live process took the fence"
+DEAD_HOLDER=$(cat "$DEAD_HOME/state/.test-fence-holder")
+kill -KILL "$DEAD_HOLDER" 2>/dev/null || fail "could not stop the fence holder"
+fm_test_wait_until 30 ledger_published "$DEAD_HOME" \
+  || fail "the worker did not recover a fence whose holder died: $(cat "$DEAD_HOME/state/.home-summary-refresh.log" 2>&1)"
+fm_test_wait_until 20 no_refresh_workers_of "$DEAD_HOME" \
+  || fail "a refresh worker was left running after it recovered a dead holder's fence"
+pass "a refresh worker recovers a fence whose holder died"

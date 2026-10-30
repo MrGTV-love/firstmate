@@ -44,7 +44,7 @@ Add required status checks with `strict_required_status_checks_policy: false`; a
 Bind the checks to the GitHub Actions app already producing them, rather than accepting the same context from any integration.
 No new app installation or manual runner setup is needed for that setting.
 
-Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 24`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
+Require the actual job contexts: `Lint 1` through `Lint 3`, `Test coverage guard`, `Repo invariants`, `Stock macOS Bash snapshot compatibility`, `Behavior portable parallel 1`, `Behavior portable parallel 2`, `Behavior portable serial 1` through `Behavior portable serial 25`, `Behavior tests (Herdr)`, `Behavior timing aggregate`, and `PR must be raised via no-mistakes`.
 The last name is the compliance job context, not its workflow title; its existing automation exceptions remain unchanged.
 The timing aggregate is not a substitute for individual jobs because it can succeed while collecting evidence from a failed run.
 
@@ -138,7 +138,7 @@ Its header and `--help` own the flags, family labels, lanes, and changed-file ma
 Portable shard balance evidence lives in `docs/fm-test-portable-shards.md`.
 Family selection is the ordinary local path; `--all` is deliberate full regression only.
 CI owns broad regression across required portable parallel shards, the portable serial lane's separate-runner shards, the Herdr lane, lint, invariants, the coverage guard, and stock macOS Bash compatibility in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` are never cancelled, and the workflow owns that contract and its rationale.
+Pushing a new head to a pull request cancels that pull request's still-running CI so only the current head is validated; pushes to `main` coalesce so a newer push replaces a still-pending main run but never cancels the running one, and the workflow owns that contract and its rationale.
 Use `bin/fm-test-run.sh --list-lanes` for exact lane names and `--help` for `--jobs` rules and required gate-skip flags when reproducing a lane locally.
 Leave the `sleep 0.1` cadence in the suites' bounded condition waits alone.
 Those sleeps look like recoverable overhead - `fm-watch-triage.test.sh` alone issues about 1,900 of them, each paying a flat ~100ms scheduler wake-up penalty on macOS - but they are not overhead added to the clock; they are how a test waits for a subject that only moves on `fm-watch.sh`'s own one-second `FM_POLL` cadence.
@@ -147,6 +147,8 @@ Some of those loops are also catching a transient rather than waiting for a sett
 Discover tests by listing `tests/*.test.sh`: each is a self-contained bash script named `<subject>.test.sh`, and its header comment describes what it covers, so pass one to `bin/fm-test-run.sh` to focus on a subject with canonical timing output.
 Shared test helpers live in `tests/lib.sh` (reporters, temp roots, git fixtures, captured-launch execution, and Claude environment/NUL-delimited argv recording), `tests/fixtures.sh` (fake toolchain and spawn-world builders), `tests/wake-helpers.sh`, `tests/secondmate-helpers.sh`, and `tests/git-config-helpers.sh` (fixture Git isolation from the host's global and system configuration and from an inherited repository location such as `GIT_DIR`, already sourced by `tests/lib.sh` and `tests/herdr-test-safety.sh`; a suite that sources neither must source it itself before its first Git operation so a direct invocation stays isolated).
 Source those instead of copying a fake toolchain into a new suite.
+A test file that can run one case by name (`FM_TEST_ONLY=<test_function>` or positional test names) selects it through `fm_test_only` or `fm_test_run_cases` in `tests/lib.sh`, never a bare `"$FM_TEST_ONLY"` call.
+Those helpers refuse an unknown name with `Unknown test case: <name>` and exit 2 before running anything, and the file exits with the selected case's own status.
 A `BASH_ENV` fixture that wraps `[` must forward the complete argument list with `builtin [ "$@"`, including the closing `]`: Bash 3.2 can collapse a quoted argument slice under `IFS=:`, corrupting interpreter selection in shell launchers such as pyenv (regression: `tests/fm-spawn-dispatch-profile.test.sh`).
 For focused inheritance fixtures, use the test-only item selection owned by `bin/fm-config-inherit-lib.sh` to avoid repeatedly transferring unrelated absent configuration while retaining every item needed by the behavioral assertions.
 Keep fixture edits portable across GNU and BSD tools: write transformed metadata to a temporary file, replace it only on success, and fail the case if preparation fails rather than testing the wrong recorded harness.

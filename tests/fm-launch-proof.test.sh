@@ -331,10 +331,7 @@ test_launch_proof_recorded_native_identity() {
   pass 'native restoration stays unmanaged without argv, cwd or initial-message shortcuts'
 }
 
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit 0
-fi
+fm_test_only
 test_launch_proof_omp_executable_identity
 test_launch_proof_recorded_native_identity
 test_launch_proof_pinned_personal_switch

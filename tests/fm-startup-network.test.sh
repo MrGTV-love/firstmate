@@ -43,7 +43,7 @@ new_world() {
   home="$w/home"
   root="$w/root"
   mkdir -p "$home/state" "$root/bin"
-  for f in "$ROOT"/bin/*.sh; do
+  for f in "$ROOT"/bin/*.sh "$ROOT"/bin/*.py; do
     ln -s "$f" "$root/bin/$(basename "$f")"
   done
   rm -f "$root/bin/fm-bootstrap.sh"

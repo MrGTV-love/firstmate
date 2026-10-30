@@ -1694,30 +1694,62 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
-# Away mode owns no follow-up of its own: every overdue open-loops row the drain
-# presented without a recorded action joins the escalation digest, and that
-# escalation is recorded as the row's receipt, so the acknowledgement gate
-# neither wedges these wakes nor lets them be consumed silently.
-escalate_overdue_rows() {  # <state>
-  local state=$1 report line id
-  [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
-  report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions) && return 0
-  case "$report" in
-    *'acknowledgement refused'*) ;;
-    *) printf '%s\n' "$report" >&2; return 1 ;;
+# Away mode records no ledger action of its own, and its acknowledgement never
+# waits on the ledger gate: firstmate's own --ack-through keeps that gate. Each
+# overdue row still needing an action joins the escalation digest for firstmate
+# once per row id and evidence identity, and again only after
+# FM_OPEN_LOOPS_RESURFACE seconds (default 21600, invalid or zero values use the
+# default), as state/.subsuper-open-work-forwarded records; a row that becomes
+# covered or leaves the ledger loses its entry, so it is forwarded again when it
+# returns to the gate. The drain's periodic WAITING OPEN WORK list joins the
+# same digest.
+forward_overdue_rows() {  # <state> <drain-output>
+  local state=$1 out=$2 report='' line id identity seen now readable=1
+  local marker="$state/.subsuper-open-work-forwarded" resurface=${FM_OPEN_LOOPS_RESURFACE:-21600}
+  case "$resurface" in
+    ''|*[!0-9]*) resurface=21600 ;;
+    *) resurface=$((10#$resurface)) ;;
   esac
+  [ "$resurface" -gt 0 ] || resurface=21600
+  [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
+  if ! report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions); then
+    case "$report" in
+      *'acknowledgement refused'*) ;;
+      *) printf '%s\n' "$report" >&2; readable=0 ;;
+    esac
+  fi
+  if [ "$readable" -eq 1 ]; then
+    now=$(_now)
+    : > "$marker.tmp" || return 1
+    while IFS= read -r line; do
+      case "$line" in '  "'*) ;; *) continue ;; esac
+      id=${line#  \"}
+      id=${id%%\"*}
+      identity=$(jq -r --arg id "$id" '.rows[] | select(.id == $id)
+        | [.category, .subject, .owner, .next_action, .evidence] | @json' "$state/open-loops.json" | cksum) \
+        || { rm -f "$marker.tmp"; return 1; }
+      identity=${identity// /:}
+      seen=$(awk -F '\t' -v id="$id" -v identity="$identity" '$1 == id && $2 == identity { print $3; exit }' \
+        "$marker" 2>/dev/null)
+      if [ -z "$seen" ] || [ $((now - seen)) -ge "$resurface" ]; then
+        escalate_add "$state" "overdue open work: ${line#  }" || { rm -f "$marker.tmp"; return 1; }
+        seen=$now
+      fi
+      printf '%s\t%s\t%s\n' "$id" "$identity" "$seen" >> "$marker.tmp" || { rm -f "$marker.tmp"; return 1; }
+    done <<EOF
+$report
+EOF
+    mv -f "$marker.tmp" "$marker" || return 1
+  fi
   while IFS= read -r line; do
     case "$line" in '  "'*) ;; *) continue ;; esac
     id=${line#  \"}
     id=${id%%\"*}
-    # One buffered digest item per row until the digest flushes.
-    if ! grep -qF "overdue open work: \"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
-      escalate_add "$state" "overdue open work: ${line#  }" || return 1
+    if ! grep -qF "waiting open work: \"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
+      escalate_add "$state" "waiting open work: ${line#  }" || return 1
     fi
-    "$FM_DAEMON_DIR/fm-open-loops.sh" action "$id" escalated \
-      --evidence "away supervisor escalation digest" > /dev/null || return 1
   done <<EOF
-$report
+$(awk '/^WAITING OPEN WORK/ { on = 1; next } on && /^  "/ { print; next } on && !/^rows\[/ { on = 0 }' "$out")
 EOF
 }
 
@@ -1741,7 +1773,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     handled=$((handled + 1))
   done < "$out"
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi
-  escalate_overdue_rows "$state" || failed=1
+  forward_overdue_rows "$state" "$out" || failed=1
 
   ack_through=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err" | tail -1)
   ack_generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err" | tail -1)
@@ -1755,7 +1787,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     log "wake drain omitted its generation-bound acknowledgement; retaining durable wakes"
     return 1
   fi
-  "$FM_DAEMON_DIR/fm-wake-drain.sh" --ack-through "$ack_through" \
+  FM_WAKE_ACK_AWAY_DAEMON=1 "$FM_DAEMON_DIR/fm-wake-drain.sh" --ack-through "$ack_through" \
     --recovery-generation "$ack_generation"
 }
 

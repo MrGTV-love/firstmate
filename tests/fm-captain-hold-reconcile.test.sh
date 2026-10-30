@@ -76,12 +76,10 @@ test_reconcile_never_closes_through_the_keyed_answer_intake() {
   run_captain "$home" hold sample-reconcile-gated --reason "waiting on the captain" >/dev/null \
     || fail "could not hold the gated work item"
 
-  set +e
+  rc=0
   out=$(printf 'sample-reconcile-call\treconcile\tReconcile\n%s\n' \
     "$(printf 'sample-reconcile-gated\treconcile\tReconcile\trelease')" \
-    | run_captain "$home" answers --source "captain chat" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" answers --source "captain chat" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the shared answer intake accepted reconcile as an answer"
   assert_contains "$out" "refused: sample-reconcile-call" \
     "the shared intake did not visibly refuse reconcile: $out"
@@ -101,11 +99,9 @@ test_reconcile_never_closes_through_the_keyed_answer_intake() {
   list=$(run_captain "$home" reconcile list) || fail "could not list the reconcile requests"
   assert_contains "$list" "reconcile-requests: 0" \
     "the shared answer intake created a reconcile request: $list"
-  set +e
+  rc=0
   out=$(printf 'sample-reconcile-call\n' \
-    | run_captain "$home" reconcile-requests --source-id unbound-src --source "captured board" 2>&1)
-  rc=$?
-  set -e
+    | run_captain "$home" reconcile-requests --source-id unbound-src --source "captured board" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an unbound captured source created a reconcile request"
   request_reconciles "$home" board-src sample-reconcile-call sample-reconcile-gated \
     || fail "the bound captured source did not create reconcile requests"
@@ -169,17 +165,13 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   printf '0.1.38 was published on 2026-09-05, so the 0.1.37 question is moot.\n' > "$home/evidence.txt"
   printf 'Still open: nothing has shipped and the choice is unchanged.\n' > "$home/note.txt"
 
-  set +e
-  out=$(run_captain "$home" reconcile close sample-moot-call --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-moot-call --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "reconcile closed a call without a pending board request"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the ungated close refusal did not name the missing board request: $out"
-  set +e
-  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "reconcile annotated a call without a pending board request"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the ungated note refusal did not name the missing board request: $out"
@@ -187,10 +179,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   request_reconciles "$home" board-src sample-moot-call sample-active-call sample-mode-call \
     || fail "could not file the reconcile requests"
 
-  set +e
-  out=$(run_captain "$home" reconcile close sample-moot-call 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-moot-call 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a reconcile close was accepted with no evidence"
   assert_contains "$out" "evidence" "the refusal did not name the missing evidence: $out"
 
@@ -198,10 +188,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   run_captain "$home" answer sample-mode-call --decision-file "$home/evidence.txt" >/dev/null \
     || fail "could not record the normal answer for the mode fixture"
   cp "$home/mode-request.backup" "$home/state/reconcile-requests/sample-mode-call.request"
-  set +e
-  out=$(run_captain "$home" reconcile close sample-mode-call --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile close sample-mode-call --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a normal captain answer replayed as a reconciliation"
   assert_contains "$out" "was not closed by reconciliation" \
     "the reconcile replay refusal did not identify the incompatible resolution mode: $out"
@@ -218,10 +206,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   case "$show" in
     *"Captain decision:"*) fail "a reconciled close was recorded as the captain's own words" ;;
   esac
-  set +e
-  out=$(run_captain "$home" answer sample-moot-call --decision-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" answer sample-moot-call --decision-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a reconciled resolution replayed as a captain answer"
   assert_contains "$out" "not a captain-answer replay" \
     "the answer replay refusal did not identify the incompatible resolution mode: $out"
@@ -236,10 +222,8 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open() {
   case "$show" in
     *"Resolution recorded by"*) fail "annotating a still-active call wrote a resolution record" ;;
   esac
-  set +e
-  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" reconcile note sample-active-call --note-file "$home/note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a retired reconcile request appended a duplicate note"
   assert_contains "$out" "no pending board-created reconcile request" \
     "the duplicate-note refusal did not name the retired request: $out"
@@ -304,11 +288,9 @@ exec "$REAL_TASKS_AXI" "$@"
 SH
   chmod +x "$home/fakebin/tasks-axi"
 
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile close sample-reconcile-close-retry \
-    --evidence-file "$home/retry-evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --evidence-file "$home/retry-evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the forced reconcile close failure reported success"
   run_captain "$home" reconcile close sample-reconcile-close-retry \
     --evidence-file "$home/retry-evidence.txt" >/dev/null \
@@ -317,28 +299,22 @@ SH
   [ "$(printf '%s\n' "$show" | grep -c 'Resolution mode: reconciled')" -eq 1 ] \
     || fail "reconcile close duplicated its resolution record on retry"
 
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-note-retry \
-    --note-file "$home/retry-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "the forced post-note probe failure reported success"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-note-retry \
-    --note-file "$home/retry-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-note.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a note retry succeeded after the request was retired"
   show=$(tasks_in "$home" show sample-reconcile-note-retry --full)
   [ "$(printf '%s\n' "$show" | grep -c 'Captain hold reconciled:')" -eq 1 ] \
     || fail "reconcile note duplicated its durable annotation"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile close sample-reconcile-close-retire \
-    --evidence-file "$home/close-retire-evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --evidence-file "$home/close-retire-evidence.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a failed close request retirement reported success"
   assert_contains "$out" "sample-reconcile-close-retire" \
     "the close retirement failure did not name its task: $out"
@@ -351,11 +327,9 @@ SH
     || fail "the closed reconciliation could not finish request retirement"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" answer sample-answer-retire \
-    --decision-file "$home/answer-retire.txt" 2>&1)
-  rc=$?
-  set -e
+    --decision-file "$home/answer-retire.txt" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "a failed answer-boundary retirement reported success"
   show=$(tasks_in "$home" show sample-answer-retire --full)
   assert_contains "$show" "state: done" "retirement failure reversed the durable captain answer"
@@ -366,11 +340,9 @@ SH
     || fail "the answer replay could not finish request retirement"
 
   chmod 0500 "$home/state/reconcile-requests"
-  set +e
+  rc=0
   out=$(run_captain "$home" reconcile note sample-reconcile-retire-retry \
-    --note-file "$home/retry-retire-note.txt" 2>&1)
-  rc=$?
-  set -e
+    --note-file "$home/retry-retire-note.txt" 2>&1) || rc=$?
   chmod 0700 "$home/state/reconcile-requests"
   [ "$rc" -ne 0 ] || fail "a failed request retirement reported note success"
   assert_not_contains "$out" "still-open:" "failed retirement reported a successful outcome"
@@ -854,11 +826,9 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   printf 'Verified source captured.txt: the recorded answers settle this call.\n' > "$home/evidence.txt"
   before=$(cat "$home/state/lane.status")
 
-  set +e
+  rc=0
   out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-a \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -eq 6 ] || fail "an attended branch closed a captain call on evidence (rc=$rc): $out"
   assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
     "the verified close refusal lost its partition action label: $out"
@@ -866,11 +836,9 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   assert_contains "$show" "held: yes" "the refused verified close released the call"
   assert_not_contains "$show" "Resolution recorded by" "the refused verified close wrote a resolution"
 
-  set +e
+  rc=0
   out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-a \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) || rc=$?
   [ "$rc" -eq 6 ] || fail "an attended branch closed an operational key on evidence (rc=$rc): $out"
   assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
     "the key close refusal lost its partition action label: $out"
@@ -903,17 +871,13 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   # An archived record is absence: the attended refusal returns for the branch.
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
     "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-b \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 6 ] || fail "an archived away record still relocated the verified close (rc=$rc)"
-  set +e
+  rc=0
   FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-b \
-    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
-  rc=$?
-  set -e
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1 || rc=$?
   [ "$rc" -eq 6 ] || fail "an archived away record still relocated the key close (rc=$rc)"
 
   # Main never meets the partition, attended or not.
@@ -1129,10 +1093,8 @@ session:
 prompts[1]{uid,prompt,selector,tag,text}:
   "2","Only choice: yes\n\nContext data:\n{\n  \"question\": \"sample-only-call\",\n  \"answer\": \"yes\"\n}","form",choice,"Only choice: yes"
 EOF
-  set +e
-  out=$(run_captain "$home" binding "$sid" 2>&1)
-  rc=$?
-  set -e
+  rc=0
+  out=$(run_captain "$home" binding "$sid" 2>&1) || rc=$?
   [ "$rc" -ne 0 ] || fail "an unbound source reported a binding"
   [ -z "$out" ] || fail "an unbound source printed a binding: $out"
   show=$(tasks_in "$home" show sample-only-call --full)
@@ -1421,12 +1383,10 @@ SH
   assert_contains "$show" "answer sent to $id" "the chat-answered call lost its channel provenance"
 
   : > "$home/send.log"
-  set +e
   env PATH="$fb:$PATH" FM_ROOT_OVERRIDE="$home" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
     FM_SEND_LOG="$home/send.log" FM_SEND_SETTLE=0 \
-    "$ROOT/bin/fm-send.sh" "$id" --resolve-key sample-chat-reconcile reconcile >/dev/null 2>&1
-  set -e
+    "$ROOT/bin/fm-send.sh" "$id" --resolve-key sample-chat-reconcile reconcile >/dev/null 2>&1 || true
   show=$(tasks_in "$home" show sample-chat-reconcile --full)
   assert_contains "$show" "state: queued" "a chat reconcile answer closed the call"
   list=$(run_captain "$home" reconcile list)

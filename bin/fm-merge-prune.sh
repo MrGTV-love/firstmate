@@ -30,8 +30,14 @@
 #
 # Transient refusals retry on later sweeps with backoff (60s, doubling to 3600s)
 # and stay silent: the task lease or project lock is held by another actor
-# (FM_LEASE_REFUSE_EXIT, FM_PROJECT_LOCK_BUSY_EXIT), a teardown that outlasts its
-# 600-second limit, an admission refusal (the worker is not finished yet), a
+# (FM_LEASE_REFUSE_EXIT), teardown's retry status FM_PROJECT_LOCK_BUSY_EXIT (the
+# project lock is held or queued for, or a no-mistakes read teardown needed went
+# silent, so its answer is unknown), a teardown stopped because it went silent (no
+# output and no process-tree CPU progress for FM_MERGE_PRUNE_TEARDOWN_STALL_SECS,
+# default the repo-wide quiet interval; a teardown that is slow but working is never
+# cut, and one waiting on a no-mistakes read prints progress while it waits, so
+# teardown's own read is the one judge of a silent daemon), an admission refusal
+# (the worker is not finished yet), a
 # landing proof that went stale (the copy's HEAD moved while teardown ran), and a
 # lifecycle action already running. One wake is raised if a task is still not
 # pruned after 24 attempts.
@@ -195,6 +201,8 @@ TEARDOWN_BIN="${FM_MERGE_PRUNE_TEARDOWN_BIN:-$SCRIPT_DIR/fm-teardown.sh}"
 CONTROL_BIN="${FM_MERGE_PRUNE_CONTROL_BIN:-$SCRIPT_DIR/fm-control.sh}"
 EXIT_WAIT="${FM_MERGE_PRUNE_EXIT_WAIT:-10}"
 case "$EXIT_WAIT" in ''|*[!0-9]*) EXIT_WAIT=10 ;; esac
+TEARDOWN_STALL_SECS=${FM_MERGE_PRUNE_TEARDOWN_STALL_SECS:-}
+case "$TEARDOWN_STALL_SECS" in ''|*[!0-9]*|0*) TEARDOWN_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
 
 BACKOFF_START=60
 BACKOFF_CAP=3600
@@ -343,7 +351,7 @@ TD_RC=0
 run_teardown() {
   TD_RC=0
   TD_OUT=$(FM_HOME="$FM_HOME" FM_IDLE_REAP_ADMISSION=1 FM_IDLE_REAP_MERGE_PRUNE=1 \
-    fm_run_timed "$(fm_mp_limit merge-prune.teardown 600)" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
+    fm_run_progress "$TEARDOWN_STALL_SECS" "$TEARDOWN_BIN" "$ID" </dev/null 2>&1) || TD_RC=$?
 }
 
 # The outcome of a pruned copy: one log line and no wake.
@@ -827,11 +835,13 @@ attempt() {
     return 0
   fi
   if [ "$TD_RC" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
-    backoff "another operation holds or is queued for the task's project lock"
+    reason=$(printf '%s\n' "$TD_OUT" | grep -m 1 -E '^(UNKNOWN|unknown):' || true)
+    [ -n "$reason" ] || reason="another operation holds or is queued for the task's project lock"
+    backoff "$reason"
     return 0
   fi
   if [ "$TD_RC" -eq 124 ] || [ "$TD_RC" -eq 137 ]; then
-    backoff "teardown exceeded 600s"
+    backoff "teardown made no output or CPU progress for ${TEARDOWN_STALL_SECS}s"
     return 0
   fi
   reason=$(first_refusal_line "$TD_OUT")

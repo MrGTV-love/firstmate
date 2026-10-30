@@ -84,7 +84,8 @@
 # equivalent patches in that head.
 # The PR head must match its forge-reported merge commit on every changed path.
 # Forced discard, unavailable proof, non-ancestor merge commits, checked-out
-# archives, or a concurrently moved ref keep the archive and name it; another
+# archives, an archive that is a symbolic ref or a filesystem symlink, or a
+# concurrently moved ref keep the archive and name it; another
 # task's refs and records-only shared/reassigned slots remain untouched.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
@@ -302,6 +303,24 @@
 # cannot be reserved; teardown logs that state and keeps project custody from
 # the reservation point through the return with treehouse return --force, as
 # before the narrowing.
+# So does an unleased slot in a superseded pool folder: treehouse lease takes a
+# slot NAME and resolves it in the project's current pool, and a pool folder
+# follows the origin URL and the Treehouse root, so a copy left in an older
+# folder after either moved shares its name with a different copy. Such a slot
+# takes the ordinary route: the landed-work test runs unchanged first, and only
+# then is the slot returned by path with the same treehouse return --force every
+# ordinary teardown uses; no operator --force is involved. A held close or a
+# shared-slot retire, which leaves copies in it, leases it by its exact path
+# with treehouse lease --path, and refuses when the installed treehouse has no
+# --path. After the reservation and the held-copy record checks, the lease an
+# earlier teardown took by name is released with treehouse return <path>
+# --if-lease-holder <this task>: only the current-pool slot that bears the
+# recorded slot's name, only when this task holds it, no other task claims it,
+# no process runs inside it, and no copy is registered or recorded inside it
+# (docs/configuration.md "Superseded pool folders").
+# Placing an unleased slot, or one held by this task's own lease, is fast where
+# Treehouse has pool-dir; otherwise it costs one 11-23 s treehouse status listing
+# per teardown under the project lock.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
@@ -327,9 +346,27 @@
 # reaper's return stage and every forced child return wait in that FIFO queue
 # instead, each waited admission follows the progress-based idle allowance and
 # 30-minute telemetry-uncertainty extreme owned by bin/fm-project-lock-lib.sh.
-# Independently, the reaper's 600s teardown limit ends an overlong teardown,
-# which keeps its durable record and is retried by the next sweep without a
-# refusal memo.
+# Independently, the reaper and bin/fm-merge-prune.sh stop a teardown that has gone
+# silent (no output and no process-tree CPU progress for their stall interval); it
+# keeps its durable record and is retried by the next sweep without a refusal memo.
+# While a read-only no-mistakes query waits, teardown prints a progress line every
+# tenth of the repo-wide quiet interval, so that outer stop never mistakes a live
+# wait for silence; the query's own stall interval (FM_TEARDOWN_NM_STALL_SECS) is
+# the one judge of a silent daemon. A query that goes silent leaves the answer
+# unknown, never "no run is parked", "still parked" or "not landed". A run-record
+# read the landing proof needed prints "unknown: the no-mistakes run record did not
+# answer; retry teardown", fires no unlanded-work guard event and exits
+# FM_PROJECT_LOCK_BUSY_EXIT. A silent parked-run lookup or abort confirmation
+# prints an UNKNOWN line and exits FM_PROJECT_LOCK_BUSY_EXIT with nothing more closed,
+# except under --force, where the captain's authorized discard goes on and prints
+# and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
+# from then on every daemon read of that teardown and its children (FM_NM_READ_STALLED)
+# is unknown at once instead of waiting out the stall again. A final-outcome
+# delivery whose ship acceptance is unknown (`fm-inactive-reconcile.sh report`
+# exits 75) also prints an UNKNOWN line, keeps every record and exits
+# FM_PROJECT_LOCK_BUSY_EXIT; under --force that report instead delivers the line
+# marked acceptance unknown (bin/fm-inactive-reconcile.sh's header owns it).
+# The sweeps retry FM_PROJECT_LOCK_BUSY_EXIT and record no refusal for it.
 # As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
 # that can fail and before the pending backlog close is published, teardown
@@ -852,36 +889,154 @@ teardown_release_project_lock() {
 
 # Whether the installed treehouse has the state-only lease command, probed
 # once: an older Treehouse reports an unknown command and a missing one
-# reports nothing, and neither can reserve a slot.
+# reports nothing, and neither can reserve a slot. The same probe records
+# whether that lease takes --path, which leases the worktree at an exact path in
+# the pool that holds it.
 TEARDOWN_TREEHOUSE_LEASE_SUPPORT=
+TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT=
 teardown_treehouse_supports_lease() {
   local help
   if [ -z "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" ]; then
     TEARDOWN_TREEHOUSE_LEASE_SUPPORT=0
+    TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT=0
     if help=$(treehouse lease --help 2>&1) \
         && grep -Eq '(^|[^[:alnum:]_-])--lease-holder([^[:alnum:]_-]|$)' <<<"$help"; then
       TEARDOWN_TREEHOUSE_LEASE_SUPPORT=1
+      ! grep -Eq '(^|[^[:alnum:]_-])--path([^[:alnum:]_-]|$)' <<<"$help" || TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT=1
     fi
   fi
   [ "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" = 1 ]
+}
+
+# Leases pool slot <slot> for <holder> by its exact path, in the pool folder
+# that holds it, and proves the durable lease in that folder's state. A slot in
+# a superseded pool folder that keeps copies needs this: a lease by name would
+# hold a same-named copy of the current pool. Without --path it prints one line
+# naming the treehouse build that has it and changes nothing.
+teardown_lease_path_supported() {  # <slot>
+  teardown_treehouse_supports_lease && [ "$TEARDOWN_TREEHOUSE_LEASE_PATH_SUPPORT" = 1 ] && return 0
+  echo "REFUSED: pool slot $1 is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path, which needs treehouse v3.1.7-fm or later (treehouse lease --path); the installed treehouse has no lease --path, so the copies stay held and nothing was changed." >&2
+  return 1
+}
+teardown_lease_slot_by_path() {  # <slot> <project> <holder>
+  local slot=$1 project=$2 holder=$3
+  teardown_lease_path_supported "$slot" || return 1
+  (cd "$project" && treehouse lease --path "$slot" --lease-holder "$holder" </dev/null) >/dev/null || return 1
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$slot"
+}
+
+# A reservation that an earlier teardown took by slot NAME while the project's
+# pool had moved to a new folder leased a same-named copy of the current pool
+# for this task. Release such a lease, and only it: it is the current-pool slot
+# named <slot-name>, the name the recorded copy's slot has in its own superseded
+# folder and so the name that earlier `treehouse lease <name>` resolved, its
+# holder is this task, no other task claims the slot, no process is inside it,
+# no copy is registered inside it, no local task record names a copy in it, and
+# the return is the conditional one a holder match gates, never forced. Another current-pool
+# slot this task holds under a different name is not that lease and is never
+# touched. A lease that cannot be released or found is reported with its exact
+# command and never blocks this teardown.
+teardown_release_misdirected_leases() {  # <project> <task-id> <slot-name>
+  local project=$1 task_id=$2 slot_name=${3:-} path procs state_dir meta copy record records_known=1 named
+  local -a record_copies=()
+  if [ -z "$slot_name" ]; then
+    echo "warning: the recorded copy's slot has no name in its pool folder's Treehouse state, so the lease an earlier teardown may have taken for $task_id by that name in the current pool cannot be singled out; inspect with (cd '$project' && treehouse status), and release that slot with: (cd '$project' && treehouse return '<slot path>' --if-lease-holder '$task_id' </dev/null)" >&2
+    return 0
+  fi
+  if ! fm_task_copy_current_pool_listing "$project"; then
+    echo "warning: treehouse status cannot be read from $project, so a lease an earlier teardown may have taken for $task_id by slot name in the current pool cannot be found; inspect with (cd '$project' && treehouse status), and release a slot leased to $task_id with: (cd '$project' && treehouse return '<slot path>' --if-lease-holder '$task_id' </dev/null)" >&2
+    return 0
+  fi
+  if fm_local_firstmate_state_dirs "$STATE"; then
+    for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+      for meta in "$state_dir"/*.meta; do
+        [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+        copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$meta" worktree)") && record_copies+=("$copy")
+      done
+    done
+  else
+    records_known=0
+  fi
+  while IFS=$'\t' read -r path procs; do
+    path=${path#P}
+    [ -n "$path" ] || continue
+    if ! teardown_slot_registered_copies "$path" || [ "${#TEARDOWN_SLOT_COPIES[@]}" -gt 0 ]; then
+      echo "warning: leaving $path leased to $task_id: copies are registered inside it, or its copies cannot be listed; once inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+      continue
+    fi
+    named=0
+    for record in ${record_copies[@]+"${record_copies[@]}"}; do
+      fm_task_copy_paths_overlap "$record" "$(fm_task_copy_canonical_dir "$path")" && named=1 && break
+    done
+    if [ "$records_known" = 0 ] || [ "$named" = 1 ]; then
+      echo "warning: leaving $path leased to $task_id: a local task record names a copy in it, or the local task records cannot be read; once inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+      continue
+    fi
+    fm_treehouse_slot_owner_state "$path" "$task_id"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine|absent) ;;
+      *)
+        echo "warning: leaving $path leased to $task_id: its slot claim is not this task's ($FM_TREEHOUSE_SLOT_OWNER); once that claim is gone and inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+        continue
+        ;;
+    esac
+    if [ "${procs#N}" != 0 ]; then
+      echo "warning: leaving $path leased to $task_id: ${procs#N} process(es) are running inside it; once they have exited and inspection shows none holds work, release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+      continue
+    fi
+    if (cd "$project" && treehouse return "$path" --if-lease-holder "$task_id" </dev/null) >/dev/null; then
+      echo "teardown: released the lease on $path that an earlier teardown took by slot name in the project's current pool" >&2
+    else
+      echo "warning: could not release the lease on $path that an earlier teardown took by slot name; release it with: (cd '$project' && treehouse return '$path' --if-lease-holder '$task_id' </dev/null)" >&2
+    fi
+  done < <(jq -r --arg id "$task_id" --arg name "$slot_name" '.[]
+    | select(.lease_holder == $id and ((.name // "") | tostring) == $name)
+    | ["P" + (.path // "" | tostring), "N" + ((.processes // []) | length | tostring)] | @tsv' \
+    <<<"$FM_TASK_COPY_CURRENT_POOL_JSON" 2>/dev/null)
 }
 
 # A process lease lapses when the worker exits. Reserve only this slot before
 # releasing project custody, so unrelated allocation can proceed during the
 # slow process and status phases without ever resetting this copy.
 # A failed cleanup deliberately retains this state-only lease for its retry.
+# treehouse lease takes a slot name and resolves it in the project's current
+# pool, so the slot is leased only when it is proved to be in that pool
+# (fm_task_copy_slot_in_current_pool); a copy in a superseded pool folder or a
+# slot whose pool cannot be placed is never leased by name.
 # Sets TEARDOWN_SLOT_CUSTODY to lease when the slot is durably held, or to
 # project when its state can be neither proved held nor leased: the caller
-# then keeps project custody through the return.
+# then keeps project custody through the return, which names the slot by path.
+# Sets TEARDOWN_SLOT_SUPERSEDED to 1 when the slot is in a superseded pool
+# folder, unleased or held there by this task's own lease (an earlier held
+# close's lease by path, whatever route this close takes); a held close leases
+# an unleased one by path
+# (teardown_lease_slot_by_path), and the caller releases this task's
+# misdirected leases (teardown_release_misdirected_leases) after the
+# reservation and the held-copy record checks. With it, it sets
+# TEARDOWN_SLOT_SUPERSEDED_NAME to the slot's name in its own folder's state:
+# the name an earlier reservation by name resolved in the current pool.
 TEARDOWN_SLOT_CUSTODY=
+TEARDOWN_SLOT_SUPERSEDED=
+TEARDOWN_SLOT_SUPERSEDED_NAME=
 teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   local slot project=${2:-$PROJ} task_id=${3:-$ID} name
   TEARDOWN_SLOT_CUSTODY=
+  TEARDOWN_SLOT_SUPERSEDED=
+  TEARDOWN_SLOT_SUPERSEDED_NAME=
   slot=$(cd "$1" && pwd -P) || return 1
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
   if fm_task_copy_pool_slot_held "$slot"; then
     TEARDOWN_SLOT_CUSTODY=lease
+    name=$FM_TASK_COPY_SLOT_NAME
+    if [ "${FM_TASK_COPY_SLOT_HOLDER:-}" = "$task_id" ] \
+        && ! fm_task_copy_slot_in_current_pool "$project" "$slot" "$name" \
+        && [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+      TEARDOWN_SLOT_SUPERSEDED=1
+      TEARDOWN_SLOT_SUPERSEDED_NAME=$name
+    fi
     return 0
   fi
   if [ "$FM_TASK_COPY_SLOT_STATE" != unleased ]; then
@@ -894,7 +1049,18 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
     TEARDOWN_SLOT_CUSTODY=project
     return 0
   fi
-  name=$FM_TASK_COPY_SLOT_NAME
+  if ! fm_task_copy_slot_in_current_pool "$project" "$slot" "$FM_TASK_COPY_SLOT_NAME"; then
+    if [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+      echo "warning: pool slot $slot is not in the project's current Treehouse pool, so it is not leased by slot name, which would hold a different copy" >&2
+      TEARDOWN_SLOT_SUPERSEDED=1
+      TEARDOWN_SLOT_SUPERSEDED_NAME=$FM_TASK_COPY_SLOT_NAME
+    else
+      echo "warning: pool slot $slot cannot be placed in the project's current Treehouse pool because treehouse status cannot be read, so it is not leased by slot name" >&2
+    fi
+    TEARDOWN_SLOT_CUSTODY=project
+    return 0
+  fi
+  name=$FM_TASK_COPY_CURRENT_SLOT_NAME
   (cd "$project" && treehouse lease "$name" --lease-holder "$task_id") || return 1
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -2219,7 +2385,8 @@ TEARDOWN_PIPELINE_INPUT_REASON=
 # times never count.
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
-  local timeout=${NM_TEARDOWN_TIMEOUT:-10} runs=0 tied=0 reasons=
+  local stall=${NM_TEARDOWN_STALL_SECS:-} runs=0 tied=0 reasons='' read_rc=0
+  case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   TEARDOWN_PIPELINE_INPUT_REASON=
   current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || current=
@@ -2240,7 +2407,12 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
     TEARDOWN_PIPELINE_INPUT_REASON="python3 is not available, so the no-mistakes run record for $pr_url cannot be read"
     return 1
   fi
-  if ! rows=$(fm_nm_bounded "$dir" "$timeout" python3 -I - "$db" "$pr_url" 2>/dev/null <<'PY'
+  # A read-only query against the daemon's database, stopped only by silence: a
+  # reader blocked on a lock burns no CPU and prints nothing, a slow one on a busy
+  # host does, so how long it takes says nothing about whether it is hung. The
+  # 30 s is SQLite's busy wait for a writer's lock, the one wait this reader cannot
+  # watch; running out of it is answered as busy, an unknown like silence.
+  FM_NM_READ_STALLED=0 teardown_nm_read rows fm_nm_bounded "$dir" "$stall" python3 -I - "$db" "$pr_url" <<'PY' || read_rc=$?
 import re
 import sqlite3
 import sys
@@ -2264,10 +2436,14 @@ try:
                 values = ["" if value is None else str(value) for value in row]
                 if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
                     print("run|" + "|".join(values))
+except sqlite3.OperationalError as error:
+    print("busy|" if "locked" in str(error) else "unreadable|")
 except (OSError, ValueError, sqlite3.Error):
     print("unreadable|")
 PY
-  ); then
+  if [ "$read_rc" -ne 0 ]; then
+    # Silence is not an answer: work_is_landed reports the proof unknown.
+    [ "$read_rc" -ne 124 ] || TEARDOWN_NM_RECORD_SILENT=1
     TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
     return 1
   fi
@@ -2278,6 +2454,11 @@ PY
         return 1
         ;;
       unreadable)
+        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      busy)
+        TEARDOWN_NM_RECORD_SILENT=1
         TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
         return 1
         ;;
@@ -2390,6 +2571,10 @@ TEARDOWN_LANDED_HEADS=()
 # comparison), empty when it answered "not landed". A reader that types
 # refusals must not count an unasked proof as a policy refusal.
 TEARDOWN_LANDED_UNASKED=
+# 1 when the run-record read the pipeline-input proof needed went silent. A copy
+# no other proof could place is then neither landed nor unlanded but unknown, and
+# work_is_landed exits for a retry instead of letting any caller refuse it.
+TEARDOWN_NM_RECORD_SILENT=0
 work_is_landed() {
   local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
   TEARDOWN_LANDED_UNASKED=
@@ -2410,7 +2595,12 @@ work_is_landed() {
     return 1
   fi
   local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
-  work_is_landed_proof "$branch" || return 1
+  TEARDOWN_NM_RECORD_SILENT=0
+  if ! work_is_landed_proof "$branch"; then
+    [ "$TEARDOWN_NM_RECORD_SILENT" = 1 ] || return 1
+    echo "unknown: the no-mistakes run record did not answer; retry teardown" >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  fi
   TEARDOWN_LANDED_DIRS+=("$dir")
   TEARDOWN_LANDED_HEADS+=("$head")
 }
@@ -2472,10 +2662,10 @@ task_archive_pr_matches_merge() {
 }
 
 reap_task_archive_branches() {
-  local refs ref sha branch target head cherry merges checked_out reason
+  local refs ref sha symref branch target head cherry merges checked_out common reason
   local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
   [ "$KIND" = ship ] && teardown_owns_worktree || return 0
-  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname)' \
+  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname) %(symref)' \
     "refs/heads/archive/$ID-submitted-$hex8" "refs/heads/archive/$ID-pipeline-$hex8") || {
     echo "warning: could not enumerate task $ID's archive branches; keeping them" >&2
     return 0
@@ -2496,11 +2686,17 @@ reap_task_archive_branches() {
   fi
   checked_out=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null) \
     || reason="checked-out branch inventory could not be read"
-  while read -r ref sha; do
+  common=$(git -C "$PROJ" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || reason="shared Git directory could not be located"
+  while read -r ref sha symref; do
     [ -n "$ref" ] || continue
     branch=${ref#refs/heads/}
     if [ -n "$reason" ]; then
       echo "notice: keeping $branch ($reason)" >&2
+      continue
+    fi
+    if [ -n "$symref" ] || [ -L "$common/$ref" ]; then
+      echo "notice: keeping $branch (archive is a link to another ref)" >&2
       continue
     fi
     if printf '%s\n' "$checked_out" | grep -qxF "branch $ref"; then
@@ -2524,7 +2720,7 @@ reap_task_archive_branches() {
     fi
     # The expected old value prevents a concurrently moved archive from being
     # deleted on proof about its previous head. Never detach another copy.
-    if git -C "$PROJ" update-ref -d "$ref" "$sha" 2>/dev/null; then
+    if git -C "$PROJ" update-ref --no-deref -d "$ref" "$sha" 2>/dev/null; then
       echo "teardown: reaped $branch (carried by the merged PR lineage)" >&2
     else
       echo "notice: keeping $branch (archive deletion could not be completed at its proven head)" >&2
@@ -3076,8 +3272,85 @@ teardown_reprove_reassigned_slot() {
 # binds through the strict object-local head rule, with bin/fm-nm-run-lib.sh's
 # shared ledger-anchored continuation rule as the only recognition for a head
 # this copy cannot resolve at all.
+# Wall-clock seconds the one MUTATION below (axi abort) may wait for its
+# acknowledgement. Harm: a hung client holding teardown. Expiry is not a verdict:
+# the daemon takes the abort when it receives it, so the status read that follows
+# is what decides, and that read is stopped by silence only (NM_TEARDOWN_STALL_SECS).
 NM_TEARDOWN_TIMEOUT=${FM_TEARDOWN_NM_TIMEOUT:-10}
 case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
+# Seconds a read-only no-mistakes query may go without output or process-tree CPU
+# progress before teardown stops it and treats the answer as unknown (the repo-wide
+# quiet interval unless FM_TEARDOWN_NM_STALL_SECS names another).
+NM_TEARDOWN_STALL_SECS=${FM_TEARDOWN_NM_STALL_SECS:-}
+case "$NM_TEARDOWN_STALL_SECS" in ''|*[!0-9]*|0*) NM_TEARDOWN_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
+# 1 when the last parked-run lookup went silent: whether a run is parked is then
+# unknown, which is not the same as "no run is parked".
+TASK_NM_READ_UNKNOWN=0
+
+# One read-only no-mistakes query into <variable>, stopped by its own stall
+# interval (FM_NM_READ_PROGRESS) with its stderr discarded, returning its status.
+# While it waits, a progress line goes to teardown's stderr every tenth of the
+# repo-wide quiet interval, so a sweep that stops a silent teardown never stops
+# one that is only waiting on a live read.
+teardown_nm_read() {  # <variable> <command> [args...]
+  local _var=$1 _out _rc=0
+  shift
+  teardown_nm_beat_start
+  _out=$(FM_NM_READ_PROGRESS=1 "$@" 2>/dev/null) || _rc=$?
+  teardown_nm_beat_stop
+  printf -v "$_var" '%s' "$_out"
+  return "$_rc"
+}
+
+# The progress line above, around a call that keeps its own output.
+TEARDOWN_NM_BEAT=
+teardown_nm_beat_start() {
+  local _every
+  _every=$(( $(fm_progress_quiet_secs) / 10 ))
+  [ "$_every" -gt 0 ] || _every=1
+  (
+    s=
+    trap 'kill "$s" 2>/dev/null; exit 0' TERM
+    while kill -0 "$$" 2>/dev/null; do
+      sleep "$_every" 2>/dev/null & s=$!
+      wait "$s"
+      echo "teardown: $ID is still waiting on a no-mistakes read" >&2
+    done
+  ) >/dev/null &
+  TEARDOWN_NM_BEAT=$!
+}
+
+teardown_nm_beat_stop() {
+  kill "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  wait "$TEARDOWN_NM_BEAT" 2>/dev/null || true
+  TEARDOWN_NM_BEAT=
+}
+
+# The status of one run with its error text, which names a run that is gone.
+teardown_nm_run_status_merged() {  # <worktree> <stall-secs> <args...>
+  fm_nm_run_bounded "$@" 2>&1
+}
+
+# A silent read about this task's own run: without --force nothing is closed and
+# teardown exits for a retry; the captain's --force discard goes on, and says and
+# records that the run state is unknown.
+teardown_nm_run_unknown() {  # <what is unknown>
+  local why="the no-mistakes daemon went silent (no output or CPU progress for ${NM_TEARDOWN_STALL_SECS}s), so $1"
+  if [ "$FORCE" != "--force" ]; then
+    echo "UNKNOWN: $why; nothing more was closed, retry teardown." >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  fi
+  echo "warning: $why; --force goes on with the no-mistakes run state unknown." >&2
+  FM_NM_READ_STALLED=1
+  export FM_NM_READ_STALLED
+  if [ ! -L "$DATA/$ID" ] && mkdir -p "$DATA/$ID" 2>/dev/null \
+      && printf '%s forced teardown went on with the no-mistakes run state unknown: %s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$why" >> "$DATA/$ID/no-mistakes-unknown.log" 2>/dev/null; then
+    echo "teardown: recorded the unknown no-mistakes run state in $DATA/$ID/no-mistakes-unknown.log" >&2
+  else
+    echo "warning: could not record the unknown no-mistakes run state in $DATA/$ID/no-mistakes-unknown.log" >&2
+  fi
+}
 # How many of the most recent `no-mistakes runs` rows the parked-run
 # continuation proof may scan, mirroring bin/fm-crew-state.sh's limit posture
 # (generous: rows of other branches interleave freely in the real ledger).
@@ -3085,7 +3358,7 @@ NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
 case "$NM_TEARDOWN_RUNS_LIMIT" in ''|*[!0-9]*) NM_TEARDOWN_RUNS_LIMIT=200 ;; esac
 TASK_RUN_ID=
 task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
-  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger
+  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger ledger_rc
   TASK_RUN_ID=
   branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
   [ -n "$branch" ] || return 1
@@ -3117,7 +3390,12 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
     # abort here must never fire for a run that already ended).
     [ -n "$run_head" ] || return 1
     [ -z "$(fm_nm_resolve_commit "$wt" "$run_head")" ] || return 1
-    ledger=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT")
+    ledger_rc=0
+    teardown_nm_read ledger fm_nm_run_checked "$wt" "$NM_TEARDOWN_STALL_SECS" runs --limit "$NM_TEARDOWN_RUNS_LIMIT" || ledger_rc=$?
+    if [ "$ledger_rc" -eq 124 ]; then
+      TASK_NM_READ_UNKNOWN=1
+      return 1
+    fi
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
   awaiting=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*awaiting_agent:' | head -1 || true)
@@ -3133,10 +3411,19 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
 }
 
 task_run_is_own_parked_run() {  # <worktree>
-  local wt=$1 out
-  # Accepted best-effort residual: query failures stay fail-open because making
-  # no-mistakes availability a prerequisite would block ship tasks with no run.
-  out=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" axi status)
+  local wt=$1 out rc=0
+  TASK_NM_READ_UNKNOWN=0
+  # Accepted best-effort residual: a query that fails outright stays fail-open,
+  # because making no-mistakes availability a prerequisite would block ship tasks
+  # with no run. A daemon that goes silent has not answered "no run is parked": it
+  # leaves that unknown, and conclude_task_no_mistakes_run exits for a retry,
+  # except under --force, where the captain's authorized discard goes on and the
+  # unknown run state is printed and recorded (teardown_nm_run_unknown).
+  teardown_nm_read out fm_nm_run_checked "$wt" "$NM_TEARDOWN_STALL_SECS" axi status || rc=$?
+  if [ "$rc" -eq 124 ]; then
+    TASK_NM_READ_UNKNOWN=1
+    return 1
+  fi
   task_status_is_own_parked_run "$wt" "$out"
 }
 
@@ -3164,18 +3451,29 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
 # worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
 # a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
-  local wt=$1 out run_id
+  local wt=$1 out run_id verify_rc
   [ "$KIND" = ship ] || return 0
   [ -d "$wt" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
-  task_run_is_own_parked_run "$wt" || return 0
+  if ! task_run_is_own_parked_run "$wt"; then
+    [ "$TASK_NM_READ_UNKNOWN" = 1 ] || return 0
+    teardown_nm_run_unknown "whether a run for $ID is parked at a gate is unknown"
+    return 0
+  fi
   run_id=$TASK_RUN_ID
   echo "teardown: no-mistakes run for $ID is parked at a gate; aborting before the worker is removed" >&2
   # Accepted best-effort residual: abort supports run-id targeting but no atomic
   # live-state condition; fully closing the resume race needs upstream compare-and-cancel.
   fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi abort --run "$run_id" >/dev/null 2>&1 || true
-  if out=$(fm_nm_run_bounded "$wt" "$NM_TEARDOWN_TIMEOUT" axi status --run "$run_id" 2>&1); then
+  verify_rc=0
+  teardown_nm_read out teardown_nm_run_status_merged "$wt" "$NM_TEARDOWN_STALL_SECS" axi status --run "$run_id" || verify_rc=$?
+  if [ "$verify_rc" -eq 0 ]; then
     task_status_is_terminal_run "$out" "$run_id" && return 0
+  elif [ "$verify_rc" -eq 124 ]; then
+    # The abort was sent; only the confirming read went silent. That is not "still
+    # parked", so it is unknown and a later teardown confirms it.
+    teardown_nm_run_unknown "whether run $run_id for $ID stopped after the abort is unknown"
+    return 0
   elif task_status_is_run_not_found "$out" "$run_id"; then
     return 0
   fi
@@ -3978,6 +4276,7 @@ require_owned_task_worktree_slot() {
 # determination and never enters this route.
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
+TEARDOWN_SHARED_LEASE_HOLDER=
 require_shared_task_worktree_slot() {
   local slot state_dir other_meta copy kind marker holder i last
   local -a sharers=() sharer_metas=()
@@ -4011,13 +4310,26 @@ require_shared_task_worktree_slot() {
       # Until reassociation, root-only records do not trigger the allocation
       # guard for nested current copies. Keep Treehouse itself from handing
       # out this slot throughout that interval, not just during our lock.
-      if ! fm_task_copy_pool_slot_held "$slot"; then
+      # A slot in a superseded pool folder with one remaining record is leased
+      # by its exact path for that record, as its lease remedy would hold it,
+      # after every refusal check (TEARDOWN_SHARED_LEASE_HOLDER).
+      if ! fm_task_copy_pool_slot_held "$slot" \
+          && { [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] \
+            || fm_task_copy_slot_in_current_pool "$PROJ" "$slot" "$FM_TASK_COPY_SLOT_NAME" \
+            || [ "$FM_TASK_COPY_POOL_CURRENCY" != superseded ] || [ "${#sharers[@]}" -ne 1 ] \
+            || ! teardown_lease_path_supported "$slot"; }; then
         holder='<remaining-task>'
         [ "${#sharers[@]}" -ne 1 ] || holder="'${sharers[0]}'"
         echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
         case "$FM_TASK_COPY_SLOT_STATE" in
           unleased)
-            echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder $holder)" >&2
+            if [ "$FM_TASK_COPY_POOL_CURRENCY" = current ]; then
+              echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_CURRENT_SLOT_NAME' --lease-holder $holder)" >&2
+            elif [ "$FM_TASK_COPY_POOL_CURRENCY" = superseded ]; then
+              echo "Hold it in place by its exact path without touching its contents (treehouse v3.1.7-fm or later): (cd '$PROJ' && treehouse lease --path '$slot' --lease-holder $holder)" >&2
+            else
+              echo "Hold it in place without touching its contents, once treehouse status run from '$PROJ' lists $slot (a lease takes a slot name and resolves it in the current pool only): (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder $holder)" >&2
+            fi
             ;;
           recovered)
             echo "Treehouse 2.3.1-fm has no supported non-forcing route to replace this recovered-state lease: treehouse lease refuses an already-leased slot. Do not return it to change the lease while copies remain." >&2
@@ -4037,6 +4349,7 @@ require_shared_task_worktree_slot() {
         fi
         return 1
       fi
+      [ "$FM_TASK_COPY_SLOT_STATE" != unleased ] || TEARDOWN_SHARED_LEASE_HOLDER=${sharers[0]}
       TEARDOWN_SLOT_REASSIGNED_TO=${sharers[*]}
       TEARDOWN_SLOT_REASSIGNED_HOME=
       ;;
@@ -4120,7 +4433,8 @@ TEARDOWN_PEER_HOMES=()
 # reserved under a durable lease exactly as an ordinary return reserves it, but
 # never returned; its claim and every foreign copy stay exactly as they were, and
 # only the task's own nested copies the proof covers go. A held close that cannot
-# prove that durable lease refuses before it removes anything. teardown_nested_slot
+# prove that durable lease refuses before it removes anything; a slot in a
+# superseded pool folder is leased by its exact path. teardown_nested_slot
 # sets TEARDOWN_HELD_SLOT to that slot while all of this holds and recomputes it
 # at each reprove.
 TEARDOWN_HELD_SLOT=
@@ -4978,7 +5292,7 @@ preflight_descendant_treehouse_slots() {
   local i j state task_id meta kind backend target worktree project lock_path held owner_rc
   local LC_ALL=C
   local -a project_locks=() project_tasks=()
-  local -a reserve_slots=() reserve_projects=() reserve_tasks=()
+  local -a reserve_slots=() reserve_projects=() reserve_tasks=() superseded=() superseded_names=()
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}
@@ -5062,12 +5376,17 @@ preflight_descendant_treehouse_slots() {
   for ((i=0; i < ${#reserve_slots[@]}; i++)); do
     teardown_reserve_pool_slot "${reserve_slots[$i]}" "${reserve_projects[$i]}" "${reserve_tasks[$i]}" || return 1
     teardown_mark_return_pending "${reserve_slots[$i]}" "${reserve_tasks[$i]}" || return 1
+    [ "$TEARDOWN_SLOT_SUPERSEDED" != 1 ] || { superseded+=("$i"); superseded_names[i]=$TEARDOWN_SLOT_SUPERSEDED_NAME; }
     if [ "$TEARDOWN_SLOT_CUSTODY" = project ]; then
       DESCENDANT_LEGACY_CUSTODY=1
     else
       DESCENDANT_LEASED_SLOTS+=("$(cd "${reserve_slots[$i]}" && pwd -P)")
     fi
   done
+  for i in ${superseded[@]+"${superseded[@]}"}; do
+    teardown_release_misdirected_leases "${reserve_projects[$i]}" "${reserve_tasks[$i]}" "${superseded_names[$i]}"
+  done
+  TEARDOWN_SLOT_SUPERSEDED=
   [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks
 }
 
@@ -5831,7 +6150,9 @@ fi
 # slot is never reserved, because nothing slot-wide is returned. A held slot is
 # reserved the same way and must end up durably leased, because it is never
 # returned and a later treehouse get could otherwise reset it over the foreign
-# copies it holds.
+# copies it holds; a slot in a superseded pool folder is leased by its exact
+# path. This task's misdirected leases are released after the reservation and
+# the held-copy record checks below.
 if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
@@ -5848,20 +6169,37 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
   if [ -n "$TEARDOWN_RESERVED_SLOT" ]; then
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
     if ! teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" \
-        || { [ -n "$TEARDOWN_HELD_SLOT" ] && [ "$TEARDOWN_SLOT_CUSTODY" != lease ]; }; then
+        || { [ -n "$TEARDOWN_HELD_SLOT" ] && [ "$TEARDOWN_SLOT_CUSTODY" != lease ] \
+          && { [ "$TEARDOWN_SLOT_SUPERSEDED" != 1 ] \
+            || ! { teardown_lease_slot_by_path "$TEARDOWN_RESERVED_SLOT" "$PROJ" "$ID" && TEARDOWN_SLOT_CUSTODY=lease; }; }; }; then
       [ -z "$TEARDOWN_HELD_SLOT" ] || echo "REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed." >&2
       exit 1
     fi
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
-  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ] || teardown_release_project_lock || exit 1
   teardown_owns_worktree || teardown_reprove_reassigned_slot
 fi
 if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+  if [ -n "$TEARDOWN_SHARED_LEASE_HOLDER" ]; then
+    teardown_acquire_project_lock || exit $?
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    if ! fm_task_copy_pool_slot_held "$TEARDOWN_SHARED_SLOT" \
+        && ! teardown_lease_slot_by_path "$TEARDOWN_SHARED_SLOT" "$PROJ" "$TEARDOWN_SHARED_LEASE_HOLDER"; then
+      echo "REFUSED: shared pool slot $TEARDOWN_SHARED_SLOT is in a superseded Treehouse pool folder and keeps copies, so it must be leased by its exact path, and a durable lease for task $TEARDOWN_SHARED_LEASE_HOLDER could not be proved, so another allocation could reset the remaining copies before reassociation; nothing was removed. Hold it in place by its exact path without touching its contents: (cd '$PROJ' && treehouse lease --path '$TEARDOWN_SHARED_SLOT' --lease-holder '$TEARDOWN_SHARED_LEASE_HOLDER')" >&2
+      exit 1
+    fi
+    teardown_release_project_lock || exit 1
+  fi
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
 [ "$KIND" = secondmate ] || teardown_held_copies_record_or_refuse || exit 1
+if [ "$TEARDOWN_SLOT_SUPERSEDED" = 1 ]; then
+  teardown_release_misdirected_leases "$PROJ" "$ID" "$TEARDOWN_SLOT_SUPERSEDED_NAME"
+  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
@@ -6089,8 +6427,15 @@ if [ "$BACKEND" = herdr ]; then
   fi
 fi
 if [ "$KIND" != secondmate ]; then
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-      "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID"; then
+  REPORT_RC=0
+  teardown_nm_beat_start
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID" ${FORCE:+"$FORCE"} || REPORT_RC=$?
+  teardown_nm_beat_stop
+  if [ "$REPORT_RC" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
+    echo "UNKNOWN: the no-mistakes daemon went silent, so whether $ID's final outcome is accepted is unknown; every durable task record is kept, retry teardown." >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  elif [ "$REPORT_RC" -ne 0 ]; then
     echo "error: $ID's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery" >&2
     exit 1
   fi
