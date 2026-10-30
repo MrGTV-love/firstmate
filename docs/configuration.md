@@ -3461,7 +3461,10 @@ The armed check prints at most one wake line: every pending condition joined wit
 Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
 `bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
 `arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM.
-The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until it prints nothing, set the new value, then run `disarm`, `retarget`, and `arm`.
+The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until the pending journal is empty, set the new value, then run `disarm`, `retarget`, and `arm`.
+A poll can print nothing while work is still pending, so silence is not the signal.
+The journal is empty when `python3 -c 'import json; print(len(json.load(open("state/slack-watch/state.json"))["pending"]))'`, run in the home with the old value restored, prints `0`.
+A `retarget` with the new value set that still refuses with `dm_user_changed_with_pending_work` means the old DM is not drained yet: restore the old value and poll again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
