@@ -15,7 +15,8 @@
     "spawn-confinement-coverage",
     "spawn-write-confinement",
     "status-log-size-cap",
-    "teardown-superseded-slot-lease"
+    "teardown-superseded-slot-lease",
+    "slack-dm-retarget-pending-work"
   ],
   "guards": [
     {
@@ -1055,6 +1056,40 @@
       "tier": "C",
       "harm": "irreversible",
       "layer_note": "added by PR #188 after a status-append loop filled the disk; deny without a guard event: an append past the cap exits 75 and a refused read returns status 2, each naming the file on stderr, and nothing is written or read; the symbolic-link refusal keeps the capped append on the status log itself; bin/fm-status-cap-guard.sh raises the over-cap wake for a raw writer; docs/configuration.md \"Status log size bounds\" describes the bounds for operators; the test proves the cap and both read refusals, and the symbolic-link refusal has no fixture"
+    },
+    {
+      "decision": "deny",
+      "fail_direction": "closed",
+      "proxy": false,
+      "proxy_reason": "",
+      "precheck_gap": "",
+      "exemptions": [],
+      "instrumented": false,
+      "status": "active",
+      "telemetry": "state/guard-events.jsonl",
+      "version": "1",
+      "id": "slack-dm-retarget-pending-work",
+      "owner": "bin/fm_slack_watch.py",
+      "sites": [
+        {
+          "file": "bin/fm-slack-check.sh",
+          "match": "Retarget refuses while the old DM has pending work"
+        },
+        {
+          "file": "bin/fm-slack-check.sh",
+          "match": "A retarget that still refuses with dm_user_changed_with_pending_work"
+        }
+      ],
+      "invariant": "a Slack retarget never drops answers or notices still pending on the old DM",
+      "layer": "runtime-block",
+      "source": "the pending journal in state/slack-watch/state.json, read by Watch.retarget() in bin/fm_slack_watch.py against the owner id stored for the established DM and FM_SLACK_DM_USER",
+      "trigger": "bin/fm-slack-check.sh retarget runs after FM_SLACK_DM_USER changed while the pending journal still holds an answer or a notice for a thread in the old DM",
+      "remedy": "restore the old FM_SLACK_DM_USER in .env, run bin/fm-slack-poll.sh until python3 -c 'import json; print(len(json.load(open(\"state/slack-watch/state.json\"))[\"pending\"]))' prints 0, set the new value, then run bin/fm-slack-check.sh disarm, bin/fm-slack-check.sh retarget, bin/fm-slack-check.sh arm",
+      "budget": 1,
+      "test": "tests/fm-slack-watch.test.sh",
+      "tier": "C",
+      "harm": "irreversible",
+      "layer_note": "added by the Slack watch activation-readiness change; deny without a guard event: retarget exits non-zero with slack: refused: dm_user_changed_with_pending_work (raised in Watch.retarget in bin/fm_slack_watch.py) and leaves the journal untouched; without the guard, answers pending on the old DM would be lost or misrouted after a retarget; the two bin/fm-slack-check.sh help lines document the refusal and its remedy; test X26 proves the refusal, the untouched journal, and the retarget that succeeds once the journal is empty"
     }
   ],
   "excluded": [
