@@ -2583,8 +2583,20 @@ ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence',
 record = json.loads(ledger.read_text())
 record['handling']['actions'][row['id']].update(requires_followup=True, captain_visible=False)
 ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: followup deferral"', '_', code / 'bin/fm-wake-lib.sh')
+result, boundary = drain()
+shown = next(l for l in result.stdout.splitlines() if row['id'] in l and l.startswith('  ')).rsplit(',', 1)[1]
+assert shown == 'true', ('a deferral marked for follow-up does not stand, so the row prints captain-visible', shown)
 again = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
 assert again.returncode == 1 and 'second deferral refused' in again.stdout, again
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']]['captain_visible'] = False
+record['rows'][0].pop('captain_visible', None)
+ledger.write_text(json.dumps(record))
+ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json')
+record = json.loads(ledger.read_text())
+assert record['handling']['actions'][row['id']]['captain_visible'] is False, record['handling']['actions']
+assert next(r for r in record['rows'] if r['id'] == row['id'])['captain_visible'] is True, record['rows']
 
 # An unproved escalation of a captain-owned row needs no new action until its evidence changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
