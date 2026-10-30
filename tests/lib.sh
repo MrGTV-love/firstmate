@@ -52,6 +52,10 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# A Claude worker launch unsets HERDR_ENV while preserving runtime-only
+# detection. Fixtures set this marker explicitly when exercising that boundary.
+unset FM_HERDR_RUNTIME
+
 # Model freshness (bin/fm-model-freshness.sh) reads each harness's live catalog,
 # which would run the developer's real claude, omp and agy from every spawn and
 # bootstrap case. The suite turns it off; tests/fm-model-freshness.test.sh turns

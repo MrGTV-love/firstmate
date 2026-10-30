@@ -827,7 +827,6 @@
     {"id": "site:bin/fm_model_picker/shadow.py:b5811691db", "rule": "S1", "text": "% (route, entry.get(\"family\"), entry.get(\"currency\"), \"-\", \"REFUSED: %s\" % why))"},
     {"id": "site:bin/fm_model_picker/shadow.py:e83548dfa0", "rule": "S1", "text": "\"yes\" if projection is not None else \"REFUSED: %s\" % why))"},
     {"id": "site:bin/fm_open_loops.py:f0ce3a9f85", "rule": "S1", "text": "print(\"error: overdue rows have no action recorded since presentation; acknowledgement refused\")"},
-    {"id": "site:bin/fm_open_loops.py:bbd376ef12", "rule": "S1", "text": "raise ValueError(\"second deferral refused; row is captain-visible; steer, merge or escalate it\")"},
     {"id": "site:bin/fm_open_loops.py:c78a1a3d95", "rule": "S1", "text": "results.append((line, ident, kind, \"refused\", str(error)))"},
     {"id": "site:bin/fm_open_loops.py:52b4be37cd", "rule": "S1", "text": "modes.add_argument(\"--check-actions\", action=\"store_true\", help=\"refuse acknowledgement with unactio"},
     {"id": "site:bin/fm_slack_watch.py:e37e0dba84", "rule": "S1", "text": "return 'refused', 'allowlist_unparseable'"},

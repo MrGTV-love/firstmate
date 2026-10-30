@@ -6,6 +6,30 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Claude launch HERDR_ENV suppression
+
+Portable verification on 2026-10-28 executed the real `fm-spawn.sh` staged launch through the TeamClaude wrapper with model-free recording binaries:
+
+```sh
+bin/fm-proc-budget.sh -- env FM_TEST_ONLY=test_claude_staged_native_hook_suppression bash tests/fm-spawn-herdr-launch-shell.test.sh
+```
+
+The command exited 0 with:
+
+```text
+ok - staged normal Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged raw Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+ok - staged secondmate Claude suppresses native marker only in managed child; proxy, incarnation and Herdr routing survive
+```
+
+The fixture records each launched child's environment and exercises backend and supervisor discovery without explicit backend configuration in that child.
+It verifies that `HERDR_ENV` is absent while the managed proxy, pane identity, recorded launch generation and Herdr runtime selection survive, and that the parent shell and a subsequent unrelated worker retain their native environment.
+The portable fixture selects the Linux launch path and supplies a fake process reader for its isolated project locks; it does not exercise nested macOS Seatbelt.
+With only fm-spawn's suppression disabled as a counterfactual, the same regression exited 1 with `not ok - normal: native marker reached Claude`; the wrapper does not mask a missing spawn boundary.
+These portable results establish the child environment boundary, not installed Claude/Herdr lifecycle behavior.
+Already-restored Claude workers are not yet covered; no ownership or registration-release path is established by these tests.
+The [Herdr restart guide](../herdr-backend.md#ownership-after-native-restoration) owns the prevention boundary and its limits.
+
 ## macOS worker write confinement
 
 Verified on 2026-10-29 on macOS 27 arm64.
