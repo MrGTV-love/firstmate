@@ -49,7 +49,8 @@
 # contributions.read.<read> key: the key's bound is read once per poll, each
 # read's sample is recorded in one batch when the poll ends, and only output
 # and process-tree CPU silence past that bound stops it. The bound starts at
-# 30 seconds, main's per-check allowance, so no read stops sooner than on main;
+# 30 seconds, the watcher's former per-check kill, so no read stops sooner
+# than it did under that kill;
 # measured samples can only raise it. There is no sweep deadline or observation
 # reservation. A stopped read is unknown: keep that URL's saved observation
 # untouched, and dial no further URL this pass, because the next read would
