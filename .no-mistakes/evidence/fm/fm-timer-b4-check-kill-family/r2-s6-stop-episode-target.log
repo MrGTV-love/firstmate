@@ -1,0 +1,17 @@
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/s6.sh: line 17: /Users/charlesabrooker/tmp/fm-lab.rFTPVD/state/.watch-triage.log: No such file or directory
+pass 1-hang: sweep done=yes; stops logged this pass=1; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|
+pass 2-hang-again: sweep done=no; stops logged this pass=0; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/lib.sh: line 32: 90505 Terminated: 15          env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME="$FM_HOME" FM_POLL=1 FM_HEARTBEAT=999999 "$@" "$ROOT/bin/fm-watch.sh" > "$p.out" 2> "$p.err"
+pass 3-hang-third: sweep done=yes; stops logged this pass=1; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|
+pass 4-healthy: sweep done=yes; stops logged this pass=0; unknown wakes queued=1
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|check: $FM_HOME/state/flaky.check.sh: healthy-run|
+pass 5-hang-new-episode: sweep done=yes; stops logged this pass=1; unknown wakes queued=2
+   queue: check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)|check: $FM_HOME/state/flaky.check.sh: healthy-run|check: $FM_HOME/state/flaky.check.sh: check flaky stopped after 4s (no progress); result unknown, retry next pass|
+-- triage log (every stop is logged):
+[2026-10-30T08:52:52-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-30T08:53:02-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-30T08:53:11-0500] check flaky stopped after 4s (no progress); result unknown, retry next pass
+-- note: pass 2 is a driver artifact. Its watcher found an unrelated open-loop-ledger wake (queued in pass 2), delivered it, and ended its cycle before the check sweep, so it proves nothing. Pass 3 is the re-hang proof: one stop logged, no new unknown wake (still 1). Pass 4 healthy: no stop. Pass 5 new episode after the healthy run: a second unknown wake.

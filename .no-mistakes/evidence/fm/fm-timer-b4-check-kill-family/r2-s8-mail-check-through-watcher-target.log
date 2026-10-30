@@ -1,0 +1,17 @@
+armed: state/mail.check.sh
+== target pass A started 08:52:46 (default watcher settings)
+sweep took 24s
+-- wake queue:
+mail:42	check: mail 42
+$FM_HOME/state/mail.check.sh	check: $FM_HOME/state/mail.check.sh: mail: new mail: woke for 42
+-- triage:
+-- .mail-check record: fm-mail-check-v1|epoch=1793368389|
+armed: state/mail.check.sh
+== target pass B started 08:53:10 (default watcher settings)
+sweep took 34s
+-- wake queue:
+$FM_HOME/state/mail.check.sh	check: $FM_HOME/state/mail.check.sh: check mail stopped after 31s (no progress); result unknown, retry next pass
+-- triage:
+[2026-10-30T08:53:43-0500] check mail stopped after 31s (no progress); result unknown, retry next pass
+-- hung poll pid alive: no
+-- .mail-check record: 

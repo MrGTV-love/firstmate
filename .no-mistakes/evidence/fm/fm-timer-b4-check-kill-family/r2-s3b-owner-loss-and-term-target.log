@@ -1,0 +1,12 @@
+target SIGKILL: check=59339 child=59400 detached=59571 all live: yes
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/s3b.sh: line 4: 47959 Killed: 9               env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME="$FM_HOME" FM_POLL=1 FM_HEARTBEAT=999999 "$@" "$ROOT/bin/fm-watch.sh" > "$p.out" 2> "$p.err"
+  watcher exited after .26s (alive now: no)
+  check tree gone 1.18s after signal (check, child, detached child)
+  .watch.lock present: lrwxr-xr-x
+  stray processes naming the lab: 0
+target SIGTERM: check=79724 child=79762 detached=79903 all live: yes
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/s3b.sh: line 4: 72294 Terminated: 15          env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME="$FM_HOME" FM_POLL=1 FM_HEARTBEAT=999999 "$@" "$ROOT/bin/fm-watch.sh" > "$p.out" 2> "$p.err"
+  watcher exited after 1.33s (alive now: no)
+  check tree gone 1.35s after signal (check, child, detached child)
+  .watch.lock released
+  stray processes naming the lab: 0

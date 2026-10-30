@@ -1,0 +1,65 @@
+ok - only required-captain contributions are rows; other actors are counted
+ok - replaced-head verdict is stale and cannot create a captain requirement
+ok - unchecked ownership is disclosed and cannot prove silence
+ok - newest check with no verdict is distinct from passing and pending
+ok - new maintainer comment wakes once and stays pending until acknowledged
+ok - new maintainer review wakes once and stays pending until acknowledged
+ok - new maintainer inline wakes once and stays pending until acknowledged
+ok - ready-for-pr on a filed issue becomes a planning wake
+ok - a fresh open issue remains measured maintainer triage
+ok - an absent check lane remains missing across repeated observations
+ok - mixed freshness retains measured captain work and discloses the gap
+ok - malformed durable evidence cannot prove silence
+ok - a transient ready-for-pr label wakes and its exact acknowledgement survives replay
+ok - recorded judgment keeps its exact head and is stale immediately on a published replacement
+ok - verdict help and refusal name exactly the actors the command accepts
+ok - a current forge observation refreshes a verdict after a replacement
+ok - an unavailable current head leaves verdict freshness unknown
+ok - away yolo delivery is fleet work without granting merge authority
+actionable: PR https://github.com/o/r/pull/8 is registered but its ready line did not reach the parent channel (rc=3)
+ok - cross-home away yolo delivery is fleet work
+ok - retired ownership persists and unsupported forge remains visibly unmeasured
+ok - unsupported forge coverage is disclosed without inventing fleet work
+ok - held unsupported forge coverage remains unmeasured
+ok - shared contribution signal wakes once while retaining both acknowledgements
+ok - watcher keeps observer diagnostics separate from contribution wakes
+ok - expired child unsupported-forge coverage remains unmeasured
+ok - watcher surfaces one durable contribution signal, rings again while it is undrained, and stops once drained
+ok - parent consumes measured child coverage and refuses expired child silence
+ok - unreadable pending signals refuse an empty-inbox claim
+ok - record task identity is the directory dirname/basename named
+ok - snapshot and pending create nothing in a home without state
+ok - a wall-clock jump does not refuse a healthy observation
+ok - a genuine forge failure still records the error and wakes after a clock jump
+ok - a URL owned by two tasks is observed once and every owner receives the result
+ok - a merged or closed contribution settles once, is not re-read, and never wakes again
+ok - a late owner inherits a terminal observation without a forge read or wake
+ok - a retry converges every owner whose saved row is not terminal, keeping its own acknowledgement state
+ok - an open PR linked from a done task keeps being observed
+ok - all live URLs are attempted without a derived observation reserve
+ok - eight 3-second PR reads complete as one coherent observation
+ok - forge reads complete at 1x and 5x with real descendant CPU progress
+ok - an unsupported URL in either rotation position leaves the pass and its GitHub URL intact
+cpu_telemetry_unavailable: fixture diagnostic
+ok - the quota reason is the refusal line, not another diagnostic on the same stream
+ok - a poll records the samples of its forge reads
+ok - after the first unknown read a pass dials nothing more, keeps every row, and the next pass dials again
+ok - one always-silent URL stays unknown while every other URL is refreshed on every later pass
+ok - a poll stopped while writing its order leaves no temporary file in state
+ok - a PR poll retired and re-armed before any sweep starts a new stop episode
+ok - every disarm or retirement path starts a new stop episode after a re-arm before any sweep
+ok - read supervision is not a sub-budget of the watcher interval
+ok - a contribution row queued by a pass the watcher stopped still rings on the next pass
+ok - a genuinely unavailable forge records an error and wakes once per failure episode
+ok - a late owner does not restart a shared forge failure episode
+ok - retire stops the unavailable check, leaves rotation and restores complete coverage
+ok - a late owner settled beside a retired final record stays unretired and known
+ok - retire is idempotent and refuses non-captain, unknown, malformed and signal-bearing pairs
+ok - a repeated poll answers unchanged PR reads with 304s and still sees a changed resource
+ok - below the floor the poll keeps the last observation stale with the reset time, once, and resumes after the reset
+ok - a genuine forge failure after a quota-stale episode wakes once
+ok - late owners of the same or another URL inherit quota staleness without restarting its episode
+ok - a successful REST wave below the floor refuses GraphQL and marks every tail owner despite the budget reserve
+ok - a completed issue stays measured while all unmeasured tail owners become quota-stale
+ok - HTTP and passthrough shims preserve backend failures without a successful response
+rc=0

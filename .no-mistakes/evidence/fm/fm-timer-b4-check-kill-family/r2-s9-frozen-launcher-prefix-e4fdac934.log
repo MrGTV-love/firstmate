@@ -1,0 +1,18 @@
+prefix shutdown: check=59023 child=59104 launcher=58832 (python3 /Users/charlesabrooker/tmp/fm-b4-trees.MI7IpD/prefix)
+  launcher frozen: stat=T   
+  HANG: watcher still alive 69.07s after TERM (driver backstop: nominal 30 s of 0.1 s polls); driver then SIGKILLed the watcher
+  only after that driver SIGKILL: launcher, check and its child gone 70.16s after TERM
+  .watch.lock still present (watcher never ran its exit cleanup)
+  stray processes naming the lab: 0
+prefix inactivity: hung check=48564 launcher=48478 frozen: stat=T   
+  HANG: sweep not finished >=60 s after freeze (nominal 600 x 0.1 s driver polls; host stretches each poll)
+  driver then sent the watcher TERM and waited for it; the watcher never exited (driver blocked in wait)
+  [operator, ~10 min later] process snapshot before intervention:
+      PID  PPID STAT ELAPSED COMMAND
+    44929 46071 S      10:50 bash .../prefix/bin/fm-watch.sh            (watcher, TERMed ~9 min earlier, still alive)
+    48478 44929 T      10:48 python3 .../prefix/bin/fm-check-run.py ... (frozen launcher)
+    48572 48478 S      10:48 python3 .../prefix/bin/fm-proc-info.py rss-tree 48564 (guardian)
+  [operator] SIGKILL watcher 44929, launcher 48478 and guardian 48572 to end the stuck driver
+  only after that operator SIGKILL: wake queue empty (b-after never ran), no triage line,
+  hung check and frozen launcher gone, stray processes naming the lab: 0, lab torn down
+RESULT (prefix e4fdac934): with a frozen launcher, neither watcher shutdown nor the check sweep ever finishes.

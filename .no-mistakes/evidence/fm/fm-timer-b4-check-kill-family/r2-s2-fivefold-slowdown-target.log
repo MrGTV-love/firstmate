@@ -1,0 +1,2 @@
+target 1x: sweep 12s -> SUCCEEDED (work-done reported)
+target 5x: sweep 48s -> SUCCEEDED (work-done reported)

@@ -1,0 +1,16 @@
+Trace: watcher (bash -x, PS4 stamps = watcher $SECONDS) TERMed while launcher frozen
++1 3575 trap watcher_cleanup EXIT
+++3 2576 watcher_cleanup
+++3 3561 fm_active_check_stop
+++3 2398 kill -TERM -- -10926
+++3 2399 kill -TERM 10926
+++3 2408 fm_check_pid_wait 10926 300
+++3 2387 perl -e 'my ($pid, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, $pid); ++$i) { select undef, undef, undef, 0.01 }' 10926 300
+++25 2412 kill -KILL -- -10926
+++25 2413 kill -KILL 10926
+
+Standalone timing of the same 300 x 0.01 s perl poll on this host:
+real 19.52
+real 18.90
+real 15.90
+ 9:10  up 1 day, 23:10, 4 users, load averages: 9.09 9.49 10.03

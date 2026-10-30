@@ -1,0 +1,16 @@
+target shutdown: check=58920 child=58941 launcher=58505 (python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18e)
+  launcher frozen: stat=T   
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/s9.sh: line 25: 47595 Terminated: 15          env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME="$FM_HOME" FM_POLL=1 FM_HEARTBEAT=999999 "$@" "$ROOT/bin/fm-watch.sh" > "$p.out" 2> "$p.err"
+  watcher exited 17.35s after TERM
+  launcher, check and its child all gone 18.36s after TERM
+  .watch.lock released
+  stray processes naming the lab: 0
+target inactivity: hung check=29528 launcher=29372 frozen: stat=T   
+  sweep finished 25.97s after freeze
+  -- wake queue:
+    check: $FM_HOME/state/a-hung.check.sh: check a-hung stopped after 25s (no progress); result unknown, retry next pass
+    check: $FM_HOME/state/b-after.check.sh: after-ran
+  -- triage:
+    [2026-10-30T08:53:35-0500] check a-hung stopped after 25s (no progress); result unknown, retry next pass
+  hung check and frozen launcher both gone
+  stray processes naming the lab: 0

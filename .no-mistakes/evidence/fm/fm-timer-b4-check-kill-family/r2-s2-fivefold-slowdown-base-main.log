@@ -1,0 +1,3 @@
+base 1x: sweep 12s -> SUCCEEDED (work-done reported)
+/Users/charlesabrooker/.no-mistakes/evidence/01M660RK8MW2W9FJGDSPWM42CN/drivers-r2/lib.sh: line 32: 96178 Terminated: 15          env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE FM_HOME="$FM_HOME" FM_POLL=1 FM_HEARTBEAT=999999 "$@" "$ROOT/bin/fm-watch.sh" > "$p.out" 2> "$p.err"
+base 5x: sweep 32s -> FAILED (no work-done; check was killed)
