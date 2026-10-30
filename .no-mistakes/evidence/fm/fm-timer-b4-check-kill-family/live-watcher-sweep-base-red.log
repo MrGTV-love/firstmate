@@ -1,0 +1,12 @@
+== RED-FIRST: base commit ca1fdbf7e bin/fm-watch.sh (old 30 s wall kill, default FM_CHECK_TIMEOUT) on the same 5x-slowed check
+[19:24:33 +1s] watcher pid 4038 started (FM_CHECK_TIMEOUT=30 LIVE_DELAY=1)
+[19:25:35 +63s] sweep ended: .last-check=present watcher-alive=no
+[19:25:35 +63s] slow-finished marker: ABSENT
+[19:25:35 +63s] hung-pid 56255 alive after sweep: no
+[19:25:35 +63s] hung-child-pid 56261 alive after sweep: no
+[19:25:35 +63s] --- triage log (check lines)
+(no stop lines)
+[19:25:35 +63s] --- wake queue reasons
+check: /Users/charlesabrooker/tmp/fm-lab.BB58Sd/state/c-after.check.sh: after-check-ran
+[19:25:35 +63s] --- watcher stdout
+check: /Users/charlesabrooker/tmp/fm-lab.BB58Sd/state/c-after.check.sh: after-check-ran

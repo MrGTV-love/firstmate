@@ -1,0 +1,9 @@
+registered: state/owner.check.sh
+[19:50:36] watcher pid 38911 started (FM_CHECK_TIMEOUT=3)
+[19:50:37] check main=40787 desc=40793 launcher=40745
+[19:50:43] after 5s with inactivity minimum 3s, progressing check still alive (expected)
+[19:50:43] sent SIGKILL to watcher
+[19:50:43] watcher exited rc=137
+[19:50:44] launcher exited
+[19:50:44] RESULT: pid 40787 gone
+[19:50:44] RESULT: pid 40793 gone

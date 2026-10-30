@@ -1,0 +1,6 @@
+== RED-FIRST sigkill on base commit ca1fdbf7e bin/fm-watch.sh
+[19:26:09 +0s] watcher pid 77576 started (FM_CHECK_TIMEOUT=3)
+[19:26:16 +7s] before owner loss: check 78646 alive=no, descendant 78649 alive=no, launcher 78637: 
+[19:26:16 +7s] watcher 77576 exited after sigkill (status 137)
+[19:26:16 +7s] launcher exited
+[19:26:16 +7s] RESULT: check 78646 and descendant 78649 are gone after watcher sigkill

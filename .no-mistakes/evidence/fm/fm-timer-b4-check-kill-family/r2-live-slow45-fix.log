@@ -1,0 +1,14 @@
+registered: state/slow.check.sh
+[19:48:06] watcher pid 16257 started ()
+[19:48:53] sweep took 47s
+[19:48:53] watcher exited rc=0
+[19:48:53] --- watch.out
+check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/slow.check.sh: slow-check-completed
+[19:48:53] --- watch.err (tail)
+calibration: "0 of 5 samples for check.inactivity on Mac-Studio.local"
+fallback: "30s existing caller limit"
+[19:48:53] --- wake queue rows (check rows)
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/slow.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/slow.check.sh: slow-check-completed
+[19:48:53] --- triage log (check lines)
+[19:48:53] RESULT: check ran to completion
+[19:48:53] RESULT: completion wake queued

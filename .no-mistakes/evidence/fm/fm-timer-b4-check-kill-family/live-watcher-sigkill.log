@@ -1,0 +1,6 @@
+== sigkill (fix head 0d6462442)
+[19:25:42 +0s] watcher pid 32289 started (FM_CHECK_TIMEOUT=3)
+[19:25:51 +9s] before owner loss: check 41737 alive=yes, descendant 41773 alive=yes, launcher 41528: python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63Y5TM1XYJMDBSHVPF3W
+[19:25:51 +9s] watcher 32289 exited after sigkill (status 137)
+[19:25:53 +11s] launcher exited
+[19:25:53 +11s] RESULT: check 41737 and descendant 41773 are gone after watcher sigkill

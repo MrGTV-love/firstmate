@@ -1,0 +1,9 @@
+== second pass retry (first attempt woke on the lab's open-loop ledger before the check sweep); episode marker: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/b-hung.check-stopped
+.last-check: present
+-- triage stop lines (all passes):
+[2026-10-29T19:23:28-0500] check b-hung stopped after 5s (no progress); result unknown, retry next pass
+[2026-10-29T19:24:20-0500] check b-hung stopped after 5s (no progress); result unknown, retry next pass
+-- wake queue reasons this pass:
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/a-slow.check.sh: slow-check-completed after 15s
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/c-after.check.sh: after-check-ran
+-- leftover sleep 600: 3922 

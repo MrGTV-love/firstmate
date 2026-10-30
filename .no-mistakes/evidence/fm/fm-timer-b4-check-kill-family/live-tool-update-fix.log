@@ -1,0 +1,15 @@
+== live tool-update via real watcher (fix head). PATH: /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/old before /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/new
+{ "tools": [ { "name": "stucktool", "command": "stucktool" }, { "name": "slowtool", "command": "slowtool" } ] }
+armed: state/tool-updates.check.sh
+arm exit=0
+.last-check present after 34s
+-- wake queue reasons:
+check: /Users/charlesabrooker/tmp/fm-lab.TeUWhV/state/tool-updates.check.sh: tool updates: stucktool check unknown: /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/old/stucktool stopped making progress; retry at the next tool-update interval; slowtool update not in effect: PATH resolves 1.0.0 at /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/old/slowtool but 2.0.0 is installed at /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/new/slowtool
+-- stop lines in triage:
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.TeUWhV/state/.watch-triage.log: No such file or directory
+(none: the watcher did not stop the check)
+-- stuck probe 79872 alive after sweep: no
+-- report record state/.tool-updates:
+fm-tool-updates-v1
+epoch=1793320363
+reported=stucktool check unknown: /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/old/stucktool stopped making progress; retry at the next tool-update interval; slowtool update not in effect: PATH resolves 1.0.0 at /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/old/slowtool but 2.0.0 is installed at /Users/charlesabrooker/tmp/fm-lab.TeUWhV/tools/new/slowtool

@@ -1,0 +1,13 @@
+== RED-FIRST sigkill on base commit ca1fdbf7e bin/fm-watch.sh, FM_CHECK_TIMEOUT=30 (base default)
+[19:26:26 +0s] watcher pid 973 started (FM_CHECK_TIMEOUT=30)
+[19:26:33 +7s] before owner loss: check 3928 alive=yes, descendant 3935 alive=yes, launcher 3915: timeout 30 bash /Users/charlesabrooker/tmp/fm-lab.ZGGxON/state/.fm-custom-check.s6qtk6
+[19:26:33 +7s] watcher 973 exited after sigkill (status 137)
+[19:31:31] observation ~5 min after base watcher SIGKILL (watcher died at 19:26:33):
+  PID  PPID ELAPSED COMMAND
+ 3915     1   05:04 timeout 30 bash /Users/charlesabrooker/tmp/fm-lab.ZGGxON/state/.fm-custom-check.s6qtk6
+ 3928  3915   05:04 bash /Users/charlesabrooker/tmp/fm-lab.ZGGxON/state/.fm-custom-check.s6qtk6
+  (descendant 3935 `sleep 300` had just ended on its own after 300 s)
+[19:31:36] test cleanup: SIGKILL leaked base check 3928 and its timeout launcher 3915 by hand
+[19:31:36 +310s] launcher exited   (only because of the manual kill above)
+RESULT: RED. The base watcher's SIGKILL left the progressing TERM-resistant check and its orphaned
+`timeout` launcher alive for over 5 minutes. Compare live-watcher-sigkill.log (fix): gone within 2 s.

@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - slow bounded check stays fresh; stopped live poll goes stale and resumes

@@ -1,0 +1,3 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+Terminated: 15
+ok - owner loss sends a check's detached child TERM before any KILL

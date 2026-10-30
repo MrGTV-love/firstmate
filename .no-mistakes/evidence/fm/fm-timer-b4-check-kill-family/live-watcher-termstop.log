@@ -1,0 +1,6 @@
+== termstop (fix head 0d6462442)
+[19:25:53 +0s] watcher pid 58225 started (FM_CHECK_TIMEOUT=3)
+[19:26:00 +7s] before owner loss: check 60555 alive=yes, descendant 60568 alive=yes, launcher 60477: python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M63Y5TM1XYJMDBSHVPF3W
+[19:26:02 +9s] watcher 58225 exited after termstop (status 143)
+[19:26:02 +9s] launcher exited
+[19:26:02 +9s] RESULT: check 60555 and descendant 60568 are gone after watcher termstop

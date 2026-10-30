@@ -1,0 +1,11 @@
+test_check_inactivity_configuration_and_launch_allowance exit=0 secs=34
+test_check_progress_survives_fivefold_slowdown exit=0 secs=22
+test_check_sigkill_owner_cleans_progressing_tree exit=0 secs=7
+test_check_absolute_limit_stops_endless_progress_as_unknown exit=0 secs=29
+test_stopped_check_wakes_once_per_episode exit=0 secs=24
+test_check_runs_without_posix_python exit=0 secs=6
+test_check_owner_loss_terms_a_detached_child exit=0 secs=5
+test_check_stderr_capture_keeps_a_capped_tail exit=0 secs=8
+test_check_wait_has_no_per_tick_processes exit=0 secs=17
+test_group_cleanup_without_perl_uses_one_sleep_per_wait exit=0 secs=10
+test_slow_check_beats_but_stopped_poll_goes_stale exit=0 secs=22

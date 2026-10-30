@@ -1,0 +1,59 @@
+registered: state/a-hung.check.sh
+registered: state/b-after.check.sh
+[19:50:15] === pass 1
+[19:50:15] watcher pid 17151 started (FM_CHECK_TIMEOUT=3 FM_WATCH_HANDLING_SUCCESSOR=0)
+[19:50:22] sweep took 7s
+[19:50:22] watcher exited rc=0
+[19:50:22] --- watch.out
+check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh: check a-hung stopped after 4s (no progress); result unknown, retry next pass
+[19:50:22] --- watch.err (tail)
+calibration: "0 of 5 samples for check.inactivity on Mac-Studio.local"
+fallback: "3s existing caller limit"
+no_progress: "pid=19577 no CPU or watched-file progress for 3.5s"
+[19:50:22] --- wake queue rows (check rows)
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh: check a-hung stopped after 4s (no progress); result unknown, retry next pass
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh: after-ran
+[19:50:22] --- triage log (check lines)
+[2026-10-29T19:50:21-0500] check a-hung stopped after 4s (no progress); result unknown, retry next pass
+[19:50:22] RESULT: check-hung.pid (19641) gone
+[19:50:22] RESULT: check-sleep.pid (19651) gone
+[19:50:22] unknown wakes this pass: 1
+[19:50:22] episode marker: present
+[19:50:22] === pass 2
+[19:50:22] watcher pid 27423 started (FM_CHECK_TIMEOUT=3 FM_WATCH_HANDLING_SUCCESSOR=1)
+[19:50:28] sweep took 6s
+[19:50:28] watcher exited rc=0
+[19:50:28] --- watch.out
+check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh: after-ran
+[19:50:28] --- watch.err (tail)
+calibration: "0 of 5 samples for check.inactivity on Mac-Studio.local"
+fallback: "3s existing caller limit"
+no_progress: "pid=28771 no CPU or watched-file progress for 3.4s"
+[19:50:28] --- wake queue rows (check rows)
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh: after-ran
+[19:50:28] --- triage log (check lines)
+[2026-10-29T19:50:21-0500] check a-hung stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-29T19:50:28-0500] check a-hung stopped after 5s (no progress); result unknown, retry next pass
+[19:50:28] RESULT: check-hung.pid (28804) gone
+[19:50:28] RESULT: check-sleep.pid (28811) gone
+[19:50:28] unknown wakes this pass: 0
+[19:50:28] episode marker: present
+[19:50:28] === pass 3
+[19:50:28] watcher pid 31662 started (FM_CHECK_TIMEOUT=3 FM_WATCH_HANDLING_SUCCESSOR=1)
+[19:50:29] sweep took 1s
+[19:50:29] watcher exited rc=0
+[19:50:29] --- watch.out
+check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh: healed
+[19:50:29] --- watch.err (tail)
+calibration: "0 of 5 samples for check.inactivity on Mac-Studio.local"
+fallback: "3s existing caller limit"
+[19:50:29] --- wake queue rows (check rows)
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/a-hung.check.sh: healed
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/b-after.check.sh: after-ran
+[19:50:30] --- triage log (check lines)
+[2026-10-29T19:50:21-0500] check a-hung stopped after 4s (no progress); result unknown, retry next pass
+[2026-10-29T19:50:28-0500] check a-hung stopped after 5s (no progress); result unknown, retry next pass
+[19:50:30] RESULT: check-hung.pid (32385) gone
+[19:50:30] RESULT: check-sleep.pid (28811) gone
+[19:50:30] unknown wakes this pass: 0
+[19:50:30] episode marker: absent

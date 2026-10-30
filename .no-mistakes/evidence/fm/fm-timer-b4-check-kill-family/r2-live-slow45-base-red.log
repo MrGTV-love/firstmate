@@ -1,0 +1,10 @@
+registered: state/slow.check.sh
+[19:49:20] watcher pid 22535 started ()
+[19:49:51] sweep took 31s
+[19:49:51] watcher exited rc=143
+[19:49:51] --- watch.out
+[19:49:51] --- watch.err (tail)
+[19:49:51] --- wake queue rows (check rows)
+[19:49:51] --- triage log (check lines)
+[19:49:51] RESULT: check was killed before it finished
+[19:49:51] RESULT: no completion wake

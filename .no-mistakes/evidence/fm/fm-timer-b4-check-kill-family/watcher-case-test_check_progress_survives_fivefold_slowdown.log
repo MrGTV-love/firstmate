@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound

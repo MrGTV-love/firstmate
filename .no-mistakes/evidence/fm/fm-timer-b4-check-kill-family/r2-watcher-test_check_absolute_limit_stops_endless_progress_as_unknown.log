@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues

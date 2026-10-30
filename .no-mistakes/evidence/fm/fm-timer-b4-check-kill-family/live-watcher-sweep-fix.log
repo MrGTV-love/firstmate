@@ -1,0 +1,13 @@
+[19:22:31 +0s] watcher pid 30120 started (FM_CHECK_TIMEOUT=3 LIVE_DELAY=1)
+[19:23:29 +58s] sweep ended: .last-check=present watcher-alive=no
+[19:23:29 +58s] slow-finished marker: present
+[19:23:29 +58s] hung-pid 50455 alive after sweep: no
+[19:23:29 +58s] hung-child-pid 50470 alive after sweep: no
+[19:23:29 +58s] --- triage log (check lines)
+[2026-10-29T19:23:28-0500] check b-hung stopped after 5s (no progress); result unknown, retry next pass
+[19:23:29 +58s] --- wake queue reasons
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/a-slow.check.sh: slow-check-completed after 51s
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/b-hung.check.sh: check b-hung stopped after 5s (no progress); result unknown, retry next pass
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/c-after.check.sh: after-check-ran
+[19:23:29 +58s] --- watcher stdout
+check: /Users/charlesabrooker/tmp/fm-lab.cRtWF7/state/a-slow.check.sh: slow-check-completed after 51s

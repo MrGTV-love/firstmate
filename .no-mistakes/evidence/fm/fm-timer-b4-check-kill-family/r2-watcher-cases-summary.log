@@ -1,0 +1,8 @@
+test_check_inactivity_configuration_and_launch_allowance rc=0 34s :: ok - decimal inactivity intervals preserve launch allowance and stop a silent check
+test_check_progress_survives_fivefold_slowdown rc=0 16s :: ok - authenticated checks complete at 1x and 5x with stderr progress beyond the old wall bound
+test_check_sigkill_owner_cleans_progressing_tree rc=0 5s :: ok - SIGKILL owner loss independently cleans a progressing TERM-resistant check tree
+test_check_absolute_limit_stops_endless_progress_as_unknown rc=0 28s :: ok - a spinning or stderr-spamming check ends at the absolute limit as unknown and the sweep continues
+test_stopped_check_wakes_once_per_episode rc=0 24s :: ok - a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one
+test_check_runs_without_posix_python rc=0 5s :: ok - without a POSIX python3 a check still runs and returns its result
+test_check_owner_loss_terms_a_detached_child rc=0 4s :: ok - owner loss sends a check's detached child TERM before any KILL
+test_slow_check_beats_but_stopped_poll_goes_stale rc=0 22s :: ok - slow bounded check stays fresh; stopped live poll goes stale and resumes

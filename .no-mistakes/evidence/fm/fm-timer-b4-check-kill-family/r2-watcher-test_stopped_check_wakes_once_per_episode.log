@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - a stopped check wakes once per episode; a re-arm keeps it, and a completed run or a disarm starts a new one

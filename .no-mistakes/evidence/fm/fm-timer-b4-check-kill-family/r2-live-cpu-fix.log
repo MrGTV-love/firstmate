@@ -1,0 +1,13 @@
+registered: state/cpu.check.sh
+[19:49:58] watcher pid 80447 started (FM_CHECK_TIMEOUT=3)
+[19:50:15] sweep took 17s
+[19:50:15] watcher exited rc=0
+[19:50:15] --- watch.out
+check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/cpu.check.sh: cpu-check-completed
+[19:50:15] --- watch.err (tail)
+calibration: "0 of 5 samples for check.inactivity on Mac-Studio.local"
+fallback: "3s existing caller limit"
+[19:50:15] --- wake queue rows (check rows)
+/Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/cpu.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.P0NYb3/state/cpu.check.sh: cpu-check-completed
+[19:50:15] --- triage log (check lines)
+[19:50:15] RESULT: CPU-only check ran to completion

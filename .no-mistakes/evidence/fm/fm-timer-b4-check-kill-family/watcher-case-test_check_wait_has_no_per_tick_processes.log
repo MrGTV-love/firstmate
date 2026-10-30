@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - bounded check returns output and failure status without launching per-tick sleep processes

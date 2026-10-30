@@ -1,0 +1,21 @@
+ok - fm-mail-check: help and usage plumbing
+ok - fm-mail-check: arm writes and binds, re-arm is idempotent, disarm removes
+ok - fm-mail-check: arm resolves a relative home into the shim
+ok - fm-mail-check: arm refuses a symlink at the shim path
+ok - fm-mail-check: arm refuses without the mail plane
+ok - fm-mail-check: a successful poll that surfaces new mail emits one wake line
+ok - fm-mail-check: a poll failure is reported once and re-reported after recovery
+ok - fm-mail-check: an unconfigured home is reported once, not every poll
+ok - a silent mail poll is stopped by the watcher, cleaned up, and retried on the next pass
+ok - fm-mail-check: a repeated stop still wakes while its mail is queued
+ok - mail queued by a poll the watcher stopped still rings on the next pass
+ok - with the default watcher bound and an empty duration ledger, an 18 s idle-CPU poll delivers its mail
+ok - a re-arm keeps the mail stop episode; a disarm and re-arm before any sweep starts a new one
+ok - mail polls deliver new mail at 1x and 5x while making progress
+ok - fm-mail-check: a fail-closed poll after a wake reports the failure, not the wake
+ok - fm-mail-check: a repeated status-4 fail-closed poll still wakes
+ok - fm-mail-check: a repeated status-2 stays-queued poll still wakes
+ok - fm-mail-check: a repeated failure that queued new mail still wakes
+ok - fm-mail-check: large repeated polls drain every reader without output noise
+ok - fm-mail-check: a repeated pre-wake heal failure stays silent
+ok - fm-mail-check: a missing mail plane is reported, not assumed

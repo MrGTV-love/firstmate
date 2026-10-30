@@ -1,0 +1,2 @@
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - without a POSIX python3 a check still runs and returns its result

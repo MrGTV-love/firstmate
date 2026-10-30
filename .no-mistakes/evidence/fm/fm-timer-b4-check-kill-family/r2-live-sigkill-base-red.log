@@ -1,0 +1,8 @@
+registered: state/owner.check.sh
+[19:50:53] watcher pid 70648 started (FM_CHECK_TIMEOUT=3)
+[19:50:55] check main=75552 desc=75564 launcher=75515
+[19:51:00] sent SIGKILL to watcher
+[19:51:00] watcher exited rc=137
+[19:51:00] launcher exited
+[19:51:00] RESULT: pid 75552 gone
+[19:51:00] RESULT: pid 75564 gone
