@@ -33,12 +33,13 @@
 # delivered or nothing is owed, and non-zero when the parent channel could not
 # be written, so teardown refuses instead of discarding an undelivered outcome.
 # A ship `done:` whose gate read went silent is unknown, never owed nothing: the
-# scan leaves it for the next poll and `report` exits non-zero so teardown keeps
-# the records, except that `report --force` (the captain's forced teardown)
-# delivers it marked `(acceptance unknown: no-mistakes read stalled)`, never as
-# accepted. Inside a scan each gate read is stopped after FM_DOD_NM_STALL_SECS
-# of silence (120 when unset), and the first silent read makes every later read
-# in that scan unknown at once, so a silent daemon costs one poll one interval.
+# scan leaves it for the next poll and `report` exits 75 (the sweeps' retry
+# status) so teardown keeps the records and asks to be retried, except that
+# `report --force` (the captain's forced teardown) delivers it marked
+# `(acceptance unknown: no-mistakes read stalled)`, never as accepted. Inside a
+# scan each gate read is stopped after FM_DOD_NM_STALL_SECS of silence (120 when
+# unset), and the first silent read makes every later read in that scan unknown
+# at once, so a silent daemon costs one poll one interval.
 # The cadence-gated scan below then evaluates at most once per
 # FM_INACTIVE_RECONCILE_SECS (default 900, valid 60..1800) per home, except
 # that --startup performs the same scan immediately in the locked session
@@ -49,10 +50,12 @@
 # first due child of every scan is always visited with at least a one-second
 # state-read bound: whole-second arithmetic can otherwise round a small budget
 # to zero mid-scan, and an invocation that exits having visited nothing would
-# advance the durable cursor past a child it never examined. A process-group
-# kill one second after the budget remains as a backstop for a scan wedged in
-# an unbounded wait (for example a live-held wake-queue lock), so the clean
-# deadline path is not racing its own backstop.
+# advance the durable cursor past a child it never examined. The whole scan
+# runs under a silence backstop of twice the gate-read interval: it stops a
+# scan that makes no output or process-tree CPU progress for that long, never
+# one that is slow but working, and the gate read's own interval fires first,
+# so the stall is judged, and remembered, inside the live scan. A wait for a
+# lock whose holder is alive is work, not silence, so the scan waits for it.
 #
 # It considers only a direct ordinary crewmate whose newest meta, status, or
 # turn-ended mtime is older than that interval and whose last status is not
@@ -420,8 +423,8 @@ claim_inactive_report_for_ledger() { # <task> <incarnation> <state> <ledger-fing
 # The ledger-first parent delivery for one direct child, for a caller holding
 # the child's meta lock. Returns 0 when the line is delivered, already
 # delivered, or nothing is owed, and 1 when it is owed but the parent channel
-# could not be written (the notice is queued once per record) or its acceptance
-# is unknown without --force.
+# could not be written (the notice is queued once per record), and 75 when its
+# acceptance is unknown without --force.
 report_child_ledger_locked() { # <id> <meta> [--force]
   local id=$1 meta=$2 force=${3:-} status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
   local gate_rc=0 acceptance=''
@@ -439,7 +442,7 @@ report_child_ledger_locked() { # <id> <meta> [--force]
     case "$gate_rc" in
       0) ;;
       2)
-        [ "$force" = --force ] || return 1
+        [ "$force" = --force ] || return 75
         acceptance=' (acceptance unknown: no-mistakes read stalled)' ;;
       *) return 0 ;;
     esac
@@ -619,7 +622,6 @@ scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
 
 scan() {
   local startup=${1:-0} self='' cursor deadline rc=0 marker_rc=0
-  : "${FM_DOD_NM_STALL_SECS:=120}"
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   if self=$(home_secondmate_id); then
@@ -683,13 +685,15 @@ case "$mode" in
       --startup) startup=1 ;;
       *) printf 'usage: fm-inactive-reconcile.sh scan [--startup]\n' >&2; exit 2 ;;
     esac
-    # The scan's own whole-second deadline enforces the budget; this outer
-    # process-group kill is only the backstop for a scan wedged outside every
-    # bounded section (an unbounded lock wait), so it fires one second after
-    # the deadline instead of racing the clean bounded exit it exists to guard.
-    if fm_run_timed $((FM_INACTIVE_RECONCILE_BUDGET_SECS + 1)) "$0" _scan-locked "$startup"; then
+    # The scan's own whole-second deadline enforces the budget between
+    # children; this outer stop is only for a scan that goes silent, and it
+    # waits twice the gate-read interval so that read's own stall fires first.
+    : "${FM_DOD_NM_STALL_SECS:=120}"
+    case "$FM_DOD_NM_STALL_SECS" in ''|*[!0-9]*|0*) FM_DOD_NM_STALL_SECS=$(fm_progress_quiet_secs) ;; esac
+    export FM_DOD_NM_STALL_SECS
+    if fm_run_progress $((FM_DOD_NM_STALL_SECS * 2)) "$0" _scan-locked "$startup"; then
       :
-    elif [ "$?" -ne 124 ]; then
+    elif ! fm_timed_out "$?"; then
       exit 1
     fi
     ;;

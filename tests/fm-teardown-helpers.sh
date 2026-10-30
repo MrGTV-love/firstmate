@@ -242,6 +242,17 @@ case "${1:-}" in
           exec sleep 60
         fi
         if [ "${FM_FAKE_NM_VERIFY_HANG:-0}" = 1 ] && [ -n "$run_id" ]; then exec sleep 60; fi
+        # Silent only for the completion gate's read inside the parent-channel
+        # report (bin/fm-inactive-reconcile.sh), so teardown's own reads answer.
+        if [ "${FM_FAKE_NM_GATE_HANG:-0}" = 1 ] && [ -z "$run_id" ]; then
+          ancestor=$PPID
+          while [ -n "$ancestor" ] && [ "$ancestor" -gt 1 ]; do
+            case "$(ps -o args= -p "$ancestor" 2>/dev/null)" in
+              *fm-inactive-reconcile.sh*) exec sleep 60 ;;
+            esac
+            ancestor=$(ps -o ppid= -p "$ancestor" 2>/dev/null | tr -d ' ')
+          done
+        fi
         # A daemon on a loaded host: the first plain status read burns CPU for this
         # many seconds before it answers (once per FM_FAKE_NM_BURN_MARK).
         if [ -n "${FM_FAKE_NM_STATUS_BURN_SECS:-}" ] && [ -z "$run_id" ] \

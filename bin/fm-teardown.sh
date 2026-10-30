@@ -6224,8 +6224,13 @@ if [ "$BACKEND" = herdr ]; then
   fi
 fi
 if [ "$KIND" != secondmate ]; then
-  if ! FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
-      "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID" ${FORCE:+"$FORCE"}; then
+  REPORT_RC=0
+  teardown_nm_read REPORT_OUT env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    "$SCRIPT_DIR/fm-inactive-reconcile.sh" report "$ID" ${FORCE:+"$FORCE"} || REPORT_RC=$?
+  if [ "$REPORT_RC" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
+    echo "UNKNOWN: the no-mistakes daemon went silent, so whether $ID's final outcome is accepted is unknown; every durable task record is kept, retry teardown." >&2
+    exit "$FM_PROJECT_LOCK_BUSY_EXIT"
+  elif [ "$REPORT_RC" -ne 0 ]; then
     echo "error: $ID's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery" >&2
     exit 1
   fi

@@ -50,6 +50,10 @@ if [ -n "${FM_FAKE_NM_HANG:-}" ]; then
   printf '%s\n' "$PWD" >> "$FM_FAKE_NM_HANG"
   exec sleep 60
 fi
+if [ -n "${FM_FAKE_NM_BURN_SECS:-}" ]; then
+  end=$((SECONDS + FM_FAKE_NM_BURN_SECS))
+  while [ "$SECONDS" -lt "$end" ]; do :; done
+fi
 id=$(basename "$PWD")
 home=$(dirname "$(dirname "$PWD")")
 plan="$home/data/$id/verification-plan.md"
@@ -661,7 +665,7 @@ test_report_keeps_unknown_done_owed_unless_forced() {
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   rc=0
   FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child || rc=$?
-  [ "$rc" -ne 0 ] || fail "report treated a done: with an unknown acceptance as owing nothing"
+  [ "$rc" -eq 75 ] || fail "report did not ask for a retry (75) for a done: with an unknown acceptance: rc=$rc"
   [ -s "$WORLD/nm-calls" ] || fail "the gate never asked the no-mistakes daemon"
   ! grep -q 'child-outcome-child' "$MAIN/state/mate.status" 2>/dev/null \
     || fail "an unknown acceptance was delivered without --force: $(cat "$MAIN/state/mate.status")"
@@ -679,35 +683,57 @@ test_report_keeps_unknown_done_owed_unless_forced() {
 }
 
 # A silent daemon must not hold the secondmate's poll for one stall interval per
-# waiting child: the first silent gate read makes the rest of the scan's reads
-# unknown at once, so only one read waits, and every child's metadata lock is
-# free when the scan ends. Once the daemon answers, the next poll delivers all.
+# waiting child, and must not get the whole scan killed either: at the default
+# scan budget the first gate read is judged by its own silence interval inside
+# the live scan, the rest of that scan's reads are unknown at once, the children
+# after them are still delivered, and no child's lock is left behind.
 test_scan_pays_one_stall_interval_for_silent_gate_reads() {
-  local id
+  local id scan_pid lock_a i
   make_world scan-unknown; bind_secondmate local
   for id in a b c; do
     write_child "$MATE" "$id" "done: PR https://example.test/owner/repo/pull/1 checks green"
   done
-  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=3 FM_INACTIVE_RECONCILE_BUDGET_SECS=30 \
-    FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" || fail "scan failed over silent gate reads"
+  write_child "$MATE" z 'failed: build broke'
+  lock_a=$(FM_STATE_OVERRIDE="$MATE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_meta_lock_path "$2"' \
+    _ "$ROOT" "$MATE/state/a.meta")
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=12 \
+    FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" &
+  scan_pid=$!
+  i=0
+  while [ "$i" -lt 100 ] && [ ! -s "$WORLD/nm-calls" ]; do sleep 0.1; i=$((i + 1)); done
+  [ -s "$WORLD/nm-calls" ] || { reap "$scan_pid"; fail "the scan never asked the daemon"; }
+  { [ -e "$lock_a" ] || [ -L "$lock_a" ]; } || { reap "$scan_pid"; fail "the waiting gate read did not hold child a's lock"; }
+  wait "$scan_pid" || fail "scan failed over silent gate reads"
   [ "$(wc -l < "$WORLD/nm-calls" | tr -d ' ')" = 1 ] \
     || fail "the scan waited on the silent daemon once per child: $(cat "$WORLD/nm-calls")"
-  ! grep -q 'child-outcome-' "$MAIN/state/mate.status" 2>/dev/null \
+  grep -q 'child-outcome-z-failed' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "the child after the silent reads was not reached: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
+  ! grep -q 'child-outcome-[abc]-' "$MAIN/state/mate.status" \
     || fail "a done: with an unknown acceptance was delivered by the scan"
-  for id in a b c; do
-    FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
-      . "$1/bin/fm-wake-lib.sh"
-      lock=$(fm_meta_lock_path "$FM_STATE_OVERRIDE/$2.meta")
-      fm_lock_try_acquire "$lock" && fm_lock_release "$lock"
-    ' _ "$ROOT" "$id" || fail "child $id's metadata lock was still held after the scan"
+  for id in a b c z; do
+    lock_a=$(FM_STATE_OVERRIDE="$MATE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_meta_lock_path "$2"' \
+      _ "$ROOT" "$MATE/state/$id.meta")
+    { [ ! -e "$lock_a" ] && [ ! -L "$lock_a" ]; } || fail "child $id's metadata lock was left behind by the scan"
   done
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=30 FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" \
-    || fail "scan failed once the daemon answered"
+  FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" || fail "scan failed once the daemon answered"
   for id in a b c; do
     grep -q "child-outcome-$id-done" "$MAIN/state/mate.status" \
       || fail "child $id's done: was not delivered once the daemon answered: $(cat "$MAIN/state/mate.status")"
   done
   pass "silent gate reads cost a scan one stall interval and hold no child lock past it"
+}
+
+# On a loaded host the gate read can take longer than the scan budget while it
+# keeps working. At the default budget it must finish and deliver in that poll,
+# not be killed on every poll and never deliver.
+test_scan_slow_working_gate_read_is_not_cut() {
+  make_world scan-slow; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  FM_FAKE_NM_BURN_SECS=13 FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" \
+    || fail "scan failed over a slow, working gate read"
+  grep -q 'child-outcome-child-done' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "a slow but working gate read was cut before it delivered: $(cat "$MAIN/state/mate.status" 2>/dev/null)"
+  pass "a gate read slower than the scan budget that keeps working delivers in the same poll"
 }
 
 # Teardown calls report while holding the child's metadata lock. A concurrent
@@ -1025,29 +1051,29 @@ SH
   pass "stalled state reads are bounded without starving later children"
 }
 
-test_full_scan_budget_includes_wake_lock_wait() {
-  local holder started elapsed i
+# A wake-queue lock held by a live holder is a wait on work, not a hang: the
+# scan waits for it instead of being killed, and the outcome it was publishing
+# is queued once the holder lets go, not lost with the killed scan.
+test_scan_waits_for_a_live_wake_lock_holder() {
+  local holder i
   make_world wake-lock; write_child "$MAIN" child 'done: green'
   FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" bash -c '
     . "$1/bin/fm-wake-lib.sh"
     fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
     : > "$2"
-    sleep 30
+    sleep 4
+    fm_lock_release "$FM_WAKE_QUEUE_LOCK"
   ' _ "$ROOT" "$WORLD/lock-ready" &
   holder=$!
   i=0
   while [ "$i" -lt 30 ] && [ ! -e "$WORLD/lock-ready" ]; do sleep 0.1; i=$((i + 1)); done
   [ -e "$WORLD/lock-ready" ] || fail "wake lock holder did not start"
 
-  started=$(date +%s)
   FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup
-  elapsed=$(( $(date +%s) - started ))
   reap "$holder"
-  # The unbounded wake-lock wait is ended by the process-group backstop, which
-  # fires one second after the budget; the bound proves the scan cannot ride
-  # the 30-second lock hold.
-  [ "$elapsed" -le 4 ] || fail "wake lock wait exceeded aggregate scan budget (${elapsed}s)"
-  pass "aggregate scan budget includes durable wake operations"
+  grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "the scan was cut while it waited for a live wake-lock holder, losing the outcome"
+  pass "a scan waits for a live wake-lock holder and queues its outcome after it"
 }
 
 # A secondmate home seeded without its parent binding cannot report ANY terminal
@@ -1142,6 +1168,7 @@ test_secondmate_remote_route_ledger_delivery
 test_report_subcommand_delivers_and_refuses
 test_report_keeps_unknown_done_owed_unless_forced
 test_scan_pays_one_stall_interval_for_silent_gate_reads
+test_scan_slow_working_gate_read_is_not_cut
 test_pending_ledger_done_is_delivered_after_worktree_removal
 test_report_avoids_scan_meta_lock_inversion
 test_local_secondmate_rejects_relative_parent_home
@@ -1156,7 +1183,7 @@ test_nonterminal_and_captain_held_states_do_not_report
 test_watcher_hook_and_idle_secondmate_exemption
 test_watcher_poll_delivers_child_ledger_line_to_parent
 test_stalled_state_read_is_bounded_and_scan_progresses
-test_full_scan_budget_includes_wake_lock_wait
+test_scan_waits_for_a_live_wake_lock_holder
 test_notice_recovery_does_not_duplicate_wake
 test_missing_parent_binding_names_itself
 test_reconciliation_never_calls_forge

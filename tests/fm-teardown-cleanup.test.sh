@@ -174,6 +174,37 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   pass "a secondmate home's teardown delivers the child's final line or refuses until it can"
 }
 
+# A secondmate-home ship teardown whose completion-gate read at the report step
+# goes silent does not know whether the child's done: is accepted. That is a
+# retry (exit 75, the status the sweeps retry without a refusal memo), never the
+# undeliverable-channel refusal: every record stays and nothing is delivered.
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry() {
+  local case_dir rc channel wt_head
+
+  case_dir=$(make_case mate-teardown-unknown)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  channel="$case_dir/parent/state/mate-x.status"
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_FAKE_NM_GATE_HANG=1 FM_DOD_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 75 "$rc" "mate-teardown-unknown: an unknown acceptance should ask for a retry: $(cat "$case_dir/stderr")"
+  grep -q "^UNKNOWN: .*final outcome is accepted is unknown.*retry teardown" "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: teardown did not say the outcome is unknown: $(cat "$case_dir/stderr")"
+  ! grep -q 'has not reached the parent channel\|REFUSED' "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: an unknown acceptance was reported as a refusal: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] && [ -f "$case_dir/state/task-x1.status" ] \
+    || fail "mate-teardown-unknown: teardown did not keep the task records"
+  ! grep -q 'child-outcome-task-x1' "$channel" 2>/dev/null \
+    || fail "mate-teardown-unknown: an unknown acceptance was delivered: $(cat "$channel")"
+  pass "a secondmate home's teardown with an unknown done: acceptance keeps its records and asks for a retry"
+}
+
 test_teardown_missing_busy_sidecar_completes() {
   local case_dir gen rc
   case_dir=$(make_case missing-busy-sidecar)
@@ -6205,6 +6236,7 @@ test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_force_overrides_unpushed
 test_secondmate_pr_registration_publishes_ready_line
 test_secondmate_home_teardown_delivers_final_line_or_refuses
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
