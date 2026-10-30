@@ -94,7 +94,9 @@ set -u
 
 # The sourced word names the file literally so fm-lint-cache.pl can resolve
 # it; a whole path held in a variable makes every caller uncacheable.
-_fm_timeout_dir="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
+_fm_timeout_dir=${BASH_SOURCE[0]%/*}
+[ "$_fm_timeout_dir" != "${BASH_SOURCE[0]}" ] || _fm_timeout_dir=.
+_fm_timeout_dir=${_fm_timeout_dir:-/}
 # shellcheck source=bin/fm-scratch-lib.sh
 [ ! -f "$_fm_timeout_dir/fm-scratch-lib.sh" ] || . "$_fm_timeout_dir/fm-scratch-lib.sh"
 unset _fm_timeout_dir

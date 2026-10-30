@@ -3,7 +3,7 @@
 #
 # Usage:
 #   fm-test-reap-orphans.sh [--tmpdir DIR]...
-#   fm-test-reap-orphans.sh --owners DIR [--candidate ROOT]...
+#   fm-test-reap-orphans.sh --owners DIR [--candidate ROOT]... [--tmpdir DIR]...
 #   fm-test-reap-orphans.sh --owner-pid PID --root DIR...
 #   fm-test-reap-orphans.sh --help
 #
@@ -67,7 +67,9 @@
 #                   below depth one.
 #                   An unmarked container or sibling is not ownership evidence.
 #   --owners DIR    directory of per-shell owner records, as tests/lib.sh keeps
-#                   them (repeatable; excludes --tmpdir). Each immediate
+#                   them (repeatable; excludes --owner-pid and --root). With
+#                   --tmpdir, both scans run and one process sweep covers what
+#                   either proves. Each immediate
 #                   subdirectory carries a .fm-test-fixture marker and a
 #                   `cleanup` file naming the fixture roots that shell made. Only
 #                   those records and roots are read, so the cost depends on how
@@ -130,9 +132,8 @@ if [ -n "$OWNER_PID" ] || [ "${#ROOTS[@]}" -gt 0 ]; then
 fi
 
 if [ "${#OWNERS[@]}" -gt 0 ]; then
-  [ "${#TMPDIRS[@]}" -eq 0 ] && [ -z "$OWNER_PID" ] \
-    || { echo "fm-test-reap-orphans: --owners excludes --tmpdir, --owner-pid and --root" >&2; exit 2; }
-  TMPDIRS=("${OWNERS[0]}")
+  [ -z "$OWNER_PID" ] \
+    || { echo "fm-test-reap-orphans: --owners excludes --owner-pid and --root" >&2; exit 2; }
 elif [ "${#CANDIDATES[@]}" -gt 0 ]; then
   echo "fm-test-reap-orphans: --candidate needs --owners" >&2
   exit 2
@@ -143,7 +144,7 @@ fi
 
 identity_ready() {
   command -v fm_pid_identity >/dev/null 2>&1 && return 0
-  FM_STATE_OVERRIDE=${TMPDIRS[0]:-/tmp}
+  FM_STATE_OVERRIDE=${TMPDIRS[0]:-${OWNERS[0]:-/tmp}}
   [ -d "$FM_STATE_OVERRIDE" ] || FM_STATE_OVERRIDE=/tmp
   export FM_STATE_OVERRIDE
   # shellcheck source=bin/fm-wake-lib.sh
@@ -353,8 +354,8 @@ if [ -n "$OWNER_PID" ]; then
       break
     done
   done
-elif [ "${#OWNERS[@]}" -gt 0 ]; then
-  for dir in "${OWNERS[@]}"; do
+else
+  for dir in ${OWNERS[@]+"${OWNERS[@]}"}; do
     dir=${dir%/}
     root=$(physical_dir "${dir%/*}") || continue
     dir=$root/${dir##*/}
@@ -366,8 +367,7 @@ elif [ "${#OWNERS[@]}" -gt 0 ]; then
       add_root "$root"
     done < <(scan_owners "$dir")
   done
-else
-  for dir in "${TMPDIRS[@]}"; do
+  for dir in ${TMPDIRS[@]+"${TMPDIRS[@]}"}; do
     dir=$(physical_dir "$dir") || continue
     while IFS= read -r -d '' marker; do
       [ -f "$marker" ] || continue

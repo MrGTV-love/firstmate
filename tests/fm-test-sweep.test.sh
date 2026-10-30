@@ -214,7 +214,37 @@ test_owners_dir_must_be_ours() {
   pass "tests/lib.sh refuses an owners directory it does not own and touches nothing behind it"
 }
 
+# The runner's wide sweep removes dead records too, so it must first stop what
+# their owner left running inside them, with the same marker proof.
+test_wide_sweep_stops_a_dead_records_process_first() {
+  local tmp="$TMP_ROOT/stray" stray record tries=0
+  mkdir -p "$tmp"
+  {
+    env TMPDIR="$tmp" bash -c '
+      . "$1"
+      cd "$FM_TEST_SHELL_DIR" || exit 1
+      sleep 300 >/dev/null 2>&1 &
+      printf "%s\n" "$!" > "$2"
+      kill -KILL $$
+    ' _ "$LIB" "$TMP_ROOT/stray-pid" >/dev/null 2>&1 || true
+  } 2>/dev/null
+  stray=$(cat "$TMP_ROOT/stray-pid")
+  kill -0 "$stray" 2>/dev/null || fail "the stray process in the killed shell's record never started"
+  record=$(find "$tmp/fm-test-owners" -mindepth 1 -maxdepth 1 -type d)
+  [ -f "$record/.fm-test-fixture" ] || { kill -KILL "$stray" 2>/dev/null; fail "the killed shell left no marked record"; }
+  touch -t 202001010000 "$record/.fm-test-fixture"
+  sourcing_shell "$tmp" FM_TEST_ORPHAN_MAX_AGE_SECONDS=0 FM_TEST_SWEEP_ALL=1
+  while kill -0 "$stray" 2>/dev/null && [ "$tries" -lt 40 ]; do tries=$((tries + 1)); sleep 0.05; done
+  if kill -0 "$stray" 2>/dev/null; then
+    kill -KILL "$stray" 2>/dev/null || true
+    fail "the wide sweep left running a process whose cwd is inside a dead shell's record"
+  fi
+  assert_absent "$record" "the wide sweep left the record of a dead shell"
+  pass "the wide sweep stops a process inside a dead shell's record before it removes the record"
+}
+
 test_killed_shell_leaves_one_marked_entry_and_sweep_removes_it
+test_wide_sweep_stops_a_dead_records_process_first
 test_owners_dir_must_be_ours
 test_sweep_keeps_live_owner_and_unmarked_entries
 test_sweep_finds_legacy_marked_roots

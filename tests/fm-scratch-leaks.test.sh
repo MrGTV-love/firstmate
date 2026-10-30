@@ -55,34 +55,43 @@ plant() {  # <tmpdir> <prefix> <f|d> <pid>: an entry owned by <pid>, as fm_scrat
   if [ "$3" = d ]; then mkdir "$entry"; : > "$entry/payload"; else : > "$entry"; fi
 }
 
-# stall_signal <tmpdir> <signal> <pidfile> <command...>: run the command with
-# TMPDIR=<tmpdir> until it records the stalled helper's pid in <pidfile>, then
-# send the signal to the command and stop the helper.
+# signal_status <signal>: the wait status a command gives when the signal ends
+# it through the default action or a trap that re-raises it; - for INT, which
+# ends some of them with their own error status once the helper is gone.
+signal_status() {
+  case "$1" in TERM) echo 143 ;; HUP) echo 129 ;; *) echo - ;; esac
+}
+
+# stall_signal <tmpdir> <signal> <status> <pidfile> <command...>: run the
+# command with TMPDIR=<tmpdir> until it records the stalled helper's pid in
+# <pidfile>, then send the signal to the command and stop the helper. <status>
+# is the exact wait status the command must give, or - for only the first two
+# checks below.
 stall_signal() {
-  local tmp=$1 sig=$2 pidfile=$3 cmd_pid helper_pid
-  shift 3
+  local tmp=$1 sig=$2 want=$3 pidfile=$4 cmd_pid helper_pid tries=0
+  shift 4
   rm -f "$pidfile"
   # perl restores the default SIGINT that a shell's background job ignores.
   TMPDIR="$tmp" perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' "$@" >/dev/null 2>&1 &
   cmd_pid=$!
   wait_for_file "$pidfile"
   helper_pid=$(cat "$pidfile")
+  [ -n "$(entries "$tmp")" ] || fail "a command stalled before it held a scratch entry, so $sig would prove nothing"
   kill -"$sig" "$cmd_pid" 2>/dev/null || true
   # Retirement signals the whole process group, helper included; a shell that
   # holds a trap runs it only once its foreground helper has ended.
+  kill -"$sig" "$helper_pid" 2>/dev/null || true
+  while kill -0 "$helper_pid" 2>/dev/null && [ "$tries" -lt 20 ]; do tries=$((tries + 1)); sleep 0.05; done
   kill -KILL "$helper_pid" 2>/dev/null || true
   wait "$cmd_pid" 2>/dev/null
   STALL_STATUS=$?
   # The command must have ended because of the signal: not as a success, not by
-  # a KILL (137: it never ran its trap), and for TERM and HUP with the exit status
-  # every command here gives them. INT ends some of them with their own error
-  # status once the helper is gone, so it is only held to the first two.
+  # a KILL (137: it never ran its trap), and with the exit status it gives that
+  # signal.
   [ "$STALL_STATUS" -ne 0 ] && [ "$STALL_STATUS" -ne 137 ] \
     || fail "a command sent $sig ended with wait status $STALL_STATUS instead of by its signal handling"
-  case "$sig" in
-    TERM) [ "$STALL_STATUS" -eq 143 ] || fail "a command sent TERM ended with wait status $STALL_STATUS, not 143" ;;
-    HUP) [ "$STALL_STATUS" -eq 129 ] || fail "a command sent HUP ended with wait status $STALL_STATUS, not 129" ;;
-  esac
+  [ "$want" = - ] || [ "$STALL_STATUS" -eq "$want" ] \
+    || fail "a command sent $sig ended with wait status $STALL_STATUS, not $want"
   # Let a surviving subshell of the command notice that its helper is gone.
   sleep 0.3
 }
@@ -137,7 +146,7 @@ test_gh_rest() {
   run_gh_rest "$tmp" fail >/dev/null 2>&1 && fail "fm-gh-rest hid a forge error"
   assert_clean "$tmp" "an fm-gh-rest read that exited on a forge error"
   for sig in $SIGNALS; do
-    stall_signal "$tmp" "$sig" "$TMP_ROOT/gh.pid" env FAKE_GH_MODE=stall FAKE_STALL_PIDFILE="$TMP_ROOT/gh.pid" \
+    stall_signal "$tmp" "$sig" "$(signal_status "$sig")" "$TMP_ROOT/gh.pid" env FAKE_GH_MODE=stall FAKE_STALL_PIDFILE="$TMP_ROOT/gh.pid" \
       FM_STATE_OVERRIDE="$TMP_ROOT/gh-state" PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-gh-rest.sh" get repos/o/r/items
     assert_clean "$tmp" "an fm-gh-rest read ended by $sig"
   done
@@ -169,9 +178,11 @@ test_timeout_status() {
 
 # --- fm-contributions ---------------------------------------------------------
 REAL_JQ=$(command -v jq || true)
+# The stall comes on the slurp of the saved records, after the command holds its
+# scratch dir and its traps; the clock read before them goes through.
 cat > "$FAKEBIN/jq" <<SH
 #!/usr/bin/env bash
-if [ -n "\${FAKE_STALL_PIDFILE:-}" ]; then
+if [ -n "\${FAKE_STALL_PIDFILE:-}" ] && [ "\${1-}" = -s ]; then
   printf '%s\n' "\$\$" > "\$FAKE_STALL_PIDFILE"
   exec sleep 120
 fi
@@ -192,7 +203,7 @@ test_contributions() {
   run_contributions "$tmp" no-such-subcommand >/dev/null 2>&1 && fail "fm-contributions accepted an unknown subcommand"
   assert_clean "$tmp" "an fm-contributions run that exited on an error"
   for sig in $SIGNALS; do
-    stall_signal "$tmp" "$sig" "$TMP_ROOT/jq.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/jq.pid" \
+    stall_signal "$tmp" "$sig" 1 "$TMP_ROOT/jq.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/jq.pid" \
       FM_HOME="$HOME_DIR" PATH="$FAKEBIN:$PATH" bash "$ROOT/bin/fm-contributions.sh" pending
     assert_clean "$tmp" "an fm-contributions run ended by $sig"
   done
@@ -247,7 +258,7 @@ SH
   chmod +x "$FAKEBIN/tail"
   for sig in $SIGNALS; do
     mkdir -p "$TMP_ROOT/sig-home/state" "$TMP_ROOT/sig-home/data"
-    stall_signal "$tmp" "$sig" "$TMP_ROOT/tail.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/tail.pid" \
+    stall_signal "$tmp" "$sig" "$(signal_status "$sig")" "$TMP_ROOT/tail.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/tail.pid" \
       FM_HOME="$TMP_ROOT/sig-home" FM_ROOT_OVERRIDE="$ROOT" PATH="$FAKEBIN:$PATH" \
       bash "$ROOT/bin/fm-procevent-remote-reply.sh" ingest ios "$TMP_ROOT/result.good"
     assert_clean "$tmp" "a remote reply ingest ended by $sig"
@@ -345,7 +356,7 @@ test_lavish_poll() {
   run_lavish_poll "$tmp" error >/dev/null 2>&1 && fail "a lavish poll hid a CLI error"
   assert_clean "$tmp" "a lavish poll that exited on a CLI error"
   for sig in $SIGNALS; do
-    stall_signal "$tmp" "$sig" "$TMP_ROOT/lavish.pid" env FAKE_LAVISH_MODE=stall FAKE_STALL_PIDFILE="$TMP_ROOT/lavish.pid" \
+    stall_signal "$tmp" "$sig" "$(signal_status "$sig")" "$TMP_ROOT/lavish.pid" env FAKE_LAVISH_MODE=stall FAKE_STALL_PIDFILE="$TMP_ROOT/lavish.pid" \
       FM_HOME="$HOME_DIR" LAVISH_AXI_STATE_DIR="$LAVISH_STATE" FM_LAVISH_POLL_RETRY_DELAY=1 PATH="$FAKEBIN:$PATH" \
       bash "$ROOT/bin/fm-procevent-lavish.sh" poll "$ARTIFACT"
     assert_clean "$tmp" "a lavish poll ended by $sig"
@@ -402,7 +413,7 @@ exec sleep 120
 SH
   chmod +x "$FAKEBIN/ps"
   for sig in $SIGNALS; do
-    stall_signal "$tmp" "$sig" "$TMP_ROOT/ps.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/ps.pid" PATH="$FAKEBIN:$PATH" \
+    stall_signal "$tmp" "$sig" "$(signal_status "$sig")" "$TMP_ROOT/ps.pid" env FAKE_STALL_PIDFILE="$TMP_ROOT/ps.pid" PATH="$FAKEBIN:$PATH" \
       bash "$ROOT/bin/fm-test-reap-orphans.sh" --tmpdir "$TMP_ROOT/reaper-scan"
     assert_clean "$tmp" "a reaper sweep ended by $sig"
   done

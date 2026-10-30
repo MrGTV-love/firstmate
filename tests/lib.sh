@@ -714,7 +714,7 @@ fm_test_reap_orphans() {
   [ "${#markers[@]}" -gt 0 ] || return 0
   # Stop what a dead owner left running before any root (and so its proof) goes.
   if [ "${FM_TEST_SWEEP_ALL:-0}" = 1 ]; then
-    reaper_args=(--tmpdir "$FM_TEST_TMPDIR")
+    reaper_args=(--owners "$FM_TEST_OWNERS_DIR" --tmpdir "$FM_TEST_TMPDIR")
   else
     reaper_args=(--owners "$FM_TEST_OWNERS_DIR")
     for dir in ${fm_test_sweep_candidates[@]+"${fm_test_sweep_candidates[@]}"}; do
@@ -725,6 +725,8 @@ fm_test_reap_orphans() {
   now=$(date +%s)
   for marker in "${markers[@]}"; do
     [ -e "$marker" ] || continue
+    mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
+    [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     owner_pid=$(sed -n '1p' "$marker" 2>/dev/null) || owner_pid=
     owner_identity=$(sed -n '2,$p' "$marker" 2>/dev/null) || owner_identity=
     case "$owner_pid" in
@@ -736,8 +738,6 @@ fm_test_reap_orphans() {
         fi
         ;;
     esac
-    mtime=$(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null) || continue
-    [ $((now - mtime)) -ge "$FM_TEST_ORPHAN_MAX_AGE_SECONDS" ] || continue
     dir=$(dirname "$marker")
     case "$dir" in
       "$FM_TEST_OWNERS_DIR"/*)
