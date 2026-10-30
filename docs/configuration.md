@@ -2771,7 +2771,8 @@ In that shared Git directory the task keeps its own declared branch and the two 
 Both archive names are anchored on the whole task id, so another task's archive, including one whose id contains or extends this task's id, stays protected like its other branches.
 The task may also create the `refs/heads/archive` and `logs/refs/heads/archive` folders again after Git removes them empty, only as those exact folders, and it may never rename or delete them.
 When a project branch named `archive` fills either folder name with a file, Git refuses every `archive/` name in that project, so the launch keeps no archive grant for that folder.
-The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write, so no file write, rename onto `packed-refs` or Git command can rewrite `packed-refs`, and another task's packed branch under `refs/heads` stays protected.
+The shared `packed-refs` file and its `packed-refs.new` rewrite file refuse every write by their own path, a rename onto `packed-refs` is refused, and creating a new hard link to `packed-refs` is refused, so another task's packed branch under `refs/heads` stays protected against those routes.
+A hard link to `packed-refs` that already sits in the writable worktree before launch, made by an unconfined actor, still reaches the same file, so a confined write through it can rewrite `packed-refs`: that route is open and tracked as follow-up.
 A Git command can still repoint a packed ref outside `refs/heads`, such as `refs/stash`, a tag or a remote-tracking ref, by writing a loose ref, which takes precedence over the packed line.
 `packed-refs.lock` stays writable, because Git takes it to delete any ref, the task's own archives included, and holding it changes no ref.
 Creating or updating a ref, `git commit`, `git push -u`, `git stash push` and the task's own loose archives keep working, because Git writes those refs as loose files.

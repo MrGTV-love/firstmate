@@ -208,8 +208,11 @@ def build(args):
         lines.append(f"(deny file-write* (literal {quoted(Path(common) / name)}))")
     # A branch Git has packed exists only as a line in packed-refs, which the
     # refs/heads rules above never see. Git rewrites the file through
-    # packed-refs.new and a rename onto packed-refs, so refusing both refuses
-    # the rewrite however the bytes arrive. packed-refs.lock stays writable:
+    # packed-refs.new and a rename onto packed-refs, so refusing both paths
+    # refuses a write by name, a rename-over and the creation of a new link to
+    # the file. A hard link to packed-refs already present in the writable
+    # worktree before launch still reaches the file and stays open (tracked as
+    # follow-up). packed-refs.lock stays writable:
     # Git takes it to delete any ref, the task's own archives included, and
     # holding it changes no ref. Deleting a packed ref, pruning one and gc's
     # pack-refs step rewrite the file, so they fail here; fm-spawn.sh sets
