@@ -758,6 +758,15 @@ def descendants_alive(pid, old):
     return any(child in table and table[child][2] == start for child, start in members)
 
 
+def observer_clock():
+    # Records cross interpreter processes. On macOS Python < 3.10 monotonic()
+    # has a process-local epoch; CLOCK_UPTIME_RAW shares the kernel's clock and,
+    # like monotonic() elsewhere, does not count system sleep as inactivity.
+    if sys.platform == 'darwin':
+        return 'uptime_raw', time.clock_gettime(time.CLOCK_UPTIME_RAW)
+    return 'monotonic', time.monotonic()
+
+
 def progress_check(path, pid, inactivity, paths, while_alive=False):
     """124 only after repeated valid samples prove no CPU or file progress.
 
@@ -827,13 +836,7 @@ def progress_check(path, pid, inactivity, paths, while_alive=False):
             files.append([name, None])
         except OSError:
             return 0
-    # Records cross interpreter processes. On macOS Python < 3.10 monotonic()
-    # has a process-local epoch; CLOCK_UPTIME_RAW shares the kernel's clock and,
-    # like monotonic() elsewhere, does not count system sleep as inactivity.
-    if sys.platform == 'darwin':
-        clock, now = 'uptime_raw', time.clock_gettime(time.CLOCK_UPTIME_RAW)
-    else:
-        clock, now = 'monotonic', time.monotonic()
+    clock, now = observer_clock()
     record = dict(pid=pid, identity=list(identity), files=files,
                   cpu=[[child, list(start), value] for (child, start), value in observed.items()],
                   clock=clock, since=now, sampled=now)
