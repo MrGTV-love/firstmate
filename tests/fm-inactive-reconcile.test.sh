@@ -1101,18 +1101,18 @@ test_scan_skips_a_child_whose_lock_is_held() {
   pass "a scan skips a child whose lock is held and handles it on a later scan"
 }
 
-# A held first child takes neither the scan's guaranteed first visit nor the
-# resume cursor: when the budget then cuts the scan short at a later child, the
-# next scan resumes at the held child instead of after the child it cut.
-test_held_first_child_keeps_the_cursor_through_a_deadline_cut() {
+# A child whose metadata lock stays held (a long teardown) must not starve the
+# children after it: the cursor moves past it, so when the budget cuts a scan at
+# a slow later child, the next scan goes on to the child after that one.
+test_held_child_does_not_starve_later_children() {
   local holder
-  make_world held-cursor
+  make_world held-starve
   write_child "$MAIN" a 'done: first'
   write_child "$MAIN" b 'done: second'
   write_child "$MAIN" c 'done: third'
   cat > "$WORLD/fakebin/fm-crew-state.sh" <<'SH'
 #!/usr/bin/env bash
-[ "$1" = a ] || sleep 30
+[ "$1" != b ] || sleep 30
 printf 'state: done · source: fake\n'
 SH
   chmod +x "$WORLD/fakebin/fm-crew-state.sh"
@@ -1120,14 +1120,34 @@ SH
   holder=$!
   wait_for_file "$WORLD/a-held" || { reap "$holder"; fail "child lock holder did not start"; }
   FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
+  kill -0 "$holder" 2>/dev/null || fail "the child lock holder ended before the later scans ran"
   : > "$WORLD/a-release"
   reap "$holder"
+  grep -Fq 'child=c state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "a held child starved the children after it"
   ! grep -Fq 'child=a state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
     || fail "the scan handled a child whose metadata lock was held"
-  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 run_reconcile "$MAIN" --startup
-  grep -Fq 'child=a state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
-    || fail "after a deadline cut the next scan did not resume at the held child"
-  pass "a held first child keeps the resume cursor through a deadline cut"
+  pass "a held child does not starve the children after it"
+}
+
+# A --startup scan behind a watcher scan that holds the scan lock waits at most
+# the scan budget, then returns and leaves its pass to the next cadence scan, so
+# the session start's other deferred work keeps its share of the stage budget.
+test_startup_scan_gives_up_behind_a_held_scan_lock() {
+  local holder rc=0
+  make_world startup-bounded; write_child "$MAIN" child 'done: green'
+  hold_lock "$MAIN" "$MAIN/state/.inactive-outcome-reconcile.lock" "$WORLD/scan-held" "$WORLD/release-scan"
+  holder=$!
+  wait_for_file "$WORLD/scan-held" || { reap "$holder"; fail "scan lock holder did not start"; }
+  FM_INACTIVE_RECONCILE_BUDGET_SECS=1 FM_FAKE_CREW_STATE='done' run_reconcile "$MAIN" --startup || rc=$?
+  kill -0 "$holder" 2>/dev/null || fail "the startup scan waited past its budget for the held scan lock"
+  : > "$WORLD/release-scan"
+  reap "$holder"
+  [ "$rc" -eq 0 ] || fail "a startup scan behind a held scan lock failed instead of leaving its pass: rc=$rc"
+  ! grep -Fq 'child=child state=done' "$MAIN/state/.wake-queue" 2>/dev/null \
+    || fail "a startup scan behind a held scan lock still ran its pass"
+  pass "a startup scan behind a held scan lock returns within its budget"
 }
 
 # The session-start --startup scan is the forced pass: it waits for a watcher
@@ -1285,8 +1305,9 @@ test_stalled_state_read_is_bounded_and_scan_progresses
 test_scan_gives_up_on_a_held_wake_lock
 test_scan_skips_a_child_whose_lock_is_held
 test_scan_does_nothing_while_another_scan_holds_the_lock
-test_held_first_child_keeps_the_cursor_through_a_deadline_cut
+test_held_child_does_not_starve_later_children
 test_startup_scan_waits_for_a_watcher_scan
+test_startup_scan_gives_up_behind_a_held_scan_lock
 test_notice_recovery_does_not_duplicate_wake
 test_missing_parent_binding_names_itself
 test_reconciliation_never_calls_forge
