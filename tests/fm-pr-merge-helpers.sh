@@ -888,12 +888,11 @@ hold_fixture_task() {
 }
 
 # The same fixture task held for a secondmate home. A captain-owned call is
-# filed with --owner captain. A call the parent owns is never held, so the only
-# parent-owned hold is a legacy hold filed before owners were recorded and then
-# classified as the parent's, which needs the parent's own record of the request
-# the hold was filed for, whose text opens `Decision owner: parent`. Args: case_dir owner(captain|parent)
+# filed with --owner captain. `hold` never files a parent-owned hold, so that one
+# is a record written directly: an external hold with `Decision owner: parent`
+# beneath its hold-set stamp. Args: case_dir owner(captain|parent)
 hold_fixture_task_owned() {
-  local case_dir=$1 owner=$2 home=$1/home parent corr=0123456789abcdef
+  local case_dir=$1 owner=$2 home=$1/home
   if [ "$owner" = captain ]; then
     FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
       "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
@@ -902,23 +901,18 @@ hold_fixture_task_owned() {
       || fail "could not place the fixture task under a captain-owned hold"
     return 0
   fi
-  parent=$(sed -n 's/^parent_home=//p' "$home/.fm-secondmate-parent")
-  mkdir -p "$parent/state/pending-replies"
-  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\nrequest_summary=Decision owner: parent; the landing choice is the main firstmate call\n' \
-    "$corr" "$(cat "$home/.fm-secondmate-home")" > "$parent/state/pending-replies/$corr"
   mv "$home/.fm-secondmate-home" "$case_dir/premate-home"
   mv "$home/.fm-secondmate-parent" "$case_dir/premate-parent"
   FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
     "$ROOT/bin/fm-captain-hold.sh" hold task-x1 \
-      --title 'Fixture call' --reason "the landing choice has not been made yet, relayed by the parent corr=$corr" >/dev/null \
-    || fail "could not place the fixture task under a legacy hold"
+      --title 'Fixture call' --reason 'the landing choice is the main firstmate call' >/dev/null \
+    || fail "could not place the fixture task under a hold"
   mv "$case_dir/premate-home" "$home/.fm-secondmate-home"
   mv "$case_dir/premate-parent" "$home/.fm-secondmate-parent"
-  printf '%s\n' 'the question was the main firstmate'"'"'s: one retry' > "$case_dir/classify-evidence"
-  FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \
-    "$ROOT/bin/fm-captain-hold.sh" classify task-x1 --owner parent \
-      --evidence-file "$case_dir/classify-evidence" --reason 'the retry was the main firstmate call' >/dev/null \
-    || fail "could not classify the fixture task as the parent's"
+  perl -0pi -e 's/^(- \[.\] task-x1 - [^\n]*)\(hold-kind: captain\)([^\n]*\n  Captain hold set: [^\n]*\n)/$1(hold-kind: external)$2  Decision owner: parent\n/m' \
+    "$home/data/backlog.md" || fail "could not record the parent as the fixture task's owner"
+  grep -q '^  Decision owner: parent$' "$home/data/backlog.md" \
+    || fail "the fixture task does not record the parent as its owner"
 }
 
 # Count the guard events in <log> matching a guard and decision, so a test can

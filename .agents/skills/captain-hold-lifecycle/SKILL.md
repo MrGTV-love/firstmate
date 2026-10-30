@@ -31,7 +31,7 @@ Only `answer` with the captain's words, an evidence-backed `reconcile close`, or
 
 A hold is only for a call that needs the captain's own words, and a secondmate home must say so when it files one with `--owner captain`.
 A call the main firstmate owns is never held: the home routes it to Main as a `needs-decision` status line and keeps working where it can, and Main's answer lets the work continue.
-The only parent-owned hold is a legacy hold already on record that `classify --owner parent` filed as the parent's: it is never a captain call, only `bin/fm-captain-hold.sh decide` with the parent's decision resolves it, and the captain's `answer` refuses it.
+A parent-owned hold is an `external` hold whose record carries `Decision owner: parent` from filing, which `hold` never writes: it is never a captain call, only `bin/fm-captain-hold.sh decide` with the parent's decision resolves it, and the captain's `answer` refuses it.
 A captain-owned hold is never released by `decide`; only the captain's own words, an evidence-backed `reconcile close`, or a `withdraw` on a recorded captain ruling that names it can release one.
 
 Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
@@ -66,8 +66,7 @@ Read such a line as "these two records disagree", never as "the captain ruled an
 Reconcile it with what actually happened - `answer` when the captain's own words exist to record, `withdraw` when a recorded captain ruling made it moot, and a fresh `needs-decision` line re-opening the status decision when that resolution was not the captain's word.
 `withdraw` needs a ruling whose own records (title, hold reason, or recorded answer) name the withdrawn task; it records the ruling and why as a non-captain resolution, never as the captain's words, and leaves unfinished work open while it closes a question-shaped row or finished work that teardown retained.
 A call's delivery to a mate's parent channel is true of a genuine captain call too, so delivery never frees a hold.
-A hold filed before owners were recorded has no owner on record; the parent settles a call that was its own once with `bin/fm-captain-hold.sh classify <id> --owner parent --evidence-file <path> --reason "<why>"`, which records a parent classification and never the captain's words and works only when the hold reason carries the `corr=<id>` of a request the parent relayed and recorded, and that recorded request opens with `Decision owner: parent` (a relayed request alone proves delivery, not ownership, so otherwise the hold stays the captain's), and a call that is the captain's is marked so with `bin/fm-captain-hold.sh hold <id> --owner captain --reason "<why>"`.
-A hold whose owner was recorded at filing is never reclassified, and the captain reverses a parent classification by re-holding with `--owner captain`.
+A hold filed before owners were recorded has no owner on record and stays the captain's: only his recorded words or a recorded captain ruling release it, and a call that is the captain's is marked so with `bin/fm-captain-hold.sh hold <id> --owner captain --reason "<why>"`.
 The absence of a routed work item is not a divergence and the guard never requires one: when the decision IS the deliverable there is nothing to route.
 
 ## Operating sequence

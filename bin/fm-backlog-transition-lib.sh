@@ -79,7 +79,7 @@ FM_BACKLOG_ROW_ERROR=
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_ROW_HOLD_KIND=
 # Set by fm_backlog_row_probe on a found row: captain while it is an open
-# captain call, parent while it is an open hold classified as the parent
+# captain call, parent while it is an open hold recorded as the parent
 # firstmate's (external, with a `Decision owner: parent` body line), else empty.
 # Either one is a decision still owed, so no close may complete the row.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.

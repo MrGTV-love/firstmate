@@ -24,8 +24,6 @@
 #     [--title <title>] [--repo <repo>] [--origin <origin-id>] [--until YYYY-MM-DD] \
 #     [--owner captain]
 #   fm-captain-hold.sh decide <task-id> --decision-file <path>
-#   fm-captain-hold.sh classify <task-id> --owner parent \
-#     --evidence-file <path> --reason <reason>
 #   fm-captain-hold.sh withdraw <task-id> --evidence-file <path> --ruling <ruling-task-id>
 #   fm-captain-hold.sh freeze <task-id> --project <project>
 #   fm-captain-hold.sh frozen <task-id>
@@ -75,10 +73,9 @@
 # at filing. In a main home the owner is the captain and no `--owner` is needed.
 # In a secondmate home `--owner captain` is required, because the home's parent
 # channel is its only addressee, so each hold must say it waits on the captain's
-# own words; any other owner is refused with the routing above. The only
-# parent-owned hold is a legacy hold `classify` filed as the parent's: an
-# `external` hold carrying a `Decision owner: parent` line, so it is never a
-# captain call: the captain predicate `open`, Bearings, the divergence guard,
+# own words; any other owner is refused with the routing above. A parent-owned
+# hold is an `external` hold whose record carries a `Decision owner: parent`
+# line written at filing; `hold` never files one. It is never a captain call: the captain predicate `open`, Bearings, the divergence guard,
 # and `answer` all ignore or refuse it, and only `decide` releases it. `open --parent-owned` is
 # its read-only predicate, with the same exit codes as `open`, and `open
 # --any-owner` answers for an open held decision of either owner, which the
@@ -116,41 +113,9 @@
 # recorded owner, because the captain has already ruled on it, and nothing else
 # releases a captain call without his words. A mate home reaches the captain
 # only through its parent channel, so a call's delivery to that channel proves
-# nothing about whose it is, and no weaker basis exists. A legacy hold that was
-# the parent's call and carries parent provenance is classified with `classify
-# --owner parent` and released with `decide`.
-#
-# `classify` is the parent's one-time correction for a hold filed before owners
-# were recorded, which carries no `Decision owner:` line and so cannot say whose
-# call it was. A one-line `--reason` and an evidence file (non-empty, at most
-# 8192 bytes) that is stored in the task body are required. It never widens
-# who may release a captain call: it classifies only a hold with locally
-# verifiable parent provenance, whose hold reason, written at filing, carries
-# the corr=<id> token of a request the parent firstmate relayed to this home,
-# matched by a record of that request: in a local mate, the parent's own
-# pending-reply record naming this home; in a remote mate, the relayed request
-# in this home's parent-route steering inbox (bin/fm-task-inbox-lib.sh). A
-# legacy hold without it stays the captain's and is released only by the
-# captain's recorded words or a recorded captain ruling (`withdraw --ruling`).
-# A matching record proves only that the request reached this home, which is also
-# true of a genuine captain call the parent relayed, so it must also record that
-# the decision was the parent's: the relayed request opens with `Decision owner:
-# parent`. Without that marker, or with a captain owner recorded in it, the hold
-# stays the captain's even when the request is on record. The refusal names the
-# missing fact: no corr token, no matching record, or no recorded parent owner. It
-# writes the owner the hold should have had, that it is a parent classification,
-# the home role it ran from, the reason, the provenance correlation, the
-# evidence digest, and the original hold reason, marked `Not a captain answer.`. A hold whose owner is recorded, whether at filing or by
-# an earlier classification, is refused, so a call recorded as the captain's is
-# never reclassified; a main home is refused, because its holds are the
-# captain's by construction. `--owner parent` is the only owner it takes: it
-# re-files the hold as an external parent decision that only `decide` releases
-# and that still blocks the merge gate. A legacy hold that is the captain's is
-# marked so by re-holding it with `hold <id> --owner captain`, never by classify.
-# The hold reason is rewritten to say it is a parent classification, so every
-# list that shows a hold shows that, and the classification is published on the
-# parent channel. The captain reverses a parent classification by re-holding
-# with `--owner captain`.
+# nothing about whose it is, and no weaker basis exists. Every other captain
+# hold, including a legacy hold filed before owners were recorded, stays the
+# captain's and is released only by his recorded words or a recorded ruling.
 #
 # `freeze` declares the one project an open captain hold freezes: a
 # `Captain hold freezes project: <project>` line in the hold's header block (the
@@ -159,7 +124,7 @@
 # A second `freeze` replaces the project. An open hold is any captain-kind row
 # that is not done, as `open` reads it, so a freeze outlives the hold's
 # `--until` revisit date: re-holding that still-open call keeps the line, and
-# only a release (`answer`, `withdraw`, `classify`, or `reconcile close`) ends
+# only a release (`answer`, `withdraw`, or `reconcile close`) ends
 # it. Re-holding released work starts a new lifecycle with no freeze: the line
 # lives only in the header block, which every resolution record moves under it.
 # `frozen` is the read-only owner predicate behind "is this task frozen by an
@@ -443,12 +408,6 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
-# shellcheck source=bin/fm-task-inbox-lib.sh
-# shellcheck disable=SC1091
-. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
-# shellcheck source=bin/fm-operational-input.sh
-# shellcheck disable=SC1091
-. "$SCRIPT_DIR/fm-operational-input.sh"
 # shellcheck source=bin/fm-lease-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-lease-lib.sh"
@@ -877,7 +836,7 @@ resolution_block() {
 
 # Durable state of one captain call: an active captain hold (annotations
 # surviving even when a date gate has expired), a recorded captain answer, an
-# open hold classified as the parent's, or a newest record that is a parent
+# open hold recorded as the parent's, or a newest record that is a parent
 # decision or a withdrawal (both attributed and marked not a captain answer).
 verify_hold_durable() {  # <task-id>
   local id=$1 show state hold_kind body
@@ -1523,29 +1482,20 @@ effective_decision_owner() {  # <decoded-task-body>
   fi
 }
 
-# Writes the owner line directly beneath the stamp. A plain filing passes no
-# extras and so clears any earlier classification; `classify` passes the
-# annotation lines that name its decider and an evidence block for the body.
-write_decision_owner() {  # <task-id> <shown-body> <owner> [<annotation-lines> [<evidence-text>]]
-  local id=$1 body=$2 owner=$3 notes=${4-} evidence=${5-} stamp rest new_body tmp
+# Writes the owner line directly beneath the stamp.
+write_decision_owner() {  # <task-id> <shown-body> <owner>
+  local id=$1 body=$2 owner=$3 stamp rest new_body tmp
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   stamp=$(printf '%s\n' "$body" | sed -n 1p)
   [ -n "$(body_hold_set_timestamp "$body")" ] \
     || fail "task $id lost its hold-set stamp before its owner was recorded"
   rest=$(printf '%s\n' "$body" | sed 1d \
-    | awk 'BEGIN { split("Decision owner: |Owner classified: |Classification reason: |Classification provenance: |Classification evidence digest: |Original hold reason: ", P, "|") }
-      { for (i in P) if (!seen[i] && index($0, P[i]) == 1) { seen[i] = 1; next } print }' \
+    | awk '!seen && index($0, "Decision owner: ") == 1 { seen = 1; next } { print }' \
     | awk 'NF || started { started = 1; print }')
   new_body=$(printf '%s\nDecision owner: %s' "$stamp" "$owner")
-  if [ -n "$notes" ]; then
-    new_body=$(printf '%s\n%s' "$new_body" "$notes")
-  fi
   if [ -n "$rest" ]; then
     new_body=$(printf '%s\n\n%s' "$new_body" "$rest")
-  fi
-  if [ -n "$evidence" ]; then
-    new_body=$(printf '%s\n\nClassification evidence:\n%s' "$new_body" "$evidence")
   fi
   tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-owner.XXXXXX") \
     || fail "cannot stage the hold owner"
@@ -1556,19 +1506,6 @@ write_decision_owner() {  # <task-id> <shown-body> <owner> [<annotation-lines> [
   if ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
     rm -f -- "$tmp"
     fail "could not record the hold owner on $id"
-  fi
-  rm -f -- "$tmp"
-}
-
-# Puts back a body this command changed, so a failed step leaves the task as it was.
-restore_task_body() {  # <task-id> <shown-body>
-  local id=$1 body tmp
-  body=$(decode_shown_value "$2") || fail "could not decode the previous body for $id"
-  tmp=$(umask 077; mktemp "${TMPDIR:-/tmp}/fm-captain-hold-restore.XXXXXX") \
-    || fail "cannot stage the previous body for $id"
-  if ! printf '%s\n' "$body" > "$tmp" || ! tasks_axi update "$id" --body-file "$tmp" >/dev/null; then
-    rm -f -- "$tmp"
-    fail "could not restore the previous body of $id; re-read it before retrying"
   fi
   rm -f -- "$tmp"
 }
@@ -2130,7 +2067,7 @@ WITHDRAW_BASIS=''
 WITHDRAW_OWNER=''
 WITHDRAW_RUN_ROLE=''
 
-# The parent firstmate's decision on a legacy call `classify` filed as its own.
+# The parent firstmate's decision on a call recorded at filing as its own.
 # That is an external hold carrying the parent owner line, and only this command
 # releases it: the captain's `answer` is never involved, and this command
 # refuses every hold whose recorded owner is not the parent. A question-shaped
@@ -2169,7 +2106,7 @@ command_decide() {
       return 0
     fi
     [ "$state" != "done" ] || fail "task $id is already closed; a parent decision resolves an open hold"
-    fail "task $id is not held; only a legacy hold classified with --owner parent waits on a parent decision"
+    fail "task $id is not held; only a hold whose recorded owner is the parent waits on a parent decision"
   fi
   if [ "$hold_kind" != external ] || [ "$owner" != parent ]; then
     fail "task $id is not waiting on the parent firstmate (recorded owner: $owner); only the captain's own words release a captain call, so use answer for that"
@@ -2282,7 +2219,7 @@ command_withdraw() {
   done
   validate_slug task-id "$id"
   [ -n "$ruling" ] \
-    || fail "a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a legacy hold classified as the parent's is released with decide, and nothing else releases a captain call without the captain's words"
+    || fail "a withdrawal needs a recorded basis: --ruling <task-id>, a closed captain call that makes this one moot; a hold recorded as the parent's is released with decide, and nothing else releases a captain call without the captain's words"
   validate_slug ruling-id "$ruling"
   [ -n "$evidence_file" ] || fail "--evidence-file is required; a withdrawal records who decided and why, never an assertion"
   load_decision "$evidence_file"
@@ -2342,151 +2279,6 @@ command_withdraw() {
   reconcile_request_retire "$id"
   publish_parent_hold "$id" "$occurrence" resolved "withdrawn, not a captain answer: $WITHDRAW_BASIS"
   printf 'withdrawn: %s\n' "$id"
-}
-
-# The parent provenance of a legacy hold. Two facts are both required, and the
-# second is the one that proves ownership. First, the hold reason written at
-# filing carries the corr=<16hex> token of a request the parent firstmate relayed
-# to this home, and a record of that request matches it. In a local mate that is
-# the parent's own pending-reply record naming this home. In a remote mate it is
-# a request in this home's parent-route steering inbox, the record the parent's
-# remote send leg writes, read through bin/fm-task-inbox-lib.sh, whose body
-# opens with the from-firstmate marker and that correlation token. Second, that
-# recorded request opens with `Decision owner: parent` (request_marks_parent_owner),
-# the parent's own recorded statement that the decision itself is its to make.
-# The first fact proves only that the request was delivered to this home. A mate
-# home reaches the captain only through the parent, so a genuine captain call
-# relayed by the parent satisfies it too and proves nothing about whose call it
-# was. A request without the marker, or one that also records a captain owner, is
-# refused: when ownership cannot be proven from the record, the hold stays the
-# captain's. Sets PROVENANCE_CORR, or PROVENANCE_GAP to the missing fact.
-PROVENANCE_CORR=
-PROVENANCE_GAP=
-PARENT_OWNER_MARK='Decision owner: parent'
-request_marks_parent_owner() {  # <relayed-request-text>
-  local text=$1
-  text=${text#"${text%%[![:space:]]*}"}
-  case "$text" in
-    "$PARENT_OWNER_MARK"|"$PARENT_OWNER_MARK"[[:space:].,\;:]*) ;;
-    *) return 1 ;;
-  esac
-  case "$text" in
-    *[Dd]ecision\ owner:\ captain*) return 1 ;;
-  esac
-  return 0
-}
-hold_parent_provenance() {  # <original-hold-reason-text>
-  local corr rec body inbox request=
-  local not_owned
-  PROVENANCE_CORR=
-  PROVENANCE_GAP="its hold reason names no corr=<id> token of a request the parent firstmate relayed to this home"
-  corr=$(printf '%s' "$1" | grep -oE '(^|[^[:alnum:]_])corr=[A-Fa-f0-9]{16}([^[:alnum:]_]|$)' | head -1 \
-    | sed -E 's/.*corr=([A-Fa-f0-9]{16}).*/\1/' | tr 'A-F' 'a-f')
-  [ -n "$corr" ] || return 1
-  not_owned="its hold reason names corr=$corr and the parent relayed that request, but the recorded request does not open with '$PARENT_OWNER_MARK', so nothing shows the decision was the parent's to make; a relayed request proves delivery to this home, not whose call it was"
-  fm_parent_channel_destination "$FM_HOME" "$STATE" >/dev/null || {
-    PROVENANCE_GAP="its hold reason names corr=$corr, but this home's parent binding cannot be read"
-    return 1
-  }
-  case "$FM_PARENT_CHANNEL_ROUTE" in
-    local)
-      PROVENANCE_GAP="its hold reason names corr=$corr, but the parent home holds no pending-reply record of that request for this home"
-      rec="$FM_SECONDMATE_PARENT_HOME/state/pending-replies/$corr"
-      [ -f "$rec" ] && [ ! -L "$rec" ] || return 1
-      [ "$(sed -n 's/^schema=//p' "$rec" | head -1)" = fm-pending-reply.v1 ] || return 1
-      [ "$(sed -n 's/^task_id=//p' "$rec" | head -1)" = "$FM_PARENT_CHANNEL_ID" ] || return 1
-      request=$(sed -n 's/^request_summary=//p' "$rec" | head -1)
-      ;;
-    remote)
-      PROVENANCE_GAP="its hold reason names corr=$corr, but this home's parent-route steering inbox holds no relayed request with that correlation"
-      inbox=$(fm_task_inbox_dir "$FM_HOME/state/parent-route" "$FM_PARENT_CHANNEL_ID")
-      for rec in "$inbox"/[0-9]*.msg "$inbox"/handled/[0-9]*.msg; do
-        [ -f "$rec" ] && [ ! -L "$rec" ] || continue
-        body=$(fm_task_inbox_body "$rec") || continue
-        case "$body" in
-          "${FM_FROMFIRST_MARK}corr=$corr"|"${FM_FROMFIRST_MARK}corr=$corr "*)
-            PROVENANCE_CORR=$corr
-            request=${body#"${FM_FROMFIRST_MARK}corr=$corr"}
-            ;;
-        esac
-        [ -z "$PROVENANCE_CORR" ] || break
-      done
-      [ -n "$PROVENANCE_CORR" ] || return 1
-      PROVENANCE_CORR=
-      ;;
-    *) return 1 ;;
-  esac
-  request_marks_parent_owner "$request" || { PROVENANCE_GAP=$not_owned; return 1; }
-  PROVENANCE_CORR=$corr
-  PROVENANCE_GAP=
-}
-
-# The parent's one-time classification of a hold filed before owners were recorded.
-# It names the owner the hold should have had, that it is a parent classification, the reason, and
-# the evidence, in the task body and in the hold reason every list shows. It is
-# never written as the captain's words. A hold whose owner was recorded at filing
-# is never reclassified, and a main home has no parent to classify toward. Only
-# a hold with parent provenance (hold_parent_provenance) is classified; any other
-# legacy hold stays the captain's, including a genuine captain call the parent only relayed, released only by the captain's words or a ruling.
-# Classifying files the hold as the parent's (external, so only decide releases
-# it). The captain reverses a parent classification by re-holding with --owner captain.
-command_classify() {
-  local id=${1:-} owner='' evidence_file='' reason='' show state hold_kind body decoded orig until
-  local run_role occurrence stored_reason new_reason notes
-  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
-  shift
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --owner) shift; owner=${1:-} ;;
-      --evidence-file) shift; evidence_file=${1:-} ;;
-      --reason) shift; reason=${1:-} ;;
-      *) usage >&2; exit 2 ;;
-    esac
-    shift
-  done
-  validate_slug task-id "$id"
-  [ "$owner" = parent ] \
-    || fail "classify takes only --owner parent: ${owner:-<missing>}; a legacy hold that is the captain's is marked so with bin/fm-captain-hold.sh hold $id --owner captain --reason <reason>"
-  validate_one_line reason "$reason"
-  [ -n "$evidence_file" ] || fail "--evidence-file is required; a classification records its evidence, never an assertion"
-  [ "$(home_decision_scope)" = mate ] \
-    || fail "this home has no parent firstmate, so its holds are the captain's by construction; nothing to classify"
-  load_decision "$evidence_file"
-  acquire_task_control_lock "$id"
-  require_tasks_axi
-  task_show "$id" || fail "task $id is absent from this home's configured backlog (data directory $DATA)"
-  show=$TASK_SHOW_OUTPUT
-  state=$(show_field "$show" state)
-  hold_kind=$(show_field_value "$show" hold_kind)
-  body=$(show_field "$show" body)
-  [ "$state" != "done" ] || fail "task $id is already closed; nothing to classify"
-  if [ "$hold_kind" != captain ]; then
-    fail "task $id is not an open captain hold; only a captain-kind hold filed before owners were recorded can be classified"
-  fi
-  decoded=$(decode_shown_value "$body")
-  if [ -n "$(body_decision_owner "$decoded")" ]; then
-    fail "task $id records its owner ($(body_decision_owner "$decoded")) from when it was filed or classified; a recorded owner is never reclassified"
-  fi
-  orig=$(stored_hold_reason_text "$(show_field_value "$show" hold_reason)") || orig=
-  hold_parent_provenance "$orig" \
-    || fail "task $id carries no parent provenance: $PROVENANCE_GAP; the hold stays the captain's, released only by the captain's words (answer) or a recorded captain ruling (withdraw --ruling)"
-  occurrence=$(( $(resolution_record_count "$body") + 1 ))
-  run_role=$(fm_answered_by_home_role "$FM_HOME" "$STATE")
-  orig=$(printf '%s' "$orig" | tr '\n\r' '  ' | cut -c1-400)
-  until=$(show_field_value "$show" hold_until)
-  [ "$until" != "-" ] || until=
-  notes=$(printf 'Owner classified: %s, a parent classification, run from %s home. Not a captain answer.\nClassification reason: %s\nClassification provenance: parent request corr=%s, which records the decision as its own, by the parent\nClassification evidence digest: %s\nOriginal hold reason: %s' \
-    "$owner" "$run_role" "$reason" "$PROVENANCE_CORR" "$DECISION_DIGEST" "$orig")
-  write_decision_owner "$id" "$body" "$owner" "$notes" "$DECISION_TEXT"
-  new_reason="Parent classification as the parent's call, not the captain's words: $reason. Original hold reason: $orig"
-  stored_reason=$(fm_hold_reason_encode "$new_reason") || fail "could not encode the classified hold reason"
-  if ! tasks_axi hold "$id" --reason "$stored_reason" --kind external ${until:+--until "$until"} >/dev/null; then
-    restore_task_body "$id" "$body"
-    fail "could not file $id as the parent's call; the hold is unchanged, so re-run classify"
-  fi
-  reconcile_request_retire "$id"
-  publish_parent_hold "$id" "$occurrence" needs-decision "$new_reason" "parent decision"
-  printf 'classified: %s as %s\n' "$id" "$owner"
 }
 
 # --- the one keyed-answer intake, and the source bindings that feed it --------
@@ -3522,7 +3314,7 @@ command_open() {  # <task-id> [--identity] [--distinguish-absent] [--parent-owne
   if fm_backlog_row_probe "$data" "$id"; then
     state=${FM_BACKLOG_ROW_STATE%% *}
     if [ "$parent_owned" -eq 1 ] || [ "$any_owner" -eq 1 ]; then
-      # The parent's own decision, recorded as the owner by classify. It is never
+      # The parent's own decision, recorded as the owner at filing. It is never
       # a captain call, so the captain predicate below answers no for it.
       [ "$FM_BACKLOG_ROW_OPEN_DECISION" != parent ] || return 0
       [ "$parent_owned" -eq 0 ] || return 1
@@ -3734,7 +3526,6 @@ command_open_bound() {
 case "${1:-}" in
   hold) shift; command_hold "$@" ;;
   decide) shift; command_decide "$@" ;;
-  classify) shift; command_classify "$@" ;;
   withdraw) shift; command_withdraw "$@" ;;
   answer) shift; command_answer "$@" ;;
   answers) shift; command_answers "$@" ;;
