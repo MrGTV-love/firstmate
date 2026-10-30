@@ -436,7 +436,7 @@ def darwin_root_native_failure():
          patch.object(module, 'darwin_cpu_reader', return_value=native), \
          patch.object(sys, 'platform', 'darwin'), \
          patch.object(sys, 'argv', ['fm-duration.py', 'progress-check', str(record), '100', '1']), \
-         patch.object(time, 'monotonic', side_effect=lambda: now):
+         patch.object(module, 'observer_clock', side_effect=lambda: ('test', now)):
         require(check()[0] == 0, 'first complete sample must not stop work')
         saved = record.read_bytes()
         now = 12.0

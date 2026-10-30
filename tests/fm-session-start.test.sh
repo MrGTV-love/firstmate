@@ -831,12 +831,12 @@ EOF
     sleep 120
   ' _ "$ROOT" "$home" "$marker" &
   holder=$!
-  fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
+  fm_test_wait_until --while-alive "$holder" -- test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
   started=$(date +%s)
   out=$(FM_HOME_SUMMARY_TIMEOUT=20 run_session_start "$home" "$root" "$fakebin:$BASE_PATH") \
     || { kill "$holder" 2>/dev/null; fail "session start failed with a refresh in flight"; }
   elapsed=$(( $(date +%s) - started ))
-  fm_test_wait_until 60 test -e "$home/state/.home-summary-refresh.pending" \
+  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.pending" -- test -e "$home/state/.home-summary-refresh.pending" \
     || { kill "$holder" 2>/dev/null; fail "the session start trigger left no marker for the refresh in flight"; }
   sleep 2
   kill "$holder" 2>/dev/null || true
@@ -866,7 +866,7 @@ EOF
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
 
   # The refresh is detached, so session start returns before it publishes.
-  fm_test_wait_until 60 jq -e --arg home "$home" "
+  fm_test_wait_until --progress-file "$home/state/home-summary.json" -- jq -e --arg home "$home" "
     .schema == \"fm-secondmate-home-summary.v1\"
     and .home == \$home
     and (.generated_epoch | type) == \"number\"
@@ -1629,7 +1629,7 @@ EOF
   # The detached home summary refresh reads the same hung endpoint after the
   # digest has returned, under its own 10-second per-task bound, so "nothing
   # stuck" means nothing survives that bound rather than nothing at this instant.
-  fm_test_wait_until 40 no_stray_herdr "$fakebin" \
+  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.log" -- no_stray_herdr "$fakebin" \
     || fail "the per-task read bound left $(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ') hung herdr process(es) behind"
 
   pass "a hung per-task endpoint read hits its configured bound, reports the task, and leaves nothing stuck"
@@ -1717,7 +1717,7 @@ EOF
   # The detached home summary refresh reads the same hung endpoint after the
   # digest has returned, under its own 10-second per-task bound, so "nothing
   # stuck" means nothing survives that bound rather than nothing at this instant.
-  fm_test_wait_until 40 no_stray_herdr "$fakebin" \
+  fm_test_wait_until --progress-file "$home/state/.home-summary-refresh.log" -- no_stray_herdr "$fakebin" \
     || fail "the fallback bound left $(pgrep -f "$fakebin/herdr" 2>/dev/null | wc -l | tr -d ' ') hung herdr process(es) behind"
 
   pass "a padded-zero per-read bound falls back to the 10s default instead of removing the bound"

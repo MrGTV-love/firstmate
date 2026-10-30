@@ -264,7 +264,7 @@ SH
     perl -e 'setpgrp(0, 0); exec @ARGV' "$home/root/bin/fm-watch-checkpoint.sh" --seconds 180 \
     >"$home/slow-out.txt" 2>"$home/slow-err.txt" &
   checkpoint_pid=$!
-  fm_test_wait_until 5 test -s "$home/slow-pgrp.mark" || {
+  fm_test_wait_until --while-alive "$checkpoint_pid" -- test -s "$home/slow-pgrp.mark" || {
     kill -KILL -- "-$checkpoint_pid" 2>/dev/null || true
     wait "$checkpoint_pid" 2>/dev/null || true
     fail "the bound child never reached its delayed process-group setup"

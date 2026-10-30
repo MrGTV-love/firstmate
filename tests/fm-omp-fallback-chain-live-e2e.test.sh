@@ -128,7 +128,7 @@ serve() {  # <name> <behavior> [param]
   python3 -I "$LAB/server.py" "$behavior" "$LAB/$name.log" "$LAB/$name.port" "$param" &
   SERVER_PIDS+=("$!")
   printf '%s\n' "$!" > "$LAB/$name.pid"
-  fm_test_wait_until 20 test -s "$LAB/$name.port" || fail "$SUBJECT: the scripted $name provider did not start"
+  fm_test_wait_until --while-alive "${SERVER_PIDS[${#SERVER_PIDS[@]}-1]}" -- test -s "$LAB/$name.port" || fail "$SUBJECT: the scripted $name provider did not start"
   printf -v "${name}_PORT" '%s' "$(cat "$LAB/$name.port")"
 }
 
