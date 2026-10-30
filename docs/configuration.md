@@ -1045,8 +1045,8 @@ The enforcing response headers, not `gh api rate_limit`, are the quota evidence 
 
 When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
 The helper's header owns the refusal interface; every REST read checks the floor before each request, including the unconditional repeat of a full last page, and publishes no partial response when refused.
-The contributions poll checks the local quota record before budget exits and after incomplete observations.
-It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
+The contributions poll checks the local quota record before each URL and after an incomplete observation; it has no sweep budget, and a read stops only after it makes no output and no process-tree CPU progress.
+It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason, and reports that once per resource/reset-window episode.
 Completed observations remain measured.
 Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
 The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its retained-result behavior.
@@ -3346,7 +3346,7 @@ This section is the single owner of the canonical schema.
 - A `git` entry reports how many commits the local clone is behind its remote branch, and stays silent when the clone is current or ahead.
 - An omitted `branch` uses the remote's default branch, taken from the clone's own record of it and otherwise asked of the remote directly, so a `--single-branch` clone still resolves.
 
-Both probe kinds are read-only and bounded, and a probe that cannot answer is reported as a check failure rather than assumed current.
+Both probe kinds are read-only and progress-supervised; an inactive probe is unknown and retried, never assumed current.
 See [`docs/examples/watched-tools.json`](examples/watched-tools.json) for a starting point to copy into local `config/watched-tools.json`.
 
 **Arm, edit, and disarm**
@@ -3369,13 +3369,12 @@ Arm the check once per home with `bin/fm-tool-update-check.sh arm`.
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `FM_TOOL_UPDATE_INTERVAL` | 900 seconds | Time between probes; `0` probes on every run. |
-| `FM_TOOL_UPDATE_PROBE_SECS` | 5 | Bounds one probe. |
-| `FM_TOOL_UPDATE_BUDGET_SECS` | 20 | Bounds a whole sweep. |
+| `FM_TOOL_UPDATE_PROBE_SECS` | 5 seconds | Minimum no-progress interval for one probe, not a wall-clock deadline. |
 
-- A sweep that runs out of budget says which tool it did not reach rather than reporting the rest as current.
-- The sweep must finish inside `FM_CHECK_TIMEOUT` (default 30), because a run the watcher kills prints nothing and records nothing and would then repeat that silence on every poll.
-- So a budget larger than that timeout allows is cut down to what fits instead of being refused, and the cut is reported in the report line.
-- A budget that is not a whole number from 1 to 120 is still refused outright.
+A sweep has no wall-clock budget.
+An inactive probe reports uncertainty, and the sweep still stamps its attempt, so it is retried after the normal interval.
+A repeated identical unknown stays silent; a changed result, known or unknown, reports.
+The script header owns the progress mechanics.
 
 ## Mail plane (.env)
 
@@ -3419,9 +3418,9 @@ A home that wants mail polled unattended arms the standing check in the live hom
 Arming writes `state/mail.check.sh` and registers it with the watcher's slow-check cadence (`FM_CHECK_INTERVAL`), so the plane's `poll` runs on its own: new mail still surfaces as `check: mail <uid>` wakes from the poll, and the standing check itself also prints a line (and the watcher turns that line into a wake) unless the poll is a proven no-op.
 
 Same-line silence is only for a proven no-op: a successful poll with no new mail, or a repeated identical pre-wake failure that cannot have queued mail.
-A fail-closed poll that already queued a wake, and a timeout, always print so the watcher wakes to drain it.
+A fail-closed poll that already queued a wake always prints, and every pass prints while a `mail:` row is still waiting in the wake queue, so the watcher wakes to drain it even after a stopped poll.
 
-`FM_MAIL_CHECK_BUDGET` (default 15, valid 5..25) bounds one standing poll and is cut down to fit `FM_CHECK_TIMEOUT`.
+The poll has no stop of its own: `FM_MAIL_TIMEOUT` bounds each socket read and the watcher's check progress rule bounds the check; a stopped check is unknown and retried, not evidence of an empty inbox.
 `bin/fm-mail-check.sh disarm` removes the standing check.
 
 ## Slack decision plane (.env)
@@ -3448,7 +3447,7 @@ Run by hand (`fm-slack-poll.sh`, `fm-slack-mirror.sh`, which print the reason to
 Every allowlist token must match `[UW][A-Z0-9]{8,}`; names, email addresses, partially valid lists, and handles are refused rather than interpreted as authority.
 Typed messages carrying a bot marker (`bot_id`, `app_id`, or `bot_profile`) are refused even when their user id is allowlisted; a Slack message subtype alone, such as `thread_broadcast` for a thread reply also sent to the main window, does not refuse an allowlisted owner's reply.
 Reaction authors also require a read-only user lookup proving they are not a bot or app user.
-`FM_SLACK_FAULT` is a test-only crash-injection value (`after-delivery` or `after-answer`) read from the process environment only, never from `.env`; unset means normal operation.
+`FM_SLACK_FAULT` is a test-only crash-injection value (`after-stage`, `after-delivery`, `after-answer`, `after-ack`, `after-cursor`, `after-notice-post`, or `before-emit`, each a commit point named for what is already done) read from the process environment only, never from `.env`; unset means normal operation.
 
 Before activation, grant `chat:write`, `im:write` (opening the owner DM), and `im:history` (reading the DM and its threads).
 Reaction answering additionally requires `reactions:read` and `users:read`; `reactions:write` is optional and lets the mirror seed numbered reactions on the card.
@@ -3458,8 +3457,20 @@ Inspect granted scopes with read-only `auth.test` before deployment rather than 
 To opt in, first run `bin/fm-captain-hold.sh bind slack-dm`, then `bin/fm-slack-check.sh arm` in the intended home.
 Arming refuses an unbound source, establishes the DM and proves it readable, then writes and registers `state/slack.check.sh` on the watcher's existing slow-check cadence.
 `bin/fm-slack-check.sh disarm` removes the check and its trust binding immediately, whatever the token or allowlist say, and exits non-zero when the removal is refused; `bin/fm-captain-hold.sh unbind slack-dm` stops the standing check and any manual poll from feeding answers.
-The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters.
-Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed`; remove `state/slack-watch/` to start a fresh DM.
+The armed check prints at most one wake line: every pending condition joined with `; `, cut to 480 characters; a condition that does not fit stays journaled and is printed by the next run behind `; +N queued`.
+Changing `FM_SLACK_DM_USER` after the DM is established is refused with `dm_user_changed` by the poll, the mirror, and the standing check, so cards and resolutions never keep going to the previous DM unnoticed.
+`bin/fm-slack-check.sh retarget` is the one step that takes the change: run `bin/fm-slack-check.sh disarm` first, then `retarget`, which first reads every tracked old-DM thread once and, only when that read is complete and finds nothing new, stops tracking the old DM's threads and posts nothing more there, then `bin/fm-slack-check.sh arm`, which opens and proves the new DM and lets the mirror post the open calls again.
+`arm` itself still refuses a changed owner with `dm_user_changed`, and `retarget` refuses with `dm_user_changed_with_pending_work` while the journal still holds an answer or notice for the old DM, or when its own read of an old thread stages one, and with the read's own error name when an old thread cannot be read or the request budget runs out.
+A refused retarget changes nothing except the rows its read staged; those rows are delivered by the old owner's poll, and an empty journal alone never proves the old threads were read.
+The poll also refuses a changed owner, so drain that work in this order: restore the old `FM_SLACK_DM_USER`, run `bin/fm-slack-poll.sh` until the pending journal is empty, set the new value, then run `disarm`, `retarget`, and `arm`.
+A poll can print nothing while work is still pending, so silence is not the signal.
+The journal is empty when `python3 -c 'import json; print(len(json.load(open("state/slack-watch/state.json"))["pending"]))'`, run in the home with the old value restored, prints `0`.
+A `retarget` with the new value set that still refuses with `dm_user_changed_with_pending_work` means the old DM is not drained yet: restore the old value and poll again.
+If a pending row can never drain because its thread or channel is gone, the last resort is to run `bin/fm-slack-check.sh disarm`, check the pending rows in `state/slack-watch/state.json` by hand, and then remove `state/slack-watch/` to start a fresh DM.
+That reset can re-read replies that were already answered, so do it only after that check.
+The same last resort covers an old thread that `retarget` can never read or judge, so that it refuses every time with an empty journal: a hold id whose call state can never be probed, an allowlisted tapper whose `users.info` lookup keeps failing, or a card the owner deleted.
+First read that thread in Slack by hand and record any answer it holds with `bin/fm-captain-hold.sh answer`; only then run `bin/fm-slack-check.sh disarm` and remove `state/slack-watch/`.
+The reset abandons that thread's unread reply: the watch never reads it again.
 Arming is an intentional live operation that can open a DM; building or testing the feature does not arm it.
 No Slack request runs when there are neither open calls nor tracked threads needing resolution.
 
@@ -3481,8 +3492,9 @@ Notices (conflicts and unmatched replies) surface in the order they arose, and a
 The notices that do not fit stay pending unchanged for the next poll, and the emitted line ends with `; +N queued` while N wait, so one long reply cannot push other pending conditions out of the wake line.
 A reply or reaction on a thread whose call has closed, or whose task was held again under a newer hold, is never applied; the old thread is retired and a typed reply there is surfaced as unmatched.
 A poll retires a closed or replaced thread only after it has read that thread's replies; a thread the poll did not reach because the per-poll answer cap ran out stays tracked, so its late reply is read and surfaced as unmatched by the next poll before the thread is retired.
-When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable is treated as replaced as soon as the call reads as open under a verified hold, so it never answers one.
+When the call's state cannot be read, the poll leaves the reply unread and tries again next time; a thread mirrored while the state was unreadable never answers a call, not even while the state is still unreadable, and is treated as replaced as soon as the call reads as open under a verified hold.
 Each tap is attributed to the member who made it, and a staged answer is dropped if that member has left the allowlist before delivery.
+The `slack-dm` binding is checked again at the moment of delivery, so a source unbound after the poll began feeds nothing; the staged answer waits for the next bound poll.
 Typing an option number, or tapping its reaction, records the option's value as the keyed answer and its label as the label, the same record the board leaves; all other typed words are passed through within the intake's existing field constraints, after Slack's own message escaping is undone (`&amp;`, `&lt;`, `&gt;` become `&`, `<`, `>`, and a link Slack wrapped as `<url>` or `<url|text>` becomes the url or the text), so the record holds what the owner typed.
 The reserved `reconcile` value never answers a call.
 A long or multiline reply is flattened to one line for the intake, which keeps its existing truncation; the full text stays in the Slack thread, and the only copy kept in this home is the journal row that stages it, which is removed when its publication completes.
@@ -3491,12 +3503,21 @@ Anything the intake writes to its error stream, such as a parent-channel deliver
 A repeat sighting of an already-recorded reply produces no extra line: the intake's replay detection keeps one record, and the poll reports only what it did.
 A closed tracked call receives one resolution notice naming the task and pointing to its local resolution record, without copying the task body, and is retired; it is not re-posted unless that task starts a genuinely new hold occurrence.
 
-`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, and the last reported failure class.
+`state/slack-watch/state.json` stores workspace/recipient identity, thread mappings, immutable observations, a durable pending-publication journal, the wake lines not yet printed, and the last reported failure class.
 It is transport state, not a second decision store; `fm-captain-hold.sh answers` still owns record creation and answer replay detection.
 Recovery repeats an unfinished intake row through that same intake before committing its cursor; the intake accepts an exact replay of a row it already applied, in both close modes, so the acknowledgement says the answer was recorded.
 The test-only `after-delivery` fault fires after the intake has applied the row and before that is journaled; `after-answer` fires after it is journaled and before the acknowledgement.
 A crash after notification publication may duplicate a notification but cannot discard the staged answer.
+Every wake line is journaled in `state.json` by the same commit that earns it and is dropped from the journal only after it has been printed, so a run that dies between its last commit and its print has its lines printed by the next run; the worst case is a repeated line, never a lost one.
+A mirror failure, or the failure of one thread's own read, is reported once and held back until the other threads' replies have been read, so one card Slack will not accept, or one card the owner deleted, never keeps the other answers unread.
+A thread whose own read failed stays tracked and is not retired until a later poll reads it.
+A deleted card can therefore make `retarget` refuse every time; the last resort above, after reading that thread by hand, is the way out.
+The per-poll answer cap counts only progress made in that poll: a newly staged answer or notice, or an older journaled answer that the poll delivers to the intake.
+A journaled row that is only retried or acknowledged again, and a thread read that fails before it delivers an answer, do not count, so a card that can no longer be read, or a row stuck before its acknowledgement, never uses up the cap of the threads after it.
+A journaled row whose thread can no longer be posted to, and a resolution post that fails, are held back the same way: the row stays journaled, the thread stays tracked, and every other thread is still read.
 Ordinary Slack outages, revoked tokens, and rate limits are reported once per failure episode; the other answer surfaces keep working.
+Writes go only to the DM Slack itself opens for `FM_SLACK_DM_USER`: before the first post or reaction of a mirror or poll run, one `conversations.open` for the configured owner must return the stored channel id, a stored id that is not a DM-shaped id of the stored owner is refused with `target_is_not_a_DM`, a stored id that differs from the owner's DM is refused with `stored_channel_not_owner_dm`, and an answer that cannot be read writes nothing; the shipped entry points accept only `mirror`, `poll`, and `check`, and `fm_slack.py` is a library with no command line.
+No local child process (the captain-hold intake, the fleet snapshot, the check registration) receives any `SLACK_*` environment value, so a child that dumps its environment cannot leak the bot token or the signing secret.
 A missing reaction scope is reported once per change in the missing set, not on every poll.
 The standing check runs inside the watcher's per-check bound; all Slack requests in one run share a 20-second budget, and individual API socket waits are capped at 10 seconds.
 
@@ -4471,14 +4492,13 @@ FM_CHECK_INTERVAL=300   # seconds between slow checks (authenticated merge polls
 FM_TASK_INBOX_GRACE_SECS=90   # seconds an unhandled steering-inbox message may sit before the watcher attempts doorbell delivery on an idle pane; also the minimum spacing between attempts
 FM_TASK_INBOX_RING_MAX=3      # watcher delivery attempts without an acknowledgement before the task surfaces as a stale wake for recovery
 FM_TASK_INBOX_BUSY_MAX=2      # consecutive busy-deferred due polls before a stuck-busy stale wake; 1..999999999, at most 9 decimal digits, otherwise 2; policy: bin/fm-task-inbox-lib.sh
-FM_CHECK_TIMEOUT=30     # decimal whole seconds allowed after each slow check launches, excluding output setup; leading zeros do not change the duration
-FM_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5..25, cut to fit FM_CHECK_TIMEOUT
+FM_CHECK_TIMEOUT=       # optional positive whole-second no-progress minimum; default 30s; output or process-tree CPU progress keeps checks alive until fm-duration's absolute limit (6 hours, FM_DURATION_ABSOLUTE_SECS), whose expiry is unknown and retried next pass
+# A stopped check's launcher (bin/fm-check-run.py) has a bounded exit wait, not a setting; bin/fm-watch.sh fm_active_check_stop owns that bound, its harm, and its off-Darwin residual.
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400
-FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
-FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
-FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
+FM_TOOL_UPDATE_PROBE_SECS=   # optional positive whole-second probe inactivity interval, default 5s
+FM_TOOL_UPDATE_NOW=     # test override for the watched-tool cadence clock
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_COPY_SWEEP_PLAN_TIMEOUT=120   # seconds the nested-copy sweep waits for Vernant's closeout plan of a locked copy before it holds the copy; a non-positive or non-numeric value becomes 120 (see "Nested task copy sweep")
 FM_COPY_SWEEP_DRIVER_RELEASE_LIMIT=5   # maximum locked release slots per apply run; see the script header ("Nested task copy sweep")

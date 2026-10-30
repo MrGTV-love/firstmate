@@ -360,6 +360,39 @@ is_live_non_zombie() {
   return 0
 }
 
+# Publish every watcher this suite starts directly, its completed poll cycles (each
+# terminal event_wait_or_sleep wait in bin/fm-watch.sh), the watcher's own unit of
+# work, to watch_polls_file. A wait for something the poll loop should produce
+# passes that file to fm_test_wait_until --cycles, so a watcher that keeps polling
+# without the outcome fails after a few cycles instead of hanging the suite.
+count_watch_polls() {
+  unset _FM_TEST_POLL_OWNER _FM_TEST_POLL_COUNT
+  # shellcheck disable=SC2329,SC2153 # Exported to each watcher; STATE is the watcher's own.
+  sleep() {
+    local completed
+    if [ "${FUNCNAME[1]:-}" = event_wait_or_sleep ] \
+      && [ "$BASH_SUBSHELL" -eq 0 ] \
+      && [ "${BASHPID:-$$}" = "${WATCHER_PID:-}" ]; then
+      if [ "${_FM_TEST_POLL_OWNER:-}" != "$WATCHER_PID" ]; then
+        _FM_TEST_POLL_OWNER=$WATCHER_PID
+        _FM_TEST_POLL_COUNT=0
+      fi
+      _FM_TEST_POLL_COUNT=$((_FM_TEST_POLL_COUNT + 1))
+      completed="$STATE/.test-poll-completed-$WATCHER_PID"
+      if ! printf '%s\n' "$_FM_TEST_POLL_COUNT" > "$completed.tmp" \
+        || ! mv -f "$completed.tmp" "$completed"; then
+        exit 1
+      fi
+    fi
+    command sleep "$@"
+  }
+  export -f sleep
+}
+
+watch_polls_file() {  # <state> <watcher-pid>
+  printf '%s/.test-poll-completed-%s\n' "$1" "$2"
+}
+
 # Return a watcher fixture to a clean cycle boundary. A watcher stopped mid-cycle
 # leaves its resumable-cycle markers behind (.prelude-progress, .prelude-deferred)
 # and may leave its downtime marker, so the next watcher launched against the

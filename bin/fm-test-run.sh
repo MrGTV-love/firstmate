@@ -438,7 +438,7 @@ family_for_basename() {
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
     fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
-    fm-timeout-lib.test.sh|fm-duration.test.sh|\
+    fm-timeout-lib.test.sh|fm-duration.test.sh|fm-test-wait-until.test.sh|\
     fm-tmux-submit-busy.test.sh|fm-trace-context-lib.test.sh|\
     fm-transition-lib.test.sh|\
     fm-test-run.test.sh|fm-test-isolation-proof.test.sh)
@@ -2144,6 +2144,7 @@ families_for_changed_path() {
       ;;
     bin/fm-duration.py|bin/fm-duration-lib.sh|bin/fm-duration-existing-limits.tsv)
       printf '%s\n' __script__:fm-duration.test.sh
+      printf '%s\n' __script__:fm-test-wait-until.test.sh
       printf '%s\n' __script__:fm-timeout-lib.test.sh
       printf '%s\n' __script__:fm-lint.test.sh
       printf '%s\n' __script__:fm-lint-policy.test.sh

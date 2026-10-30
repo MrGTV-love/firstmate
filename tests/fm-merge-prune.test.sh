@@ -404,7 +404,7 @@ start_pane() {  # <dir> <command...>
   WORKER_PIDS+=("$pid")
   printf '%s\n' "$pid" > "$W/pane.pid"
   # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
-  fm_test_wait_until 10 sh -c 'l=$(pgrep -P "$1" | sed -n 1p); [ -n "$l" ] && [ -n "$(pgrep -P "$l")" ]' _ "$pid" || true
+  fm_test_wait_until --while-alive "$pid" -- sh -c 'l=$(pgrep -P "$1" | sed -n 1p); [ -n "$l" ] && [ -n "$(pgrep -P "$l")" ]' _ "$pid" || true
   launcher=$(pgrep -P "$pid" | sed -n 1p)
   PANE_CHILD=$(pgrep -P "$launcher" | sed -n 1p)
   WORKER_PIDS+=("$launcher" "$PANE_CHILD")
@@ -433,7 +433,7 @@ start_stray_shell() {  # <dir>
 
 wait_inside() {  # <dir>: until some process works inside it
   # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
-  fm_test_wait_until 10 sh -c '[ -n "$(lsof -t +D "$1" 2>/dev/null)" ]' _ "$1" || true
+  fm_test_wait_until --while-alive "${WORKER_PIDS[${#WORKER_PIDS[@]}-1]}" -- sh -c '[ -n "$(lsof -t +D "$1" 2>/dev/null)" ]' _ "$1" || true
 }
 
 # The task's terminal pane lives on <tmux|herdr>; the world starts on herdr.
@@ -1170,7 +1170,7 @@ scn_other_process_in_the_pane_keeps_the_copy() {  # <build|busy-shell|stray-shel
     holder)
       start_pane "$W" bash "$W/bin/pane-holder" "$COPY/README.md" "$W" "$W/hold"
       # shellcheck disable=SC2016 # The single-quoted sh -c body expands in the child shell.
-      fm_test_wait_until 10 sh -c '[ -n "$(lsof -t "$1" 2>/dev/null)" ]' _ "$COPY/README.md" || true
+      fm_test_wait_until --while-alive "$PANE_CHILD" -- sh -c '[ -n "$(lsof -t "$1" 2>/dev/null)" ]' _ "$COPY/README.md" || true
       ;;
   esac
   [ -n "$alive" ] || alive=$PANE_CHILD
@@ -2657,7 +2657,7 @@ assert_copy_removed() {
 test_e2e_merge_prunes_the_copy_with_the_real_teardown() {
   make_e2e_world
   prune_real arm t1 --run || fail "arm --run failed"
-  fm_test_wait_until 60 grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
+  fm_test_wait_until --progress-file "$DATA/t1/merge-prune.log" -- grep -q 'reaped: teardown completed' "$DATA/t1/merge-prune.log" || fail "the detached attempt did not finish: $(cat "$DATA/t1/merge-prune.log" 2>/dev/null)"
   [ ! -e "$COPY" ] || fail "the copy is still on disk after the prune reported it reaped"
   assert_copy_removed
   [ ! -e "$STATE/t1.meta" ] || fail "the task record is still there: real teardown did not complete"

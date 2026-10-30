@@ -300,7 +300,7 @@ test_enabled_records_and_injects_identical_carrier_before_launch() {
   expect_code 0 "$status" "enabled trace-context spawn should succeed"
   assert_contains "$out" "spawned $CASE_ID" "enabled spawn should report success"
   meta="$HOME_DIR/state/$CASE_ID.meta"
-  fm_test_wait_until 60 jq -e --arg id "$CASE_ID" "
+  fm_test_wait_until --progress-file "$HOME_DIR/state/home-summary.json" -- jq -e --arg id "$CASE_ID" "
     .schema == \"fm-secondmate-home-summary.v1\"
     and any(.endpoints[]; .id == \$id)
   " "$HOME_DIR/state/home-summary.json" \
@@ -338,12 +338,12 @@ test_spawn_does_not_wait_for_the_home_summary_refresh() {
     sleep 120
   ' _ "$ROOT" "$HOME_DIR" "$marker" &
   holder=$!
-  fm_test_wait_until 20 test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
+  fm_test_wait_until --while-alive "$holder" -- test -e "$marker" || { kill "$holder" 2>/dev/null; fail "could not hold the refresh lock"; }
   out=$(FM_HOME_SUMMARY_TIMEOUT=20 run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_ID" "$PROJ_DIR")
   status=$?
   expect_code 0 "$status" "spawn should succeed with a refresh in flight"
   assert_contains "$out" "spawned $CASE_ID" "spawn did not report success with a refresh in flight"
-  fm_test_wait_until 60 test -e "$HOME_DIR/state/.home-summary-refresh.pending" \
+  fm_test_wait_until --progress-file "$HOME_DIR/state/.home-summary-refresh.pending" -- test -e "$HOME_DIR/state/.home-summary-refresh.pending" \
     || { kill "$holder" 2>/dev/null; fail "the spawn trigger left no marker for the refresh in flight"; }
   sleep 2
   kill "$holder" 2>/dev/null || true

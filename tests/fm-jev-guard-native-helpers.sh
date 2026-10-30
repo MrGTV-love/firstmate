@@ -35,7 +35,7 @@ fm_jev_native_run() {
   : > "$lab/model.jsonl"
   python3 -I "$ROOT/tests/fm-jev-guard-native-fixture.py" "$lab" "$backend" > "$lab/server.out" 2>&1 &
   FM_JEV_NATIVE_SERVER_PID=$!
-  fm_test_wait_until 20 test -s "$lab/port" || fail "$subject: private provider did not start"
+  fm_test_wait_until --while-alive "$FM_JEV_NATIVE_SERVER_PID" -- test -s "$lab/port" || fail "$subject: private provider did not start"
   local base
   base="http://127.0.0.1:$(cat "$lab/port")"
   export FM_JEV_GUARD_BASE_URL="$base/v1/systemone"
