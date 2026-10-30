@@ -823,7 +823,7 @@ hold_fixture_task() {
 # filed with --owner captain. A call the parent owns is never held, so the only
 # parent-owned hold is a legacy hold filed before owners were recorded and then
 # classified as the parent's, which needs the parent's own record of the request
-# the hold was filed for. Args: case_dir owner(captain|parent)
+# the hold was filed for, whose text opens `Decision owner: parent`. Args: case_dir owner(captain|parent)
 hold_fixture_task_owned() {
   local case_dir=$1 owner=$2 home=$1/home parent corr=0123456789abcdef
   if [ "$owner" = captain ]; then
@@ -836,8 +836,8 @@ hold_fixture_task_owned() {
   fi
   parent=$(sed -n 's/^parent_home=//p' "$home/.fm-secondmate-parent")
   mkdir -p "$parent/state/pending-replies"
-  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\n' "$corr" "$(cat "$home/.fm-secondmate-home")" \
-    > "$parent/state/pending-replies/$corr"
+  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\nrequest_summary=Decision owner: parent; the landing choice is the main firstmate call\n' \
+    "$corr" "$(cat "$home/.fm-secondmate-home")" > "$parent/state/pending-replies/$corr"
   mv "$home/.fm-secondmate-home" "$case_dir/premate-home"
   mv "$home/.fm-secondmate-parent" "$case_dir/premate-parent"
   FM_HOME="$home" FM_STATE_OVERRIDE="$case_dir/state" TASKS_AXI_BACKEND=markdown \

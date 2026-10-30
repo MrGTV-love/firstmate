@@ -132,7 +132,12 @@
 # in this home's parent-route steering inbox (bin/fm-task-inbox-lib.sh). A
 # legacy hold without it stays the captain's and is released only by the
 # captain's recorded words or a recorded captain ruling (`withdraw --ruling`).
-# The refusal names the missing fact: no corr token, or no matching record. It
+# A matching record proves only that the request reached this home, which is also
+# true of a genuine captain call the parent relayed, so it must also record that
+# the decision was the parent's: the relayed request opens with `Decision owner:
+# parent`. Without that marker, or with a captain owner recorded in it, the hold
+# stays the captain's even when the request is on record. The refusal names the
+# missing fact: no corr token, no matching record, or no recorded parent owner. It
 # writes the owner the hold should have had, that it is a parent classification,
 # the home role it ran from, the reason, the provenance correlation, the
 # evidence digest, and the original hold reason, marked `Not a captain answer.`. A hold whose owner is recorded, whether at filing or by
@@ -2339,23 +2344,46 @@ command_withdraw() {
   printf 'withdrawn: %s\n' "$id"
 }
 
-# The parent provenance of a legacy hold: the hold reason written at filing
-# carries the corr=<16hex> token of a request the parent firstmate relayed to
-# this home, and a record of that request matches it. In a local mate that is
+# The parent provenance of a legacy hold. Two facts are both required, and the
+# second is the one that proves ownership. First, the hold reason written at
+# filing carries the corr=<16hex> token of a request the parent firstmate relayed
+# to this home, and a record of that request matches it. In a local mate that is
 # the parent's own pending-reply record naming this home. In a remote mate it is
 # a request in this home's parent-route steering inbox, the record the parent's
 # remote send leg writes, read through bin/fm-task-inbox-lib.sh, whose body
-# opens with the from-firstmate marker and that correlation token. Sets
-# PROVENANCE_CORR, or PROVENANCE_GAP to the missing fact.
+# opens with the from-firstmate marker and that correlation token. Second, that
+# recorded request opens with `Decision owner: parent` (request_marks_parent_owner),
+# the parent's own recorded statement that the decision itself is its to make.
+# The first fact proves only that the request was delivered to this home. A mate
+# home reaches the captain only through the parent, so a genuine captain call
+# relayed by the parent satisfies it too and proves nothing about whose call it
+# was. A request without the marker, or one that also records a captain owner, is
+# refused: when ownership cannot be proven from the record, the hold stays the
+# captain's. Sets PROVENANCE_CORR, or PROVENANCE_GAP to the missing fact.
 PROVENANCE_CORR=
 PROVENANCE_GAP=
+PARENT_OWNER_MARK='Decision owner: parent'
+request_marks_parent_owner() {  # <relayed-request-text>
+  local text=$1
+  text=${text#"${text%%[![:space:]]*}"}
+  case "$text" in
+    "$PARENT_OWNER_MARK"|"$PARENT_OWNER_MARK"[[:space:].,\;:]*) ;;
+    *) return 1 ;;
+  esac
+  case "$text" in
+    *[Dd]ecision\ owner:\ captain*) return 1 ;;
+  esac
+  return 0
+}
 hold_parent_provenance() {  # <original-hold-reason-text>
-  local corr rec body inbox
+  local corr rec body inbox request=
+  local not_owned
   PROVENANCE_CORR=
   PROVENANCE_GAP="its hold reason names no corr=<id> token of a request the parent firstmate relayed to this home"
   corr=$(printf '%s' "$1" | grep -oE '(^|[^[:alnum:]_])corr=[A-Fa-f0-9]{16}([^[:alnum:]_]|$)' | head -1 \
     | sed -E 's/.*corr=([A-Fa-f0-9]{16}).*/\1/' | tr 'A-F' 'a-f')
   [ -n "$corr" ] || return 1
+  not_owned="its hold reason names corr=$corr and the parent relayed that request, but the recorded request does not open with '$PARENT_OWNER_MARK', so nothing shows the decision was the parent's to make; a relayed request proves delivery to this home, not whose call it was"
   fm_parent_channel_destination "$FM_HOME" "$STATE" >/dev/null || {
     PROVENANCE_GAP="its hold reason names corr=$corr, but this home's parent binding cannot be read"
     return 1
@@ -2367,6 +2395,7 @@ hold_parent_provenance() {  # <original-hold-reason-text>
       [ -f "$rec" ] && [ ! -L "$rec" ] || return 1
       [ "$(sed -n 's/^schema=//p' "$rec" | head -1)" = fm-pending-reply.v1 ] || return 1
       [ "$(sed -n 's/^task_id=//p' "$rec" | head -1)" = "$FM_PARENT_CHANNEL_ID" ] || return 1
+      request=$(sed -n 's/^request_summary=//p' "$rec" | head -1)
       ;;
     remote)
       PROVENANCE_GAP="its hold reason names corr=$corr, but this home's parent-route steering inbox holds no relayed request with that correlation"
@@ -2375,14 +2404,19 @@ hold_parent_provenance() {  # <original-hold-reason-text>
         [ -f "$rec" ] && [ ! -L "$rec" ] || continue
         body=$(fm_task_inbox_body "$rec") || continue
         case "$body" in
-          "${FM_FROMFIRST_MARK}corr=$corr"|"${FM_FROMFIRST_MARK}corr=$corr "*) PROVENANCE_CORR=$corr ;;
+          "${FM_FROMFIRST_MARK}corr=$corr"|"${FM_FROMFIRST_MARK}corr=$corr "*)
+            PROVENANCE_CORR=$corr
+            request=${body#"${FM_FROMFIRST_MARK}corr=$corr"}
+            ;;
         esac
         [ -z "$PROVENANCE_CORR" ] || break
       done
       [ -n "$PROVENANCE_CORR" ] || return 1
+      PROVENANCE_CORR=
       ;;
     *) return 1 ;;
   esac
+  request_marks_parent_owner "$request" || { PROVENANCE_GAP=$not_owned; return 1; }
   PROVENANCE_CORR=$corr
   PROVENANCE_GAP=
 }
@@ -2393,7 +2427,7 @@ hold_parent_provenance() {  # <original-hold-reason-text>
 # never written as the captain's words. A hold whose owner was recorded at filing
 # is never reclassified, and a main home has no parent to classify toward. Only
 # a hold with parent provenance (hold_parent_provenance) is classified; any other
-# legacy hold stays the captain's, released only by the captain's words or a ruling.
+# legacy hold stays the captain's, including a genuine captain call the parent only relayed, released only by the captain's words or a ruling.
 # Classifying files the hold as the parent's (external, so only decide releases
 # it). The captain reverses a parent classification by re-holding with --owner captain.
 command_classify() {
@@ -2441,7 +2475,7 @@ command_classify() {
   orig=$(printf '%s' "$orig" | tr '\n\r' '  ' | cut -c1-400)
   until=$(show_field_value "$show" hold_until)
   [ "$until" != "-" ] || until=
-  notes=$(printf 'Owner classified: %s, a parent classification, run from %s home. Not a captain answer.\nClassification reason: %s\nClassification provenance: parent request corr=%s\nClassification evidence digest: %s\nOriginal hold reason: %s' \
+  notes=$(printf 'Owner classified: %s, a parent classification, run from %s home. Not a captain answer.\nClassification reason: %s\nClassification provenance: parent request corr=%s, which records the decision as its own, by the parent\nClassification evidence digest: %s\nOriginal hold reason: %s' \
     "$owner" "$run_role" "$reason" "$PROVENANCE_CORR" "$DECISION_DIGEST" "$orig")
   write_decision_owner "$id" "$body" "$owner" "$notes" "$DECISION_TEXT"
   new_reason="Parent classification as the parent's call, not the captain's words: $reason. Original hold reason: $orig"

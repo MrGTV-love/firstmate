@@ -377,7 +377,7 @@ The basis works on any captain hold, including one recorded as the captain's or 
 
 There is no weaker basis for `withdraw`.
 A mate home reaches the captain only through its parent channel, so a call's delivery to that channel is also true of a genuine captain call and proves nothing about whose it is.
-A legacy hold that was the parent's call and carries parent provenance is classified with `classify --owner parent` and resolved with `decide`; one without provenance stays the captain's.
+A legacy hold whose recorded relayed request marks the decision as the parent's own is classified with `classify --owner parent` and resolved with `decide`; any other legacy hold, including a genuine captain call the parent only relayed, stays the captain's.
 
 ### Classifying a hold filed before owners were recorded
 
@@ -392,7 +392,7 @@ It never widens who may release a captain call (see the provenance rule below).
   A hold whose owner was recorded at filing, or by an earlier classification, is refused, so a call recorded as the captain's is never reclassified.
   A main home is refused, because its holds are the captain's by construction.
 - The legacy set is closed and cannot grow: a secondmate home refuses every new hold that names no owner, through `bin/fm-captain-hold.sh hold` and the `bin/fm-decision-hold.sh` shim alike.
-- Only a hold with parent provenance can be classified (below); any other legacy hold stays the captain's.
+- Only a hold whose recorded relayed request marks the decision as the parent's can be classified (below); any other legacy hold stays the captain's, even when the parent relayed it.
 - The record names the owner, says it is `a parent classification`, and names the home role the command ran from (derived, never typed), the reason, the provenance correlation, the evidence digest, and the original hold reason, and says `Not a captain answer.`.
   It is never written under `Captain decision:` or `Answered by:`.
 - It re-files the hold as an `external` parent decision, so the existing `decide` releases it with the work item left open, and the merge gate refuses it until then.
@@ -405,18 +405,24 @@ It never widens who may release a captain call (see the provenance rule below).
 #### Parent provenance for `classify`
 
 The harm this guard judges is a non-captain actor releasing a genuine captain call without the captain's words.
-`classify` therefore needs a fact recorded at filing, never an assertion made at classify time.
-A hold has parent provenance when its hold reason, written when the hold was filed, carries the `corr=<id>` token of a request the parent firstmate relayed to this home.
-A record of that request must match the token, read through the record's owner and never from free text:
+`classify` therefore needs a fact recorded before classify time, never an assertion made at classify time, and that fact must show the decision itself was the parent's.
+A mate home reaches the captain only through the parent, so a request's delivery to this home is also true of a genuine captain call the parent relayed.
+Relay or transport provenance alone never qualifies.
+Two recorded facts are both required:
 
-- In a local mate, the parent's own pending-reply record for that correlation (`state/pending-replies/<id>` in the parent home) must exist and name this home.
-- In a remote mate, which cannot read its parent home, the request must be in this home's own parent-route steering inbox (`state/parent-route/<mate-id>.inbox/`, pending or `handled/`).
-  That is the durable record the parent's remote send leg writes (`bin/fm-send.sh`), read through `bin/fm-task-inbox-lib.sh`, and its body must open with the from-firstmate marker and that `corr=<id>` token.
+1. The hold reason, written when the hold was filed, carries the `corr=<id>` token of a request the parent firstmate relayed to this home, and a record of that request matches it.
+   The record is read through its owner and never from free text:
+   - In a local mate, the parent's own pending-reply record for that correlation (`state/pending-replies/<id>` in the parent home) must exist and name this home.
+   - In a remote mate, which cannot read its parent home, the request must be in this home's own parent-route steering inbox (`state/parent-route/<mate-id>.inbox/`, pending or `handled/`).
+     That is the durable record the parent's remote send leg writes (`bin/fm-send.sh`), read through `bin/fm-task-inbox-lib.sh`, and its body must open with the from-firstmate marker and that `corr=<id>` token.
+2. That recorded request opens with `Decision owner: parent`, the parent's own recorded statement that the decision was its to make.
+   A request that does not open with it, or that records `Decision owner: captain`, does not qualify.
 
-A hold reason with no such token, or a token that no record matches, is refused, and the hold stays held.
-The refusal names which fact is missing: no `corr=<id>` token, or a token with no matching record.
-A legacy hold without provenance stays the captain's: it is released only by the captain's recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`), and `decide` refuses it.
-A hold filed before this rule carries a `corr=<id>` token only if its filer copied one into the reason, so `classify` may not free such a hold, and one without a token still needs the captain's words or a captain ruling.
+A hold reason with no such token, a token that no record matches, or a matching request that does not record the parent as the owner is refused, and the hold stays held.
+The refusal names which fact is missing: no `corr=<id>` token, a token with no matching record, or a record that does not mark the decision as the parent's.
+When ownership cannot be proven from the record, the hold fails closed and stays the captain's: it is released only by the captain's recorded words (`answer`) or by a recorded captain ruling (`withdraw --ruling`), and `decide` refuses it.
+A request relayed before this rule does not open with the marker, so `classify` frees none of them, and a hold that carries a `corr=<id>` token still needs the captain's words or a captain ruling.
+The real hold behind PR 290 may be one of these and may stay the captain's.
 
 ## Reconcile: re-check reality, never a blind close
 
@@ -824,8 +830,8 @@ The owner, parent decision, classification, and withdrawal paths are pinned in `
 - `withdraw` releases a legacy secondmate hold moot under a recorded captain ruling, and refuses a captain call whose delivery to the parent channel is on record but that has no ruling, for a recorded and an ownerless hold alike.
 - The divergence guard reports a legacy captain hold once and stops reporting it after the withdrawal.
 - `classify` moves a legacy hold with parent provenance to the parent once, with evidence, reason, and the not-captain marker, and `decide` then releases it with the work open.
-  It refuses a legacy hold without parent provenance, or whose correlation the parent never recorded, and leaves it held for the captain, so `decide` still refuses it.
-  In a remote mate it accepts a hold whose correlation matches a relayed request in the home's parent-route steering inbox, and its refusal names whether the token or the matching record is missing.
+  It refuses a legacy hold without parent provenance, whose correlation the parent never recorded, or whose recorded relayed request does not mark the decision as the parent's (a genuine captain call the parent relayed), and leaves it held for the captain, so `decide` still refuses it.
+  In a remote mate it accepts a hold whose correlation matches a relayed request in the home's parent-route steering inbox that marks the decision as the parent's, and its refusal names whether the token, the matching record, or the recorded parent owner is missing.
   It refuses a missing record piece, any owner other than the parent, a recorded captain or parent owner, a task that is not a captain hold, a second classification, and a main home.
   A legacy hold that is the captain's is marked so by `hold --owner captain`, which keeps it an open captain call and leaves nothing for `classify` to change.
   The classified hold reads as Main's classification in the held listing, leaves Bearings and the divergence check, and the captain's re-hold with `--owner captain` takes it back and makes `decide` refuse it.

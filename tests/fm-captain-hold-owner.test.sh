@@ -25,15 +25,31 @@ make_mate_home() {  # <name>; prints the mate home, the parent is "<mate>-parent
   printf '%s\n' "$mate"
 }
 
-# A request the parent firstmate relayed to the mate, recorded in the parent
-# home as bin/fm-pending-reply-lib.sh records it; prints a hold reason that
-# carries the request's correlation, as a hold filed for that request does.
+# A request the parent firstmate relayed to the mate as its own decision,
+# recorded in the parent home as bin/fm-pending-reply-lib.sh records it, with the
+# request opening `Decision owner: parent`; prints a hold reason that carries the
+# request's correlation, as a hold filed for that request does.
 parent_relayed_reason() {  # <mate-home> <reason>
   local mate=$1 parent corr=0123456789abcdef
   parent=$(sed -n 's/^parent_home=//p' "$mate/.fm-secondmate-parent")
   mkdir -p "$parent/state/pending-replies"
-  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\nphase=resolved\n' "$corr" "$(cat "$mate/.fm-secondmate-home")" \
-    > "$parent/state/pending-replies/$corr"
+  printf 'schema=fm-pending-reply.v1\ncorr_id=%s\ntask_id=%s\nrequest_summary=Decision owner: parent; %s\nphase=resolved\n' \
+    "$corr" "$(cat "$mate/.fm-secondmate-home")" "$2" > "$parent/state/pending-replies/$corr"
+  printf '%s, relayed by the parent firstmate corr=%s' "$2" "$corr"
+}
+
+# A request the parent firstmate relayed to the mate whose text says nothing
+# about who decides, recorded by the real pending-reply library; prints a hold
+# reason that carries the real correlation. A genuine captain call looks like this.
+relayed_reason() {  # <mate-home> <reason> <request-text>
+  local mate=$1 parent corr
+  parent=$(sed -n 's/^parent_home=//p' "$mate/.fm-secondmate-parent")
+  mkdir -p "$parent/state"
+  corr=$(
+    . "$ROOT/bin/fm-operational-input.sh"
+    . "$ROOT/bin/fm-pending-reply-lib.sh"
+    fm_pending_reply_create "$parent" "$parent/state" "$(cat "$mate/.fm-secondmate-home")" "$3"
+  ) || fail "could not record the relayed request"
   printf '%s, relayed by the parent firstmate corr=%s' "$2" "$corr"
 }
 
@@ -528,6 +544,40 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   done
   ! grep -qs 'parent decision unproven-work' "$channel" || fail "a refused classification reached the parent channel"
 
+  # A genuine captain call the parent only relayed has a request on record, so the
+  # relay proves delivery and nothing about whose call it was. A request that does
+  # not open with the parent as owner, one that names the owner later in its text,
+  # and one that also records the captain as owner all leave the hold the captain's.
+  make_legacy_mate_hold "$mate" relayed-captain-call "$(relayed_reason "$mate" \
+    "land or drop 18 unpublished commits" \
+    "Relay to the captain: land-or-drop of 18 unpublished commits is the captain's call; do not decide it as Main.")"
+  make_legacy_mate_hold "$mate" late-marker-call "$(relayed_reason "$mate" \
+    "land or drop 18 unpublished commits" \
+    "Relay to the captain: land-or-drop is theirs to answer. Decision owner: parent")"
+  make_legacy_mate_hold "$mate" both-owners-call "$(relayed_reason "$mate" \
+    "land or drop 18 unpublished commits" \
+    "Decision owner: parent. Decision owner: captain, relayed for the captain's answer.")"
+  for id in relayed-captain-call late-marker-call both-owners-call; do
+    printf 'Main thinks this was its own call; no captain answer or ruling exists.\n' > "$mate/e5-evidence.txt"
+    if run_captain "$mate" classify "$id" --owner parent --evidence-file "$mate/e5-evidence.txt" \
+      --reason "Main thinks this was its own call" 2>"$mate/refusal.err" >/dev/null; then
+      fail "classify released a genuine captain call on relay provenance alone: $id"
+    fi
+    assert_contains "$(cat "$mate/refusal.err")" "the recorded request does not open with 'Decision owner: parent', so nothing shows the decision was the parent's to make" \
+      "the refusal for $id did not say the relayed request proves delivery, not ownership"
+    show=$(tasks_in "$mate" show "$id" --full)
+    assert_contains "$show" "held: yes" "the refused classification released $id"
+    assert_contains "$show" "hold_kind: captain" "the refused classification changed the kind of $id"
+    assert_not_contains "$show" "Decision owner:" "the refused classification recorded an owner on $id"
+    [ "$(open_status "$mate" "$id")" = 0 ] || fail "$id stopped reading as an open captain call"
+    if run_captain "$mate" decide "$id" --decision-file "$decision" 2>/dev/null >/dev/null; then
+      fail "decide released the genuine captain call $id without a captain ruling"
+    fi
+    assert_contains "$(tasks_in "$mate" show "$id" --full)" "held: yes" "the refused decision released $id"
+    [ "$(open_status "$mate" "$id" --parent-owned)" != 0 ] || fail "$id reads as the parent's open call"
+  done
+  ! grep -qs 'parent decision relayed-captain-call' "$channel" || fail "a refused classification reached the parent channel"
+
   make_legacy_mate_hold "$mate" legacy-work "$(parent_relayed_reason "$mate" "retry or fix one red CI check")"
   [ "$(open_status "$mate" legacy-work)" = 0 ] || fail "the legacy hold is not an open captain call"
 
@@ -589,9 +639,12 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
     . "$ROOT/bin/fm-task-inbox-lib.sh"
     . "$ROOT/bin/fm-operational-input.sh"
     fm_task_inbox_write "$remote/state/parent-route" "$(cat "$remote/.fm-secondmate-home")" \
-      "${FM_FROMFIRST_MARK}corr=00112233445566ff retry the red check once or fix it" >/dev/null
+      "${FM_FROMFIRST_MARK}corr=00112233445566ff Decision owner: parent; retry the red check once or fix it" >/dev/null
+    fm_task_inbox_write "$remote/state/parent-route" "$(cat "$remote/.fm-secondmate-home")" \
+      "${FM_FROMFIRST_MARK}corr=1122334455667788 Relay to the captain: land-or-drop is the captain's call" >/dev/null
   ) || fail "could not record the relayed request in the remote inbox"
   make_legacy_mate_hold "$remote" relayed-work "retry or fix one red CI check, relayed corr=00112233445566ff"
+  make_legacy_mate_hold "$remote" relayed-captain-work "land or drop, relayed corr=1122334455667788"
   make_legacy_mate_hold "$remote" unrelayed-work "retry or fix one red CI check, relayed corr=aabbccddeeff0011"
   make_legacy_mate_hold "$remote" tokenless-work "retry or fix one red CI check"
   if run_captain "$remote" classify unrelayed-work --owner parent --evidence-file "$evidence" \
@@ -607,13 +660,21 @@ test_main_classifies_a_legacy_hold_and_the_parent_decision_releases_it() {
   fi
   assert_contains "$(cat "$remote/refusal.err")" "its hold reason names no corr=<id> token" \
     "the remote refusal did not say the reason names no correlation"
+  if run_captain "$remote" classify relayed-captain-work --owner parent --evidence-file "$evidence" \
+    --reason "the question was Main's" 2>"$remote/refusal.err" >/dev/null; then
+    fail "classify released a remote genuine captain call on a relayed inbox request alone"
+  fi
+  assert_contains "$(cat "$remote/refusal.err")" "the recorded request does not open with 'Decision owner: parent'" \
+    "the remote refusal did not say the relayed request does not record the parent as owner"
+  assert_contains "$(tasks_in "$remote" show relayed-captain-work --full)" "hold_kind: captain" "the refused remote classification changed the hold"
+  [ "$(open_status "$remote" relayed-captain-work)" = 0 ] || fail "the relayed remote captain call stopped reading as open"
   run_captain "$remote" classify relayed-work --owner parent --evidence-file "$evidence" \
     --reason "the question was Main's" >/dev/null || fail "classify refused a remote hold matched by its relayed inbox request"
   show=$(shown "$remote" relayed-work)
   assert_contains "$show" "Decision owner: parent" "the remote classification did not record the parent as owner"
   assert_contains "$show" "Classification provenance: parent request corr=00112233445566ff" "the remote provenance was not recorded"
   [ "$(open_status "$remote" relayed-work --parent-owned)" = 0 ] || fail "the remote classified hold does not read as the parent's open call"
-  pass "Main classifies a legacy hold with parent provenance once, with evidence, and the parent decision releases it with the work still open; a hold without provenance stays the captain's"
+  pass "Main classifies a legacy hold only on a recorded request that marks the decision as the parent's, and the parent decision releases it with the work still open; a hold without that proof, including a genuine captain call the parent relayed, stays the captain's"
 }
 
 test_a_recorded_captain_owner_is_never_reclassified() {
