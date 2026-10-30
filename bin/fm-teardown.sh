@@ -343,7 +343,11 @@
 # except under --force, where the captain's authorized discard goes on and prints
 # and records (data/<id>/no-mistakes-unknown.log) that the run state is unknown;
 # from then on every daemon read of that teardown and its children (FM_NM_READ_STALLED)
-# is unknown at once instead of waiting out the stall again.
+# is unknown at once instead of waiting out the stall again. A final-outcome
+# delivery whose ship acceptance is unknown (`fm-inactive-reconcile.sh report`
+# exits 75) also prints an UNKNOWN line, keeps every record and exits
+# FM_PROJECT_LOCK_BUSY_EXIT; under --force that report instead delivers the line
+# marked acceptance unknown (bin/fm-inactive-reconcile.sh's header owns it).
 # The sweeps retry FM_PROJECT_LOCK_BUSY_EXIT and record no refusal for it.
 # As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
