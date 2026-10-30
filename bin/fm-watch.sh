@@ -3513,8 +3513,12 @@ pr_poll_publish_release() {
 
 watcher_cleanup() {
   local cleanup_status=0 owns_lock=0 transition=release-lock
-  # A stop that lands inside `read -t` can leave bash's read alarm armed; it
-  # must not end this cleanup while it waits for a check launcher to finish.
+  # A stop that lands inside `read -t` runs this cleanup inside that read, whose
+  # timeout must not end it while it waits for a check launcher to finish. Bash
+  # 5 checks the read's deadline at every signal check and jumps back into the
+  # read, abandoning this cleanup and the stop; any new read builtin disarms
+  # that deadline. Bash 3.2 delivers it as SIGALRM instead.
+  read -r _ < /dev/null || true
   trap '' ALRM
   FM_LOCK_WAIT_TICK=
   pr_poll_publish_release || cleanup_status=1
