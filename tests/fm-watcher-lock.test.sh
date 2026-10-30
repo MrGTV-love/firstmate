@@ -505,6 +505,48 @@ SH
   pass 'owner loss sends a check'"'"'s detached child TERM before any KILL'
 }
 
+test_stopped_check_tree_is_gone_when_stop_returns() {
+  local dir state
+  dir=$(make_case check-stop-term-ignoring)
+  state="$dir/state"
+  # Every member ignores TERM, so only the launcher's own TERM-then-KILL
+  # cleanup ends them; the detached child is reachable only through it.
+  cat > "$state/detached.sh" <<'SH'
+#!/usr/bin/env bash
+trap '' TERM
+printf '%s\n' "$$" > "$FM_STATE_OVERRIDE/detached-pid"
+exec sleep 600
+SH
+  chmod +x "$state/detached.sh"
+  cat > "$state/stubborn-check.sh" <<'SH'
+#!/usr/bin/env bash
+exec python3 -c 'import os, signal, subprocess, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+subprocess.Popen([sys.argv[1]], start_new_session=True)
+open(sys.argv[2], "w").write("%d\n" % os.getpid())
+time.sleep(600)' "$FM_STATE_OVERRIDE/detached.sh" "$FM_STATE_OVERRIDE/check-pid"
+SH
+  FM_HOME="$dir" FM_STATE_OVERRIDE="$state" bash -c '
+      . "$1"
+      WATCHER_PID=$$
+      trap "fm_active_check_stop; fm_check_output_cleanup" EXIT
+      live() {
+        kill -0 "$1" 2>/dev/null || return 1
+        case "$(ps -p "$1" -o stat= 2>/dev/null)" in Z*) return 1 ;; esac
+      }
+      watcher_beat force
+      CHECK_TIMEOUT=2
+      run_check_capture stubborn "$STATE/stubborn-check.sh" || exit 21
+      [ "$FM_CHECK_STATUS" = 124 ] && [ -z "$FM_CHECK_RESULT" ] || exit 22
+      IFS= read -r check_pid < "$STATE/check-pid" || exit 23
+      IFS= read -r detached_pid < "$STATE/detached-pid" || exit 24
+      ! live "$check_pid" || { kill -KILL "$check_pid" "$detached_pid" 2>/dev/null; exit 25; }
+      ! live "$detached_pid" || { kill -KILL "$detached_pid" 2>/dev/null; exit 26; }
+    ' _ "$WATCH" > "$dir/capture.out" 2> "$dir/capture.err" \
+    || fail "a stopped check reported cleanup while its TERM-ignoring tree lived (exit $?): $(cat "$dir/capture.err")"
+  pass 'a stopped check returns only after its TERM-ignoring tree, detached child included, is gone'
+}
+
 test_check_stderr_capture_keeps_a_capped_tail() {
   local dir state
   dir=$(make_case check-stderr-cap)
@@ -3328,6 +3370,7 @@ test_check_absolute_limit_stops_endless_progress_as_unknown
 test_stopped_check_wakes_once_per_episode
 test_check_runs_without_posix_python
 test_check_owner_loss_terms_a_detached_child
+test_stopped_check_tree_is_gone_when_stop_returns
 test_check_stderr_capture_keeps_a_capped_tail
 test_live_stalled_watch_lock_is_replaced_past_hard_bound
 test_guard_warnings

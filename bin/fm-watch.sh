@@ -372,15 +372,14 @@ HEARTBEAT_MAX=${FM_HEARTBEAT_MAX:-7200}  # heartbeat backoff cap
 CHECK_INTERVAL=${FM_CHECK_INTERVAL:-300}  # seconds between *.check.sh sweeps
 # Harm: a silent, CPU-idle check blocks the sweep. Only a consecutive
 # no-progress proof permits stopping it; slow work has no wall-clock cap.
-# shellcheck source=bin/fm-duration-lib.sh
-. "$SCRIPT_DIR/fm-duration-lib.sh"
+# FM_CHECK_TIMEOUT is that no-progress minimum, not a run-time allowance.
 CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-}
 case "$CHECK_TIMEOUT" in
   ''|*[!0-9]*) unset FM_CHECK_TIMEOUT ;;
   *) CHECK_TIMEOUT=$((10#$CHECK_TIMEOUT))
      if [ "$CHECK_TIMEOUT" -gt 0 ]; then FM_CHECK_TIMEOUT=$CHECK_TIMEOUT; else unset FM_CHECK_TIMEOUT; fi ;;
 esac
-CHECK_TIMEOUT=$(fm_duration_limit check.inactivity "${FM_CHECK_TIMEOUT:-30}")
+CHECK_TIMEOUT=${FM_CHECK_TIMEOUT:-30}     # seconds allowed per *.check.sh
 # Harm: checks run inline in this loop, so one that keeps progressing forever
 # (a CPU spin, or a retry loop writing stderr) starves every later watcher duty.
 # A progressing check stops only at fm-duration.py's absolute extreme (6 hours
@@ -390,6 +389,13 @@ CAPTURE_ABSOLUTE=$(python3 -c 'import runpy, sys
 d = runpy.run_path(sys.argv[1])
 print(d["positive_override"]("FM_DURATION_ABSOLUTE_SECS", d["ABSOLUTE_LIMIT"]))' \
   "$SCRIPT_DIR/fm-duration.py" 2>/dev/null) || CAPTURE_ABSOLUTE=
+# A stopped check launcher (bin/fm-check-run.py) first runs its own cleanup:
+# the portable sweep's LEFTOVER_GRACE off Darwin, then its guardian's
+# TERM_SECONDS. Both are read from their one definition, in hundredths.
+CHECK_LAUNCHER_CLEANUP_HUNDREDTHS=$(python3 -c 'import math, runpy, sys
+proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
+print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 100))' \
+  "$SCRIPT_DIR/fm-proc-info.py" "$SCRIPT_DIR/fm-proc-budget-tree.py" 2>/dev/null) || CHECK_LAUNCHER_CLEANUP_HUNDREDTHS=0
 # Harm: a check that keeps writing stderr grows its private progress file
 # without bound. Past the cap only the newest tail is kept.
 CHECK_STDERR_CAP_BYTES=1048576
@@ -2369,13 +2375,15 @@ fm_check_group_wait() {  # <pgid> <polls>
 }
 
 # A stop-requested launcher may itself be stopped or unable to service TERM.
-# Give its guardian-first cleanup the same grace as an unowned group, then let
-# the caller KILL the launcher; its independent guardian still owns the check.
-fm_check_pid_wait() {  # <pid> <polls>
+# Wait longer than its own worst-case cleanup, so a responsive launcher always
+# exits only after its guardian has cleaned the check; only an unresponsive one
+# reaches the caller's KILL, after which its guardian still sees owner EOF.
+# The bound is wall-clock hundredths: a loaded host stretches each poll's sleep.
+fm_check_pid_wait() {  # <pid> <hundredths>
   local hundredths=$(($2 % 100))
   kill -0 "$1" 2>/dev/null || return 0
   if command -v perl >/dev/null 2>&1; then
-    perl -e 'my ($pid, $polls) = @ARGV; for (my $i = 0; $i < $polls && kill(0, $pid); ++$i) { select undef, undef, undef, 0.01 }' "$1" "$2"
+    perl -MTime::HiRes=time -e 'my ($pid, $hundredths) = @ARGV; my $end = time + $hundredths / 100; while (kill(0, $pid) && time < $end) { select undef, undef, undef, 0.01 }' "$1" "$2"
   else
     [ "$hundredths" -ge 10 ] || hundredths=0$hundredths
     sleep "$(($2 / 100)).$hundredths"
@@ -2389,9 +2397,11 @@ fm_active_check_stop() {
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
   if [ -n "$FM_ACTIVE_CHECK_OWNED" ] && [ -n "$pid" ]; then
-    # A responsive launcher lets its guardian clean first. An unresponsive
-    # launcher must not prevent the independent KILL/owner-loss path below.
-    fm_check_pid_wait "$pid" "$stop_polls" || true
+    # Harm: a stopped or wedged launcher would hold every stop, including
+    # watcher shutdown, forever. Bound: the grace, the launcher's own cleanup
+    # allowance, and a 1 s margin for its interpreter, process-table reads and
+    # signal delivery outside those timed waits. Expiry KILLs the launcher.
+    fm_check_pid_wait "$pid" "$((FM_ACTIVE_CHECK_GRACE * 100 + CHECK_LAUNCHER_CLEANUP_HUNDREDTHS + 100))" || true
   else
     [ -z "$pgid" ] || fm_check_group_wait "$pgid" "$stop_polls" || true
   fi

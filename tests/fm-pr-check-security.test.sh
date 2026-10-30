@@ -1532,8 +1532,21 @@ test_bootstrap_leaves_unauthenticated_checks() {
 
 custom_snapshot_signal_case() {  # <responsive|stopped>
   local mode=$1 dir state child_pid_file launcher_pid_file pid child_pid launcher_pid check_pgid i rc
-  local active_check_grace=0 guardian_grace=1 stop_margin=3 stop_polls launcher_command group_states host
+  local active_check_grace=0 watcher_margin=10 test_margin=20 allowances launcher_cleanup guardian_grace
+  local stop_polls launcher_command group_states host
   host=$(uname)
+  # In tenths of a second, from their one definitions. Custom captures use
+  # FM_ACTIVE_CHECK_GRACE=0. The watcher waits that grace, the launcher's own
+  # cleanup (TERM_SECONDS + LEFTOVER_GRACE) and its 1 s margin before it KILLs
+  # a stopped launcher; the guardian then gives TERM-resistant work
+  # TERM_SECONDS. The 2 s test margin covers interpreter starts and scheduling.
+  # This is a bound on requested shutdown, never on normally progressing work.
+  allowances=$(python3 -c 'import math, runpy, sys
+proc, tree = (runpy.run_path(path) for path in sys.argv[1:])
+print(math.ceil((proc["TERM_SECONDS"] + tree["LEFTOVER_GRACE"]) * 10), math.ceil(proc["TERM_SECONDS"] * 10))' \
+    "$ROOT/bin/fm-proc-info.py" "$ROOT/bin/fm-proc-budget-tree.py") || fail "cannot read cleanup allowances"
+  read -r launcher_cleanup guardian_grace <<< "$allowances"
+  stop_polls=$((active_check_grace * 10 + launcher_cleanup + watcher_margin + guardian_grace + test_margin))
   dir=$(make_case "custom-snapshot-signal-$mode")
   state="$dir/home/state"
   child_pid_file="$dir/custom-child.pid"
@@ -1590,11 +1603,6 @@ SH
     kill -STOP "$launcher_pid" || fail "could not stop owned launcher"
   fi
   kill -TERM "$pid" 2>/dev/null || fail "could not signal watcher during custom check"
-  # Custom captures use FM_ACTIVE_CHECK_GRACE=0; the guardian gives TERM-resistant
-  # work its own 1 s grace. The fixed 3 s margin covers the controller's 0.2 s
-  # escalation allowance, final 1 s group reap, and scheduling/pipe-close work.
-  # This is a bound on requested shutdown, never on normally progressing work.
-  stop_polls=$(((active_check_grace + guardian_grace + stop_margin) * 10))
   i=0
   while { process_is_live_non_zombie "$pid" || process_is_live_non_zombie "$launcher_pid" \
       || process_is_live_non_zombie "$child_pid"; } && [ "$i" -lt "$stop_polls" ]; do

@@ -883,6 +883,9 @@ test_invalid_environment_and_action_refuse() {
   FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=0 "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "zero probe bound exit"
   status=0
+  FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=00 "$CHECK" >/dev/null 2>&1 || status=$?
+  expect_code 2 "$status" "zero probe bound with a leading zero exit"
+  status=0
   FM_HOME="$home" FM_TOOL_UPDATE_PROBE_SECS=invalid "$CHECK" >/dev/null 2>&1 || status=$?
   expect_code 2 "$status" "invalid inactivity interval exit"
   status=0
@@ -892,6 +895,19 @@ test_invalid_environment_and_action_refuse() {
   FM_HOME="$home" "$CHECK" --help >/dev/null 2>&1 || status=$?
   expect_code 0 "$status" "help exit"
   pass "an out of range bound or unknown action refuses instead of guessing"
+}
+
+test_leading_zero_probe_bound_is_decimal() {
+  local home dir out
+  home=$(make_home leading-zero)
+  dir="$TMP_ROOT/leading-zero/bin"
+  # 08 is not an octal number, and a 2 s quiet probe outlasts a bound of 0 or 1.
+  make_slow_copy "$dir" "$TOOL" 2
+  write_config "$home" "{\"tools\":[{\"name\":\"herdr\",\"command\":\"$TOOL\"}]}"
+  out="$home/out.txt"
+  run_check "$home" "$(fixture_path "$dir")" "$out" FM_TOOL_UPDATE_PROBE_SECS=08
+  [ ! -s "$out" ] || fail "a leading-zero probe bound was not read as 8 decimal seconds: $(cat "$out")"
+  pass "a leading-zero probe bound is accepted as decimal seconds"
 }
 
 # --- arming through the existing watcher contract ----------------------------
@@ -1103,6 +1119,7 @@ test_a_repeated_unknown_is_silent_until_the_result_changes
 test_sweep_is_independent_of_watcher_inactivity
 test_arm_disarm_and_help_print_no_calibration_noise
 test_invalid_environment_and_action_refuse
+test_leading_zero_probe_bound_is_decimal
 test_arm_registers_the_check_and_disarm_removes_it
 test_arm_refuses_a_symlink_at_the_shim_path
 test_a_failed_registration_leaves_no_unregistered_shim

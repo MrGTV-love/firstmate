@@ -46,13 +46,11 @@
 #
 # poll consumes fm-fleet-snapshot.sh --contribution-input, a local-only read.
 # Each forge read runs through fm_duration_progress under a stable
-# contributions.read.<read> key: the key's bound is read once per poll, each
-# read's sample is recorded in one batch when the poll ends, and only output
-# and process-tree CPU silence past that bound stops it. The bound starts at
-# 30 seconds, the watcher's former per-check kill, so no read stops sooner
-# than it did under that kill;
-# measured samples can only raise it. There is no sweep deadline or observation
-# reservation. A stopped read is unknown: keep that URL's saved observation
+# contributions.read.<read> key, and each read's sample is recorded in one
+# batch when the poll ends. Only 5 seconds of output and process-tree CPU
+# silence stops a read: main's existing 5-second per-read cap, now applied to
+# silence rather than to elapsed time, so a read that keeps progressing is never
+# cut. There is no sweep deadline or observation reservation. A stopped read is unknown: keep that URL's saved observation
 # untouched, and dial no further URL this pass, because the next read would
 # most likely wait on the same unreachable forge; every remaining URL is
 # unknown for this pass and keeps its row, and the next pass retries. The URL
@@ -218,11 +216,6 @@ write_record() { # task record-json-file
   mv -f -- "$staged" "$file"
 }
 
-read_bound() { # read name: its key's inactivity bound, read from the ledger once per poll
-  [ -s "$TMP/bound.$1" ] || fm_duration_limit "contributions.read.$1" 30 2>/dev/null > "$TMP/bound.$1" || true
-  cat "$TMP/bound.$1"
-}
-
 forge() {
   local rc=0 forge_err=${FORGE_ERR:-$TMP/forge.err} read
   read=${forge_err##*/}
@@ -234,7 +227,7 @@ forge() {
     set -- gh "$@"
   fi
   if [ "$rc" -eq 0 ]; then
-    fm_duration_progress "contributions.read.${read%.err}" "$(read_bound "${read%.err}")" "$TMP/durations.tsv" \
+    fm_duration_progress "contributions.read.${read%.err}" 5 "$TMP/durations.tsv" \
       env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 "$@" 2> "$forge_err" || rc=$?
   fi
   if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
