@@ -1,0 +1,13 @@
+node:1: command not found: _nvm_lazy_load
+$ node --version; v26.4.0
+$ run test_claude_large_payload_grok_exclusions test_tracked_claude_entries_inert_under_grok (target bd9830f43)
+warning: re-init: ignored --initial-branch=main
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.BhNS5b/claude-config-large-exclusions/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.BhNS5b/claude-config-large-exclusions/legacy/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.BhNS5b/claude-config-large-exclusions-task/modern/large-payload
+large-payload Grok exclusion: Stop/fm-turnend-guard.sh//Users/charlesabrooker/tmp/fm-turnend-guard.BhNS5b/claude-config-large-exclusions-task/legacy/large-payload
+ok - tracked Claude fm-turnend-guard.sh Stop hook: larger-than-pipe-buffer payload preserves modern and legacy Grok exclusions
+warning: re-init: ignored --initial-branch=main
+ok - tracked Claude hooks: real native receipts, task applicability, modern and legacy Grok exclusion
+/tmp/fm-pr209-drv.3DKj/run.sh test_claude_large_payload_grok_exclusions   4.48s user 11.67s system 45% cpu 35.695 total
+exit=0
