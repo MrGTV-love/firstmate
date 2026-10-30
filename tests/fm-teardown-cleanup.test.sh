@@ -174,6 +174,60 @@ test_secondmate_home_teardown_delivers_final_line_or_refuses() {
   pass "a secondmate home's teardown delivers the child's final line or refuses until it can"
 }
 
+# The report step runs under teardown's progress line but keeps its own
+# diagnostics: a misconfigured reconciler names its own cause.
+test_secondmate_home_teardown_shows_report_diagnostics() {
+  local case_dir rc wt_head
+
+  case_dir=$(make_case mate-teardown-report-stderr)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  write_meta "$case_dir" local-only ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_INACTIVE_RECONCILE_BUDGET_SECS=40 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "mate-teardown-report-stderr: teardown went on past a report that could not run"
+  grep -q 'FM_INACTIVE_RECONCILE_BUDGET_SECS must be a whole number from 1 to 30' "$case_dir/stderr" \
+    || fail "mate-teardown-report-stderr: the report's own diagnostic was hidden: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] || fail "mate-teardown-report-stderr: teardown did not keep the task record"
+  pass "a secondmate home's teardown shows the report step's own diagnostics"
+}
+
+# A secondmate-home ship teardown whose completion-gate read at the report step
+# goes silent does not know whether the child's done: is accepted. That is a
+# retry (exit 75, the status the sweeps retry without a refusal memo), never the
+# undeliverable-channel refusal: every record stays and nothing is delivered.
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry() {
+  local case_dir rc channel wt_head
+
+  case_dir=$(make_case mate-teardown-unknown)
+  configure_secondmate_home "$case_dir" local "$case_dir/parent"
+  mkdir -p "$case_dir/parent/state"
+  channel="$case_dir/parent/state/mate-x.status"
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit "$case_dir" "merged work"
+  wt_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" update-ref refs/heads/main "$wt_head"
+  printf 'done: PR https://github.com/example/repo/pull/9 checks green\n' > "$case_dir/state/task-x1.status"
+  rc=0
+  FM_HOME="$case_dir/home" FM_FAKE_NM_GATE_HANG=1 FM_DOD_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 75 "$rc" "mate-teardown-unknown: an unknown acceptance should ask for a retry: $(cat "$case_dir/stderr")"
+  grep -q "^UNKNOWN: .*final outcome is accepted is unknown.*retry teardown" "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: teardown did not say the outcome is unknown: $(cat "$case_dir/stderr")"
+  ! grep -q 'has not reached the parent channel\|REFUSED' "$case_dir/stderr" \
+    || fail "mate-teardown-unknown: an unknown acceptance was reported as a refusal: $(cat "$case_dir/stderr")"
+  [ -f "$case_dir/state/task-x1.meta" ] && [ -f "$case_dir/state/task-x1.status" ] \
+    || fail "mate-teardown-unknown: teardown did not keep the task records"
+  ! grep -q 'child-outcome-task-x1' "$channel" 2>/dev/null \
+    || fail "mate-teardown-unknown: an unknown acceptance was delivered: $(cat "$channel")"
+  pass "a secondmate home's teardown with an unknown done: acceptance keeps its records and asks for a retry"
+}
+
 test_teardown_missing_busy_sidecar_completes() {
   local case_dir gen rc
   case_dir=$(make_case missing-busy-sidecar)
@@ -1382,6 +1436,129 @@ EOF
   kill -0 "$pid" 2>/dev/null || fail "parked-run-abort-unconfirmed: process reap ran before refusal"
   kill -KILL "$pid" 2>/dev/null || true
   pass "teardown refuses before reap or removal when a task-owned run remains parked"
+}
+
+# A no-mistakes daemon that goes quiet is not a daemon with no run to abort.
+# Reading that silence as "nothing is parked" would remove the worker that a parked
+# gate is waiting on and orphan the run, so teardown stops with the retry status
+# (75), closes nothing, and says the answer is unknown.
+test_silent_daemon_leaves_the_parked_run_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-daemon-silent: a silent daemon should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-daemon-silent: teardown did not say the answer is unknown"
+  assert_present "$case_dir/wt" "parked-run-daemon-silent: teardown removed the worktree"
+  assert_present "$case_dir/state/task-x1.meta" "parked-run-daemon-silent: teardown removed the task record"
+  assert_absent "$case_dir/nm-abort.log" "parked-run-daemon-silent: teardown aborted a run it could not see"
+  pass "a silent daemon leaves teardown unknown and closing nothing, not fail-open"
+}
+
+# The same lookup on a loaded host: the daemon answers, but only after burning CPU
+# for longer than the ten seconds this read used to be allowed. A slow answer is an
+# answer; the parked run is found and aborted before the worker goes.
+test_slow_working_daemon_still_finds_the_parked_run() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-slow)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_BURN_SECS=13 FM_FAKE_NM_BURN_MARK="$case_dir/nm-burned" FM_TEARDOWN_NM_STALL_SECS=2 \
+  FM_DURATION_NO_PROGRESS_SECS=20 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-slow: a slow, working daemon should not block teardown"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-daemon-slow: the parked run was not found and aborted"
+  assert_grep "task-x1 is still waiting on a no-mistakes read" "$case_dir/stderr" \
+    "parked-run-daemon-slow: teardown printed no progress while it waited, so a sweep could call it silent"
+  pass "a slow, working daemon still lets teardown find and abort the parked run, with progress while it waits"
+}
+
+# The captain's --force discard is not held hostage by a quiet daemon: once the
+# parked-run lookup is unknown, teardown goes on, and says and records that the
+# run state is unknown.
+test_forced_teardown_goes_on_past_a_silent_daemon() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-daemon-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_STATUS_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-daemon-silent-forced: --force should go on past an unknown run state"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "force goes on with the no-mistakes run state unknown" "$case_dir/stderr" \
+    "parked-run-daemon-silent-forced: teardown did not say the run state is unknown"
+  assert_grep "run state unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-daemon-silent-forced: teardown did not record the unknown run state"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-daemon-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent daemon and records the run state as unknown"
+}
+
+test_forced_teardown_goes_on_past_a_silent_confirmation() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent-forced)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 0 "$rc" "parked-run-confirmation-silent-forced: --force should go on past an unknown abort"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "abort --run" "$case_dir/nm-abort.log" \
+    "parked-run-confirmation-silent-forced: the parked run was not aborted first"
+  assert_grep "stopped after the abort is unknown" "$case_dir/data/task-x1/no-mistakes-unknown.log" \
+    "parked-run-confirmation-silent-forced: teardown did not record the unknown abort outcome"
+  assert_absent "$case_dir/state/task-x1.meta" "parked-run-confirmation-silent-forced: the forced teardown did not finish"
+  pass "a forced teardown goes on past a silent abort confirmation and records it as unknown"
+}
+
+# After the abort is sent, only the confirming read goes quiet. That is not "still
+# parked": nothing is known yet, and a later teardown confirms it.
+test_silent_confirmation_after_abort_is_unknown() {
+  local case_dir rc head
+  case_dir=$(make_case parked-run-confirmation-silent)
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  rc=0
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+  FM_FAKE_NM_VERIFY_HANG=1 FM_TEARDOWN_NM_STALL_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+
+  expect_code 75 "$rc" "parked-run-confirmation-silent: a silent confirmation should leave the answer unknown"
+  assert_grep "UNKNOWN: the no-mistakes daemon went silent" "$case_dir/stderr" \
+    "parked-run-confirmation-silent: teardown did not say the confirmation is unknown"
+  if grep -q 'is still parked after axi abort' "$case_dir/stderr"; then
+    fail "parked-run-confirmation-silent: a silent confirmation was reported as still parked"
+  fi
+  assert_present "$case_dir/wt" "parked-run-confirmation-silent: teardown removed the worktree"
+  pass "a silent confirmation after the abort is unknown, not a still-parked verdict"
 }
 
 test_another_branchs_parked_run_is_never_touched() {
@@ -6208,6 +6385,8 @@ test_exempt_retry_clears_prior_close_replay_authority
 test_local_only_force_overrides_unpushed
 test_secondmate_pr_registration_publishes_ready_line
 test_secondmate_home_teardown_delivers_final_line_or_refuses
+test_secondmate_home_teardown_unknown_acceptance_is_a_retry
+test_secondmate_home_teardown_shows_report_diagnostics
 test_teardown_missing_busy_sidecar_completes
 test_herdr_teardown_clears_escalation_marker
 test_herdr_flat_teardown_refuses_orphaning_records_then_retry_completes
@@ -6246,6 +6425,11 @@ test_parked_run_behind_diverged_newer_row_is_never_aborted
 test_parked_advanced_run_ambiguous_rows_are_never_aborted
 test_ledger_proven_continuation_never_aborts_active_run
 test_parked_own_run_refuses_when_abort_is_unconfirmed
+test_silent_daemon_leaves_the_parked_run_unknown
+test_slow_working_daemon_still_finds_the_parked_run
+test_silent_confirmation_after_abort_is_unknown
+test_forced_teardown_goes_on_past_a_silent_daemon
+test_forced_teardown_goes_on_past_a_silent_confirmation
 test_mismatched_run_after_abort_refuses_unconfirmed
 test_empty_status_after_abort_refuses_unconfirmed
 test_not_found_status_after_abort_confirms_completion

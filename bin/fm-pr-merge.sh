@@ -1618,6 +1618,8 @@ require_released_captain_hold() {
       printf 'error: task %s is still held for the captain; nothing was merged\n' "$ID" >&2
       printf "Release it with the captain's own words, then re-run this merge: %s answer %s --decision-file <captain-answer-file> --release\n" \
         "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
+      printf 'If a recorded captain ruling made the question moot, release it honestly instead: %s withdraw %s --evidence-file <file> --ruling <captain-ruling-task>\n' \
+        "$SCRIPT_DIR/fm-captain-hold.sh" "$ID" >&2
       "$SCRIPT_DIR/fm-guard-event.sh" merge-held-task deny --source-ok true --elapsed-ms 0 2>/dev/null
       return 1
       ;;
