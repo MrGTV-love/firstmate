@@ -1,0 +1,278 @@
+#### open-work ledger live driver: BASE a7f3e14a3  (now=2026-10-30T17:44:33Z)
+
+## S1a  A steer sent minutes before the drain re-presents an unchanged reviewed green PR row still counts
+  $ action <row> steered --evidence 001.msg
+    exit=0
+    | action: "row-s1a"
+    | kind: steered
+  $ fm-wake-drain.sh --ack-through ...
+    exit=0
+  $ (t+120s, row re-presented) action <row> steered --evidence 001.msg  # the SAME message, no new one
+    exit=1
+    | error: "steered evidence must be a new delivery sent after this row's presentation"
+  $ fm-wake-drain.sh --ack-through ...
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "row-s1a","firstmate","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh",7320,"PASS on head",false
+  ==> FAIL: S1a-same re-presented row accepts the steer it already had, no re-steer
+
+  $ (t+300s, re-presented again) action <row> steered --evidence 002.msg  # sent 30 s before this re-presentation
+    exit=0
+    | action: "row-s1a"
+    | kind: steered
+  $ fm-wake-drain.sh --ack-through ...
+    exit=0
+  ==> PASS: S1a steer sent minutes before re-presentation accepted, no new message needed
+
+## S1b  The same unchanged stalled row, already steered, needs no second message when re-presented
+  $ action <row> steered --evidence 001.msg
+    exit=0
+    | action: "row-s1b"
+    | kind: steered
+  $ ack
+    exit=0
+  $ (t+120s, re-presented) ack with no new action
+    exit=0
+  $ fm-open-loops.sh --check-actions
+    exit=0
+  ==> PASS: S1b an unchanged steered row is still covered on re-presentation
+
+## S1c  (guard) A steer sent before the row went overdue, or older than four hours, is refused
+  $ action <row> steered --evidence 002.msg  # sent before the row became overdue
+    exit=1
+    | error: "steered evidence must be a new delivery sent after this row's presentation"
+  $ (t+5h) action <row> steered --evidence 001.msg  # now five hours old
+    exit=0
+    | action: "row-s1c"
+    | kind: steered
+  ==> FAIL: S1c stale steers refused
+
+## S2  A remote secondmate's delivered pending-reply id is accepted as steered evidence
+  $ action <row> steered --evidence 85af55d55e88a1a5  # pending reply not delivered
+    exit=1
+    | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  $ action <row> steered --evidence 14f7ca16c4061e71  # delivered, but to another task
+    exit=1
+    | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  $ action <row> steered --evidence 2211221122112211  # symbolic link to a delivered record
+    exit=1
+    | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  $ action <row> steered --evidence a5cb1fdac1fd0d90  # delivered to mini after the episode began
+    exit=1
+    | error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  $ ack
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "row-s2","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+  ==> FAIL: S2 delivered remote id accepted; undelivered, foreign and symlinked ids refused
+
+## S3  One owner decides captain_visible: the deferral refusal and the printed row agree
+  $ action <row> deferred --evidence "lint running" --recheck +600s
+    exit=0
+    | action: "row-s3"
+    | kind: deferred
+  $ ack
+    exit=0
+    drain header: rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    drain row:      "row-s3","worker:worker","worker","follow up on lint.full.whole",7900,"waiting for lint.full.whole; declaration age 7200s",false
+  (t+700s, deferral lapsed) drain prints captain_visible=false
+  $ action <row> deferred --evidence "still running" --recheck +1300s
+    exit=1
+    | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+  stored row captain_visible=True
+  ==> FAIL: S3 refused second deferral and printed row both say captain-visible
+
+## S4a  A red PR row parked on purpose can wait on a named live task (no captain escalation)
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ action <red_check row> waiting --evidence "PR is red because main is red; parked until repair-owner merges" --prerequisite-task repair-owner --recheck +1h
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ ack
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "b00fd1aebda89b21d906d3bb","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ (next drain) ack with no new action
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "b00fd1aebda89b21d906d3bb","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ fm-open-loops.sh --report  # row stays visible
+    exit=0
+    | generated_epoch: 1793382273
+    | complete: true
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "b00fd1aebda89b21d906d3bb","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  ==> FAIL: S4a wait on live task accepted, stands across presentations, row stays visible
+
+## S4-merged  The waiting row resurfaces when the prerequisite PR merges
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ action ... waiting --prerequisite-task repair-owner
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ --check-actions before the change
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "9549258b20a734dbaa427c5d","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ --check-actions after the prerequisite PR merges
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "9549258b20a734dbaa427c5d","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ renew the wait
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  ==> FAIL: S4-merged wait ends and cannot be renewed when the prerequisite PR merges
+
+## S4-failed  The waiting row resurfaces when the prerequisite fails
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ action ... waiting --prerequisite-task repair-owner
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ --check-actions before the change
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "5aaa828e7d1d29f98d56f112","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ --check-actions after the prerequisite fails
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "5aaa828e7d1d29f98d56f112","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ renew the wait
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  ==> FAIL: S4-failed wait ends and cannot be renewed when the prerequisite fails
+
+## S4-stalled  The waiting row resurfaces when the prerequisite stalls (overdue stalled_worker row)
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ action ... waiting --prerequisite-task repair-owner
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ --check-actions before the change
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "399ec9fd9a0ee7b68f4a4ca6","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ --check-actions after the prerequisite stalls (overdue stalled_worker row)
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "399ec9fd9a0ee7b68f4a4ca6","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  $ renew the wait
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  ==> FAIL: S4-stalled wait ends and cannot be renewed when the prerequisite stalls (overdue stalled_worker row)
+
+## S3b  Intent 2: a deferred red PR row whose worker is parked on a task can be answered truthfully with a wait
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ action <red_check row> deferred --evidence "parked until repair-owner merges" --recheck +600s
+    exit=0
+    | action: "77f7316e42d84a574abe7d40"
+    | kind: deferred
+  $ ack
+    exit=0
+    drain header: None
+    drain row:    None
+  (t+120s, first deferral still stands) drain prints captain_visible=None
+  $ second deferral
+    exit=1
+    | error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+    drain header: rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    drain row:      "77f7316e42d84a574abe7d40","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236793,"Behavior portable serial 17",true
+  after refusal: drain prints captain_visible=true; stored row captain_visible=True
+  $ action <red_check row> waiting --evidence "PR is red because main is red; parked until repair-owner merges" --prerequisite-task repair-owner --recheck +1h
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ ack (no captain escalation recorded)
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "77f7316e42d84a574abe7d40","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236793,"Behavior portable serial 17",true
+  recorded action kind: deferred
+  ==> FAIL: S3b refusal names the wait; printed and stored visibility agree after it; the wait is accepted and acks
+
+## S4g  (guard) A wait on a task that is not live, or on the row's own task, is refused; recheck must be <=24h
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ waiting --prerequisite-task no-such-task
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ waiting --prerequisite-task parked-job  # the row's own worker
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ waiting --prerequisite-task repair-owner --recheck +25h
+    exit=1
+    | error: "waiting requires --recheck at a future UTC time within 24 hours"
+  $ --check-actions (nothing recorded)
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "fa38f6913b000ef767723af2","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",236673,"Behavior portable serial 17",false
+  ==> PASS: S4g bad waits refused and the row stays actionable
+
+## S4h  (guard) A standing wait never outlives its recheck
+  collected row: category=red_check owner=worker:parked-job overdue=True
+  $ waiting ... --recheck +1h
+    exit=1
+    | error: "this obligation cannot have a standing dependency wait"
+  $ (t+1h) --check-actions
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "6b89a122b216b74dc454fa55","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",240273,"Behavior portable serial 17",false
+  ==> PASS: S4h due recheck restores the action requirement
+
+## S5  (guard) A row with no real handling still goes overdue and is re-presented every drain
+  $ drain then ack with no action
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "row-s5","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+  $ (t+120s) drain then ack with no action
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "row-s5","worker:worker","worker","follow up on lint.full.whole",7320,"waiting for lint.full.whole; declaration age 7200s",false
+  $ --check-actions
+    exit=1
+    | error: overdue rows have no action recorded since presentation; acknowledgement refused
+    | OVERDUE:
+    | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    |   "row-s5","worker:worker","worker","follow up on lint.full.whole",7320,"waiting for lint.full.whole; declaration age 7200s",false
+  row printed by both drains: True
+  ==> PASS: S5 unhandled overdue row blocks ack and re-presents
+
+#### summary
+FAIL  S1a-same re-presented row accepts the steer it already had, no re-steer
+PASS  S1a steer sent minutes before re-presentation accepted, no new message needed
+PASS  S1b an unchanged steered row is still covered on re-presentation
+FAIL  S1c stale steers refused
+FAIL  S2 delivered remote id accepted; undelivered, foreign and symlinked ids refused
+FAIL  S3 refused second deferral and printed row both say captain-visible
+FAIL  S4a wait on live task accepted, stands across presentations, row stays visible
+FAIL  S4-merged wait ends and cannot be renewed when the prerequisite PR merges
+FAIL  S4-failed wait ends and cannot be renewed when the prerequisite fails
+FAIL  S4-stalled wait ends and cannot be renewed when the prerequisite stalls (overdue stalled_worker row)
+FAIL  S3b refusal names the wait; printed and stored visibility agree after it; the wait is accepted and acks
+PASS  S4g bad waits refused and the row stays actionable
+PASS  S4h due recheck restores the action requirement
+PASS  S5 unhandled overdue row blocks ack and re-presents
