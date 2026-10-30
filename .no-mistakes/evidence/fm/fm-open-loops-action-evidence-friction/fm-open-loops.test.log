@@ -69,8 +69,4 @@ PASS: a steer older than four hours, one sent before the episode, or one predati
 PASS: the overdue episode opens when the row became overdue, or at first presentation when the record cannot say
 PASS: a delivered pending-reply correlation id is accepted as steered evidence; undelivered, foreign, early and linked ids are refused
 PASS: captain_visible is one derived value for the printed row, the stored action and the deferral check
-PASS: a red PR row waits on a named live task, idle or parked, and resurfaces when it merges, fails, stalls, loses its session or record, is replaced, lands done with no PR or comes due; a prerequisite that is not live is refused
-PASS: a prerequisite-task delivery sent inside the current overdue episode counts after a re-presentation; one older than the episode is refused; a row no longer overdue closes its episode
-PASS: open_pr and red_check rows wait on a live task by reason; unanswered_question and unlanded_commit rows are refused that form and still wait through a delivery naming them
-ok - open-work reconciliation reports owned obligations from live records
-exit=0 seconds=1173
+Terminated: 15

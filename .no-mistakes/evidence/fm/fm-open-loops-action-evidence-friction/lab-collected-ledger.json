@@ -1,0 +1,85 @@
+{
+ "schema": "fm-open-loops.v1",
+ "generated_epoch": 1793379535,
+ "home": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA",
+ "complete": true,
+ "rows": [
+  {
+   "id": "9f732f4e7bb5120339e24f35",
+   "category": "open_pr",
+   "subject": "https://github.com/test/project/pull/284",
+   "owner": "firstmate",
+   "next_action": "route the green PR's review; merge it under AGENTS.md section 7",
+   "age_seconds": 0,
+   "limit_seconds": 3600,
+   "overdue": false,
+   "evidence": "",
+   "source": {
+    "home": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/config",
+    "task": "green-job",
+    "generation": "3ce994f125d3221ef2fa111dd376d49a923f196e23d8a97fc9625b8c1482ad8b",
+    "kind": "pr",
+    "url": "https://github.com/test/project/pull/284",
+    "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+   }
+  },
+  {
+   "id": "bc660bfa12d2ef16c462afb5",
+   "category": "red_check",
+   "subject": "https://github.com/test/project/pull/283",
+   "owner": "worker:parked-job",
+   "next_action": "diagnose: code or test",
+   "age_seconds": 7200,
+   "limit_seconds": 0,
+   "overdue": true,
+   "evidence": "Behavior portable serial 17",
+   "source": {
+    "home": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA",
+    "state": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state",
+    "data": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/data",
+    "config": "/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/config",
+    "task": "parked-job",
+    "generation": "3e640a22c4a0c6584ed617a9e0a8812b1b3dc77fba6fd1ea251a3cc8e54f09d3",
+    "kind": "pr",
+    "url": "https://github.com/test/project/pull/283",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   }
+  },
+  {
+   "id": "21a240eadbea79bb002a7e1a",
+   "category": "silent_report",
+   "subject": "green-job",
+   "owner": "firstmate",
+   "next_action": "check in: progress, blockers, cross-workstream dependencies",
+   "age_seconds": 0,
+   "limit_seconds": 900,
+   "overdue": false,
+   "evidence": "last heard: status=1793379535; inbox acknowledgement=None; resolved reply=None"
+  },
+  {
+   "id": "0629b7e7e3c4d3d6e73c4d70",
+   "category": "silent_report",
+   "subject": "parked-job",
+   "owner": "firstmate",
+   "next_action": "check in: progress, blockers, cross-workstream dependencies",
+   "age_seconds": 0,
+   "limit_seconds": 900,
+   "overdue": false,
+   "evidence": "last heard: status=1793379535; inbox acknowledgement=None; resolved reply=None"
+  },
+  {
+   "id": "65464fa643bd451809ce21ed",
+   "category": "silent_report",
+   "subject": "repair-owner",
+   "owner": "firstmate",
+   "next_action": "check in: progress, blockers, cross-workstream dependencies",
+   "age_seconds": 0,
+   "limit_seconds": 900,
+   "overdue": false,
+   "evidence": "last heard: status=1793379535; inbox acknowledgement=None; resolved reply=None"
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+lab FM_HOME=/Users/charlesabrooker/tmp/fm-lab.3Q2aCA TMUX_TMPDIR=/tmp/fml.E02cPq
+PASS [M5] green PR row next_action points at AGENTS.md section 7 and asks no approval
+PASS [M2] collector publishes a red_check row for PR 283 owned by its parked worker
+PASS [M6] drain presents the unhandled overdue red row
+PASS [M6] --check-actions exits 1 while the row has no action
+PASS [M6] acknowledgement is refused while the row has no action
+PASS [M2] a wait on a task that does not exist is refused
+PASS [M2] a red PR row is accepted as waiting on live task repair-owner
+PASS [M2] acknowledgement passes once the wait is recorded
+PASS [M2] --check-actions exits 0 while the wait stands
+PASS [M2] the next drain does not re-present the standing wait
+PASS [M2] the standing wait stays visible in --report
+PASS [M2] merge record written by fm_pr_poll_merge_mark_notified exists
+PASS [M2] a merged prerequisite resurfaces the row (--check-actions exits 1)
+PASS [M2] a new wait on the merged prerequisite is refused
+PASS [M2] after the merge is undone, a new wait on the live task is accepted
+PASS [M2] after the merge is undone, --check-actions exits 0
+PASS [M2] a failed prerequisite resurfaces the row (--check-actions exits 1)
+PASS [M2] after the failure is undone, a new wait on the live task is accepted
+PASS [M2] after the failure is undone, --check-actions exits 0
+PASS [M2] a gone prerequisite session resurfaces the row (--check-actions exits 1)
+PASS [M2] a new wait on a gone prerequisite is refused as not live
+PASS [M2] after the gone session is undone, a new wait on the live task is accepted
+PASS [M2] after the gone session is undone, --check-actions exits 0
+PASS [M2] a stalled prerequisite resurfaces the row (--check-actions exits 1)
+PASS [M2] a new wait on a stalled prerequisite is refused
+PASS [M2] wait with 600s recheck stands now
+PASS [M2] the same wait no longer stands after its recheck (--check-actions exits 1)
+PASS [M1] steer with a delivery made inside the overdue episode is accepted
+PASS [M1] ack passes after the steer
+PASS [M1] unchanged steered row is not re-presented and needs no new message (ack passes)
+PASS [M1] reviewed-green PR row: first steer accepted
+PASS [M1] reviewed-green PR row: ack passes
+PASS [M1] reviewed-green PR row is re-presented after a steer
+PASS [M1] re-presentation accepts the SAME earlier delivery as steered (no new message demanded)
+PASS [M1] ack passes after citing the same delivery
+PASS [M1-adv] a delivery made before the row became overdue is refused
+PASS [M1-adv] ack stays refused with no valid action
+PASS [M1-adv] a delivery older than four hours is refused
+PASS [restart] first steer with delivery 1 accepted
+PASS [restart] ack passes
+PASS [restart] the restarted row is presented again
+PASS [restart] the delivery from the earlier episode is refused
+PASS [restart] acknowledgement stays gated
+PASS [restart] the stored episode starts at the restarted overdue moment
+PASS [restart] a delivery after the new boundary answers it
+PASS [restart] ack passes after the fresh steer
+PASS [M4] an undelivered pending-reply id is refused
+PASS [M4] another task's delivered pending-reply id is refused
+PASS [M4] the remote secondmate's delivered pending-reply id is accepted as steered
+PASS [M4] stored action cites the correlation id
+PASS [M4] ack passes
+PASS [M3] printed row is captain_visible false before any deferral
+PASS [M3] first deferral accepted
+PASS [M3] ack passes
+PASS [M3] second deferral on the unchanged row is refused while the first stands
+PASS [M3] the refusal stores captain_visible and requires_followup
+PASS [M3] stored published row is captain_visible true
+PASS [M3] --check-actions exits 1 after the refusal
+PASS [M3] the next drain prints the row captain_visible true
+PASS [M3] a lapsed deferral row prints captain_visible true and the second deferral is refused
+PASS [M3] the refusal for a red PR names the live-task wait remedy
+PASS [M6] drain 1 presents the unhandled overdue row
+PASS [M6] drain 1: ack is refused without an action
+PASS [M6] drain 2 presents the unhandled overdue row
+PASS [M6] drain 2: ack is refused without an action
+SUMMARY: 65 passed, 0 failed
+driver exit=0
+teardown: lab=/Users/charlesabrooker/tmp/fm-lab.3Q2aCA rc=0 exists_after=no

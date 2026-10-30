@@ -1,0 +1,761 @@
+
+====================================================================================================
+Part A setup: real tmux on the lab socket, three ship tasks, forge double
+====================================================================================================
+$ [now=T0+0] tmux -f /dev/null new-session -d -s fm -n fm-repair-owner bash -c 'exec -a claude sleep 7200'
+  exit=0
+$ [now=T0+0] tmux new-window -d -t fm: -n fm-parked-job bash -c 'exec -a claude sleep 7200'
+  exit=0
+$ [now=T0+0] tmux new-window -d -t fm: -n fm-green-job bash -c 'exec -a claude sleep 7200'
+  exit=0
+$ [now=T0+0] tmux display-message -p -t fm #{socket_path}
+  exit=0
+  stdout:
+    /private/tmp/fml.E02cPq/tmux-501/default
+tmux socket (lab-private): /private/tmp/fml.E02cPq/tmux-501/default
+$ [now=T0+0] git init -q --bare -b main /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/origin.git
+  exit=0
+$ [now=T0+0] git init -q -b main /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/seed
+  exit=0
+$ [now=T0+0] git -C /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/seed -c user.name=lab -c user.email=lab@example.invalid commit -q --allow-empty -m baseline
+  exit=0
+$ [now=T0+0] git -C /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/seed push -q /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/origin.git main
+  exit=0
+$ [now=T0+0] git clone -q /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/origin.git /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/parked-job-tree
+  exit=0
+$ [now=T0+0] git -C /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/parked-job-tree checkout -q -b fm/parked-job
+  exit=0
+$ [now=T0+0] git clone -q /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/origin.git /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/green-job-tree
+  exit=0
+$ [now=T0+0] git -C /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/green-job-tree checkout -q -b fm/green-job
+  exit=0
+$ [now=T0+0] git clone -q /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/origin.git /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/repair-owner-tree
+  exit=0
+$ [now=T0+0] git -C /Users/charlesabrooker/tmp/fm-lab-scratch.5cvpVd/repair-owner-tree checkout -q -b fm/repair-owner
+  exit=0
+$ [now=T0+0] bin/fm-busy-event.sh arm $FM_HOME/state parked-job
+  exit=0
+  stdout:
+    g1793379535.27196.14303
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state parked-job busy --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-busy-event.sh arm $FM_HOME/state green-job
+  exit=0
+  stdout:
+    g1793379535.27418.16855
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state green-job busy --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-busy-event.sh arm $FM_HOME/state repair-owner
+  exit=0
+  stdout:
+    g1793379535.27585.10805
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state repair-owner busy --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh --heartbeat --json  exit=0
+  row: {"id": "9f732f4e7bb5120339e24f35", "category": "open_pr", "subject": "https://github.com/test/project/pull/284", "owner": "firstmate", "next_action": "route the green PR's review; merge it under AGENTS.md section 7", "overdue": false, "age_seconds": 0, "limit_seconds": 3600}
+  row: {"id": "bc660bfa12d2ef16c462afb5", "category": "red_check", "subject": "https://github.com/test/project/pull/283", "owner": "worker:parked-job", "next_action": "diagnose: code or test", "overdue": true, "age_seconds": 7200, "limit_seconds": 0}
+  row: {"id": "21a240eadbea79bb002a7e1a", "category": "silent_report", "subject": "green-job", "owner": "firstmate", "next_action": "check in: progress, blockers, cross-workstream dependencies", "overdue": false, "age_seconds": 0, "limit_seconds": 900}
+  row: {"id": "0629b7e7e3c4d3d6e73c4d70", "category": "silent_report", "subject": "parked-job", "owner": "firstmate", "next_action": "check in: progress, blockers, cross-workstream dependencies", "overdue": false, "age_seconds": 0, "limit_seconds": 900}
+  row: {"id": "65464fa643bd451809ce21ed", "category": "silent_report", "subject": "repair-owner", "owner": "firstmate", "next_action": "check in: progress, blockers, cross-workstream dependencies", "overdue": false, "age_seconds": 0, "limit_seconds": 900}
+$ [now=T0+0] bin/fm-crew-state.sh repair-owner
+  exit=0
+  stdout:
+    state: working · source: pane · harness busy (claude-hook)
+>>> PASS [M5] green PR row next_action points at AGENTS.md section 7 and asks no approval
+  green PR next_action: "route the green PR's review; merge it under AGENTS.md section 7"
+>>> PASS [M2] collector publishes a red_check row for PR 283 owned by its parked worker
+
+====================================================================================================
+M6: an unhandled overdue row is presented and gates acknowledgement
+====================================================================================================
+$ [now=T0+0] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh red PR overdue
+  exit=0
+$ [now=T0+0] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379538	1	check	report	check: red PR overdue
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 34932.1793379538.7xC6Su
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M66TKKH2HW0FE1KAGB8D21NC/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [M6] drain presents the unhandled overdue red row
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M6] --check-actions exits 1 while the row has no action
+$ [now=T0+0] bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 34932.1793379538.7xC6Su
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M6] acknowledgement is refused while the row has no action
+
+====================================================================================================
+M2: wait on a named live task
+====================================================================================================
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task no-such-task --recheck 2026-10-30T17:58:55Z
+  exit=1
+  stdout:
+    error: "[Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/no-such-task.meta'"
+>>> PASS [M2] a wait on a task that does not exist is refused
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=0
+  stdout:
+    action: "bc660bfa12d2ef16c462afb5"
+    kind: waiting
+>>> PASS [M2] a red PR row is accepted as waiting on live task repair-owner
+$ [now=T0+0] bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 34932.1793379538.7xC6Su
+  exit=0
+>>> PASS [M2] acknowledgement passes once the wait is recorded
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=0
+>>> PASS [M2] --check-actions exits 0 while the wait stands
+$ [now=T0+0] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh again
+  exit=0
+$ [now=T0+0] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    1793379543	2	check	report	check: again
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 44145.1793379543.Wqpggb
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+0] bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 44145.1793379543.Wqpggb
+  exit=0
+>>> PASS [M2] the next drain does not re-present the standing wait
+$ [now=T0+0] bin/fm-open-loops.sh --report
+  exit=0
+  stdout:
+    generated_epoch: 1793379535
+    complete: true
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M2] the standing wait stays visible in --report
+
+====================================================================================================
+M2: the wait ends when the prerequisite merges
+====================================================================================================
+$ [now=T0+0] bash -c . "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner github github.com test/project 290 _ bin/fm-pr-lib.sh $FM_HOME/state
+  exit=0
+>>> PASS [M2] merge record written by fm_pr_poll_merge_mark_notified exists
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M2] a merged prerequisite resurfaces the row (--check-actions exits 1)
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=1
+  stdout:
+    error: "prerequisite task's PR has merged; follow up on its result"
+>>> PASS [M2] a new wait on the merged prerequisite is refused
+$ [now=T0+0] bin/fm-open-loops.sh --heartbeat --json  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=0
+  stdout:
+    action: "bc660bfa12d2ef16c462afb5"
+    kind: waiting
+>>> PASS [M2] after the merge is undone, a new wait on the live task is accepted
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=0
+>>> PASS [M2] after the merge is undone, --check-actions exits 0
+
+====================================================================================================
+M2: the wait ends when the prerequisite fails
+====================================================================================================
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state repair-owner idle --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M2] a failed prerequisite resurfaces the row (--check-actions exits 1)
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state repair-owner busy --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh --heartbeat --json  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=0
+  stdout:
+    action: "bc660bfa12d2ef16c462afb5"
+    kind: waiting
+>>> PASS [M2] after the failure is undone, a new wait on the live task is accepted
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=0
+>>> PASS [M2] after the failure is undone, --check-actions exits 0
+
+====================================================================================================
+M2: the wait ends when the prerequisite session is gone (real tmux window killed)
+====================================================================================================
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state repair-owner idle --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] tmux kill-window -t fm:fm-repair-owner
+  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M2] a gone prerequisite session resurfaces the row (--check-actions exits 1)
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=1
+  stdout:
+    error: "prerequisite task is not live (its session is gone, dead, failed or unreadable); follow up on it"
+>>> PASS [M2] a new wait on a gone prerequisite is refused as not live
+$ [now=T0+0] tmux new-window -d -t fm: -n fm-repair-owner bash -c 'exec -a claude sleep 7200'
+  exit=0
+$ [now=T0+0] bin/fm-busy-event.sh apply $FM_HOME/state repair-owner busy --current-gen --source claude-hook --event lab
+  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh --heartbeat --json  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=0
+  stdout:
+    action: "bc660bfa12d2ef16c462afb5"
+    kind: waiting
+>>> PASS [M2] after the gone session is undone, a new wait on the live task is accepted
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=0
+>>> PASS [M2] after the gone session is undone, --check-actions exits 0
+
+====================================================================================================
+M2: the wait ends when the prerequisite stalls (stalled_worker row injected into the published ledger)
+====================================================================================================
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7200,"Behavior portable serial 17",false
+>>> PASS [M2] a stalled prerequisite resurfaces the row (--check-actions exits 1)
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:58:55Z
+  exit=1
+  stdout:
+    error: "prerequisite task is stalled, missing or failed; follow up on it"
+>>> PASS [M2] a new wait on a stalled prerequisite is refused
+
+====================================================================================================
+M2: the wait never stands past its recheck
+====================================================================================================
+$ [now=T0+0] bin/fm-open-loops.sh --heartbeat --json  exit=0
+$ [now=T0+0] bin/fm-open-loops.sh action bc660bfa12d2ef16c462afb5 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T17:08:55Z
+  exit=0
+  stdout:
+    action: "bc660bfa12d2ef16c462afb5"
+    kind: waiting
+$ [now=T0+0] bin/fm-open-loops.sh --check-actions
+  exit=0
+>>> PASS [M2] wait with 600s recheck stands now
+$ [now=T0+700] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "bc660bfa12d2ef16c462afb5","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",7900,"Behavior portable serial 17",false
+>>> PASS [M2] the same wait no longer stands after its recheck (--check-actions exits 1)
+
+====================================================================================================
+Part B case m1-steer-ordinary: row {"id": "row-m1-steer-ordinary", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+10] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+10] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-steer-ordinary","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379566	3	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 94423.1793379566.EFyYvk
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+10] bash -c . "$1"; fm_task_inbox_write "$2" "$3" "$4" _ bin/fm-task-inbox-lib.sh $FM_HOME/state worker follow up on the lint step
+  exit=0
+  stdout:
+    /Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/worker.inbox/001.msg
+  delivery 001.msg at=2026-10-30T16:59:28Z
+$ [now=T0+10] bin/fm-open-loops.sh action row-m1-steer-ordinary steered --evidence 001.msg
+  exit=0
+  stdout:
+    action: "row-m1-steer-ordinary"
+    kind: steered
+>>> PASS [M1] steer with a delivery made inside the overdue episode is accepted
+$ [now=T0+10] bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 94423.1793379566.EFyYvk
+  exit=0
+>>> PASS [M1] ack passes after the steer
+$ [now=T0+130] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh again
+  exit=0
+$ [now=T0+130] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    1793379568	4	check	report	check: again
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 98612.1793379568.GB6sb5
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+130] bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 98612.1793379568.GB6sb5
+  exit=0
+>>> PASS [M1] unchanged steered row is not re-presented and needs no new message (ack passes)
+
+====================================================================================================
+Part B case m1-steer-reviewed: row {"id": "row-m1-steer-reviewed", "category": "review_pass_not_merged", "subject": "https://github.com/test/project/pull/9", "owner": "firstmate", "next_action": "merge through bin/fm-pr-merge.sh under AGENTS.md section 7", "age_seconds": 7200, "limit_seconds": 600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s", "source": {"task": "worker"}}
+====================================================================================================
+$ [now=T0+10] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+10] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-steer-reviewed","firstmate","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379571	5	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 5465.1793379571.RTy0OH
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+10] bash -c . "$1"; fm_task_inbox_write "$2" "$3" "$4" _ bin/fm-task-inbox-lib.sh $FM_HOME/state worker follow up on the lint step
+  exit=0
+  stdout:
+    /Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/worker.inbox/001.msg
+  delivery 001.msg at=2026-10-30T16:59:33Z
+$ [now=T0+10] bin/fm-open-loops.sh action row-m1-steer-reviewed steered --evidence 001.msg
+  exit=0
+  stdout:
+    action: "row-m1-steer-reviewed"
+    kind: steered
+>>> PASS [M1] reviewed-green PR row: first steer accepted
+$ [now=T0+10] bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 5465.1793379571.RTy0OH
+  exit=0
+>>> PASS [M1] reviewed-green PR row: ack passes
+$ [now=T0+130] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh again
+  exit=0
+$ [now=T0+130] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-steer-reviewed","firstmate","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7320,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379574	6	check	report	check: again
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 12495.1793379574.PiSkum
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+130] bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 12495.1793379574.PiSkum
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-steer-reviewed","firstmate","https://github.com/test/project/pull/9","merge through bin/fm-pr-merge.sh under AGENTS.md section 7",7320,"waiting for lint.full.whole; declaration age 7200s",false
+>>> PASS [M1] reviewed-green PR row is re-presented after a steer
+$ [now=T0+130] bin/fm-open-loops.sh action row-m1-steer-reviewed steered --evidence 001.msg
+  exit=0
+  stdout:
+    action: "row-m1-steer-reviewed"
+    kind: steered
+>>> PASS [M1] re-presentation accepts the SAME earlier delivery as steered (no new message demanded)
+$ [now=T0+130] bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 12495.1793379574.PiSkum
+  exit=0
+>>> PASS [M1] ack passes after citing the same delivery
+$ [now=T0+130] bash -c . "$1"; fm_task_inbox_write "$2" "$3" "$4" _ bin/fm-task-inbox-lib.sh $FM_HOME/state worker follow up on the lint step
+  exit=0
+  stdout:
+    /Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/worker.inbox/002.msg
+  delivery 002.msg at=2026-10-30T16:59:37Z
+
+====================================================================================================
+Part B case m1-before-overdue: row {"id": "row-m1-before-overdue", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 3700, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+4042] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+4042] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-before-overdue","worker:worker","worker","follow up on lint.full.whole",3700,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379577	7	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 21143.1793379577.EmcvUJ
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+4042] bin/fm-open-loops.sh action row-m1-before-overdue steered --evidence 002.msg
+  exit=1
+  stdout:
+    error: "steered evidence must be a new delivery sent after this row became overdue or its evidence last changed"
+>>> PASS [M1-adv] a delivery made before the row became overdue is refused
+$ [now=T0+4042] bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 21143.1793379577.EmcvUJ
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-before-overdue","worker:worker","worker","follow up on lint.full.whole",3700,"waiting for lint.full.whole; declaration age 7200s",false
+>>> PASS [M1-adv] ack stays refused with no valid action
+$ [now=T0+4042] bin/fm-open-loops.sh action row-m1-before-overdue escalated --evidence lab cleanup
+  exit=0
+  stdout:
+    action: "row-m1-before-overdue"
+    kind: escalated
+$ [now=T0+4042] bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 21143.1793379577.EmcvUJ
+  exit=0
+
+====================================================================================================
+Part B case m1-older-than-4h: row {"id": "row-m1-older-than-4h", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 100000, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+18042] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+18042] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m1-older-than-4h","worker:worker","worker","follow up on lint.full.whole",100000,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379579	8	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 26899.1793379579.qxmrwY
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+18042] bin/fm-open-loops.sh action row-m1-older-than-4h steered --evidence 002.msg
+  exit=1
+  stdout:
+    error: "steered evidence is older than four hours; send a new delivery"
+>>> PASS [M1-adv] a delivery older than four hours is refused
+$ [now=T0+18042] bin/fm-open-loops.sh action row-m1-older-than-4h escalated --evidence lab cleanup
+  exit=0
+  stdout:
+    action: "row-m1-older-than-4h"
+    kind: escalated
+$ [now=T0+18042] bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 26899.1793379579.qxmrwY
+  exit=0
+
+====================================================================================================
+Part B case clock-restart: row {"id": "row-clock-restart", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+20] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+20] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-clock-restart","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379581	9	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 30839.1793379581.qrcAoP
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+20] bash -c . "$1"; fm_task_inbox_write "$2" "$3" "$4" _ bin/fm-task-inbox-lib.sh $FM_HOME/state worker follow up on the lint step
+  exit=0
+  stdout:
+    /Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/worker.inbox/001.msg
+  delivery 001.msg at=2026-10-30T16:59:43Z
+$ [now=T0+20] bash -c . "$1"; fm_task_inbox_write "$2" "$3" "$4" _ bin/fm-task-inbox-lib.sh $FM_HOME/state worker follow up on the lint step
+  exit=0
+  stdout:
+    /Users/charlesabrooker/tmp/fm-lab.3Q2aCA/state/worker.inbox/002.msg
+  delivery 002.msg at=2026-10-30T16:59:45Z
+$ [now=T0+20] bin/fm-open-loops.sh action row-clock-restart steered --evidence 001.msg
+  exit=0
+  stdout:
+    action: "row-clock-restart"
+    kind: steered
+>>> PASS [restart] first steer with delivery 1 accepted
+$ [now=T0+20] bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 30839.1793379581.qrcAoP
+  exit=0
+>>> PASS [restart] ack passes
+  rewrote row age to 4151 (clock restarted; evidence text unchanged)
+$ [now=T0+600] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh restarted
+  exit=0
+$ [now=T0+600] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-clock-restart","worker:worker","worker","follow up on lint.full.whole",4151,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379586	10	check	report	check: restarted
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 37126.1793379586.lrWmqb
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [restart] the restarted row is presented again
+$ [now=T0+600] bin/fm-open-loops.sh action row-clock-restart steered --evidence 001.msg
+  exit=1
+  stdout:
+    error: "steered evidence must be a new delivery sent after this row became overdue or its evidence last changed"
+>>> PASS [restart] the delivery from the earlier episode is refused
+$ [now=T0+600] bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 37126.1793379586.lrWmqb
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-clock-restart","worker:worker","worker","follow up on lint.full.whole",4151,"waiting for lint.full.whole; declaration age 7200s",false
+>>> PASS [restart] acknowledgement stays gated
+  stored episode: {"digest": "3eeeba29d317a9f02e23bea4", "start": 1793379584, "clock": 1793375984}
+>>> PASS [restart] the stored episode starts at the restarted overdue moment
+$ [now=T0+600] bin/fm-open-loops.sh action row-clock-restart steered --evidence 002.msg
+  exit=0
+  stdout:
+    action: "row-clock-restart"
+    kind: steered
+>>> PASS [restart] a delivery after the new boundary answers it
+$ [now=T0+600] bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 37126.1793379586.lrWmqb
+  exit=0
+>>> PASS [restart] ack passes after the fresh steer
+
+====================================================================================================
+Part B case m4-remote: row {"id": "row-m4-remote", "category": "silent_report", "subject": "mini", "owner": "firstmate", "next_action": "check in: progress, blockers, cross-workstream dependencies", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "last heard"}
+====================================================================================================
+$ [now=T0+30] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+30] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m4-remote","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",7200,"last heard",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379593	11	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 56766.1793379593.0ZSU7A
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+30] bash -c . "$1"; fm_pending_reply_create "$2" "$3" "$4" "progress check" _ bin/fm-pending-reply-lib.sh $FM_HOME $FM_HOME/state mini
+  exit=0
+  stdout:
+    1e0c4726a8f71e74
+$ [now=T0+30] bash -c . "$1"; fm_pending_reply_create "$2" "$3" "$4" "progress check" _ bin/fm-pending-reply-lib.sh $FM_HOME $FM_HOME/state other
+  exit=0
+  stdout:
+    d64fd9bcbe1709f2
+$ [now=T0+30] bash -c . "$1"; fm_pending_reply_mark_delivered "$2" "$3" _ bin/fm-pending-reply-lib.sh $FM_HOME/state d64fd9bcbe1709f2
+  exit=0
+$ [now=T0+30] bash -c . "$1"; fm_pending_reply_create "$2" "$3" "$4" "progress check" _ bin/fm-pending-reply-lib.sh $FM_HOME $FM_HOME/state mini
+  exit=0
+  stdout:
+    e91652e23b6730ff
+$ [now=T0+30] bash -c . "$1"; fm_pending_reply_mark_delivered "$2" "$3" _ bin/fm-pending-reply-lib.sh $FM_HOME/state e91652e23b6730ff
+  exit=0
+  corr ids: undelivered=1e0c4726a8f71e74 foreign=d64fd9bcbe1709f2 delivered=e91652e23b6730ff
+$ [now=T0+30] bin/fm-open-loops.sh action row-m4-remote steered --evidence 1e0c4726a8f71e74
+  exit=1
+  stdout:
+    error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+>>> PASS [M4] an undelivered pending-reply id is refused
+$ [now=T0+30] bin/fm-open-loops.sh action row-m4-remote steered --evidence d64fd9bcbe1709f2
+  exit=1
+  stdout:
+    error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox, or for a remote secondmate the delivered pending-reply correlation id"
+>>> PASS [M4] another task's delivered pending-reply id is refused
+$ [now=T0+30] bin/fm-open-loops.sh action row-m4-remote steered --evidence e91652e23b6730ff
+  exit=0
+  stdout:
+    action: "row-m4-remote"
+    kind: steered
+>>> PASS [M4] the remote secondmate's delivered pending-reply id is accepted as steered
+>>> PASS [M4] stored action cites the correlation id
+$ [now=T0+30] bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 56766.1793379593.0ZSU7A
+  exit=0
+>>> PASS [M4] ack passes
+
+====================================================================================================
+Part B case m3-standing-deferral: row {"id": "row-m3-standing-deferral", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+40] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+40] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m3-standing-deferral","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379596	12	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 65719.1793379596.t54fdO
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [M3] printed row is captain_visible false before any deferral
+$ [now=T0+40] bin/fm-open-loops.sh action row-m3-standing-deferral deferred --evidence lint running --recheck 2026-10-30T17:09:35Z
+  exit=0
+  stdout:
+    action: "row-m3-standing-deferral"
+    kind: deferred
+>>> PASS [M3] first deferral accepted
+$ [now=T0+40] bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 65719.1793379596.t54fdO
+  exit=0
+>>> PASS [M3] ack passes
+$ [now=T0+40] bin/fm-open-loops.sh action row-m3-standing-deferral deferred --evidence lint still running --recheck 2026-10-30T17:14:35Z
+  exit=1
+  stdout:
+    error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+>>> PASS [M3] second deferral on the unchanged row is refused while the first stands
+>>> PASS [M3] the refusal stores captain_visible and requires_followup
+>>> PASS [M3] stored published row is captain_visible true
+$ [now=T0+40] bin/fm-open-loops.sh --check-actions
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m3-standing-deferral","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",true
+>>> PASS [M3] --check-actions exits 1 after the refusal
+$ [now=T0+40] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh refused
+  exit=0
+$ [now=T0+40] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m3-standing-deferral","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",true
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379599	13	check	report	check: refused
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 70480.1793379599.jorcTW
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [M3] the next drain prints the row captain_visible true
+$ [now=T0+40] bin/fm-open-loops.sh action row-m3-standing-deferral escalated --evidence lab cleanup
+  exit=0
+  stdout:
+    action: "row-m3-standing-deferral"
+    kind: escalated
+$ [now=T0+40] bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 70480.1793379599.jorcTW
+  exit=0
+
+====================================================================================================
+Part B case m3-red-remedy: row {"id": "row-m3-red-remedy", "category": "red_check", "subject": "https://github.com/test/project/pull/283", "owner": "worker:parked-job", "next_action": "follow up on lint.full.whole", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+40] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh first
+  exit=0
+$ [now=T0+40] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m3-red-remedy","worker:parked-job","https://github.com/test/project/pull/283","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379602	14	check	report	check: first
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 78054.1793379602.HLqVRd
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+40] bin/fm-open-loops.sh action row-m3-red-remedy deferred --evidence main red --recheck 2026-10-30T17:09:35Z
+  exit=0
+  stdout:
+    action: "row-m3-red-remedy"
+    kind: deferred
+$ [now=T0+40] bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 78054.1793379602.HLqVRd
+  exit=0
+$ [now=T0+700] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh lapsed
+  exit=0
+$ [now=T0+700] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m3-red-remedy","worker:parked-job","https://github.com/test/project/pull/283","follow up on lint.full.whole",7860,"waiting for lint.full.whole; declaration age 7200s",true
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379604	15	check	report	check: lapsed
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 83391.1793379604.vmtFJy
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+$ [now=T0+700] bin/fm-open-loops.sh action row-m3-red-remedy deferred --evidence main still red --recheck 2026-10-30T17:20:35Z
+  exit=1
+  stdout:
+    error: "second deferral refused; row is captain-visible; steer, merge, wait on a named live task or escalate it"
+>>> PASS [M3] a lapsed deferral row prints captain_visible true and the second deferral is refused
+>>> PASS [M3] the refusal for a red PR names the live-task wait remedy
+$ [now=T0+700] bin/fm-open-loops.sh action row-m3-red-remedy escalated --evidence lab cleanup
+  exit=0
+  stdout:
+    action: "row-m3-red-remedy"
+    kind: escalated
+$ [now=T0+700] bin/fm-wake-drain.sh --ack-through 15 --recovery-generation 83391.1793379604.vmtFJy
+  exit=0
+
+====================================================================================================
+Part B case m6-unhandled: row {"id": "row-m6-unhandled", "category": "stalled_worker", "subject": "worker", "owner": "worker:worker", "next_action": "follow up on lint.full.whole", "age_seconds": 7200, "limit_seconds": 3600, "overdue": true, "evidence": "waiting for lint.full.whole; declaration age 7200s"}
+====================================================================================================
+$ [now=T0+50] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh pass 0
+  exit=0
+$ [now=T0+50] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m6-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379606	16	check	report	check: pass 0
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 16 --recovery-generation 86337.1793379606.Vn0MUz
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [M6] drain 1 presents the unhandled overdue row
+$ [now=T0+50] bin/fm-wake-drain.sh --ack-through 16 --recovery-generation 86337.1793379606.Vn0MUz
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m6-unhandled","worker:worker","worker","follow up on lint.full.whole",7200,"waiting for lint.full.whole; declaration age 7200s",false
+>>> PASS [M6] drain 1: ack is refused without an action
+$ [now=T0+650] bash -c . "$1"; fm_wake_append check report "check: $2" _ bin/fm-wake-lib.sh pass 1
+  exit=0
+$ [now=T0+650] bin/fm-wake-drain.sh
+  exit=0
+  stdout:
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m6-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+    help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+    1793379608	17	check	report	check: pass 1
+  stderr:
+    WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 86337.1793379606.Vn0MUz
+    WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+>>> PASS [M6] drain 2 presents the unhandled overdue row
+$ [now=T0+650] bin/fm-wake-drain.sh --ack-through 17 --recovery-generation 86337.1793379606.Vn0MUz
+  exit=1
+  stdout:
+    error: overdue rows have no action recorded since presentation; acknowledgement refused
+    OVERDUE:
+    rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+      "row-m6-unhandled","worker:worker","worker","follow up on lint.full.whole",7800,"waiting for lint.full.whole; declaration age 7200s",false
+>>> PASS [M6] drain 2: ack is refused without an action
+
+SUMMARY: 65 passed, 0 failed
