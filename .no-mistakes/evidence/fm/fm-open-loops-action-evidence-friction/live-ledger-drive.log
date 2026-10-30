@@ -1,0 +1,111 @@
+### A. red PR row waits on a named live task (real no-mistakes on PATH)
+row: id=66d2027364218b050c1fe6ae category=red_check owner=worker:parked-job overdue=True captain_visible=None next_action='diagnose: code or test'
+$ bin/fm-open-loops.sh action 66d2027364218b050c1fe6ae waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T01:32:31Z
+  exit=0
+  | action: "66d2027364218b050c1fe6ae"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 10146.1793320352.drZGiQ
+  exit=0
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 19539.1793320356.Sgt7mG
+  exit=0
+$ bin/fm-open-loops.sh --check-actions
+  exit=0
+==> PASS: M2 wait on live task accepted and stands across a re-presentation 
+
+$ bin/fm-open-loops.sh action 66d2027364218b050c1fe6ae waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task no-such-task --recheck 2026-10-30T01:32:31Z
+  exit=1
+  | error: "[Errno 2] No such file or directory: '/private/tmp/fm-ledger-live.RXEs/home-wait-live/state/no-such-task.meta'"
+$ bin/fm-open-loops.sh action 66d2027364218b050c1fe6ae waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task parked-job --recheck 2026-10-30T01:32:31Z
+  exit=1
+  | error: "waiting requires a distinct assigned prerequisite task"
+==> PASS: M2 wait on a task that is not live (or the row's own task) is refused 
+
+### B. the prerequisite fails -> the standing wait stops counting
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "66d2027364218b050c1fe6ae","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",174751,"Behavior portable serial 17",false
+==> PASS: M2 standing wait resurfaces when the prerequisite fails 
+
+### C. the prerequisite PR merges -> the standing wait stops counting
+$ bin/fm-open-loops.sh action cc63da25fed3d4a9bafbd635 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T01:32:31Z
+  exit=0
+  | action: "cc63da25fed3d4a9bafbd635"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28809.1793320362.YBwYnm
+  exit=0
+$ bin/fm-open-loops.sh --check-actions
+  exit=0
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "cc63da25fed3d4a9bafbd635","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",174751,"Behavior portable serial 17",false
+==> PASS: M2 standing wait resurfaces when the prerequisite PR merges 
+
+### D. done ship, no PR, repo not initialized -- REAL no-mistakes binary
+real no-mistakes: /Users/charlesabrooker/.local/bin/no-mistakes
+$ (cd tree && no-mistakes axi status)
+  exit=1
+  | error: repo not initialized (run 'no-mistakes init' first)
+  | help[1]: Run `no-mistakes init` to set up the gate in this repository
+$ bin/fm-open-loops.sh action 4409e9dcb9fd11f51f254949 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T01:32:31Z
+  exit=0
+  | action: "4409e9dcb9fd11f51f254949"
+  | kind: waiting
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 67327.1793320377.BDGopK
+  exit=0
+$ bin/fm-open-loops.sh --check-actions
+  exit=0
+$ bin/fm-open-loops.sh --check-actions
+  exit=1
+  | error: overdue rows have no action recorded since presentation; acknowledgement refused
+  | OVERDUE:
+  | rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  |   "4409e9dcb9fd11f51f254949","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",174751,"Behavior portable serial 17",false
+$ bin/fm-open-loops.sh action 4409e9dcb9fd11f51f254949 waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T01:32:31Z
+  exit=1
+  | error: "prerequisite task is done with no PR; its report is its delivery; follow up on its result"
+==> PASS: uninitialized repo: done ship with no PR counts as landed (wait resurfaces; new wait refused as done-with-no-PR) 
+
+### E. done ship, run read stalls (exit 1, no answer) -> unknown, not landed
+$ bin/fm-open-loops.sh action a07297c05d7fa26d38b3b30c waiting --evidence PR is red because main is red; parked until repair-owner merges --prerequisite-task repair-owner --recheck 2026-10-30T01:32:31Z
+  exit=1
+  | error: "prerequisite task is done and its PR source could not be read; try again next pass"
+==> PASS: stalled run read is unknown, never a done-with-no-PR verdict 
+
+### F. one batch: stall then answering read -> second line accepted
+$ bin/fm-open-loops.sh action --batch -
+  exit=1
+  | results[2]{line,id,kind,result,message}:
+  |   1,"a07297c05d7fa26d38b3b30c","waiting","refused","prerequisite task is done and its PR source could not be read; try again next pass"
+  |   2,"a07297c05d7fa26d38b3b30c","waiting","recorded",""
+==> PASS: batch: stalled first line refused, answering second line accepted (unread mark cleared) 
+
+### G. green PR row next_action
+row: category=open_pr owner=firstmate next_action="route the green PR's review; merge it under AGENTS.md section 7"
+$ bin/fm-open-loops.sh
+  exit=0
+  | bin: /private/tmp/fm-ledger-live.RXEs/code/bin/fm-open-loops.sh
+  | description: Reconcile assigned work against live delivery evidence
+  | complete: true
+  | generated_epoch: 1793320351
+  | rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  |   "open_pr","https://github.com/test/project/pull/283","firstmate","route the green PR's review; merge it under AGENTS.md section 7",7200,true,""
+  |   "silent_report","parked-job","firstmate","check in: progress, blockers, cross-workstream dependencies",0,false,"last heard: status=1793320351; inbox acknowledgement=None; resolved reply=None"
+  |   "silent_report","repair-owner","firstmate","check in: progress, blockers, cross-workstream dependencies",0,false,"last heard: status=1793320351; inbox acknowledgement=None; resolved reply=None"
+  | help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+==> PASS: M5 green PR next_action names AGENTS.md section 7, no merge approval ask 
+
+### SUMMARY
+PASS  M2 wait on live task accepted and stands across a re-presentation
+PASS  M2 wait on a task that is not live (or the row's own task) is refused
+PASS  M2 standing wait resurfaces when the prerequisite fails
+PASS  M2 standing wait resurfaces when the prerequisite PR merges
+PASS  uninitialized repo: done ship with no PR counts as landed (wait resurfaces; new wait refused as done-with-no-PR)
+PASS  stalled run read is unknown, never a done-with-no-PR verdict
+PASS  batch: stalled first line refused, answering second line accepted (unread mark cleared)
+PASS  M5 green PR next_action names AGENTS.md section 7, no merge approval ask
