@@ -1,0 +1,43 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.Hpiu1a
+export TMUX_TMPDIR=/tmp/fml.jxORb8
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.Hpiu1a && rm -rf /Users/charlesabrooker/tmp/fm-lab.Hpiu1a
+lab home: /Users/charlesabrooker/tmp/fm-lab.Hpiu1a
+no-mistakes resolves to: /Users/charlesabrooker/tmp/fm-lab.Hpiu1a/fakebin/no-mistakes
+gh resolves to: /Users/charlesabrooker/tmp/fm-lab.Hpiu1a/fakebin/gh
+##### CHANGE (target commit)
+=== case change-silent: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-pr-check.sh, daemon=silent, FM_DOD_NM_STALL_SECS=3
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: the no-mistakes run for this copy did not answer (no output or CPU progress), so its verification-plan evidence is unknown, not a verdict; read it again
+exit=75 elapsed=5s
+recorded pr= in meta: 0
+leftover fake daemons: 0
+=== case change-slow: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-pr-check.sh, daemon=slow, FM_DOD_NM_STALL_SECS=3
+error: the run exposes no verification-plan snapshot, so its review coverage cannot be accounted for
+exit=1 elapsed=22s
+recorded pr= in meta: 0
+leftover fake daemons: 0
+=== case change-unreadable: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-pr-check.sh, daemon=unreadable, FM_DOD_NM_STALL_SECS=3
+error: the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+exit=1 elapsed=0s
+recorded pr= in meta: 0
+leftover fake daemons: 0
+##### BASE (386a4fdf40ef952e5f3ce0cf46228caf05c49906) - same fakes; FM_DOD_NM_STALL_SECS is unknown to base
+=== case base-silent: /Users/charlesabrooker/tmp/fm-lab.Hpiu1a/base/bin/fm-pr-check.sh, daemon=silent, FM_DOD_NM_STALL_SECS=3
+error: the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+exit=1 elapsed=16s
+recorded pr= in meta: 0
+leftover fake daemons: 0
+=== case base-slow: /Users/charlesabrooker/tmp/fm-lab.Hpiu1a/base/bin/fm-pr-check.sh, daemon=slow, FM_DOD_NM_STALL_SECS=3
+error: the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable
+exit=1 elapsed=16s
+recorded pr= in meta: 0
+leftover fake daemons: 0
+##### daemon calls
+1793351892 axi status mode=silent
+1793351898 axi status mode=slow
+1793351918 axi status mode=unreadable
+1793351919 axi status mode=silent
+1793351935 axi status mode=slow
+lab removed: yes

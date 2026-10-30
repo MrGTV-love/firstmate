@@ -1,0 +1,792 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-30T09:16:06Z tests/fm-crew-state.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - captured AXI replacement status replays through crew-state
+ok - captured AXI parked status replays through crew-state
+ok - captured AXI failed status replays through crew-state
+ok - captured capped inventory replays selection, ambiguity, and unavailable lookup
+ok - captured status formats reject a synthetic authority transition
+ok - captured completed status yields to synthetic subsequent development
+ok - captured cancelled run leaves fleet inventory unverified without a failure contradiction
+ok - failed-outcome/github/open: terminal delivery uses current disposition
+ok - failed-outcome/github/merged: terminal delivery uses current disposition
+ok - failed-outcome/github/closed: terminal delivery uses current disposition
+ok - failed-outcome/github/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/github/skipped: terminal delivery uses current disposition
+ok - failed-outcome/github/no-identity: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/open: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/merged: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/closed: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/skipped: terminal delivery uses current disposition
+ok - failed-outcome/gitlab/no-identity: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/open: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/merged: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/closed: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/unreadable: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/skipped: terminal delivery uses current disposition
+ok - failed-outcome/gerrit/no-identity: terminal delivery uses current disposition
+ok - failed-status/github/open: terminal delivery uses current disposition
+ok - failed-status/github/merged: terminal delivery uses current disposition
+ok - failed-status/github/closed: terminal delivery uses current disposition
+ok - failed-status/github/unreadable: terminal delivery uses current disposition
+ok - failed-status/github/skipped: terminal delivery uses current disposition
+ok - failed-status/github/no-identity: terminal delivery uses current disposition
+ok - failed-status/gitlab/open: terminal delivery uses current disposition
+ok - failed-status/gitlab/merged: terminal delivery uses current disposition
+ok - failed-status/gitlab/closed: terminal delivery uses current disposition
+ok - failed-status/gitlab/unreadable: terminal delivery uses current disposition
+ok - failed-status/gitlab/skipped: terminal delivery uses current disposition
+ok - failed-status/gitlab/no-identity: terminal delivery uses current disposition
+ok - failed-status/gerrit/open: terminal delivery uses current disposition
+ok - failed-status/gerrit/merged: terminal delivery uses current disposition
+ok - failed-status/gerrit/closed: terminal delivery uses current disposition
+ok - failed-status/gerrit/unreadable: terminal delivery uses current disposition
+ok - failed-status/gerrit/skipped: terminal delivery uses current disposition
+ok - failed-status/gerrit/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/github/open: terminal delivery uses current disposition
+ok - cancelled-outcome/github/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/github/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/github/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/github/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/github/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/open: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/gitlab/no-identity: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/open: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/merged: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/closed: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/unreadable: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/skipped: terminal delivery uses current disposition
+ok - cancelled-outcome/gerrit/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/github/open: terminal delivery uses current disposition
+ok - cancelled-status/github/merged: terminal delivery uses current disposition
+ok - cancelled-status/github/closed: terminal delivery uses current disposition
+ok - cancelled-status/github/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/github/skipped: terminal delivery uses current disposition
+ok - cancelled-status/github/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/open: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/merged: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/closed: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/skipped: terminal delivery uses current disposition
+ok - cancelled-status/gitlab/no-identity: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/open: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/merged: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/closed: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/unreadable: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/skipped: terminal delivery uses current disposition
+ok - cancelled-status/gerrit/no-identity: terminal delivery uses current disposition
+ok - outcome: cancellation without delivery carries no verdict
+ok - status: cancellation without delivery carries no verdict
+ok - selected: cancellation without delivery carries no verdict
+ok - coarse: cancellation without delivery carries no verdict
+ok - no-ci-log: cancellation without delivery carries no verdict
+ok - red-ci: cancellation without delivery carries no verdict
+ok - cancelled-test: cancellation without delivery carries no verdict
+ok - skipped-test: cancellation without delivery carries no verdict
+ok - synthetic cancelled run leaves fleet inventory unverified without a failure contradiction
+ok - cancelled-outcome: terminal delivery reports only observed evidence
+ok - cancelled-status: terminal delivery reports only observed evidence
+ok - skipped-rebase: terminal delivery reports only observed evidence
+ok - cancelled-skipped-rebase: terminal delivery reports only observed evidence
+ok - passed: terminal delivery reports only observed evidence
+ok - active run-step is authoritative
+ok - stale needs-decision over active run is superseded
+ok - stale blocked over active run is superseded
+ok - daemon/timeout blocked claim over a live fixing run reads as run alive
+ok - socket refusal or missing socket over a stale fixing run reports blocked
+ok - socket refusal over a terminal attributed run reports blocked
+ok - socket-down evidence outranks a live run only while it is the log's latest event
+ok - broken-pipe blocker over a live run keeps the plain superseded reading
+ok - genuine daemon-down blocked line still reports blocked
+ok - a busy secondmate keeps its open blocker until that exact key closes
+ok - the most recently opened decision supplies the reported state and detail
+ok - ship and scout terminal declarations supersede stale decisions
+ok - a model-matrix fallback notice never changes the worker's declared state
+ok - latest status retains legacy completion events and shared captain matching
+ok - latest status subprocess work stays bounded and still reads past a long prose tail
+ok - genuine parked run is not flagged superseded
+ok - the parked human-decision component is derived from the findings table's action column
+ok - scalar gate parked run is not flagged superseded
+ok - gate block parked run is not flagged superseded
+ok - ci-ready status log beats monitoring run
+ok - ci-monitoring run with checks already green surfaces done
+ok - top-level ci status uses ci log green marker
+ok - terminal no-checks ci-monitor marker surfaces done
+ok - base-advance re-arm after green stays checks green
+ok - a green marker before the ci log tail still surfaces done
+ok - pending no-checks ci-monitor marker stays working
+ok - ci-monitoring run with checks not yet green stays working
+ok - a fresh issue after an earlier green reading is not masked
+ok - stale checks-green status log does not mask CI relapse
+ok - ci fixing is not overridden by an earlier green marker
+ok - top-level fixing is not overridden by a stale ci running row
+ok - top-level fixing is not overridden by a stale done log
+ok - terminal passed run is authoritative
+ok - terminal passed-with-override run reads done like a clean pass
+ok - terminal passed-with-skips run reads done with the skip kept visible
+ok - no-mistakes completion consumes revision-bound verification-plan evidence
+ok - a no-mistakes status-log final done consumes task-bound plan evidence
+ok - terminal passed run uses matching retirement receipt without forge
+ok - terminal passed no-forge mode preserves local receipt evidence
+ok - terminal passed run with open PR does not claim merged
+ok - terminal passed run PR overrides stale task metadata
+ok - terminal passed run without readable PR identity reports unknown
+ok - terminal passed run reads open GitLab MR state
+ok - terminal passed run reads Forgejo pull request state through tea api
+ok - terminal passed run reads merged GitLab MR state
+ok - terminal passed run handles failed GitLab read
+ok - a forge read gets its host's measured bound: slow names the state, silent is unknown and retryable
+ok - a host without perl still reads the PR state through the measured bound
+ok - terminal passed run reads open Gerrit change state
+ok - terminal passed run reads merged and abandoned Gerrit change state
+ok - terminal passed run handles an unreadable or mismatched Gerrit read
+ok - terminal failed run is authoritative
+ok - orphaned ci monitor after green reads as held-for-merge done
+ok - status-only failed orphaned ci monitor after green reads done
+ok - genuinely failing CI keeps the failed verdict
+ok - a second failed step disqualifies the orphaned-monitor reclassification
+ok - outcome/merged: ci_monitor_interrupted with every step completed reads done
+ok - outcome/open: ci_monitor_interrupted with every step completed reads done
+ok - status-only/merged: ci_monitor_interrupted with every step completed reads done
+ok - status-only/open: ci_monitor_interrupted with every step completed reads done
+ok - inventory/merged: ci_monitor_interrupted with every step completed reads done
+ok - inventory/open: ci_monitor_interrupted with every step completed reads done
+ok - outcome/closed: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/closed: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - status-only/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/closed: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/unreadable: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/no-identity: ci_monitor_interrupted with no live PR does not read done
+ok - inventory/skipped: ci_monitor_interrupted with no live PR does not read done
+ok - outcome/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - status-only/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-pending: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-failed: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/lint-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/intent-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - inventory/rebase-skipped: ci_monitor_interrupted with a non-completed step does not read done
+ok - outcome: ci_monitor_interrupted with no recorded PR does not read done
+ok - status-only: ci_monitor_interrupted with no recorded PR does not read done
+ok - inventory: ci_monitor_interrupted with no recorded PR does not read done
+ok - ci_monitor_interrupted outranks stale and newer worker declarations
+ok - cross-branch run is attributed via the real runs list
+ok - socket refusal over a coarse active run reports blocked
+ok - failed ledger record reads unknown only when the daemon is provably down
+ok - cross-branch attribution picks the branch's most recent row
+ok - a newer failure is not hidden by a live sibling
+ok - runs-list selection keeps the newer failure over an older live row
+ok - an older unfetched live sibling does not hide a newer failure
+ok - two terminal rows keep the existing newest-first precedence
+ok - an unclassifiable status row keeps the ledger's newest-first precedence
+ok - a terminal run with no live sibling is unchanged
+ok - coarse run does not probe another branch's ci log
+ok - another branch's run is ignored, falls back
+ok - unpushed ship done: is current-state blocked
+ok - recorded merged PR reads done under the fleet snapshot's captured meta
+ok - no-mistakes pre-validation done: stays current-state done
+ok - moved remote branch without the named head is current-state blocked
+ok - no run + a busy semantic record reads working, attributed to its source
+ok - a launch parked on a recognized interactive prompt never reads working, closing the absorb path a stale watcher poll depends on
+ok - a converted adapter never reads working from rendered footer text
+ok - grok still reads working through its isolated rendered-tail fallback
+ok - herdr's native busy verdict reads working with no record present
+ok - a herdr CLI that fails to answer reads unknown/unreachable, never gone
+ok - an alive endpoint whose scrollback read failed stays working
+ok - a husk pane (agent gone) still reads gone for reclaim
+ok - a mid-tool-call crew stays working because its record outranks herdr's generation state
+ok - an idle record with idle agent_status stays not-busy (no regression for a human-blocked agent)
+ok - no run + idle pane uses the status-log verb
+fm-status: refused to read feat-big.status: a span of 200041 bytes is past the read limit of 5000 bytes (cap plus reserve); nothing was read and nothing was changed. Read its tail with tail -c, or tear the lane down to retire the log
+ok - a status log past the read limits reads unknown and names the log
+ok - no run + idle pane parses keyed status syntax
+ok - no run + idle pane on a paused: status reports state: paused with its reason
+ok - no run + idle pane honors the configured paused verb
+ok - a trailing resolved: event does not corrupt state render (idle stays idle)
+ok - dead window ignores stale status log
+ok - a tmux that fails to answer reads unknown/unreachable, never gone
+ok - closed pane still reports a terminal run-step
+ok - closed pane still reports an active run-step
+ok - a wedged daemon costs one read and leaves the pane to answer (elapsed 2s)
+ok - a healthy daemon read makes no daemon status probe
+ok - a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker
+ok - responsive lookups each keep their own allowance
+ok - scout skips the run lookup
+ok - torn-down worktree is handled gracefully
+ok - fm-crew-state remote: alive endpoint falls through to the routed status log
+ok - fm-crew-state remote: an idle alive endpoint reads alive, never gone or dead
+ok - fm-crew-state remote: an unreachable host reads unknown-remote, never gone or dead
+ok - fm-crew-state remote: the remote host's own dead verdict is reported truthfully
+ok - missing meta is handled gracefully
+ok - crew_is_provably_working absorbs a validating crew found only via the runs-list fallback
+ok - crew_is_provably_working still surfaces a genuinely stopped crew (safety property preserved)
+ok - usage error exits 2
+ok - historical same-branch rewritten head is not attributed as current
+ok - active run with valid descendant fix head remains current
+ok - local work advanced past run head invalidates attribution
+ok - pipeline-owned active run binds without head equality and beats the failed row
+ok - a genuinely failed run with no later run is not hidden
+ok - coarse scan anchors the unresolvable active row instead of falling to an older one
+ok - coarse scan with a mismatched anchor stays unknown and lets the pane answer
+ok - coarse terminal row at a foreign head is not attributed
+ok - an executing run binds regardless of branch_sync state
+ok - a parked run keeps the strict head rule without pipeline_owned
+ok - run_parked_scalar_gate_running keeps the strict head rule despite its live status word
+ok - run_parked_in_gate_block keeps the strict head rule despite its live status word
+ok - the exemption never applies to a terminal run
+ok - missing run head falls back instead of matching by branch
+ok - active fix round with an unfetched pipeline head reads working
+ok - unanchored unverifiable active row is attributed because it is live
+ok - unresolvable terminal row never reads as current
+ok - runs-list continuation attribution works when axi answers another branch
+ok - herdr stale registration over a shell-only pane reads agent gone, not alive
+ok - herdr stale working record never reports a shell-only pane busy
+ok - capped overview retains both competing same-branch run ids
+ok - same-branch identity survives both runs falling outside the overview
+ok - a capped overview with zero same-branch rows reports absent, not unreadable
+ok - no run for this branch beside a live run elsewhere reads absent, not unreadable
+ok - the capped inventory reader is bounded by the crew read budget
+ok - a repo spelling the inventory does not record reads unreadable
+ok - a linked worktree green PR in merge monitoring reads held for merge
+ok - complete inventory preserves the replacement gate without writes
+ok - missing complete-inventory failure reports unknown
+ok - corrupt complete-inventory failure reports unknown
+ok - schema complete-inventory failure reports unknown
+ok - repo complete-inventory failure reports unknown
+ok - count complete-inventory failure reports unknown
+ok - norepo complete-inventory failure reports unknown
+ok - R6 complete selection ignores unrelated branch semantics
+ok - R6 requested branches use exact identity without a whitelist
+ok - R6 capped inventory ignores unrelated semantics and names both ids
+ok - R6 complete identity lookup precedes partial-row semantic rejection
+ok - R6 capped inventory preserves quoted requested-branch identity
+ok - R6 structural completeness and requested-run validation remain enforced
+ok - R5 complete inventory without Python keeps the replacement gate
+ok - R5 complete ambiguity without Python names both ids
+ok - R5 capped lookup without Python preserves available ids
+ok - R5 capped lookup without SQLite support preserves available ids
+ok - R1 both directions of inventory liveness disagreement read unknown
+ok - R2 uninitialized busy workers retain pane reporting
+ok - R2 uninitialized idle workers retain status reporting
+ok - R3 historical inventory yields to the current busy pane
+ok - R3 historical inventory yields to current worker status
+ok - superseded cancelled run preserves the replacement review gate
+ok - a live rebased run beats an older failed run at the local head
+ok - pending run with a rebased head reads working
+ok - running run with a rebased head reads working
+ok - legacy live rebased run is authoritative over an older failed row
+ok - legacy surface binds a fixing run at a rebased head
+ok - legacy surface binds a ci run at a rebased head
+ok - an unproven record at a diverged head does not answer for the crew
+ok - an unproven record with a dead daemon never overrides a busy pane
+ok - an ordinary blocked tip over a coarse live row keeps the superseded reading
+ok - a socket-refused blocker survives the dead-daemon verdict
+ok - an ordinary blocked tip survives the dead-daemon verdict
+ok - a parked gate survives a dead daemon with its findings intact
+ok - an unproven record at a diverged head does not answer on the selected route
+ok - a live record at a diverged head binds while the daemon answers
+ok - the anchored continuation binds while the daemon answers
+ok - a head-tied coarse record keeps its working reading and its original note
+ok - a coarse failed record with a dead daemon reads unknown
+ok - the selected-run anchored continuation reports the dead daemon, not an identity failure
+ok - the selected-run anchored continuation binds while the daemon answers
+ok - the selected route keeps an anchored parked run's gate with a dead daemon
+ok - an open decision survives the dead-daemon verdict on the selected route
+ok - a coarse pending ledger word reads unknown
+ok - an unanswered probe never turns a failed coarse record into a gate
+ok - the selected-route dead-daemon verdict names the run once
+ok - a head-tied row reads working when axi names the self run
+ok - a head-tied row reads working when axi names the other run
+ok - a head-tied coarse row is exempt even when the record head diverged
+ok - an unrecognised ledger word keeps the ordinary supersede note
+ok - an unanswered daemon probe leaves a live rebased run bound
+ok - a head-tied coarse live row is exempt from the dead-daemon verdict
+ok - a coarse live row over an open decision keeps the original supersede note
+ok - a coarse live row at a rebased head is not attributed
+ok - a terminal run at a diverged head keeps the strict head rule
+ok - competing live runs report unknown with both run ids
+ok - newer failed run remains failed beside an older live run
+ok - missing run selection reports unknown with candidate ids
+ok - wrong-id run selection reports unknown with candidate ids
+ok - wrong-branch run selection reports unknown with candidate ids
+ok - wrong-head run selection reports unknown with candidate ids
+ok - missing-status run selection reports unknown with candidate ids
+ok - malformed-table run selection reports unknown with candidate ids
+ok - inventory-error run selection reports unknown with candidate ids
+ok - selected-error run selection reports unknown with candidate ids
+ok - legacy conflicting run records report unknown
+ok - omp live-model record adds model-drift and run-error only on positive evidence
+all fm-crew-state tests passed
+FM_TEST_END 2026-10-30T09:22:45Z tests/fm-crew-state.test.sh exit=0 duration_ms=398701 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T09:22:45Z tests/fm-watch-triage.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-30T09:22:45Z tests/fm-watch-triage-waits.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-30T09:22:45Z tests/fm-inactive-reconcile.test.sh family=watcher-wake-lock expected_gate_skip=none
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - main direct terminal presentation has a durable receipt
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - a branch-actor acknowledgement retires the inactive-outcome receipt and later scans stay quiet
+ok - unpushed CI-ready ship done: is not published upstream
+ok - a delivered ship done: skips the git gate on later polls
+ok - secondmate delivers a child's terminal ledger line once, on the next poll, from the ledger alone
+ok - multiline terminal outcomes are reported once before or during a state read
+ok - an unterminated continuation line does not withhold a proven child outcome
+ok - later status prose does not change the inactive terminal receipt identity
+ok - busy child locks do not starve later ledger outcomes
+ok - ledger delivery carries the report pointer, the failed verb, and each new terminal line
+ok - pr= requires the recorded PR or a ready-signal terminal line, whatever its stamp, and never a scout
+ok - terminal lines arriving during state reads remain ledger-owned
+ok - inactive and ledger paths reconcile one raced completion without hiding later events
+ok - progress after an inactive fallback starts a distinct terminal event
+ok - complete long ledger lines retain distinct receipt identities
+ok - a ledger line still being appended waits for its newline
+ok - the remote route carries a child's ledger line once
+ok - report delivers a child's final line, owes nothing twice, and refuses only an unwritable channel
+ok - an unknown done: acceptance stays owed without --force and is delivered marked unknown with it
+actionable: child outcome needs parent report: child=child state=done (missing or unreadable parent binding .fm-secondmate-parent)
+ok - a pending unknown acceptance keeps its qualifier through a failed delivery and a plain retry
+ok - silent gate reads cost a scan one stall interval and hold no child lock past it
+ok - a gate read slower than the scan budget that keeps working delivers in the same poll
+actionable: child outcome needs parent report: child=child state=done (missing or unreadable parent binding .fm-secondmate-parent)
+ok - a pending ship done: is delivered by report after teardown removed the worktree
+ok - report preserves teardown's metadata-before-scan lock order
+actionable: child outcome needs parent report: child=child state=failed (missing or unreadable parent binding .fm-secondmate-parent)
+ok - relative local parent homes fail closed
+ok - invalid secondmate markers block routing and surface the obligation
+ok - remote parent-replies mirror input is durable and idempotent
+ok - reused task ids retain per-incarnation terminal receipts
+ok - legacy metadata rewrites preserve terminal receipt identity
+ok - relaunch cannot replace metadata during terminal snapshot
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - terminal reconciliation ignores heartbeat backoff state
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - scan marker replaces a symlink without overwriting its target
+ok - nonterminal and captain-held workers remain outside inactive terminal reporting
+ok - watcher hook wakes for terminal loss and preserves idle secondmate exemption
+ok - the real watcher poll delivers a child's terminal ledger line to the parent channel
+actionable: inactive terminal outcome awaiting captain presentation: child=b state=done pr=https://example.test/owner/repo/pull/1
+ok - stalled state reads are bounded without starving later children
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - a held wake lock costs a scan its budget, and the next scan queues the outcome
+actionable: inactive terminal outcome awaiting captain presentation: child=b state=done pr=https://example.test/owner/repo/pull/1
+actionable: inactive terminal outcome awaiting captain presentation: child=a state=done pr=https://example.test/owner/repo/pull/1
+ok - a scan skips a child whose lock is held and handles it on a later scan
+ok - a scan does nothing while another scan holds the scan lock
+actionable: inactive terminal outcome awaiting captain presentation: child=c state=done pr=https://example.test/owner/repo/pull/1
+ok - a held child does not starve the children after it
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - a startup scan waits for a watcher scan and then runs its pass
+ok - a startup scan behind a held scan lock returns within its budget
+actionable: inactive terminal outcome needs parent report: child=child state=failed (missing or unreadable parent binding .fm-secondmate-parent)
+ok - notice recovery remains idempotent across queue acknowledgement
+ok - a secondmate home with no parent binding names the missing binding instead of failing quietly
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - reconciliation makes zero forge or PR API calls
+actionable: inactive terminal outcome awaiting captain presentation: child=child state=done pr=https://example.test/owner/repo/pull/1
+ok - reconciliation state reads set no-forge mode
+all inactive reconciliation tests passed
+FM_TEST_END 2026-10-30T09:25:17Z tests/fm-inactive-reconcile.test.sh exit=0 duration_ms=151719 gate_skip=false
+ok - a stale pane sitting on a terminal status is surfaced (queue + exit)
+ok - a stale terminal-looking status is overridden and absorbed while a run is actively working, then wedge-escalated
+ok - provably-working non-terminal stale is absorbed on first sight, then wedge-escalated past the threshold
+ok - consecutive wedge escalations on the same pane accumulate and demand deep inspection at the threshold
+ok - a pane becoming active again resets the consecutive wedge-escalation counter
+ok - a record whose endpoint is dead or missing reports itself once and is never re-escalated
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+ok - the once-only gone report re-arms when the endpoint comes back, and reports a later death again
+ok - a second death after a same-window relaunch reports in full without a live probe, and an unchanged dead pane stays silent
+ok - a successor's byte-identical dead display reports in full, and the same incarnation still absorbs
+ok - a stuck pane capture goes stale; TERM stops its watcher and runs cleanup
+ok - the pending-reply pass beats between records (7 beacon updates in 15s)
+watcher: recovery state could not be persisted; retaining stale lock evidence
+ok - TERM stops a watcher whose downtime-marker lock is held, retaining stale evidence
+ok - the cleanup marker-lock bound is decimal and zero falls back to the default
+ok - a busy worker below the turn-age bound remains working with no escalation
+ok - a busy worker with a stable pane hash still escalates once its completed-turn age reaches the bound
+ok - a busy worker whose pane hash changes every poll still escalates once its completed-turn age reaches the bound
+ok - touching a busy worker's completed-turn marker resets the age and prevents an old-age escalation
+ok - native progress resets busy age without a completed turn or notification
+ok - repeated busy turn-age escalations reuse the existing escalation counter and demand deep inspection at the threshold
+ok - the production default busy-turn-age bound is 3600s (5min under does not wedge, 66min over does)
+ok - a busy pane under a declared pause is rechecked on the long cadence, and lifting the pause restores the wedge escalation
+ok - away mode hands a busy declared pause to the daemon as a plain stale, and lifting the declaration restores the wedge escalation
+ok - away mode wakes the daemon once per declaration for a busy pane whose footer ticks on every capture
+ok - a not-provably-working non-terminal stale is surfaced immediately (never left to wait out the timer)
+ok - a declared pause is absorbed on first sight, then re-surfaced as a recheck past the threshold, never wedge-escalated
+ok - exited declared-pause and captain-held panes use bounded pause cadence while a live decision gate still surfaces once
+ok - unchanged stale hashes reclassify when a crew enters or leaves pause
+ok - a declared pause is periodically rechecked against authoritative active-run state
+ok - a paused status overridden by authoritative working preserves its wedge timer, is rechecked rather than wedge-escalated while the declaration stands, and escalates once it is lifted
+ok - matching non-terminal stale suppressors repair missing or corrupt stale-since timers
+ok - a quiet pane writing its own worktree is deferred, while one writing nothing still wedge-escalates on the unchanged schedule
+ok - a write deferral re-surfaces once on the bounded pause cadence, so a churning worktree cannot stay invisible
+ok - a hung worktree walk defers the wedge escalation and re-surfaces as unknown, while a prompt empty walk still escalates
+ok - a secondmate's own home supervision churn is not crew write evidence, so a pane recording that home keeps the unchanged escalation schedule
+ok - an idle-window timer repair drops a finished write-deferral chain, so the next deferral gets a fresh re-surface window
+ok - both first-sight paths through a captain-relevant status drop a finished write-deferral chain with the idle window
+FM_TEST_END 2026-10-30T09:31:52Z tests/fm-watch-triage-waits.test.sh exit=0 duration_ms=546446 gate_skip=false
+ok - status_span_has_actionable: benign absorbed, captain events surfaced, classified events not re-fired
+ok - an actionable event is not hidden by later routine appends, and is named as itself
+ok - span classification retires closed decisions and surfaces rejected transitions for reconciliation
+ok - span classification from an offset keeps closed decisions closed and live ones live
+ok - a malformed seen signature causes the whole status log to be classified
+ok - stale_is_terminal: terminal status surfaces, non-terminal and no-status are benign
+ok - classifier primitives: keyed decisions and activity phases, captain relevance, window-to-task, and overrides
+ok - unrecognized status prefixes are visible and recognized prefixes are unchanged
+ok - crew_is_provably_working: only working+run-step/pane is provable; idle/finished/parked/failed/unknown surface
+ok - status_is_paused: only the leading paused verb matches, paused is not captain-relevant, and the two declared-wait verbs stay separable
+ok - status_declared_wait_identity: restatements share an identity; new keys, re-declared keys, and keyless text do not
+ok - a concurrent status append cannot mix declaration and episode positions
+ok - crew_absorb_class: working/paused/none from one read; crew_is_paused and crew_is_provably_working agree
+ok - crew_worktree_written_since: real writes are evidence; no worktree, no anchor, quiet trees, .git churn and a mate's own home are not
+ok - an empty FM_WORKTREE_WRITE_PRUNE widens the probe to the whole depth-bounded tree instead of disabling it
+ok - an empty FM_WORKTREE_WRITE_PRUNE exported into the environment prunes nothing, widening the probe
+ok - the worktree write probe stops a silent walk as unknown and lets a slow, working one finish
+ok - signal_crew_provably_working: benign only when every referenced crew is provably working
+ok - a secondmate's unmarked routine progress absorbs when provably working; routed, terminal, note, marked, and unknown lines surface
+ok - completed-cycle waits ignore slow-check progress beats and include terminal classification
+ok - a no-verb signal whose crew is provably working is absorbed (no exit, no queue, suppressor advanced, beacon present)
+ok - a bare turn-end whose crew is provably working (busy pane) is absorbed
+ok - a bare turn-end whose crew is not provably working is surfaced (the swallowed-finish fix)
+ok - a bare turn-end from a pane that churned since the previous poll is absorbed
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+ok - pane churn resets prior wedge escalation state before the stale-path poll
+ok - a churning turn-end inside an already-open deferral window is absorbed without re-marking
+ok - a bare turn-end from a pane unchanged since the previous poll still surfaces
+ok - a bare turn-end backed by a malformed prior hash surfaces
+ok - a bare turn-end backed by a newline-terminated prior hash surfaces
+ok - a churning secondmate turn-end surfaces without a stale resurface path
+ok - a turn-end whose marker key matches another recorded endpoint surfaces
+ok - two metadata records sharing one endpoint make churn evidence ambiguous
+ok - a batch may satisfy positive evidence independently per task
+ok - per-task evidence composition stays off until the home opts in
+ok - a status-bearing batch never falls through to pane-churn evidence
+ok - pane-churn turn-end absorb is off until a home opts in
+ok - a perpetually churning pane surfaces once its bounded deferral window is spent
+ok - an unrecordable pane-churn deadline surfaces the turn-end
+ok - an invalid pane-churn bound surfaces the turn-end
+ok - an oversized pane-churn bound surfaces the turn-end
+ok - invalid existing pane-churn deadlines surface without mutation
+ok - a surfaced batch opens no partial pane-churn deadline
+ok - a no-verb working: note whose crew is idle with no running pipeline is surfaced
+ok - a secondmate's status note surfaces even while its own agent is busy
+ok - a busy secondmate's routine working: is absorbed while its later note: still surfaces
+ok - a secondmate blocker wakes despite busy evidence and later unrelated appends
+ok - a self-announced close never wakes its own home, and the next real note still does
+ok - a close after OPEN DECISIONS fold never wakes its own home, and the next real note still does
+ok - a folded worker decision with no home append still wakes
+ok - separate answers over unclassified decisions wake once, and the next real note still does
+ok - a close after OPEN DECISIONS fold still surfaces a worker failure inside the folded span
+ok - a close after OPEN DECISIONS fold still surfaces unlisted secondmate lines inside the folded span
+tests/fm-watch-triage-helpers.sh: line 51: 26400 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - device-only shift migrates seen and heartbeat markers; two passes enqueue no wake
+tests/fm-watch-triage-helpers.sh: line 51: 58205 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that grows after device migration signals once
+ok - changed inode, birth, device plus inode, weak identity, growth, and mode still signal once
+tests/fm-watch-triage-helpers.sh: line 51: 47781 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - a log that lags its marker across a device shift reads only its new bytes and signals once
+tests/fm-watch-triage-helpers.sh: line 51: 63479 Terminated: 15          PATH="$fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_CREW_STATE_BIN="$fakebin/fm-crew-state.sh" FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$@" "$WATCH" > "$out"
+ok - owned appends recorded before a device shift stay owned and do not wake
+ok - adoption leaves a same-device lag alone and migrates each field whose device differs
+ok - eight pending files produce eight rows, retaining the newest between-scan state
+ok - slow 1.6 MB log classification commits its endpoint and refreshes the beacon within WATCHER_STALE_GRACE=3
+ok - a classification still making progress past FM_WATCHER_STALL_BOUND commits its endpoint and signals
+ok - a status read with no progress for FM_WATCHER_STALL_BOUND is stopped as stalled
+ok - a status log that vanishes before its span is read is a quiet empty span in both scans
+ok - captain-relevant signal is surfaced (queue + exit) and marked surfaced
+ok - done, keyed needs-decision, and keyed blocked lines surface whether written between cycles or during one
+ok - done and keyed decision signals appended during quiet and actionable checks are delivered
+ok - late signals keep original stale routing and wake once independently, including Main-owned stale rows
+ok - a late routine signal preserves heartbeat fleet scope and gets one task-scoped follow-up
+ok - follow-ups filter drained rows and marker-store failures preserve one-shot check results in successor posture
+ok - follow-up and end-of-prelude output failures preserve signal markers until one successful successor ring
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-watch.sh: line 3558: /Users/charlesabrooker/tmp/fm-test-run.wRGCgN/w2/tmp/fm-watch-triage-tests.Qy1rIt/late-marker-procevent-write/state/.watch-late-signals.tmp.96721: Is a directory
+rm: /Users/charlesabrooker/tmp/fm-test-run.wRGCgN/w2/tmp/fm-watch-triage-tests.Qy1rIt/late-marker-procevent-write/state/.watch-late-signals.tmp.96721: is a directory
+ok - late marker failures deliver signals and leave interrupted process-event wakes owed
+ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal
+ok - the signal wake goes first and the overdue ledger surfaces on the next cycle
+ok - maintenance debt survives early wakes until both stalled mates, process-events, and every due check run
+ok - an invalid deferral marker restores the previous cycle order
+ok - a needs-decision signal row's queued payload is marked needs-decision: for branch exclusion
+ok - a reconciliation-required needs-decision row's queued payload is still marked needs-decision:
+ok - a captain-held signal stays actionable while the crew is still working
+ok - a pending-reply second-mate escalation is marked for main-only routing
+ok - an ordinary blocked event remains branch-eligible
+ok - a routine event containing a needs-decision phrase keeps its ordinary payload, unmarked
+ok - a captain event hidden behind a later routine append is still surfaced (queue + exit)
+ok - a keyed decision signal reads only the newly appended span, not the whole log
+ok - a finished release reported before routine cleanup chatter is still surfaced
+ok - a routine append after an already-classified event is absorbed (no re-wake)
+ok - unreadable status reports are bounded without advancing classification
+ok - permission recovery surfaces content from the unadvanced position
+ok - triage log capping handles wc byte counts with leading spaces
+ok - a captured process-event result wakes a healthy watcher proactively, with no manual drain
+ok - an unacknowledged process-event result re-drains until handling is acknowledged
+tests/fm-watch-triage-helpers.sh: line 51:   743 Terminated: 15          PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+ok - poll-discovered recovery preserves acknowledgement completed before cleanup and leaves its successor quiet
+ok - complete process-event queue keys map to distinct seen markers
+ok - process-event queue keys surface under their own headlines
+ok - every launch-failure episode is delivered under the failed-to-start headline
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 65042.1793352894.UnagW8
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+ok - queue revalidation, proactive output, and marker commit serialize with drain
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-push-transition-lib.sh: line 106: echo: write error: Broken pipe
+tests/fm-watch-triage-helpers.sh: line 51: 84866 Killed: 9               PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+tests/fm-watch-triage-helpers.sh: line 51: 89980 Killed: 9               PATH="$dir/fakebin:$PATH" FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" FM_PROCEVENT_CLAIM_ROOT="$dir/claims" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" FM_POLL=0.2 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$out"
+ok - surfacing failures replay until post-handling acknowledgement
+find: /Users/charlesabrooker/tmp/fm-test-run.wRGCgN/w2/tmp/fm-watch-triage-tests.Qy1rIt/procevent-marker-failure/state/.home-summary-refresh.lock.owner.ZzzI3S: No such file or directory
+ok - marker failure exits through the shared wake owner, releases its lock, and replays later
+ok - a heartbeat with no captain-relevant change is absorbed and backs off the cadence
+ok - the heartbeat starts the dry-run review-agent selector
+ok - the heartbeat skips the review-agent selector when the home has no dispatch rules
+ok - heartbeat backstop fail-safe surfaces a captain-relevant status the per-wake path missed
+ok - the heartbeat backstop surfaces a captain event hidden behind a later routine append
+ok - the liveness beacon stays fresh while the watcher absorbs benign wakes (fm-guard never false-alarms)
+ok - an afk signal records its captured heartbeat endpoint
+ok - with .afk present the watcher reverts to one-shot so the daemon owns triage (no double-triage)
+FM_TEST_END 2026-10-30T09:35:47Z tests/fm-watch-triage.test.sh exit=0 duration_ms=781676 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T09:35:47Z tests/fm-dod-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - CRLF criteria and exclusions survive; NUL briefs and external criteria refuse explicitly
+ok - verification plans carry actual criteria, exclusions and rubric without broadening intent
+ok - missing shared rubric refuses verification-plan construction
+ok - fenced DoD-file examples do not refuse actual criteria
+ok - unfenced DoD-file directives after fenced examples remain authoritative and require structured items
+ok - mandatory items require unique ids, every --shape field nonempty, and a known Authority; fences and empty sections are refused
+ok - scout done: is not gated
+ok - unpushed ship done: is refused
+ok - no-mistakes pre-validation done: is not gated
+ok - named head on a remote-tracking ref is accepted
+ok - a moved remote branch that lacks the named head is refused
+ok - a 40-hex token in the note is not the named head
+ok - a recorded merged PR satisfies the gate after prune
+ok - the merged-PR short-circuit applies only to the recorded PR the done line names
+ok - a recorded forge head needs task-bound plan evidence and still binds the named PR; only merged-with-missing-copy cleanup is evidence-free
+ok - a pipeline fix commit past the worker head binds by ancestry or the recorded pr_head; a diverged head does not
+ok - a recorded Gerrit change is direct-PR publication proof while no-mistakes still requires custody and task-bound validation
+ok - a silent run read is unknown (2) and a slow, working one is answered by the evidence gate
+ok - a direct-PR recorded head does not cover a later unpushed commit
+ok - CI-ready notes require checks green and an actual PR reference
+ok - no-mistakes CI-ready done: with extra text is gated
+ok - keyed and spaced ship done: lines are gated
+ok - local-only linked named branch is reachable from the project clone
+ok - local-only detached HEAD only in the disposable copy is refused
+ok - standalone local-only done: requires the named head in the project clone
+ok - non-done lines are not gated
+ok - fenced and indented Captain lines are not authorized intent
+ok - PR-based DoD draft check uses gh-axi
+ok - a task owns several PRs only on positive evidence in its own records
+ok - promotion keeps a scout's recorded base branch and refuses local-only for it
+ok - the dispatch verdict lists every leftover Task and Definition of Done token in one pass
+ok - a fully filled brief passes the dispatch verdict with no output
+ok - the dispatch verdict refuses a blank exclusion list
+ok - the dispatch verdict accepts None as the exclusion answer
+ok - the task-only scope skips the exclusion list
+ok - the verification plan carries the stated exclusions
+ok - the exclusion list does not satisfy an empty Firstmate spec
+ok - spec content survives the exclusion list
+ok - the dispatch verdict reports an empty DoD file with its path
+ok - the dispatch verdict lists every token a DoD file still holds
+ok - the task-only dispatch scope skips the Definition of Done and the full scope checks it
+ok - promotion lists every Task placeholder in one refusal with its scout-time boundary and the repair
+ok - external-forge direct-PR is refused with the exact supported-forge diagnostic
+ok - external-forge direct-PR instructions are refused without publishing a brief
+ok - worker role names the skill and its fallback skill file
+ok - worker role renders the shared rubric and refuses without it
+all fm-dod-lib tests passed
+FM_TEST_END 2026-10-30T09:36:23Z tests/fm-dod-lib.test.sh exit=0 duration_ms=35991 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T09:36:23Z tests/fm-pr-ready-reconcile.test.sh family=pr-forge expected_gate_skip=none
+ok - persistent early forge hang cannot starve a later healthy ship across bounded passes
+ok - refusal queues one check wake per reason, skips the forge for ten minutes, then registers once the cause healed at the same head
+ok - a changing fm-guard.sh banner neither re-wakes the same refusal nor enters its reason
+ok - a green no-mistakes run with no done line registers from its fm-crew-state.sh PR; a busy run and a direct-PR lane do not
+ok - a green run whose marker is 60 base-advance lines back still registers through the real crew-state reading
+ok - a silent run reading is stopped as unknown and the later ready ship registers in the same pass
+ok - a run reading that is slow but working finishes and registers its ship
+ok - a registrar that reports an unanswered run is unknown: no refusal memo, no wake, asked again next pass
+ok - an unanswered run between two identical refusals keeps the memo, so the repeat queues no second wake
+ok - ready PR records pr/head, arms merge poll, releases exactly one place; second pass changes nothing
+ok - direct-PR ready ship registers; scouts, secondmates, local-only, progress and draft waits are skipped
+ok - newest ready signal wins over an older PR and survives later resolution notes
+ok - the declared PR registers even when the note names another PR after it
+ok - a note that does not open with PR <url> registers no PR, least of all an unrelated leading one
+ok - draft is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreachable is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - unreadable-forge is refused once without mutation, stays quiet for ten minutes, then registers at the same head
+ok - 200,000-line log uses only its bounded tail; old ready outside tail is ignored and new ready registers within 60s
+ok - eight-record admission cap rotates fairly so later candidates register on the next pass
+ok - unreadable task record and log each report once without stopping the pass
+ok - real watcher registers ready PR before notification exit, without supervisor action or status edits
+ok - hung forge call is killed at the pass limit and the next watcher tick registers the ready ship
+FM_TEST_END 2026-10-30T09:38:03Z tests/fm-pr-ready-reconcile.test.sh exit=0 duration_ms=100233 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T09:38:04Z tests/fm-startup-network.test.sh family=session-bootstrap expected_gate_skip=none
+ok - fm-startup-network: wait fails when no deferred stage publishes before its deadline
+ok - fm-startup-network: start returns immediately and never holds the caller's stdout open
+ok - fm-startup-network: exactly one of the digest and the wake reports each actionable result
+ok - fm-startup-network: a claimant crash after publication still surfaces the result
+ok - fm-startup-network: a report-publication failure is failed, diagnosed, and still wakes
+ok - fm-startup-network: silent and explicitly informational successes never queue a main-blocking wake
+ok - fm-startup-network: an actionable state=done report still queues a wake
+ok - fm-startup-network: deferred invalid secondmate markers produce durable wakes
+ok - fm-startup-network: manual callers cannot forge mutation authority
+ok - fm-startup-network: an aggregate bound turns a wedged sweep into an actionable line
+ok - fm-startup-network: an abandoned run reports as needing a rerun, never as in progress forever
+ok - fm-startup-network: locked requests supersede in-flight probe-only workers
+ok - fm-startup-network: a second start never launches a competing worker
+ok - fm-startup-network: start atomically reserves the generation harvest observes
+ok - fm-startup-network: a new lock owner gets a distinct worker generation
+ok - fm-startup-network: fleet-lock takeover cannot overlap a mutating sweep
+ok - fm-startup-network: timing records share one origin so their offsets form a timeline
+ok - fm-startup-network: timings are durable and printed only on demand
+ok - fm-startup-network: a timed-out run still publishes the partial timings it recorded
+ok - fm-startup-network: the timing artifact cannot carry a command line or forge records
+ok - fm-startup-network: a held publish lock ends the worker inside its budget with a failed-rerun record
+# fm-startup-network.test.sh: all assertions passed
+FM_TEST_END 2026-10-30T09:40:03Z tests/fm-startup-network.test.sh exit=0 duration_ms=118986 gate_skip=false
+FM_TEST_BEGIN 2026-10-30T09:40:03Z tests/fm-merge-prune.test.sh family=unclassified expected_gate_skip=none
+ok - only a verified merge of the recorded PR arms the prune, and arming is idempotent
+ok - remote tasks, secondmates and a disabled setting are never armed
+ok - a record that is not due waits, and --now overrides
+ok - a vanished task or a different PR drops the record without calling teardown
+ok - a verified merge asks teardown once, never forced, removes the copy teardown left, and logs reaped
+ok - co-tenant, lease, timeout, not-ready and lifecycle refusals retry on later ticks and then succeed, silently
+ok - a teardown that goes silent is stopped and retried quietly, and the log names the silence
+ok - the sweep retries a contended task on a later tick and finishes it
+ok - backoff doubles from 60s to a 3600s cap and one wake follows the 24th attempt
+ok - a sweep runs only due records, at most 3 per pass
+ok - a copy refused by a false positive but clean, pushed and unused is removed, preserve-list files copied with checksums first
+ok - a changed tracked file keeps the copy with exactly one wake naming it
+ok - an untracked file keeps the copy with exactly one wake
+ok - an untracked file that status.showUntrackedFiles=no hides from a plain git status still keeps the copy with exactly one wake
+ok - an untracked file in a nested copy that status.showUntrackedFiles=no hides still keeps the copy with exactly one wake
+ok - a changed submodule that diff.ignoreSubmodules=all hides from a plain git status still keeps the copy with exactly one wake
+ok - an unpushed commit keeps the copy with exactly one wake naming it
+ok - a stash entry keeps the copy
+ok - a live process inside keeps the copy with exactly one wake
+ok - an unpushed commit in a NESTED copy keeps the whole slot
+ok - an unpushed commit in a nested clone keeps the whole slot with one wake before a teardown that would return it
+ok - an unpushed commit in a nested linked worktree keeps the whole slot with one wake before a teardown that would close the task
+ok - a job in the task's terminal pane keeps the copy with one wake before a teardown that would end it
+ok - the finished worker's agent in its pane does not keep the copy: teardown runs
+ok - a clean pushed orphan nested copy goes with its slot, its preserve-list records preserved
+ok - a clean pushed nested clone that the project's .gitignore does not cover, and a clone inside it, go with the slot: the clones are not untracked files of the copy that holds them, and their own proofs ran
+ok - a clean linked worktree of the project nested in the copy, which the project's .gitignore does not cover, is removed before the destroy so treehouse does not refuse the slot as dirty
+ok - an untracked file beside a nested clone still keeps the copy with one wake naming that file
+ok - a nested clone that the project's .gitignore does not cover, with an unpushed commit, keeps the slot with one wake naming the clone
+ok - the prune and bin/fm-teardown-nested-lib.sh agree on whether each ignored entry blocks removal
+ok - the one named difference from teardown: a wholly ignored .tac/ holding .venv and node_modules passes the prune and blocks teardown, and state.json beside them still blocks both
+ok - a merged copy holding only graft output is removed without a keep wake
+ok - custom .ignore content, including appended lines and newlines, keeps its existing reason
+ok - older sessions, null sync times, cache-only, stale cards, implements edges and project caches under graft/ are scratch
+ok - a .git below graft/ keeps the copy
+ok - graft/ content git tracks gets no scratch exemption
+ok - a unique ignored file outside the preserve list and the scratch patterns keeps the copy
+ok - a copy outside the pool is never destroyed
+ok - a plain git tree at <root>/a/b/c is not a pool copy: it is kept with one wake and nothing is stopped or destroyed
+ok - a worker steered between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off
+ok - a worker that turns busy between the first verdict and the project lock is not stopped, signalled or destroyed, and the attempt backs off
+ok - a failing git ls-files for ignored files keeps the copy and is never read as no ignored files
+ok - a failing git ls-files for tracked files keeps the copy and is never read as no submodules
+ok - a failing git stash list keeps the copy and retries later and is never read as no stash
+ok - a subtree the nested-copy search cannot read keeps the copy and is never read as no nested copy
+ok - a .claude directory that cannot be listed keeps the copy and is never read as empty
+ok - a commit proved landed by the merged PR head does not keep the copy
+ok - a commit that only the merged PR head carries does not keep the copy
+ok - a squash-merged copy is removed although the default branch moved on after the merge
+ok - a system search indexer (Spotlight) reading the copy does not keep it; any other process does
+ok - a refusal about a live pipeline is retained, never overridden
+ok - the ship-deliverable-not-landed refusal is settled by the fallback
+ok - an orphan nested copy refused for a HEAD that is not proved landed, with the registered-copy refusal teardown always prints with it, is not settled: the copy stays with one wake
+ok - a nested independent clone that is clean and pushed on main but has an unpushed commit on a side branch keeps the copy with one wake
+ok - a nested independent clone with a stash made on a side branch keeps the copy with one wake
+ok - a nested independent clone with an unpushed side branch and a stash made on it keeps the copy with one wake
+ok - a closeout driver's exact-tree refusal for an own nested copy is settled by the fallback
+ok - a leaked worktree process refusal keeps the copy with one wake and no fallback
+ok - a leaked task tmp process refusal keeps the copy with one wake and no fallback
+ok - a launch agent that is still loaded after launchctl bootout keeps the copy with one wake and no fallback
+ok - a process whose ownership is not proven keeps the copy with one wake and no fallback
+ok - an unknown new refusal text keeps the copy with one wake and no fallback
+ok - a landing refusal printed together with a non-landing refusal keeps the copy
+ok - a copy with a pushed follow-up commit that the merged PR does not carry stays with one wake before the pane shell is ended, nothing stopped and nothing destroyed
+ok - in a linked worktree slot, another task's local-only commit and stash do not keep the copy
+ok - in a linked worktree slot, the copy's own unpushed commit keeps it
+ok - in a linked worktree slot, a stash made on the copy's branch keeps it
+ok - a detached linked worktree slot keeps the copy while any stash exists
+ok - a GitHub Enterprise PR keeps the copy with one wake and no fallback
+ok - a Forgejo PR keeps the copy with one wake and no fallback
+ok - a destroy the tool refuses keeps the copy with one wake
+ok - a retained copy is reaped on the quiet retry once its cause clears
+ok - a retained reason longer than the saved 300 characters is logged and woken once, not at every retry
+ok - the idle shell the task's tmux pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open
+ok - the idle shell the task's herdr pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open
+ok - a build, editor or test started in the pane keeps the copy with exactly one wake
+ok - an agent still running in the pane after the exit verb keeps the copy with one wake and is never signalled
+ok - a pane shell with a child process keeps the copy with exactly one wake
+ok - an idle shell that is not the task's pane shell keeps the copy with exactly one wake
+ok - a pane shell with a file of the copy open but its working directory elsewhere keeps the copy and is left alone
+ok - a shell that is the pane's own shell keeps the copy with one wake and is left alone, so the pane stays open
+ok - a remote that never answers is never waited on while the project lock is held, and the attempt still finishes
+ok - a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced
+ok - an exit verb that does not confirm the agent stopped leaves the pane shell alone and keeps the copy
+ok - a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done
+ok - a worker with no busy record whose pane reads busy is not reapable by the prune, even with state/<id>.control-exit left from an earlier stop
+ok - a worker whose busy record is gone and whose old state/<id>.control-exit is still present is not closed while its agent is alive in the pane: the prune backs off and the copy stays
+ok - a pane that cannot be read exempts no shell
+ok - a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed
+ok - an independent clone under .venv or node_modules with a commit on no remote keeps the whole slot with one wake
+ok - ignored data under .claude or .opencode that is not a hook file, a nested clone or on the preserve list keeps the copy with one wake
+ok - a process probe that exits with an error, or prints a message, keeps the copy and retries; a silent exit 1 with nothing open does not
+ok - a process probe that lists a process and then fails keeps the copy and retries
+ok - a process table that is only partly read (ps fails after printing rows) never shows the agent gone, in the reap admission and in the check before teardown
+ok - a slot claim that names this task id under another home, or no home, is never destroyed
+ok - a wake that could not be appended is not recorded as sent, and the repaired queue gets exactly one
+ok - a project lock held by another actor stops nothing, backs off silently, and the retry finishes
+ok - removing the copy teardown returned takes the project lock; a busy lock is a silent retry from the prune record alone, then the copy is removed with no wake
+ok - a slot teardown kept leased, for another task's record or held for foreign copies, is never removed and raises no wake
+ok - a copy that is not a pool slot is left after teardown, with no wake and no record
+ok - the retry reads the lease again and leaves a returned slot that a new launch leased
+ok - a lease read that fails after teardown keeps the copy and record, retries quietly, wakes once when retries run out, and a readable retry removes the copy
+ok - a returned copy with a unique ignored file is kept with one wake
+ok - a returned copy's preserve-list records are copied with checksums before it is removed
+ok - an empty preserve-list path, in the copy or a nested copy, has nothing to checksum and does not keep the copy
+ok - end to end: a verified merge arms the prune, the detached run reaps the copy through the real teardown, the copy is gone, and the log says reaped with no wake
+ok - end to end: a co-tenant's lifecycle lock makes the real teardown refuse, the prune retries later without a wake, and then reaps
+ok - end to end: a silent daemon makes the real teardown exit 75 as unknown, the prune retries without a wake, and then reaps
+ok - end to end: a teardown waiting quietly on a slow daemon prints progress, is not cut, and reaps the copy
+ok - end to end: a refused removal of the returned copy keeps the copy and the prune record with one wake, and the retry removes it and logs reaped with no further wake
+ok - end to end: a worker stopped with the exit verb before its PR merged, whose pane holds only its treehouse get and idle shell, is pruned through the real teardown with no human step
+ok - end to end: a squash-merged copy with ignored files that teardown refuses is removed by the fallback, preserved records first, and teardown then closes the task
+ok - end to end: a copy with a pushed follow-up commit that is not merged stays before anything is stopped, forces nothing and raises exactly one wake
+ok - end to end: a changed file, an unpushed commit and an unpushed NESTED commit each keep the copy, force nothing, and raise exactly one wake
+ok - mutation proof (unsafe direction): breaking any safety proof makes its keep case fail
+ok - mutation proof (over-strict direction): tightening any permission makes its removal case fail
+FM_TEST_END 2026-10-30T09:56:27Z tests/fm-merge-prune.test.sh exit=0 duration_ms=984155 gate_skip=false
+FM_TEST_SUMMARY total=8 failed=0 skipped_gate=0 duration_ms=2421468
+FM_TEST_SUMMARY_FAMILY family=pr-forge count=1 duration_ms=100233 failed=0
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=434692 failed=0
+FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=118986 failed=0
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=984155 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=3 duration_ms=1479841 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-merge-prune.test.sh duration_ms=984155
+FM_TEST_SLOWEST rank=2 script=tests/fm-watch-triage.test.sh duration_ms=781676
+FM_TEST_SLOWEST rank=3 script=tests/fm-watch-triage-waits.test.sh duration_ms=546446
+FM_TEST_SLOWEST rank=4 script=tests/fm-crew-state.test.sh duration_ms=398701
+FM_TEST_SLOWEST rank=5 script=tests/fm-inactive-reconcile.test.sh duration_ms=151719
+FM_TEST_SLOWEST rank=6 script=tests/fm-startup-network.test.sh duration_ms=118986
+FM_TEST_SLOWEST rank=7 script=tests/fm-pr-ready-reconcile.test.sh duration_ms=100233
+FM_TEST_SLOWEST rank=8 script=tests/fm-dod-lib.test.sh duration_ms=35991
+exit=0

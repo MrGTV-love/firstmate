@@ -1,0 +1,20 @@
+export FM_HOME=/Users/charlesabrooker/tmp/fm-lab.2tHGca
+export TMUX_TMPDIR=/tmp/fml.EhKaOh
+fm-lab-home: teardown: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-lab-home.sh teardown /Users/charlesabrooker/tmp/fm-lab.2tHGca && rm -rf /Users/charlesabrooker/tmp/fm-lab.2tHGca
+lab home: /Users/charlesabrooker/tmp/fm-lab.2tHGca
+no-mistakes resolves to: /Users/charlesabrooker/tmp/fm-lab.2tHGca/fakebin/no-mistakes
+harness idle record written (gen g1793352046.4542.24164)
+lab tmux: fm:fm-demo-ship
+=== change: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M660KSJ1TSWQBKVSCT0ETPW9/bin/fm-crew-state.sh demo-ship (daemon silent; FM_DOD_NM_STALL_SECS=3, FM_CREW_STATE_NM_TIMEOUT=3)
+stdout: state: unknown · source: status-log · the no-mistakes run for this copy did not answer (no output or CPU progress), so its verification-plan evidence is unknown, not a verdict; read it again · run-store: skipped (no output or CPU progress)
+stderr (last 3): 
+exit=0 elapsed=5s
+=== base: /Users/charlesabrooker/tmp/fm-lab.2tHGca/base/bin/fm-crew-state.sh demo-ship (daemon silent; FM_DOD_NM_STALL_SECS=3, FM_CREW_STATE_NM_TIMEOUT=3)
+stdout: state: blocked · source: status-log · the no-mistakes run for this copy could not be read, so its verification-plan evidence is unavailable · run-store: skipped (no output or CPU progress)
+stderr (last 3): 
+exit=0 elapsed=4s
+##### daemon calls
+1793352047 axi status
+1793352051 axi status
+leftover fake daemons: 0
+lab removed: yes
