@@ -46,6 +46,10 @@ SH
   cat > "$fake/no-mistakes" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-} ${2:-}" = "axi status" ] || exit 2
+if [ -n "${FM_FAKE_NM_HANG:-}" ]; then
+  printf '%s\n' "$PWD" >> "$FM_FAKE_NM_HANG"
+  exec sleep 60
+fi
 id=$(basename "$PWD")
 home=$(dirname "$(dirname "$PWD")")
 plan="$home/data/$id/verification-plan.md"
@@ -128,12 +132,12 @@ run_reconcile() { # <home> [--startup]
 
 # The teardown-side entry point: deliver one child's terminal ledger line for a
 # caller holding its meta lock.
-run_report() { # <home> <child>
-  local home=$1 child=$2
+run_report() { # <home> <child> [--force]
+  local home=$1 child=$2 option=${3:-}
   PATH="$WORLD/fakebin:$PATH" FM_ROOT_OVERRIDE="$WORLD/root" FM_HOME="$home" \
     FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" \
-    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child"
+    FM_FORGE_LOG="$WORLD/forge.log" "$RECON" report "$child" ${option:+"$option"}
 }
 
 wake_count() { # <home> <key prefix>
@@ -647,6 +651,65 @@ test_report_subcommand_delivers_and_refuses() {
   pass "report delivers a child's final line, owes nothing twice, and refuses only an unwritable channel"
 }
 
+# A ship done: whose gate read goes silent has an unknown acceptance, which is
+# neither "accepted" nor "nothing owed". Without --force the report keeps it
+# owed, so teardown keeps the child's records and asks for a rerun; the captain's
+# forced teardown delivers it, marked unknown, never in the accepted form.
+test_report_keeps_unknown_done_owed_unless_forced() {
+  local rc key line
+  make_world report-unknown; bind_secondmate local
+  write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
+  rc=0
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child || rc=$?
+  [ "$rc" -ne 0 ] || fail "report treated a done: with an unknown acceptance as owing nothing"
+  [ -s "$WORLD/nm-calls" ] || fail "the gate never asked the no-mistakes daemon"
+  ! grep -q 'child-outcome-child' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "an unknown acceptance was delivered without --force: $(cat "$MAIN/state/mate.status")"
+  [ "$(outcome_count "$MATE" reported)" = 0 ] || fail "an unknown acceptance was recorded as delivered"
+
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=2 run_report "$MATE" child --force \
+    || fail "a forced report did not go on past the unknown acceptance"
+  key=$(reported_outcome_key "$MATE" child 'done') || fail "forced report receipt key missing"
+  line="done [key=$key]: child child done (acceptance unknown: no-mistakes read stalled): PR https://example.test/owner/repo/pull/1 checks green pr=https://example.test/owner/repo/pull/1 mode=no-mistakes yolo=off"
+  sed -E 's/ \[at=[0-9]+\]//' "$MAIN/state/mate.status" | grep -Fxq "$line" \
+    || fail "forced report did not deliver the outcome marked unknown: $(cat "$MAIN/state/mate.status")"
+  ! grep -Fq "child child done: PR" "$MAIN/state/mate.status" \
+    || fail "forced report delivered the unknown outcome as accepted"
+  pass "an unknown done: acceptance stays owed without --force and is delivered marked unknown with it"
+}
+
+# A silent daemon must not hold the secondmate's poll for one stall interval per
+# waiting child: the first silent gate read makes the rest of the scan's reads
+# unknown at once, so only one read waits, and every child's metadata lock is
+# free when the scan ends. Once the daemon answers, the next poll delivers all.
+test_scan_pays_one_stall_interval_for_silent_gate_reads() {
+  local id
+  make_world scan-unknown; bind_secondmate local
+  for id in a b c; do
+    write_child "$MATE" "$id" "done: PR https://example.test/owner/repo/pull/1 checks green"
+  done
+  FM_FAKE_NM_HANG="$WORLD/nm-calls" FM_DOD_NM_STALL_SECS=3 FM_INACTIVE_RECONCILE_BUDGET_SECS=30 \
+    FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" || fail "scan failed over silent gate reads"
+  [ "$(wc -l < "$WORLD/nm-calls" | tr -d ' ')" = 1 ] \
+    || fail "the scan waited on the silent daemon once per child: $(cat "$WORLD/nm-calls")"
+  ! grep -q 'child-outcome-' "$MAIN/state/mate.status" 2>/dev/null \
+    || fail "a done: with an unknown acceptance was delivered by the scan"
+  for id in a b c; do
+    FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      lock=$(fm_meta_lock_path "$FM_STATE_OVERRIDE/$2.meta")
+      fm_lock_try_acquire "$lock" && fm_lock_release "$lock"
+    ' _ "$ROOT" "$id" || fail "child $id's metadata lock was still held after the scan"
+  done
+  FM_INACTIVE_RECONCILE_BUDGET_SECS=30 FM_FAKE_CREW_STATE='unknown' run_reconcile "$MATE" \
+    || fail "scan failed once the daemon answered"
+  for id in a b c; do
+    grep -q "child-outcome-$id-done" "$MAIN/state/mate.status" \
+      || fail "child $id's done: was not delivered once the daemon answered: $(cat "$MAIN/state/mate.status")"
+  done
+  pass "silent gate reads cost a scan one stall interval and hold no child lock past it"
+}
+
 # Teardown calls report while holding the child's metadata lock. A concurrent
 # scan may hold the scan lock while waiting for that metadata lock, so report
 # must not wait for the scan lock in the opposite order.
@@ -1077,6 +1140,8 @@ test_long_terminal_lines_have_distinct_receipts
 test_secondmate_partial_ledger_line_waits_for_newline
 test_secondmate_remote_route_ledger_delivery
 test_report_subcommand_delivers_and_refuses
+test_report_keeps_unknown_done_owed_unless_forced
+test_scan_pays_one_stall_interval_for_silent_gate_reads
 test_pending_ledger_done_is_delivered_after_worktree_removal
 test_report_avoids_scan_meta_lock_inversion
 test_local_secondmate_rejects_relative_parent_home

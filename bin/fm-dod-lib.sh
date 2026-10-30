@@ -1473,7 +1473,8 @@ fm_dod_nm_expected_plan() {  # <state> <task-id>
 # process-tree CPU progress for FM_DOD_NM_STALL_SECS, default the repo-wide quiet
 # interval), never by a wall clock. Returns 0 with the status on stdout; 2 when
 # the read went silent, which is unknown rather than a failed run (the caller
-# says so and the read is tried again later); 1 when the status is unreadable.
+# says so, sets FM_NM_READ_STALLED so later reads in its process are unknown at
+# once, and the read is tried again later); 1 when the status is unreadable.
 fm_dod_nm_status_out() {  # <worktree>
   local wt=$1 out rc=0 stall=${FM_DOD_NM_STALL_SECS:-}
   case "$stall" in ''|*[!0-9]*|0*) stall=$(fm_progress_quiet_secs) ;; esac
@@ -1505,6 +1506,7 @@ fm_dod_nm_evidence_required() {  # <worktree> <state> <task-id> [meta]
   rc=0
   out=$(fm_dod_nm_status_out "$wt") || rc=$?
   if [ "$rc" -eq 2 ]; then
+    FM_NM_READ_STALLED=1
     fm_dod_nm_unanswered "its verification-plan evidence"
     return 2
   elif [ "$rc" -ne 0 ]; then
@@ -1534,6 +1536,7 @@ fm_dod_nm_custody_returned() {  # <worktree>
   local wt=$1 out outcome code pipeline_head head_tree pipeline_tree rc=0
   out=$(fm_dod_nm_status_out "$wt") || rc=$?
   if [ "$rc" -eq 2 ]; then
+    FM_NM_READ_STALLED=1
     fm_dod_nm_unanswered "whether its fixes are recovered"
     return 2
   elif [ "$rc" -ne 0 ]; then

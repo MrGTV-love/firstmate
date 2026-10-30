@@ -3,7 +3,7 @@
 #
 # Usage:
 #   fm-inactive-reconcile.sh scan [--startup]
-#   fm-inactive-reconcile.sh report <task-id>
+#   fm-inactive-reconcile.sh report <task-id> [--force]
 #   fm-inactive-reconcile.sh acknowledge <fingerprint>
 #
 # This is an adjunct to the existing watcher poll loop and session-start path,
@@ -32,6 +32,13 @@
 # does before it removes the child's record; it exits 0 when the line is
 # delivered or nothing is owed, and non-zero when the parent channel could not
 # be written, so teardown refuses instead of discarding an undelivered outcome.
+# A ship `done:` whose gate read went silent is unknown, never owed nothing: the
+# scan leaves it for the next poll and `report` exits non-zero so teardown keeps
+# the records, except that `report --force` (the captain's forced teardown)
+# delivers it marked `(acceptance unknown: no-mistakes read stalled)`, never as
+# accepted. Inside a scan each gate read is stopped after FM_DOD_NM_STALL_SECS
+# of silence (120 when unset), and the first silent read makes every later read
+# in that scan unknown at once, so a silent daemon costs one poll one interval.
 # The cadence-gated scan below then evaluates at most once per
 # FM_INACTIVE_RECONCILE_SECS (default 900, valid 60..1800) per home, except
 # that --startup performs the same scan immediately in the locked session
@@ -413,9 +420,11 @@ claim_inactive_report_for_ledger() { # <task> <incarnation> <state> <ledger-fing
 # The ledger-first parent delivery for one direct child, for a caller holding
 # the child's meta lock. Returns 0 when the line is delivered, already
 # delivered, or nothing is owed, and 1 when it is owed but the parent channel
-# could not be written (the notice is queued once per record).
-report_child_ledger_locked() { # <id> <meta>
-  local id=$1 meta=$2 status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
+# could not be written (the notice is queued once per record) or its acceptance
+# is unknown without --force.
+report_child_ledger_locked() { # <id> <meta> [--force]
+  local id=$1 meta=$2 force=${3:-} status last previous state note pr mode yolo data incarnation fingerprint predecessor_head outcome_key line
+  local gate_rc=0 acceptance=''
   status="$STATE/$id.status"
   last=$(child_terminal_ledger_line "$status") || return 0
   state=$(status_line_verb "$last")
@@ -423,11 +432,17 @@ report_child_ledger_locked() { # <id> <meta>
   incarnation=$(meta_incarnation "$meta")
   fingerprint=$(sha256_text "$incarnation|$id|$state|ledger|$last")
   if [ "$state" = "done" ] && [ ! -f "$(record_path "$fingerprint" reported)" ] \
-    && [ ! -f "$(record_path "$fingerprint" pending)" ] \
-    && ! fm_dod_accept_ship_done "$(meta_field "$meta" kind)" "$(meta_field "$meta" mode)" \
+    && [ ! -f "$(record_path "$fingerprint" pending)" ]; then
+    fm_dod_accept_ship_done "$(meta_field "$meta" kind)" "$(meta_field "$meta" mode)" \
       "$(meta_field "$meta" worktree)" "$(meta_field "$meta" project)" "$last" \
-      "$STATE" "$id" "$meta" >/dev/null; then
-    return 0
+      "$STATE" "$id" "$meta" >/dev/null || gate_rc=$?
+    case "$gate_rc" in
+      0) ;;
+      2)
+        [ "$force" = --force ] || return 1
+        acceptance=' (acceptance unknown: no-mistakes read stalled)' ;;
+      *) return 0 ;;
+    esac
   fi
   outcome_key="child-outcome-$id-$state-${fingerprint:0:8}"
   ensure_record "$fingerprint" "$id" "$incarnation" "$state" "$outcome_key" direct upstream "$pr" || return 1
@@ -447,7 +462,7 @@ report_child_ledger_locked() { # <id> <meta>
   mode=$(clean_field "$(meta_field "$meta" mode)")
   yolo=$(clean_field "$(meta_field "$meta" yolo)")
   data="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
-  line="$state [key=$outcome_key]: child $id $state: $note"
+  line="$state [key=$outcome_key]: child $id $state$acceptance: $note"
   [ -z "$pr" ] || line="$line pr=$pr"
   [ -z "$mode" ] || line="$line mode=$mode"
   [ -z "$yolo" ] || line="$line yolo=$yolo"
@@ -487,15 +502,15 @@ ledger_pass() {
 }
 
 # The `report <task-id>` entry point: the caller holds the child's meta lock.
-report_child() { # <id>
-  local id=$1 meta rc=0
+report_child() { # <id> [--force]
+  local id=$1 force=${2:-} meta rc=0
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   home_secondmate_id >/dev/null || { rc=$?; [ "$rc" -eq 1 ] && return 0; return 1; }
   meta="$STATE/$id.meta"
   [ -f "$meta" ] && [ ! -L "$meta" ] || return 0
   [ "$(meta_field "$meta" kind)" != secondmate ] || return 0
-  report_child_ledger_locked "$id" "$meta"
+  report_child_ledger_locked "$id" "$meta" "$force"
 }
 
 reconcile_direct_child_locked() { # <id> <meta> <secondmate-id-or-empty> <timeout>
@@ -604,6 +619,7 @@ scan_pass() { # <cursor> <after|through> <deadline> <secondmate-id-or-empty>
 
 scan() {
   local startup=${1:-0} self='' cursor deadline rc=0 marker_rc=0
+  : "${FM_DOD_NM_STALL_SECS:=120}"
   mkdir -p "$STATE" "$OUTCOME_DIR" || return 1
   [ ! -L "$OUTCOME_DIR" ] || return 1
   if self=$(home_secondmate_id); then
@@ -684,11 +700,11 @@ case "$mode" in
     scan "$2"
     ;;
   report)
-    if [ "$#" -ne 2 ] || ! valid_id "$2"; then
-      printf 'usage: fm-inactive-reconcile.sh report <task-id>\n' >&2
+    if [ "$#" -lt 2 ] || [ "$#" -gt 3 ] || ! valid_id "$2" || { [ "$#" -eq 3 ] && [ "$3" != --force ]; }; then
+      printf 'usage: fm-inactive-reconcile.sh report <task-id> [--force]\n' >&2
       exit 2
     fi
-    report_child "$2"
+    report_child "$2" "${3:-}"
     ;;
   acknowledge)
     [ "$#" -eq 2 ] || { printf 'usage: fm-inactive-reconcile.sh acknowledge <fingerprint>\n' >&2; exit 2; }
