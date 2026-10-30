@@ -1167,6 +1167,34 @@ SH
   pass "host: dialog a turn never completed with its report (a park boundary, a stopped turn, no report) reaches the next turn"
 }
 
+# The host asks fm_pid_alive about processes it is stopping, and on Linux that
+# reads /proc/<pid>/stat after finding it readable. A process that exits between
+# the two leaves a stat file that cannot be opened or read; on bash 5 the state
+# variable then stays unset and, under the host's set -u, the host died with
+# exit 1 instead of handing the wake back. This case makes that state permanent
+# with a stat that passes the readability test and fails the read, once as a
+# directory (the read errors) and once as a socket (the open errors).
+test_liveness_probe_survives_a_process_that_exits_while_it_is_read() {
+  local root pid kind out
+  root="$TMP_ROOT/proc-exits-mid-read"
+  sleep 300 &
+  pid=$!
+  for kind in directory socket; do
+    mkdir -p "$root/$kind/$pid"
+    case "$kind" in
+      directory) mkdir "$root/$kind/$pid/stat" ;;
+      socket) perl -MIO::Socket::UNIX -e 'chdir $ARGV[0] or die "$!"; IO::Socket::UNIX->new(Local => "stat", Listen => 1) or die "$!"' \
+        "$root/$kind/$pid" || fail "fixture: could not create a socket stat file" ;;
+    esac
+    [ -r "$root/$kind/$pid/stat" ] || fail "fixture: the $kind stat file does not pass the readability test"
+    out=$(FM_PROC_ROOT_OVERRIDE="$root/$kind" bash -c 'set -u; . "$1"; fm_pid_alive "$2"; printf "%s\n" "$?"' _ "$ROOT/bin/fm-wake-lib.sh" "$pid" 2>&1)
+    [ "$out" = 0 ] || { kill "$pid" 2>/dev/null; fail "a live process whose stat cannot be read ($kind) must still answer alive, without an error: got: $out"; }
+  done
+  kill "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+  pass "host: a liveness probe whose process exits while its stat is read answers from kill -0 and never aborts the caller"
+}
+
 # The attended engine never judges without the captain's words: a mirror that
 # is missing, cannot be read, or holds an entry that does not parse hands the
 # wake to main before any engine turn and leaves the mirror cursor where it was.
@@ -2233,6 +2261,7 @@ run_host_case test_primary_without_a_verified_mirror_runs_away_only
 run_host_case test_attended_wake_carries_the_dialog_mirror
 run_host_case test_dialog_bearing_files_are_owner_only
 run_host_case test_undelivered_dialog_is_fed_again_on_the_next_turn
+run_host_case test_liveness_probe_survives_a_process_that_exits_while_it_is_read
 run_host_case test_attended_wake_with_an_unreadable_mirror_reaches_main
 run_host_case test_away_wake_is_handled_on_the_engine_and_never_reaches_main
 run_host_case test_away_turn_without_a_report_hands_the_wake_to_main
