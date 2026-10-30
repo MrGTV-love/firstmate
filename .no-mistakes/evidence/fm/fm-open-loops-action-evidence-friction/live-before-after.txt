@@ -1,0 +1,48 @@
+Live open-work ledger drive: real bin/fm-open-loops.sh + bin/fm-wake-drain.sh in disposable lab homes (bin/fm-lab-home.sh env),
+real tmux on the lab's private socket, real fm-crew-state.sh, real no-mistakes (NM_HOME in the lab), GitHub REST answered by a local double.
+head = dcb08350f (this change); base = 28bb500b2 (before). Each check is one observable result.
+
+green PR next_action does not ask for merge approval|head=PASS|base=FAIL
+green PR next_action points at AGENTS.md section 7|head=PASS|base=FAIL
+drain prints the green PR next_action without approval|head=PASS|base=FAIL
+first steer accepted|head=PASS|base=PASS
+first turn acknowledges|head=PASS|base=PASS
+the unchanged red row is re-presented (needs an action again)|head=PASS|base=PASS
+same steer accepted on re-presentation of the unchanged row (no new message)|head=PASS|base=FAIL
+re-presentation turn acknowledges|head=PASS|base=FAIL
+old steer refused after the row evidence changed|head=PASS|base=PASS
+red PR row waits on live task repair-owner by reason|head=PASS|base=FAIL
+turn acknowledges under the wait|head=PASS|base=FAIL
+next drain demands no action for the waiting red row|head=PASS|base=FAIL
+unchanged wait stands across the next presentation|head=PASS|base=FAIL
+--check-actions passes while prerequisite is live|head=PASS|base=FAIL
+row stays visible in --report while waiting|head=PASS|base=PASS
+wait on an absent task refused|head=PASS|base=PASS
+wait ends when prerequisite fails|head=PASS|base=PASS
+new wait on a failed prerequisite refused|head=PASS|base=PASS
+wait re-recorded once prerequisite is working again|head=PASS|base=FAIL
+wait ends when prerequisite session is gone|head=PASS|base=PASS
+new wait on a gone prerequisite refused|head=PASS|base=PASS
+wait re-recorded once prerequisite session is back|head=PASS|base=FAIL
+wait stands before the stall|head=PASS|base=FAIL
+wait stands while the stall row is under its limit|head=PASS|base=FAIL
+wait ends once the stall row crosses its limit (20s later, no recollection)|head=PASS|base=PASS
+new wait on a stalled prerequisite refused|head=PASS|base=PASS
+done prerequisite with unmerged PR 290 carries the wait|head=PASS|base=FAIL
+--check-actions passes before merge|head=PASS|base=FAIL
+wait ends when prerequisite PR merges|head=PASS|base=PASS
+new wait after the prerequisite merged refused|head=PASS|base=PASS
+drain re-presents the red row after the merge|head=PASS|base=PASS
+first deferral accepted|head=PASS|base=PASS
+turn acknowledges|head=PASS|base=PASS
+second deferral refused|head=PASS|base=PASS
+printed captain_visible agrees with the refusal (true)|head=PASS|base=FAIL
+stored row captain_visible true|head=PASS|base=PASS
+refusal offers the truthful wait verb for a red_check row|head=PASS|base=FAIL
+after the refusal, a wait on the live task answers the row|head=PASS|base=FAIL
+drain presents the remote secondmate row|head=PASS|base=PASS
+undelivered pending-reply id refused|head=PASS|base=PASS
+delivered reply for another task refused|head=PASS|base=PASS
+delivered pending-reply id accepted as steered evidence|head=PASS|base=FAIL
+stored evidence is the correlation id|head=PASS|base=FAIL
+turn acknowledges after the remote steer|head=PASS|base=FAIL

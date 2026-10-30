@@ -1,0 +1,377 @@
+
+===== [base] scenario merge-text: code=/tmp/fm-livedrive.RRnk1T/base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.tMgOtI =====
+# collected rows: [["coverage", "ledger degraded", "firstmate", true, "restore the unreadable sources and rerun the reconciler"], ["open_pr", "https://github.com/test/project/pull/284", "firstmate", true, "route the green PR's review and obtain merge approval"], ["red_check", "https://github.com/test/project/pull/283", "worker:parked-job", true, "diagnose: code or test"], ["silent_report", "green-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "parked-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "repair-owner", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"]]
+# red row caedba32616c9906619756f8: evidence='Behavior portable serial 17' source.kind=None
+# green PR row next_action: "route the green PR's review and obtain merge approval"
+CHECK [base] green PR next_action does not ask for merge approval: FAIL "route the green PR's review and obtain merge approval"
+CHECK [base] green PR next_action points at AGENTS.md section 7: FAIL 
+$ bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "19b6080e2b2df7a4222ecf72","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "16492551d982d1608babd9f2","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "caedba32616c9906619756f8","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332502	1	check	report	check: green pr
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 6296.1793332502.GweLB3
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-livedrive.RRnk1T/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+CHECK [base] drain prints the green PR next_action without approval: FAIL 
+# [base] merge-text summary: green PR next_action does not ask for merge approval=FAIL, green PR next_action points at AGENTS.md section 7=FAIL, drain prints the green PR next_action without approval=FAIL
+
+===== [base] scenario steer-represent: code=/tmp/fm-livedrive.RRnk1T/base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.PsSAYS =====
+# collected rows: [["coverage", "ledger degraded", "firstmate", true, "restore the unreadable sources and rerun the reconciler"], ["open_pr", "https://github.com/test/project/pull/284", "firstmate", true, "route the green PR's review and obtain merge approval"], ["red_check", "https://github.com/test/project/pull/283", "worker:parked-job", true, "diagnose: code or test"], ["silent_report", "green-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "parked-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "repair-owner", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"]]
+# red row c865aa02693737dd8389af33: evidence='Behavior portable serial 17' source.kind=None
+$ bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "855e8a29dd8bbc1048bea7d0","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous; worker current state repair-",false
+    "d61d39a4f6435fc82ba94d93","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "c865aa02693737dd8389af33","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332531	1	check	report	check: red check
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 86930.1793332531.fUjO4n
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-livedrive.RRnk1T/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+# steer delivered to parked-job: 001.msg
+$ bin/fm-open-loops.sh action c865aa02693737dd8389af33 steered --evidence 001.msg
+  action: "c865aa02693737dd8389af33"
+  kind: steered
+  -> exit 0
+CHECK [base] first steer accepted: PASS 
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 86930.1793332531.fUjO4n
+  -> exit 0
+CHECK [base] first turn acknowledges: PASS 
+$ FM_OPEN_LOOPS_NOW=now+300 bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "855e8a29dd8bbc1048bea7d0","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "c865aa02693737dd8389af33","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",2100,"Behavior portable serial 17",false
+  STANDING (a receipt stands; no action needed):
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d61d39a4f6435fc82ba94d93","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259500,"",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332538	2	check	report	check: again
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 8003.1793332538.orAjKf
+  WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+CHECK [base] the unchanged red row is re-presented (needs an action again): PASS 
+$ FM_OPEN_LOOPS_NOW=now+300 bin/fm-open-loops.sh action c865aa02693737dd8389af33 steered --evidence 001.msg
+  error: "steered evidence must be a new delivery sent after this row's presentation"
+  -> exit 1
+CHECK [base] same steer accepted on re-presentation of the unchanged row (no new message): FAIL error: "steered evidence must be a new delivery sent after this row's presentation"
+CHECK [base] re-presentation turn acknowledges: FAIL 
+$ FM_OPEN_LOOPS_NOW=now+600 bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "c865aa02693737dd8389af33","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",2400,"Behavior portable serial 17; and a new failing check",false
+  STANDING (a receipt stands; no action needed):
+  rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "855e8a29dd8bbc1048bea7d0","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "d61d39a4f6435fc82ba94d93","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259800,"",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332550	3	check	report	check: changed
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 8003.1793332538.orAjKf
+  WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+$ FM_OPEN_LOOPS_NOW=now+600 bin/fm-open-loops.sh action c865aa02693737dd8389af33 steered --evidence 001.msg
+  error: "steered evidence must be a new delivery sent after this row's presentation"
+  -> exit 1
+CHECK [base] old steer refused after the row evidence changed: PASS error: "steered evidence must be a new delivery sent after this row's presentation"
+# [base] steer-represent summary: first steer accepted=PASS, first turn acknowledges=PASS, the unchanged red row is re-presented (needs an action again)=PASS, same steer accepted on re-presentation of the unchanged row (no new message)=FAIL, re-presentation turn acknowledges=FAIL, old steer refused after the row evidence changed=PASS
+
+===== [base] scenario task-wait: code=/tmp/fm-livedrive.RRnk1T/base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.3HywBo =====
+# collected rows: [["coverage", "ledger degraded", "firstmate", true, "restore the unreadable sources and rerun the reconciler"], ["open_pr", "https://github.com/test/project/pull/284", "firstmate", true, "route the green PR's review and obtain merge approval"], ["red_check", "https://github.com/test/project/pull/283", "worker:parked-job", true, "diagnose: code or test"], ["silent_report", "green-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "parked-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "repair-owner", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"]]
+# red row 1759453b61a1517354302cbf: evidence='Behavior portable serial 17' source.kind=None
+$ bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d5667181679dec3828535115","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "2f7a2e1cad3d561bbb58d2cc","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332602	1	check	report	check: red check
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3582.1793332602.OIkkzx
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-livedrive.RRnk1T/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T09:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] red PR row waits on live task repair-owner by reason: FAIL error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 3582.1793332602.OIkkzx
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] turn acknowledges under the wait: FAIL 
+$ FM_OPEN_LOOPS_NOW=now+120 bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1920,"Behavior portable serial 17",false
+  STANDING (a receipt stands; no action needed):
+  rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d5667181679dec3828535115","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "2f7a2e1cad3d561bbb58d2cc","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259320,"",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332604	2	check	report	check: again
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 3582.1793332602.OIkkzx
+  WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+CHECK [base] next drain demands no action for the waiting red row: FAIL 
+$ FM_OPEN_LOOPS_NOW=now+120 bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 3582.1793332602.OIkkzx
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1920,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] unchanged wait stands across the next presentation: FAIL 
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] --check-actions passes while prerequisite is live: FAIL 
+$ bin/fm-open-loops.sh --report
+  generated_epoch: 1793332598
+  complete: false
+  OVERDUE:
+  rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d5667181679dec3828535115","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "2f7a2e1cad3d561bbb58d2cc","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 0
+CHECK [base] row stays visible in --report while waiting: PASS 
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task no-such-task --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T04:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] wait on an absent task refused: PASS error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait ends when prerequisite fails: PASS 
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T04:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] new wait on a failed prerequisite refused: PASS error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T09:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] wait re-recorded once prerequisite is working again: FAIL error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait ends when prerequisite session is gone: PASS 
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T04:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] new wait on a gone prerequisite refused: PASS error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T09:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] wait re-recorded once prerequisite session is back: FAIL error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait stands before the stall: FAIL 
+# published a stalled_worker row for repair-owner at 3590s (limit 3600s), not yet overdue
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait stands while the stall row is under its limit: FAIL 
+$ FM_OPEN_LOOPS_NOW=now+20 bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1820,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait ends once the stall row crosses its limit (20s later, no recollection): PASS 
+$ FM_OPEN_LOOPS_NOW=now+20 bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T04:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] new wait on a stalled prerequisite refused: PASS error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T09:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] done prerequisite with unmerged PR 290 carries the wait: FAIL error: "this obligation cannot have a standing dependency wait"
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] --check-actions passes before merge: FAIL 
+$ bash -c . "$1"; fm_pr_poll_merge_mark_notified "$2" repair-owner github github.com test/project 290 _ bin/fm-pr-lib.sh /Users/charlesabrooker/tmp/fm-lab.3HywBo/state
+  -> exit 0
+$ bin/fm-open-loops.sh --check-actions
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  -> exit 1
+CHECK [base] wait ends when prerequisite PR merges: PASS 
+$ bin/fm-open-loops.sh action 1759453b61a1517354302cbf waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T04:56:38Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] new wait after the prerequisite merged refused: PASS error: "this obligation cannot have a standing dependency wait"
+$ FM_OPEN_LOOPS_NOW=now+60 bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1759453b61a1517354302cbf","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1860,"Behavior portable serial 17",false
+  STANDING (a receipt stands; no action needed):
+  rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "d5667181679dec3828535115","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing)",false
+    "2f7a2e1cad3d561bbb58d2cc","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259260,"",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332630	3	check	report	check: after merge
+  STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+  repair-owner done [at=1793332598]: PR 290 opened; awaiting review
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 3582.1793332602.OIkkzx
+  WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+CHECK [base] drain re-presents the red row after the merge: PASS 
+# [base] task-wait summary: red PR row waits on live task repair-owner by reason=FAIL, turn acknowledges under the wait=FAIL, next drain demands no action for the waiting red row=FAIL, unchanged wait stands across the next presentation=FAIL, --check-actions passes while prerequisite is live=FAIL, row stays visible in --report while waiting=PASS, wait on an absent task refused=PASS, wait ends when prerequisite fails=PASS, new wait on a failed prerequisite refused=PASS, wait re-recorded once prerequisite is working again=FAIL, wait ends when prerequisite session is gone=PASS, new wait on a gone prerequisite refused=PASS, wait re-recorded once prerequisite session is back=FAIL, wait stands before the stall=FAIL, wait stands while the stall row is under its limit=FAIL, wait ends once the stall row crosses its limit (20s later, no recollection)=PASS, new wait on a stalled prerequisite refused=PASS, done prerequisite with unmerged PR 290 carries the wait=FAIL, --check-actions passes before merge=FAIL, wait ends when prerequisite PR merges=PASS, new wait after the prerequisite merged refused=PASS, drain re-presents the red row after the merge=PASS
+
+===== [base] scenario visibility: code=/tmp/fm-livedrive.RRnk1T/base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.J6EKO1 =====
+# collected rows: [["coverage", "ledger degraded", "firstmate", true, "restore the unreadable sources and rerun the reconciler"], ["open_pr", "https://github.com/test/project/pull/284", "firstmate", true, "route the green PR's review and obtain merge approval"], ["red_check", "https://github.com/test/project/pull/283", "worker:parked-job", true, "diagnose: code or test"], ["silent_report", "green-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "parked-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "repair-owner", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"]]
+# red row ddafd9284c18ee88e2533440: evidence='Behavior portable serial 17' source.kind=None
+$ bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1f93eb97d0ecd6e30f5063da","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "84e80de14ab9c35fa23a2f8e","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "ddafd9284c18ee88e2533440","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332653	1	check	report	check: red check
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54185.1793332654.8PptNK
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-livedrive.RRnk1T/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+$ bin/fm-open-loops.sh action ddafd9284c18ee88e2533440 deferred --evidence main is red; repair in flight --recheck 2026-10-30T04:07:28Z
+  action: "ddafd9284c18ee88e2533440"
+  kind: deferred
+  -> exit 0
+CHECK [base] first deferral accepted: PASS 
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54185.1793332654.8PptNK
+  -> exit 0
+CHECK [base] turn acknowledges: PASS 
+$ FM_OPEN_LOOPS_NOW=now+700 bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "ddafd9284c18ee88e2533440","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",2500,"Behavior portable serial 17",false
+  STANDING (a receipt stands; no action needed):
+  rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "1f93eb97d0ecd6e30f5063da","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "84e80de14ab9c35fa23a2f8e","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259900,"",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332661	2	check	report	check: lapsed
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 77288.1793332661.1E5Ic8
+  WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+# printed row captain_visible field: 'false'
+$ FM_OPEN_LOOPS_NOW=now+700 bin/fm-open-loops.sh action ddafd9284c18ee88e2533440 deferred --evidence still red --recheck 2026-10-30T04:19:08Z
+  error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+  -> exit 1
+CHECK [base] second deferral refused: PASS 
+CHECK [base] printed captain_visible agrees with the refusal (true): FAIL printed=false
+CHECK [base] stored row captain_visible true: PASS 
+CHECK [base] refusal offers the truthful wait verb for a red_check row: FAIL 
+$ FM_OPEN_LOOPS_NOW=now+700 bin/fm-open-loops.sh action ddafd9284c18ee88e2533440 waiting --prerequisite-task repair-owner --evidence PR is red because main is red; parked until repair-owner merges --recheck 2026-10-30T05:09:08Z
+  error: "this obligation cannot have a standing dependency wait"
+  -> exit 1
+CHECK [base] after the refusal, a wait on the live task answers the row: FAIL error: "this obligation cannot have a standing dependency wait"
+# [base] visibility summary: first deferral accepted=PASS, turn acknowledges=PASS, second deferral refused=PASS, printed captain_visible agrees with the refusal (true)=FAIL, stored row captain_visible true=PASS, refusal offers the truthful wait verb for a red_check row=FAIL, after the refusal, a wait on the live task answers the row=FAIL
+
+===== [base] scenario remote-steer: code=/tmp/fm-livedrive.RRnk1T/base FM_HOME=/Users/charlesabrooker/tmp/fm-lab.C7TYTF =====
+# collected rows: [["coverage", "ledger degraded", "firstmate", true, "restore the unreadable sources and rerun the reconciler"], ["open_pr", "https://github.com/test/project/pull/284", "firstmate", true, "route the green PR's review and obtain merge approval"], ["red_check", "https://github.com/test/project/pull/283", "worker:parked-job", true, "diagnose: code or test"], ["silent_report", "green-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "parked-job", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"], ["silent_report", "repair-owner", "firstmate", false, "check in: progress, blockers, cross-workstream dependencies"]]
+# red row 4f134c12f84a84cdef4b134b: evidence='Behavior portable serial 17' source.kind=None
+# published an overdue silent_report row for remote secondmate mini (remote_host set; its inbox is remote)
+$ bin/fm-wake-drain.sh
+  OVERDUE:
+  rows[4]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "f6180cb140958ef067d69c6f","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker liveness green-job: worker liveness is inconclusive: ambiguous; worker current state green-job: harness state unavailable (unknown missing); worker liveness parked-job: worker liveness is inconclusive: ambiguous; worker current state parked-job: harness state unavailable (unknown missing); worker liveness repair-owner: worker liveness is inconclusive: ambiguous",false
+    "8e25387dca0ad59ec0de2298","firstmate","https://github.com/test/project/pull/284","route the green PR's review and obtain merge approval",259200,"",false
+    "4f134c12f84a84cdef4b134b","worker:parked-job","https://github.com/test/project/pull/283","diagnose: code or test",1800,"Behavior portable serial 17",false
+    "lab-silent-mini","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",1800,"last heard: status=1793330872",false
+  help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>] or: bin/fm-open-loops.sh action --batch <jsonl-file|-> (one action object per line)
+  1793332676	1	check	report	check: silent secondmate
+  WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28878.1793332676.NQOkLe
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ●  WATCHER DOWN - SUPERVISION IS OFF
+  ●  4 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+  ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+  ●  This is a supervision warning only; the guarded operation WILL still run.
+  ●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery: the Stop hook runs /tmp/fm-livedrive.RRnk1T/base/bin/fm-claude-stop-autoarm.sh, which owns continuity and re-arms the watcher at the next turn end, so a second manual cycle is wrong.
+  ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+  -> exit 0
+CHECK [base] drain presents the remote secondmate row: PASS 
+# pending-reply 373132f509879017 for mini delivered=False
+$ bin/fm-open-loops.sh action lab-silent-mini steered --evidence 373132f509879017
+  error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  -> exit 1
+CHECK [base] undelivered pending-reply id refused: PASS error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+# pending-reply 5c9a2ad51ca6d913 for other delivered=True
+$ bin/fm-open-loops.sh action lab-silent-mini steered --evidence 5c9a2ad51ca6d913
+  error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  -> exit 1
+CHECK [base] delivered reply for another task refused: PASS error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+# pending-reply 5671fad72ec604fa for mini delivered=True
+$ bin/fm-open-loops.sh action lab-silent-mini steered --evidence 5671fad72ec604fa
+  error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+  -> exit 1
+CHECK [base] delivered pending-reply id accepted as steered evidence: FAIL error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+CHECK [base] stored evidence is the correlation id: FAIL 
+$ bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28878.1793332676.NQOkLe
+  error: overdue rows have no action recorded since presentation; acknowledgement refused
+  OVERDUE:
+  rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+    "lab-silent-mini","firstmate","mini","check in: progress, blockers, cross-workstream dependencies",1800,"last heard: status=1793330872",false
+  -> exit 1
+CHECK [base] turn acknowledges after the remote steer: FAIL 
+# [base] remote-steer summary: drain presents the remote secondmate row=PASS, undelivered pending-reply id refused=PASS, delivered reply for another task refused=PASS, delivered pending-reply id accepted as steered evidence=FAIL, stored evidence is the correlation id=FAIL, turn acknowledges after the remote steer=FAIL
